@@ -30,7 +30,7 @@ object SkinManager {
         getOrLoadAssembled(username, true)
     }
 
-    private suspend fun getOrLoadAssembled(username: String, backView: Boolean): ImageBitmap? {
+    private fun getOrLoadAssembled(username: String, backView: Boolean): ImageBitmap? {
         val cacheKey = "${username}_${if (backView) "back" else "front"}"
         if (memoryCache.containsKey(cacheKey)) return memoryCache[cacheKey]
 
@@ -55,7 +55,7 @@ object SkinManager {
         }
     }
 
-    // Логика нарезки (Порт из JavaFX PixelWriter в AWT Graphics/SetRGB)
+    // Логика смешной нарезки скинь а
     private fun assemble(skin: BufferedImage, backView: Boolean): BufferedImage? {
         val w = skin.width
         val h = skin.height

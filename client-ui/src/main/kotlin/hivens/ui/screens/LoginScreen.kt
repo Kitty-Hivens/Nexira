@@ -13,10 +13,10 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import hivens.core.data.SessionData
-import hivens.ui.components.CaelestiaButton
+import hivens.ui.components.CelestiaButton
 import hivens.ui.components.GlassCard
 import hivens.ui.di
-import hivens.ui.theme.CaelestiaTheme
+import hivens.ui.theme.CelestiaTheme
 import kotlinx.coroutines.launch
 
 @Composable
@@ -43,10 +43,10 @@ fun LoginScreen(onLoginSuccess: (SessionData) -> Unit) {
                 verticalArrangement = Arrangement.Center
             ) {
                 Text(
-                    text = "Caelestia",
+                    text = "Aura Client",
                     style = MaterialTheme.typography.h4,
                     fontWeight = FontWeight.Bold,
-                    color = CaelestiaTheme.colors.textPrimary
+                    color = CelestiaTheme.colors.textPrimary
                 )
                 Spacer(modifier = Modifier.height(32.dp))
 
@@ -66,12 +66,12 @@ fun LoginScreen(onLoginSuccess: (SessionData) -> Unit) {
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     colors = TextFieldDefaults.outlinedTextFieldColors(
-                        textColor = CaelestiaTheme.colors.textPrimary,
-                        focusedBorderColor = CaelestiaTheme.colors.primary,
-                        unfocusedBorderColor = CaelestiaTheme.colors.border.copy(alpha = 0.5f),
-                        focusedLabelColor = CaelestiaTheme.colors.primary,
-                        unfocusedLabelColor = CaelestiaTheme.colors.textSecondary,
-                        cursorColor = CaelestiaTheme.colors.primary,
+                        textColor = CelestiaTheme.colors.textPrimary,
+                        focusedBorderColor = CelestiaTheme.colors.primary,
+                        unfocusedBorderColor = CelestiaTheme.colors.border.copy(alpha = 0.5f),
+                        focusedLabelColor = CelestiaTheme.colors.primary,
+                        unfocusedLabelColor = CelestiaTheme.colors.textSecondary,
+                        cursorColor = CelestiaTheme.colors.primary,
                         backgroundColor = Color.Transparent
                     )
                 )
@@ -86,12 +86,12 @@ fun LoginScreen(onLoginSuccess: (SessionData) -> Unit) {
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                     shape = RoundedCornerShape(12.dp),
                     colors = TextFieldDefaults.outlinedTextFieldColors(
-                        textColor = CaelestiaTheme.colors.textPrimary,
-                        focusedBorderColor = CaelestiaTheme.colors.primary,
-                        unfocusedBorderColor = CaelestiaTheme.colors.border.copy(alpha = 0.5f),
-                        focusedLabelColor = CaelestiaTheme.colors.primary,
-                        unfocusedLabelColor = CaelestiaTheme.colors.textSecondary,
-                        cursorColor = CaelestiaTheme.colors.primary,
+                        textColor = CelestiaTheme.colors.textPrimary,
+                        focusedBorderColor = CelestiaTheme.colors.primary,
+                        unfocusedBorderColor = CelestiaTheme.colors.border.copy(alpha = 0.5f),
+                        focusedLabelColor = CelestiaTheme.colors.primary,
+                        unfocusedLabelColor = CelestiaTheme.colors.textSecondary,
+                        cursorColor = CelestiaTheme.colors.primary,
                         backgroundColor = Color.Transparent
                     )
                 )
@@ -105,17 +105,17 @@ fun LoginScreen(onLoginSuccess: (SessionData) -> Unit) {
                         checked = rememberMe,
                         onCheckedChange = { rememberMe = it },
                         colors = CheckboxDefaults.colors(
-                            checkedColor = CaelestiaTheme.colors.primary,
-                            uncheckedColor = CaelestiaTheme.colors.border,
+                            checkedColor = CelestiaTheme.colors.primary,
+                            uncheckedColor = CelestiaTheme.colors.border,
                             checkmarkColor = Color.Black
                         )
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Запомнить пароль", color = CaelestiaTheme.colors.textPrimary)
+                    Text("Запомнить пароль", color = CelestiaTheme.colors.textPrimary)
                 }
                 Spacer(modifier = Modifier.height(24.dp))
 
-                CaelestiaButton(
+                CelestiaButton(
                     text = if (isLoading) "Вход..." else "Войти",
                     enabled = !isLoading && login.isNotEmpty() && password.isNotEmpty(),
                     onClick = {
@@ -123,7 +123,7 @@ fun LoginScreen(onLoginSuccess: (SessionData) -> Unit) {
                         errorMessage = null
                         scope.launch {
                             try {
-                                val lastServer = di.profileManager.lastServerId ?: "Industrial"
+                                val lastServer = di.profileManager.lastServerId ?: "Industrial" // Почему не Create?
                                 val session = di.authService.login(login, password, lastServer)
                                 if (rememberMe) {
                                     di.credentialsManager.save(login, password)

@@ -1,7 +1,7 @@
 package hivens.launcher
 
-import hivens.core.api.ILauncherService
-import hivens.core.api.IManifestProcessorService
+import hivens.core.api.interfaces.ILauncherService
+import hivens.core.api.interfaces.IManifestProcessorService
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.FileManifest
 import hivens.core.data.InstanceProfile
@@ -14,17 +14,15 @@ import java.io.File
 import java.io.IOException
 import java.io.InputStream
 import java.io.InputStreamReader
-import java.net.URL
 import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.StandardCopyOption
 import java.util.*
 import java.util.stream.Collectors
 import kotlin.concurrent.thread
 
 enum class LauncherLogType { INFO, WARN, ERROR }
 
-class LauncherService(
+class LauncherService( // TODO: God class. Возможно стоит разделить на части.
     private val manifestProcessor: IManifestProcessorService,
     private val profileManager: ProfileManager,
     private val javaManager: JavaManagerService
@@ -43,7 +41,7 @@ class LauncherService(
 
     private enum class OS { WINDOWS, LINUX, MACOS, UNKNOWN }
 
-    // [NEW] Пайп для чтения логов
+    // Пайп для чтения логов
     private fun pipeOutput(stream: InputStream, type: LauncherLogType, onLog: (String, LauncherLogType) -> Unit) {
         val reader = BufferedReader(InputStreamReader(stream))
         thread(isDaemon = true) {
@@ -67,7 +65,7 @@ class LauncherService(
         }
     }
 
-    // [NEW] Главный метод запуска с логами
+    // Главный метод запуска с логами
     @Throws(IOException::class)
     fun launchClientWithLogs(
         sessionData: SessionData,
@@ -79,7 +77,7 @@ class LauncherService(
     ): Process {
         val profile: InstanceProfile = profileManager.getProfile(serverProfile.assetDir)
 
-        var memory = if (profile.memoryMb != null && profile.memoryMb!! > 0) profile.memoryMb!! else allocatedMemoryMB
+        var memory = if (profile.memoryMb > 0) profile.memoryMb else allocatedMemoryMB
         if (memory < 768) memory = 1024
 
         val javaExec: String = when {
@@ -141,7 +139,7 @@ class LauncherService(
         val pb = ProcessBuilder(jvmArgs)
         pb.directory(clientRootPath.toFile())
 
-        // [ВАЖНО] Перехватываем вывод
+        // Перехватываем вывод
         pb.redirectErrorStream(false)
 
         onLog("LAUNCH COMMAND: ${java.lang.String.join(" ", jvmArgs)}", LauncherLogType.INFO)
@@ -163,8 +161,6 @@ class LauncherService(
     ): Process {
         return launchClientWithLogs(sessionData, serverProfile, clientRootPath, javaExecutablePath, allocatedMemoryMB) { _, _ -> }
     }
-
-    // --- Вспомогательные методы (возвращены на место) ---
 
     private fun buildMinecraftArgs(
         sessionData: SessionData,

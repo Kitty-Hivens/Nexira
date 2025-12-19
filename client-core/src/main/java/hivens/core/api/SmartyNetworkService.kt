@@ -5,6 +5,7 @@ import com.google.gson.JsonSyntaxException
 import hivens.config.ServiceEndpoints
 import hivens.core.api.dto.SmartyResponse
 import hivens.core.api.dto.SmartyServer
+import hivens.core.api.interfaces.IServerListService
 import hivens.core.api.model.ServerProfile
 import okhttp3.*
 import org.slf4j.LoggerFactory
@@ -21,15 +22,11 @@ import java.util.concurrent.TimeUnit
 class SmartyNetworkService(baseClient: OkHttpClient, private val gson: Gson) : IServerListService {
 
     private val logger = LoggerFactory.getLogger(SmartyNetworkService::class.java)
-
-    // Константы из Java-класса
     private val officialJarUrl = "https://www.smartycraft.ru/downloads/smartycraft.jar"
     private val cachedHashFile = File("smarty_hash.cache")
-    
-    // Дефолтный хеш
     private var currentHash = "5515a4bdd5f532faf0db61b8263d1952"
 
-    // Настраиваем клиент с SOCKS прокси (как и в AuthService)
+    // Настраиваем клиент с SOCKS прокси
     private val client: OkHttpClient = baseClient.newBuilder()
         .proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress("proxy.smartycraft.ru", 1080)))
         .proxyAuthenticator { _, response ->
@@ -58,8 +55,7 @@ class SmartyNetworkService(baseClient: OkHttpClient, private val gson: Gson) : I
     override fun fetchProfiles(): CompletableFuture<List<ServerProfile>> {
         return CompletableFuture.supplyAsync {
             val smartyServers = getServers()
-            
-            // Конвертируем DTO Smarty в нашу модель ServerProfile
+
             smartyServers.map { s ->
                 ServerProfile(
                     name = s.name ?: "Unknown",
@@ -74,7 +70,6 @@ class SmartyNetworkService(baseClient: OkHttpClient, private val gson: Gson) : I
         }
     }
 
-    // Публичный метод для получения "сырого" списка (аналог getServers из Java)
     fun getServers(): List<SmartyServer> {
         return try {
             // Попытка 1: С текущим хешем
@@ -113,7 +108,7 @@ class SmartyNetworkService(baseClient: OkHttpClient, private val gson: Gson) : I
                 "testModeKey": "false",
                 "debug": "false"
             }
-        """.trimIndent()
+        """.trimIndent() // Хоть и кажется, что мы криворукие, раз cheksum написали. Не бейте. Это не наша вина.
 
         val formBody = FormBody.Builder()
             .add("action", "loader")
@@ -121,7 +116,7 @@ class SmartyNetworkService(baseClient: OkHttpClient, private val gson: Gson) : I
             .build()
 
         val request = Request.Builder()
-            .url(ServiceEndpoints.AUTH_LOGIN) // Используем API URL
+            .url(ServiceEndpoints.AUTH_LOGIN)
             .post(formBody)
             .header("User-Agent", "SMARTYlauncher/3.6.2")
             .build()
@@ -131,7 +126,7 @@ class SmartyNetworkService(baseClient: OkHttpClient, private val gson: Gson) : I
 
             var rawJson = response.body?.string() ?: return emptyList()
 
-            // Очистка ответа от мусора (как в Java коде)
+            // Очистка ответа от мусора
             val jsonStart = rawJson.indexOf("{")
             if (jsonStart != -1) {
                 rawJson = rawJson.substring(jsonStart)
@@ -190,7 +185,7 @@ class SmartyNetworkService(baseClient: OkHttpClient, private val gson: Gson) : I
             
             Files.deleteIfExists(tempJar)
 
-            // Конвертация байтов в hex строку (логика из Java)
+            // Конвертация байтов в hex строку
             val bytes = digest.digest()
             val sb = StringBuilder()
             for (b in bytes) {

@@ -19,7 +19,7 @@ class ProfileManager(
     private val profiles: MutableMap<String, InstanceProfile> = HashMap()
 
     var lastServerId: String? = null
-        private set // Сеттер приватный, изменение только через метод setLastServerId
+        private set
 
     init {
         load()
@@ -36,7 +36,7 @@ class ProfileManager(
 
     fun setLastServerId(lastServerId: String) {
         this.lastServerId = lastServerId
-        save() // Сохраняем сразу при изменении
+        save()
     }
 
     private fun load() {
@@ -45,13 +45,11 @@ class ProfileManager(
 
         try {
             Files.newBufferedReader(file).use { reader ->
-                // Читаем как JsonElement, чтобы определить формат файла
                 val root = gson.fromJson(reader, JsonElement::class.java)
 
                 if (root.isJsonObject) {
                     val json = root.asJsonObject
 
-                    // Проверяем, новый ли это формат (есть поле "profiles" или "lastServerId")
                     if (json.has("profiles") || json.has("lastServerId")) {
                         if (json.has("lastServerId")) {
                             this.lastServerId = json.get("lastServerId").asString
@@ -62,7 +60,6 @@ class ProfileManager(
                             if (loaded != null) profiles.putAll(loaded)
                         }
                     } else {
-                        // Старый формат
                         val type = object : TypeToken<Map<String, InstanceProfile>>() {}.type
                         val loaded: Map<String, InstanceProfile>? = gson.fromJson(root, type)
                         if (loaded != null) profiles.putAll(loaded)
@@ -80,7 +77,6 @@ class ProfileManager(
         val file = workDir.resolve(fileName)
         try {
             Files.newBufferedWriter(file).use { writer ->
-                // Создаем структуру для сохранения (обертка)
                 val data = mapOf(
                     "lastServerId" to lastServerId,
                     "profiles" to profiles

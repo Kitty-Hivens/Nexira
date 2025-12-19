@@ -2,7 +2,7 @@ package hivens.core.data
 
 import com.google.gson.annotations.SerializedName
 
-enum class AuthStatus {
+enum class AuthStatus { // TODO: Удалить / использовать неиспользованные статусы
     @SerializedName("OK")
     OK,
 

@@ -11,7 +11,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
-data class CaelestiaColors(
+data class CelestiaColors(
     val isDark: Boolean,
     val background: Color,
     val surface: Color,
@@ -23,10 +23,10 @@ data class CaelestiaColors(
     val error: Color = Color(0xFFCF6679)
 )
 
-val LocalCaelestiaColors = staticCompositionLocalOf { CaelestiaDarkPalette }
+val LocalCelestiaColors = staticCompositionLocalOf { CelestiaDarkPalette }
 
 // ТЕМНАЯ ТЕМА (Основная)
-val CaelestiaDarkPalette = CaelestiaColors(
+val CelestiaDarkPalette = CelestiaColors(
     isDark = true,
     background = Color(0xFF0F0F0F),
     surface = Color(0xFF1A1A1A),
@@ -36,8 +36,9 @@ val CaelestiaDarkPalette = CaelestiaColors(
     textSecondary = Color(0xFF888888)
 )
 
+// TODO: Возможно для любителей экстрима ухудшить тему.
 // СВЕТЛАЯ ТЕМА (Для любителей выжигать глаза)
-val CaelestiaLightPalette = CaelestiaColors(
+val CelestiaLightPalette = CelestiaColors(
     isDark = false,
     background = Color(0xFFF5F5F5),
     surface = Color(0xFFFFFFFF),
@@ -49,11 +50,11 @@ val CaelestiaLightPalette = CaelestiaColors(
 )
 
 @Composable
-fun CaelestiaTheme(
-    useDarkTheme: Boolean = true, // Можно менять из настроек
+fun CelestiaTheme(
+    useDarkTheme: Boolean = true, // Можно менять из настроек. Правда-правда!
     content: @Composable () -> Unit
 ) {
-    val colors = if (useDarkTheme) CaelestiaDarkPalette else CaelestiaLightPalette
+    val colors = if (useDarkTheme) CelestiaDarkPalette else CelestiaLightPalette
 
     val materialColors = if (useDarkTheme) {
         darkColors(
@@ -83,7 +84,7 @@ fun CaelestiaTheme(
         large = RoundedCornerShape(24.dp)
     )
 
-    CompositionLocalProvider(LocalCaelestiaColors provides colors) {
+    CompositionLocalProvider(LocalCelestiaColors provides colors) {
         MaterialTheme(
             colors = materialColors,
             shapes = shapes,
@@ -92,8 +93,8 @@ fun CaelestiaTheme(
     }
 }
 
-object CaelestiaTheme {
-    val colors: CaelestiaColors
+object CelestiaTheme {
+    val colors: CelestiaColors
         @Composable
-        get() = LocalCaelestiaColors.current
+        get() = LocalCelestiaColors.current
 }

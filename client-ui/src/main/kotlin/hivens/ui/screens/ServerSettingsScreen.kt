@@ -19,10 +19,10 @@ import androidx.compose.ui.unit.dp
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.InstanceProfile
 import hivens.core.data.OptionalMod
-import hivens.ui.components.CaelestiaButton
+import hivens.ui.components.CelestiaButton
 import hivens.ui.components.GlassCard
 import hivens.ui.di
-import hivens.ui.theme.CaelestiaTheme
+import hivens.ui.theme.CelestiaTheme
 import java.awt.Desktop
 import java.io.File
 import javax.swing.JFrame
@@ -65,12 +65,12 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
     Column(Modifier.fillMaxSize().padding(24.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = { saveProfile(); onBack() }) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Назад", tint = CaelestiaTheme.colors.textPrimary)
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Назад", tint = CelestiaTheme.colors.textPrimary)
             }
             Spacer(Modifier.width(8.dp))
             Column {
-                Text(server.title?.uppercase() ?: "SERVER", style = MaterialTheme.typography.h5, color = CaelestiaTheme.colors.textPrimary)
-                Text("Настройки запуска", style = MaterialTheme.typography.caption, color = CaelestiaTheme.colors.textSecondary)
+                Text(server.title?.uppercase() ?: "SERVER", style = MaterialTheme.typography.h5, color = CelestiaTheme.colors.textPrimary)
+                Text("Настройки запуска", style = MaterialTheme.typography.caption, color = CelestiaTheme.colors.textSecondary)
             }
         }
 
@@ -79,25 +79,25 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
         Row(Modifier.fillMaxSize()) {
             GlassCard(Modifier.weight(1f).fillMaxHeight()) {
                 Column(Modifier.padding(24.dp).verticalScroll(rememberScrollState())) {
-                    Text("СИСТЕМА", style = MaterialTheme.typography.subtitle2, color = CaelestiaTheme.colors.primary)
+                    Text("СИСТЕМА", style = MaterialTheme.typography.subtitle2, color = CelestiaTheme.colors.primary)
                     Spacer(Modifier.height(16.dp))
 
-                    Text("ОЗУ: ${memory.roundToInt()} MB", color = CaelestiaTheme.colors.textSecondary)
+                    Text("ОЗУ: ${memory.roundToInt()} MB", color = CelestiaTheme.colors.textSecondary)
                     Slider(
                         value = memory, onValueChange = { memory = it }, valueRange = 1024f..16384f, steps = 14,
-                        colors = SliderDefaults.colors(thumbColor = CaelestiaTheme.colors.primary, activeTrackColor = CaelestiaTheme.colors.primary)
+                        colors = SliderDefaults.colors(thumbColor = CelestiaTheme.colors.primary, activeTrackColor = CelestiaTheme.colors.primary)
                     )
 
                     Spacer(Modifier.height(24.dp))
-                    Divider(color = CaelestiaTheme.colors.border)
+                    Divider(color = CelestiaTheme.colors.border)
                     Spacer(Modifier.height(24.dp))
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(
                             checked = useCustomJava, onCheckedChange = { useCustomJava = it },
-                            colors = CheckboxDefaults.colors(checkedColor = CaelestiaTheme.colors.primary)
+                            colors = CheckboxDefaults.colors(checkedColor = CelestiaTheme.colors.primary)
                         )
-                        Text("Своя версия Java", color = CaelestiaTheme.colors.textPrimary)
+                        Text("Своя версия Java", color = CelestiaTheme.colors.textPrimary)
                     }
 
                     if (useCustomJava) {
@@ -109,27 +109,27 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                                 IconButton(onClick = {
                                     val file = pickExecutable("Выберите Java Executable")
                                     if (file != null) javaPath = file.absolutePath
-                                }) { Icon(Icons.Default.Edit, null, tint = CaelestiaTheme.colors.textSecondary) }
+                                }) { Icon(Icons.Default.Edit, null, tint = CelestiaTheme.colors.textSecondary) }
                             },
                             colors = TextFieldDefaults.outlinedTextFieldColors(
-                                textColor = CaelestiaTheme.colors.textPrimary,
-                                focusedBorderColor = CaelestiaTheme.colors.primary,
-                                unfocusedBorderColor = CaelestiaTheme.colors.border
+                                textColor = CelestiaTheme.colors.textPrimary,
+                                focusedBorderColor = CelestiaTheme.colors.primary,
+                                unfocusedBorderColor = CelestiaTheme.colors.border
                             )
                         )
                     } else {
-                        Text("Автоматическая Java (${server.version.let { if(it.startsWith("1.12")) "Java 8" else "Java 17+" }})", style = MaterialTheme.typography.caption, color = CaelestiaTheme.colors.textSecondary)
+                        Text("Автоматическая Java (${server.version.let { if(it.startsWith("1.12")) "Java 8" else "Java 17+" }})", style = MaterialTheme.typography.caption, color = CelestiaTheme.colors.textSecondary)
                     }
 
                     Spacer(Modifier.weight(1f))
-                    CaelestiaButton("Открыть папку", onClick = {
+                    CelestiaButton("Открыть папку", onClick = {
                         val path = di.dataDirectory.resolve("clients").resolve(server.assetDir)
                         if (!path.toFile().exists()) path.toFile().mkdirs()
                         Desktop.getDesktop().open(path.toFile())
                     }, modifier = Modifier.fillMaxWidth(), primary = false)
 
                     Spacer(Modifier.height(12.dp))
-                    CaelestiaButton("Сбросить клиент", onClick = {
+                    CelestiaButton("Сбросить клиент", onClick = {
                         val path = di.dataDirectory.resolve("clients").resolve(server.assetDir)
                         path.toFile().deleteRecursively()
                         saveProfile()
@@ -142,12 +142,12 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
 
             GlassCard(Modifier.weight(1f).fillMaxHeight()) {
                 Column(Modifier.padding(24.dp)) {
-                    Text("МОДИФИКАЦИИ", style = MaterialTheme.typography.subtitle2, color = CaelestiaTheme.colors.primary)
+                    Text("МОДИФИКАЦИИ", style = MaterialTheme.typography.subtitle2, color = CelestiaTheme.colors.primary)
                     Spacer(Modifier.height(16.dp))
 
                     if (mods.isEmpty()) {
                         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text("Нет опциональных модов", color = CaelestiaTheme.colors.textSecondary)
+                            Text("Нет опциональных модов", color = CelestiaTheme.colors.textSecondary)
                         }
                     } else {
                         LazyColumn(Modifier.fillMaxSize()) {
@@ -170,14 +170,14 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
 @Composable
 fun ModItemRow(mod: OptionalMod, isChecked: Boolean, onToggle: (Boolean) -> Unit) {
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(CaelestiaTheme.colors.background.copy(alpha = 0.5f)).padding(12.dp),
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(CelestiaTheme.colors.background.copy(alpha = 0.5f)).padding(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Checkbox(checked = isChecked, onCheckedChange = onToggle, colors = CheckboxDefaults.colors(checkedColor = CaelestiaTheme.colors.primary))
+        Checkbox(checked = isChecked, onCheckedChange = onToggle, colors = CheckboxDefaults.colors(checkedColor = CelestiaTheme.colors.primary))
         Spacer(Modifier.width(12.dp))
         Column {
-            Text(mod.name, style = MaterialTheme.typography.body2, color = CaelestiaTheme.colors.textPrimary)
-            if (!mod.description.isNullOrEmpty()) Text(mod.description!!, style = MaterialTheme.typography.caption, color = CaelestiaTheme.colors.textSecondary)
+            Text(mod.name, style = MaterialTheme.typography.body2, color = CelestiaTheme.colors.textPrimary)
+            if (!mod.description.isNullOrEmpty()) Text(mod.description!!, style = MaterialTheme.typography.caption, color = CelestiaTheme.colors.textSecondary)
         }
     }
 }

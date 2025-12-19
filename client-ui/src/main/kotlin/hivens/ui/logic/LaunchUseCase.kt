@@ -22,12 +22,11 @@ class LaunchUseCase(private val di: LauncherDI) {
         onSessionUpdated: (SessionData) -> Unit
     ) {
         GameConsoleService.clear()
-        GameConsoleService.append("=== ЗАПУСК (Silent Mode) ===", LogType.INFO)
+        GameConsoleService.append("Запуск Minecraft...", LogType.INFO)
         GameConsoleService.append("Цель: ${server.name}", LogType.INFO)
 
         withContext(Dispatchers.IO) {
             try {
-                // 1. Авторизация
                 onProgress(0.1f, "Авторизация...")
                 GameConsoleService.append("Шаг 1: Авторизация...", LogType.INFO)
 
@@ -75,8 +74,6 @@ class LaunchUseCase(private val di: LauncherDI) {
                 // 3. Запуск Java
                 onProgress(0.9f, "Подготовка JVM...")
                 val settings = di.settingsService.getSettings()
-
-                // [FIX] Имя переменной: javaManagerService
                 val javaPath = if (!settings.javaPath.isNullOrEmpty()) {
                     Path.of(settings.javaPath!!)
                 } else {
@@ -109,10 +106,10 @@ class LaunchUseCase(private val di: LauncherDI) {
 
                 val exitCode = process.waitFor()
                 if (exitCode != 0) {
-                    GameConsoleService.append("Игра упала (Код $exitCode)", LogType.ERROR)
+                    GameConsoleService.append("Игра посыпалась (Код: $exitCode)", LogType.ERROR)
                     GameConsoleService.show()
                 } else {
-                    GameConsoleService.append("Игра закрылась нормально.", LogType.INFO)
+                    GameConsoleService.append("Игра закрылась в страхе.", LogType.INFO)
                 }
 
             } catch (e: Exception) {

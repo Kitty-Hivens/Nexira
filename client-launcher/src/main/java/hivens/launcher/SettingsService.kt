@@ -1,7 +1,7 @@
 package hivens.launcher
 
 import com.google.gson.Gson
-import hivens.core.api.ISettingsService
+import hivens.core.api.interfaces.ISettingsService
 import hivens.core.data.SettingsData
 import org.slf4j.LoggerFactory
 import java.io.IOException
@@ -14,10 +14,9 @@ class SettingsService(
 ) : ISettingsService {
 
     private val log = LoggerFactory.getLogger(SettingsService::class.java)
-    private var cachedSettings: SettingsData? = null // Кэш в памяти
+    private var cachedSettings: SettingsData? = null
 
     init {
-        // Загружаем сразу при старте
         reload()
     }
 
@@ -25,12 +24,11 @@ class SettingsService(
         if (cachedSettings == null) {
             reload()
         }
-        // Если даже после reload null (ошибка чтения), возвращаем дефолтные, но не сохраняем их в файл пока
         return cachedSettings ?: SettingsData.defaults()
     }
 
     override fun saveSettings(settings: SettingsData) {
-        this.cachedSettings = settings // Обновляем кэш
+        this.cachedSettings = settings
         try {
             if (settingsFile.parent != null) {
                 Files.createDirectories(settingsFile.parent)

@@ -27,11 +27,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.SessionData
-import hivens.ui.components.CaelestiaButton
+import hivens.ui.components.CelestiaButton
 import hivens.ui.components.GlassCard
 import hivens.ui.di
 import hivens.ui.logic.LaunchUseCase
-import hivens.ui.theme.CaelestiaTheme
+import hivens.ui.theme.CelestiaTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -101,7 +101,7 @@ fun DashboardScreen(
         Text(
             text = "ДОБРО ПОЖАЛОВАТЬ, ${session.playerName.uppercase()}",
             style = MaterialTheme.typography.h5,
-            color = CaelestiaTheme.colors.textPrimary.copy(alpha = 0.7f)
+            color = CelestiaTheme.colors.textPrimary.copy(alpha = 0.7f)
         )
 
         Spacer(Modifier.height(24.dp))
@@ -118,16 +118,16 @@ fun DashboardScreen(
                                     text = selectedServer!!.title?.uppercase() ?: selectedServer!!.name,
                                     style = MaterialTheme.typography.h3,
                                     fontWeight = FontWeight.Black,
-                                    color = CaelestiaTheme.colors.textPrimary
+                                    color = CelestiaTheme.colors.textPrimary
                                 )
                                 Spacer(Modifier.height(8.dp))
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Badge(text = "VER: ${selectedServer!!.version}", color = CaelestiaTheme.colors.primary)
+                                    Badge(text = "VER: ${selectedServer!!.version}", color = CelestiaTheme.colors.primary)
                                     Spacer(Modifier.width(12.dp))
                                     if (isSyncingSession) {
-                                        Badge(text = "СИНХРОНИЗАЦИЯ...", color = CaelestiaTheme.colors.textSecondary)
+                                        Badge(text = "СИНХРОНИЗАЦИЯ...", color = CelestiaTheme.colors.textSecondary)
                                     } else {
-                                        Badge(text = "ONLINE", color = CaelestiaTheme.colors.success)
+                                        Badge(text = "ONLINE", color = CelestiaTheme.colors.success)
                                     }
                                 }
                             }
@@ -136,14 +136,14 @@ fun DashboardScreen(
                                 onClick = { onOpenServerSettings(selectedServer!!) },
                                 enabled = !isLaunching
                             ) {
-                                Icon(Icons.Default.Settings, null, tint = CaelestiaTheme.colors.textSecondary, modifier = Modifier.size(32.dp))
+                                Icon(Icons.Default.Settings, null, tint = CelestiaTheme.colors.textSecondary, modifier = Modifier.size(32.dp))
                             }
                         }
                     }
                 }
 
                 // Нижний блок (Список и Запуск)
-                Text("ВЫБОР СЕРВЕРА", style = MaterialTheme.typography.caption, color = CaelestiaTheme.colors.textSecondary, fontWeight = FontWeight.Bold)
+                Text("ВЫБОР СЕРВЕРА", style = MaterialTheme.typography.caption, color = CelestiaTheme.colors.textSecondary, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(12.dp))
 
                 Box(Modifier.fillMaxWidth().height(60.dp)) {
@@ -174,8 +174,8 @@ fun DashboardScreen(
                         style = ScrollbarStyle(
                             minimalHeight = 4.dp, thickness = 4.dp, shape = RoundedCornerShape(2.dp),
                             hoverDurationMillis = 300,
-                            unhoverColor = CaelestiaTheme.colors.surface.copy(alpha = 0.5f),
-                            hoverColor = CaelestiaTheme.colors.primary
+                            unhoverColor = CelestiaTheme.colors.surface.copy(alpha = 0.5f),
+                            hoverColor = CelestiaTheme.colors.primary
                         )
                     )
                 }
@@ -185,8 +185,8 @@ fun DashboardScreen(
                 Column(Modifier.fillMaxWidth()) {
                     Row(Modifier.fillMaxWidth().height(20.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                         if (isLaunching || isSyncingSession) {
-                            Text(statusText, style = MaterialTheme.typography.caption, color = CaelestiaTheme.colors.textSecondary)
-                            if (isLaunching) Text("${(progress * 100).toInt()}%", style = MaterialTheme.typography.caption, color = CaelestiaTheme.colors.primary)
+                            Text(statusText, style = MaterialTheme.typography.caption, color = CelestiaTheme.colors.textSecondary)
+                            if (isLaunching) Text("${(progress * 100).toInt()}%", style = MaterialTheme.typography.caption, color = CelestiaTheme.colors.primary)
                         }
                     }
                     Spacer(Modifier.height(4.dp))
@@ -195,8 +195,8 @@ fun DashboardScreen(
                         LinearProgressIndicator(
                             progress = if (isSyncingSession) 0f else progress,
                             modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
-                            backgroundColor = CaelestiaTheme.colors.surface,
-                            color = CaelestiaTheme.colors.primary
+                            backgroundColor = CelestiaTheme.colors.surface,
+                            color = CelestiaTheme.colors.primary
                         )
                     } else {
                         Spacer(Modifier.height(6.dp))
@@ -204,7 +204,7 @@ fun DashboardScreen(
 
                     Spacer(Modifier.height(16.dp))
 
-                    CaelestiaButton(
+                    CelestiaButton(
                         text = when {
                             isSyncingSession -> "СИНХРОНИЗАЦИЯ..."
                             isLaunching -> "ЗАПУСК..."
@@ -212,7 +212,7 @@ fun DashboardScreen(
                         },
                         enabled = !isLaunching && !isSyncingSession && selectedServer != null,
                         onClick = {
-                            if (selectedServer == null) return@CaelestiaButton
+                            if (selectedServer == null) return@CelestiaButton
                             isLaunching = true
 
                             scope.launch {
@@ -261,9 +261,9 @@ fun ServerChip(name: String, isSelected: Boolean, onClick: () -> Unit) {
     )
 
     // Анимация прозрачности фона
-    val backgroundColor = if (isSelected) CaelestiaTheme.colors.primary
-    else if (isHovered) CaelestiaTheme.colors.surface.copy(alpha = 0.9f)
-    else CaelestiaTheme.colors.surface
+    val backgroundColor = if (isSelected) CelestiaTheme.colors.primary
+    else if (isHovered) CelestiaTheme.colors.surface.copy(alpha = 0.9f)
+    else CelestiaTheme.colors.surface
 
     Box(
         modifier = Modifier
@@ -285,7 +285,7 @@ fun ServerChip(name: String, isSelected: Boolean, onClick: () -> Unit) {
     ) {
         Text(
             text = name,
-            color = if (isSelected) Color.Black else CaelestiaTheme.colors.textPrimary,
+            color = if (isSelected) Color.Black else CelestiaTheme.colors.textPrimary,
             fontWeight = FontWeight.Bold,
             maxLines = 1
         )

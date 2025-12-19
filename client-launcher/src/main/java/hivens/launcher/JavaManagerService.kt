@@ -48,7 +48,7 @@ class JavaManagerService(
         return when {
             mcVersion.startsWith("1.21") || mcVersion.startsWith("1.20.5") || mcVersion.startsWith("1.20.6") -> 21
             mcVersion.startsWith("1.17") || mcVersion.startsWith("1.18") || mcVersion.startsWith("1.19") || mcVersion.startsWith("1.20") -> 17
-            else -> 8 // Default for 1.7.10 - 1.16.5
+            else -> 8 // Default for 1.7.10 - 1.16.5. TODO: fix 1.7.10. lol.
         }
     }
 
@@ -175,7 +175,7 @@ class JavaManagerService(
             BufferedInputStream(fi).use { bi ->
                 GzipCompressorInputStream(bi).use { gzi ->
                     TarArchiveInputStream(gzi).use { tai ->
-                        var entry = tai.nextTarEntry
+                        var entry = tai.nextEntry
                         while (entry != null) {
                             val p = dest.resolve(entry.name)
                             if (entry.isDirectory) {
@@ -187,7 +187,7 @@ class JavaManagerService(
                                     p.toFile().setExecutable(true)
                                 }
                             }
-                            entry = tai.nextTarEntry
+                            entry = tai.nextEntry
                         }
                     }
                 }

@@ -11,10 +11,8 @@ object ZipUtils {
 
     fun unzip(zipFile: File, destDir: File) {
         if (!destDir.exists()) destDir.mkdirs()
+        val buffer = ByteArray(8192)
 
-        val buffer = ByteArray(8192) // Увеличенный буфер для скорости
-
-        // .use автоматически закроет поток (аналог try-with-resources)
         ZipInputStream(FileInputStream(zipFile)).use { zis ->
             var zipEntry = zis.nextEntry
             while (zipEntry != null) {
@@ -32,8 +30,7 @@ object ZipUtils {
                 if (zipEntry.isDirectory) {
                     newFile.mkdirs()
                 } else {
-                    val parent = newFile.parentFile
-                    if (parent != null) parent.mkdirs()
+                    newFile.parentFile?.mkdirs()
 
                     FileOutputStream(newFile).use { fos ->
                         var len: Int

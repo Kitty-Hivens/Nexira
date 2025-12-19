@@ -1,6 +1,6 @@
 package hivens.launcher
 
-import hivens.core.api.IFileIntegrityService
+import hivens.core.api.interfaces.IFileIntegrityService
 import hivens.core.data.FileStatus
 import org.slf4j.LoggerFactory
 import java.io.IOException
@@ -21,7 +21,6 @@ class FileIntegrityService : IFileIntegrityService {
         private const val BUFFER_SIZE = 8192
     }
 
-    // Пул MessageDigest для потокобезопасности
     private val digestProvider = ThreadLocal.withInitial {
         try {
             MessageDigest.getInstance(HASH_ALGORITHM)

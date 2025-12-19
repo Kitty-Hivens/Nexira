@@ -10,7 +10,7 @@ import java.net.InetSocketAddress
 import java.net.Socket
 import java.nio.charset.StandardCharsets
 
-object ServerPinger {
+object ServerPinger {  // TODO: Не используется. Проверить связи.
 
     data class ServerStatus(
         val description: String,

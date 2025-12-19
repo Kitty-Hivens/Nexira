@@ -10,7 +10,6 @@ data class ServerProfile(
     var extraCheckSum: String? = null,
     var optionalModsData: Map<String, Any>? = null
 ) {
-    // Вторичный конструктор для удобства (как в Java)
     constructor(name: String, version: String, ip: String, port: Int) : this(
         name = name,
         version = version,

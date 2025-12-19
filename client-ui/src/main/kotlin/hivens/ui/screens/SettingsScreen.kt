@@ -8,13 +8,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import hivens.ui.components.CaelestiaButton
+import hivens.ui.components.CelestiaButton
 import hivens.ui.components.GlassCard
 import hivens.ui.di
-import hivens.ui.theme.CaelestiaTheme
-import java.awt.FileDialog
-import java.io.File
-import javax.swing.JFrame
+import hivens.ui.theme.CelestiaTheme
 import kotlin.math.roundToInt
 
 @Composable
@@ -31,16 +28,14 @@ fun SettingsScreen(
     val scrollState = rememberScrollState()
 
     Column(Modifier.fillMaxSize()) {
-        Text("ГЛОБАЛЬНЫЕ НАСТРОЙКИ", style = MaterialTheme.typography.h4, color = CaelestiaTheme.colors.textPrimary)
+        Text("ГЛОБАЛЬНЫЕ НАСТРОЙКИ", style = MaterialTheme.typography.h4, color = CelestiaTheme.colors.textPrimary)
         Spacer(Modifier.height(24.dp))
 
         GlassCard(Modifier.fillMaxWidth().weight(1f)) {
             Column(
                 Modifier.fillMaxSize().padding(32.dp).verticalScroll(scrollState)
             ) {
-
-                // --- Интерфейс ---
-                Text("ИНТЕРФЕЙС", style = MaterialTheme.typography.subtitle2, color = CaelestiaTheme.colors.primary)
+                Text("ИНТЕРФЕЙС", style = MaterialTheme.typography.subtitle2, color = CelestiaTheme.colors.primary)
                 Spacer(Modifier.height(16.dp))
 
                 Row(
@@ -48,42 +43,41 @@ fun SettingsScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Темная тема", color = CaelestiaTheme.colors.textPrimary)
+                    Text("Темная тема", color = CelestiaTheme.colors.textPrimary)
                     Switch(
                         checked = isDarkTheme,
                         onCheckedChange = { onToggleTheme() },
-                        colors = SwitchDefaults.colors(checkedThumbColor = CaelestiaTheme.colors.primary)
+                        colors = SwitchDefaults.colors(checkedThumbColor = CelestiaTheme.colors.primary)
                     )
                 }
 
                 Spacer(Modifier.height(24.dp))
-                Divider(color = CaelestiaTheme.colors.border)
+                Divider(color = CelestiaTheme.colors.border)
                 Spacer(Modifier.height(24.dp))
 
-                // ... (Остальной код настроек памяти и Java такой же, как в прошлом примере, только стили обновлены) ...
                 // --- Блок Памяти ---
-                Text("ВЫДЕЛЕНИЕ ПАМЯТИ (RAM)", style = MaterialTheme.typography.subtitle2, color = CaelestiaTheme.colors.primary)
+                Text("ВЫДЕЛЕНИЕ ПАМЯТИ (RAM)", style = MaterialTheme.typography.subtitle2, color = CelestiaTheme.colors.primary)
                 Spacer(Modifier.height(16.dp))
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("${memory.roundToInt()} MB", style = MaterialTheme.typography.subtitle1, modifier = Modifier.width(80.dp), color = CaelestiaTheme.colors.textPrimary)
+                    Text("${memory.roundToInt()} MB", style = MaterialTheme.typography.subtitle1, modifier = Modifier.width(80.dp), color = CelestiaTheme.colors.textPrimary)
                     Slider(
                         value = memory,
                         onValueChange = { memory = it },
                         valueRange = 1024f..16384f,
                         steps = 14,
                         modifier = Modifier.weight(1f),
-                        colors = SliderDefaults.colors(thumbColor = CaelestiaTheme.colors.primary, activeTrackColor = CaelestiaTheme.colors.primary)
+                        colors = SliderDefaults.colors(thumbColor = CelestiaTheme.colors.primary, activeTrackColor = CelestiaTheme.colors.primary)
                     )
                 }
 
                 Spacer(Modifier.height(24.dp))
-                Divider(color = CaelestiaTheme.colors.border)
+                Divider(color = CelestiaTheme.colors.border)
                 Spacer(Modifier.height(24.dp))
 
                 // --- Кнопка Сохранить ---
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    CaelestiaButton(
+                    CelestiaButton(
                         text = "СОХРАНИТЬ",
                         onClick = {
                             val newSettings = di.settingsService.getSettings()
@@ -99,10 +93,4 @@ fun SettingsScreen(
             }
         }
     }
-}
-
-private fun pickJavaFile(): File? {
-    val dialog = FileDialog(null as JFrame?, "Выберите Java", FileDialog.LOAD)
-    dialog.isVisible = true
-    return if (dialog.directory != null && dialog.file != null) File(dialog.directory, dialog.file) else null
 }

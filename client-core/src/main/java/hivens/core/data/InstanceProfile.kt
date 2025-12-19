@@ -4,7 +4,7 @@ package hivens.core.data
  * Профиль настроек конкретного сервера.
  * Хранит выбор игрока и локальные настройки.
  */
-data class InstanceProfile(
+data class InstanceProfile( // TODO: Решить, что делать с дефолтными настройками в ui.
     var serverId: String,
     var memoryMb: Int = 4096,
     var javaPath: String? = null,

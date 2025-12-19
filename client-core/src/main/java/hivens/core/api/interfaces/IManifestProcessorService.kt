@@ -1,4 +1,4 @@
-package hivens.core.api
+package hivens.core.api.interfaces
 
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.FileData
@@ -16,7 +16,7 @@ interface IManifestProcessorService {
     fun flattenManifest(manifest: FileManifest): Map<String, FileData>
 
     /**
-     * Возвращает список опциональных модификаций для КОНКРЕТНОГО профиля.
+     * Возвращает список опциональных модификаций для конкретного профиля.
      */
     fun getOptionalModsForClient(profile: ServerProfile): List<OptionalMod>
 }

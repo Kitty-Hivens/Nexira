@@ -15,9 +15,9 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.unit.dp
 import hivens.core.data.SessionData
-import hivens.ui.components.CaelestiaButton
+import hivens.ui.components.CelestiaButton
 import hivens.ui.components.GlassCard
-import hivens.ui.theme.CaelestiaTheme
+import hivens.ui.theme.CelestiaTheme
 import hivens.ui.utils.SkinManager
 import kotlinx.coroutines.launch
 import java.awt.FileDialog
@@ -41,7 +41,7 @@ fun ProfileScreen(session: SessionData) {
     LaunchedEffect(Unit) { loadSkins() }
 
     Column(Modifier.fillMaxSize().padding(24.dp)) {
-        Text("ПРОФИЛЬ", style = MaterialTheme.typography.h4, color = CaelestiaTheme.colors.textPrimary)
+        Text("ПРОФИЛЬ", style = MaterialTheme.typography.h4, color = CelestiaTheme.colors.textPrimary)
         Spacer(Modifier.height(24.dp))
 
         Row(Modifier.fillMaxSize()) {
@@ -60,14 +60,14 @@ fun ProfileScreen(session: SessionData) {
                                 }
                             }
                         } else {
-                            Text("Загрузка скина...", color = CaelestiaTheme.colors.textSecondary)
+                            Text("Загрузка скина...", color = CelestiaTheme.colors.textSecondary)
                         }
                     }
                     IconButton(
                         onClick = { SkinManager.invalidate(session.playerName); loadSkins() },
                         modifier = Modifier.align(Alignment.TopEnd).padding(16.dp)
                     ) {
-                        Icon(Icons.Default.Refresh, "Обновить", tint = CaelestiaTheme.colors.textPrimary)
+                        Icon(Icons.Default.Refresh, "Обновить", tint = CelestiaTheme.colors.textPrimary)
                     }
                 }
             }
@@ -77,20 +77,20 @@ fun ProfileScreen(session: SessionData) {
             Column(Modifier.width(300.dp).fillMaxHeight()) {
                 GlassCard(Modifier.fillMaxWidth().weight(1f)) {
                     Column(Modifier.padding(24.dp)) {
-                        Text(session.playerName, style = MaterialTheme.typography.h5, color = CaelestiaTheme.colors.textPrimary)
+                        Text(session.playerName, style = MaterialTheme.typography.h5, color = CelestiaTheme.colors.textPrimary)
                         val status = if (session.accessToken.length > 10) "Авторизован" else "Оффлайн"
-                        Text("Статус: $status", color = if (session.accessToken.length > 10) CaelestiaTheme.colors.success else CaelestiaTheme.colors.error)
+                        Text("Статус: $status", color = if (session.accessToken.length > 10) CelestiaTheme.colors.success else CelestiaTheme.colors.error)
 
                         Spacer(Modifier.height(32.dp))
 
-                        CaelestiaButton("Загрузить скин", onClick = {
+                        CelestiaButton("Загрузить скин", onClick = {
                             val file = pickImage("Выберите скин (PNG)")
                             if (file != null) println("Uploading skin: ${file.name}")
                         }, modifier = Modifier.fillMaxWidth())
 
                         Spacer(Modifier.height(16.dp))
 
-                        CaelestiaButton("Загрузить плащ", onClick = {
+                        CelestiaButton("Загрузить плащ", onClick = {
                             val file = pickImage("Выберите плащ (PNG)")
                             if (file != null) println("Uploading cloak")
                         }, modifier = Modifier.fillMaxWidth(), primary = false)

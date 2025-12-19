@@ -11,7 +11,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
 
 /**
- * Основной контейнер Caelestia - темный, полупрозрачный, с тонкой обводкой.
+ * Основной контейнер Celestia - темный, полупрозрачный, с тонкой обводкой.
  */
 @Composable
 fun GlassCard(
@@ -26,14 +26,14 @@ fun GlassCard(
         shape = shape,
         color = backgroundColor,
         border = BorderStroke(1.dp, borderColor),
-        elevation = 0.dp // Caelestia плоская, тени через слои
+        elevation = 0.dp // Celestia плоская, тени через слои
     ) {
         Box(content = content)
     }
 }
 
 @Composable
-fun CaelestiaButton(
+fun CelestiaButton(
     text: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,

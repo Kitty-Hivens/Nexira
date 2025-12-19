@@ -1,7 +1,7 @@
 package hivens.launcher
 
 import com.google.gson.Gson
-import hivens.core.api.IManifestProcessorService
+import hivens.core.api.interfaces.IManifestProcessorService
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.FileData
 import hivens.core.data.FileManifest
@@ -14,11 +14,10 @@ class ManifestProcessorService(private val gson: Gson) : IManifestProcessorServi
 
     private val log = LoggerFactory.getLogger(ManifestProcessorService::class.java)
 
-    override fun processManifest(version: String): FileManifest? {
+    override fun processManifest(version: String): FileManifest {
         return FileManifest()
     }
 
-    // [FIX] Убрали nullable (?), так как в интерфейсе стоит FileManifest
     override fun flattenManifest(manifest: FileManifest): Map<String, FileData> {
         val result = HashMap<String, FileData>()
         flattenRecursive(manifest, "", result)

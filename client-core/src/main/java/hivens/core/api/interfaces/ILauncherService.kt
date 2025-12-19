@@ -1,4 +1,4 @@
-package hivens.core.api
+package hivens.core.api.interfaces
 
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.SessionData

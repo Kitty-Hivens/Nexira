@@ -38,16 +38,15 @@ import hivens.core.data.SessionData
 import hivens.launcher.LauncherDI
 import hivens.ui.components.GlassCard
 import hivens.ui.screens.*
-import hivens.ui.theme.CaelestiaTheme
+import hivens.ui.theme.CelestiaTheme
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.utils.SkinManager
-import kotlinx.coroutines.launch
 import kotlin.math.cos
 import kotlin.math.sin
 
 val di = LauncherDI()
 
-sealed class AppState {
+sealed class AppState { // Вам не нравится код? Пожалуйста, сделайте форк :3. Умоляю вас
     data object Login : AppState()
     data class Shell(val session: SessionData) : AppState()
 }
@@ -71,10 +70,10 @@ fun main() = application {
     Window(
         onCloseRequest = ::exitApplication,
         state = windowState,
-        title = "Caelestia",
+        title = "Celestia", // TODO: А тут точно Селестия?
         resizable = false
     ) {
-        CaelestiaTheme(useDarkTheme = isDarkTheme) {
+        CelestiaTheme(useDarkTheme = isDarkTheme) {
             var appState by remember { mutableStateOf<AppState>(AppState.Login) }
 
             LaunchedEffect(Unit) {
@@ -91,7 +90,7 @@ fun main() = application {
             }
 
             Box(Modifier.fillMaxSize().background(MaterialTheme.colors.background)) {
-                CaelestiaBackground(isDarkTheme = isDarkTheme)
+                CelestiaBackground(isDarkTheme = isDarkTheme)
 
                 when (val state = appState) {
                     is AppState.Login -> LoginScreen(onLoginSuccess = { session -> appState = AppState.Shell(session) })
@@ -108,14 +107,14 @@ fun main() = application {
 }
 
 @Composable
-fun CaelestiaBackground(isDarkTheme: Boolean) {
+fun CelestiaBackground(isDarkTheme: Boolean) {
     val infiniteTransition = rememberInfiniteTransition()
     val t by infiniteTransition.animateFloat(
         initialValue = 0f, targetValue = 6.28f,
         animationSpec = infiniteRepeatable(animation = tween(20000, easing = LinearEasing), repeatMode = RepeatMode.Restart)
     )
-    val primaryColor = CaelestiaTheme.colors.primary
-    val successColor = CaelestiaTheme.colors.success
+    val primaryColor = CelestiaTheme.colors.primary
+    val successColor = CelestiaTheme.colors.success
     val bgAlpha = if (isDarkTheme) 0.15f else 0.05f
     val glowAlpha = if (isDarkTheme) 0.1f else 0.05f
 
@@ -152,24 +151,24 @@ fun ShellUI(initialSession: SessionData, onToggleTheme: () -> Unit, onLogout: ()
                 verticalArrangement = Arrangement.spacedBy(32.dp)
             ) {
                 // Аватар
-                Box(Modifier.size(48.dp).clip(CircleShape).background(CaelestiaTheme.colors.surface).border(1.dp, CaelestiaTheme.colors.primary.copy(alpha = 0.5f), CircleShape), contentAlignment = Alignment.TopCenter) {
+                Box(Modifier.size(48.dp).clip(CircleShape).background(CelestiaTheme.colors.surface).border(1.dp, CelestiaTheme.colors.primary.copy(alpha = 0.5f), CircleShape), contentAlignment = Alignment.TopCenter) {
                     if (faceBitmap != null) {
                         Image(painter = BitmapPainter(faceBitmap!!), contentDescription = null, modifier = Modifier.size(48.dp).offset(y = 4.dp), contentScale = ContentScale.Crop, alignment = Alignment.TopCenter)
                     } else {
-                        Text(currentSession.playerName.take(1).uppercase(), color = CaelestiaTheme.colors.primary, modifier = Modifier.align(Alignment.Center))
+                        Text(currentSession.playerName.take(1).uppercase(), color = CelestiaTheme.colors.primary, modifier = Modifier.align(Alignment.Center))
                     }
                 }
 
                 Spacer(Modifier.height(16.dp))
 
-                // Основная навигация (Консоли тут больше нет)
+                // Основная навигация
                 NavButton(Icons.Default.Home, currentScreen is ShellScreen.Home || currentScreen is ShellScreen.ServerSettings) { currentScreen = ShellScreen.Home }
                 NavButton(Icons.Default.Person, currentScreen is ShellScreen.Profile) { currentScreen = ShellScreen.Profile }
                 NavButton(Icons.Default.Settings, currentScreen is ShellScreen.GlobalSettings) { currentScreen = ShellScreen.GlobalSettings }
 
                 Spacer(Modifier.weight(1f))
 
-                // [NEW] Нижний блок: Консоль (мелко) + Выход
+                // Нижний блок: Консоль + Выход
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
 
                     // Стильная маленькая кнопка отладки
@@ -178,14 +177,14 @@ fun ShellUI(initialSession: SessionData, onToggleTheme: () -> Unit, onLogout: ()
                             // Гаечный ключ выглядит более "технически"
                             Icons.Default.Build,
                             contentDescription = "Debug Console",
-                            tint = CaelestiaTheme.colors.textSecondary.copy(alpha = 0.3f), // Очень тусклая, пока не наведешь
+                            tint = CelestiaTheme.colors.textSecondary.copy(alpha = 0.3f), // Очень тусклая, пока не наведешь
                             modifier = Modifier.size(20.dp)
                         )
                     }
 
                     // Кнопка выхода
                     IconButton(onClick = onLogout) {
-                        Icon(Icons.AutoMirrored.Filled.ExitToApp, "Logout", tint = CaelestiaTheme.colors.error.copy(alpha = 0.8f))
+                        Icon(Icons.AutoMirrored.Filled.ExitToApp, "Logout", tint = CelestiaTheme.colors.error.copy(alpha = 0.8f))
                     }
                 }
             }
@@ -217,6 +216,6 @@ fun ShellUI(initialSession: SessionData, onToggleTheme: () -> Unit, onLogout: ()
 @Composable
 fun NavButton(icon: ImageVector, isSelected: Boolean, onClick: () -> Unit) {
     IconButton(onClick = onClick) {
-        Icon(icon, contentDescription = null, tint = if (isSelected) CaelestiaTheme.colors.primary else CaelestiaTheme.colors.textSecondary.copy(alpha = 0.5f), modifier = Modifier.size(32.dp))
+        Icon(icon, contentDescription = null, tint = if (isSelected) CelestiaTheme.colors.primary else CelestiaTheme.colors.textSecondary.copy(alpha = 0.5f), modifier = Modifier.size(32.dp))
     }
 }

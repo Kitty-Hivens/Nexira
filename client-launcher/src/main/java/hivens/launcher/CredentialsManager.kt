@@ -13,7 +13,6 @@ class CredentialsManager(dataDir: Path, private val gson: Gson) {
 
     fun save(username: String, password: String) {
         try {
-            // SecurityUtils - это Kotlin object, методы вызываются как статические
             val encryptedPass = SecurityUtils.encrypt(password)
             val data = Credentials(username, encryptedPass)
             Files.writeString(dataFile, gson.toJson(data))
@@ -28,7 +27,6 @@ class CredentialsManager(dataDir: Path, private val gson: Gson) {
             val json = Files.readString(dataFile)
             val data = gson.fromJson(json, Credentials::class.java)
             if (data?.encryptedPassword != null) {
-                // Расшифровываем сразу при загрузке
                 data.decryptedPassword = SecurityUtils.decrypt(data.encryptedPassword)
                 return data
             }

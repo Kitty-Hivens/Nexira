@@ -1,4 +1,4 @@
-package hivens.core.api
+package hivens.core.api.interfaces
 
 import hivens.core.data.SessionData
 import java.io.IOException

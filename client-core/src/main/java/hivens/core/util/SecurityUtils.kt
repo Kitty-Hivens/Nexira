@@ -2,8 +2,7 @@ package hivens.core.util
 
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
-import java.util.Arrays
-import java.util.Base64
+import java.util.*
 import javax.crypto.Cipher
 import javax.crypto.spec.SecretKeySpec
 
@@ -16,7 +15,7 @@ object SecurityUtils {
             var key = SECRET.toByteArray(StandardCharsets.UTF_8)
             val sha = MessageDigest.getInstance("SHA-1")
             key = sha.digest(key)
-            key = Arrays.copyOf(key, 16) // 128-bit keys
+            key = key.copyOf(16) // 128-bit keys
             SecretKeySpec(key, "AES")
         } catch (e: Exception) {
             throw RuntimeException("Error generating key", e)
