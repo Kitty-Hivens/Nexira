@@ -14,7 +14,7 @@ import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
-import androidx.compose.material.icons.filled.Build // [NEW] Иконка для консоли (гаечный ключ)
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
@@ -29,10 +29,9 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Window
-import androidx.compose.ui.window.application
-import androidx.compose.ui.window.rememberWindowState
+import androidx.compose.ui.window.*
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.SessionData
 import hivens.launcher.LauncherDI
@@ -60,10 +59,26 @@ sealed class ShellScreen {
 }
 
 fun main() = application {
-    val windowState = rememberWindowState(width = 1000.dp, height = 650.dp)
+    val windowState = rememberWindowState(
+        width = 1000.dp,
+        height = 650.dp,
+        position = WindowPosition(Alignment.Center)
+    )
     var isDarkTheme by remember { mutableStateOf(true) }
+    var isAppVisible by remember { mutableStateOf(true) }
 
-    // Окно консоли (появляется только если активно)
+    Tray(
+        icon = painterResource("images/favicon.png"),
+        tooltip = "Aura Launcher",
+        onAction = { isAppVisible = !isAppVisible }, // Клик по иконке скрывает/показывает окно
+        menu = {
+            Item("Показать/Скрыть", onClick = { isAppVisible = !isAppVisible })
+            Item("Открыть консоль", onClick = { GameConsoleService.show() })
+            Separator()
+            Item("Выход", onClick = ::exitApplication)
+        }
+    )
+
     if (GameConsoleService.shouldShowConsole) {
         ConsoleWindow(onClose = { GameConsoleService.hide() })
     }
@@ -72,7 +87,8 @@ fun main() = application {
         onCloseRequest = ::exitApplication,
         state = windowState,
         title = "Aura Launcher",
-        resizable = false
+        resizable = false,
+        visible = isAppVisible // Управляем видимостью через трей
     ) {
         CelestiaTheme(useDarkTheme = isDarkTheme) {
             var appState by remember { mutableStateOf<AppState>(AppState.Login) }
@@ -101,7 +117,6 @@ fun main() = application {
                         onLogout = { di.credentialsManager.clear(); appState = AppState.Login },
                         onCloseApp = ::exitApplication
                     )
-
                 }
             }
         }
@@ -145,14 +160,12 @@ fun ShellUI(initialSession: SessionData, onToggleTheme: () -> Unit, onLogout: ()
     }
 
     Row(Modifier.fillMaxSize().padding(24.dp)) {
-        // --- БОКОВАЯ ПАНЕЛЬ ---
         GlassCard(modifier = Modifier.width(80.dp).fillMaxHeight(), shape = MaterialTheme.shapes.large) {
             Column(
                 Modifier.fillMaxSize().padding(vertical = 32.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(32.dp)
             ) {
-                // Аватар
                 Box(Modifier.size(48.dp).clip(CircleShape).background(CelestiaTheme.colors.surface).border(1.dp, CelestiaTheme.colors.primary.copy(alpha = 0.5f), CircleShape), contentAlignment = Alignment.TopCenter) {
                     if (faceBitmap != null) {
                         Image(painter = BitmapPainter(faceBitmap!!), contentDescription = null, modifier = Modifier.size(48.dp).offset(y = 4.dp), contentScale = ContentScale.Crop, alignment = Alignment.TopCenter)
@@ -163,17 +176,28 @@ fun ShellUI(initialSession: SessionData, onToggleTheme: () -> Unit, onLogout: ()
 
                 Spacer(Modifier.height(16.dp))
 
-                // Основная навигация
                 NavButton(Icons.Default.Home, currentScreen is ShellScreen.Home || currentScreen is ShellScreen.ServerSettings || currentScreen is ShellScreen.News) { currentScreen = ShellScreen.Home }
                 NavButton(Icons.Default.Person, currentScreen is ShellScreen.Profile) { currentScreen = ShellScreen.Profile }
                 NavButton(Icons.Default.Settings, currentScreen is ShellScreen.GlobalSettings) { currentScreen = ShellScreen.GlobalSettings }
 
                 Spacer(Modifier.weight(1f))
 
-                // Нижний блок с консолью и выходом
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    IconButton(onClick = { GameConsoleService.show() }, modifier = Modifier.size(32.dp)) {
-                        Icon(Icons.Default.Build, contentDescription = "Debug Console", tint = CelestiaTheme.colors.textSecondary.copy(alpha = 0.3f), modifier = Modifier.size(20.dp))
+                    val isConsoleOpen = GameConsoleService.shouldShowConsole
+                    IconButton(
+                        onClick = {
+                            if (isConsoleOpen) GameConsoleService.hide()
+                            else GameConsoleService.show()
+                        },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Build,
+                            contentDescription = "Debug Console",
+                            // Меняем цвет, если открыта
+                            tint = if (isConsoleOpen) CelestiaTheme.colors.primary else CelestiaTheme.colors.textSecondary.copy(alpha = 0.3f),
+                            modifier = Modifier.size(20.dp)
+                        )
                     }
                     IconButton(onClick = onLogout) {
                         Icon(Icons.AutoMirrored.Filled.ExitToApp, "Logout", tint = CelestiaTheme.colors.error.copy(alpha = 0.8f))
@@ -184,7 +208,6 @@ fun ShellUI(initialSession: SessionData, onToggleTheme: () -> Unit, onLogout: ()
 
         Spacer(Modifier.width(24.dp))
 
-        // --- КОНТЕНТ ---
         Box(Modifier.weight(1f).fillMaxHeight()) {
             Crossfade(targetState = currentScreen) { screen ->
                 when (screen) {
@@ -197,9 +220,7 @@ fun ShellUI(initialSession: SessionData, onToggleTheme: () -> Unit, onLogout: ()
                         onOpenServerSettings = { server -> currentScreen = ShellScreen.ServerSettings(server) },
                         onOpenNews = { currentScreen = ShellScreen.News }
                     )
-                    is ShellScreen.News -> NewsScreen(
-                        onBack = { currentScreen = ShellScreen.Home }
-                    )
+                    is ShellScreen.News -> NewsScreen(onBack = { currentScreen = ShellScreen.Home })
                     is ShellScreen.Profile -> ProfileScreen(currentSession, di.smartyNetworkService)
                     is ShellScreen.GlobalSettings -> SettingsScreen(isDarkTheme = true, onToggleTheme = onToggleTheme)
                     is ShellScreen.ServerSettings -> ServerSettingsScreen(server = screen.server, onBack = { currentScreen = ShellScreen.Home })
