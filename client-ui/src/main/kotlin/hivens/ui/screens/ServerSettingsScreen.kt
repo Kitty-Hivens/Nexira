@@ -1,6 +1,9 @@
 package hivens.ui.screens
 
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -11,10 +14,12 @@ import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.InstanceProfile
@@ -37,6 +42,9 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
     var useCustomJava by remember { mutableStateOf(false) }
     val modStates = remember { mutableStateMapOf<String, Boolean>() }
 
+    // Анимация появления списка
+    var modsLoaded by remember { mutableStateOf(false) }
+
     LaunchedEffect(server) {
         val p = di.profileManager.getProfile(server.assetDir)
         profile = p
@@ -51,6 +59,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
         loadedMods.forEach { mod ->
             modStates[mod.id] = p.optionalModsState.getOrDefault(mod.id, mod.isDefault)
         }
+        modsLoaded = true
     }
 
     fun saveProfile() {
@@ -77,6 +86,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
         Spacer(Modifier.height(24.dp))
 
         Row(Modifier.fillMaxSize()) {
+            // ЛЕВАЯ КОЛОНКА (Система)
             GlassCard(Modifier.weight(1f).fillMaxHeight()) {
                 Column(Modifier.padding(24.dp).verticalScroll(rememberScrollState())) {
                     Text("СИСТЕМА", style = MaterialTheme.typography.subtitle2, color = CelestiaTheme.colors.primary)
@@ -147,24 +157,35 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
 
             Spacer(Modifier.width(24.dp))
 
+            // ПРАВАЯ КОЛОНКА (Моды)
             GlassCard(Modifier.weight(1f).fillMaxHeight()) {
                 Column(Modifier.padding(24.dp)) {
                     Text("МОДИФИКАЦИИ", style = MaterialTheme.typography.subtitle2, color = CelestiaTheme.colors.primary)
                     Spacer(Modifier.height(16.dp))
 
-                    if (mods.isEmpty()) {
+                    if (mods.isEmpty() && modsLoaded) {
                         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             Text("Нет опциональных модов", color = CelestiaTheme.colors.textSecondary)
                         }
                     } else {
-                        LazyColumn(Modifier.fillMaxSize()) {
-                            items(mods) { mod ->
-                                ModItemRow(mod = mod, isChecked = modStates[mod.id] ?: false, onToggle = { isChecked ->
-                                    modStates[mod.id] = isChecked
-                                    if (isChecked) mod.excludings.forEach { conflict -> modStates[conflict] = false }
-                                    saveProfile()
-                                })
-                                Spacer(Modifier.height(8.dp))
+                        // Анимация появления списка
+                        AnimatedVisibility(
+                            visible = modsLoaded,
+                            enter = slideInVertically(initialOffsetY = { 50 }, animationSpec = tween(500)) + fadeIn(tween(500))
+                        ) {
+                            LazyColumn(Modifier.fillMaxSize()) {
+                                items(mods) { mod ->
+                                    ModItemRow(
+                                        mod = mod,
+                                        isChecked = modStates[mod.id] ?: false,
+                                        onToggle = { isChecked ->
+                                            modStates[mod.id] = isChecked
+                                            if (isChecked) mod.excludings.forEach { conflict -> modStates[conflict] = false }
+                                            saveProfile()
+                                        }
+                                    )
+                                    Spacer(Modifier.height(8.dp))
+                                }
                             }
                         }
                     }
@@ -176,15 +197,63 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
 
 @Composable
 fun ModItemRow(mod: OptionalMod, isChecked: Boolean, onToggle: (Boolean) -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(CelestiaTheme.colors.background.copy(alpha = 0.5f)).padding(12.dp),
-        verticalAlignment = Alignment.CenterVertically
+    // Состояние раскрытия описания
+    var expanded by remember { mutableStateOf(false) }
+
+    // Анимация цвета фона
+    val backgroundColor by animateColorAsState(
+        targetValue = if (isChecked) CelestiaTheme.colors.primary.copy(alpha = 0.2f) else CelestiaTheme.colors.background.copy(alpha = 0.5f),
+        animationSpec = tween(300)
+    )
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(backgroundColor)
+            .clickable { onToggle(!isChecked) } // Клик по всей строке переключает мод
+            .padding(12.dp)
+            .animateContentSize() // Плавное изменение размера при раскрытии
     ) {
-        Checkbox(checked = isChecked, onCheckedChange = onToggle, colors = CheckboxDefaults.colors(checkedColor = CelestiaTheme.colors.primary))
-        Spacer(Modifier.width(12.dp))
-        Column {
-            Text(mod.name, style = MaterialTheme.typography.body2, color = CelestiaTheme.colors.textPrimary)
-            if (!mod.description.isNullOrEmpty()) Text(mod.description!!, style = MaterialTheme.typography.caption, color = CelestiaTheme.colors.textSecondary)
+        Row(
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Checkbox(
+                checked = isChecked,
+                onCheckedChange = null, // Обрабатывается в Row clickable
+                colors = CheckboxDefaults.colors(checkedColor = CelestiaTheme.colors.primary)
+            )
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(mod.name, style = MaterialTheme.typography.body2, color = CelestiaTheme.colors.textPrimary)
+            }
+
+            // Если есть описание, показываем кнопку Info
+            if (!mod.description.isNullOrEmpty()) {
+                IconButton(
+                    onClick = { expanded = !expanded },
+                    modifier = Modifier.size(24.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Info,
+                        contentDescription = "Info",
+                        tint = if (expanded) CelestiaTheme.colors.primary else CelestiaTheme.colors.textSecondary
+                    )
+                }
+            }
+        }
+
+        // Раскрывающееся описание
+        if (expanded && !mod.description.isNullOrEmpty()) {
+            Spacer(Modifier.height(8.dp))
+            Divider(color = CelestiaTheme.colors.border.copy(alpha = 0.3f))
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = mod.description!!,
+                style = MaterialTheme.typography.caption,
+                color = CelestiaTheme.colors.textSecondary,
+                modifier = Modifier.padding(start = 32.dp) // Отступ под чекбокс
+            )
         }
     }
 }

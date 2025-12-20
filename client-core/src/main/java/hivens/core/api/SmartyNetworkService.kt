@@ -21,15 +21,11 @@ import java.util.concurrent.TimeUnit
 class SmartyNetworkService(baseClient: OkHttpClient, private val gson: Gson) {
 
     private val logger = LoggerFactory.getLogger(SmartyNetworkService::class.java)
-
-    // URL официального лаунчера для обхода защиты
-    private val uploadUrl = "http://www.smartycraft.ru/launcher2/index.php"
-    private val officialJarUrl = "https://www.smartycraft.ru/downloads/smartycraft.jar"
     private val cachedHashFile = File("smarty_hash.cache")
     private var currentHash = "5515a4bdd5f532faf0db61b8263d1952"
 
     private val client: OkHttpClient = baseClient.newBuilder()
-        .proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress("proxy.smartycraft.ru", 1080)))
+        .proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress(ServiceEndpoints.PROXY_HOST, ServiceEndpoints.PROXY_PORT)))
         .proxyAuthenticator { _, response ->
             val credential = Credentials.basic("proxyuser", "proxyuserproxyuser")
             response.request.newBuilder()
@@ -50,7 +46,6 @@ class SmartyNetworkService(baseClient: OkHttpClient, private val gson: Gson) {
 
     /**
      * Получает данные для Дашборда (Серверы + Новости).
-     * Если хеш устарел (статус UPDATE), автоматически обновляет его.
      */
     fun getDashboardResponse(): SmartyResponse {
         var response = tryGetDashboard(currentHash)
@@ -92,7 +87,7 @@ class SmartyNetworkService(baseClient: OkHttpClient, private val gson: Gson) {
             .build()
 
         val request = Request.Builder()
-            .url(uploadUrl)
+            .url(ServiceEndpoints.AUTH_LOGIN)
             .post(requestBody)
             .header("User-Agent", "SMARTYlauncher/3.6.2")
             .build()
@@ -108,12 +103,10 @@ class SmartyNetworkService(baseClient: OkHttpClient, private val gson: Gson) {
 
                 if (!response.isSuccessful) return "Ошибка сети: ${response.code}"
 
-                // Парсим JSON-ответ, если есть
                 if (body != null && body.startsWith("{")) {
                     try {
                         val respObj = gson.fromJson(body, SmartyResponse::class.java)
                         if (respObj.status == "OK") return "OK"
-                        // Переводим известные статусы ошибок
                         return when (respObj.status) {
                             "SIZE" -> "Ошибка: Неверный размер (нужен 64x32/64x64)"
                             "TYPE" -> "Ошибка: Неверный формат файла"
@@ -183,7 +176,11 @@ class SmartyNetworkService(baseClient: OkHttpClient, private val gson: Gson) {
     private fun downloadAndCalculateHash(): String? {
         try {
             val tempJar = Files.createTempFile("smarty_temp", ".jar")
-            val request = Request.Builder().url(officialJarUrl).header("User-Agent", "SMARTYlauncher/3.6.2").build()
+            val request = Request.Builder()
+                .url(ServiceEndpoints.OFFICIAL_JAR_URL)
+                .header("User-Agent", "SMARTYlauncher/3.6.2")
+                .build()
+
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) return null
                 response.body?.byteStream()?.use { input ->
