@@ -33,9 +33,11 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.*
 import hivens.core.api.model.ServerProfile
+import hivens.core.data.SeasonTheme
 import hivens.core.data.SessionData
 import hivens.launcher.LauncherDI
 import hivens.ui.components.GlassCard
+import hivens.ui.components.SeasonalEffectsLayer
 import hivens.ui.screens.*
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.utils.GameConsoleService
@@ -70,7 +72,7 @@ fun main() = application {
     Tray(
         icon = painterResource("images/favicon.png"),
         tooltip = "Aura Launcher",
-        onAction = { isAppVisible = !isAppVisible }, // Клик по иконке скрывает/показывает окно
+        onAction = { isAppVisible = !isAppVisible },
         menu = {
             Item("Показать/Скрыть", onClick = { isAppVisible = !isAppVisible })
             Item("Открыть консоль", onClick = { GameConsoleService.show() })
@@ -88,10 +90,12 @@ fun main() = application {
         state = windowState,
         title = "Aura Launcher",
         resizable = false,
-        visible = isAppVisible // Управляем видимостью через трей
+        visible = isAppVisible
     ) {
         CelestiaTheme(useDarkTheme = isDarkTheme) {
             var appState by remember { mutableStateOf<AppState>(AppState.Login) }
+            // Инициализация темы из настроек
+            var seasonalTheme by remember { mutableStateOf(di.settingsService.getSettings().seasonalTheme) }
 
             LaunchedEffect(Unit) {
                 val creds = di.credentialsManager.load()
@@ -107,7 +111,8 @@ fun main() = application {
             }
 
             Box(Modifier.fillMaxSize().background(MaterialTheme.colors.background)) {
-                CelestiaBackground(isDarkTheme = isDarkTheme)
+                // Передаем параметры в фон
+                CelestiaBackground(isDarkTheme = isDarkTheme, currentTheme = seasonalTheme)
 
                 when (val state = appState) {
                     is AppState.Login -> LoginScreen(onLoginSuccess = { session -> appState = AppState.Shell(session) })
@@ -115,7 +120,8 @@ fun main() = application {
                         initialSession = state.session,
                         onToggleTheme = { isDarkTheme = !isDarkTheme },
                         onLogout = { di.credentialsManager.clear(); appState = AppState.Login },
-                        onCloseApp = ::exitApplication
+                        onCloseApp = ::exitApplication,
+                        onThemeChanged = { newTheme -> seasonalTheme = newTheme }
                     )
                 }
             }
@@ -124,7 +130,7 @@ fun main() = application {
 }
 
 @Composable
-fun CelestiaBackground(isDarkTheme: Boolean) {
+fun CelestiaBackground(isDarkTheme: Boolean, currentTheme: SeasonTheme) {
     val infiniteTransition = rememberInfiniteTransition()
     val t by infiniteTransition.animateFloat(
         initialValue = 0f, targetValue = 6.28f,
@@ -146,10 +152,21 @@ fun CelestiaBackground(isDarkTheme: Boolean) {
         drawRect(brush = Brush.radialGradient(colors = listOf(primaryColor.copy(alpha = bgAlpha), Color.Transparent), center = Offset(x1, y1), radius = width * 0.6f))
         drawRect(brush = Brush.radialGradient(colors = listOf(successColor.copy(alpha = glowAlpha), Color.Transparent), center = Offset(x2, y2), radius = width * 0.5f))
     }
+
+    // Восстановленный вызов с isDarkTheme
+    SeasonalEffectsLayer(
+        theme = currentTheme
+    )
 }
 
 @Composable
-fun ShellUI(initialSession: SessionData, onToggleTheme: () -> Unit, onLogout: () -> Unit, onCloseApp: () -> Unit) {
+fun ShellUI(
+    initialSession: SessionData,
+    onToggleTheme: () -> Unit,
+    onLogout: () -> Unit,
+    onCloseApp: () -> Unit,
+    onThemeChanged: (SeasonTheme) -> Unit
+) {
     var currentSession by remember { mutableStateOf(initialSession) }
     var currentScreen by remember { mutableStateOf<ShellScreen>(ShellScreen.Home) }
     var selectedServer by remember { mutableStateOf<ServerProfile?>(null) }
@@ -194,7 +211,6 @@ fun ShellUI(initialSession: SessionData, onToggleTheme: () -> Unit, onLogout: ()
                         Icon(
                             Icons.Default.Build,
                             contentDescription = "Debug Console",
-                            // Меняем цвет, если открыта
                             tint = if (isConsoleOpen) CelestiaTheme.colors.primary else CelestiaTheme.colors.textSecondary.copy(alpha = 0.3f),
                             modifier = Modifier.size(20.dp)
                         )
@@ -222,7 +238,11 @@ fun ShellUI(initialSession: SessionData, onToggleTheme: () -> Unit, onLogout: ()
                     )
                     is ShellScreen.News -> NewsScreen(onBack = { currentScreen = ShellScreen.Home })
                     is ShellScreen.Profile -> ProfileScreen(currentSession, di.smartyNetworkService)
-                    is ShellScreen.GlobalSettings -> SettingsScreen(isDarkTheme = true, onToggleTheme = onToggleTheme)
+                    is ShellScreen.GlobalSettings -> SettingsScreen(
+                        isDarkTheme = true,
+                        onToggleTheme = onToggleTheme,
+                        onThemeChanged = onThemeChanged
+                    )
                     is ShellScreen.ServerSettings -> ServerSettingsScreen(server = screen.server, onBack = { currentScreen = ShellScreen.Home })
                 }
             }

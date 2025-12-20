@@ -4,6 +4,7 @@ data class SettingsData(
     var javaPath: String? = null,
     var memoryMB: Int = 4096,
     var isDarkTheme: Boolean = true,
+    var seasonalTheme: SeasonTheme = SeasonTheme.AUTO,
     var closeAfterStart: Boolean = true,
     var saveCredentials: Boolean = true,
     var savedUsername: String? = null,
