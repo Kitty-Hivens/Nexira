@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List // Иконка для новостей
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -44,7 +45,8 @@ fun DashboardScreen(
     onServerSelected: (ServerProfile) -> Unit,
     onSessionUpdated: (SessionData) -> Unit,
     onCloseApp: () -> Unit,
-    onOpenServerSettings: (ServerProfile) -> Unit
+    onOpenServerSettings: (ServerProfile) -> Unit,
+    onOpenNews: () -> Unit
 ) {
     var servers by remember { mutableStateOf<List<ServerProfile>>(emptyList()) }
     var selectedServer by remember { mutableStateOf(initialSelectedServer) }
@@ -59,10 +61,12 @@ fun DashboardScreen(
 
     val listState = rememberLazyListState()
 
-    // 1. Загрузка списка серверов
+    // 1. Загрузка данных
     LaunchedEffect(Unit) {
         if (servers.isEmpty()) {
-            val loaded = withContext(Dispatchers.IO) { di.serverListService.fetchProfiles().get() }
+            // Это загрузит и серверы, и новости в кэш
+            val data = withContext(Dispatchers.IO) { di.serverListService.fetchDashboardData().get() }
+            val loaded = data.servers
             servers = loaded
 
             if (selectedServer == null) {
@@ -76,7 +80,6 @@ fun DashboardScreen(
         }
     }
 
-    // 2. Авто-синхронизация сессии
     LaunchedEffect(selectedServer) {
         val srv = selectedServer ?: return@LaunchedEffect
         if (session.serverId != srv.assetDir) {
@@ -131,6 +134,15 @@ fun DashboardScreen(
                                     }
                                 }
                             }
+
+                            IconButton(
+                                onClick = onOpenNews,
+                                enabled = !isLaunching
+                            ) {
+                                Icon(Icons.AutoMirrored.Filled.List, null, tint = CelestiaTheme.colors.textSecondary, modifier = Modifier.size(32.dp))
+                            }
+
+                            Spacer(Modifier.width(8.dp))
 
                             IconButton(
                                 onClick = { onOpenServerSettings(selectedServer!!) },
@@ -241,7 +253,6 @@ fun DashboardScreen(
     }
 }
 
-// Helper components
 @Composable
 fun Badge(text: String, color: Color) {
     Box(modifier = Modifier.border(1.dp, color.copy(alpha = 0.5f), RoundedCornerShape(4.dp)).padding(horizontal = 8.dp, vertical = 2.dp)) {
@@ -254,13 +265,11 @@ fun ServerChip(name: String, isSelected: Boolean, onClick: () -> Unit) {
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
 
-    // Анимация масштаба
     val scale by animateFloatAsState(
         targetValue = if (isHovered || isSelected) 1.05f else 1.0f,
         animationSpec = tween(durationMillis = 200)
     )
 
-    // Анимация прозрачности фона
     val backgroundColor = if (isSelected) CelestiaTheme.colors.primary
     else if (isHovered) CelestiaTheme.colors.surface.copy(alpha = 0.9f)
     else CelestiaTheme.colors.surface
@@ -269,7 +278,6 @@ fun ServerChip(name: String, isSelected: Boolean, onClick: () -> Unit) {
         modifier = Modifier
             .height(40.dp)
             .defaultMinSize(minWidth = 100.dp)
-            // Применяем масштаб
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
@@ -278,7 +286,7 @@ fun ServerChip(name: String, isSelected: Boolean, onClick: () -> Unit) {
             .background(backgroundColor)
             .clickable(
                 interactionSource = interactionSource,
-                indication = null // Убираем ripple, он тут лишний при наличии scale
+                indication = null
             ) { onClick() }
             .padding(horizontal = 20.dp),
         contentAlignment = Alignment.Center

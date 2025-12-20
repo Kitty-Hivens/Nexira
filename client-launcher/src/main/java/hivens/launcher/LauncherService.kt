@@ -195,6 +195,7 @@ class LauncherService(
             args.add("-Dio.netty.native.workdir=" + nativesPath.toAbsolutePath())
             args.add("-DlibraryDirectory=" + libDir.toAbsolutePath())
 
+            // Добавляем client-1.21.1... в игнор лист, на всякий случай, хотя exclusion из CP важнее
             val ignoreList = "securejarhandler-3.0.8.jar,asm-9.7.jar,asm-commons-9.7.jar,asm-tree-9.7.jar,asm-util-9.7.jar,asm-analysis-9.7.jar,bootstraplauncher-2.0.2.jar,JarJarFileSystems-0.4.1.jar,client-extra,neoforge-,neoforge-21.1.504.jar"
             args.add("-DignoreList=$ignoreList")
             args.add("-DmergeModules=jna-5.10.0.jar,jna-platform-5.10.0.jar")
@@ -285,12 +286,9 @@ class LauncherService(
 
                 if (absoluteExcluded.contains(path)) return@filter false
                 if (path.startsWith(modsDir)) return@filter false
-
                 if (fileName.startsWith("neoforge-")) return@filter false
-
-                if (fileName.startsWith("client-1.21.1")) {
-                    if (!fileName.contains("-srg")) return@filter false
-                }
+                if (fileName.startsWith("client-1.21.1")) return@filter false
+                // -----------------------
 
                 return@filter true
             }

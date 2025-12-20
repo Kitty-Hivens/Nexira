@@ -48,7 +48,7 @@ class JavaManagerService(
         return when {
             mcVersion.startsWith("1.21") || mcVersion.startsWith("1.20.5") || mcVersion.startsWith("1.20.6") -> 21
             mcVersion.startsWith("1.17") || mcVersion.startsWith("1.18") || mcVersion.startsWith("1.19") || mcVersion.startsWith("1.20") -> 17
-            else -> 8 // Default for 1.7.10 - 1.16.5. TODO: fix 1.7.10. lol.
+            else -> 8
         }
     }
 
@@ -91,8 +91,8 @@ class JavaManagerService(
         val os = getOsName()
         val arch = getArchName()
 
-        return when (version) {
-            8 -> when {
+        return when (version) { // БЛИИИН СОЛЯРИСА НЕТ. Почему???
+            8 -> when {         // FreeBSD тоже нет! Как и тестировщиков под него.
                 os == "win" && arch == "x64" -> "https://download.bell-sw.com/java/8u472+9/bellsoft-jdk8u472+9-windows-amd64-full.zip"
                 os == "win" && arch == "x32" -> "https://download.bell-sw.com/java/8u472+9/bellsoft-jdk8u472+9-windows-i586.zip"
                 os == "linux" && arch == "x64" -> "https://download.bell-sw.com/java/8u472+9/bellsoft-jdk8u472+9-linux-amd64-full.tar.gz"

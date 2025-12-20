@@ -1,6 +1,6 @@
 plugins {
     kotlin("jvm")
-    id("org.jetbrains.compose") version "1.7.0"
+    id("org.jetbrains.compose") version "1.9.3"
     id("org.jetbrains.kotlin.plugin.compose") version "2.1.0"
 }
 
@@ -24,9 +24,14 @@ dependencies {
     implementation(compose.ui)
     implementation(compose.foundation)
     implementation(compose.preview)
+    implementation(compose.materialIconsExtended)
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.9.0")
+
+    // Image
+    implementation("io.coil-kt.coil3:coil-network-okhttp:3.0.4")
+    implementation("io.coil-kt.coil3:coil-compose:3.3.0")
 
     // Logging
     implementation("org.slf4j:slf4j-simple:2.0.9")

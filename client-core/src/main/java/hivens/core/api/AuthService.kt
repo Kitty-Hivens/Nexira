@@ -43,7 +43,8 @@ class AuthService(baseClient: OkHttpClient, private val gson: Gson) : IAuthServi
         @SerializedName("uid") val uid: String? = null,
         @SerializedName("uuid") val uuid: String? = null,
         @SerializedName("session") val session: String? = null,
-        @SerializedName("client") val client: FileManifest? = null
+        @SerializedName("client") val client: FileManifest? = null,
+        @SerializedName("money") val money: Int = 0
     )
 
     override fun login(username: String, password: String, serverId: String): SessionData {
@@ -108,11 +109,13 @@ class AuthService(baseClient: OkHttpClient, private val gson: Gson) : IAuthServi
                 return SessionData(
                     status = authResp.status,
                     playerName = authResp.playername ?: "",
+                    uid = authResp.uid ?: "",
                     uuid = cleanUuid,
                     accessToken = finalGameToken ?: "",
                     fileManifest = authResp.client,
                     serverId = serverId,
-                    cachedPassword = password
+                    cachedPassword = password,
+                    balance = authResp.money
                 )
 
             } catch (e: JsonSyntaxException) {

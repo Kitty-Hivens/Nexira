@@ -55,6 +55,7 @@ sealed class ShellScreen {
     data object Home : ShellScreen()
     data object Profile : ShellScreen()
     data object GlobalSettings : ShellScreen()
+    data object News : ShellScreen()
     data class ServerSettings(val server: ServerProfile) : ShellScreen()
 }
 
@@ -100,6 +101,7 @@ fun main() = application {
                         onLogout = { di.credentialsManager.clear(); appState = AppState.Login },
                         onCloseApp = ::exitApplication
                     )
+
                 }
             }
         }
@@ -162,27 +164,17 @@ fun ShellUI(initialSession: SessionData, onToggleTheme: () -> Unit, onLogout: ()
                 Spacer(Modifier.height(16.dp))
 
                 // Основная навигация
-                NavButton(Icons.Default.Home, currentScreen is ShellScreen.Home || currentScreen is ShellScreen.ServerSettings) { currentScreen = ShellScreen.Home }
+                NavButton(Icons.Default.Home, currentScreen is ShellScreen.Home || currentScreen is ShellScreen.ServerSettings || currentScreen is ShellScreen.News) { currentScreen = ShellScreen.Home }
                 NavButton(Icons.Default.Person, currentScreen is ShellScreen.Profile) { currentScreen = ShellScreen.Profile }
                 NavButton(Icons.Default.Settings, currentScreen is ShellScreen.GlobalSettings) { currentScreen = ShellScreen.GlobalSettings }
 
                 Spacer(Modifier.weight(1f))
 
-                // Нижний блок: Консоль + Выход
+                // Нижний блок с консолью и выходом
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-
-                    // Стильная маленькая кнопка отладки
                     IconButton(onClick = { GameConsoleService.show() }, modifier = Modifier.size(32.dp)) {
-                        Icon(
-                            // Гаечный ключ выглядит более "технически"
-                            Icons.Default.Build,
-                            contentDescription = "Debug Console",
-                            tint = CelestiaTheme.colors.textSecondary.copy(alpha = 0.3f), // Очень тусклая, пока не наведешь
-                            modifier = Modifier.size(20.dp)
-                        )
+                        Icon(Icons.Default.Build, contentDescription = "Debug Console", tint = CelestiaTheme.colors.textSecondary.copy(alpha = 0.3f), modifier = Modifier.size(20.dp))
                     }
-
-                    // Кнопка выхода
                     IconButton(onClick = onLogout) {
                         Icon(Icons.AutoMirrored.Filled.ExitToApp, "Logout", tint = CelestiaTheme.colors.error.copy(alpha = 0.8f))
                     }
@@ -202,9 +194,13 @@ fun ShellUI(initialSession: SessionData, onToggleTheme: () -> Unit, onLogout: ()
                         onServerSelected = { server -> selectedServer = server },
                         onSessionUpdated = { newSession -> currentSession = newSession },
                         onCloseApp = onCloseApp,
-                        onOpenServerSettings = { server -> currentScreen = ShellScreen.ServerSettings(server) }
+                        onOpenServerSettings = { server -> currentScreen = ShellScreen.ServerSettings(server) },
+                        onOpenNews = { currentScreen = ShellScreen.News }
                     )
-                    is ShellScreen.Profile -> ProfileScreen(currentSession)
+                    is ShellScreen.News -> NewsScreen(
+                        onBack = { currentScreen = ShellScreen.Home }
+                    )
+                    is ShellScreen.Profile -> ProfileScreen(currentSession, di.smartyNetworkService)
                     is ShellScreen.GlobalSettings -> SettingsScreen(isDarkTheme = true, onToggleTheme = onToggleTheme)
                     is ShellScreen.ServerSettings -> ServerSettingsScreen(server = screen.server, onBack = { currentScreen = ShellScreen.Home })
                 }

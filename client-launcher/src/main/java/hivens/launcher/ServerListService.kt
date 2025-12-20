@@ -1,33 +1,57 @@
 package hivens.launcher
 
-import hivens.core.api.interfaces.IServerListService
+import hivens.config.ServiceEndpoints
 import hivens.core.api.SmartyNetworkService
 import hivens.core.api.dto.SmartyServer
+import hivens.core.api.interfaces.IServerListService
 import hivens.core.api.model.ServerProfile
+import hivens.core.data.DashboardData
+import hivens.core.data.NewsItem
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import java.util.concurrent.CompletableFuture
 
 class ServerListService(private val networkService: SmartyNetworkService) : IServerListService {
 
-    private var cachedProfiles: List<ServerProfile>? = null
+    private var cachedData: DashboardData? = null
 
-    override fun fetchProfiles(): CompletableFuture<List<ServerProfile>> {
-        if (!cachedProfiles.isNullOrEmpty()) {
-            return CompletableFuture.completedFuture(cachedProfiles)
+    override fun fetchDashboardData(): CompletableFuture<DashboardData> {
+        // Если данные есть в кэше, возвращаем их сразу
+        if (cachedData != null) {
+            return CompletableFuture.completedFuture(cachedData)
         }
 
         return CompletableFuture.supplyAsync {
-            val profiles = ArrayList<ServerProfile>()
             try {
-                val rawServers = networkService.getServers()
-                for (srv in rawServers) {
-                    profiles.add(getProfile(srv))
+                val response = networkService.getDashboardResponse()
+                val servers = response.servers.map { getProfile(it) }
+                val news = response.news.map { newsDto ->
+                    // Формируем ссылку на картинку
+                    val imageName = if (newsDto.image.endsWith(".jpg")) newsDto.image else "${newsDto.image}.jpg"
+                    val imageUrl = "${ServiceEndpoints.BASE_URL}/images/news/mini/$imageName"
+
+                    NewsItem(
+                        id = newsDto.id,
+                        title = newsDto.name,
+                        description = "Просмотров: ${newsDto.views}",
+                        date = formatTimestamp(newsDto.date),
+                        imageUrl = imageUrl
+                    )
                 }
-                this.cachedProfiles = profiles
+
+                val data = DashboardData(servers, news)
+                this.cachedData = data
+                data
             } catch (e: Exception) {
-                System.err.println("Error fetching profiles: " + e.message)
+                e.printStackTrace()
+                DashboardData(emptyList(), emptyList())
             }
-            profiles
         }
+    }
+
+    override fun fetchProfiles(): CompletableFuture<List<ServerProfile>> {
+        return fetchDashboardData().thenApply { it.servers }
     }
 
     private fun getProfile(srv: SmartyServer): ServerProfile {
@@ -40,6 +64,16 @@ class ServerListService(private val networkService: SmartyNetworkService) : ISer
             assetDir = srv.name ?: "Unknown"
             extraCheckSum = srv.extraCheckSum
             optionalModsData = srv.optionalMods
+        }
+    }
+
+    private fun formatTimestamp(ts: Long): String {
+        return try {
+            val date = Date(ts * 1000L)
+            val sdf = SimpleDateFormat("dd MMM yyyy", Locale("ru"))
+            sdf.format(date)
+        } catch (e: Exception) {
+            "Unknown Date"
         }
     }
 }
