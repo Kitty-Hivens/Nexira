@@ -54,9 +54,7 @@ jobs:
 
       # Для Linux часто нужны библиотеки для работы Compose при сборке
       - name: Install Linux Dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libgl1-mesa-glx libgl1-mesa-dri xorg-dev
+        run: sudo apt-get update && sudo apt-get install -y libgl1 libgl1-mesa-dri xorg-dev
 
       - name: Build AppImage and Deb
         run: ./gradlew :client-ui:packageAppImage :client-ui:packageDeb
