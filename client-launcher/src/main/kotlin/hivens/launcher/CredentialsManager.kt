@@ -46,8 +46,8 @@ class CredentialsManager(dataDir: Path, private val gson: Gson) {
     }
 
     data class Credentials(
-        val username: String,
-        val encryptedPassword: String?
+        val username: String = "",
+        val encryptedPassword: String? = null
     ) {
         @Transient
         var decryptedPassword: String? = null
