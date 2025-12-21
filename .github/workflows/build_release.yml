@@ -1,83 +1,105 @@
-name: Build Aura Launcher
+name: Build and Package Launcher
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: # Возможность запустить кнопку вручную
   push:
     tags:
-      - 'v*'
+      - 'v*' # Запускать автоматически при создании тега (например, v1.0.0)
 
 jobs:
-  build-apps:
-    name: Build for ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-
+  # --- СБОРКА ДЛЯ WINDOWS ---
+  build-windows:
+    name: Build Windows (MSI)
+    runs-on: windows-latest
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Java
+      - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
-          distribution: 'liberica'
           java-version: '21'
+          distribution: 'temurin'
 
-      # Кешируем Gradle, чтобы сборка летала
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
-      # --- LINUX АГЕНТ ---
-      - name: Build Linux (Deb & AppImage dir)
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          # Собираем .deb
-          ./gradlew :client-ui:packageDeb
-          # Собираем переносимую папку (как ты хотел)
-          ./gradlew :client-ui:createDistributable
-          # Упаковываем папку в архив для удобства
-          cd client-ui/build/compose/binaries/main/app/linux
-          tar -czvf AuraLauncher-Linux.tar.gz AuraLauncher
+      - name: Build MSI Package
+        run: ./gradlew.bat :client-ui:packageMsi
 
-      # --- WINDOWS АГЕНТ ---
-      - name: Build Windows (MSI)
-        if: matrix.os == 'windows-latest'
-        run: ./gradlew :client-ui:packageMsi
-
-      # --- MACOS АГЕНТ ---
-      - name: Build macOS (DMG)
-        if: matrix.os == 'macos-latest'
-        run: ./gradlew :client-ui:packageDmg
-
-      # Забираем Linux .deb
-      - name: Upload Linux Deb
-        if: matrix.os == 'ubuntu-latest'
+      - name: Upload Windows Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: AuraLauncher-Linux-Deb
+          name: windows-installer
+          path: client-ui/build/compose/binaries/main/msi/*.msi
+          if-no-files-found: error
+
+  # --- СБОРКА ДЛЯ LINUX ---
+  build-linux:
+    name: Build Linux (AppImage & Deb)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      # Для Linux часто нужны библиотеки для работы Compose при сборке
+      - name: Install Linux Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgl1-mesa-glx libgl1-mesa-dri xorg-dev
+
+      - name: Build AppImage and Deb
+        run: ./gradlew :client-ui:packageAppImage :client-ui:packageDeb
+
+      - name: Upload Linux AppImage
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-appimage
+          path: client-ui/build/compose/binaries/main/appImage/*.AppImage
+
+      - name: Upload Linux Deb
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-deb
           path: client-ui/build/compose/binaries/main/deb/*.deb
 
-      # Забираем Linux Portable
-      - name: Upload Linux Portable
-        if: matrix.os == 'ubuntu-latest'
-        uses: actions/upload-artifact@v4
-        with:
-          name: AuraLauncher-Linux-Portable
-          path: client-ui/build/compose/binaries/main/app/linux/AuraLauncher-Linux.tar.gz
+  # --- СБОРКА ДЛЯ MACOS ---
+  build-macos:
+    name: Build macOS (DMG)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
 
-      # Забираем Windows .msi
-      - name: Upload Windows MSI
-        if: matrix.os == 'windows-latest'
-        uses: actions/upload-artifact@v4
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
         with:
-          name: AuraLauncher-Windows
-          path: client-ui/build/compose/binaries/main/msi/*.msi
+          java-version: '21'
+          distribution: 'temurin'
 
-      # Забираем Mac .dmg
-      - name: Upload macOS DMG
-        if: matrix.os == 'macos-latest'
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build DMG Package
+        run: ./gradlew :client-ui:packageDmg
+        # Обратите внимание: без Apple Developer ID приложение будет "неподписанным"
+        # и пользователям придется разрешать его запуск через настройки.
+
+      - name: Upload macOS Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: AuraLauncher-MacOS
+          name: macos-dmg
           path: client-ui/build/compose/binaries/main/dmg/*.dmg
+          if-no-files-found: error
