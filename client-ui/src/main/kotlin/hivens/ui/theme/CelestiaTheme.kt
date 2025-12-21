@@ -61,7 +61,7 @@ fun CelestiaTheme(
             primary = colors.primary,
             background = colors.background,
             surface = colors.surface,
-            onPrimary = if (useDarkTheme) Color.Black else Color.White,
+            onPrimary = Color.White,
             onBackground = colors.textPrimary,
             onSurface = colors.textPrimary,
             error = colors.error
