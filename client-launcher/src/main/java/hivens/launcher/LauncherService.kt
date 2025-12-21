@@ -5,9 +5,9 @@ import hivens.core.api.interfaces.IManifestProcessorService
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.FileManifest
 import hivens.core.data.InstanceProfile
-import hivens.core.data.OptionalMod
 import hivens.core.data.SessionData
-import hivens.core.util.ZipUtils
+import hivens.launcher.component.EnvironmentPreparer
+import hivens.launcher.component.ModManager
 import org.slf4j.LoggerFactory
 import java.io.BufferedReader
 import java.io.File
@@ -16,19 +16,24 @@ import java.io.InputStream
 import java.io.InputStreamReader
 import java.nio.file.Files
 import java.nio.file.Path
-import java.util.*
+import java.util.ArrayList
+import java.util.Locale
 import java.util.stream.Collectors
 import kotlin.concurrent.thread
 
 enum class LauncherLogType { INFO, WARN, ERROR }
 
-class LauncherService( // TODO: God class. Возможно стоит разделить на части.
+class LauncherService(
     private val manifestProcessor: IManifestProcessorService,
     private val profileManager: ProfileManager,
     private val javaManager: JavaManagerService
 ) : ILauncherService {
 
     private val log = LoggerFactory.getLogger(LauncherService::class.java)
+
+    private val modManager = ModManager(manifestProcessor)
+    private val envPreparer = EnvironmentPreparer()
+
     private val launchConfigs: Map<String, LaunchConfig> = buildLaunchConfigMap()
 
     private data class LaunchConfig(
@@ -36,36 +41,12 @@ class LauncherService( // TODO: God class. Возможно стоит разд�
         val tweakClass: String?,
         val assetIndex: String,
         val jvmArgs: List<String>,
-        val nativesDir: String
+        val nativesDir: String,
+        val programArgs: List<String> = emptyList()
     )
 
     private enum class OS { WINDOWS, LINUX, MACOS, UNKNOWN }
 
-    // Пайп для чтения логов
-    private fun pipeOutput(stream: InputStream, type: LauncherLogType, onLog: (String, LauncherLogType) -> Unit) {
-        val reader = BufferedReader(InputStreamReader(stream))
-        thread(isDaemon = true) {
-            try {
-                var line: String?
-                while (reader.readLine().also { line = it } != null) {
-                    val text = line ?: continue
-                    val finalType = if (type == LauncherLogType.ERROR) {
-                        LauncherLogType.ERROR
-                    } else if (text.contains("WARN", ignoreCase = true)) {
-                        LauncherLogType.WARN
-                    } else if (text.contains("ERROR", ignoreCase = true) || text.contains("Exception", ignoreCase = true)) {
-                        LauncherLogType.ERROR
-                    } else {
-                        LauncherLogType.INFO
-                    }
-                    onLog(text, finalType)
-                    if (finalType == LauncherLogType.ERROR) System.err.println(text) else println(text)
-                }
-            } catch (e: Exception) { /* Stream closed */ }
-        }
-    }
-
-    // Главный метод запуска с логами
     @Throws(IOException::class)
     fun launchClientWithLogs(
         sessionData: SessionData,
@@ -76,73 +57,39 @@ class LauncherService( // TODO: God class. Возможно стоит разд�
         onLog: (String, LauncherLogType) -> Unit
     ): Process {
         val profile: InstanceProfile = profileManager.getProfile(serverProfile.assetDir)
+        val version = serverProfile.version
+
+        val config = launchConfigs[version]
+            ?: launchConfigs.entries.find { version.startsWith(it.key) }?.value
+            ?: throw IOException("Unsupported version: $version")
 
         var memory = if (profile.memoryMb > 0) profile.memoryMb else allocatedMemoryMB
         if (memory < 768) memory = 1024
 
-        val javaExec: String = when {
-            !profile.javaPath.isNullOrEmpty() -> profile.javaPath!!
-            Files.exists(javaExecutablePath) -> javaExecutablePath.toString()
-            else -> javaManager.getJavaPath(serverProfile.version).toString()
-        }
+        val javaExec: String = resolveJavaPath(profile, javaExecutablePath, version)
 
         onLog("Starting ${serverProfile.name} with Java: $javaExec, RAM: $memory", LauncherLogType.INFO)
         log.info("Starting {} with Java: {}, RAM: {}", serverProfile.name, javaExec, memory)
 
-        val version = serverProfile.version
-        val config = launchConfigs[version] ?: throw IOException("Unsupported version: $version")
-
         val allMods = manifestProcessor.getOptionalModsForClient(serverProfile)
         val manifest = sessionData.fileManifest ?: FileManifest()
+        modManager.syncMods(clientRootPath, profile, allMods, manifest, version)
 
-        syncMods(clientRootPath, profile, allMods, manifest, version)
+        envPreparer.prepareNatives(clientRootPath, config.nativesDir, version)
+        envPreparer.prepareAssets(clientRootPath, "assets-$version.zip")
 
-        prepareNatives(clientRootPath, config.nativesDir, version)
-        prepareAssets(clientRootPath, "assets-$version.zip")
+        cleanUpGarbage(clientRootPath)
 
-        val jvmArgs = ArrayList<String>()
-        jvmArgs.add(javaExec)
-        jvmArgs.add("-noverify")
+        val command = buildProcessCommand(
+            javaExec, memory, clientRootPath, config,
+            manifest, sessionData, serverProfile, profile
+        )
 
-        if (getPlatform() == OS.MACOS) {
-            jvmArgs.add("-XstartOnFirstThread")
-            jvmArgs.add("-Djava.awt.headless=false")
-        }
-
-        jvmArgs.add("-Dminecraft.api.auth.host=http://www.smartycraft.ru/launcher/")
-        jvmArgs.add("-Dminecraft.api.account.host=http://www.smartycraft.ru/launcher/")
-        jvmArgs.add("-Dminecraft.api.session.host=http://www.smartycraft.ru/launcher/")
-        jvmArgs.add("-Dminecraft.launcher.brand=smartycraft")
-        jvmArgs.add("-Dlauncher.version=3.0.0")
-
-        jvmArgs.addAll(config.jvmArgs)
-        if (!profile.jvmArgs.isNullOrEmpty()) {
-            jvmArgs.addAll(profile.jvmArgs!!.split(" "))
-        }
-
-        jvmArgs.add("-Xms512M")
-        jvmArgs.add("-Xmx${memory}M")
-
-        val nativesPath = clientRootPath.resolve(config.nativesDir)
-        jvmArgs.add("-Djava.library.path=" + nativesPath.toAbsolutePath())
-        jvmArgs.add("-cp")
-        jvmArgs.add(buildClasspath(clientRootPath, manifest))
-        jvmArgs.add(config.mainClass)
-
-        jvmArgs.addAll(buildMinecraftArgs(sessionData, serverProfile, clientRootPath, config.assetIndex))
-
-        if (config.tweakClass != null) {
-            jvmArgs.add("--tweakClass")
-            jvmArgs.add(config.tweakClass)
-        }
-
-        val pb = ProcessBuilder(jvmArgs)
+        val pb = ProcessBuilder(command)
         pb.directory(clientRootPath.toFile())
-
-        // Перехватываем вывод
         pb.redirectErrorStream(false)
 
-        onLog("LAUNCH COMMAND: ${java.lang.String.join(" ", jvmArgs)}", LauncherLogType.INFO)
+        onLog("LAUNCH COMMAND: ${java.lang.String.join(" ", command)}", LauncherLogType.INFO)
 
         val process = pb.start()
 
@@ -162,160 +109,252 @@ class LauncherService( // TODO: God class. Возможно стоит разд�
         return launchClientWithLogs(sessionData, serverProfile, clientRootPath, javaExecutablePath, allocatedMemoryMB) { _, _ -> }
     }
 
-    private fun buildMinecraftArgs(
-        sessionData: SessionData,
+    private fun cleanUpGarbage(clientRoot: Path) {
+        try {
+            Files.list(clientRoot).use { rootStream ->
+                rootStream.filter { Files.isDirectory(it) && it.fileName.toString().startsWith("libraries") }
+                    .forEach { libDir ->
+                        Files.walk(libDir).use { walk ->
+                            walk.filter { Files.isRegularFile(it) }
+                                .filter {
+                                    val name = it.toString().lowercase()
+                                    !name.endsWith(".jar") && !name.endsWith(".zip")
+                                }
+                                .forEach {
+                                    try { Files.deleteIfExists(it) } catch (_: Exception) {}
+                                }
+                        }
+                    }
+            }
+        } catch (_: Exception) {}
+    }
+
+    private fun resolveJavaPath(profile: InstanceProfile, defaultPath: Path, version: String): String {
+        if (!profile.javaPath.isNullOrEmpty()) return profile.javaPath!!
+        try {
+            val managedPath = javaManager.getJavaPath(version)
+            if (Files.exists(managedPath)) return managedPath.toString()
+        } catch (_: Exception) {}
+        if (Files.exists(defaultPath)) return defaultPath.toString()
+        return "java"
+    }
+
+    private fun buildProcessCommand(
+        javaExec: String,
+        memoryMB: Int,
+        clientRoot: Path,
+        config: LaunchConfig,
+        manifest: FileManifest,
+        session: SessionData,
         serverProfile: ServerProfile,
-        clientRootPath: Path,
-        assetIndex: String
+        userProfile: InstanceProfile
     ): List<String> {
         val args = ArrayList<String>()
-        args.add("--username")
-        args.add(sessionData.playerName)
-        args.add("--version")
-        args.add("Forge " + serverProfile.version)
-        args.add("--gameDir")
-        args.add(clientRootPath.toAbsolutePath().toString())
-        args.add("--assetsDir")
-        args.add(clientRootPath.resolve("assets").toAbsolutePath().toString())
-        args.add("--assetIndex")
-        args.add(assetIndex)
-        args.add("--uuid")
-        args.add(sessionData.uuid)
-        args.add("--accessToken")
-        args.add(sessionData.accessToken)
-        args.add("--userProperties")
-        args.add("{}")
-        args.add("--userType")
-        args.add("mojang")
+        args.add(javaExec)
+        args.add("-noverify")
+
+        if (getPlatform() == OS.MACOS) {
+            args.add("-XstartOnFirstThread")
+            args.add("-Djava.awt.headless=false")
+        }
+
+        args.add("-Dminecraft.api.auth.host=http://www.smartycraft.ru/launcher/")
+        args.add("-Dminecraft.api.account.host=http://www.smartycraft.ru/launcher/")
+        args.add("-Dminecraft.api.session.host=http://www.smartycraft.ru/launcher/")
+        args.add("-Dminecraft.launcher.brand=smartycraft")
+        args.add("-Dminecraft.launcher.version=3.6.2")
+
+        val nativesPath = clientRoot.resolve(config.nativesDir)
+        args.add("-Djava.library.path=" + nativesPath.toAbsolutePath())
+
+        val isNeoForge = config.assetIndex == "1.21.1"
+        var modulePathString = ""
+
+        val neoForgeModules = listOf(
+            "cpw/mods/securejarhandler/3.0.8/securejarhandler-3.0.8.jar",
+            "org/ow2/asm/asm/9.7/asm-9.7.jar",
+            "org/ow2/asm/asm-commons/9.7/asm-commons-9.7.jar",
+            "org/ow2/asm/asm-tree/9.7/asm-tree-9.7.jar",
+            "org/ow2/asm/asm-util/9.7/asm-util-9.7.jar",
+            "org/ow2/asm/asm-analysis/9.7/asm-analysis-9.7.jar",
+            "cpw/mods/bootstraplauncher/2.0.2/bootstraplauncher-2.0.2.jar",
+            "net/neoforged/JarJarFileSystems/0.4.1/JarJarFileSystems-0.4.1.jar"
+        )
+
+        if (isNeoForge) {
+            val libDir = clientRoot.resolve("libraries-1.21.1")
+            val mpPaths = ArrayList<String>()
+            for (subPath in neoForgeModules) {
+                val file = libDir.resolve(subPath)
+                if (Files.exists(file)) mpPaths.add(file.toAbsolutePath().toString())
+            }
+            modulePathString = java.lang.String.join(File.pathSeparator, mpPaths)
+
+            args.add("-Djna.tmpdir=" + nativesPath.toAbsolutePath())
+            args.add("-Dorg.lwjgl.system.SharedLibraryExtractPath=" + nativesPath.toAbsolutePath())
+            args.add("-Dio.netty.native.workdir=" + nativesPath.toAbsolutePath())
+            args.add("-DlibraryDirectory=" + libDir.toAbsolutePath())
+
+            // Добавляем client-1.21.1... в игнор лист, на всякий случай, хотя exclusion из CP важнее
+            val ignoreList = "securejarhandler-3.0.8.jar,asm-9.7.jar,asm-commons-9.7.jar,asm-tree-9.7.jar,asm-util-9.7.jar,asm-analysis-9.7.jar,bootstraplauncher-2.0.2.jar,JarJarFileSystems-0.4.1.jar,client-extra,neoforge-,neoforge-21.1.504.jar"
+            args.add("-DignoreList=$ignoreList")
+            args.add("-DmergeModules=jna-5.10.0.jar,jna-platform-5.10.0.jar")
+        }
+
+        args.addAll(config.jvmArgs)
+        if (!userProfile.jvmArgs.isNullOrEmpty()) {
+            args.addAll(userProfile.jvmArgs!!.split(" "))
+        }
+
+        args.add("-Xms512M")
+        args.add("-Xmx${memoryMB}M")
+
+        if (isNeoForge && modulePathString.isNotEmpty()) {
+            args.add("-p")
+            args.add(modulePathString)
+        }
+
+        args.add("-cp")
+        args.add(buildClasspath(clientRoot, manifest, if (isNeoForge) neoForgeModules else emptyList()))
+
+        args.add(config.mainClass)
+        args.addAll(config.programArgs)
+        args.addAll(buildMinecraftArgs(session, serverProfile, clientRoot, config.assetIndex))
+
+        if (config.tweakClass != null) {
+            args.add("--tweakClass")
+            args.add(config.tweakClass)
+        }
+
         return args
     }
 
-    private fun prepareNatives(clientRoot: Path, nativesDirName: String, version: String) {
-        val binDir = clientRoot.resolve("bin")
-        val nativesDir = clientRoot.resolve(nativesDirName)
+    private fun buildMinecraftArgs(
+        session: SessionData,
+        profile: ServerProfile,
+        root: Path,
+        assetIndex: String
+    ): List<String> {
+        val args = ArrayList<String>()
+        args.add("--username"); args.add(session.playerName)
+        args.add("--version"); args.add("Forge ${profile.version}")
+        args.add("--gameDir"); args.add(root.toAbsolutePath().toString())
+        args.add("--assetsDir"); args.add(root.resolve("assets").toAbsolutePath().toString())
+        args.add("--assetIndex"); args.add(assetIndex)
+        args.add("--uuid"); args.add(session.uuid)
+        args.add("--accessToken"); args.add(session.accessToken)
+        args.add("--userProperties"); args.add("{}")
+        args.add("--userType"); args.add("mojang")
 
-        if (!Files.exists(nativesDir) || nativesDir.toFile().list()?.isEmpty() == true) {
-            val targetZipName = "natives-$version.zip"
-            val nativesZip = binDir.resolve(targetZipName)
-            if (Files.exists(nativesZip)) {
-                try {
-                    ZipUtils.unzip(nativesZip.toFile(), nativesDir.toFile())
-                } catch (e: IOException) {
-                    log.error("Failed to unzip server natives", e)
-                }
-            }
+        if (assetIndex == "1.21.1") {
+            args.add("--fml.neoForgeVersion"); args.add("21.1.504")
+            args.add("--fml.fmlVersion"); args.add("4.0.34")
+            args.add("--fml.mcVersion"); args.add("1.21.1")
+            args.add("--fml.neoFormVersion"); args.add("20240808.144430")
         }
+
+        return args
     }
 
-    private fun prepareAssets(clientRoot: Path, assetsZipName: String) {
-        val assetsDir = clientRoot.resolve("assets")
-        val assetsZip = clientRoot.resolve(assetsZipName)
-        if (Files.exists(assetsZip)) {
-            val indexesDir = assetsDir.resolve("indexes").toFile()
-            if (!indexesDir.exists() || !indexesDir.isDirectory) {
-                try {
-                    ZipUtils.unzip(assetsZip.toFile(), assetsDir.toFile())
-                } catch (e: IOException) {
-                    log.error("Failed to unzip assets", e)
+    private fun buildClasspath(clientRoot: Path, manifest: FileManifest, excludedModules: List<String>): String {
+        val currentOs = getPlatform()
+        val allJars = HashSet<Path>()
+        val modsDir = clientRoot.resolve("mods").toAbsolutePath()
+        val libDir = clientRoot.resolve("libraries-1.21.1").toAbsolutePath()
+
+        manifestProcessor.flattenManifest(manifest).keys.forEach { pathStr ->
+            allJars.add(clientRoot.resolve(pathStr))
+        }
+
+        if (manifest.files.isEmpty()) {
+            try {
+                Files.walk(libDir).use { walk ->
+                    walk.filter {
+                        val name = it.toString().lowercase()
+                        Files.isRegularFile(it) && name.endsWith(".jar") && !name.endsWith(".cache")
+                    }.forEach { allJars.add(it) }
                 }
+            } catch (_: Exception) {}
+        }
+
+        val absoluteExcluded = excludedModules.map { libDir.resolve(it).toAbsolutePath() }
+
+        return allJars.stream()
+            .map { it.toAbsolutePath() }
+            .filter { path ->
+                val fileName = path.fileName.toString().lowercase()
+
+                if (absoluteExcluded.contains(path)) return@filter false
+                if (path.startsWith(modsDir)) return@filter false
+                if (fileName.startsWith("neoforge-")) return@filter false
+                if (fileName.startsWith("client-1.21.1")) return@filter false
+                // -----------------------
+
+                return@filter true
             }
-        }
-    }
-
-    @Throws(IOException::class)
-    private fun syncMods(
-        clientRoot: Path,
-        profile: InstanceProfile,
-        allMods: List<OptionalMod>,
-        manifest: FileManifest,
-        clientVersion: String
-    ) {
-        val modsDir = clientRoot.resolve("mods")
-        if (!Files.exists(modsDir)) Files.createDirectories(modsDir)
-
-        val allowedFiles = HashSet<String>()
-        val optionalJarNames = HashSet<String>()
-        for (mod in allMods) {
-            optionalJarNames.addAll(mod.jars)
-        }
-
-        val flatFiles = manifestProcessor.flattenManifest(manifest)
-        for (path in flatFiles.keys) {
-            if (path.contains("/mods/") || path.startsWith("mods/")) {
-                val fileName = File(path).name
-                if (!optionalJarNames.contains(fileName)) {
-                    allowedFiles.add(fileName)
-                }
-            }
-        }
-
-        val state = profile.optionalModsState
-        for (mod in allMods) {
-            val isEnabled = state.getOrDefault(mod.id, mod.isDefault)
-            if (isEnabled) {
-                allowedFiles.addAll(mod.jars)
-            }
-        }
-
-        cleanDirectory(modsDir, allowedFiles)
-
-        if (clientVersion.isNotEmpty()) {
-            val versionModsDir = modsDir.resolve(clientVersion)
-            if (Files.exists(versionModsDir)) {
-                cleanDirectory(versionModsDir, allowedFiles)
-            }
-        }
-    }
-
-    @Throws(IOException::class)
-    private fun cleanDirectory(dir: Path, allowedFiles: Set<String>) {
-        Files.list(dir).use { stream ->
-            stream.filter { Files.isRegularFile(it) }
-                .filter { path ->
-                    val name = path.fileName.toString()
-                    name.endsWith(".jar") || name.endsWith(".zip") || name.endsWith(".litemod")
-                }
-                .forEach { path ->
-                    val fileName = path.fileName.toString()
-                    if (!allowedFiles.contains(fileName)) {
-                        try {
-                            Files.delete(path)
-                        } catch (e: IOException) {
-                            log.error("Failed to delete $fileName", e)
-                        }
-                    }
-                }
-        }
-    }
-
-    private fun buildClasspath(clientRootPath: Path, manifest: FileManifest): String {
-        return manifestProcessor.flattenManifest(manifest).keys.stream()
-            .filter { f -> f.endsWith(".jar") }
-            .filter { f -> !f.contains("/mods/") }
+            .map { it.toString() }
+            .filter { isLibraryCompatibleWithOs(it, currentOs) }
             .sorted { p1, p2 ->
-                if (p1.contains("launchwrapper")) return@sorted -1
-                if (p2.contains("launchwrapper")) return@sorted 1
+                val p1Lower = p1.lowercase()
+                val p2Lower = p2.lowercase()
+                val p1Boots = p1Lower.contains("bootstraplauncher") || p1Lower.contains("launchwrapper")
+                val p2Boots = p2Lower.contains("bootstraplauncher") || p2Lower.contains("launchwrapper")
+                if (p1Boots && !p2Boots) return@sorted -1
+                if (!p1Boots && p2Boots) return@sorted 1
                 p1.compareTo(p2)
             }
-            .map { clientRootPath.resolve(it) }
-            .map { it.toString() }
             .collect(Collectors.joining(File.pathSeparator))
+    }
+
+    private fun isLibraryCompatibleWithOs(path: String, os: OS): Boolean {
+        val fileName = path.lowercase()
+        if (!fileName.contains("natives")) return true
+        return when (os) {
+            OS.LINUX -> !fileName.contains("natives-windows") && !fileName.contains("natives-macos")
+            OS.WINDOWS -> !fileName.contains("natives-linux") && !fileName.contains("natives-macos")
+            OS.MACOS -> !fileName.contains("natives-windows") && !fileName.contains("natives-linux")
+            else -> true
+        }
+    }
+
+    private fun pipeOutput(stream: InputStream, type: LauncherLogType, onLog: (String, LauncherLogType) -> Unit) {
+        val reader = BufferedReader(InputStreamReader(stream))
+        thread(isDaemon = true) {
+            try {
+                var line: String?
+                while (reader.readLine().also { line = it } != null) {
+                    val text = line ?: continue
+                    val finalType = when {
+                        type == LauncherLogType.ERROR -> LauncherLogType.ERROR
+                        text.contains("WARN", ignoreCase = true) -> LauncherLogType.WARN
+                        text.contains("ERROR", ignoreCase = true) || text.contains("Exception", ignoreCase = true) -> LauncherLogType.ERROR
+                        else -> LauncherLogType.INFO
+                    }
+                    onLog(text, finalType)
+                    if (finalType == LauncherLogType.ERROR) System.err.println(text) else println(text)
+                }
+            } catch (_: Exception) {}
+        }
     }
 
     private fun buildLaunchConfigMap(): Map<String, LaunchConfig> {
         return mapOf(
             "1.7.10" to LaunchConfig(
-                "net.minecraft.launchwrapper.Launch",
-                "cpw.mods.fml.common.launcher.FMLTweaker",
-                "1.7.10",
-                listOf("-Dorg.lwjgl.opengl.Display.allowSoftwareOpenGL=true"),
-                "bin/natives-1.7.10"
+                mainClass = "net.minecraft.launchwrapper.Launch",
+                tweakClass = "cpw.mods.fml.common.launcher.FMLTweaker",
+                assetIndex = "1.7.10",
+                jvmArgs = listOf(
+                    "-Dorg.lwjgl.opengl.Display.allowSoftwareOpenGL=true",
+                    "-Dfml.ignoreInvalidMinecraftCertificates=true",
+                    "-Dfml.ignorePatchDiscrepancies=true"
+                ),
+                nativesDir = "bin/natives-1.7.10"
             ),
             "1.12.2" to LaunchConfig(
-                "net.minecraft.launchwrapper.Launch",
-                "net.minecraftforge.fml.common.launcher.FMLTweaker",
-                "1.12.2",
-                listOf(
+                mainClass = "net.minecraft.launchwrapper.Launch",
+                tweakClass = "net.minecraftforge.fml.common.launcher.FMLTweaker",
+                assetIndex = "1.12.2",
+                jvmArgs = listOf(
                     "-XX:+UseG1GC",
                     "-XX:+UnlockExperimentalVMOptions",
                     "-XX:G1NewSizePercent=20",
@@ -325,16 +364,54 @@ class LauncherService( // TODO: God class. Возможно стоит разд�
                     "-Dfml.ignoreInvalidMinecraftCertificates=true",
                     "-Dfml.ignorePatchDiscrepancies=true"
                 ),
-                "bin/natives-1.12.2"
+                nativesDir = "bin/natives-1.12.2"
+            ),
+            "1.21.1" to LaunchConfig(
+                mainClass = "cpw.mods.bootstraplauncher.BootstrapLauncher",
+                tweakClass = null,
+                assetIndex = "1.21.1",
+                jvmArgs = listOf(
+                    "-XX:+UseG1GC",
+                    "-XX:+UnlockExperimentalVMOptions",
+                    "-XX:G1NewSizePercent=20",
+                    "-XX:G1ReservePercent=20",
+                    "-XX:MaxGCPauseMillis=50",
+                    "-XX:G1HeapRegionSize=32M",
+
+                    "--add-modules=ALL-MODULE-PATH",
+                    "--add-reads=org.openjdk.nashorn=ALL-UNNAMED",
+
+                    "--add-modules=jdk.naming.dns",
+                    "--add-exports=jdk.naming.dns/com.sun.jndi.dns=java.naming",
+                    "--add-opens=java.base/java.util.jar=ALL-UNNAMED",
+                    "--add-opens=java.base/java.lang.invoke=ALL-UNNAMED",
+                    "--add-opens=java.base/java.lang=ALL-UNNAMED",
+                    "--add-opens=java.base/java.util=ALL-UNNAMED",
+                    "--add-opens=java.base/java.io=ALL-UNNAMED",
+                    "--add-opens=java.base/java.nio=ALL-UNNAMED",
+                    "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED",
+                    "--add-opens=java.base/java.time=ALL-UNNAMED",
+
+                    "--add-opens=java.base/java.util.jar=cpw.mods.securejarhandler",
+                    "--add-opens=java.base/java.lang.invoke=cpw.mods.securejarhandler",
+                    "--add-exports=java.base/sun.security.util=cpw.mods.securejarhandler",
+
+                    "-Djava.awt.headless=false",
+                    "-Djava.net.preferIPv6Addresses=system"
+                ),
+                nativesDir = "bin/natives-1.21.1",
+                programArgs = listOf("--launchTarget", "forgeclient")
             )
         )
     }
 
     private fun getPlatform(): OS {
         val osName = System.getProperty("os.name").lowercase(Locale.getDefault())
-        if (osName.contains("win")) return OS.WINDOWS
-        if (osName.contains("mac")) return OS.MACOS
-        if (osName.contains("nix") || osName.contains("nux") || osName.contains("aix")) return OS.LINUX
-        return OS.UNKNOWN
+        return when {
+            osName.contains("win") -> OS.WINDOWS
+            osName.contains("mac") -> OS.MACOS
+            osName.contains("nix") || osName.contains("nux") || osName.contains("aix") -> OS.LINUX
+            else -> OS.UNKNOWN
+        }
     }
 }

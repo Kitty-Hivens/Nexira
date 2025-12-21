@@ -1,11 +1,10 @@
 package hivens.core.data
 
-import java.io.File
-
 data class SettingsData(
     var javaPath: String? = null,
     var memoryMB: Int = 4096,
-    var theme: String = "Warm", // TODO: Устарело.
+    var isDarkTheme: Boolean = true,
+    var seasonalTheme: SeasonTheme = SeasonTheme.AUTO,
     var closeAfterStart: Boolean = true,
     var saveCredentials: Boolean = true,
     var savedUsername: String? = null,
@@ -16,13 +15,9 @@ data class SettingsData(
     companion object {
         fun defaults(): SettingsData {
             val data = SettingsData()
-            val os = System.getProperty("os.name").lowercase()
-            val javaHome = System.getProperty("java.home")
-            val javaBin = javaHome + File.separator + "bin" + File.separator + if (os.contains("win")) "java.exe" else "java"
-
-            data.javaPath = javaBin
+            data.javaPath = null
             data.memoryMB = 4096
-            data.theme = "Warm"
+            data.isDarkTheme = true
             data.saveCredentials = true
             return data
         }

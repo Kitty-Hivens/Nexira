@@ -13,10 +13,10 @@ import java.net.Proxy
 import java.nio.file.Path
 import java.nio.file.Paths
 
-class LauncherDI { // TODO: Некоторое инжектит само себе. Перевести сюда.
+class LauncherDI {
 
     val dataDirectory: Path
-    private val httpClient: OkHttpClient
+    val httpClient: OkHttpClient
     private val gson: Gson
 
     // Сервисы
@@ -30,6 +30,7 @@ class LauncherDI { // TODO: Некоторое инжектит само себ�
     val profileManager: ProfileManager
     val javaManagerService: JavaManagerService
     val credentialsManager: CredentialsManager
+    val smartyNetworkService: SmartyNetworkService
 
     init {
         val userHome = System.getProperty("user.home")
@@ -54,15 +55,15 @@ class LauncherDI { // TODO: Некоторое инжектит само себ�
             .proxyAuthenticator(okHttpProxyAuthenticator)
             .build()
 
-        // Базовые сервисы
+        // Инициализация сервисов
         this.authService = AuthService(httpClient, gson)
         this.integrityService = FileIntegrityService()
         this.downloadService = FileDownloadService(httpClient, gson)
         this.manifestProcessorService = ManifestProcessorService(gson)
         this.settingsService = SettingsService(gson, dataDirectory.resolve("settings.json"))
         this.credentialsManager = CredentialsManager(dataDirectory, gson)
-        val networkService = SmartyNetworkService(httpClient, gson)
-        this.serverListService = ServerListService(networkService)
+        this.smartyNetworkService = SmartyNetworkService(httpClient, gson)
+        this.serverListService = ServerListService(smartyNetworkService)
         this.profileManager = ProfileManager(dataDirectory, gson)
         this.javaManagerService = JavaManagerService(dataDirectory, httpClient)
         this.launcherService = LauncherService(
