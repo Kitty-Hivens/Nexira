@@ -66,6 +66,8 @@ jobs:
         run: |
           wget https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage -O appimagetool.AppImage
           chmod +x appimagetool.AppImage
+          # Распаковываем тулзу, чтобы не зависеть от FUSE на агенте
+          ./appimagetool.AppImage --appimage-extract
 
       - name: Build Linux Targets
         run: ./gradlew :client-ui:packageAppImage :client-ui:packageDeb :client-ui:packageRpm
@@ -73,14 +75,36 @@ jobs:
       - name: Prepare Artifacts
         shell: bash
         run: |
-          # 1. Конвертируем папку в единый файл .AppImage
-          # ИСПРАВЛЕНО: путь к папке 'app', а не 'appImage'
-          ARCH=x86_64 ./appimagetool.AppImage client-ui/build/compose/binaries/main/app AuraLauncher.AppImage
+          # 1. Готовим правильную структуру AppDir
+          mkdir -p AppDir/usr
+          # Копируем всё, что собрал Gradle (bin, lib, runtime) в usr/
+          cp -r client-ui/build/compose/binaries/main/app/* AppDir/usr/
           
-          # 2. Deb
+          # 2. Создаем симлинк для запуска (AppRun)
+          # appimagetool запускает файл, на который указывает AppRun
+          cd AppDir
+          ln -s usr/bin/AuraLauncher AppRun
+          cd ..
+          
+          # 3. Создаем файл .desktop (Обязателен в корне)
+          cat > AppDir/AuraLauncher.desktop <<EOF
+          [Desktop Entry]
+          Name=Aura Launcher
+          Exec=AuraLauncher
+          Icon=AuraLauncher
+          Type=Application
+          Categories=Game;
+          EOF
+          
+          # 4. Копируем иконку (Обязательна в корне)
+          # Используем favicon.png из исходников
+          cp client-ui/src/main/resources/images/favicon.png AppDir/AuraLauncher.png
+          
+          # 5. Собираем .AppImage (используя распакованный тул)
+          ARCH=x86_64 ./squashfs-root/AppRun AppDir AuraLauncher.AppImage
+          
+          # 6. Подбираем Deb и Rpm
           find client-ui/build/compose/binaries -name "*.deb" -exec mv {} AuraLauncher.deb \;
-          
-          # 3. Rpm
           find client-ui/build/compose/binaries -name "*.rpm" -exec mv {} AuraLauncher.rpm \;
 
       - name: Upload Linux Artifacts
