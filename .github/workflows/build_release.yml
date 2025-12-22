@@ -1,103 +1,155 @@
-name: Build and Package Launcher
+name: Build and Publish (All Formats)
 
 on:
-  workflow_dispatch: # Возможность запустить кнопку вручную
+  workflow_dispatch:
   push:
     tags:
-      - 'v*' # Запускать автоматически при создании тега (например, v1.0.0)
+      - 'v*'
+
+permissions:
+  contents: write
 
 jobs:
-  # --- СБОРКА ДЛЯ WINDOWS ---
+  # --- 1. WINDOWS (MSI Installer + Portable ZIP) ---
   build-windows:
-    name: Build Windows (MSI)
+    name: Build Windows
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up JDK 21
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
           java-version: '21'
           distribution: 'temurin'
+      - uses: gradle/actions/setup-gradle@v3
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
+      # Собираем и MSI, и папку с EXE (image)
+      - name: Build Windows Targets
+        run: ./gradlew.bat :client-ui:packageMsi :client-ui:packageDistribution
 
-      - name: Build MSI Package
-        run: ./gradlew.bat :client-ui:packageMsi
+      - name: Prepare Artifacts
+        shell: pwsh
+        run: |
+          # 1. Переименовываем MSI
+          Get-ChildItem client-ui/build/compose/binaries/main/msi/*.msi | Rename-Item -NewName "AuraLauncher-Setup.msi"
+          Move-Item client-ui/build/compose/binaries/main/msi/AuraLauncher-Setup.msi .
 
-      - name: Upload Windows Artifact
+          # 2. Создаем Portable ZIP (из папки app)
+          # Это даст пользователям .exe без установки
+          Compress-Archive -Path client-ui/build/compose/binaries/main/app/* -DestinationPath AuraLauncher-Portable.zip
+
+      - name: Upload Windows Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: windows-installer
-          path: client-ui/build/compose/binaries/main/msi/*.msi
+          name: windows-files
+          path: |
+            AuraLauncher-Setup.msi
+            AuraLauncher-Portable.zip
           if-no-files-found: error
 
-  # --- СБОРКА ДЛЯ LINUX ---
+  # --- 2. LINUX (AppImage, Deb, Rpm) ---
   build-linux:
-    name: Build Linux (AppImage & Deb)
+    name: Build Linux
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up JDK 21
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
           java-version: '21'
           distribution: 'temurin'
+      - uses: gradle/actions/setup-gradle@v3
+      - run: chmod +x gradlew
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
+      # Ставим зависимости для сборки (включая rpm!)
+      - name: Install Dependencies
+        run: sudo apt-get update && sudo apt-get install -y libgl1 libgl1-mesa-dri xorg-dev rpm binutils
 
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
+      # Скачиваем утилиту для сборки настоящего AppImage файла
+      - name: Setup AppImageTool
+        run: |
+          wget https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage -O appimagetool.AppImage
+          chmod +x appimagetool.AppImage
 
-      # Для Linux часто нужны библиотеки для работы Compose при сборке
-      - name: Install Linux Dependencies
-        run: sudo apt-get update && sudo apt-get install -y libgl1 libgl1-mesa-dri xorg-dev
+      # Собираем все форматы через Gradle
+      - name: Build Linux Targets
+        run: ./gradlew :client-ui:packageAppImage :client-ui:packageDeb :client-ui:packageRpm
 
-      - name: Build AppImage and Deb
-        run: ./gradlew :client-ui:packageAppImage :client-ui:packageDeb
+      - name: Prepare Artifacts
+        shell: bash
+        run: |
+          # 1. Конвертируем папку в единый файл .AppImage
+          # ARCH=x86_64 нужно для appimagetool
+          ARCH=x86_64 ./appimagetool.AppImage client-ui/build/compose/binaries/main/appImage AuraLauncher.AppImage
+          
+          # 2. Deb
+          find client-ui/build/compose/binaries -name "*.deb" -exec mv {} AuraLauncher.deb \;
+          
+          # 3. Rpm
+          find client-ui/build/compose/binaries -name "*.rpm" -exec mv {} AuraLauncher.rpm \;
 
-      - name: Upload Linux AppImage
+      - name: Upload Linux Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: linux-appimage
-          path: client-ui/build/compose/binaries/main/appImage/*.AppImage
+          name: linux-files
+          path: |
+            AuraLauncher.AppImage
+            AuraLauncher.deb
+            AuraLauncher.rpm
+          if-no-files-found: error
 
-      - name: Upload Linux Deb
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-deb
-          path: client-ui/build/compose/binaries/main/deb/*.deb
-
-  # --- СБОРКА ДЛЯ MACOS ---
+  # --- 3. MACOS (DMG) ---
   build-macos:
-    name: Build macOS (DMG)
+    name: Build macOS
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up JDK 21
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
           java-version: '21'
           distribution: 'temurin'
+      - uses: gradle/actions/setup-gradle@v3
+      - run: chmod +x gradlew
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
-
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
-
-      - name: Build DMG Package
+      - name: Build DMG
         run: ./gradlew :client-ui:packageDmg
-        # Обратите внимание: без Apple Developer ID приложение будет "неподписанным"
-        # и пользователям придется разрешать его запуск через настройки.
+
+      - name: Prepare Artifact
+        shell: bash
+        run: |
+          find client-ui/build/compose/binaries -name "*.dmg" -exec mv {} AuraLauncher.dmg \;
 
       - name: Upload macOS Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: macos-dmg
-          path: client-ui/build/compose/binaries/main/dmg/*.dmg
+          name: macos-file
+          path: AuraLauncher.dmg
           if-no-files-found: error
+
+  # --- 4. CREATE RELEASE ---
+  publish-release:
+    name: Publish Release
+    needs: [build-windows, build-linux, build-macos]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: List Files
+        run: ls -R artifacts
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: ${{ contains(github.ref, '-') }}
+          files: |
+            artifacts/AuraLauncher-Setup.msi
+            artifacts/AuraLauncher-Portable.zip
+            artifacts/AuraLauncher.AppImage
+            artifacts/AuraLauncher.deb
+            artifacts/AuraLauncher.rpm
+            artifacts/AuraLauncher.dmg
