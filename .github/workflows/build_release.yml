@@ -59,17 +59,14 @@ jobs:
       - uses: gradle/actions/setup-gradle@v3
       - run: chmod +x gradlew
 
-      # Ставим зависимости для сборки (включая rpm!)
       - name: Install Dependencies
         run: sudo apt-get update && sudo apt-get install -y libgl1 libgl1-mesa-dri xorg-dev rpm binutils
 
-      # Скачиваем утилиту для сборки настоящего AppImage файла
       - name: Setup AppImageTool
         run: |
           wget https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage -O appimagetool.AppImage
           chmod +x appimagetool.AppImage
 
-      # Собираем все форматы через Gradle
       - name: Build Linux Targets
         run: ./gradlew :client-ui:packageAppImage :client-ui:packageDeb :client-ui:packageRpm
 
@@ -77,8 +74,8 @@ jobs:
         shell: bash
         run: |
           # 1. Конвертируем папку в единый файл .AppImage
-          # ARCH=x86_64 нужно для appimagetool
-          ARCH=x86_64 ./appimagetool.AppImage client-ui/build/compose/binaries/main/appImage AuraLauncher.AppImage
+          # ИСПРАВЛЕНО: путь к папке 'app', а не 'appImage'
+          ARCH=x86_64 ./appimagetool.AppImage client-ui/build/compose/binaries/main/app AuraLauncher.AppImage
           
           # 2. Deb
           find client-ui/build/compose/binaries -name "*.deb" -exec mv {} AuraLauncher.deb \;
