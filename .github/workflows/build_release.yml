@@ -79,24 +79,42 @@ jobs:
         run: |
           # 1. Готовим структуру AppDir
           mkdir -p AppDir/usr
+          # Копируем содержимое (bin, lib, runtime)
           cp -r client-ui/build/compose/binaries/main/app/* AppDir/usr/
           
+          # ОТЛАДКА: Показываем, что реально лежит в папке bin
+          echo "Contents of AppDir/usr/bin:"
+          ls -la AppDir/usr/bin/
+          
+          # АВТО-ОПРЕДЕЛЕНИЕ ИМЕНИ: Берем первый файл в папке bin
+          # Это защитит нас от проблем с регистром (AuraLauncher vs auralauncher)
+          BIN_NAME=$(ls AppDir/usr/bin | head -n 1)
+          echo "Detected binary name: $BIN_NAME"
+          
+          if [ -z "$BIN_NAME" ]; then
+            echo "Error: Could not detect binary name in AppDir/usr/bin"
+            exit 1
+          fi
+
           # 2. Создаем AppRun (скрипт запуска)
+          # Используем найденное имя $BIN_NAME
           cat > AppDir/AppRun <<EOF
           #!/bin/sh
           export APPDIR="\$(dirname "\$(readlink -f "\${0}")")"
           export PATH="\$APPDIR/usr/bin:\$PATH"
           export LD_LIBRARY_PATH="\$APPDIR/usr/lib:\$LD_LIBRARY_PATH"
-          exec "\$APPDIR/usr/bin/AuraLauncher" "\$@"
+          exec "\$APPDIR/usr/bin/$BIN_NAME" "\$@"
           EOF
-          chmod +x AppDir/AppRun
-          chmod +x AppDir/usr/bin/AuraLauncher
           
-          # 3. .desktop файл
+          # Права на выполнение
+          chmod +x AppDir/AppRun
+          chmod +x "AppDir/usr/bin/$BIN_NAME"
+          
+          # 3. .desktop файл (Тоже используем $BIN_NAME)
           cat > AppDir/AuraLauncher.desktop <<EOF
           [Desktop Entry]
           Name=Aura Launcher
-          Exec=AuraLauncher
+          Exec=$BIN_NAME
           Icon=AuraLauncher
           Type=Application
           Categories=Game;
@@ -106,14 +124,13 @@ jobs:
           cp client-ui/src/main/resources/images/favicon.png AppDir/AuraLauncher.png
           
           # 5. Сборка .AppImage
+          # --no-appstream чтобы не ругался на отсутствие метаданных
           ARCH=x86_64 ./squashfs-root/AppRun --no-appstream AppDir AuraLauncher.AppImage
           
-          # 6. Проверка (Вывод инфо о файле в лог, чтобы убедиться, что он живой)
-          echo "Checking generated file:"
+          # 6. Проверка файла
           file AuraLauncher.AppImage
-          ls -lh AuraLauncher.AppImage
           
-          # 7. Deb и Rpm
+          # 7. Deb и Rpm (переименование)
           find client-ui/build/compose/binaries -name "*.deb" -exec mv {} AuraLauncher.deb \;
           find client-ui/build/compose/binaries -name "*.rpm" -exec mv {} AuraLauncher.rpm \;
 
