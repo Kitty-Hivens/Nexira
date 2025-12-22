@@ -59,16 +59,13 @@ jobs:
       - uses: gradle/actions/setup-gradle@v3
       - run: chmod +x gradlew
 
-      # ФИКС: Добавлен libfuse2 (критично для AppImage!) и file (для проверки)
       - name: Install Dependencies
         run: sudo apt-get update && sudo apt-get install -y libgl1 libgl1-mesa-dri xorg-dev rpm binutils libfuse2 file
 
       - name: Setup AppImageTool
         run: |
-          # Скачиваем тулзу
           wget https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage -O appimagetool.AppImage
           chmod +x appimagetool.AppImage
-          # Распаковываем
           ./appimagetool.AppImage --appimage-extract
 
       - name: Build Linux Targets
@@ -77,60 +74,58 @@ jobs:
       - name: Prepare Artifacts
         shell: bash
         run: |
-          # 1. Готовим структуру AppDir
-          mkdir -p AppDir/usr
-          # Копируем содержимое (bin, lib, runtime)
-          cp -r client-ui/build/compose/binaries/main/app/* AppDir/usr/
+          # 1. Ищем, где реально лежит бинарник
+          # Ищем файл 'AuraLauncher' в папке binaries
+          EXE_PATH=$(find client-ui/build/compose/binaries -type f -name "AuraLauncher" | grep "/bin/" | head -n 1)
           
-          # ОТЛАДКА: Показываем, что реально лежит в папке bin
-          echo "Contents of AppDir/usr/bin:"
-          ls -la AppDir/usr/bin/
-          
-          # АВТО-ОПРЕДЕЛЕНИЕ ИМЕНИ: Берем первый файл в папке bin
-          # Это защитит нас от проблем с регистром (AuraLauncher vs auralauncher)
-          BIN_NAME=$(ls AppDir/usr/bin | head -n 1)
-          echo "Detected binary name: $BIN_NAME"
-          
-          if [ -z "$BIN_NAME" ]; then
-            echo "Error: Could not detect binary name in AppDir/usr/bin"
+          if [ -z "$EXE_PATH" ]; then
+            echo "❌ Ошибка: Бинарник 'AuraLauncher' не найден!"
+            find client-ui/build/compose/binaries # Вывод для отладки
             exit 1
           fi
-
-          # 2. Создаем AppRun (скрипт запуска)
-          # Используем найденное имя $BIN_NAME
+          
+          echo "Бинарник найден: $EXE_PATH"
+          
+          # Вычисляем пути
+          BIN_DIR=$(dirname "$EXE_PATH")       # .../app/AuraLauncher/bin
+          APP_ROOT=$(dirname "$BIN_DIR")       # .../app/AuraLauncher
+          
+          echo "Корень приложения: $APP_ROOT"
+          
+          # 2. Готовим структуру AppDir
+          mkdir -p AppDir/usr
+          # Копируем всё из найденного корня (bin, lib) в usr/
+          cp -r "$APP_ROOT"/* AppDir/usr/
+          
+          # 3. Создаем AppRun
           cat > AppDir/AppRun <<EOF
           #!/bin/sh
           export APPDIR="\$(dirname "\$(readlink -f "\${0}")")"
           export PATH="\$APPDIR/usr/bin:\$PATH"
           export LD_LIBRARY_PATH="\$APPDIR/usr/lib:\$LD_LIBRARY_PATH"
-          exec "\$APPDIR/usr/bin/$BIN_NAME" "\$@"
+          exec "\$APPDIR/usr/bin/AuraLauncher" "\$@"
           EOF
           
-          # Права на выполнение
           chmod +x AppDir/AppRun
-          chmod +x "AppDir/usr/bin/$BIN_NAME"
+          chmod +x AppDir/usr/bin/AuraLauncher
           
-          # 3. .desktop файл (Тоже используем $BIN_NAME)
+          # 4. Создаем .desktop
           cat > AppDir/AuraLauncher.desktop <<EOF
           [Desktop Entry]
           Name=Aura Launcher
-          Exec=$BIN_NAME
+          Exec=AuraLauncher
           Icon=AuraLauncher
           Type=Application
           Categories=Game;
           EOF
           
-          # 4. Иконка
+          # 5. Иконка
           cp client-ui/src/main/resources/images/favicon.png AppDir/AuraLauncher.png
           
-          # 5. Сборка .AppImage
-          # --no-appstream чтобы не ругался на отсутствие метаданных
+          # 6. Сборка .AppImage
           ARCH=x86_64 ./squashfs-root/AppRun --no-appstream AppDir AuraLauncher.AppImage
           
-          # 6. Проверка файла
-          file AuraLauncher.AppImage
-          
-          # 7. Deb и Rpm (переименование)
+          # 7. Deb и Rpm
           find client-ui/build/compose/binaries -name "*.deb" -exec mv {} AuraLauncher.deb \;
           find client-ui/build/compose/binaries -name "*.rpm" -exec mv {} AuraLauncher.rpm \;
 
