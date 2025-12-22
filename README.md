@@ -35,7 +35,7 @@
 
 1.  Клонируйте репозиторий:
     ```bash
-    git clone https://github.com/YourUsername/Aura-Launcher.git
+    git clone https://github.com/Kitty-Hivens/Aura-Launcher.git
     ```
 2.  Запустите сборку:
     * **Linux/macOS:** `./gradlew :client-ui:packageDistribution`
