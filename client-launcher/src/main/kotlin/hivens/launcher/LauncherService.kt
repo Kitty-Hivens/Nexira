@@ -5,6 +5,7 @@ import hivens.core.api.interfaces.IManifestProcessorService
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.FileManifest
 import hivens.core.data.InstanceProfile
+import hivens.core.data.LauncherLogType
 import hivens.core.data.SessionData
 import hivens.launcher.component.ClasspathProvider
 import hivens.launcher.component.EnvironmentPreparer
@@ -16,14 +17,10 @@ import java.nio.file.Files
 import java.nio.file.Path
 
 /**
- * Основной сервис, управляющий жизненным циклом запуска игрового клиента.
+ * Реализация сервиса запуска клиента Minecraft.
  *
- * Реализует паттерн **Facade**, скрывая сложность инициализации и координации
- * следующих подсистем:
- * * **Environment**: Подготовка файловой системы (natives, assets).
- * * **Dependency Resolution**: Построение classpath.
- * * **Command Factory**: Генерация аргументов процесса.
- * * **IO Handling**: Перехват логов процесса.
+ * <p>Действует как фасад, координируя работу компонентов подготовки окружения ([EnvironmentPreparer]),
+ * сборки classpath ([ClasspathProvider]) и формирования командной строки ([GameCommandBuilder]).</p>
  */
 class LauncherService(
     manifestProcessor: IManifestProcessorService,
@@ -33,33 +30,18 @@ class LauncherService(
 
     private val log = LoggerFactory.getLogger(LauncherService::class.java)
 
-    // Инициализация компонентов-делегатов
     private val envPreparer = EnvironmentPreparer()
     private val classpathProvider = ClasspathProvider(manifestProcessor)
     private val commandBuilder = GameCommandBuilder()
     private val logHandler = ProcessLogHandler()
 
     /**
-     * Запускает клиент Minecraft в отдельном процессе ОС.
+     * Запускает клиент с перехватом логов.
      *
-     * **Последовательность операций:**
-     * 1. Резолвинг Java Runtime (пользовательская или управляемая).
-     * 2. Распаковка нативных библиотек во временную директорию.
-     * 3. Сборка Classpath на основе манифеста файлов.
-     * 4. Формирование командной строки.
-     * 5. Запуск процесса и аттачмент логгера.
-     *
-     * @param sessionData Данные сессии авторизации.
-     * @param serverProfile Профиль выбранного сервера.
-     * @param clientRootPath Корневая директория клиента.
-     * @param javaExecutablePath Путь к системной Java (fallback).
-     * @param allocatedMemoryMB Лимит RAM (Heap Size).
-     * @param onLog Callback для стриминга логов.
-     *
-     * @throws IOException При ошибках ввода-вывода или невалидной конфигурации.
+     * @see [ILauncherService.launchClientWithLogs]
      */
     @Throws(IOException::class)
-    fun launchClientWithLogs(
+    override fun launchClientWithLogs(
         sessionData: SessionData,
         serverProfile: ServerProfile,
         clientRootPath: Path,
@@ -69,32 +51,31 @@ class LauncherService(
     ): Process {
         val profile: InstanceProfile = profileManager.getProfile(serverProfile.assetDir)
         val version = serverProfile.version
-        
-        // 1. Memory Allocation Strategy
+
+        // 1. Стратегия выделения памяти
         var memory = if (profile.memoryMb > 0) profile.memoryMb else allocatedMemoryMB
         if (memory < 768) memory = 1024
 
-        // 2. Java Runtime Resolution
+        // 2. Определение пути к Java
         val javaExec: String = resolveJavaPath(profile, javaExecutablePath, version)
-        
+
         log.info("Инициализация сессии: {}, Java: {}, Heap: {}MB", serverProfile.name, javaExec, memory)
         onLog("Запуск ${serverProfile.name}...", LauncherLogType.INFO)
 
-        // 3. Environment Preparation
+        // 3. Подготовка нативных библиотек и ассетов
         val nativesDir = commandBuilder.getNativesDir(version)
         envPreparer.prepareNatives(clientRootPath, nativesDir, version)
         envPreparer.prepareAssets(clientRootPath, "assets-$version.zip")
 
-        // 4. Classpath Construction
+        // 4. Сборка Classpath
         val manifest = sessionData.fileManifest ?: FileManifest()
         val excludedModules = if (version == "1.21.1") commandBuilder.getNeoForgeModules() else emptyList()
-        
         val classpath = classpathProvider.buildClasspath(clientRootPath, manifest, excludedModules)
 
-        // 5. Command Assembly
+        // 5. Сборка команды запуска
         val command = commandBuilder.build(
-            javaExec, memory, clientRootPath, 
-            serverProfile, sessionData, profile, 
+            javaExec, memory, clientRootPath,
+            serverProfile, sessionData, profile,
             classpath
         )
 
@@ -102,11 +83,11 @@ class LauncherService(
         pb.directory(clientRootPath.toFile())
         pb.redirectErrorStream(false)
 
-        onLog("LAUNCH ARGS: ${java.lang.String.join(" ", command)}", LauncherLogType.INFO)
+        onLog("CMD: ${java.lang.String.join(" ", command)}", LauncherLogType.INFO)
 
         val process = pb.start()
-        
-        // 6. IO Attachment
+
+        // 6. Подключение перехватчика логов
         logHandler.attach(process, onLog)
 
         return process
@@ -119,9 +100,15 @@ class LauncherService(
         javaExecutablePath: Path,
         allocatedMemoryMB: Int
     ): Process {
-        return launchClientWithLogs(sessionData, serverProfile, clientRootPath, javaExecutablePath, allocatedMemoryMB) { _, _ -> }
+        return launchClientWithLogs(
+            sessionData, serverProfile, clientRootPath, javaExecutablePath, allocatedMemoryMB
+        ) { _, _ -> /* Логи игнорируются */ }
     }
 
+    /**
+     * Выбирает подходящий Java Runtime.
+     * Приоритет: Настройка профиля -> Управляемая Java (JavaManager) -> Системная Java.
+     */
     private fun resolveJavaPath(profile: InstanceProfile, defaultPath: Path, version: String): String {
         if (!profile.javaPath.isNullOrEmpty()) return profile.javaPath!!
         runCatching {

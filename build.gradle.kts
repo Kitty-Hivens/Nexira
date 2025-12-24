@@ -10,20 +10,26 @@ allprojects {
 }
 
 subprojects {
-    apply(plugin = "org.jetbrains.kotlin.jvm")
+    // УДАЛЕНО: apply(plugin = "org.jetbrains.kotlin.jvm") <-- Убираем эту строку
 
-    java {
-        sourceCompatibility = JavaVersion.VERSION_21
-        targetCompatibility = JavaVersion.VERSION_21
+    // Оставляем настройки Java (они применятся, если в модуле подключен java плагин)
+    afterEvaluate {
+        // Используем afterEvaluate, чтобы настройки применились ПОСЛЕ того,
+        // как модуль подключит плагин
+        if (plugins.hasPlugin("java")) {
+            configure<JavaPluginExtension> {
+                sourceCompatibility = JavaVersion.VERSION_21
+                targetCompatibility = JavaVersion.VERSION_21
+            }
+        }
     }
 
     dependencies {
-        implementation(kotlin("stdlib-jdk8"))
+        // Зависимости тоже лучше перенести в модули, но если хотите оставить здесь:
+        // implementation(kotlin("stdlib-jdk8")) <-- Это лучше убрать, Kotlin 1.4+ добавляет сам
 
-        compileOnly("org.projectlombok:lombok:1.18.30")
-        annotationProcessor("org.projectlombok:lombok:1.18.30")
-
-        implementation("org.slf4j:slf4j-api:2.0.12")
-        runtimeOnly("ch.qos.logback:logback-classic:1.4.14")
+        // Lombok и логирование можно оставить, если они нужны везде
+        // Но для KMP (client-ui) Lombok не сработает.
+        // Лучше перенести это в конкретные модули.
     }
 }

@@ -2,6 +2,8 @@ package hivens.ui.screens
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
+// ИСПРАВЛЕНИЕ: Удален импорт core.animateColorAsState
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -19,22 +21,28 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.InstanceProfile
 import hivens.core.data.OptionalMod
+import hivens.core.api.interfaces.IManifestProcessorService
+import hivens.launcher.ProfileManager
 import hivens.ui.components.CelestiaButton
 import hivens.ui.components.GlassCard
-import hivens.ui.di
 import hivens.ui.theme.CelestiaTheme
+import org.koin.compose.koinInject
 import java.awt.Desktop
 import java.io.File
+import java.nio.file.Path
 import javax.swing.JFrame
 import kotlin.math.roundToInt
 
 @Composable
 fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
+    val profileManager: ProfileManager = koinInject()
+    val manifestProcessorService: IManifestProcessorService = koinInject()
+    val dataDirectory: Path = koinInject()
+
     var mods by remember { mutableStateOf<List<OptionalMod>>(emptyList()) }
     var profile by remember { mutableStateOf<InstanceProfile?>(null) }
     var javaPath by remember { mutableStateOf("") }
@@ -42,11 +50,10 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
     var useCustomJava by remember { mutableStateOf(false) }
     val modStates = remember { mutableStateMapOf<String, Boolean>() }
 
-    // Анимация появления списка
     var modsLoaded by remember { mutableStateOf(false) }
 
     LaunchedEffect(server) {
-        val p = di.profileManager.getProfile(server.assetDir)
+        val p = profileManager.getProfile(server.assetDir)
         profile = p
         if (!p.javaPath.isNullOrEmpty()) {
             javaPath = p.javaPath!!
@@ -54,7 +61,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
         }
         if (p.memoryMb > 0) memory = p.memoryMb.toFloat()
 
-        val loadedMods = di.manifestProcessorService.getOptionalModsForClient(server)
+        val loadedMods = manifestProcessorService.getOptionalModsForClient(server)
         mods = loadedMods
         loadedMods.forEach { mod ->
             modStates[mod.id] = p.optionalModsState.getOrDefault(mod.id, mod.isDefault)
@@ -67,7 +74,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
             p.javaPath = if (useCustomJava && javaPath.isNotBlank()) javaPath else null
             p.memoryMb = memory.roundToInt()
             modStates.forEach { (id, state) -> p.optionalModsState[id] = state }
-            di.profileManager.saveProfile(p)
+            profileManager.saveProfile(p)
         }
     }
 
@@ -86,7 +93,6 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
         Spacer(Modifier.height(24.dp))
 
         Row(Modifier.fillMaxSize()) {
-            // ЛЕВАЯ КОЛОНКА (Система)
             GlassCard(Modifier.weight(1f).fillMaxHeight()) {
                 Column(Modifier.padding(24.dp).verticalScroll(rememberScrollState())) {
                     Text("СИСТЕМА", style = MaterialTheme.typography.subtitle2, color = CelestiaTheme.colors.primary)
@@ -140,14 +146,14 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
 
                     Spacer(Modifier.weight(1f))
                     CelestiaButton("Открыть папку", onClick = {
-                        val path = di.dataDirectory.resolve("clients").resolve(server.assetDir)
+                        val path = dataDirectory.resolve("clients").resolve(server.assetDir)
                         if (!path.toFile().exists()) path.toFile().mkdirs()
                         Desktop.getDesktop().open(path.toFile())
                     }, modifier = Modifier.fillMaxWidth(), primary = false)
 
                     Spacer(Modifier.height(12.dp))
                     CelestiaButton("Сбросить клиент", onClick = {
-                        val path = di.dataDirectory.resolve("clients").resolve(server.assetDir)
+                        val path = dataDirectory.resolve("clients").resolve(server.assetDir)
                         path.toFile().deleteRecursively()
                         saveProfile()
                         onBack()
@@ -157,7 +163,6 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
 
             Spacer(Modifier.width(24.dp))
 
-            // ПРАВАЯ КОЛОНКА (Моды)
             GlassCard(Modifier.weight(1f).fillMaxHeight()) {
                 Column(Modifier.padding(24.dp)) {
                     Text("МОДИФИКАЦИИ", style = MaterialTheme.typography.subtitle2, color = CelestiaTheme.colors.primary)
@@ -168,7 +173,6 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                             Text("Нет опциональных модов", color = CelestiaTheme.colors.textSecondary)
                         }
                     } else {
-                        // Анимация появления списка
                         AnimatedVisibility(
                             visible = modsLoaded,
                             enter = slideInVertically(initialOffsetY = { 50 }, animationSpec = tween(500)) + fadeIn(tween(500))
@@ -197,10 +201,8 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
 
 @Composable
 fun ModItemRow(mod: OptionalMod, isChecked: Boolean, onToggle: (Boolean) -> Unit) {
-    // Состояние раскрытия описания
     var expanded by remember { mutableStateOf(false) }
 
-    // Анимация цвета фона
     val backgroundColor by animateColorAsState(
         targetValue = if (isChecked) CelestiaTheme.colors.primary.copy(alpha = 0.2f) else CelestiaTheme.colors.background.copy(alpha = 0.5f),
         animationSpec = tween(300)
@@ -211,16 +213,16 @@ fun ModItemRow(mod: OptionalMod, isChecked: Boolean, onToggle: (Boolean) -> Unit
             .fillMaxWidth()
             .clip(RoundedCornerShape(8.dp))
             .background(backgroundColor)
-            .clickable { onToggle(!isChecked) } // Клик по всей строке переключает мод
+            .clickable { onToggle(!isChecked) }
             .padding(12.dp)
-            .animateContentSize() // Плавное изменение размера при раскрытии
+            .animateContentSize()
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Checkbox(
                 checked = isChecked,
-                onCheckedChange = null, // Обрабатывается в Row clickable
+                onCheckedChange = null,
                 colors = CheckboxDefaults.colors(checkedColor = CelestiaTheme.colors.primary)
             )
             Spacer(Modifier.width(12.dp))
@@ -228,7 +230,6 @@ fun ModItemRow(mod: OptionalMod, isChecked: Boolean, onToggle: (Boolean) -> Unit
                 Text(mod.name, style = MaterialTheme.typography.body2, color = CelestiaTheme.colors.textPrimary)
             }
 
-            // Если есть описание, показываем кнопку Info
             if (!mod.description.isNullOrEmpty()) {
                 IconButton(
                     onClick = { expanded = !expanded },
@@ -243,7 +244,6 @@ fun ModItemRow(mod: OptionalMod, isChecked: Boolean, onToggle: (Boolean) -> Unit
             }
         }
 
-        // Раскрывающееся описание
         if (expanded && !mod.description.isNullOrEmpty()) {
             Spacer(Modifier.height(8.dp))
             Divider(color = CelestiaTheme.colors.border.copy(alpha = 0.3f))
@@ -252,7 +252,7 @@ fun ModItemRow(mod: OptionalMod, isChecked: Boolean, onToggle: (Boolean) -> Unit
                 text = mod.description!!,
                 style = MaterialTheme.typography.caption,
                 color = CelestiaTheme.colors.textSecondary,
-                modifier = Modifier.padding(start = 32.dp) // Отступ под чекбокс
+                modifier = Modifier.padding(start = 32.dp)
             )
         }
     }

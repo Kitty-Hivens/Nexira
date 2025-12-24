@@ -48,7 +48,7 @@ object SkinManager {
             if (cacheBusters.containsKey(username)) {
                 urlStr += "?t=${cacheBusters[username]}"
             }
-            val url = URL(urlStr)
+            val url = java.net.URI.create(urlStr).toURL()
             ImageIO.read(url)
         } catch (e: Exception) {
             null

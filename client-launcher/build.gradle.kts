@@ -1,3 +1,7 @@
+plugins {
+    kotlin("jvm")
+}
+
 dependencies {
     // Контракты (IFileDownloadService)
     implementation(project(":client-core"))
@@ -14,4 +18,6 @@ dependencies {
     implementation("org.apache.commons:commons-lang3:3.18.0")
     implementation("org.apache.commons:commons-compress:1.26.1")
     implementation("commons-io:commons-io:2.15.1")
+    implementation("io.insert-koin:koin-core:3.5.3")
+    implementation("org.slf4j:slf4j-api:2.0.12")
 }

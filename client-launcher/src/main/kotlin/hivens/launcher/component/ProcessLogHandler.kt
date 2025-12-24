@@ -1,6 +1,6 @@
 package hivens.launcher.component
 
-import hivens.launcher.LauncherLogType
+import hivens.core.data.LauncherLogType
 import java.io.BufferedReader
 import java.io.InputStream
 import java.io.InputStreamReader

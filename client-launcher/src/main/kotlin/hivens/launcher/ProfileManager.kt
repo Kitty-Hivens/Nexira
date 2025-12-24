@@ -10,6 +10,12 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.util.HashMap
 
+/**
+ * Менеджер управления профилями настроек клиентов.
+ *
+ * <p>Отвечает за сохранение и загрузку индивидуальных настроек для каждого сервера
+ * (выделенная память, путь к Java, состояние опциональных модификаций) в файл profiles.json.</p>
+ */
 class ProfileManager(
     private val workDir: Path,
     private val gson: Gson
@@ -18,24 +24,28 @@ class ProfileManager(
     private val fileName = "profiles.json"
     private val profiles: MutableMap<String, InstanceProfile> = HashMap()
 
+    /**
+     * ID последнего выбранного сервера.
+     */
     var lastServerId: String? = null
-        private set
 
     init {
         load()
     }
 
+    /**
+     * Возвращает профиль для указанного ID сервера.
+     * Если профиль не существует, создает новый пустой профиль.
+     */
     fun getProfile(serverId: String): InstanceProfile {
         return profiles.computeIfAbsent(serverId) { InstanceProfile(it) }
     }
 
+    /**
+     * Сохраняет профиль в память и записывает изменения на диск.
+     */
     fun saveProfile(profile: InstanceProfile) {
         profiles[profile.serverId] = profile
-        save()
-    }
-
-    fun setLastServerId(lastServerId: String) {
-        this.lastServerId = lastServerId
         save()
     }
 
@@ -60,6 +70,7 @@ class ProfileManager(
                             if (loaded != null) profiles.putAll(loaded)
                         }
                     } else {
+                        // Обратная совместимость со старым форматом
                         val type = object : TypeToken<Map<String, InstanceProfile>>() {}.type
                         val loaded: Map<String, InstanceProfile>? = gson.fromJson(root, type)
                         if (loaded != null) profiles.putAll(loaded)
@@ -73,7 +84,10 @@ class ProfileManager(
         }
     }
 
-    private fun save() {
+    /**
+     * Принудительно сохраняет текущее состояние профилей на диск.
+     */
+    fun save() {
         val file = workDir.resolve(fileName)
         try {
             Files.newBufferedWriter(file).use { writer ->

@@ -4,11 +4,11 @@ import hivens.core.util.ZipUtils
 import hivens.launcher.util.ClientFileHelper
 import org.slf4j.LoggerFactory
 import java.io.IOException
-import java.net.URL
+import java.net.URI
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
-import java.util.Locale
+import java.util.*
 import java.util.stream.Collectors
 
 class EnvironmentPreparer {
@@ -131,7 +131,9 @@ class EnvironmentPreparer {
         try {
             log.info("Downloading: $urlStr")
             val tempJar = Files.createTempFile("aura_native_", ".jar")
-            URL(urlStr).openStream().use { input ->
+
+            // ИСПРАВЛЕНИЕ: URL(String) deprecated -> URI.create(String).toURL()
+            URI.create(urlStr).toURL().openStream().use { input ->
                 Files.copy(input, tempJar, StandardCopyOption.REPLACE_EXISTING)
             }
             ZipUtils.unzip(tempJar.toFile(), destDir.toFile())

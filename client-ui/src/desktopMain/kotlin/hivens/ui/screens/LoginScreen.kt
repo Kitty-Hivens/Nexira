@@ -24,21 +24,39 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import hivens.core.api.interfaces.IAuthService
 import hivens.core.data.SessionData
+import hivens.launcher.CredentialsManager
+import hivens.launcher.ProfileManager
 import hivens.ui.components.GlassCard
-import hivens.ui.di
 import hivens.ui.theme.CelestiaTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.koin.compose.koinInject
 
+/**
+ * Экран авторизации пользователя.
+ *
+ * <p>Обрабатывает ввод логина/пароля, анимацию ошибок (тряска) и
+ * сохранение учетных данных.</p>
+ *
+ * @param onLoginSuccess Callback, вызываемый при успешной авторизации.
+ */
 @Composable
 fun LoginScreen(onLoginSuccess: (SessionData) -> Unit) {
+    // Внедрение зависимостей
+    val authService: IAuthService = koinInject()
+    val profileManager: ProfileManager = koinInject()
+    val credentialsManager: CredentialsManager = koinInject()
+
+    // Состояние полей ввода
     var login by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var rememberMe by remember { mutableStateOf(true) }
 
+    // Состояние UI
     var isLoading by remember { mutableStateOf(false) }
     var isSuccess by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -46,6 +64,7 @@ fun LoginScreen(onLoginSuccess: (SessionData) -> Unit) {
     val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
 
+    // Анимация появления и "тряски" при ошибке
     val shakeOffset = remember { Animatable(0f) }
     var isVisible by remember { mutableStateOf(false) }
 
@@ -81,25 +100,24 @@ fun LoginScreen(onLoginSuccess: (SessionData) -> Unit) {
             return
         }
 
-        // 1. Скрываем клавиатуру и ставим статус загрузки
         focusManager.clearFocus()
         isLoading = true
         errorMessage = null
 
         scope.launch {
             try {
-                // 2. Уходим в IO поток, чтобы UI не завис и анимация играла
+                // Выполняем авторизацию в IO потоке
                 val session = withContext(Dispatchers.IO) {
-                    val lastServer = di.profileManager.lastServerId ?: "Industrial"
-                    val s = di.authService.login(login, password, lastServer)
+                    val lastServer = profileManager.lastServerId ?: "Industrial"
+                    val s = authService.login(login, password, lastServer)
 
                     if (rememberMe) {
-                        di.credentialsManager.save(login, password)
+                        credentialsManager.save(login, password)
                     }
-                    s // Возвращаем сессию
+                    s
                 }
 
-                // 3. Успех! UI поток
+                // Успех
                 isLoading = false
                 isSuccess = true
                 delay(1500)
@@ -107,7 +125,7 @@ fun LoginScreen(onLoginSuccess: (SessionData) -> Unit) {
 
             } catch (e: Exception) {
                 isLoading = false
-                // Убираем технический префикс ошибки, если он есть
+                // Очищаем сообщение об ошибке от технического мусора
                 errorMessage = e.message?.replace("java.lang.Exception: ", "")
                     ?.substringAfter("API: ")
                     ?: "Ошибка входа"
@@ -146,6 +164,7 @@ fun LoginScreen(onLoginSuccess: (SessionData) -> Unit) {
                     )
                     Spacer(modifier = Modifier.height(32.dp))
 
+                    // Блок ошибки
                     AnimatedVisibility(
                         visible = errorMessage != null,
                         enter = expandVertically() + fadeIn(),
@@ -169,6 +188,7 @@ fun LoginScreen(onLoginSuccess: (SessionData) -> Unit) {
                         }
                     }
 
+                    // Поле Логина
                     OutlinedTextField(
                         value = login,
                         onValueChange = { login = it; errorMessage = null },
@@ -190,6 +210,7 @@ fun LoginScreen(onLoginSuccess: (SessionData) -> Unit) {
                     )
                     Spacer(modifier = Modifier.height(16.dp))
 
+                    // Поле Пароля
                     OutlinedTextField(
                         value = password,
                         onValueChange = { password = it; errorMessage = null },
@@ -215,6 +236,7 @@ fun LoginScreen(onLoginSuccess: (SessionData) -> Unit) {
                     )
                     Spacer(modifier = Modifier.height(16.dp))
 
+                    // Чекбокс "Запомнить"
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
@@ -233,6 +255,7 @@ fun LoginScreen(onLoginSuccess: (SessionData) -> Unit) {
                     }
                     Spacer(modifier = Modifier.height(24.dp))
 
+                    // Кнопка Входа
                     Button(
                         onClick = { doLogin() },
                         enabled = !isLoading && !isSuccess,

@@ -1,4 +1,4 @@
-package hivens.launcher
+package hivens.core.data
 
 /**
  * Тип сообщения лога, приходящего от процесса Minecraft.
