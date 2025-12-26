@@ -70,7 +70,7 @@ class ServerListService(private val networkService: SmartyNetworkService) : ISer
     private fun formatTimestamp(ts: Long): String {
         return try {
             val date = Date(ts * 1000L)
-            val sdf = SimpleDateFormat("dd MMM yyyy", Locale("ru"))
+            val sdf = SimpleDateFormat("dd MMM yyyy", Locale.of("ru"))
             sdf.format(date)
         } catch (e: Exception) {
             "Unknown Date"

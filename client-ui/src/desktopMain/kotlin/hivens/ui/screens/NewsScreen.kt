@@ -23,26 +23,39 @@ import coil3.request.ImageRequest
 import coil3.request.crossfade
 import coil3.compose.LocalPlatformContext
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
+import okhttp3.OkHttpClient
+import org.koin.compose.koinInject
 
 import hivens.core.data.NewsItem
+import hivens.core.api.interfaces.IServerListService
 import hivens.ui.components.GlassCard
 import hivens.ui.theme.CelestiaTheme
-import hivens.ui.di
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+/**
+ * Экран просмотра новостей проекта.
+ *
+ * <p>Загружает новости через [IServerListService] и отображает их в списке.
+ * Использует Coil для асинхронной загрузки изображений с поддержкой общего OkHttpClient.</p>
+ */
 @Composable
 fun NewsScreen(
     onBack: () -> Unit
 ) {
+    // Внедрение зависимостей
+    val httpClient: OkHttpClient = koinInject()
+    val serverListService: IServerListService = koinInject()
+
     var newsList by remember { mutableStateOf<List<NewsItem>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
 
+    // Настройка Coil ImageLoader с использованием нашего OkHttpClient
     val context = LocalPlatformContext.current
     val imageLoader = remember {
         ImageLoader.Builder(context)
             .components {
-                add(OkHttpNetworkFetcherFactory(callFactory = { di.httpClient }))
+                add(OkHttpNetworkFetcherFactory(callFactory = { httpClient }))
             }
             .build()
     }
@@ -50,7 +63,8 @@ fun NewsScreen(
     LaunchedEffect(Unit) {
         try {
             val dashboardData = withContext(Dispatchers.IO) {
-                di.serverListService.fetchDashboardData().get()
+                // Если сервис использует CompletableFuture (Legacy), вызываем get()
+                serverListService.fetchDashboardData().get()
             }
             newsList = dashboardData.news
         } catch (e: Exception) {
@@ -63,7 +77,7 @@ fun NewsScreen(
     Column(
         modifier = Modifier.fillMaxSize().padding(24.dp)
     ) {
-        // Хедер
+        // Заголовок
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.padding(bottom = 24.dp)
@@ -75,7 +89,7 @@ fun NewsScreen(
             Text("НОВОСТИ ПРОЕКТА", style = MaterialTheme.typography.h4, color = CelestiaTheme.colors.textPrimary)
         }
 
-        // Список
+        // Контент
         GlassCard(modifier = Modifier.fillMaxSize()) {
             if (isLoading) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -107,7 +121,7 @@ fun NewsCard(item: NewsItem, imageLoader: ImageLoader) {
         shape = RoundedCornerShape(16.dp)
     ) {
         Row(modifier = Modifier.fillMaxSize()) {
-            // Картинка
+            // Изображение новости
             if (item.imageUrl != null) {
                 AsyncImage(
                     model = ImageRequest.Builder(LocalPlatformContext.current)
@@ -125,6 +139,7 @@ fun NewsCard(item: NewsItem, imageLoader: ImageLoader) {
                         .background(CelestiaTheme.colors.background.copy(alpha = 0.5f))
                 )
             } else {
+                // Заглушка, если картинки нет
                 Box(
                     modifier = Modifier
                         .width(200.dp)
@@ -138,7 +153,7 @@ fun NewsCard(item: NewsItem, imageLoader: ImageLoader) {
                 }
             }
 
-            // Текст
+            // Текстовое описание
             Column(
                 modifier = Modifier.fillMaxSize().padding(16.dp),
                 verticalArrangement = Arrangement.SpaceBetween

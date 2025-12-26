@@ -29,25 +29,44 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.*
+import org.koin.compose.KoinContext
+import org.koin.compose.koinInject
+import org.koin.core.context.startKoin
+import org.koin.core.context.stopKoin
+import org.koin.core.module.dsl.singleOf
+import org.koin.dsl.module
+import org.jetbrains.compose.resources.painterResource
+import hivens.client_ui.generated.resources.Res
+import hivens.client_ui.generated.resources.favicon
+
+import hivens.core.api.SmartyNetworkService
+import hivens.core.api.interfaces.IAuthService
+import hivens.core.api.interfaces.ISettingsService
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.SeasonTheme
 import hivens.core.data.SessionData
-import hivens.launcher.LauncherDI
+import hivens.launcher.CredentialsManager
+import hivens.launcher.ProfileManager
+import hivens.launcher.di.appModule
+import hivens.launcher.di.networkModule
 import hivens.ui.components.GlassCard
 import hivens.ui.components.SeasonalEffectsLayer
+import hivens.ui.logic.LaunchUseCase
 import hivens.ui.screens.*
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.utils.SkinManager
+import org.slf4j.LoggerFactory
 import kotlin.math.cos
 import kotlin.math.sin
 
-val di = LauncherDI()
+val uiModule = module {
+    singleOf(::LaunchUseCase)
+}
 
-sealed class AppState { // Вам не нравится код? Пожалуйста, сделайте форк :3. Умоляю вас
+sealed class AppState {
     data object Login : AppState()
     data class Shell(val session: SessionData) : AppState()
 }
@@ -60,71 +79,115 @@ sealed class ShellScreen {
     data class ServerSettings(val server: ServerProfile) : ShellScreen()
 }
 
-fun main() = application {
-    val windowState = rememberWindowState(
-        width = 1000.dp,
-        height = 650.dp,
-        position = WindowPosition(Alignment.Center)
-    )
-    var isDarkTheme by remember { mutableStateOf(true) }
-    var isAppVisible by remember { mutableStateOf(true) }
-
-    Tray(
-        icon = painterResource("images/favicon.png"),
-        tooltip = "Aura Launcher",
-        onAction = { isAppVisible = !isAppVisible },
-        menu = {
-            Item("Показать/Скрыть", onClick = { isAppVisible = !isAppVisible })
-            Item("Открыть консоль", onClick = { GameConsoleService.show() })
-            Separator()
-            Item("Выход", onClick = ::exitApplication)
-        }
-    )
-
-    if (GameConsoleService.shouldShowConsole) {
-        ConsoleWindow(onClose = { GameConsoleService.hide() })
+fun main() {
+    // Инициализация Koin ДО запуска графического интерфейса.
+    // Это предотвращает ошибки "KoinApplication has not been started".
+    startKoin {
+        modules(networkModule, appModule, uiModule)
     }
 
-    Window(
-        onCloseRequest = ::exitApplication,
-        state = windowState,
-        title = "Aura Launcher",
-        resizable = false,
-        visible = isAppVisible
-    ) {
-        CelestiaTheme(useDarkTheme = isDarkTheme) {
-            var appState by remember { mutableStateOf<AppState>(AppState.Login) }
-            // Инициализация темы из настроек
-            var seasonalTheme by remember { mutableStateOf(di.settingsService.getSettings().seasonalTheme) }
+    application {
+        val windowState = rememberWindowState(
+            width = 1000.dp,
+            height = 650.dp,
+            position = WindowPosition(Alignment.Center)
+        )
+        var isDarkTheme by remember { mutableStateOf(true) }
+        var isAppVisible by remember { mutableStateOf(true) }
 
-            LaunchedEffect(Unit) {
-                val creds = di.credentialsManager.load()
-                if (creds?.decryptedPassword != null) {
-                    try {
-                        val lastServer = di.profileManager.lastServerId ?: "Industrial"
-                        val session = di.authService.login(creds.username, creds.decryptedPassword!!, lastServer)
-                        appState = AppState.Shell(session)
-                    } catch (e: Exception) {
-                        println("Auto-login failed: ${e.message}")
-                    }
-                }
+        // Гарантируем остановку Koin при закрытии приложения
+        DisposableEffect(Unit) {
+            onDispose { stopKoin() }
+        }
+
+        val trayIcon = painterResource(Res.drawable.favicon)
+
+        Tray(
+            icon = trayIcon,
+            tooltip = "Aura Launcher",
+            onAction = { isAppVisible = !isAppVisible },
+            menu = {
+                Item("Показать/Скрыть", onClick = { isAppVisible = !isAppVisible })
+                Item("Открыть консоль", onClick = { GameConsoleService.show() })
+                Separator()
+                Item("Выход", onClick = ::exitApplication)
             }
+        )
 
-            Box(Modifier.fillMaxSize().background(MaterialTheme.colors.background)) {
-                // Передаем параметры в фон
-                CelestiaBackground(isDarkTheme = isDarkTheme, currentTheme = seasonalTheme)
+        if (GameConsoleService.shouldShowConsole) {
+            ConsoleWindow(onClose = { GameConsoleService.hide() })
+        }
 
-                when (val state = appState) {
-                    is AppState.Login -> LoginScreen(onLoginSuccess = { session -> appState = AppState.Shell(session) })
-                    is AppState.Shell -> ShellUI(
-                        initialSession = state.session,
+        KoinContext {
+            Window(
+                onCloseRequest = ::exitApplication,
+                state = windowState,
+                title = "Aura Launcher",
+                resizable = false,
+                visible = isAppVisible,
+                icon = trayIcon,
+                undecorated = true,
+                transparent = true
+            ) {
+                CelestiaTheme(useDarkTheme = isDarkTheme) {
+                    AppContent(
+                        isDarkTheme = isDarkTheme,
                         onToggleTheme = { isDarkTheme = !isDarkTheme },
-                        onLogout = { di.credentialsManager.clear(); appState = AppState.Login },
-                        onCloseApp = ::exitApplication,
-                        onThemeChanged = { newTheme -> seasonalTheme = newTheme }
+                        onCloseApp = ::exitApplication
                     )
                 }
             }
+        }
+    }
+}
+
+/**
+ * Корневой компонент с логикой навигации и авто-входа.
+ */
+@Composable
+fun AppContent(
+    isDarkTheme: Boolean,
+    onToggleTheme: () -> Unit,
+    onCloseApp: () -> Unit
+) {
+    val credentialsManager: CredentialsManager = koinInject()
+    val authService: IAuthService = koinInject()
+    val profileManager: ProfileManager = koinInject()
+    val settingsService: ISettingsService = koinInject()
+
+    var appState by remember { mutableStateOf<AppState>(AppState.Login) }
+    var seasonalTheme by remember { mutableStateOf(settingsService.getSettings().seasonalTheme) }
+
+    LaunchedEffect(Unit) {
+        val creds = credentialsManager.load()
+        if (creds?.decryptedPassword != null) {
+            try {
+                val lastServer = profileManager.lastServerId ?: "Industrial"
+                val session = authService.login(creds.username, creds.decryptedPassword!!, lastServer)
+                appState = AppState.Shell(session)
+            } catch (e: Exception) {
+                LoggerFactory.getLogger("AppContent").warn("Auto-login failed: ${e.message}")
+            }
+        }
+    }
+
+    Box(Modifier.fillMaxSize().background(MaterialTheme.colors.background)) {
+        CelestiaBackground(isDarkTheme = isDarkTheme, currentTheme = seasonalTheme)
+
+        when (val state = appState) {
+            is AppState.Login -> LoginScreen(
+                onLoginSuccess = { session -> appState = AppState.Shell(session) }
+            )
+            is AppState.Shell -> ShellUI(
+                initialSession = state.session,
+                onToggleTheme = onToggleTheme,
+                onLogout = {
+                    credentialsManager.clear()
+                    appState = AppState.Login
+                },
+                onCloseApp = onCloseApp,
+                onThemeChanged = { newTheme -> seasonalTheme = newTheme }
+            )
         }
     }
 }
@@ -153,10 +216,7 @@ fun CelestiaBackground(isDarkTheme: Boolean, currentTheme: SeasonTheme) {
         drawRect(brush = Brush.radialGradient(colors = listOf(successColor.copy(alpha = glowAlpha), Color.Transparent), center = Offset(x2, y2), radius = width * 0.5f))
     }
 
-    // Восстановленный вызов с isDarkTheme
-    SeasonalEffectsLayer(
-        theme = currentTheme
-    )
+    SeasonalEffectsLayer(theme = currentTheme)
 }
 
 @Composable
@@ -167,6 +227,8 @@ fun ShellUI(
     onCloseApp: () -> Unit,
     onThemeChanged: (SeasonTheme) -> Unit
 ) {
+    val smartyNetworkService: SmartyNetworkService = koinInject()
+
     var currentSession by remember { mutableStateOf(initialSession) }
     var currentScreen by remember { mutableStateOf<ShellScreen>(ShellScreen.Home) }
     var selectedServer by remember { mutableStateOf<ServerProfile?>(null) }
@@ -237,7 +299,7 @@ fun ShellUI(
                         onOpenNews = { currentScreen = ShellScreen.News }
                     )
                     is ShellScreen.News -> NewsScreen(onBack = { currentScreen = ShellScreen.Home })
-                    is ShellScreen.Profile -> ProfileScreen(currentSession, di.smartyNetworkService)
+                    is ShellScreen.Profile -> ProfileScreen(currentSession, smartyNetworkService)
                     is ShellScreen.GlobalSettings -> SettingsScreen(
                         isDarkTheme = true,
                         onToggleTheme = onToggleTheme,

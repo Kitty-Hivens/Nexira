@@ -1,6 +1,7 @@
 package hivens.core.api.interfaces
 
 import hivens.core.api.model.ServerProfile
+import hivens.core.data.LauncherLogType
 import hivens.core.data.SessionData
 import java.io.IOException
 import java.nio.file.Path
@@ -28,5 +29,15 @@ interface ILauncherService {
         clientRootPath: Path,
         javaExecutablePath: Path,
         allocatedMemoryMB: Int
+    ): Process
+
+    @Throws(IOException::class)
+    fun launchClientWithLogs(
+        sessionData: SessionData,
+        serverProfile: ServerProfile,
+        clientRootPath: Path,
+        javaExecutablePath: Path,
+        allocatedMemoryMB: Int,
+        onLog: (String, LauncherLogType) -> Unit
     ): Process
 }

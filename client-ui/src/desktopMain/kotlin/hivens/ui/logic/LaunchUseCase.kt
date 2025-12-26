@@ -1,11 +1,14 @@
 package hivens.ui.logic
 
+import hivens.core.api.interfaces.IAuthService
+import hivens.core.api.interfaces.IFileDownloadService
+import hivens.core.api.interfaces.ILauncherService
+import hivens.core.api.interfaces.ISettingsService
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.SessionData
-import hivens.launcher.FileDownloadService
-import hivens.launcher.LauncherDI
-import hivens.launcher.LauncherLogType
-import hivens.launcher.LauncherService
+import hivens.core.data.LauncherLogType
+import hivens.launcher.CredentialsManager
+import hivens.launcher.JavaManagerService
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.utils.LogType
 import kotlinx.coroutines.Dispatchers
@@ -13,8 +16,38 @@ import kotlinx.coroutines.withContext
 import java.nio.file.Files
 import java.nio.file.Path
 
-class LaunchUseCase(private val di: LauncherDI) {
+/**
+ * Сценарий использования (UseCase) для запуска игры.
+ *
+ * <p>Агрегирует логику взаимодействия между UI и системными сервисами.
+ * Выполняет последовательность действий: авторизация -> обновление файлов -> запуск процесса.</p>
+ *
+ * @property authService Сервис авторизации.
+ * @property credentialsManager Менеджер локального хранения паролей.
+ * @property settingsService Сервис глобальных настроек лаунчера.
+ * @property downloadService Сервис загрузки и валидации файлов.
+ * @property javaManagerService Сервис управления версиями Java.
+ * @property launcherService Сервис запуска процесса игры.
+ * @property dataDirectory Рабочая директория приложения.
+ */
+class LaunchUseCase(
+    private val authService: IAuthService,
+    private val credentialsManager: CredentialsManager,
+    private val settingsService: ISettingsService,
+    private val downloadService: IFileDownloadService,
+    private val javaManagerService: JavaManagerService,
+    private val launcherService: ILauncherService,
+    private val dataDirectory: Path
+) {
 
+    /**
+     * Запускает цепочку операций для входа в игру.
+     *
+     * @param currentSession Текущая сессия пользователя.
+     * @param server Профиль выбранного сервера.
+     * @param onProgress Callback для отображения прогресса в UI (0.0 - 1.0).
+     * @param onSessionUpdated Callback для возврата обновленной сессии в UI.
+     */
     suspend fun launch(
         currentSession: SessionData,
         server: ServerProfile,
@@ -27,6 +60,7 @@ class LaunchUseCase(private val di: LauncherDI) {
 
         withContext(Dispatchers.IO) {
             try {
+                // 1. Авторизация
                 onProgress(0.1f, "Авторизация...")
                 GameConsoleService.append("Шаг 1: Авторизация...", LogType.INFO)
 
@@ -34,9 +68,9 @@ class LaunchUseCase(private val di: LauncherDI) {
                 val targetServerId = server.assetDir
 
                 try {
-                    val pass = di.credentialsManager.load()?.decryptedPassword ?: session.cachedPassword
+                    val pass = credentialsManager.load()?.decryptedPassword ?: session.cachedPassword
                     if (!pass.isNullOrEmpty()) {
-                        session = di.authService.login(session.playerName, pass, targetServerId)
+                        session = authService.login(session.playerName, pass, targetServerId)
                         GameConsoleService.append("Успешный вход. UUID: ${session.uuid}", LogType.INFO)
                     } else {
                         GameConsoleService.append("Пароль не найден, пробуем старую сессию.", LogType.WARN)
@@ -47,15 +81,14 @@ class LaunchUseCase(private val di: LauncherDI) {
 
                 onSessionUpdated(session)
 
-                // 2. Скачивание
+                // 2. Синхронизация файлов
                 onProgress(0.2f, "Синхронизация файлов...")
                 GameConsoleService.append("Шаг 2: Проверка файлов...", LogType.INFO)
 
-                val clientDir = di.dataDirectory.resolve("clients").resolve(targetServerId)
+                val clientDir = dataDirectory.resolve("clients").resolve(targetServerId)
                 if (!Files.exists(clientDir)) Files.createDirectories(clientDir)
-                val downloader = di.downloadService as FileDownloadService
 
-                downloader.processSession(
+                downloadService.processSession(
                     session = session,
                     serverId = targetServerId,
                     targetDir = clientDir,
@@ -71,22 +104,21 @@ class LaunchUseCase(private val di: LauncherDI) {
                 )
                 GameConsoleService.append("Файлы синхронизированы.", LogType.INFO)
 
-                // 3. Запуск Java
+                // 3. Подготовка окружения Java
                 onProgress(0.9f, "Подготовка JVM...")
-                val settings = di.settingsService.getSettings()
+                val settings = settingsService.getSettings()
                 val javaPath = if (!settings.javaPath.isNullOrEmpty()) {
                     Path.of(settings.javaPath!!)
                 } else {
-                    di.javaManagerService.getJavaPath(server.version)
+                    javaManagerService.getJavaPath(server.version)
                 }
                 val memory = settings.memoryMB
 
                 GameConsoleService.append("Шаг 3: Запуск процесса...", LogType.INFO)
                 GameConsoleService.append("Java: $javaPath", LogType.INFO)
 
-                val launcher = di.launcherService as LauncherService
-
-                val process = launcher.launchClientWithLogs(
+                // 4. Запуск процесса
+                val process = launcherService.launchClientWithLogs(
                     sessionData = session,
                     serverProfile = server,
                     clientRootPath = clientDir,
@@ -104,9 +136,10 @@ class LaunchUseCase(private val di: LauncherDI) {
                 onProgress(1.0f, "Игра запущена")
                 GameConsoleService.append("--- Minecraft запущен ---", LogType.INFO)
 
+                // Ожидание завершения процесса
                 val exitCode = process.waitFor()
                 if (exitCode != 0) {
-                    GameConsoleService.append("Игра посыпалась (Код: $exitCode)", LogType.ERROR)
+                    GameConsoleService.append("Игра упала с ошибкой (Код: $exitCode)", LogType.ERROR)
                     GameConsoleService.show()
                 } else {
                     GameConsoleService.append("Игра закрылась в страхе.", LogType.INFO)
