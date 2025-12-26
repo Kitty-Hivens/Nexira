@@ -120,7 +120,7 @@ jobs:
           EOF
           
           # 5. Иконка
-          cp client-ui/src/main/resources/images/favicon.png AppDir/AuraLauncher.png
+          cp client-ui/src/commonMain/composeResources/drawable/favicon.png AppDir/AuraLauncher.png
           
           # 6. Сборка .AppImage
           ARCH=x86_64 ./squashfs-root/AppRun --no-appstream AppDir AuraLauncher.AppImage
