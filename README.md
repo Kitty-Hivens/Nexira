@@ -58,7 +58,7 @@
 
 1.  Клонируйте репозиторий:
     ```bash
-    git clone [https://github.com/Kitty-Hivens/Aura-Launcher.git](https://github.com/Kitty-Hivens/Aura-Launcher.git)
+    git clone https://github.com/Kitty-Hivens/Aura-Launcher.git
     cd Aura-Launcher
     ```
 
