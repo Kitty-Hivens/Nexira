@@ -2,47 +2,31 @@ package hivens.launcher.component
 
 import hivens.core.api.interfaces.IManifestProcessorService
 import hivens.core.data.FileManifest
+import org.slf4j.LoggerFactory
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.Locale
 import java.util.stream.Collectors
+import kotlin.io.path.name
+import kotlin.io.path.pathString
 
 /**
- * Компонент, реализующий стратегию формирования Classpath для JVM.
+ * Компонент, отвечающий за разрешение зависимостей classpath для JVM.
  *
- * Отвечает за сборку корректного аргумента `-classpath` с учетом специфических требований
- * серверного античита (проверка контрольных сумм библиотек).
- *
- * **Конфигурация путей:**
- * Все библиотеки ищутся строго внутри папки клиента (например, `.aura/clients/RPG/libraries`),
- * обеспечивая полную изоляцию сборок.
- *
- * **Особенности реализации для обхода защиты:**
- * * **Отключена фильтрация по ОС:** Загружаются нативные библиотеки всех платформ,
- * так как сервер проверяет хеш полного списка библиотек из манифеста.
- * * **Фильтрация служебного мусора:** Исключаются локальные архивы Aura (`assets.zip`, `extra.zip`),
- * которые отсутствуют в официальном клиенте и ломают хеш.
+ * Обеспечивает строгое соответствие манифесту сервера, сохраняя при этом
+ * целостность локальных файлов и кроссплатформенную совместимость.
  */
 internal class ClasspathProvider(
     private val manifestProcessor: IManifestProcessorService
 ) {
 
-    /**
-     * Строит строку путей к классам (Classpath String).
-     *
-     * **Алгоритм работы:**
-     * 1. Агрегация путей из манифеста файлов.
-     * 2. Разрешение всех путей относительно корня клиента (`clientRoot`).
-     * 3. Мягкая проверка существования файлов.
-     * 4. Фильтрация "мусорных" архивов Aura.
-     * 5. Сортировка и выделение главного JAR-файла.
-     *
-     * @param clientRoot Корневая директория экземпляра клиента (например, .../clients/RPG).
-     * @param manifest Объект манифеста, содержащий список ожидаемых файлов.
-     * @param excludedModules Список исключаемых модулей (не используется в данной реализации).
-     *
-     * @return Строка путей, разделенная системным разделителем [File.pathSeparator].
-     */
+    private val logger = LoggerFactory.getLogger(ClasspathProvider::class.java)
+
+    // Внутренний черный список файлов, которые генерируются лаунчером локально,
+    // но не должны попадать в classpath для сохранения согласованности хеша с сервером.
+    private val internalBlacklist = setOf("extra.zip", "assets.zip", "natives.zip")
+
     fun buildClasspath(
         clientRoot: Path,
         manifest: FileManifest,
@@ -50,77 +34,121 @@ internal class ClasspathProvider(
     ): String {
         val allJars = HashSet<Path>()
         val modsDir = clientRoot.resolve("mods").toAbsolutePath()
+        // Библиотеки теперь ищутся строго внутри папки клиента для обеспечения изоляции
+        val libDir = clientRoot.resolve("libraries").toAbsolutePath()
 
-        // 1. Агрегация и разрешение путей
-        // ВАЖНО: Все пути строятся относительно папки клиента (Local Libraries Strategy)
+        // 1. Агрегация путей из манифеста
         manifestProcessor.flattenManifest(manifest).keys.forEach { rawPath ->
-            val cleanPath = sanitizePath(rawPath)
-            // Всегда resolve от clientRoot, никаких externalRoot
-            val resolvedPath = clientRoot.resolve(cleanPath)
-            allJars.add(resolvedPath)
+            // Очистка и разрешение пути относительно корня клиента
+            val resolved = resolveSanitizedPath(clientRoot, rawPath)
+            allJars.add(resolved)
         }
 
-        val libs = ArrayList<String>()
-        var mainJar: String? = null
-
-        // 2. Фильтрация и формирование списка
-        allJars.forEach { path ->
-            val pathStr = path.toAbsolutePath().toString()
-            val fileName = path.fileName.toString().lowercase()
-
-            // --- Блок валидации ---
-
-            // Пропускаем файл, только если его нет физически И это не библиотека.
-            if (!Files.exists(path) && !pathStr.contains("libraries")) return@forEach
-
-            // Проверка расширений и системных папок
-            if (!fileName.endsWith(".jar") && !fileName.endsWith(".zip")) return@forEach
-            if (pathStr.startsWith(modsDir.toString())) return@forEach
-            if (pathStr.contains("/config/") || pathStr.contains("/assets/")) return@forEach
-
-            // --- Блок "Clean Aura" (Фильтр мусора) ---
-            // Убираем файлы, которых нет в манифесте сервера
-            if ((fileName.startsWith("assets-") || fileName == "assets.zip") && fileName.endsWith(".zip")) return@forEach
-            if ((fileName.startsWith("natives-") || fileName == "natives.zip") && fileName.endsWith(".zip")) return@forEach
-            if (fileName == "extra.zip") return@forEach
-
-            // --- Блок Cross-Platform ---
-            // Фильтр по ОС отключен намеренно. Грузим всё для совпадения хеша.
-
-            // --- Блок разделения ---
-            if (fileName.startsWith("smartycraft") && fileName.endsWith(".jar")) {
-                mainJar = pathStr
-            } else {
-                libs.add(pathStr)
+        // 2. Резервный вариант: Локальное сканирование (восстановлена поддержка Legacy)
+        if (manifest.files.isEmpty()) {
+            runCatching {
+                if (Files.exists(libDir)) {
+                    Files.walk(libDir).use { walk ->
+                        walk.filter {
+                            val name = it.name.lowercase()
+                            Files.isRegularFile(it) && name.endsWith(".jar") && !name.endsWith(".cache")
+                        }.forEach { allJars.add(it) }
+                    }
+                }
+            }.onFailure { e ->
+                logger.warn("Не удалось просканировать локальную директорию библиотек: ${e.message}")
             }
         }
 
-        // 3. Сортировка (для детерминированного порядка)
-        libs.sort()
+        // Подготовка исключений
+        val absoluteExcluded = excludedModules.map { libDir.resolve(it).toAbsolutePath() }
 
-        // Добавляем Main Jar в конец списка
-        val result = if (mainJar != null) {
-            libs + mainJar!!
-        } else {
-            libs
-        }
+        // 3. Фильтрация и Сортировка
+        return allJars.stream()
+            .map { it.toAbsolutePath() }
+            .filter { path ->
+                val fileName = path.name.lowercase()
+                val pathStr = path.toString()
 
-        return result.stream().collect(Collectors.joining(File.pathSeparator))
+                // Базовая валидация существования
+                if (!Files.exists(path)) {
+                    // WARN: Допускаем отсутствующие библиотеки, если они часть структуры
+                    // (некоторые серверы проверяют хеш даже отсутствующих файлов), но пишем предупреждение.
+                    if (!pathStr.contains("libraries")) return@filter false
+                }
+
+                // Проверка расширения
+                if (!fileName.endsWith(".jar") && !fileName.endsWith(".zip")) return@filter false
+
+                // Исключение папок модов и конфигов/ассетов
+                if (path.startsWith(modsDir)) return@filter false
+                if (pathStr.contains("${File.separator}config${File.separator}") ||
+                    pathStr.contains("${File.separator}assets${File.separator}")) return@filter false
+
+                // Явные исключения (из аргумента excludedModules)
+                if (absoluteExcluded.contains(path)) return@filter false
+
+                // --- ФИЛЬТР ЦЕЛОСТНОСТИ (INTEGRITY FILTER) ---
+                // Исключаем локальные архивы, вызывающие несовпадение контрольных сумм на строгих серверах
+                if (internalBlacklist.contains(fileName)) return@filter false
+                if ((fileName.startsWith("assets-") || fileName.startsWith("natives-")) && fileName.endsWith(".zip")) {
+                    return@filter false
+                }
+
+                true
+            }
+            .filter { path ->
+                // ПРИМЕЧАНИЕ: Фильтрация по ОС здесь намеренно отключена.
+                // Строгие серверы требуют полного classpath из манифеста (включая нативные библиотеки Windows/macOS)
+                // для совпадения ожидаемой контрольной суммы, даже на Linux.
+                // Мы загружаем всё для обеспечения подключения.
+                true
+            }
+            .map { it.toString() }
+            .sorted(::sortLibraries) // Восстановлен детерминированный порядок (сортировка)
+            .collect(Collectors.joining(File.pathSeparator))
     }
 
     /**
-     * Очищает "сырой" путь из манифеста от лишних префиксов.
-     *
-     * Убирает первую директорию из пути, если она не является стандартной.
+     * Разрешает "сырой" путь из манифеста относительно корня клиента.
+     * Безопасно обрабатывает разделители путей для Windows/Unix.
      */
-    private fun sanitizePath(rawPath: String): String {
-        val parts = rawPath.split("/")
-        if (parts.size < 2) return rawPath
+    private fun resolveSanitizedPath(root: Path, rawPath: String): Path {
+        // Нормализация разделителей под текущую систему
+        val normalized = rawPath.replace("/", File.separator).replace("\\", File.separator)
 
-        val firstDir = parts[0]
-        if (!firstDir.startsWith("libraries") && !firstDir.equals("bin") && !firstDir.equals("mods")) {
-            return rawPath.substring(firstDir.length + 1)
+        // Удаление стандартных префиксов, чтобы избежать дублирования путей
+        val parts = normalized.split(File.separator)
+        if (parts.size > 1) {
+            val first = parts[0]
+            if (!first.startsWith("libraries") && first != "bin" && first != "mods") {
+                return root.resolve(normalized.substringAfter(File.separator))
+            }
         }
-        return rawPath
+        return root.resolve(normalized)
+    }
+
+    /**
+     * Сортирует библиотеки для обеспечения детерминированного порядка загрузки классов.
+     * Библиотеки начальной загрузки (Bootstrap/LaunchWrapper) должны загружаться первыми.
+     */
+    private fun sortLibraries(p1: String, p2: String): Int {
+        val p1Name = File(p1).name.lowercase()
+        val p2Name = File(p2).name.lowercase()
+
+        val p1Priority = isBootstrapLibrary(p1Name)
+        val p2Priority = isBootstrapLibrary(p2Name)
+
+        return when {
+            p1Priority && !p2Priority -> -1
+            !p1Priority && p2Priority -> 1
+            else -> p1.compareTo(p2) // Лексикографическая сортировка для стабильности
+        }
+    }
+
+    private fun isBootstrapLibrary(name: String): Boolean {
+        return name.contains("launchwrapper") ||
+                name.contains("bootstraplauncher") ||
+                name.contains("asm-all")
     }
 }
