@@ -1,7 +1,8 @@
 plugins {
-    kotlin("multiplatform") // Меняем jvm на multiplatform
+    kotlin("multiplatform")
     id("org.jetbrains.compose") version "1.9.3"
     id("org.jetbrains.kotlin.plugin.compose") version "2.1.0"
+    id("com.github.gmazzo.buildconfig")
 }
 
 group = "hivens"
@@ -53,6 +54,14 @@ kotlin {
             }
         }
     }
+}
+
+// Настройка генератора конфига
+buildConfig {
+    packageName("hivens.ui") // Пакет, где будет лежать класс
+    buildConfigField("String", "APP_VERSION", "\"${project.version}\"")
+    buildConfigField("long", "BUILD_TIME", "${System.currentTimeMillis()}L")
+    buildConfigField("String", "APP_NAME", "\"Aura Launcher\"")
 }
 
 compose.desktop {
