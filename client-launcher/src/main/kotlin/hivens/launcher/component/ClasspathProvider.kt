@@ -13,7 +13,7 @@ import kotlin.io.path.name
 
 /**
  * Компонент, отвечающий за сборку classpath для запуска JVM.
- * Фильтрует лишние файлы (конфиги, нативы), чтобы хеш совпадал с серверным.
+ * Фильтрует лишние файлы (конфиги, нативы, моды), чтобы локальный хеш совпадал с серверным.
  */
 class ClasspathProvider(
     private val manifestProcessor: IManifestProcessorService
@@ -27,9 +27,8 @@ class ClasspathProvider(
     fun buildClasspath(
         clientRoot: Path,
         manifest: FileManifest,
-        excludedModules: List<String> // Обычно это ignoredFiles из LaunchUseCase
+        excludedModules: List<String>
     ): String {
-        // LinkedHashSet сохраняет порядок вставки
         val allJars = LinkedHashSet<Path>()
 
         val modsDir = clientRoot.resolve("mods").toAbsolutePath()
@@ -75,6 +74,9 @@ class ClasspathProvider(
             .joinToString(File.pathSeparator)
     }
 
+    /**
+     * Проверяет, подходит ли библиотека для включения в classpath.
+     */
     private fun validateLibrary(path: Path, modsDir: Path, excludedNames: Set<String>): Boolean {
         val fileName = path.name.lowercase()
 
@@ -110,6 +112,10 @@ class ClasspathProvider(
         return true
     }
 
+    /**
+     * Разрешает путь из манифеста относительно корня клиента.
+     * Убирает префикс с именем сервера, если он есть (Legacy структура Smarty).
+     */
     private fun resolveSanitizedPath(root: Path, rawPath: String): Path {
         val pathPart = Paths.get(rawPath)
 
@@ -124,6 +130,10 @@ class ClasspathProvider(
         return root.resolve(pathPart)
     }
 
+    /**
+     * Сортировка для детерминированного порядка загрузки.
+     * LaunchWrapper и Bootstrap должны быть первыми.
+     */
     private fun compareLibraries(p1: Path, p2: Path): Int {
         val n1 = p1.name.lowercase()
         val n2 = p2.name.lowercase()
