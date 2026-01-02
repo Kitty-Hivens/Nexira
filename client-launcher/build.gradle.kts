@@ -1,23 +1,20 @@
 plugins {
     kotlin("jvm")
+    kotlin("plugin.serialization") version "2.1.0"
 }
 
 dependencies {
-    // Контракты (IFileDownloadService)
     implementation(project(":client-core"))
-
-    // Эндпоинты (CLIENT_DOWNLOAD_BASE)
     implementation(project(":client-config"))
 
-    // OkHttp (поставляется транзитивно из client-core)
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
-
-    // JSON-маппинг
-    implementation("com.google.code.gson:gson:2.10.1")
-
-    implementation("org.apache.commons:commons-lang3:3.18.0")
     implementation("org.apache.commons:commons-compress:1.26.1")
-    implementation("commons-io:commons-io:2.15.1")
     implementation("io.insert-koin:koin-core:3.5.3")
     implementation("org.slf4j:slf4j-api:2.0.12")
+
+    // Ktor Client & Serialization
+    val ktorVersion = "3.3.3"
+    implementation("io.ktor:ktor-client-core:$ktorVersion")
+    implementation("io.ktor:ktor-client-okhttp:$ktorVersion")
+    implementation("io.ktor:ktor-client-content-negotiation:$ktorVersion")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
 }

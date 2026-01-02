@@ -23,7 +23,7 @@ interface ILauncherService {
      * @throws IOException в случае ошибки I/O при запуске.
      */
     @Throws(IOException::class)
-    fun launchClient(
+    suspend fun launchClient(
         sessionData: SessionData,
         serverProfile: ServerProfile,
         clientRootPath: Path,
@@ -32,7 +32,7 @@ interface ILauncherService {
     ): Process
 
     @Throws(IOException::class)
-    fun launchClientWithLogs(
+    suspend fun launchClientWithLogs(
         sessionData: SessionData,
         serverProfile: ServerProfile,
         clientRootPath: Path,

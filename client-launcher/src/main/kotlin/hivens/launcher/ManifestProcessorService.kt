@@ -1,20 +1,21 @@
 package hivens.launcher
 
-import com.google.gson.Gson
 import hivens.core.api.interfaces.IManifestProcessorService
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.FileData
 import hivens.core.data.FileManifest
 import hivens.core.data.OptionalMod
-import org.slf4j.LoggerFactory
-import java.util.ArrayList
-import java.util.HashMap
+import kotlinx.serialization.json.* import org.slf4j.LoggerFactory
 
-class ManifestProcessorService(private val gson: Gson) : IManifestProcessorService {
+class ManifestProcessorService(
+    private val json: Json
+) : IManifestProcessorService {
 
     private val log = LoggerFactory.getLogger(ManifestProcessorService::class.java)
 
     override fun processManifest(version: String): FileManifest {
+        // В текущей архитектуре манифест приходит уже готовым в SessionData,
+        // этот метод в оригинале был заглушкой, оставляем заглушкой.
         return FileManifest()
     }
 
@@ -35,25 +36,19 @@ class ManifestProcessorService(private val gson: Gson) : IManifestProcessorServi
 
     override fun getOptionalModsForClient(profile: ServerProfile): List<OptionalMod> {
         val result = ArrayList<OptionalMod>()
-        val rawMods = profile.optionalModsData
+        val rawMods = profile.optionalModsData ?: return result
 
-        if (rawMods.isNullOrEmpty()) {
-            return result
-        }
-
-        for ((modId, modData) in rawMods) {
+        rawMods.forEach { (modId, modData) ->
             try {
-                val json = gson.toJson(modData)
-                val mod = gson.fromJson(json, OptionalMod::class.java)
+                val mod = json.decodeFromJsonElement<OptionalMod>(modData)
 
+                // Заполняем пропуски, если их нет в JSON
                 if (mod.id.isEmpty()) mod.id = modId
-                if (mod.jars.isEmpty()) {
-                    mod.jars = mutableListOf("$modId.jar")
-                }
+                if (mod.jars.isEmpty()) mod.jars = mutableListOf("$modId.jar")
 
                 result.add(mod)
             } catch (e: Exception) {
-                log.error("Failed to parse mod {}", modId, e)
+                log.error("Ошибка парсинга конфигурации мода '$modId': ${e.message}")
             }
         }
         return result

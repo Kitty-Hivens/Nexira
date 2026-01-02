@@ -2,16 +2,23 @@ package hivens.launcher.component
 
 import hivens.core.util.ZipUtils
 import hivens.launcher.util.ClientFileHelper
+import io.ktor.client.HttpClient
+import io.ktor.client.request.prepareGet
+import io.ktor.client.statement.bodyAsChannel
+import io.ktor.http.isSuccess
+import io.ktor.utils.io.jvm.javaio.copyTo
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
+import java.io.FileOutputStream
 import java.io.IOException
-import java.net.URI
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.util.*
 import java.util.stream.Collectors
 
-class EnvironmentPreparer {
+class EnvironmentPreparer(private val httpClient: HttpClient) {
     private val log = LoggerFactory.getLogger(EnvironmentPreparer::class.java)
 
     // Модули для Modern версий (1.13+)
@@ -21,7 +28,7 @@ class EnvironmentPreparer {
     )
     private val lwjgl3Version = "3.3.3"
 
-    fun prepareNatives(clientRoot: Path, nativesDirName: String, version: String) {
+    suspend fun prepareNatives(clientRoot: Path, nativesDirName: String, version: String) = withContext(Dispatchers.IO) {
         val binDir = clientRoot.resolve("bin")
         val nativesDir = clientRoot.resolve(nativesDirName)
         val osSuffix = getOsSuffix()
@@ -29,7 +36,7 @@ class EnvironmentPreparer {
         // 1. Проверка: Если папка валидна, ничего не делаем
         if (isFolderValidForOs(nativesDir, osSuffix)) {
             log.info("Natives valid for $osSuffix ($version).")
-            return
+            return@withContext
         }
 
         // Чистим папку перед новой попыткой
@@ -68,11 +75,10 @@ class EnvironmentPreparer {
             }
         }
 
-        // 3. Фолбек на Maven (если локального нет или он битый)
+        // 3. Скачивание через Ktor
         if (!unpackedSuccessfully) {
-            log.warn("Natives missing. Downloading correct version from Maven Central...")
+            log.warn("Natives missing. Downloading via Ktor...")
 
-            // !!! ГЛАВНОЕ ИСПРАВЛЕНИЕ: Выбор версии !!!
             if (version == "1.7.10" || version.startsWith("1.7.")) {
                 downloadLegacyLWJGL2(nativesDir, osSuffix, "2.9.1")
             } else if (version == "1.12.2" || version.startsWith("1.12.")) {
@@ -82,11 +88,8 @@ class EnvironmentPreparer {
             }
 
             flattenNatives(nativesDir)
-
             if (!isFolderValidForOs(nativesDir, osSuffix)) {
-                log.error("CRITICAL: Failed to provide natives via Maven!")
-            } else {
-                log.info("Natives downloaded and unpacked successfully.")
+                log.error("CRITICAL: Failed to provide natives!")
             }
         }
     }
@@ -94,7 +97,7 @@ class EnvironmentPreparer {
     /**
      * Скачивание для СТАРЫХ версий (1.7.10, 1.12.2) -> LWJGL 2
      */
-    private fun downloadLegacyLWJGL2(destDir: Path, os: String, version: String) {
+    private suspend fun downloadLegacyLWJGL2(destDir: Path, os: String, version: String) {
         val mavenOs = if (os == "macos") "macosx" else os // LWJGL 2 использовал 'macosx'
 
         // Список файлов для LWJGL 2
@@ -103,7 +106,6 @@ class EnvironmentPreparer {
             "https://repo1.maven.org/maven2/net/java/jinput/jinput-platform/2.0.5/jinput-platform-2.0.5-natives-$mavenOs.jar" to "jinput_platform"
         )
 
-        log.info("Detected Legacy Minecraft ($version). Downloading LWJGL 2 natives...")
 
         artifacts.keys.forEach { url ->
             downloadAndUnzip(url, destDir)
@@ -111,13 +113,13 @@ class EnvironmentPreparer {
     }
 
     /**
-     * Скачивание для НОВЫХ версий (1.13+) -> LWJGL 3
+     * Скачивание для новых версий (1.13+) -> LWJGL 3
      */
-    private fun downloadModernLWJGL3(destDir: Path, os: String) {
+    private suspend fun downloadModernLWJGL3(destDir: Path, os: String) {
         val mavenOsClassifier = "natives-$os"
         val baseUrl = "https://repo1.maven.org/maven2/org/lwjgl"
 
-        log.info("Detected Modern Minecraft. Downloading LWJGL $lwjgl3Version natives...")
+        log.info("Downloading LWJGL $lwjgl3Version natives...")
 
         for (module in lwjgl3Modules) {
             val fileName = "$module-$lwjgl3Version-$mavenOsClassifier.jar"
@@ -126,18 +128,23 @@ class EnvironmentPreparer {
         }
     }
 
-    // Утилитный метод для скачивания и распаковки
-    private fun downloadAndUnzip(urlStr: String, destDir: Path) {
+    private suspend fun downloadAndUnzip(urlStr: String, destDir: Path) {
         try {
             log.info("Downloading: $urlStr")
             val tempJar = Files.createTempFile("aura_native_", ".jar")
 
-            // ИСПРАВЛЕНИЕ: URL(String) deprecated -> URI.create(String).toURL()
-            URI.create(urlStr).toURL().openStream().use { input ->
-                Files.copy(input, tempJar, StandardCopyOption.REPLACE_EXISTING)
+            try {
+                httpClient.prepareGet(urlStr).execute { httpResponse ->
+                    if (!httpResponse.status.isSuccess()) throw IOException("HTTP ${httpResponse.status}")
+                    val channel = httpResponse.bodyAsChannel()
+                    FileOutputStream(tempJar.toFile()).use { fos ->
+                        channel.copyTo(fos)
+                    }
+                }
+                ZipUtils.unzip(tempJar.toFile(), destDir.toFile())
+            } finally {
+                Files.deleteIfExists(tempJar)
             }
-            ZipUtils.unzip(tempJar.toFile(), destDir.toFile())
-            Files.delete(tempJar)
         } catch (e: Exception) {
             log.error("Failed to fetch/unzip: $urlStr", e)
         }
@@ -180,7 +187,7 @@ class EnvironmentPreparer {
             Files.list(dir).use { stream ->
                 stream.anyMatch { it.toString().lowercase().endsWith(expectedExtension) }
             }
-        } catch (e: Exception) { false }
+        } catch (_: Exception) { false }
     }
 
     fun prepareAssets(clientRoot: Path, assetsZipName: String) {
@@ -197,11 +204,10 @@ class EnvironmentPreparer {
                 try {
                     // Грубая проверка: если файлов мало, значит распаковка была кривой
                     if (Files.list(objectsDir).count() < 10) needUnzip = true
-                } catch (e: Exception) { needUnzip = true }
+                } catch (_: Exception) { needUnzip = true }
             }
         } else {
             // Если запрошенного архива нет, попробуем найти стандартный assets.zip
-            // (фикс вашей проблемы с 1.7.10)
             val fallbackZip = clientRoot.resolve("assets.zip")
             if (Files.exists(fallbackZip)) {
                 log.info("Requested $assetsZipName not found, but assets.zip exists. Using fallback.")

@@ -121,8 +121,8 @@ fun DashboardScreen(
             scope.launch(Dispatchers.IO) {
                 try {
                     val creds = credentialsManager.load()
-                    if (creds?.decryptedPassword != null) {
-                        val newSession = authService.login(session.playerName, creds.decryptedPassword!!, srv.assetDir)
+                    if (creds?.cachedPassword != null) {
+                        val newSession = authService.login(session.playerName, creds.cachedPassword!!, srv.assetDir)
                         withContext(Dispatchers.Main) {
                             onSessionUpdated(newSession)
                         }

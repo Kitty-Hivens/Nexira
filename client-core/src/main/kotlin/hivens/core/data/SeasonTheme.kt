@@ -1,28 +1,30 @@
 package hivens.core.data
 
-import com.google.gson.annotations.SerializedName
-import java.util.Calendar
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import java.util.*
 
+@Serializable
 enum class SeasonTheme(val title: String) {
-    @SerializedName("AUTO")
+    @SerialName("AUTO")
     AUTO("Автоматически"),
 
-    @SerializedName("NONE")
+    @SerialName("NONE")
     NONE("Отключено"),
 
-    @SerializedName("WINTER")
+    @SerialName("WINTER")
     WINTER("Зима (Снег)"),
 
-    @SerializedName("NEW_YEAR")
+    @SerialName("NEW_YEAR")
     NEW_YEAR("Новый год"),
 
-    @SerializedName("SPRING")
+    @SerialName("SPRING")
     SPRING("Весна (Сакура)"),
 
-    @SerializedName("SUMMER")
+    @SerialName("SUMMER")
     SUMMER("Лето (Светлячки)"),
 
-    @SerializedName("AUTUMN")
+    @SerialName("AUTUMN")
     AUTUMN("Осень (Листопад)");
 
     companion object {

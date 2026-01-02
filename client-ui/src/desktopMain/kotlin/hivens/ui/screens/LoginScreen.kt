@@ -112,7 +112,7 @@ fun LoginScreen(onLoginSuccess: (SessionData) -> Unit) {
                     val s = authService.login(login, password, lastServer)
 
                     if (rememberMe) {
-                        credentialsManager.save(login, password)
+                        credentialsManager.save(s)
                     }
                     s
                 }

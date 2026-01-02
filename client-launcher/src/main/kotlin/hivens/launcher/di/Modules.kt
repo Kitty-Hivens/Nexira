@@ -1,66 +1,102 @@
 package hivens.launcher.di
 
-import com.google.gson.Gson
-import com.google.gson.GsonBuilder
 import hivens.config.ServiceEndpoints
 import hivens.core.api.AuthService
-import hivens.core.api.SmartyNetworkService
+import hivens.core.api.ServerRepository
+import hivens.core.api.SkinRepository
 import hivens.core.api.interfaces.*
 import hivens.launcher.*
-import okhttp3.Authenticator
-import okhttp3.Credentials
-import okhttp3.OkHttpClient
+import hivens.launcher.component.EnvironmentPreparer
+import io.ktor.client.*
+import io.ktor.client.engine.okhttp.*
+import io.ktor.client.plugins.*
+import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.request.*
+import io.ktor.http.*
+import io.ktor.serialization.kotlinx.json.*
+import kotlinx.serialization.json.Json
 import org.koin.core.module.dsl.singleOf
 import org.koin.dsl.module
 import java.net.InetSocketAddress
-import java.net.PasswordAuthentication
 import java.net.Proxy
 import java.nio.file.Paths
 import java.util.concurrent.TimeUnit
 
 /**
- * Модуль, отвечающий за сетевое взаимодействие, HTTP-клиенты и парсеры.
+ * Модуль, отвечающий за сетевое взаимодействие.
  */
 val networkModule = module {
 
     /**
-     * Предоставляет глобальный экземпляр [Gson] с включенным форматированием.
+     * Глобальная конфигурация JSON.
      */
-    single<Gson> {
-        GsonBuilder().setPrettyPrinting().create()
+    single<Json> {
+        Json {
+            ignoreUnknownKeys = true
+            prettyPrint = true
+            isLenient = true
+            encodeDefaults = true
+        }
     }
 
     /**
-     * Предоставляет основной [OkHttpClient], настроенный для работы через прокси SmartyCraft.
-     * Включает настройки таймаутов и аутентификации прокси.
+     * Основной HTTP-клиент.
+     * Использует движок OkHttp под капотом для поддержки SOCKS прокси с авторизацией.
      */
-    single<OkHttpClient> {
+    single<HttpClient> {
         java.net.Authenticator.setDefault(object : java.net.Authenticator() {
-            override fun getPasswordAuthentication(): PasswordAuthentication {
-                return PasswordAuthentication("proxyuser", "proxyuserproxyuser".toCharArray())
+            override fun getPasswordAuthentication(): java.net.PasswordAuthentication {
+                // TODO: В будущем вынести логин/пароль в конфиг
+                return java.net.PasswordAuthentication("proxyuser", "proxyuserproxyuser".toCharArray())
             }
         })
 
-        val okHttpProxyAuthenticator = Authenticator { _, response ->
-            val credential = Credentials.basic("proxyuser", "proxyuserproxyuser")
-            response.request.newBuilder()
-                .header("Proxy-Authorization", credential)
-                .build()
-        }
+        HttpClient(OkHttp) {
+            // Настройка движка (специфично для JVM/OkHttp)
+            engine {
+                config {
+                    // Настройка прокси
+                    proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress(ServiceEndpoints.PROXY_HOST, ServiceEndpoints.PROXY_PORT)))
 
-        OkHttpClient.Builder()
-            .proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress(ServiceEndpoints.PROXY_HOST, ServiceEndpoints.PROXY_PORT)))
-            .proxyAuthenticator(okHttpProxyAuthenticator)
-            .connectTimeout(30, TimeUnit.SECONDS)
-            .readTimeout(60, TimeUnit.SECONDS)
-            .build()
+                    // Аутентификация на прокси
+                    proxyAuthenticator { _, response ->
+                        val credential = okhttp3.Credentials.basic("proxyuser", "proxyuserproxyuser")
+                        response.request.newBuilder()
+                            .header("Proxy-Authorization", credential)
+                            .build()
+                    }
+
+                    connectTimeout(30, TimeUnit.SECONDS)
+                    readTimeout(300, TimeUnit.SECONDS)
+                }
+            }
+
+            // Плагины Ktor
+            install(ContentNegotiation) {
+                json(get())
+            }
+
+            install(HttpTimeout) {
+                requestTimeoutMillis = 600_000 // 10 минут
+                connectTimeoutMillis = 30_000  // 30 сек на подключение
+                socketTimeoutMillis = 600_000  // 10 минут на ожидание пакетов
+            }
+
+            defaultRequest {
+                // Эмуляция User-Agent, чтобы сервер не отверг запрос
+                header("User-Agent", "SMARTYlauncher/3.6.2")
+                contentType(ContentType.Application.Json)
+            }
+        }
     }
 
-    singleOf(::SmartyNetworkService)
+    // Репозитории
+    singleOf(::ServerRepository)
+    singleOf(::SkinRepository)
 }
 
 /**
- * Модуль основных компонентов приложения: сервисов, менеджеров и конфигураций.
+ * Модуль основных компонентов приложения.
  */
 val appModule = module {
 
@@ -71,6 +107,7 @@ val appModule = module {
         Paths.get(System.getProperty("user.home"), ".aura")
     }
 
+    // Менеджеры и сервисы
     single { CredentialsManager(get(), get()) }
 
     single<ISettingsService> {
@@ -79,21 +116,28 @@ val appModule = module {
     }
 
     single<IFileIntegrityService> { FileIntegrityService() }
-    single<IFileDownloadService> { FileDownloadService(get(), get()) }
+    single<IFileDownloadService> { FileDownloadService(get()) }
+
     single<IManifestProcessorService> { ManifestProcessorService(get()) }
     single { ProfileManager(get(), get()) }
     single { JavaManagerService(get(), get()) }
+
+    // EnvironmentPreparer
+    singleOf(::EnvironmentPreparer)
+
     single<IAuthService> { AuthService(get(), get()) }
     single<IServerListService> { ServerListService(get()) }
 
     /**
-     * Основной сервис запуска игры, агрегирующий логику подготовки окружения.
+     * Основной сервис запуска.
+     * Теперь принимает EnvironmentPreparer через DI.
      */
     single<ILauncherService> {
         LauncherService(
             manifestProcessor = get(),
             profileManager = get(),
-            javaManager = get()
+            javaManager = get(),
+            envPreparer = get()
         )
     }
 }

@@ -18,7 +18,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import hivens.core.api.SmartyNetworkService
+import hivens.core.api.SkinRepository
 import hivens.core.data.SessionData
 import hivens.ui.components.CelestiaButton
 import hivens.ui.components.GlassCard
@@ -34,7 +34,7 @@ import java.net.URI
 import javax.swing.JFrame
 
 @Composable
-fun ProfileScreen(session: SessionData, networkService: SmartyNetworkService) {
+fun ProfileScreen(session: SessionData, skinRepository: SkinRepository) {
     var frontSkin by remember { mutableStateOf<ImageBitmap?>(null) }
     var backSkin by remember { mutableStateOf<ImageBitmap?>(null) }
     var uploadStatus by remember { mutableStateOf("") }
@@ -167,8 +167,8 @@ fun ProfileScreen(session: SessionData, networkService: SmartyNetworkService) {
                                 uploadStatus = "Загрузка..."
                                 scope.launch {
                                     val result = withContext(Dispatchers.IO) {
-                                        // Используем переданный сервис
-                                        networkService.uploadAsset(file, "skin", session)
+                                        // Вызываем новый метод из SkinRepository
+                                        skinRepository.uploadSkin(file, false, session)
                                     }
                                     uploadStatus = result
                                     if (!result.startsWith("Ошибка")) {

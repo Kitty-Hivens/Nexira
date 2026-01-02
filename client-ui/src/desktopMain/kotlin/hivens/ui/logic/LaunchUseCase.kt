@@ -3,12 +3,14 @@ package hivens.ui.logic
 import hivens.core.api.interfaces.IAuthService
 import hivens.core.api.interfaces.IFileDownloadService
 import hivens.core.api.interfaces.ILauncherService
+import hivens.core.api.interfaces.IManifestProcessorService
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.SessionData
 import hivens.core.data.LauncherLogType
 import hivens.launcher.CredentialsManager
 import hivens.launcher.JavaManagerService
+import hivens.launcher.ProfileManager
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.utils.LogType
 import kotlinx.coroutines.Dispatchers
@@ -18,17 +20,6 @@ import java.nio.file.Path
 
 /**
  * Сценарий использования (UseCase) для запуска игры.
- *
- * <p>Агрегирует логику взаимодействия между UI и системными сервисами.
- * Выполняет последовательность действий: авторизация -> обновление файлов -> запуск процесса.</p>
- *
- * @property authService Сервис авторизации.
- * @property credentialsManager Менеджер локального хранения паролей.
- * @property settingsService Сервис глобальных настроек лаунчера.
- * @property downloadService Сервис загрузки и валидации файлов.
- * @property javaManagerService Сервис управления версиями Java.
- * @property launcherService Сервис запуска процесса игры.
- * @property dataDirectory Рабочая директория приложения.
  */
 class LaunchUseCase(
     private val authService: IAuthService,
@@ -37,17 +28,11 @@ class LaunchUseCase(
     private val downloadService: IFileDownloadService,
     private val javaManagerService: JavaManagerService,
     private val launcherService: ILauncherService,
+    private val manifestProcessor: IManifestProcessorService,
+    private val profileManager: ProfileManager,
     private val dataDirectory: Path
 ) {
 
-    /**
-     * Запускает цепочку операций для входа в игру.
-     *
-     * @param currentSession Текущая сессия пользователя.
-     * @param server Профиль выбранного сервера.
-     * @param onProgress Callback для отображения прогресса в UI (0.0 - 1.0).
-     * @param onSessionUpdated Callback для возврата обновленной сессии в UI.
-     */
     suspend fun launch(
         currentSession: SessionData,
         server: ServerProfile,
@@ -68,7 +53,7 @@ class LaunchUseCase(
                 val targetServerId = server.assetDir
 
                 try {
-                    val pass = credentialsManager.load()?.decryptedPassword ?: session.cachedPassword
+                    val pass = credentialsManager.load()?.cachedPassword ?: session.cachedPassword
                     if (!pass.isNullOrEmpty()) {
                         session = authService.login(session.playerName, pass, targetServerId)
                         GameConsoleService.append("Успешный вход. UUID: ${session.uuid}", LogType.INFO)
@@ -81,7 +66,11 @@ class LaunchUseCase(
 
                 onSessionUpdated(session)
 
-                // 2. Синхронизация файлов
+                // 2. Расчет опциональных модов (DEBUG)
+                GameConsoleService.append("--- Проверка модификаций ---", LogType.INFO)
+                val ignoredFiles = calculateIgnoredFiles(server)
+
+                // 3. Синхронизация файлов
                 onProgress(0.2f, "Синхронизация файлов...")
                 GameConsoleService.append("Шаг 2: Проверка файлов...", LogType.INFO)
 
@@ -93,7 +82,7 @@ class LaunchUseCase(
                     serverId = targetServerId,
                     targetDir = clientDir,
                     extraCheckSum = server.extraCheckSum,
-                    ignoredFiles = emptySet(),
+                    ignoredFiles = ignoredFiles, // <-- Передаем вычисленный список
                     messageUI = {},
                     progressUI = { current: Int, total: Int ->
                         if (total > 0) {
@@ -104,7 +93,7 @@ class LaunchUseCase(
                 )
                 GameConsoleService.append("Файлы синхронизированы.", LogType.INFO)
 
-                // 3. Подготовка окружения Java
+                // 4. Подготовка окружения Java
                 onProgress(0.9f, "Подготовка JVM...")
                 val settings = settingsService.getSettings()
                 val javaPath = if (!settings.javaPath.isNullOrEmpty()) {
@@ -115,9 +104,8 @@ class LaunchUseCase(
                 val memory = settings.memoryMB
 
                 GameConsoleService.append("Шаг 3: Запуск процесса...", LogType.INFO)
-                GameConsoleService.append("Java: $javaPath", LogType.INFO)
 
-                // 4. Запуск процесса
+                // 5. Запуск процесса
                 val process = launcherService.launchClientWithLogs(
                     sessionData = session,
                     serverProfile = server,
@@ -136,13 +124,12 @@ class LaunchUseCase(
                 onProgress(1.0f, "Игра запущена")
                 GameConsoleService.append("--- Minecraft запущен ---", LogType.INFO)
 
-                // Ожидание завершения процесса
                 val exitCode = process.waitFor()
                 if (exitCode != 0) {
                     GameConsoleService.append("Игра упала с ошибкой (Код: $exitCode)", LogType.ERROR)
                     GameConsoleService.show()
                 } else {
-                    GameConsoleService.append("Игра закрылась в страхе.", LogType.INFO)
+                    GameConsoleService.append("Игра закрылась корректно.", LogType.INFO)
                 }
 
             } catch (e: Exception) {
@@ -152,5 +139,29 @@ class LaunchUseCase(
                 GameConsoleService.show()
             }
         }
+    }
+
+    /**
+     * Вычисляет список файлов, которые нужно игнорировать (не качать и удалить).
+     */
+    private fun calculateIgnoredFiles(server: ServerProfile): Set<String> {
+        val availableMods = manifestProcessor.getOptionalModsForClient(server)
+        if (availableMods.isEmpty()) return emptySet()
+
+        val ignored = HashSet<String>()
+        val userProfile = profileManager.getProfile(server.assetDir)
+        val userState = userProfile.optionalModsState
+
+        for (mod in availableMods) {
+            // Если настройки нет в профиле игрока, берем дефолтное значение мода (из поля selected/default)
+            val isEnabled = userState[mod.id] ?: mod.isDefault
+
+            if (!isEnabled) {
+                ignored.addAll(mod.jars)
+                if (mod.infoFile != null) ignored.add(mod.infoFile!!)
+            }
+        }
+
+        return ignored
     }
 }

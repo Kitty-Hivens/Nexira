@@ -40,8 +40,7 @@ import org.koin.dsl.module
 import org.jetbrains.compose.resources.painterResource
 import hivens.client_ui.generated.resources.Res
 import hivens.client_ui.generated.resources.favicon
-
-import hivens.core.api.SmartyNetworkService
+import hivens.core.api.SkinRepository
 import hivens.core.api.interfaces.IAuthService
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.api.model.ServerProfile
@@ -145,11 +144,7 @@ fun main() {
  * Корневой компонент с логикой навигации и авто-входа.
  */
 @Composable
-fun AppContent(
-    isDarkTheme: Boolean,
-    onToggleTheme: () -> Unit,
-    onCloseApp: () -> Unit
-) {
+fun AppContent(isDarkTheme: Boolean, onToggleTheme: () -> Unit, onCloseApp: () -> Unit) {
     val credentialsManager: CredentialsManager = koinInject()
     val authService: IAuthService = koinInject()
     val profileManager: ProfileManager = koinInject()
@@ -159,11 +154,13 @@ fun AppContent(
     var seasonalTheme by remember { mutableStateOf(settingsService.getSettings().seasonalTheme) }
 
     LaunchedEffect(Unit) {
-        val creds = credentialsManager.load()
-        if (creds?.decryptedPassword != null) {
+        val savedSession = credentialsManager.load() // Теперь это SessionData?
+        // Проверяем cachedPassword
+        if (savedSession?.cachedPassword != null) {
             try {
                 val lastServer = profileManager.lastServerId ?: "Industrial"
-                val session = authService.login(creds.username, creds.decryptedPassword!!, lastServer)
+                // Используем сохраненные данные
+                val session = authService.login(savedSession.playerName, savedSession.cachedPassword!!, lastServer)
                 appState = AppState.Shell(session)
             } catch (e: Exception) {
                 LoggerFactory.getLogger("AppContent").warn("Auto-login failed: ${e.message}")
@@ -173,18 +170,12 @@ fun AppContent(
 
     Box(Modifier.fillMaxSize().background(MaterialTheme.colors.background)) {
         CelestiaBackground(isDarkTheme = isDarkTheme, currentTheme = seasonalTheme)
-
         when (val state = appState) {
-            is AppState.Login -> LoginScreen(
-                onLoginSuccess = { session -> appState = AppState.Shell(session) }
-            )
+            is AppState.Login -> LoginScreen(onLoginSuccess = { session -> appState = AppState.Shell(session) })
             is AppState.Shell -> ShellUI(
                 initialSession = state.session,
                 onToggleTheme = onToggleTheme,
-                onLogout = {
-                    credentialsManager.clear()
-                    appState = AppState.Login
-                },
+                onLogout = { credentialsManager.clear(); appState = AppState.Login },
                 onCloseApp = onCloseApp,
                 onThemeChanged = { newTheme -> seasonalTheme = newTheme }
             )
@@ -227,8 +218,7 @@ fun ShellUI(
     onCloseApp: () -> Unit,
     onThemeChanged: (SeasonTheme) -> Unit
 ) {
-    val smartyNetworkService: SmartyNetworkService = koinInject()
-
+    val skinRepository: SkinRepository = koinInject()
     var currentSession by remember { mutableStateOf(initialSession) }
     var currentScreen by remember { mutableStateOf<ShellScreen>(ShellScreen.Home) }
     var selectedServer by remember { mutableStateOf<ServerProfile?>(null) }
@@ -299,7 +289,7 @@ fun ShellUI(
                         onOpenNews = { currentScreen = ShellScreen.News }
                     )
                     is ShellScreen.News -> NewsScreen(onBack = { currentScreen = ShellScreen.Home })
-                    is ShellScreen.Profile -> ProfileScreen(currentSession, smartyNetworkService)
+                    is ShellScreen.Profile -> ProfileScreen(currentSession, skinRepository)
                     is ShellScreen.GlobalSettings -> SettingsScreen(
                         isDarkTheme = true,
                         onToggleTheme = onToggleTheme,
