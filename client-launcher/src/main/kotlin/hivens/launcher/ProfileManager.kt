@@ -1,5 +1,6 @@
 package hivens.launcher
 
+import hivens.config.AppConfig
 import hivens.core.data.InstanceProfile
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -14,7 +15,7 @@ class ProfileManager(
     private val json: Json
 ) {
     private val log = LoggerFactory.getLogger(ProfileManager::class.java)
-    private val fileName = "profiles.json"
+    private val fileName = AppConfig.FILES_PROFILES
     private val profiles = ConcurrentHashMap<String, InstanceProfile>()
     var lastServerId: String? = null
 

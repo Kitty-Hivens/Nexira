@@ -1,7 +1,8 @@
 package hivens.core.api
 
-import hivens.config.ServiceEndpoints
+import hivens.config.AppConfig
 import hivens.core.api.dto.SmartyResponse
+import hivens.core.data.DashboardRequest
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -17,9 +18,9 @@ class ServerRepository(
     private val json: Json
 ) {
     private val logger = LoggerFactory.getLogger("ServerRepository")
-    private val cachedHashFile = File("smarty_hash.cache")
+    private val cachedHashFile = File(AppConfig.FILES_HASH_CACHE)
     // Устаревший хеш, который был зашит в коде
-    private var currentHash = "5515a4bdd5f532faf0db61b8263d1952"
+    private var currentHash = AppConfig.DEFAULT_LAUNCHER_HASH
 
     init {
         if (cachedHashFile.exists()) {
@@ -54,18 +55,15 @@ class ServerRepository(
     private suspend fun requestDashboard(hash: String): SmartyResponse {
         // Формируем JSON вручную, так как сервер ожидает строку JSON внутри поля формы "json"
         // Это специфика старого PHP бэкенда SmartyCraft
-        val payload = """
-            {
-                "version": "3.6.2",
-                "cheksum": "$hash",
-                "format": "jar",
-                "testModeKey": "false",
-                "debug": "false"
-            }
-        """.trimIndent()
+        val requestPayload = DashboardRequest(
+            version = AppConfig.LAUNCHER_VERSION,
+            cheksum = hash
+        )
+
+        val payload = json.encodeToString(requestPayload)
 
         return try {
-            val response = client.post(ServiceEndpoints.AUTH_LOGIN) {
+            val response = client.post(AppConfig.AUTH_URL) {
                 setBody(FormDataContent(Parameters.build {
                     append("action", "loader")
                     append("json", payload)
@@ -84,7 +82,7 @@ class ServerRepository(
 
     private suspend fun updateLauncherHash(): String? {
         return try {
-            val bytes = client.get(ServiceEndpoints.OFFICIAL_JAR_URL).body<ByteArray>()
+            val bytes = client.get(AppConfig.OFFICIAL_JAR_URL).body<ByteArray>()
             val md = MessageDigest.getInstance("MD5")
             val digest = md.digest(bytes)
             digest.joinToString("") { "%02x".format(it) }

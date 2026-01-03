@@ -1,6 +1,6 @@
 package hivens.core.api
 
-import hivens.config.ServiceEndpoints
+import hivens.config.AppConfig
 import hivens.core.api.interfaces.IAuthService
 import hivens.core.data.AuthStatus
 import hivens.core.data.FileManifest
@@ -38,8 +38,8 @@ class AuthService(
         val javaVersion: String,
         val javaBitness: Int,
         val javaHome: String,
-        val classPath: String = "smartycraft.jar",
-        val rtCheckSum: String = "d41d8cd98f00b204e9800998ecf8427e"
+        val classPath: String = AppConfig.PROTOCOL_DEFAULT_JAR,
+        val rtCheckSum: String = AppConfig.PROTOCOL_DEFAULT_CSUM
     )
 
     @Serializable
@@ -80,7 +80,7 @@ class AuthService(
         val response: AuthResponse = try {
             val call = kotlinx.coroutines.runBlocking { // Временно runBlocking, если интерфейс синхронный. Лучше сделать метод suspend!
                 client.submitForm(
-                    url = ServiceEndpoints.AUTH_LOGIN,
+                    url = AppConfig.AUTH_URL,
                     formParameters = Parameters.build {
                         append("action", "login")
                         append("json", jsonString)
@@ -140,7 +140,7 @@ class AuthService(
     private fun generateGameToken(uid: String?, sessionV3: String?): String? {
         if (sessionV3 == null || uid == null) return sessionV3
         return try {
-            val salt = "sdgsdfhgosd8dfrg"
+            val salt = AppConfig.AUTH_SALT
             val keyHash = getMD5(uid + salt)
             val key = keyHash.take(16)
             val decrypted = decryptAES(sessionV3, key)

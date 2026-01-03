@@ -1,6 +1,6 @@
 package hivens.launcher.di
 
-import hivens.config.ServiceEndpoints
+import hivens.config.AppConfig
 import hivens.core.api.AuthService
 import hivens.core.api.ServerRepository
 import hivens.core.api.SkinRepository
@@ -46,8 +46,10 @@ val networkModule = module {
     single<HttpClient> {
         java.net.Authenticator.setDefault(object : java.net.Authenticator() {
             override fun getPasswordAuthentication(): java.net.PasswordAuthentication {
-                // TODO: В будущем вынести логин/пароль в конфиг
-                return java.net.PasswordAuthentication("proxyuser", "proxyuserproxyuser".toCharArray())
+                return java.net.PasswordAuthentication(
+                    AppConfig.Proxy.USER,
+                    AppConfig.Proxy.PASS.toCharArray()
+                )
             }
         })
 
@@ -56,11 +58,10 @@ val networkModule = module {
             engine {
                 config {
                     // Настройка прокси
-                    proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress(ServiceEndpoints.PROXY_HOST, ServiceEndpoints.PROXY_PORT)))
-
+                    proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress(AppConfig.Proxy.HOST, AppConfig.Proxy.PORT)))
                     // Аутентификация на прокси
                     proxyAuthenticator { _, response ->
-                        val credential = okhttp3.Credentials.basic("proxyuser", "proxyuserproxyuser")
+                        val credential = okhttp3.Credentials.basic(AppConfig.Proxy.USER, AppConfig.Proxy.PASS)
                         response.request.newBuilder()
                             .header("Proxy-Authorization", credential)
                             .build()

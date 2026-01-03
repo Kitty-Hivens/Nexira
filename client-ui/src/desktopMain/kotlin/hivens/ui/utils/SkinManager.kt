@@ -2,11 +2,10 @@ package hivens.ui.utils
 
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toComposeImageBitmap
-import hivens.config.ServiceEndpoints
+import hivens.config.AppConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.awt.image.BufferedImage
-import java.net.URL
 import java.util.concurrent.ConcurrentHashMap
 import javax.imageio.ImageIO
 
@@ -44,13 +43,13 @@ object SkinManager {
 
     private fun downloadSkin(username: String): BufferedImage? {
         return try {
-            var urlStr = "${ServiceEndpoints.BASE_URL}/skins/$username.png"
+            var urlStr = "${AppConfig.SKINS_URL}$username.png"
             if (cacheBusters.containsKey(username)) {
                 urlStr += "?t=${cacheBusters[username]}"
             }
             val url = java.net.URI.create(urlStr).toURL()
             ImageIO.read(url)
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             null
         }
     }

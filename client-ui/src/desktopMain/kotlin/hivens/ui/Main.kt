@@ -40,6 +40,7 @@ import org.koin.dsl.module
 import org.jetbrains.compose.resources.painterResource
 import hivens.client_ui.generated.resources.Res
 import hivens.client_ui.generated.resources.favicon
+import hivens.config.AppConfig
 import hivens.core.api.SkinRepository
 import hivens.core.api.interfaces.IAuthService
 import hivens.core.api.interfaces.ISettingsService
@@ -103,7 +104,7 @@ fun main() {
 
         Tray(
             icon = trayIcon,
-            tooltip = "Aura Launcher",
+            tooltip = AppConfig.APP_TITLE,
             onAction = { isAppVisible = !isAppVisible },
             menu = {
                 Item("Показать/Скрыть", onClick = { isAppVisible = !isAppVisible })
@@ -121,7 +122,7 @@ fun main() {
             Window(
                 onCloseRequest = ::exitApplication,
                 state = windowState,
-                title = "Aura Launcher",
+                title = AppConfig.APP_TITLE,
                 resizable = false,
                 visible = isAppVisible,
                 icon = trayIcon,
@@ -154,11 +155,11 @@ fun AppContent(isDarkTheme: Boolean, onToggleTheme: () -> Unit, onCloseApp: () -
     var seasonalTheme by remember { mutableStateOf(settingsService.getSettings().seasonalTheme) }
 
     LaunchedEffect(Unit) {
-        val savedSession = credentialsManager.load() // Теперь это SessionData?
+        val savedSession = credentialsManager.load() // Теперь это "SessionData?"
         // Проверяем cachedPassword
         if (savedSession?.cachedPassword != null) {
             try {
-                val lastServer = profileManager.lastServerId ?: "Industrial"
+                val lastServer = profileManager.lastServerId ?: AppConfig.DEFAULT_SERVER_ID
                 // Используем сохраненные данные
                 val session = authService.login(savedSession.playerName, savedSession.cachedPassword!!, lastServer)
                 appState = AppState.Shell(session)

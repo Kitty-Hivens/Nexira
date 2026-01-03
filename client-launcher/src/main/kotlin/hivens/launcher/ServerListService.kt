@@ -1,6 +1,6 @@
 package hivens.launcher
 
-import hivens.config.ServiceEndpoints
+import hivens.config.AppConfig
 import hivens.core.api.ServerRepository
 import hivens.core.api.dto.SmartyServer
 import hivens.core.api.interfaces.IServerListService
@@ -34,7 +34,7 @@ class ServerListService(private val repository: ServerRepository) : IServerListS
                 val servers = response.servers.map { getProfile(it) }
                 val news = response.news.map { newsDto ->
                     val imageName = if (newsDto.image.endsWith(".jpg")) newsDto.image else "${newsDto.image}.jpg"
-                    val imageUrl = "${ServiceEndpoints.BASE_URL}/images/news/mini/$imageName"
+                    val imageUrl = "${AppConfig.BASE_URL}/images/news/mini/$imageName"
 
                     NewsItem(
                         id = newsDto.id,
