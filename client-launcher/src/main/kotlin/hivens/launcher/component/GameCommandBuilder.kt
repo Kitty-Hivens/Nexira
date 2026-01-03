@@ -1,5 +1,6 @@
 package hivens.launcher.component
 
+import hivens.config.AppConfig
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.InstanceProfile
 import hivens.core.data.SessionData
@@ -102,11 +103,11 @@ internal class GameCommandBuilder {
         }
 
         // 3. System Properties (Launcher Identity)
-        args.add("-Dminecraft.api.auth.host=http://www.smartycraft.ru/launcher/")
-        args.add("-Dminecraft.api.account.host=http://www.smartycraft.ru/launcher/")
-        args.add("-Dminecraft.api.session.host=http://www.smartycraft.ru/launcher/")
-        args.add("-Dminecraft.launcher.brand=smartycraft")
-        args.add("-Dminecraft.launcher.version=3.6.2")
+        args.add("-Dminecraft.api.auth.host=${AppConfig.BASE_URL}/launcher/")
+        args.add("-Dminecraft.api.account.host=${AppConfig.BASE_URL}/launcher/")
+        args.add("-Dminecraft.api.session.host=${AppConfig.BASE_URL}/launcher/")
+        args.add("-Dminecraft.launcher.brand=${AppConfig.BRANDING_NAME}")
+        args.add("-Dminecraft.launcher.version=${AppConfig.LAUNCHER_VERSION}")
 
         // 4. Natives Configuration
         val nativesPath = clientRoot.resolve(config.nativesDir)

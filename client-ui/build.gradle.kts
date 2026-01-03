@@ -1,11 +1,11 @@
 plugins {
-    kotlin("multiplatform") // Меняем jvm на multiplatform
+    kotlin("multiplatform")
     id("org.jetbrains.compose") version "1.9.3"
     id("org.jetbrains.kotlin.plugin.compose") version "2.1.0"
+    id("com.github.gmazzo.buildconfig")
 }
 
 group = "hivens"
-version = "1.0-SNAPSHOT"
 
 repositories {
     google()
@@ -55,6 +55,14 @@ kotlin {
     }
 }
 
+// Настройка генератора конфига
+buildConfig {
+    packageName("hivens.ui") // Пакет, где будет лежать класс
+    buildConfigField("String", "FORK_VERSION", "\"${project.version}\"")
+    buildConfigField("long", "BUILD_TIME", "${System.currentTimeMillis()}L")
+    buildConfigField("String", "APP_NAME", "\"Aura Launcher\"")
+}
+
 compose.desktop {
     application {
         mainClass = "hivens.ui.MainKt"
@@ -68,7 +76,26 @@ compose.desktop {
                 org.jetbrains.compose.desktop.application.dsl.TargetFormat.AppImage
             )
             packageName = "AuraLauncher"
-            packageVersion = "1.0.0"
+
+            val cleanVersion = project.version.toString().removePrefix("v").substringBefore("-")
+            // Если версия начинается с "0." (например 0.1.0), превращаем её в 1.0.0
+            // Иначе оставляем как есть.
+            val safeVersion = if (cleanVersion.startsWith("0") || cleanVersion.isEmpty()) "1.0.0" else cleanVersion
+
+            
+            println("Packaging version: $safeVersion (Original: ${project.version})")
+
+            packageVersion = safeVersion
+
+            description = "Aura Launcher v${project.version}"
+            copyright = "© 2026 Hivens"
+            vendor = "Hivens"
+
+            linux {
+                packageName = "aura-launcher"
+                debMaintainer = "hivens@smartycraft.ru"
+                appCategory = "Game"
+            }
         }
     }
 }

@@ -25,12 +25,11 @@ import java.nio.file.Path
 class LauncherService(
     manifestProcessor: IManifestProcessorService,
     private val profileManager: ProfileManager,
-    private val javaManager: JavaManagerService
+    private val javaManager: JavaManagerService,
+    private val envPreparer: EnvironmentPreparer
 ) : ILauncherService {
 
     private val log = LoggerFactory.getLogger(LauncherService::class.java)
-
-    private val envPreparer = EnvironmentPreparer()
     private val classpathProvider = ClasspathProvider(manifestProcessor)
     private val commandBuilder = GameCommandBuilder()
     private val logHandler = ProcessLogHandler()
@@ -41,7 +40,7 @@ class LauncherService(
      * @see [ILauncherService.launchClientWithLogs]
      */
     @Throws(IOException::class)
-    override fun launchClientWithLogs(
+    override suspend fun launchClientWithLogs(
         sessionData: SessionData,
         serverProfile: ServerProfile,
         clientRootPath: Path,
@@ -93,7 +92,7 @@ class LauncherService(
         return process
     }
 
-    override fun launchClient(
+    override suspend fun launchClient(
         sessionData: SessionData,
         serverProfile: ServerProfile,
         clientRootPath: Path,
@@ -109,7 +108,7 @@ class LauncherService(
      * Выбирает подходящий Java Runtime.
      * Приоритет: Настройка профиля -> Управляемая Java (JavaManager) -> Системная Java.
      */
-    private fun resolveJavaPath(profile: InstanceProfile, defaultPath: Path, version: String): String {
+    private suspend fun resolveJavaPath(profile: InstanceProfile, defaultPath: Path, version: String): String {
         if (!profile.javaPath.isNullOrEmpty()) return profile.javaPath!!
         runCatching {
             val managedPath = javaManager.getJavaPath(version)

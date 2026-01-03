@@ -2,8 +2,6 @@ package hivens.ui.screens
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
-// ИСПРАВЛЕНИЕ: Удален импорт core.animateColorAsState
-
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -179,12 +177,17 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                         ) {
                             LazyColumn(Modifier.fillMaxSize()) {
                                 items(mods) { mod ->
+                                    val currentState = modStates[mod.id] ?: mod.isDefault
+
                                     ModItemRow(
                                         mod = mod,
-                                        isChecked = modStates[mod.id] ?: false,
+                                        isChecked = currentState,
                                         onToggle = { isChecked ->
                                             modStates[mod.id] = isChecked
-                                            if (isChecked) mod.excludings.forEach { conflict -> modStates[conflict] = false }
+                                            // Если включаем мод, выключаем конфликтующие
+                                            if (isChecked) {
+                                                mod.excludings.forEach { conflict -> modStates[conflict] = false }
+                                            }
                                             saveProfile()
                                         }
                                     )

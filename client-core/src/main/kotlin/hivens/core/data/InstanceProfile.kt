@@ -1,9 +1,12 @@
 package hivens.core.data
 
+import kotlinx.serialization.Serializable
+
 /**
  * Профиль настроек конкретного сервера.
  * Хранит выбор игрока и локальные настройки.
  */
+@Serializable
 data class InstanceProfile( // TODO: Решить, что делать с дефолтными настройками в ui.
     var serverId: String = "",
     var memoryMb: Int = 4096,

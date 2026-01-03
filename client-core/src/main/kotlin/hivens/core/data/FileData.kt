@@ -1,14 +1,16 @@
 package hivens.core.data
 
-import com.google.gson.annotations.SerializedName
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
 /**
  * Модель данных (DTO) для отдельного файла в манифесте.
  */
+@Serializable
 data class FileData(
-    @SerializedName("md5")
+    @SerialName("md5")
     val md5: String = "",
 
-    @SerializedName("size")
+    @SerialName("size")
     val size: Long = 0
 )

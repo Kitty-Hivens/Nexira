@@ -1,14 +1,16 @@
 package hivens.core.data
 
-import com.google.gson.annotations.SerializedName
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
 /**
  * Модель данных (DTO) для манифеста файлов клиента.
  */
+@Serializable
 data class FileManifest(
-    @SerializedName("directories")
+    @SerialName("directories")
     val directories: Map<String, FileManifest> = emptyMap(),
 
-    @SerializedName("files")
+    @SerialName("files")
     val files: Map<String, FileData> = emptyMap()
 )

@@ -1,9 +1,12 @@
 package hivens.core.api.dto
 
-import com.google.gson.annotations.SerializedName
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
+@Serializable
 data class SmartyResponse(
-    @SerializedName("status") val status: String? = null,
-    @SerializedName("servers") val servers: List<SmartyServer> = emptyList(),
-    @SerializedName("news") val news: List<SmartyNews> = emptyList()
+    @SerialName("status") val status: String? = null,
+    @SerialName("servers") val servers: List<SmartyServer> = emptyList(),
+    @SerialName("news") val news: List<SmartyNews> = emptyList(),
+    @SerialName("message") val message: String? = null
 )

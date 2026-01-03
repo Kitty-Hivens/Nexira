@@ -1,5 +1,8 @@
 package hivens.core.data
 
+import kotlinx.serialization.Serializable
+
+@Serializable
 data class SettingsData(
     var javaPath: String? = null,
     var memoryMB: Int = 4096,

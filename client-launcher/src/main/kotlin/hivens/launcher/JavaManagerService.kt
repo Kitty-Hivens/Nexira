@@ -1,47 +1,53 @@
 package hivens.launcher
 
-import okhttp3.OkHttpClient
-import okhttp3.Request
+import io.ktor.client.*
+import io.ktor.client.request.*
+import io.ktor.client.statement.*
+import io.ktor.http.*
+import io.ktor.utils.io.jvm.javaio.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
 import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream
-import org.apache.commons.io.FileUtils
-import org.apache.commons.lang3.SystemUtils
 import org.slf4j.LoggerFactory
 import java.io.*
-import java.nio.file.Files
-import java.nio.file.Path
-import java.nio.file.StandardCopyOption
-import java.util.*
+import java.nio.file.*
+import java.nio.file.attribute.BasicFileAttributes
+import java.nio.file.attribute.PosixFilePermission
 import java.util.zip.ZipInputStream
 
 class JavaManagerService(
     baseDir: Path,
-    private val httpClient: OkHttpClient
+    private val httpClient: HttpClient
 ) {
     private val log = LoggerFactory.getLogger(JavaManagerService::class.java)
     private val runtimesDir: Path = baseDir.resolve("runtimes")
 
-    @Throws(IOException::class)
-    fun getJavaPath(version: String): Path {
+    /**
+     * Возвращает путь к исполняемому файлу Java.
+     * Если нужной версии нет — скачивает её.
+     */
+    suspend fun getJavaPath(version: String): Path = withContext(Dispatchers.IO) {
         val javaVersion = detectJavaVersion(version)
-        // Формируем уникальное имя папки
-        val folderName = "java-$javaVersion-${getOsName()}-${getArchName()}"
+        val os = getOsName()
+        val arch = getArchName()
+
+        val folderName = "java-$javaVersion-$os-$arch"
         val targetDir = runtimesDir.resolve(folderName)
 
-        var executable = findJavaExecutable(targetDir)
-        if (executable != null) return executable
+        findJavaExecutable(targetDir)?.let { return@withContext it }
 
-        log.info("Java {} ({}/{}) not found locally. Downloading Liberica...", javaVersion, getOsName(), getArchName())
+        log.info("Java {} ({}/{}) не найдена локально. Начинаем загрузку...", javaVersion, os, arch)
         downloadAndUnpack(javaVersion, targetDir)
 
-        executable = findJavaExecutable(targetDir) 
-            ?: throw IOException("Java downloaded but executable not found!")
+        val executable = findJavaExecutable(targetDir)
+            ?: throw IOException("Java была скачана, но исполняемый файл не найден!")
 
-        if (!SystemUtils.IS_OS_WINDOWS) {
-            executable.toFile().setExecutable(true)
+        if (os != "win") {
+            setExecutablePermissions(executable)
         }
 
-        return executable
+        return@withContext executable
     }
 
     private fun detectJavaVersion(mcVersion: String): Int {
@@ -52,47 +58,157 @@ class JavaManagerService(
         }
     }
 
-    @Throws(IOException::class)
-    private fun downloadAndUnpack(version: Int, targetDir: Path) {
+    private suspend fun downloadAndUnpack(version: Int, targetDir: Path) {
         val url = getDownloadUrl(version)
-            ?: throw IOException("No Java build available for this OS/Arch combination (${getOsName()} ${getArchName()})")
+            ?: throw IOException("Нет сборки Java для этой системы (${getOsName()} ${getArchName()})")
 
         val isZip = url.endsWith(".zip")
-        val archive = Files.createTempFile("java_pkg", if (isZip) ".zip" else ".tar.gz").toFile()
+        val archive = Files.createTempFile("java_pkg", if (isZip) ".zip" else ".tar.gz")
 
-        log.info("Downloading from: {}", url)
-        val request = Request.Builder().url(url).build()
+        try {
+            log.info("Скачивание Java: $url")
 
-        httpClient.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) throw IOException("Download failed: ${response.code}")
-            val body = response.body ?: throw IOException("Empty body")
-            
-            FileOutputStream(archive).use { fos ->
-                fos.write(body.bytes())
+            httpClient.prepareGet(url).execute { httpResponse ->
+                if (!httpResponse.status.isSuccess()) {
+                    throw IOException("Ошибка загрузки: ${httpResponse.status}")
+                }
+                val channel = httpResponse.bodyAsChannel()
+                val fileStream = FileOutputStream(archive.toFile())
+                channel.copyTo(fileStream)
+            }
+
+            log.info("Распаковка в $targetDir")
+            deleteDirectoryRecursively(targetDir)
+            Files.createDirectories(targetDir)
+
+            if (isZip) {
+                unzip(archive.toFile(), targetDir)
+            } else {
+                untargz(archive.toFile(), targetDir)
+            }
+        } finally {
+            Files.deleteIfExists(archive)
+        }
+    }
+    private fun getOsName(): String {
+        val os = System.getProperty("os.name").lowercase()
+        return when {
+            os.contains("win") -> "win"
+            os.contains("nux") || os.contains("nix") || os.contains("aix") -> "linux"
+            os.contains("mac") -> "mac"
+            else -> "unknown"
+        }
+    }
+
+    private fun getArchName(): String {
+        val arch = System.getProperty("os.arch").lowercase()
+        return when {
+            arch.contains("aarch64") || arch.contains("arm64") -> "arm64"
+            arch.contains("64") -> "x64"
+            arch.contains("86") || arch.contains("32") -> "x32"
+            else -> "x64" // Дефолт для странных случаев
+        }
+    }
+
+    private fun findJavaExecutable(dir: Path): Path? {
+        if (!Files.exists(dir)) return null
+
+        return try {
+            Files.walk(dir).use { stream ->
+                stream.filter { p ->
+                    val name = p.fileName.toString()
+                    (name == "java" || name == "java.exe") && Files.isExecutable(p)
+                }.findFirst().orElse(null)
+            }
+        } catch (_: Exception) { null }
+    }
+
+    private fun deleteDirectoryRecursively(path: Path) {
+        if (!Files.exists(path)) return
+        Files.walkFileTree(path, object : SimpleFileVisitor<Path>() {
+            override fun visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult {
+                Files.delete(file)
+                return FileVisitResult.CONTINUE
+            }
+            override fun postVisitDirectory(dir: Path, exc: IOException?): FileVisitResult {
+                Files.delete(dir)
+                return FileVisitResult.CONTINUE
+            }
+        })
+    }
+
+    private fun setExecutablePermissions(path: Path) {
+        try {
+            // Работает на Unix-системах (Linux/Mac)
+            val permissions = Files.getPosixFilePermissions(path).toMutableSet()
+            // Добавляем rwx-r-x-r-x
+            permissions.add(PosixFilePermission.OWNER_EXECUTE)
+            permissions.add(PosixFilePermission.GROUP_EXECUTE)
+            permissions.add(PosixFilePermission.OTHERS_EXECUTE)
+            Files.setPosixFilePermissions(path, permissions)
+        } catch (_: UnsupportedOperationException) {
+            // На Windows игнорируем
+        } catch (e: Exception) {
+            log.warn("Не удалось установить права на исполнение для $path: ${e.message}")
+        }
+    }
+
+    private fun unzip(zip: File, dest: Path) {
+        ZipInputStream(FileInputStream(zip)).use { zis ->
+            var entry = zis.nextEntry
+            while (entry != null) {
+                // Защита от Zip Slip уязвимости
+                val resolvedPath = dest.resolve(entry.name).normalize()
+                if (!resolvedPath.startsWith(dest)) {
+                    throw IOException("Zip entry is outside of the target dir: ${entry.name}")
+                }
+
+                if (entry.isDirectory) {
+                    Files.createDirectories(resolvedPath)
+                } else {
+                    Files.createDirectories(resolvedPath.parent)
+                    Files.copy(zis, resolvedPath, StandardCopyOption.REPLACE_EXISTING)
+                }
+                entry = zis.nextEntry
             }
         }
+    }
 
-        log.info("Unpacking to {}", targetDir)
-        if (Files.exists(targetDir)) {
-            FileUtils.deleteDirectory(targetDir.toFile())
+    private fun untargz(tar: File, dest: Path) {
+        FileInputStream(tar).use { fi ->
+            BufferedInputStream(fi).use { bi ->
+                GzipCompressorInputStream(bi).use { gzi ->
+                    TarArchiveInputStream(gzi).use { tai ->
+                        var entry = tai.nextEntry
+                        while (entry != null) {
+                            val resolvedPath = dest.resolve(entry.name).normalize()
+                            if (!resolvedPath.startsWith(dest)) {
+                                throw IOException("Tar entry is outside of the target dir: ${entry.name}")
+                            }
+
+                            if (entry.isDirectory) {
+                                Files.createDirectories(resolvedPath)
+                            } else {
+                                Files.createDirectories(resolvedPath.parent)
+                                Files.copy(tai, resolvedPath, StandardCopyOption.REPLACE_EXISTING)
+                                // Восстановление прав на исполнение из архива (для Linux/Mac)
+                                if (getOsName() != "win" && (entry.mode and 0b001_000_001) != 0) { // Проверяем бит execute
+                                    setExecutablePermissions(resolvedPath)
+                                }
+                            }
+                            entry = tai.nextEntry
+                        }
+                    }
+                }
+            }
         }
-        Files.createDirectories(targetDir)
-
-        if (isZip) {
-            unzip(archive, targetDir)
-        } else {
-            untargz(archive, targetDir)
-        }
-
-        archive.delete()
     }
 
     private fun getDownloadUrl(version: Int): String? {
         val os = getOsName()
         val arch = getArchName()
-
-        return when (version) { // БЛИИИН СОЛЯРИСА НЕТ. Почему???
-            8 -> when {         // FreeBSD тоже нет! Как и тестировщиков под него.
+        return when (version) {
+            8 -> when {
                 os == "win" && arch == "x64" -> "https://download.bell-sw.com/java/8u472+9/bellsoft-jdk8u472+9-windows-amd64-full.zip"
                 os == "win" && arch == "x32" -> "https://download.bell-sw.com/java/8u472+9/bellsoft-jdk8u472+9-windows-i586.zip"
                 os == "linux" && arch == "x64" -> "https://download.bell-sw.com/java/8u472+9/bellsoft-jdk8u472+9-linux-amd64-full.tar.gz"
@@ -116,82 +232,6 @@ class JavaManagerService(
                 else -> null
             }
             else -> null
-        }
-    }
-
-    private fun getOsName(): String {
-        return when {
-            SystemUtils.IS_OS_WINDOWS -> "win"
-            SystemUtils.IS_OS_LINUX -> "linux"
-            SystemUtils.IS_OS_MAC -> "mac"
-            else -> "unknown"
-        }
-    }
-
-    private fun getArchName(): String {
-        val arch = System.getProperty("os.arch").lowercase(Locale.ROOT)
-        return when {
-            arch.contains("aarch64") || arch.contains("arm64") -> "arm64"
-            arch.contains("64") -> "x64"
-            arch.contains("86") || arch.contains("32") -> "x32"
-            else -> "x64"
-        }
-    }
-
-    private fun findJavaExecutable(dir: Path): Path? {
-        if (!Files.exists(dir)) return null
-        return try {
-            Files.walk(dir).use { stream ->
-                stream.filter { p ->
-                    val name = p.fileName.toString()
-                    name == "java" || name == "java.exe"
-                }.findFirst().orElse(null)
-            }
-        } catch (e: IOException) {
-            null
-        }
-    }
-
-    @Throws(IOException::class)
-    private fun unzip(zip: File, dest: Path) {
-        ZipInputStream(FileInputStream(zip)).use { zis ->
-            var entry = zis.nextEntry
-            while (entry != null) {
-                val p = dest.resolve(entry.name)
-                if (entry.isDirectory) {
-                    Files.createDirectories(p)
-                } else {
-                    Files.createDirectories(p.parent)
-                    Files.copy(zis, p, StandardCopyOption.REPLACE_EXISTING)
-                }
-                entry = zis.nextEntry
-            }
-        }
-    }
-
-    @Throws(IOException::class)
-    private fun untargz(tar: File, dest: Path) {
-        FileInputStream(tar).use { fi ->
-            BufferedInputStream(fi).use { bi ->
-                GzipCompressorInputStream(bi).use { gzi ->
-                    TarArchiveInputStream(gzi).use { tai ->
-                        var entry = tai.nextEntry
-                        while (entry != null) {
-                            val p = dest.resolve(entry.name)
-                            if (entry.isDirectory) {
-                                Files.createDirectories(p)
-                            } else {
-                                Files.createDirectories(p.parent)
-                                Files.copy(tai, p, StandardCopyOption.REPLACE_EXISTING)
-                                if (!SystemUtils.IS_OS_WINDOWS && (entry.mode and 73) != 0) {
-                                    p.toFile().setExecutable(true)
-                                }
-                            }
-                            entry = tai.nextEntry
-                        }
-                    }
-                }
-            }
         }
     }
 }

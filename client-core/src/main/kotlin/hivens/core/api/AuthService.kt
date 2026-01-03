@@ -1,51 +1,56 @@
 package hivens.core.api
 
-import com.google.gson.Gson
-import com.google.gson.JsonSyntaxException
-import com.google.gson.annotations.SerializedName
-import hivens.config.ServiceEndpoints
+import hivens.config.AppConfig
 import hivens.core.api.interfaces.IAuthService
 import hivens.core.data.AuthStatus
 import hivens.core.data.FileManifest
 import hivens.core.data.SessionData
-import okhttp3.Credentials
-import okhttp3.FormBody
-import okhttp3.OkHttpClient
-import okhttp3.Request
+import io.ktor.client.*
+import io.ktor.client.call.*
+import io.ktor.client.request.forms.*
+import io.ktor.http.*
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
-import java.net.InetSocketAddress
-import java.net.Proxy
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 import java.util.*
-import java.util.concurrent.TimeUnit
 import javax.crypto.Cipher
 import javax.crypto.spec.SecretKeySpec
 
-class AuthService(baseClient: OkHttpClient, private val gson: Gson) : IAuthService {
+class AuthService(
+    private val client: HttpClient,
+    private val json: Json
+) : IAuthService {
 
     private val logger = LoggerFactory.getLogger(AuthService::class.java)
 
-    private val client: OkHttpClient = baseClient.newBuilder()
-        .proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress(ServiceEndpoints.PROXY_HOST, ServiceEndpoints.PROXY_PORT)))
-        .proxyAuthenticator { _, response ->
-            val credential = Credentials.basic("proxyuser", "proxyuserproxyuser")
-            response.request.newBuilder()
-                .header("Proxy-Authorization", credential)
-                .build()
-        }
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(15, TimeUnit.SECONDS)
-        .build()
+    @Serializable
+    private data class AuthRequest(
+        val login: String,
+        val password: String, // MD5 hash
+        val server: String,
+        val session: String,
+        val mac: String,
+        val osName: String,
+        val osBitness: Int,
+        val javaVersion: String,
+        val javaBitness: Int,
+        val javaHome: String,
+        val classPath: String = AppConfig.PROTOCOL_DEFAULT_JAR,
+        val rtCheckSum: String = AppConfig.PROTOCOL_DEFAULT_CSUM
+    )
 
+    @Serializable
     private data class AuthResponse(
-        @SerializedName("status") val status: AuthStatus? = null,
-        @SerializedName("playername") val playername: String? = null,
-        @SerializedName("uid") val uid: String? = null,
-        @SerializedName("uuid") val uuid: String? = null,
-        @SerializedName("session") val session: String? = null,
-        @SerializedName("client") val client: FileManifest? = null,
-        @SerializedName("money") val money: Int = 0
+        @SerialName("status") val status: AuthStatus? = null,
+        @SerialName("playername") val playername: String? = null,
+        @SerialName("uid") val uid: String? = null,
+        @SerialName("uuid") val uuid: String? = null,
+        @SerialName("session") val session: String? = null,
+        @SerialName("client") val client: FileManifest? = null,
+        @SerialName("money") val money: Int = 0
     )
 
     override fun login(username: String, password: String, serverId: String): SessionData {
@@ -55,116 +60,94 @@ class AuthService(baseClient: OkHttpClient, private val gson: Gson) : IAuthServi
         val clientSessionId = UUID.randomUUID().toString().replace("-", "")
         val is64 = System.getProperty("os.arch").contains("64")
 
-        val payload = mapOf(
-            "login" to username,
-            "password" to passwordEncoded,
-            "server" to serverId,
-            "session" to clientSessionId,
-            "mac" to generateRandomMac(),
-            "osName" to System.getProperty("os.name"),
-            "osBitness" to if (is64) 64 else 32,
-            "javaVersion" to System.getProperty("java.version"),
-            "javaBitness" to if (is64) 64 else 32,
-            "javaHome" to System.getProperty("java.home"),
-            "classPath" to "smartycraft.jar",
-            "rtCheckSum" to "d41d8cd98f00b204e9800998ecf8427e"
+        // Собираем объект запроса
+        val requestPayload = AuthRequest(
+            login = username,
+            password = passwordEncoded,
+            server = serverId,
+            session = clientSessionId,
+            mac = generateRandomMac(),
+            osName = System.getProperty("os.name"),
+            osBitness = if (is64) 64 else 32,
+            javaVersion = System.getProperty("java.version"),
+            javaBitness = if (is64) 64 else 32,
+            javaHome = System.getProperty("java.home")
         )
 
-        val formBody = FormBody.Builder()
-            .add("action", "login")
-            .add("json", gson.toJson(payload))
-            .build()
+        // Сериализуем в строку JSON для отправки в поле формы
+        val jsonString = json.encodeToString(requestPayload)
 
-        val request = Request.Builder()
-            .url(ServiceEndpoints.AUTH_LOGIN)
-            .post(formBody)
-            .header("User-Agent", "SMARTYlauncher/3.6.2")
-            .build()
-
-        client.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) {
-                throw AuthException(AuthStatus.INTERNAL_ERROR, "HTTP ${response.code}")
-            }
-
-            var rawResponse = response.body?.string()?.trim() ?: ""
-
-            // Серверы часто возвращают "Bad login" как plain text
-            if (rawResponse.contains("Bad login", ignoreCase = true)) {
-                throw AuthException(AuthStatus.BAD_LOGIN, "Неверный логин или пароль")
-            }
-            if (rawResponse.contains("User not found", ignoreCase = true)) {
-                throw AuthException(AuthStatus.BAD_LOGIN, "Пользователь не найден")
-            }
-
-            // Пытаемся найти JSON
-            val start = rawResponse.indexOf("{")
-            val end = rawResponse.lastIndexOf("}")
-
-            if (start != -1 && end != -1) {
-                rawResponse = rawResponse.substring(start, end + 1)
-            } else {
-                // Если это не JSON и не известная ошибка
-                logger.warn("Server returned unknown text: $rawResponse")
-                // Выводим сырой ответ, если он короткий, иначе общую ошибку
-                val msg = if (rawResponse.length < 50) "Ошибка: $rawResponse" else "Некорректный ответ сервера"
-                throw AuthException(AuthStatus.INTERNAL_ERROR, msg)
-            }
-
-            try {
-                val authResp = gson.fromJson(rawResponse, AuthResponse::class.java)
-                    ?: throw AuthException(AuthStatus.INTERNAL_ERROR, "Пустой ответ сервера")
-
-                if (authResp.status != AuthStatus.OK) {
-                    val msg = when (authResp.status) {
-                        AuthStatus.BAD_LOGIN -> "Неверный логин или пароль"
-                        AuthStatus.NEED_2FA -> "Требуется двухфакторная аутентификация"
-                        AuthStatus.BANNED -> "Аккаунт заблокирован"
-                        null -> "Сервер отклонил вход (причина не указана)"
-                        else -> "Ошибка сервера: ${authResp.status}"
+        val response: AuthResponse = try {
+            val call = kotlinx.coroutines.runBlocking { // Временно runBlocking, если интерфейс синхронный. Лучше сделать метод suspend!
+                client.submitForm(
+                    url = AppConfig.AUTH_URL,
+                    formParameters = Parameters.build {
+                        append("action", "login")
+                        append("json", jsonString)
                     }
-                    throw AuthException(authResp.status ?: AuthStatus.INTERNAL_ERROR, msg)
-                }
-
-                if (authResp.uuid == null || authResp.playername == null) {
-                    throw AuthException(AuthStatus.INTERNAL_ERROR, "Неполные данные профиля")
-                }
-
-                val finalGameToken = generateGameToken(authResp.uid, authResp.session)
-                val cleanUuid = authResp.uuid.replace("-", "")
-
-                return SessionData(
-                    status = authResp.status,
-                    playerName = authResp.playername,
-                    uid = authResp.uid ?: "",
-                    uuid = cleanUuid,
-                    accessToken = finalGameToken ?: "",
-                    fileManifest = authResp.client,
-                    serverId = serverId,
-                    cachedPassword = password,
-                    balance = authResp.money
                 )
-
-            } catch (e: JsonSyntaxException) {
-                logger.error("JSON Error: {}", rawResponse)
-                throw AuthException(AuthStatus.INTERNAL_ERROR, "Сбой чтения ответа")
             }
+
+            // Читаем тело ответа как строку для ручной обработки ошибок
+            val rawBody = kotlinx.coroutines.runBlocking { call.body<String>().trim() }
+
+            // Обработка текстовых ошибок сервера
+            if (rawBody.contains("Bad login", ignoreCase = true)) throw AuthException(AuthStatus.BAD_LOGIN, "Неверный логин или пароль")
+            if (rawBody.contains("User not found", ignoreCase = true)) throw AuthException(AuthStatus.BAD_LOGIN, "Пользователь не найден")
+
+            // Парсим JSON
+            json.decodeFromString(rawBody)
+
+        } catch (e: Exception) {
+            if (e is AuthException) throw e
+            logger.error("Ошибка авторизации", e)
+            throw AuthException(AuthStatus.INTERNAL_ERROR, "Ошибка сети: ${e.message}")
         }
+
+        if (response.status != AuthStatus.OK && response.status != AuthStatus.LOGIN) {
+            val msg = when (response.status) {
+                AuthStatus.BAD_LOGIN -> "Пользователь не найден"
+                AuthStatus.PASSWORD -> "Неверный пароль"
+                AuthStatus.NEED_2FA -> "Требуется 2FA"
+                AuthStatus.BANNED -> "Аккаунт заблокирован"
+                else -> "Ошибка сервера: ${response.status}"
+            }
+            throw AuthException(response.status ?: AuthStatus.INTERNAL_ERROR, msg)
+        }
+
+        // Только если статус ОК, проверяем данные профиля
+        if (response.uuid == null || response.playername == null) {
+            // Если пароль верный (OK), но сервер не прислал профиль — это внутренняя ошибка
+            throw AuthException(AuthStatus.INTERNAL_ERROR, "Неполные данные профиля")
+        }
+
+        val finalGameToken = generateGameToken(response.uid, response.session)
+        val cleanUuid = response.uuid.replace("-", "")
+
+        return SessionData(
+            status = response.status,
+            playerName = response.playername,
+            uid = response.uid ?: "",
+            uuid = cleanUuid,
+            accessToken = finalGameToken ?: "",
+            fileManifest = response.client,
+            serverId = serverId,
+            cachedPassword = password,
+            balance = response.money
+        )
     }
 
     private fun generateGameToken(uid: String?, sessionV3: String?): String? {
         if (sessionV3 == null || uid == null) return sessionV3
         return try {
-            val salt = "sdgsdfhgosd8dfrg"
+            val salt = AppConfig.AUTH_SALT
             val keyHash = getMD5(uid + salt)
-            val key = keyHash.substring(0, 16)
+            val key = keyHash.take(16)
             val decrypted = decryptAES(sessionV3, key)
             val hash1 = getMD5(decrypted)
             val suffix = if (hash1.length >= 3) hash1.substring(hash1.length - 3) else ""
             getMD5(hash1 + suffix)
-        } catch (e: Exception) {
-            logger.error("Failed to generate game token", e)
-            sessionV3
-        }
+        } catch (_: Exception) { sessionV3 }
     }
 
     private fun decryptAES(base64Cipher: String, key: String): String {
@@ -181,7 +164,7 @@ class AuthService(baseClient: OkHttpClient, private val gson: Gson) : IAuthServi
             val md = MessageDigest.getInstance("MD5")
             val hash = md.digest(input.toByteArray(StandardCharsets.UTF_8))
             hash.joinToString("") { "%02x".format(it) }
-        } catch (e: Exception) { "" }
+        } catch (_: Exception) { "" }
     }
 
     private fun generateRandomMac(): String {
