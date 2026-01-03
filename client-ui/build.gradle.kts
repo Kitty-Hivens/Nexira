@@ -6,7 +6,6 @@ plugins {
 }
 
 group = "hivens"
-version = "1.0-SNAPSHOT"
 
 repositories {
     google()
@@ -59,7 +58,7 @@ kotlin {
 // Настройка генератора конфига
 buildConfig {
     packageName("hivens.ui") // Пакет, где будет лежать класс
-    buildConfigField("String", "APP_VERSION", "\"${project.version}\"")
+    buildConfigField("String", "FORK_VERSION", "\"${project.version}\"")
     buildConfigField("long", "BUILD_TIME", "${System.currentTimeMillis()}L")
     buildConfigField("String", "APP_NAME", "\"Aura Launcher\"")
 }
@@ -77,7 +76,26 @@ compose.desktop {
                 org.jetbrains.compose.desktop.application.dsl.TargetFormat.AppImage
             )
             packageName = "AuraLauncher"
-            packageVersion = "1.0.0"
+
+            val rawVersion = project.version.toString().substringBefore("-")
+
+            // Если версия начинается с "0." (например 0.1.0), превращаем её в 1.0.0
+            // Иначе оставляем как есть.
+            val safeVersion = if (rawVersion.startsWith("0")) "1.0.0" else rawVersion
+
+            println("Packaging version: $safeVersion (Original: ${project.version})")
+
+            packageVersion = safeVersion
+
+            description = "Aura Launcher v${project.version}"
+            copyright = "© 2026 Hivens"
+            vendor = "Hivens"
+
+            linux {
+                packageName = "aura-launcher"
+                debMaintainer = "hivens@smartycraft.ru"
+                appCategory = "Game"
+            }
         }
     }
 }

@@ -24,7 +24,7 @@ jobs:
 
       # Собираем и MSI, и папку с EXE (image)
       - name: Build Windows Targets
-        run: ./gradlew.bat :client-ui:packageMsi :client-ui:packageDistribution -Pversion=${{ github.ref_name }}
+        run: ./gradlew.bat :client-ui:packageMsi :client-ui:packageDistribution "-Pversion=${{ github.ref_name }}"
 
       - name: Prepare Artifacts
         shell: pwsh

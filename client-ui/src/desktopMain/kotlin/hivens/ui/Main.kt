@@ -104,7 +104,7 @@ fun main() {
 
         Tray(
             icon = trayIcon,
-            tooltip = AppConfig.APP_TITLE,
+            tooltip = "${AppConfig.APP_TITLE} v${AppConfig.CLIENT_VERSION}",
             onAction = { isAppVisible = !isAppVisible },
             menu = {
                 Item("Показать/Скрыть", onClick = { isAppVisible = !isAppVisible })
