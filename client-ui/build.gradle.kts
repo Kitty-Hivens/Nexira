@@ -77,12 +77,12 @@ compose.desktop {
             )
             packageName = "AuraLauncher"
 
-            val rawVersion = project.version.toString().substringBefore("-")
-
+            val cleanVersion = project.version.toString().removePrefix("v").substringBefore("-")
             // Если версия начинается с "0." (например 0.1.0), превращаем её в 1.0.0
             // Иначе оставляем как есть.
-            val safeVersion = if (rawVersion.startsWith("0")) "1.0.0" else rawVersion
+            val safeVersion = if (cleanVersion.startsWith("0") || cleanVersion.isEmpty()) "1.0.0" else cleanVersion
 
+            
             println("Packaging version: $safeVersion (Original: ${project.version})")
 
             packageVersion = safeVersion
