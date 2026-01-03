@@ -211,7 +211,7 @@ fun SplashScreen() {
             CircularProgressIndicator(color = CelestiaTheme.colors.primary)
             Spacer(Modifier.height(16.dp))
             Text(
-                "Aura Launcher v${AppConfig.LAUNCHER_VERSION}",
+                "Aura Launcher v${AppConfig.CLIENT_VERSION}",
                 style = MaterialTheme.typography.caption,
                 color = CelestiaTheme.colors.textSecondary
             )
