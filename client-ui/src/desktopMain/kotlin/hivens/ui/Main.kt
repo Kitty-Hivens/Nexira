@@ -8,10 +8,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.Icon
-import androidx.compose.material.IconButton
-import androidx.compose.material.MaterialTheme
-import androidx.compose.material.Text
+import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.Build
@@ -31,13 +28,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.*
-import org.koin.compose.KoinContext
-import org.koin.compose.koinInject
-import org.koin.core.context.startKoin
-import org.koin.core.context.stopKoin
-import org.koin.core.module.dsl.singleOf
-import org.koin.dsl.module
-import org.jetbrains.compose.resources.painterResource
 import hivens.client_ui.generated.resources.Res
 import hivens.client_ui.generated.resources.favicon
 import hivens.config.AppConfig
@@ -58,6 +48,16 @@ import hivens.ui.screens.*
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.utils.SkinManager
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
+import org.jetbrains.compose.resources.painterResource
+import org.koin.compose.KoinContext
+import org.koin.compose.koinInject
+import org.koin.core.context.startKoin
+import org.koin.core.context.stopKoin
+import org.koin.core.module.dsl.singleOf
+import org.koin.dsl.module
 import org.slf4j.LoggerFactory
 import kotlin.math.cos
 import kotlin.math.sin
@@ -67,8 +67,9 @@ val uiModule = module {
 }
 
 sealed class AppState {
-    data object Login : AppState()
-    data class Shell(val session: SessionData) : AppState()
+    data object Splash : AppState()                         // Экран инициализации
+    data object Login : AppState()                          // Экран входа
+    data class Shell(val session: SessionData) : AppState() // Основной интерфейс
 }
 
 sealed class ShellScreen {
@@ -80,8 +81,6 @@ sealed class ShellScreen {
 }
 
 fun main() {
-    // Инициализация Koin ДО запуска графического интерфейса.
-    // Это предотвращает ошибки "KoinApplication has not been started".
     startKoin {
         modules(networkModule, appModule, uiModule)
     }
@@ -95,7 +94,6 @@ fun main() {
         var isDarkTheme by remember { mutableStateOf(true) }
         var isAppVisible by remember { mutableStateOf(true) }
 
-        // Гарантируем остановку Koin при закрытии приложения
         DisposableEffect(Unit) {
             onDispose { stopKoin() }
         }
@@ -141,9 +139,6 @@ fun main() {
     }
 }
 
-/**
- * Корневой компонент с логикой навигации и авто-входа.
- */
 @Composable
 fun AppContent(isDarkTheme: Boolean, onToggleTheme: () -> Unit, onCloseApp: () -> Unit) {
     val credentialsManager: CredentialsManager = koinInject()
@@ -151,34 +146,74 @@ fun AppContent(isDarkTheme: Boolean, onToggleTheme: () -> Unit, onCloseApp: () -
     val profileManager: ProfileManager = koinInject()
     val settingsService: ISettingsService = koinInject()
 
-    var appState by remember { mutableStateOf<AppState>(AppState.Login) }
+    // Начинаем со SplahScreen
+    var appState by remember { mutableStateOf<AppState>(AppState.Splash) }
     var seasonalTheme by remember { mutableStateOf(settingsService.getSettings().seasonalTheme) }
 
+    // Логика инициализации (Запускается один раз в фоне)
     LaunchedEffect(Unit) {
-        val savedSession = credentialsManager.load() // Теперь это "SessionData?"
-        // Проверяем cachedPassword
-        if (savedSession?.cachedPassword != null) {
-            try {
-                val lastServer = profileManager.lastServerId ?: AppConfig.DEFAULT_SERVER_ID
-                // Используем сохраненные данные
-                val session = authService.login(savedSession.playerName, savedSession.cachedPassword!!, lastServer)
-                appState = AppState.Shell(session)
-            } catch (e: Exception) {
-                LoggerFactory.getLogger("AppContent").warn("Auto-login failed: ${e.message}")
+        withContext(Dispatchers.IO) {
+            // Имитация загрузки, чтобы юзер увидел лого (убирает мелькание белого экрана)
+            delay(800)
+
+            val savedSession = credentialsManager.load()
+            var nextState: AppState = AppState.Login
+
+            // Пробуем авто-вход без блокировки UI
+            if (savedSession?.cachedPassword != null) {
+                try {
+                    val lastServer = profileManager.lastServerId ?: AppConfig.DEFAULT_SERVER_ID
+                    val session = authService.login(savedSession.playerName, savedSession.cachedPassword!!, lastServer)
+                    nextState = AppState.Shell(session)
+                } catch (e: Exception) {
+                    LoggerFactory.getLogger("AppContent").warn("Auto-login failed: ${e.message}")
+                }
             }
+            // Переключаем состояние
+            appState = nextState
         }
     }
 
     Box(Modifier.fillMaxSize().background(MaterialTheme.colors.background)) {
         CelestiaBackground(isDarkTheme = isDarkTheme, currentTheme = seasonalTheme)
-        when (val state = appState) {
-            is AppState.Login -> LoginScreen(onLoginSuccess = { session -> appState = AppState.Shell(session) })
-            is AppState.Shell -> ShellUI(
-                initialSession = state.session,
-                onToggleTheme = onToggleTheme,
-                onLogout = { credentialsManager.clear(); appState = AppState.Login },
-                onCloseApp = onCloseApp,
-                onThemeChanged = { newTheme -> seasonalTheme = newTheme }
+
+        // Плавная смена экранов
+        Crossfade(targetState = appState, animationSpec = tween(500)) { state ->
+            when (state) {
+                is AppState.Splash -> SplashScreen()
+                is AppState.Login -> LoginScreen(onLoginSuccess = { session -> appState = AppState.Shell(session) })
+                is AppState.Shell -> ShellUI(
+                    initialSession = state.session,
+                    onToggleTheme = onToggleTheme,
+                    onLogout = { credentialsManager.clear(); appState = AppState.Login },
+                    onCloseApp = onCloseApp,
+                    onThemeChanged = { newTheme -> seasonalTheme = newTheme }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun SplashScreen() {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(
+                painter = painterResource(Res.drawable.favicon),
+                contentDescription = null,
+                modifier = Modifier.size(100.dp),
+                tint = CelestiaTheme.colors.primary
+            )
+            Spacer(Modifier.height(24.dp))
+            CircularProgressIndicator(color = CelestiaTheme.colors.primary)
+            Spacer(Modifier.height(16.dp))
+            Text(
+                "Aura Launcher v${AppConfig.LAUNCHER_VERSION}",
+                style = MaterialTheme.typography.caption,
+                color = CelestiaTheme.colors.textSecondary
             )
         }
     }

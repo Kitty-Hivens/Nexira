@@ -4,16 +4,17 @@ import hivens.config.AppConfig
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.InstanceProfile
 import hivens.core.data.SessionData
+import org.slf4j.LoggerFactory
 import java.io.File
+import java.nio.file.Files
 import java.nio.file.Path
+import java.util.stream.Collectors
 
 /**
  * Фабрика командной строки процесса (Process Command Factory).
- *
- * Инкапсулирует логику трансляции профиля сервера и настроек пользователя
- * в линейный список аргументов для запуска JVM.
  */
 internal class GameCommandBuilder {
+    private val logger = LoggerFactory.getLogger(GameCommandBuilder::class.java)
 
     /**
      * Immutable-конфигурация версии.
@@ -121,7 +122,7 @@ internal class GameCommandBuilder {
             args.add("-Dio.netty.native.workdir=" + nativesPath.toAbsolutePath())
             args.add("-DlibraryDirectory=" + libDir.toAbsolutePath())
 
-            // Module Exclusion List
+            // TODO: Эти списки тоже желательно вынести в конфиг или определять динамически в будущем
             val ignoreList = "securejarhandler-3.0.8.jar,asm-9.7.jar,asm-commons-9.7.jar,asm-tree-9.7.jar,asm-util-9.7.jar,asm-analysis-9.7.jar,bootstraplauncher-2.0.2.jar,JarJarFileSystems-0.4.1.jar,client-extra,neoforge-,neoforge-21.1.504.jar"
             args.add("-DignoreList=$ignoreList")
             args.add("-DmergeModules=jna-5.10.0.jar,jna-platform-5.10.0.jar")
@@ -137,15 +138,24 @@ internal class GameCommandBuilder {
 
         // 7. Java 9+ Module Path (NeoForge)
         if (config.assetIndex == "1.21.1") {
-            val modules = getNeoForgeModules()
             val libDir = clientRoot.resolve("libraries-1.21.1")
-            val validModules = modules.map { libDir.resolve(it) }
-                .filter { it.toFile().exists() }
-                .map { it.toAbsolutePath().toString() }
-            
-            if (validModules.isNotEmpty()) {
-                args.add("-p")
-                args.add(java.lang.String.join(File.pathSeparator, validModules))
+
+            if (Files.exists(libDir)) {
+                // Ищем все JAR файлы в папке
+                val validModules = Files.list(libDir)
+                    .filter { it.toString().endsWith(".jar") }
+                    .map { it.toAbsolutePath().toString() }
+                    .collect(Collectors.toList())
+
+                if (validModules.isNotEmpty()) {
+                    logger.info("Найдены NeoForge модули (${validModules.size} шт): ${validModules.map { File(it).name }}")
+                    args.add("-p")
+                    args.add(java.lang.String.join(File.pathSeparator, validModules))
+                } else {
+                    logger.warn("ВНИМАНИЕ: Папка модулей пуста: $libDir. Запуск может не состояться.")
+                }
+            } else {
+                logger.error("КРИТИЧЕСКАЯ ОШИБКА: Папка модулей не найдена: $libDir")
             }
         }
 
@@ -165,20 +175,6 @@ internal class GameCommandBuilder {
 
         return args
     }
-    
-    /**
-     * Список модулей для `--module-path`.
-     */
-    fun getNeoForgeModules(): List<String> = listOf(
-        "cpw/mods/securejarhandler/3.0.8/securejarhandler-3.0.8.jar",
-        "org/ow2/asm/asm/9.7/asm-9.7.jar",
-        "org/ow2/asm/asm-commons/9.7/asm-commons-9.7.jar",
-        "org/ow2/asm/asm-tree/9.7/asm-tree-9.7.jar",
-        "org/ow2/asm/asm-util/9.7/asm-util-9.7.jar",
-        "org/ow2/asm/asm-analysis/9.7/asm-analysis-9.7.jar",
-        "cpw/mods/bootstraplauncher/2.0.2/bootstraplauncher-2.0.2.jar",
-        "net/neoforged/JarJarFileSystems/0.4.1/JarJarFileSystems-0.4.1.jar"
-    )
 
     private fun getConfig(version: String): VersionConfig {
         return configs[version]
