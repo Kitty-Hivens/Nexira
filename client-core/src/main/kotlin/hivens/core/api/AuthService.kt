@@ -53,7 +53,7 @@ class AuthService(
         @SerialName("money") val money: Int = 0
     )
 
-    override fun login(username: String, password: String, serverId: String): SessionData {
+    override suspend fun login(username: String, password: String, serverId: String): SessionData {
         logger.info("Вход через API V3 (сервер: {})...", serverId)
 
         val passwordEncoded = getMD5(password)
@@ -78,18 +78,15 @@ class AuthService(
         val jsonString = json.encodeToString(requestPayload)
 
         val response: AuthResponse = try {
-            val call = kotlinx.coroutines.runBlocking { // Временно runBlocking, если интерфейс синхронный. Лучше сделать метод suspend!
-                client.submitForm(
-                    url = AppConfig.AUTH_URL,
-                    formParameters = Parameters.build {
-                        append("action", "login")
-                        append("json", jsonString)
-                    }
-                )
-            }
-
+            val call = client.submitForm(
+                url = AppConfig.AUTH_URL,
+                formParameters = Parameters.build {
+                    append("action", "login")
+                    append("json", jsonString)
+                }
+            )
             // Читаем тело ответа как строку для ручной обработки ошибок
-            val rawBody = kotlinx.coroutines.runBlocking { call.body<String>().trim() }
+            val rawBody = call.body<String>().trim()
 
             // Обработка текстовых ошибок сервера
             if (rawBody.contains("Bad login", ignoreCase = true)) throw AuthException(AuthStatus.BAD_LOGIN, "Неверный логин или пароль")

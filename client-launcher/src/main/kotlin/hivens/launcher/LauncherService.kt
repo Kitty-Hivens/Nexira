@@ -68,7 +68,7 @@ class LauncherService(
 
         // 4. Сборка Classpath
         val manifest = sessionData.fileManifest ?: FileManifest()
-        val excludedModules = if (version == "1.21.1") commandBuilder.getNeoForgeModules() else emptyList()
+        val excludedModules = emptyList<String>()
         val classpath = classpathProvider.buildClasspath(clientRootPath, manifest, excludedModules)
 
         // 5. Сборка команды запуска

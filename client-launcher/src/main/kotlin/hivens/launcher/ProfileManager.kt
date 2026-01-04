@@ -16,17 +16,42 @@ class ProfileManager(
 ) {
     private val log = LoggerFactory.getLogger(ProfileManager::class.java)
     private val fileName = AppConfig.FILES_PROFILES
+
+    // Хранилище профилей
     private val profiles = ConcurrentHashMap<String, InstanceProfile>()
+
+    // Хранилище избранного (НОВОЕ)
+    // Используем synchronizedSet или просто HashSet с синхронизацией при записи,
+    // но для простоты чтения в UI сделаем копирование при get.
+    private val _favorites = ConcurrentHashMap.newKeySet<String>()
+
     var lastServerId: String? = null
+
+    // Публичный доступ к избранному (для UI)
+    val favoriteServers: Set<String>
+        get() = _favorites.toSet()
 
     @Serializable
     private data class ProfilesContainer(
         val lastServerId: String? = null,
-        val profiles: Map<String, InstanceProfile> = emptyMap()
+        val profiles: Map<String, InstanceProfile> = emptyMap(),
+        val favorites: Set<String> = emptySet()
     )
 
     init {
         load()
+    }
+
+    /**
+     * Переключает статус избранного для сервера.
+     */
+    fun toggleFavorite(assetDir: String) {
+        if (_favorites.contains(assetDir)) {
+            _favorites.remove(assetDir)
+        } else {
+            _favorites.add(assetDir)
+        }
+        save()
     }
 
     fun getProfile(serverId: String): InstanceProfile {
@@ -47,6 +72,7 @@ class ProfileManager(
             val container = try {
                 json.decodeFromString<ProfilesContainer>(text)
             } catch (_: Exception) {
+                // Поддержка старого формата (миграция)
                 try {
                     val map = json.decodeFromString<Map<String, InstanceProfile>>(text)
                     ProfilesContainer(null, map)
@@ -57,9 +83,14 @@ class ProfileManager(
             }
 
             container.profiles.forEach { (k, v) -> profiles[k] = v }
+
+            // Загружаем избранное
+            _favorites.clear()
+            _favorites.addAll(container.favorites)
+
             this.lastServerId = container.lastServerId
 
-            log.info("Loaded ${profiles.size} profiles.")
+            log.info("Loaded ${profiles.size} profiles and ${_favorites.size} favorites.")
         } catch (e: IOException) {
             log.error("Failed to load profiles", e)
         }
@@ -68,7 +99,11 @@ class ProfileManager(
     fun save() {
         val file = workDir.resolve(fileName)
         try {
-            val container = ProfilesContainer(lastServerId, profiles.toMap())
+            val container = ProfilesContainer(
+                lastServerId = lastServerId,
+                profiles = profiles.toMap(),
+                favorites = _favorites.toSet()
+            )
             val text = json.encodeToString(container)
             Files.writeString(file, text)
         } catch (e: IOException) {

@@ -127,6 +127,11 @@ class JavaManagerService(
         if (!Files.exists(path)) return
         Files.walkFileTree(path, object : SimpleFileVisitor<Path>() {
             override fun visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult {
+                // Снимаем атрибуты Read-Only перед удалением
+                try {
+                    Files.setAttribute(file, "dos:readonly", false)
+                } catch (_: Exception) { /* Игнорируем на не-Windows */ }
+
                 Files.delete(file)
                 return FileVisitResult.CONTINUE
             }

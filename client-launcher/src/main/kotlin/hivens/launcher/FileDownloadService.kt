@@ -1,22 +1,19 @@
 package hivens.launcher
 
 import hivens.core.api.interfaces.IFileDownloadService
+import hivens.core.data.FileData
 import hivens.core.data.FileManifest
 import hivens.core.data.SessionData
 import hivens.core.util.ZipUtils
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
-import io.ktor.http.isSuccess
-import io.ktor.utils.io.jvm.javaio.*
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.runBlocking
+import io.ktor.http.*
+import io.ktor.utils.io.*
+import kotlinx.coroutines.*
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
-import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 import java.io.FileOutputStream
 import java.io.IOException
@@ -24,6 +21,8 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.security.MessageDigest
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
+import kotlin.math.roundToInt
 
 class FileDownloadService(
     private val client: HttpClient
@@ -40,134 +39,183 @@ class FileDownloadService(
         )
     }
 
-    override fun processSession(
+    override suspend fun processSession(
         session: SessionData,
         serverId: String,
         targetDir: Path,
         extraCheckSum: String?,
         ignoredFiles: Set<String>?,
         messageUI: ((String) -> Unit)?,
-        progressUI: ((Int, Int) -> Unit)?
-    ) {
+        progressUI: ((Int, Int, Long, Long, String) -> Unit)?
+    ) = withContext(Dispatchers.IO) {
         val manifest = session.fileManifest ?: throw IOException("Манифест файлов пуст!")
-        logger.info("Начало обновления клиента: $serverId")
-
         Files.createDirectories(targetDir)
 
-        // 1. Превращаем дерево манифеста в плоский список файлов (Path -> MD5)
+        // 1. Получаем карту Path -> FileData
         val filesMap = flattenManifest(manifest)
 
-        // 2. Фильтрация игнорируемых файлов (опциональные моды и т.д.)
+        // 2. Фильтрация
         if (!ignoredFiles.isNullOrEmpty()) {
             filesMap.keys.removeIf { relativePath ->
                 val clean = normalizePath(relativePath)
                 ignoredFiles.any { clean.endsWith("/$it") || clean == it }
             }
-
-            // физическое удаление
             cleanupIgnoredFiles(targetDir, ignoredFiles)
         }
 
-        logger.info("Файлов к проверке: ${filesMap.size}")
-        messageUI?.invoke("Проверка файлов...")
+        // 3. Скачивание с подсчетом байтов
+        downloadMissingFiles(targetDir, filesMap, messageUI, progressUI)
 
-        // 3. Скачивание
-        runBlocking {
-            downloadMissingFiles(targetDir, filesMap, messageUI, progressUI)
-        }
-
-        // 4. Обработка Extra.zip (конфиги)
+        // 4. Extra.zip (конфиги)
         processExtraZip(targetDir, filesMap, extraCheckSum, messageUI)
-
-        messageUI?.invoke("Готово!")
     }
 
     /**
      * Рекурсивно обходит манифест и собирает все файлы в одну карту.
      */
-    private fun flattenManifest(manifest: FileManifest): MutableMap<String, String> {
-        val result = HashMap<String, String>()
-
+    private fun flattenManifest(manifest: FileManifest): MutableMap<String, FileData> {
+        val result = HashMap<String, FileData>()
         fun traverse(m: FileManifest, currentPath: String) {
-            // Файлы
             m.files.forEach { (name, data) ->
                 val fullPath = if (currentPath.isEmpty()) name else "$currentPath/$name"
-                result[fullPath] = data.md5
+                result[fullPath] = data
             }
-            // Папки
             m.directories.forEach { (name, subManifest) ->
-                val nextPath = if (currentPath.isEmpty()) name else "$currentPath/$name"
-                traverse(subManifest, nextPath)
+                traverse(subManifest, if (currentPath.isEmpty()) name else "$currentPath/$name")
             }
         }
-
         traverse(manifest, "")
         return result
     }
 
     private suspend fun downloadMissingFiles(
         baseDir: Path,
-        files: Map<String, String>,
+        files: Map<String, FileData>,
         messageUI: ((String) -> Unit)?,
-        progressUI: ((Int, Int) -> Unit)?
+        progressUI: ((Int, Int, Long, Long, String) -> Unit)?
     ) {
-        val total = files.size
-        val currentCounter = AtomicInteger(0)
-        // Ограничиваем кол-во одновременных загрузок
-        val semaphore = Semaphore(5)
+        // ЭТАП 1: Проверка хешей
+        messageUI?.invoke("Сверка хеш-сумм...")
+
+        // Тут происходит тяжелая работа (чтение файлов с диска)
+        val filesToDownload = files.filter { (path, data) ->
+            isFileMissingOrChanged(baseDir.resolve(normalizePath(path)), data.md5)
+        }
+
+        val totalFilesCount = filesToDownload.size
+        // Считаем общий размер (если size нет, будет 0)
+        val totalBytesToDownload = filesToDownload.values.sumOf { it.size }
+
+        if (totalFilesCount == 0) {
+            messageUI?.invoke("Файлы проверены, обновлений нет.")
+            return
+        }
+
+        // ЭТАП 2: Скачивание
+        messageUI?.invoke("Загрузка обновлений ($totalFilesCount файлов)...")
+
+        // Атомики для потокобезопасного счета
+        val currentFileCounter = AtomicInteger(0)
+        val downloadedBytesGlobal = AtomicLong(0)
+        val semaphore = Semaphore(5) // Ограничение в 5 потоков
+
+        val startTime = System.currentTimeMillis()
 
         coroutineScope {
-            val tasks = files.map { (rawPath, expectedHash) ->
+            // Тикер для UI
+            val monitorJob = launch(Dispatchers.Main) {
+                while (isActive) {
+                    val currentBytes = downloadedBytesGlobal.get()
+                    val currentFiles = currentFileCounter.get()
+
+                    val now = System.currentTimeMillis()
+                    val durationSec = (now - startTime) / 1000.0
+                    val speed = if (durationSec > 0.1) formatSpeed(currentBytes / durationSec) else "..."
+
+                    progressUI?.invoke(
+                        currentFiles,
+                        totalFilesCount,
+                        currentBytes,
+                        totalBytesToDownload,
+                        speed
+                    )
+
+                    delay(100)
+                    if (currentFiles >= totalFilesCount && currentBytes >= totalBytesToDownload) break
+                }
+            }
+
+            // Скачивание
+            val tasks = filesToDownload.map { (rawPath, _) ->
                 async(Dispatchers.IO) {
-                    // Ждем свободный слот в семафоре
+                    if (!isActive) throw CancellationException()
+
                     semaphore.withPermit {
-                        try {
-                            val cleanPath = normalizePath(rawPath)
-                            val targetFile = baseDir.resolve(cleanPath)
+                        if (!isActive) throw CancellationException()
 
-                            // Обновляем UI (прогресс бар)
-                            val current = currentCounter.incrementAndGet()
-                            progressUI?.invoke(current, total)
+                        val cleanPath = normalizePath(rawPath)
+                        val targetFile = baseDir.resolve(cleanPath)
 
-                            // Обновляем текст (реже, чтобы не мигало)
-                            if (current % 5 == 0) messageUI?.invoke("Загрузка: ${shorten(cleanPath)}")
-
-                            if (isFileMissingOrChanged(targetFile, expectedHash)) {
-                                downloadFileInternal(rawPath, targetFile)
-                            }
-                        } catch (e: Exception) {
-                            logger.error("Ошибка скачивания: $rawPath", e)
-                            throw e // Пробрасываем ошибку, чтобы остановить процесс
+                        downloadFileInternal(rawPath, targetFile) { bytesRead ->
+                            // Просто увеличиваем счетчик. UI не трогаем.
+                            downloadedBytesGlobal.addAndGet(bytesRead.toLong())
+                            if (!isActive) throw CancellationException()
                         }
+
+                        currentFileCounter.incrementAndGet()
                     }
                 }
             }
+
             // Ждем завершения всех загрузок
-            tasks.awaitAll()
+            try {
+                tasks.awaitAll()
+            } finally {
+                monitorJob.cancel()
+            }
+
+            // Финальный апдейт (100%)
+            if (isActive) {
+                progressUI?.invoke(
+                    totalFilesCount, totalFilesCount,
+                    totalBytesToDownload, totalBytesToDownload,
+                    ""
+                )
+            }
         }
     }
 
-    private suspend fun downloadFileInternal(serverPath: String, localPath: Path) {
+    private suspend fun downloadFileInternal(
+        serverPath: String,
+        localPath: Path,
+        onBytesRead: ((Int) -> Unit)? = null
+    ) {
         val url = DOWNLOAD_BASE_URL + serverPath.replace(" ", "%20")
-
         withContext(Dispatchers.IO) {
             if (localPath.parent != null) Files.createDirectories(localPath.parent)
 
             client.prepareGet(url).execute { response ->
                 if (!response.status.isSuccess()) throw IOException("HTTP ${response.status} for $url")
 
-                // Стримим байты прямо в файл
                 val channel = response.bodyAsChannel()
                 FileOutputStream(localPath.toFile()).use { output ->
-                    channel.copyTo(output)
+                    val buffer = ByteArray(8192)
+                    while (!channel.isClosedForRead) {
+                        val read = channel.readAvailable(buffer, 0, buffer.size)
+                        if (read <= 0) break
+                        output.write(buffer, 0, read)
+                        onBytesRead?.invoke(read)
+                    }
                 }
             }
         }
     }
 
-    // Для совместимости с интерфейсом (если вызывается отдельно)
-    override fun downloadFile(relativePath: String, destinationPath: Path) {
-        runBlocking { downloadFileInternal(relativePath, destinationPath) }
+    private fun formatSpeed(bytesPerSec: Double): String {
+        val kb = bytesPerSec / 1024
+        if (kb < 1024) return "${kb.roundToInt()} KB/s"
+        val mb = kb / 1024
+        return String.format("%.1f MB/s", mb)
     }
 
     /**
@@ -189,7 +237,7 @@ class FileDownloadService(
 
     private fun processExtraZip(
         baseDir: Path,
-        files: Map<String, String>,
+        files: Map<String, FileData>,
         serverCheckSum: String?,
         messageUI: ((String) -> Unit)?
     ) {
@@ -246,8 +294,6 @@ class FileDownloadService(
         }
         return md.digest().joinToString("") { "%02x".format(it) }
     }
-
-    private fun shorten(p: String) = if (p.length > 30) "..." + p.takeLast(30) else p
 
     private fun cleanupIgnoredFiles(baseDir: Path, ignoredFiles: Set<String>) {
         if (ignoredFiles.isEmpty()) return

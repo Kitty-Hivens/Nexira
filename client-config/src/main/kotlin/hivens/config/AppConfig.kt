@@ -20,7 +20,6 @@ object AppConfig {
     const val BASE_URL = "https://www.smartycraft.ru"
     const val AUTH_URL = "$BASE_URL/launcher2/index.php"
     const val OFFICIAL_JAR_URL = "$BASE_URL/downloads/smartycraft.jar"
-    const val SKINS_URL = "$BASE_URL/skins/"
 
     // Таймауты
     const val TIMEOUT_CONNECT = 30_000L
@@ -29,7 +28,7 @@ object AppConfig {
     // ==========================================
     // 3. ФАЙЛОВАЯ СИСТЕМА
     // ==========================================
-    const val WORK_DIR_NAME = ".aura"
+    const val APP_DIR = ".aura"
     const val FILES_SETTINGS = "settings.json"
     const val FILES_PROFILES = "profiles.json"
     const val FILES_HASH_CACHE = "smarty_hash.cache"
@@ -47,7 +46,6 @@ object AppConfig {
     // 5. ПРОКСИ
     // ==========================================
     object Proxy {
-        const val ENABLED = true
         const val HOST = "proxy.smartycraft.ru"
         const val PORT = 1080
         const val USER = "proxyuser"

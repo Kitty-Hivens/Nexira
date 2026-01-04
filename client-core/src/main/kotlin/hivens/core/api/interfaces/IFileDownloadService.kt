@@ -8,13 +8,6 @@ import java.nio.file.Path
  * Контракт для сервиса загрузки файлов клиента.
  */
 interface IFileDownloadService {
-
-    /**
-     * Загружает один файл из удаленного источника.
-     */
-    @Throws(IOException::class)
-    fun downloadFile(relativePath: String, destinationPath: Path)
-
     /**
      * Запускает полный процесс обработки сессии (парсинг манифеста, скачивание файлов, распаковка extra.zip).
      * * @param session Сессия пользователя (содержит манифест файлов).
@@ -26,13 +19,13 @@ interface IFileDownloadService {
      * @param progressUI Лямбда для прогресса (текущее, всего) (опционально).
      */
     @Throws(IOException::class)
-    fun processSession(
+    suspend fun processSession(
         session: SessionData,
         serverId: String,
         targetDir: Path,
         extraCheckSum: String?,
         ignoredFiles: Set<String>?,
         messageUI: ((String) -> Unit)?,
-        progressUI: ((Int, Int) -> Unit)?
+        progressUI: ((Int, Int, Long, Long, String) -> Unit)?
     )
 }

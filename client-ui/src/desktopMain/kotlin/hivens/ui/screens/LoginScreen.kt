@@ -68,6 +68,20 @@ fun LoginScreen(onLoginSuccess: (SessionData) -> Unit) {
     val shakeOffset = remember { Animatable(0f) }
     var isVisible by remember { mutableStateOf(false) }
 
+    // Замена удаленного цвета border на textSecondary с прозрачностью
+    val borderColor = CelestiaTheme.colors.textSecondary.copy(alpha = 0.3f)
+
+    // Выносим стили, чтобы уменьшить размер кода
+    val inputColors = TextFieldDefaults.outlinedTextFieldColors(
+        textColor = CelestiaTheme.colors.textPrimary,
+        focusedBorderColor = CelestiaTheme.colors.primary,
+        unfocusedBorderColor = borderColor,
+        focusedLabelColor = CelestiaTheme.colors.primary,
+        unfocusedLabelColor = CelestiaTheme.colors.textSecondary,
+        cursorColor = CelestiaTheme.colors.primary,
+        backgroundColor = Color.Transparent
+    )
+
     LaunchedEffect(Unit) { isVisible = true }
 
     fun triggerShake() {
@@ -149,7 +163,7 @@ fun LoginScreen(onLoginSuccess: (SessionData) -> Unit) {
                     .wrapContentHeight()
                     .offset(x = shakeOffset.value.dp),
                 shape = RoundedCornerShape(24.dp),
-                backgroundColor = Color.Black.copy(alpha = 0.4f)
+                backgroundColor = CelestiaTheme.colors.glassBackground.copy(alpha = 0.4f)
             ) {
                 Column(
                     modifier = Modifier.padding(40.dp),
@@ -164,7 +178,7 @@ fun LoginScreen(onLoginSuccess: (SessionData) -> Unit) {
                     )
                     Spacer(modifier = Modifier.height(32.dp))
 
-                    // Блок ошибки
+                    // Ошибка
                     AnimatedVisibility(
                         visible = errorMessage != null,
                         enter = expandVertically() + fadeIn(),
@@ -188,7 +202,7 @@ fun LoginScreen(onLoginSuccess: (SessionData) -> Unit) {
                         }
                     }
 
-                    // Поле Логина
+                    // Логин
                     OutlinedTextField(
                         value = login,
                         onValueChange = { login = it; errorMessage = null },
@@ -198,19 +212,11 @@ fun LoginScreen(onLoginSuccess: (SessionData) -> Unit) {
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                         keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
                         shape = RoundedCornerShape(12.dp),
-                        colors = TextFieldDefaults.outlinedTextFieldColors(
-                            textColor = CelestiaTheme.colors.textPrimary,
-                            focusedBorderColor = CelestiaTheme.colors.primary,
-                            unfocusedBorderColor = CelestiaTheme.colors.border.copy(alpha = 0.5f),
-                            focusedLabelColor = CelestiaTheme.colors.primary,
-                            unfocusedLabelColor = CelestiaTheme.colors.textSecondary,
-                            cursorColor = CelestiaTheme.colors.primary,
-                            backgroundColor = Color.Transparent
-                        )
+                        colors = inputColors
                     )
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Поле Пароля
+                    // Пароль
                     OutlinedTextField(
                         value = password,
                         onValueChange = { password = it; errorMessage = null },
@@ -218,25 +224,14 @@ fun LoginScreen(onLoginSuccess: (SessionData) -> Unit) {
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         visualTransformation = PasswordVisualTransformation(),
-                        keyboardOptions = KeyboardOptions(
-                            keyboardType = KeyboardType.Password,
-                            imeAction = ImeAction.Done
-                        ),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
                         keyboardActions = KeyboardActions(onDone = { doLogin() }),
                         shape = RoundedCornerShape(12.dp),
-                        colors = TextFieldDefaults.outlinedTextFieldColors(
-                            textColor = CelestiaTheme.colors.textPrimary,
-                            focusedBorderColor = CelestiaTheme.colors.primary,
-                            unfocusedBorderColor = CelestiaTheme.colors.border.copy(alpha = 0.5f),
-                            focusedLabelColor = CelestiaTheme.colors.primary,
-                            unfocusedLabelColor = CelestiaTheme.colors.textSecondary,
-                            cursorColor = CelestiaTheme.colors.primary,
-                            backgroundColor = Color.Transparent
-                        )
+                        colors = inputColors
                     )
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Чекбокс "Запомнить"
+                    // Чекбокс
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
@@ -246,8 +241,8 @@ fun LoginScreen(onLoginSuccess: (SessionData) -> Unit) {
                             onCheckedChange = { rememberMe = it },
                             colors = CheckboxDefaults.colors(
                                 checkedColor = CelestiaTheme.colors.primary,
-                                uncheckedColor = CelestiaTheme.colors.border,
-                                checkmarkColor = Color.Black
+                                uncheckedColor = borderColor,
+                                checkmarkColor = CelestiaTheme.colors.onPrimary
                             )
                         )
                         Spacer(modifier = Modifier.width(8.dp))
@@ -255,7 +250,7 @@ fun LoginScreen(onLoginSuccess: (SessionData) -> Unit) {
                     }
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    // Кнопка Входа
+                    // Кнопка
                     Button(
                         onClick = { doLogin() },
                         enabled = !isLoading && !isSuccess,
