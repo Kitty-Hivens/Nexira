@@ -109,7 +109,7 @@ val appModule = module {
      * Рабочая директория приложения (.aura).
      */
     single(createdAtStart = true) {
-        Paths.get(System.getProperty("user.home"), AppConfig.WORK_DIR_NAME)
+        Paths.get(System.getProperty("user.home"), AppConfig.APP_DIR)
     }
 
     // Менеджеры и сервисы

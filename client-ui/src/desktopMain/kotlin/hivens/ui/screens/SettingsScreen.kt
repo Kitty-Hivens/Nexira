@@ -3,22 +3,20 @@ package hivens.ui.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.data.SeasonTheme
-import hivens.ui.components.CelestiaButton
 import hivens.ui.components.GlassCard
 import hivens.ui.theme.CelestiaTheme
 import org.koin.compose.koinInject
-import kotlin.math.roundToInt
 
 @Composable
 fun SettingsScreen(
@@ -27,177 +25,176 @@ fun SettingsScreen(
     onThemeChanged: (SeasonTheme) -> Unit
 ) {
     val settingsService: ISettingsService = koinInject()
-    val currentSettings = remember { settingsService.getSettings() }
 
-    var memory by remember { mutableStateOf(currentSettings.memoryMB.toFloat()) }
-    var autoClose by remember { mutableStateOf(currentSettings.closeAfterStart) }
-    var selectedTheme by remember { mutableStateOf(currentSettings.seasonalTheme) }
+    // Загружаем настройки при старте
+    // Используем remember, чтобы не перечитывать конфиг при каждом рекомпозишене
+    val initialSettings = remember { settingsService.getSettings() }
 
+    var closeAfterStart by remember { mutableStateOf(initialSettings.closeAfterStart) }
+    var selectedTheme by remember { mutableStateOf(initialSettings.seasonalTheme) }
+
+    // Состояние выпадающего списка и сообщения о сохранении
     var isThemeDropdownExpanded by remember { mutableStateOf(false) }
     var showSavedMessage by remember { mutableStateOf(false) }
 
-    val scrollState = rememberScrollState()
-    val dividerColor = CelestiaTheme.colors.textSecondary.copy(alpha = 0.2f)
+    // Функция сохранения
+    fun save() {
+        // Получаем актуальный объект (на случай, если он изменился извне, хотя здесь это редкость)
+        val current = settingsService.getSettings()
 
-    Column(Modifier.fillMaxSize().padding(24.dp)) {
+        // Копируем с новыми значениями
+        val newSettings = current.copy(
+            closeAfterStart = closeAfterStart,
+            seasonalTheme = selectedTheme
+        )
+
+        // Сохраняем
+        settingsService.saveSettings(newSettings)
+        showSavedMessage = true
+    }
+
+    Column(Modifier.fillMaxSize().padding(16.dp)) {
         Text(
             text = "ГЛОБАЛЬНЫЕ НАСТРОЙКИ",
-            style = MaterialTheme.typography.h4,
-            color = CelestiaTheme.colors.textPrimary
+            style = MaterialTheme.typography.h5,
+            color = CelestiaTheme.colors.textPrimary,
+            fontWeight = FontWeight.Bold
         )
+
         Spacer(Modifier.height(24.dp))
 
-        GlassCard(Modifier.fillMaxWidth().weight(1f)) {
-            Column(
-                Modifier.fillMaxSize().padding(32.dp).verticalScroll(scrollState)
+        GlassCard(Modifier.weight(1f).fillMaxWidth()) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(24.dp),
+                verticalArrangement = Arrangement.spacedBy(24.dp)
             ) {
-                // --- ИНТЕРФЕЙС ---
-                Text("ИНТЕРФЕЙС", style = MaterialTheme.typography.subtitle2, color = CelestiaTheme.colors.primary)
-                Spacer(Modifier.height(16.dp))
+                // --- Секция: Интерфейс ---
+                item {
+                    SettingsSectionTitle("Интерфейс")
 
-                // ТЕМА
-                var switchState by remember(isDarkTheme) { mutableStateOf(isDarkTheme) }
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Темная тема", color = CelestiaTheme.colors.textPrimary)
-                    Switch(
-                        checked = switchState,
-                        onCheckedChange = {
-                            switchState = it
-                            onToggleTheme()
-                        },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = CelestiaTheme.colors.primary,
-                            checkedTrackColor = CelestiaTheme.colors.primary.copy(alpha = 0.5f)
-                        )
+                    // Темная тема
+                    var themeSwitchState by remember(isDarkTheme) { mutableStateOf(isDarkTheme) }
+                    SettingsSwitchRow(
+                        title = "Темная тема",
+                        checked = themeSwitchState, // Используем локальную переменную
+                        onCheckedChange = { isChecked ->
+                            themeSwitchState = isChecked // 1. Мгновенно двигаем ползунок
+                            onToggleTheme()              // 2. Запускаем тяжелую смену темы
+                        }
                     )
-                }
 
-                Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(16.dp))
 
-                // Выбор сезонного эффекта
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text("Сезонный эффект", color = CelestiaTheme.colors.textPrimary)
-                        Text("Анимация на заднем фоне", style = MaterialTheme.typography.caption, color = CelestiaTheme.colors.textSecondary)
-                    }
-
-                    Box {
-                        Row(
-                            Modifier
-                                .clickable { isThemeDropdownExpanded = true }
-                                .padding(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(selectedTheme.title, color = CelestiaTheme.colors.primary)
-                            Icon(Icons.Default.ArrowDropDown, null, tint = CelestiaTheme.colors.primary)
+                    // Сезонный эффект (Выпадающий список)
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text("Сезонный эффект", color = CelestiaTheme.colors.textPrimary)
+                            Text("Анимация на заднем фоне", style = MaterialTheme.typography.caption, color = CelestiaTheme.colors.textSecondary)
                         }
 
-                        DropdownMenu(
-                            expanded = isThemeDropdownExpanded,
-                            onDismissRequest = { isThemeDropdownExpanded = false },
-                            modifier = Modifier.background(CelestiaTheme.colors.surface)
-                        ) {
-                            SeasonTheme.entries.forEach { theme ->
-                                DropdownMenuItem(onClick = {
-                                    selectedTheme = theme
-                                    isThemeDropdownExpanded = false
-                                    onThemeChanged(theme)
-                                    val s = settingsService.getSettings()
-                                    s.seasonalTheme = theme
-                                    settingsService.saveSettings(s)
-                                }) {
-                                    Text(theme.title, color = CelestiaTheme.colors.textPrimary)
+                        Box {
+                            Row(
+                                Modifier
+                                    .clickable { isThemeDropdownExpanded = true }
+                                    .padding(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(selectedTheme.title, color = CelestiaTheme.colors.primary, fontWeight = FontWeight.Bold)
+                                Icon(Icons.Default.ArrowDropDown, null, tint = CelestiaTheme.colors.primary)
+                            }
+
+                            DropdownMenu(
+                                expanded = isThemeDropdownExpanded,
+                                onDismissRequest = { isThemeDropdownExpanded = false },
+                                modifier = Modifier.background(CelestiaTheme.colors.surface)
+                            ) {
+                                SeasonTheme.entries.forEach { theme ->
+                                    DropdownMenuItem(onClick = {
+                                        selectedTheme = theme
+                                        isThemeDropdownExpanded = false
+                                        onThemeChanged(theme)
+                                        save() // Сохраняем сразу при выборе
+                                    }) {
+                                        Text(theme.title, color = CelestiaTheme.colors.textPrimary)
+                                    }
                                 }
                             }
                         }
                     }
                 }
 
-                Spacer(Modifier.height(24.dp))
-                Divider(color = dividerColor)
-                Spacer(Modifier.height(24.dp))
+                // --- Секция: Поведение ---
+                item {
+                    SettingsSectionTitle("Поведение")
 
-                // --- ПАМЯТЬ ---
-                Text("ПАМЯТЬ", style = MaterialTheme.typography.subtitle2, color = CelestiaTheme.colors.primary)
-                Spacer(Modifier.height(16.dp))
-
-                Text("Выделение памяти (RAM)", color = CelestiaTheme.colors.textSecondary)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        "${memory.roundToInt()} MB",
-                        style = MaterialTheme.typography.subtitle1,
-                        modifier = Modifier.width(80.dp),
-                        color = CelestiaTheme.colors.textPrimary
-                    )
-                    Slider(
-                        value = memory,
-                        onValueChange = { memory = it },
-                        valueRange = 1024f..16384f,
-                        steps = 30,
-                        modifier = Modifier.weight(1f),
-                        colors = SliderDefaults.colors(
-                            thumbColor = CelestiaTheme.colors.primary,
-                            activeTrackColor = CelestiaTheme.colors.primary,
-                            inactiveTrackColor = dividerColor
-                        )
+                    SettingsSwitchRow(
+                        title = "Закрывать лаунчер после запуска игры",
+                        checked = closeAfterStart,
+                        onCheckedChange = {
+                            closeAfterStart = it
+                            save() // Сохраняем сразу
+                        }
                     )
                 }
 
-                Spacer(Modifier.height(24.dp))
-                Divider(color = dividerColor)
-                Spacer(Modifier.height(24.dp))
+                // Секция памяти удалена, как и просили
+            }
+        }
 
-                // --- ПОВЕДЕНИЕ ---
-                Text("ПОВЕДЕНИЕ", style = MaterialTheme.typography.subtitle2, color = CelestiaTheme.colors.primary)
-                Spacer(Modifier.height(16.dp))
-
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Закрывать лаунчер после запуска игры", color = CelestiaTheme.colors.textPrimary)
-                    Switch(
-                        checked = autoClose,
-                        onCheckedChange = { autoClose = it },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = CelestiaTheme.colors.primary,
-                            checkedTrackColor = CelestiaTheme.colors.primary.copy(alpha = 0.5f)
-                        )
-                    )
-                }
-
-                Spacer(Modifier.height(32.dp))
-
-                // --- FOOTER ---
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
-                    if (showSavedMessage) {
-                        Text("Настройки сохранены", color = CelestiaTheme.colors.success, modifier = Modifier.padding(end = 16.dp))
-                    }
-
-                    CelestiaButton(
-                        text = "СОХРАНИТЬ",
-                        onClick = {
-                            val newSettings = settingsService.getSettings()
-                            newSettings.memoryMB = memory.roundToInt()
-                            newSettings.closeAfterStart = autoClose
-                            newSettings.seasonalTheme = selectedTheme
-
-                            settingsService.saveSettings(newSettings)
-                            showSavedMessage = true
-                        },
-                        modifier = Modifier.width(150.dp)
-                    )
+        // Footer с сообщением, если нужно (хотя мы сохраняем сразу, но оставим для обратной связи)
+        if (showSavedMessage) {
+            Spacer(Modifier.height(8.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                Text("Настройки сохранены", color = CelestiaTheme.colors.success, style = MaterialTheme.typography.caption)
+            }
+            // Сбрасываем сообщение через 2 секунды
+            LaunchedEffect(showSavedMessage) {
+                if (showSavedMessage) {
+                    kotlinx.coroutines.delay(2000)
+                    showSavedMessage = false
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun SettingsSectionTitle(text: String) {
+    Text(
+        text = text.uppercase(),
+        style = MaterialTheme.typography.caption,
+        color = CelestiaTheme.colors.primary,
+        fontWeight = FontWeight.Bold
+    )
+    Spacer(Modifier.height(8.dp))
+    Divider(color = CelestiaTheme.colors.primary.copy(alpha = 0.3f))
+    Spacer(Modifier.height(16.dp))
+}
+
+@Composable
+private fun SettingsSwitchRow(
+    title: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(title, style = MaterialTheme.typography.body1, color = CelestiaTheme.colors.textPrimary)
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = CelestiaTheme.colors.primary,
+                checkedTrackColor = CelestiaTheme.colors.primary.copy(alpha = 0.5f)
+            )
+        )
     }
 }
