@@ -28,7 +28,7 @@ object AppConfig {
     // ==========================================
     // 3. ФАЙЛОВАЯ СИСТЕМА
     // ==========================================
-    const val WORK_DIR_NAME = ".aura"
+    const val APP_DIR = ".aura"
     const val FILES_SETTINGS = "settings.json"
     const val FILES_PROFILES = "profiles.json"
     const val FILES_HASH_CACHE = "smarty_hash.cache"

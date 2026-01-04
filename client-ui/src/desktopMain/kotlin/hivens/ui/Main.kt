@@ -78,6 +78,7 @@ sealed class ShellScreen {
     data object GlobalSettings : ShellScreen()
     data object News : ShellScreen()
     data class ServerSettings(val server: ServerProfile) : ShellScreen()
+    data class ServerDetails(val server: ServerProfile) : ShellScreen()
 }
 
 fun main() {
@@ -102,7 +103,7 @@ fun main() {
 
         Tray(
             icon = trayIcon,
-            tooltip = "${AppConfig.APP_TITLE} v${AppConfig.CLIENT_VERSION}",
+            tooltip = "${AppConfig.APP_TITLE} v${AppConfig.CLIENT_VERSION.removePrefix("v")}",
             onAction = { isAppVisible = !isAppVisible },
             menu = {
                 Item("Показать/Скрыть", onClick = { isAppVisible = !isAppVisible })
@@ -146,7 +147,7 @@ fun AppContent(isDarkTheme: Boolean, onToggleTheme: () -> Unit, onCloseApp: () -
     val profileManager: ProfileManager = koinInject()
     val settingsService: ISettingsService = koinInject()
 
-    // Начинаем со SplahScreen
+    // Начинаем со SplashScreen
     var appState by remember { mutableStateOf<AppState>(AppState.Splash) }
     var seasonalTheme by remember { mutableStateOf(settingsService.getSettings().seasonalTheme) }
 
@@ -211,7 +212,7 @@ fun SplashScreen() {
             CircularProgressIndicator(color = CelestiaTheme.colors.primary)
             Spacer(Modifier.height(16.dp))
             Text(
-                "Aura Launcher v${AppConfig.CLIENT_VERSION}",
+                "Aura Launcher v${AppConfig.CLIENT_VERSION.removePrefix("v")}",
                 style = MaterialTheme.typography.caption,
                 color = CelestiaTheme.colors.textSecondary
             )
@@ -322,7 +323,8 @@ fun ShellUI(
                         onSessionUpdated = { newSession -> currentSession = newSession },
                         onCloseApp = onCloseApp,
                         onOpenServerSettings = { server -> currentScreen = ShellScreen.ServerSettings(server) },
-                        onOpenNews = { currentScreen = ShellScreen.News }
+                        onOpenNews = { currentScreen = ShellScreen.News },
+                        onOpenDetails = { server -> currentScreen = ShellScreen.ServerDetails(server) }
                     )
                     is ShellScreen.News -> NewsScreen(onBack = { currentScreen = ShellScreen.Home })
                     is ShellScreen.Profile -> ProfileScreen(currentSession, skinRepository)
@@ -332,6 +334,7 @@ fun ShellUI(
                         onThemeChanged = onThemeChanged
                     )
                     is ShellScreen.ServerSettings -> ServerSettingsScreen(server = screen.server, onBack = { currentScreen = ShellScreen.Home })
+                    is ShellScreen.ServerDetails -> ServerDetailScreen(server = screen.server, onBack = { currentScreen = ShellScreen.Home })
                 }
             }
         }

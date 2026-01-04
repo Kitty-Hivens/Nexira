@@ -1,20 +1,22 @@
 package hivens.ui.screens
 
-import androidx.compose.foundation.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.*
+import androidx.compose.material.Icon
+import androidx.compose.material.IconButton
+import androidx.compose.material.MaterialTheme
+import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -23,15 +25,15 @@ import hivens.core.api.interfaces.ISettingsService
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.SessionData
 import hivens.launcher.ProfileManager
-import hivens.ui.components.CelestiaButton
 import hivens.ui.components.GlassCard
+import hivens.ui.components.LaunchControlPanel
+import hivens.ui.components.SquareServerCard
 import hivens.ui.logic.LaunchState
 import hivens.ui.logic.LauncherController
 import hivens.ui.theme.CelestiaTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
-import java.text.DecimalFormat
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
@@ -42,22 +44,21 @@ fun DashboardScreen(
     onSessionUpdated: (SessionData) -> Unit,
     onCloseApp: () -> Unit,
     onOpenServerSettings: (ServerProfile) -> Unit,
-    onOpenNews: () -> Unit
+    onOpenNews: () -> Unit,
+    onOpenDetails: (ServerProfile) -> Unit
 ) {
-    // ЗАВИСИМОСТИ
     val serverListService: IServerListService = koinInject()
     val settingsService: ISettingsService = koinInject()
     val profileManager: ProfileManager = koinInject()
     val controller: LauncherController = koinInject()
 
-    // СОСТОЯНИЕ
     val launchState by controller.state.collectAsState()
 
     var servers by remember { mutableStateOf<List<ServerProfile>>(emptyList()) }
     var selectedServerState by remember { mutableStateOf(initialSelectedServer) }
 
-    val scope = rememberCoroutineScope()
-    val listState = rememberLazyListState()
+    var favoriteTrigger by remember { mutableStateOf(0) }
+    val favorites = remember(favoriteTrigger) { profileManager.favoriteServers }
 
     // ЛОГИКА: Закрытие приложения после запуска (Fix "Parameter onCloseApp is never used")
     LaunchedEffect(launchState) {
@@ -100,232 +101,111 @@ fun DashboardScreen(
     }
 
     Column(Modifier.fillMaxSize().padding(16.dp)) {
-        // ПРИВЕТСТВИЕ
-        Text(
-            text = "ДОБРО ПОЖАЛОВАТЬ, ${session.playerName.uppercase()}",
-            style = MaterialTheme.typography.h5,
-            color = CelestiaTheme.colors.textPrimary.copy(alpha = 0.7f)
-        )
+
+        // --- ХЕДЕР: Приветствие и Кнопка Новостей ---
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "ДОБРО ПОЖАЛОВАТЬ, ${session.playerName.uppercase()}",
+                style = MaterialTheme.typography.h5,
+                color = CelestiaTheme.colors.textPrimary.copy(alpha = 0.7f)
+            )
+
+            // Кнопка НОВОСТИ
+            IconButton(
+                onClick = onOpenNews,
+                // Блокируем кнопку, если идет загрузка, чтобы не ломать стейт
+                enabled = launchState is LaunchState.Idle || launchState is LaunchState.Error
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.List,
+                    contentDescription = "Новости",
+                    tint = CelestiaTheme.colors.textSecondary,
+                    modifier = Modifier.size(32.dp)
+                )
+            }
+        }
 
         Spacer(Modifier.height(24.dp))
 
-        // ОСНОВНАЯ КАРТОЧКА
+        // ОСНОВНОЙ КОНТЕЙНЕР
         GlassCard(Modifier.weight(1f).fillMaxWidth()) {
-            Column(Modifier.padding(32.dp)) {
+            Column(Modifier.padding(24.dp)) {
 
-                // ИНФО О СЕРВЕРЕ
-                Box(Modifier.weight(1f)) {
-                    if (selectedServerState != null) {
-                        ServerHeader(
-                            server = selectedServerState!!,
-                            launchState = launchState,
-                            onOpenNews = onOpenNews,
-                            onSettings = { onOpenServerSettings(selectedServerState!!) }
-                        )
-                    }
-                }
-
-                // СПИСОК СЕРВЕРОВ
                 Text(
-                    "ВЫБОР СЕРВЕРА",
+                    "ДОСТУПНЫЕ СЕРВЕРЫ",
                     style = MaterialTheme.typography.caption,
                     color = CelestiaTheme.colors.textSecondary,
                     fontWeight = FontWeight.Bold
                 )
-                Spacer(Modifier.height(8.dp))
 
-                // Заменяем Box(height=60) на более гибкий контейнер
-                Box(Modifier.fillMaxWidth().height(80.dp)) { // Чуть выше
-                    LazyRow(
-                        state = listState,
-                        modifier = Modifier.fillMaxSize(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp), // Меньше отступ
-                        contentPadding = PaddingValues(bottom = 8.dp) // Отступ для скроллбара
+                Spacer(Modifier.height(16.dp))
+
+                Box(Modifier.weight(1f)) {
+                    LazyVerticalGrid(
+                        columns = GridCells.Adaptive(minSize = 180.dp),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp, start = 8.dp, end = 8.dp)
                     ) {
-                        items(servers) { srv ->
+                        val sortedServers = servers.sortedByDescending { favorites.contains(it.assetDir) }
+
+                        items(sortedServers) { srv ->
                             val isSelected = srv == selectedServerState
-                            // Более компактный чип
-                            ServerChip(srv.name, isSelected) {
-                                if (launchState is LaunchState.Idle || launchState is LaunchState.Error) {
-                                    selectedServerState = srv
-                                    onServerSelected(srv)
-                                    profileManager.lastServerId = srv.assetDir
-                                    profileManager.save()
+
+                            SquareServerCard(
+                                profile = srv,
+                                isSelected = isSelected,
+                                isFavorite = favorites.contains(srv.assetDir),
+                                onSelect = {
+                                    if (launchState is LaunchState.Idle || launchState is LaunchState.Error) {
+                                        selectedServerState = srv
+                                        onServerSelected(srv)
+                                        profileManager.lastServerId = srv.assetDir
+                                        profileManager.save()
+                                    }
+                                },
+                                onLaunch = {
+                                    if (selectedServerState != null && (launchState is LaunchState.Idle || launchState is LaunchState.Error)) {
+                                        controller.launch(session, selectedServerState!!, onSessionUpdated)
+                                    }
+                                },
+                                onSettings = { onOpenServerSettings(srv) },
+                                onDetails = { onOpenDetails(srv) },
+                                onToggleFav = {
+                                    profileManager.toggleFavorite(srv.assetDir)
+                                    favoriteTrigger++
                                 }
-                            }
+                            )
                         }
                     }
-                    HorizontalScrollbar(
-                        modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(),
-                        adapter = rememberScrollbarAdapter(listState),
-                        style = ScrollbarStyle(
-                            minimalHeight = 4.dp, thickness = 4.dp, shape = RoundedCornerShape(2.dp),
-                            hoverDurationMillis = 300,
-                            unhoverColor = CelestiaTheme.colors.surface.copy(alpha = 0.5f),
-                            hoverColor = CelestiaTheme.colors.primary
-                        )
-                    )
                 }
 
-                Spacer(Modifier.height(32.dp))
+                Spacer(Modifier.height(24.dp))
 
                 // ПАНЕЛЬ ЗАПУСКА
-                LaunchControlPanel(
-                    state = launchState,
-                    onLaunch = {
-                        if (selectedServerState != null) {
-                            controller.launch(session, selectedServerState!!, onSessionUpdated)
-                        }
-                    },
-                    onAbort = { controller.abort() },
-                    onClearError = { controller.clearError() }
-                )
-            }
-        }
-    }
-}
-
-// --- КОМПОНЕНТЫ ---
-
-@Composable
-private fun ServerHeader(
-    server: ServerProfile,
-    launchState: LaunchState,
-    onOpenNews: () -> Unit,
-    onSettings: () -> Unit
-) {
-    val isLocked = launchState !is LaunchState.Idle && launchState !is LaunchState.Error
-
-    Row(verticalAlignment = Alignment.Top) {
-        Column(Modifier.weight(1f)) {
-            Text(
-                text = server.title?.uppercase() ?: server.name,
-                style = MaterialTheme.typography.h3,
-                fontWeight = FontWeight.Black,
-                color = CelestiaTheme.colors.textPrimary
-            )
-            Spacer(Modifier.height(8.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Badge(text = "VER: ${server.version}", color = CelestiaTheme.colors.primary)
-                Spacer(Modifier.width(12.dp))
-                Badge(text = "ONLINE", color = CelestiaTheme.colors.success)
-            }
-        }
-
-        IconButton(onClick = onOpenNews, enabled = !isLocked) {
-            Icon(Icons.AutoMirrored.Filled.List, null, tint = CelestiaTheme.colors.textSecondary, modifier = Modifier.size(32.dp))
-        }
-        Spacer(Modifier.width(8.dp))
-        IconButton(onClick = onSettings, enabled = !isLocked) {
-            Icon(Icons.Default.Settings, null, tint = CelestiaTheme.colors.textSecondary, modifier = Modifier.size(32.dp))
-        }
-    }
-}
-
-@Composable
-private fun LaunchControlPanel(
-    state: LaunchState,
-    onLaunch: () -> Unit,
-    onAbort: () -> Unit,
-    onClearError: () -> Unit
-) {
-    Column(Modifier.fillMaxWidth()) {
-        // СТАТУС БАР
-        Row(Modifier.fillMaxWidth().height(20.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-            when (state) {
-                is LaunchState.Idle -> Text("Готов к игре", style = MaterialTheme.typography.caption, color = CelestiaTheme.colors.textSecondary)
-                is LaunchState.Prepare -> Text(state.stepName, style = MaterialTheme.typography.caption, color = CelestiaTheme.colors.textSecondary)
-                is LaunchState.Downloading -> {
-                    val downloadedMb = state.downloadedBytes / 1024.0 / 1024.0
-                    val totalMb = state.totalBytes / 1024.0 / 1024.0
-                    val format = DecimalFormat("#0.0")
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Загрузка: ", style = MaterialTheme.typography.caption, color = CelestiaTheme.colors.textSecondary)
-                        Text(
-                            "${format.format(downloadedMb)} / ${format.format(totalMb)} MB (${state.speedStr})",
-                            style = MaterialTheme.typography.caption,
-                            color = CelestiaTheme.colors.primary,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(16.dp))
+                        .background(Color.Black.copy(alpha = 0.2f), RoundedCornerShape(16.dp))
+                        .padding(16.dp)
+                ) {
+                    LaunchControlPanel(
+                        state = launchState,
+                        onLaunch = {
+                            if (selectedServerState != null) {
+                                controller.launch(session, selectedServerState!!, onSessionUpdated)
+                            }
+                        },
+                        onAbort = { controller.abort() },
+                        onClearError = { controller.clearError() }
+                    )
                 }
-                is LaunchState.Error -> Text(state.message, style = MaterialTheme.typography.caption, color = CelestiaTheme.colors.error)
-                is LaunchState.GameRunning -> Text("Игра запущена", style = MaterialTheme.typography.caption, color = CelestiaTheme.colors.success)
             }
         }
-
-        Spacer(Modifier.height(4.dp))
-
-        // ПРОГРЕСС БАР
-        val progress = when(state) {
-            is LaunchState.Prepare -> state.progress
-            is LaunchState.Downloading -> state.progress
-            is LaunchState.GameRunning -> 1.0f
-            else -> 0f
-        }
-
-        if (state !is LaunchState.Idle && state !is LaunchState.Error) {
-            LinearProgressIndicator(
-                progress = progress,
-                modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
-                backgroundColor = CelestiaTheme.colors.surface,
-                color = CelestiaTheme.colors.primary
-            )
-        } else {
-            Spacer(Modifier.height(6.dp))
-        }
-
-        Spacer(Modifier.height(16.dp))
-
-        // КНОПКА ДЕЙСТВИЯ
-        val btnText = when (state) {
-            is LaunchState.Downloading, is LaunchState.Prepare -> "ОТМЕНА"
-            is LaunchState.GameRunning -> "ЗАПУЩЕНО"
-            is LaunchState.Error -> "СБРОСИТЬ ОШИБКУ" // Кнопка меняется при ошибке
-            else -> "ИГРАТЬ"
-        }
-
-        CelestiaButton(
-            text = btnText,
-            enabled = state !is LaunchState.GameRunning,
-            onClick = {
-                when (state) {
-                    is LaunchState.Downloading, is LaunchState.Prepare -> onAbort()
-                    is LaunchState.Error -> onClearError()
-                    else -> onLaunch()
-                }
-            },
-            modifier = Modifier.fillMaxWidth().height(60.dp)
-        )
-    }
-}
-
-@Composable
-fun Badge(text: String, color: Color) {
-    Box(modifier = Modifier.border(1.dp, color.copy(alpha = 0.5f), RoundedCornerShape(4.dp)).padding(horizontal = 8.dp, vertical = 2.dp)) {
-        Text(text, style = MaterialTheme.typography.overline, color = color)
-    }
-}
-
-@Composable
-fun ServerChip(name: String, isSelected: Boolean, onClick: () -> Unit) {
-    val backgroundColor = if (isSelected) CelestiaTheme.colors.primary else CelestiaTheme.colors.surface
-    val contentColor = if (isSelected) Color.White else CelestiaTheme.colors.textPrimary
-
-    Box(
-        modifier = Modifier
-            .height(32.dp) // Было 40, стало компактнее
-            .clip(RoundedCornerShape(8.dp)) // Меньше скругление
-            .background(backgroundColor)
-            .clickable { onClick() }
-            .padding(horizontal = 16.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = name,
-            color = contentColor,
-            fontWeight = FontWeight.SemiBold,
-            style = MaterialTheme.typography.caption // Меньший шрифт
-        )
     }
 }
