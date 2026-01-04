@@ -38,11 +38,6 @@ object SkinManager {
         isAntiAlias = false
     }
 
-    fun invalidate() {
-        frontCache.clear()
-        backCache.clear()
-    }
-
     fun invalidate(nickname: String) {
         frontCache.remove(nickname)
         backCache.remove(nickname)
