@@ -4,16 +4,15 @@ import hivens.config.AppConfig
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.InstanceProfile
 import hivens.core.data.SessionData
+import org.slf4j.LoggerFactory
 import java.io.File
 import java.nio.file.Path
 
 /**
  * Фабрика командной строки процесса (Process Command Factory).
- *
- * Инкапсулирует логику трансляции профиля сервера и настроек пользователя
- * в линейный список аргументов для запуска JVM.
  */
 internal class GameCommandBuilder {
+    private val logger = LoggerFactory.getLogger(GameCommandBuilder::class.java)
 
     /**
      * Immutable-конфигурация версии.
@@ -115,14 +114,17 @@ internal class GameCommandBuilder {
 
         // 5. NeoForge Environment (1.21+)
         if (config.assetIndex == "1.21.1") {
-            val libDir = clientRoot.resolve("libraries-1.21.1")
+            val libDirStandard = clientRoot.resolve("libraries")
+            val libDirCustom = clientRoot.resolve("libraries-1.21.1")
+            val libDir = if (libDirCustom.resolve("cpw").toFile().exists()) libDirCustom else libDirStandard
+
             args.add("-Djna.tmpdir=" + nativesPath.toAbsolutePath())
             args.add("-Dorg.lwjgl.system.SharedLibraryExtractPath=" + nativesPath.toAbsolutePath())
             args.add("-Dio.netty.native.workdir=" + nativesPath.toAbsolutePath())
             args.add("-DlibraryDirectory=" + libDir.toAbsolutePath())
 
-            // Module Exclusion List
-            val ignoreList = "securejarhandler-3.0.8.jar,asm-9.7.jar,asm-commons-9.7.jar,asm-tree-9.7.jar,asm-util-9.7.jar,asm-analysis-9.7.jar,bootstraplauncher-2.0.2.jar,JarJarFileSystems-0.4.1.jar,client-extra,neoforge-,neoforge-21.1.504.jar"
+            // FIX: Добавил "client" в начало списка игнорируемых модулей
+            val ignoreList = "client,securejarhandler-3.0.8.jar,asm-9.7.jar,asm-commons-9.7.jar,asm-tree-9.7.jar,asm-util-9.7.jar,asm-analysis-9.7.jar,bootstraplauncher-2.0.2.jar,JarJarFileSystems-0.4.1.jar,client-extra,neoforge-,neoforge-21.1.504.jar"
             args.add("-DignoreList=$ignoreList")
             args.add("-DmergeModules=jna-5.10.0.jar,jna-platform-5.10.0.jar")
         }
@@ -138,14 +140,23 @@ internal class GameCommandBuilder {
         // 7. Java 9+ Module Path (NeoForge)
         if (config.assetIndex == "1.21.1") {
             val modules = getNeoForgeModules()
-            val libDir = clientRoot.resolve("libraries-1.21.1")
+            val libDirStandard = clientRoot.resolve("libraries")
+            val libDirCustom = clientRoot.resolve("libraries-1.21.1")
+            val libDir = if (libDirCustom.resolve("cpw").toFile().exists()) libDirCustom else libDirStandard
+
             val validModules = modules.map { libDir.resolve(it) }
-                .filter { it.toFile().exists() }
+                .filter {
+                    val exists = it.toFile().exists()
+                    if (!exists) logger.warn("Module missing: $it")
+                    exists
+                }
                 .map { it.toAbsolutePath().toString() }
-            
+
             if (validModules.isNotEmpty()) {
                 args.add("-p")
                 args.add(java.lang.String.join(File.pathSeparator, validModules))
+            } else {
+                logger.error("CRITICAL: No NeoForge modules found in $libDir!")
             }
         }
 
@@ -165,11 +176,8 @@ internal class GameCommandBuilder {
 
         return args
     }
-    
-    /**
-     * Список модулей для `--module-path`.
-     */
-    fun getNeoForgeModules(): List<String> = listOf(
+
+    private fun getNeoForgeModules(): List<String> = listOf(
         "cpw/mods/securejarhandler/3.0.8/securejarhandler-3.0.8.jar",
         "org/ow2/asm/asm/9.7/asm-9.7.jar",
         "org/ow2/asm/asm-commons/9.7/asm-commons-9.7.jar",
