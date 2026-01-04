@@ -42,6 +42,9 @@ kotlin {
                 implementation(project(":client-core"))
                 implementation(project(":client-launcher"))
 
+                implementation("io.github.vinceglb:filekit-core:0.12.0")
+                implementation("io.github.vinceglb:filekit-dialogs-compose:0.12.0")
+
                 // Koin для Desktop
                 implementation("io.insert-koin:koin-core:3.5.3")
                 implementation("io.insert-koin:koin-compose:1.1.2")

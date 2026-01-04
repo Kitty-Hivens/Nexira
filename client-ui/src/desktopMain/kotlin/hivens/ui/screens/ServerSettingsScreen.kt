@@ -2,39 +2,43 @@ package hivens.ui.screens
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import hivens.core.api.interfaces.IManifestProcessorService
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.InstanceProfile
 import hivens.core.data.OptionalMod
-import hivens.core.api.interfaces.IManifestProcessorService
 import hivens.launcher.ProfileManager
 import hivens.ui.components.CelestiaButton
 import hivens.ui.components.GlassCard
 import hivens.ui.theme.CelestiaTheme
+import io.github.vinceglb.filekit.FileKit
+import io.github.vinceglb.filekit.dialogs.FileKitMode
+import io.github.vinceglb.filekit.dialogs.FileKitType
+import io.github.vinceglb.filekit.dialogs.openFilePicker
+import io.github.vinceglb.filekit.path
+import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import java.awt.Desktop
-import java.io.File
 import java.nio.file.Path
-import javax.swing.JFrame
 import kotlin.math.roundToInt
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
     val profileManager: ProfileManager = koinInject()
@@ -43,20 +47,19 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
 
     var mods by remember { mutableStateOf<List<OptionalMod>>(emptyList()) }
     var profile by remember { mutableStateOf<InstanceProfile?>(null) }
+
     var javaPath by remember { mutableStateOf("") }
     var memory by remember { mutableStateOf(4096f) }
-    var useCustomJava by remember { mutableStateOf(false) }
-    val modStates = remember { mutableStateMapOf<String, Boolean>() }
 
+    val modStates = remember { mutableStateMapOf<String, Boolean>() }
     var modsLoaded by remember { mutableStateOf(false) }
+
+    val scope = rememberCoroutineScope() // Нужен для запуска FileKit
 
     LaunchedEffect(server) {
         val p = profileManager.getProfile(server.assetDir)
         profile = p
-        if (!p.javaPath.isNullOrEmpty()) {
-            javaPath = p.javaPath!!
-            useCustomJava = true
-        }
+        javaPath = p.javaPath ?: ""
         if (p.memoryMb > 0) memory = p.memoryMb.toFloat()
 
         val loadedMods = manifestProcessorService.getOptionalModsForClient(server)
@@ -69,12 +72,23 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
 
     fun saveProfile() {
         profile?.let { p ->
-            p.javaPath = if (useCustomJava && javaPath.isNotBlank()) javaPath else null
+            p.javaPath = javaPath.ifBlank { null }
             p.memoryMb = memory.roundToInt()
             modStates.forEach { (id, state) -> p.optionalModsState[id] = state }
             profileManager.saveProfile(p)
         }
     }
+
+    val recommendedJavaLabel = remember(server.version) {
+        val ver = server.version
+        when {
+            ver.startsWith("1.2") -> "Java 21"
+            ver.startsWith("1.17") || ver.startsWith("1.18") || ver.startsWith("1.19") || ver.startsWith("1.20") -> "Java 17"
+            else -> "Java 8"
+        }
+    }
+
+    val borderColor = CelestiaTheme.colors.textSecondary.copy(alpha = 0.2f)
 
     Column(Modifier.fillMaxSize().padding(24.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -98,48 +112,64 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
 
                     Text("ОЗУ: ${memory.roundToInt()} MB", color = CelestiaTheme.colors.textSecondary)
                     Slider(
-                        value = memory, onValueChange = { memory = it }, valueRange = 1024f..16384f, steps = 14,
-                        colors = SliderDefaults.colors(thumbColor = CelestiaTheme.colors.primary, activeTrackColor = CelestiaTheme.colors.primary)
+                        value = memory,
+                        onValueChange = { memory = it },
+                        valueRange = 1024f..16384f,
+                        steps = 30,
+                        colors = SliderDefaults.colors(
+                            thumbColor = CelestiaTheme.colors.primary,
+                            activeTrackColor = CelestiaTheme.colors.primary,
+                            inactiveTrackColor = borderColor
+                        )
                     )
 
                     Spacer(Modifier.height(24.dp))
-                    Divider(color = CelestiaTheme.colors.border)
+                    Divider(color = borderColor)
                     Spacer(Modifier.height(24.dp))
 
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(
-                            checked = useCustomJava, onCheckedChange = { useCustomJava = it },
-                            colors = CheckboxDefaults.colors(checkedColor = CelestiaTheme.colors.primary)
-                        )
-                        Text("Своя версия Java", color = CelestiaTheme.colors.textPrimary)
-                    }
+                    Text("Версия Java", color = CelestiaTheme.colors.textPrimary, style = MaterialTheme.typography.body2)
+                    Spacer(Modifier.height(8.dp))
 
-                    if (useCustomJava) {
-                        Spacer(Modifier.height(8.dp))
-                        OutlinedTextField(
-                            value = javaPath, onValueChange = { javaPath = it },
-                            label = { Text("Путь к java.exe") }, modifier = Modifier.fillMaxWidth(),
-                            trailingIcon = {
-                                IconButton(onClick = {
-                                    val file = pickExecutable("Выберите Java Executable")
-                                    if (file != null) javaPath = file.absolutePath
-                                }) { Icon(Icons.Default.Edit, null, tint = CelestiaTheme.colors.textSecondary) }
-                            },
-                            colors = TextFieldDefaults.outlinedTextFieldColors(
-                                textColor = CelestiaTheme.colors.textPrimary,
-                                focusedBorderColor = CelestiaTheme.colors.primary,
-                                unfocusedBorderColor = CelestiaTheme.colors.border
-                            )
-                        )
-                    } else {
-                        val autoJavaLabel = server.version.let { ver ->
-                            when {
-                                ver.startsWith("1.2") -> "Java 21"
-                                ver.startsWith("1.17") || ver.startsWith("1.18") || ver.startsWith("1.19") || ver.startsWith("1.20") -> "Java 17"
-                                else -> "Java 8"
+                    OutlinedTextField(
+                        value = javaPath,
+                        onValueChange = { javaPath = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .onFocusChanged { it.isFocused },
+                        placeholder = {
+                            Text("Автоматически ($recommendedJavaLabel)", color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.5f))
+                        },
+                        singleLine = true,
+                        colors = TextFieldDefaults.outlinedTextFieldColors(
+                            textColor = CelestiaTheme.colors.textPrimary,
+                            cursorColor = CelestiaTheme.colors.primary,
+                            focusedBorderColor = CelestiaTheme.colors.primary,
+                            unfocusedBorderColor = borderColor,
+                            backgroundColor = Color.Transparent
+                        ),
+                        trailingIcon = {
+                            IconButton(onClick = {
+                                scope.launch {
+                                    val file = FileKit.openFilePicker(
+                                        type = FileKitType.File(extensions = listOf("exe", "bin")),
+                                        mode = FileKitMode.Single,
+                                        title = "Выберите Java"
+                                    )
+                                    file?.path?.let { javaPath = it }
+                                }
+                            }) {
+                                Icon(Icons.Default.Folder, null, tint = CelestiaTheme.colors.primary)
                             }
                         }
-                        Text("Автоматическая Java ($autoJavaLabel)", style = MaterialTheme.typography.caption, color = CelestiaTheme.colors.textSecondary)
+                    )
+
+                    if (javaPath.isEmpty()) {
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "Оставьте пустым для использования встроенной Java",
+                            style = MaterialTheme.typography.caption,
+                            color = CelestiaTheme.colors.textSecondary
+                        )
                     }
 
                     Spacer(Modifier.weight(1f))
@@ -202,67 +232,87 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ModItemRow(mod: OptionalMod, isChecked: Boolean, onToggle: (Boolean) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
 
     val backgroundColor by animateColorAsState(
-        targetValue = if (isChecked) CelestiaTheme.colors.primary.copy(alpha = 0.2f) else CelestiaTheme.colors.background.copy(alpha = 0.5f),
+        targetValue = if (isChecked) CelestiaTheme.colors.primary.copy(alpha = 0.15f) else CelestiaTheme.colors.background.copy(alpha = 0.3f),
         animationSpec = tween(300)
     )
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .background(backgroundColor)
-            .clickable { onToggle(!isChecked) }
-            .padding(12.dp)
-            .animateContentSize()
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Checkbox(
-                checked = isChecked,
-                onCheckedChange = null,
-                colors = CheckboxDefaults.colors(checkedColor = CelestiaTheme.colors.primary)
-            )
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text(mod.name, style = MaterialTheme.typography.body2, color = CelestiaTheme.colors.textPrimary)
-            }
+    val borderColor = if (isChecked) CelestiaTheme.colors.primary.copy(alpha = 0.5f) else Color.Transparent
 
+    TooltipArea(
+        tooltip = {
             if (!mod.description.isNullOrEmpty()) {
-                IconButton(
-                    onClick = { expanded = !expanded },
-                    modifier = Modifier.size(24.dp)
+                Surface(
+                    color = Color.Black.copy(alpha = 0.9f),
+                    shape = RoundedCornerShape(8.dp),
+                    elevation = 4.dp,
+                    modifier = Modifier.padding(10.dp).widthIn(max = 300.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Info,
-                        contentDescription = "Info",
-                        tint = if (expanded) CelestiaTheme.colors.primary else CelestiaTheme.colors.textSecondary
+                    Text(
+                        text = mod.description!!,
+                        color = Color.White,
+                        modifier = Modifier.padding(12.dp),
+                        style = MaterialTheme.typography.caption
                     )
                 }
             }
-        }
+        },
+        delayMillis = 600
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .background(backgroundColor)
+                .border(1.dp, borderColor, RoundedCornerShape(8.dp))
+                .clickable { onToggle(!isChecked) }
+                .padding(12.dp)
+                .animateContentSize()
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(
+                    checked = isChecked,
+                    onCheckedChange = null,
+                    colors = CheckboxDefaults.colors(
+                        checkedColor = CelestiaTheme.colors.primary,
+                        uncheckedColor = CelestiaTheme.colors.textSecondary.copy(alpha = 0.5f)
+                    )
+                )
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(mod.name, style = MaterialTheme.typography.body2, color = CelestiaTheme.colors.textPrimary)
+                }
 
-        if (expanded && !mod.description.isNullOrEmpty()) {
-            Spacer(Modifier.height(8.dp))
-            Divider(color = CelestiaTheme.colors.border.copy(alpha = 0.3f))
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = mod.description!!,
-                style = MaterialTheme.typography.caption,
-                color = CelestiaTheme.colors.textSecondary,
-                modifier = Modifier.padding(start = 32.dp)
-            )
+                if (!mod.description.isNullOrEmpty()) {
+                    IconButton(
+                        onClick = { expanded = !expanded },
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = "Info",
+                            tint = if (expanded) CelestiaTheme.colors.primary else CelestiaTheme.colors.textSecondary.copy(alpha = 0.5f)
+                        )
+                    }
+                }
+            }
+
+            if (expanded && !mod.description.isNullOrEmpty()) {
+                Spacer(Modifier.height(8.dp))
+                Divider(color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.2f))
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = mod.description!!,
+                    style = MaterialTheme.typography.caption,
+                    color = CelestiaTheme.colors.textSecondary,
+                    modifier = Modifier.padding(start = 32.dp)
+                )
+            }
         }
     }
-}
-
-private fun pickExecutable(title: String): File? {
-    val dialog = java.awt.FileDialog(null as JFrame?, title, java.awt.FileDialog.LOAD)
-    dialog.isVisible = true
-    return if (dialog.directory != null && dialog.file != null) File(dialog.directory, dialog.file) else null
 }

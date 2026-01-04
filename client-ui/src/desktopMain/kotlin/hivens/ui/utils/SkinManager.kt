@@ -1,155 +1,251 @@
 package hivens.ui.utils
 
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.toComposeImageBitmap
-import hivens.config.AppConfig
+import androidx.compose.ui.graphics.asComposeImageBitmap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.awt.image.BufferedImage
-import java.util.concurrent.ConcurrentHashMap
-import javax.imageio.ImageIO
+import org.jetbrains.skia.ColorAlphaType
+import org.jetbrains.skia.ImageInfo
+import java.io.ByteArrayOutputStream
+import java.net.HttpURLConnection
+import java.net.URL
 
+/**
+ * Менеджер скинов для SmartyCraft.
+ * Логика рендеринга адаптирована под h.java из исходников лаунчера.
+ */
 object SkinManager {
-    private const val OUTPUT_SCALE = 8
-    private val cacheBusters = ConcurrentHashMap<String, Long>()
-    private val memoryCache = ConcurrentHashMap<String, ImageBitmap>()
+    private const val BASE_SKIN_URL = "https://www.smartycraft.ru/skins/"
+    private const val BASE_CLOAK_URL = "https://www.smartycraft.ru/cloaks/"
 
-    fun invalidate(username: String) {
-        cacheBusters[username] = System.currentTimeMillis()
-        memoryCache.remove(username)
-        memoryCache.remove("${username}_front")
-        memoryCache.remove("${username}_back")
+    private val frontCache = mutableMapOf<String, ImageBitmap>()
+    private val backCache = mutableMapOf<String, ImageBitmap>()
+
+    // Режим для обычных скинов (64x32/64x64) - Пиксельная четкость (как в Minecraft)
+    private val samplingNearest = org.jetbrains.skia.FilterMipmap(
+        org.jetbrains.skia.FilterMode.NEAREST,
+        org.jetbrains.skia.MipmapMode.NONE
+    )
+
+    // Режим для HD скинов (>64px) - Линейное сглаживание (убирает "шум" и рябь)
+    private val samplingLinear = org.jetbrains.skia.FilterMipmap(
+        org.jetbrains.skia.FilterMode.LINEAR,
+        org.jetbrains.skia.MipmapMode.NONE
+    )
+
+    // Paint без антиалиасинга для четких границ деталей
+    private val paint = org.jetbrains.skia.Paint().apply {
+        isAntiAlias = false
     }
 
-    suspend fun getSkinFront(username: String): ImageBitmap? = withContext(Dispatchers.IO) {
-        getOrLoadAssembled(username, false)
+    fun invalidate() {
+        frontCache.clear()
+        backCache.clear()
     }
 
-    suspend fun getSkinBack(username: String): ImageBitmap? = withContext(Dispatchers.IO) {
-        getOrLoadAssembled(username, true)
+    fun invalidate(nickname: String) {
+        frontCache.remove(nickname)
+        backCache.remove(nickname)
     }
 
-    private fun getOrLoadAssembled(username: String, backView: Boolean): ImageBitmap? {
-        val cacheKey = "${username}_${if (backView) "back" else "front"}"
-        if (memoryCache.containsKey(cacheKey)) return memoryCache[cacheKey]
+    suspend fun getSkinFront(nickname: String): ImageBitmap? = withContext(Dispatchers.IO) {
+        if (frontCache.containsKey(nickname)) return@withContext frontCache[nickname]
 
-        val rawImage = downloadSkin(username) ?: return null
-        val assembled = assemble(rawImage, backView) ?: return null
+        val rawSkin = downloadTexture("$BASE_SKIN_URL$nickname.png") ?: return@withContext null
+        val processed = assembleSkin(rawSkin, isFront = true, cloak = null)
 
-        val composeBitmap = assembled.toComposeImageBitmap()
-        memoryCache[cacheKey] = composeBitmap
-        return composeBitmap
+        val result = processed.asComposeImageBitmap()
+        frontCache[nickname] = result
+        return@withContext result
     }
 
-    private fun downloadSkin(username: String): BufferedImage? {
+    suspend fun getSkinBack(nickname: String, cloakHash: String? = null): ImageBitmap? = withContext(Dispatchers.IO) {
+        // Ключ кеша должен учитывать плащ, но для UI профиля пока хватит ника
+        if (backCache.containsKey(nickname)) return@withContext backCache[nickname]
+
+        val rawSkin = downloadTexture("$BASE_SKIN_URL$nickname.png") ?: return@withContext null
+
+        // Логика плащей SmartyCraft: приоритет хешу, иначе пробуем по нику
+        val cloakUrl = if (!cloakHash.isNullOrEmpty()) {
+            "$BASE_CLOAK_URL$cloakHash.png"
+        } else {
+            "$BASE_CLOAK_URL$nickname.png"
+        }
+        val rawCloak = downloadTexture(cloakUrl)
+
+        val processed = assembleSkin(rawSkin, isFront = false, cloak = rawCloak)
+
+        val result = processed.asComposeImageBitmap()
+        backCache[nickname] = result
+        return@withContext result
+    }
+
+    private fun downloadTexture(url: String): org.jetbrains.skia.Image? {
         return try {
-            var urlStr = "${AppConfig.SKINS_URL}$username.png"
-            if (cacheBusters.containsKey(username)) {
-                urlStr += "?t=${cacheBusters[username]}"
+            val conn = URL(url).openConnection() as HttpURLConnection
+            conn.connectTimeout = 3000
+            conn.readTimeout = 3000
+            conn.setRequestProperty("User-Agent", "Mozilla/5.0") // Притворяемся браузером
+            if (conn.responseCode != 200) return null
+
+            val bytes = conn.inputStream.use { input ->
+                val out = ByteArrayOutputStream()
+                input.copyTo(out)
+                out.toByteArray()
             }
-            val url = java.net.URI.create(urlStr).toURL()
-            ImageIO.read(url)
-        } catch (_: Exception) {
+            org.jetbrains.skia.Image.makeFromEncoded(bytes)
+        } catch (e: Exception) {
             null
         }
     }
 
-    // Логика смешной нарезки скинь а
-    private fun assemble(skin: BufferedImage, backView: Boolean): BufferedImage? {
-        val w = skin.width
-        val h = skin.height
-        if (w == 0 || h == 0) return null
+    /**
+     * Сборка скина из кусочков.
+     * Координаты и зеркалирование соответствуют h.java.
+     */
+    private fun assembleSkin(
+        skin: org.jetbrains.skia.Image,
+        isFront: Boolean,
+        cloak: org.jetbrains.skia.Image?
+    ): org.jetbrains.skia.Bitmap {
+        val viewW = 160
+        val viewH = 320
 
-        val is64x64 = (h == w)
-        val finalW = 16 * OUTPUT_SCALE
-        val finalH = 32 * OUTPUT_SCALE
+        val output = org.jetbrains.skia.Bitmap()
+        output.allocPixels(ImageInfo.makeS32(viewW, viewH, ColorAlphaType.PREMUL))
+        val canvas = org.jetbrains.skia.Canvas(output)
 
-        val dest = BufferedImage(finalW, finalH, BufferedImage.TYPE_INT_ARGB)
-        val g = dest.graphics
+        val w = skin.width.toFloat()
+        val h = skin.height.toFloat()
 
-        // Вспомогательная функция для рисования части тела
-        fun drawLimb(sx: Int, sy: Int, sw: Int, sh: Int, dx: Int, dy: Int, flipX: Boolean) {
-            val ratio = w / 64.0
-            val actualSX = (sx * ratio).toInt()
-            val actualSY = (sy * ratio).toInt()
-            val actualSW = (sw * ratio).toInt()
-            val actualSH = (sh * ratio).toInt()
+        // Определение формата (HD / Legacy)
+        val isHD = w > 64
+        val k = w / 64f
+        val isLegacy = h == 32f * k // Старый формат 64x32
 
-            // Вырезаем кусок
-            var part = skin.getSubimage(actualSX, actualSY, actualSW, actualSH)
+        // Ширина руки (4px Steve, 3px Alex). h.java считает все Modern скины тонкими,
+        // но для универсальности оставим 4px как дефолт.
+        val armW = 4f
+        val scale = 10f
 
-            // Масштабируем до целевого размера
-            val destW = sw * OUTPUT_SCALE
-            val destH = sh * OUTPUT_SCALE
+        // Выбор режима сглаживания
+        val samplingMode = if (isHD) samplingLinear else samplingNearest
 
-            // Если нужно отразить (Flip X)
-            if (flipX) {
-                val tx = java.awt.geom.AffineTransform.getScaleInstance(-1.0, 1.0)
-                tx.translate(-part.width.toDouble(), 0.0)
-                val op = java.awt.image.AffineTransformOp(tx, java.awt.image.AffineTransformOp.TYPE_NEAREST_NEIGHBOR)
-                part = op.filter(part, null)
+        // Функция отрисовки части текстуры
+        fun drawPart(
+            srcX: Float, srcY: Float, srcW: Float, srcH: Float,
+            dstX: Float, dstY: Float, dstW: Float, dstH: Float,
+            mirror: Boolean = false
+        ) {
+            val srcRect = org.jetbrains.skia.Rect.makeXYWH(srcX * k, srcY * k, srcW * k, srcH * k)
+            val dstRect = org.jetbrains.skia.Rect.makeXYWH(dstX * scale, dstY * scale, dstW * scale, dstH * scale)
+
+            if (mirror) {
+                canvas.save()
+                // Зеркалирование относительно центра целевого прямоугольника
+                val centerX = dstRect.left + dstRect.width / 2
+                canvas.translate(centerX, 0f)
+                canvas.scale(-1f, 1f)
+                canvas.translate(-centerX, 0f)
+                canvas.drawImageRect(skin, srcRect, dstRect, samplingMode, paint, true)
+                canvas.restore()
+            } else {
+                canvas.drawImageRect(skin, srcRect, dstRect, samplingMode, paint, true)
             }
-
-            g.drawImage(part, dx * OUTPUT_SCALE, dy * OUTPUT_SCALE, destW, destH, null)
         }
 
-        if (!backView) {
-            drawLimb(8, 8, 8, 8, 4, 0, false)   // Head
-            drawLimb(40, 8, 8, 8, 4, 0, false)  // Hat (Accessory)
-            drawLimb(20, 20, 8, 12, 4, 8, false) // Body
-            if (is64x64) drawLimb(20, 36, 8, 12, 4, 8, false) // Body Layer 2
+        // --- 1. ГОЛОВА (Head) ---
+        val headSrcX = if (isFront) 8f else 24f
+        drawPart(headSrcX, 8f, 8f, 8f, 4f, 0f, 8f, 8f)
 
-            drawLimb(44, 20, 4, 12, 0, 8, false) // Right Arm
-            if (is64x64) drawLimb(44, 36, 4, 12, 0, 8, false)
+        // Шлем / Аксессуар (Helm)
+        val helmSrcX = if (isFront) 40f else 56f
+        drawPart(helmSrcX, 8f, 8f, 8f, 4f, 0f, 8f, 8f)
 
-            // Left Arm
-            if (is64x64) {
-                drawLimb(36, 52, 4, 12, 12, 8, false)
-                drawLimb(52, 52, 4, 12, 12, 8, false)
+        // --- 2. ТЕЛО (Body) ---
+        val bodySrcX = if (isFront) 20f else 32f
+        drawPart(bodySrcX, 20f, 8f, 12f, 4f, 8f, 8f, 12f)
+
+        if (!isLegacy) {
+            val body2SrcX = if (isFront) 20f else 32f
+            drawPart(body2SrcX, 36f, 8f, 12f, 4f, 8f, 8f, 12f)
+        }
+
+        // --- 3. РУКИ (Arms) ---
+        if (isFront) {
+            // Вид спереди: Правая рука (слева на экране), Левая (справа)
+            drawPart(44f, 20f, armW, 12f, 4f - armW, 8f, armW, 12f) // Right Arm Front
+
+            val dstXLeft = 12f
+            if (isLegacy) {
+                // Левая рука = Зеркальная правая
+                drawPart(44f, 20f, armW, 12f, dstXLeft, 8f, armW, 12f, mirror = true)
             } else {
-                drawLimb(44, 20, 4, 12, 12, 8, true) // Flip for 1.7 skins
-            }
-
-            drawLimb(4, 20, 4, 12, 4, 20, false) // Right Leg
-            if (is64x64) drawLimb(4, 36, 4, 12, 4, 20, false)
-
-            // Left Leg
-            if (is64x64) {
-                drawLimb(20, 52, 4, 12, 8, 20, false)
-                drawLimb(4, 52, 4, 12, 8, 20, false)
-            } else {
-                drawLimb(4, 20, 4, 12, 8, 20, true)
+                drawPart(36f, 52f, armW, 12f, dstXLeft, 8f, armW, 12f) // Left Arm Front
+                drawPart(52f, 52f, armW, 12f, dstXLeft, 8f, armW, 12f) // Overlay
+                drawPart(44f, 36f, armW, 12f, 4f - armW, 8f, armW, 12f) // Right Overlay
             }
         } else {
-            // BACK VIEW
-            drawLimb(24, 8, 8, 8, 4, 0, false)   // Head Back
-            drawLimb(56, 8, 8, 8, 4, 0, false)   // Hat Back
+            // Вид сзади: Левая рука (слева на экране), Правая (справа)
+            val dstXRight = 12f // Screen Right -> Character Right Arm Back
+            val dstXLeft = 4f - armW // Screen Left -> Character Left Arm Back
 
-            drawLimb(32, 20, 8, 12, 4, 8, false) // Body Back
-            if (is64x64) drawLimb(32, 36, 8, 12, 4, 8, false)
+            // Right Arm Back (Texture 52,20)
+            drawPart(52f, 20f, armW, 12f, dstXRight, 8f, armW, 12f)
+            if (!isLegacy) drawPart(52f, 36f, armW, 12f, dstXRight, 8f, armW, 12f)
 
-            drawLimb(52, 20, 4, 12, 12, 8, false) // Right Arm Back
-            if (is64x64) drawLimb(52, 36, 4, 12, 12, 8, false)
-
-            if (is64x64) {
-                drawLimb(44, 52, 4, 12, 0, 8, false) // Left Arm Back
-                drawLimb(60, 52, 4, 12, 0, 8, false)
+            // Left Arm Back
+            if (isLegacy) {
+                // Зеркалим Right Arm Back для левой руки
+                drawPart(52f, 20f, armW, 12f, dstXLeft, 8f, armW, 12f, mirror = true)
             } else {
-                drawLimb(52, 20, 4, 12, 0, 8, true)
-            }
-
-            drawLimb(12, 20, 4, 12, 8, 20, false) // Right Leg Back
-            if (is64x64) drawLimb(12, 36, 4, 12, 8, 20, false)
-
-            if (is64x64) {
-                drawLimb(28, 52, 4, 12, 4, 20, false) // Left Leg Back
-                drawLimb(12, 52, 4, 12, 4, 20, false)
-            } else {
-                drawLimb(12, 20, 4, 12, 4, 20, true)
+                drawPart(44f, 52f, armW, 12f, dstXLeft, 8f, armW, 12f) // Left Arm Back
+                drawPart(60f, 52f, armW, 12f, dstXLeft, 8f, armW, 12f) // Overlay
             }
         }
 
-        g.dispose()
-        return dest
+        // --- 4. НОГИ (Legs) ---
+        // Right Leg (Texture 0,20 / 12,20)
+        if (isFront) {
+            drawPart(4f, 20f, 4f, 12f, 4f, 20f, 4f, 12f) // Front
+            if (!isLegacy) drawPart(4f, 36f, 4f, 12f, 4f, 20f, 4f, 12f)
+        } else {
+            // Back View: Рисуем Right Leg (12,20) справа на экране
+            drawPart(12f, 20f, 4f, 12f, 8f, 20f, 4f, 12f)
+            if (!isLegacy) drawPart(12f, 36f, 4f, 12f, 8f, 20f, 4f, 12f)
+        }
+
+        // Left Leg
+        if (isLegacy) {
+            // Зеркалим правую ногу
+            if (isFront) drawPart(4f, 20f, 4f, 12f, 8f, 20f, 4f, 12f, mirror = true)
+            else drawPart(12f, 20f, 4f, 12f, 4f, 20f, 4f, 12f, mirror = true) // Back View Mirror
+        } else {
+            if (isFront) {
+                drawPart(20f, 52f, 4f, 12f, 8f, 20f, 4f, 12f)
+                drawPart(4f, 52f, 4f, 12f, 8f, 20f, 4f, 12f)
+            } else {
+                drawPart(28f, 52f, 4f, 12f, 4f, 20f, 4f, 12f)
+                drawPart(12f, 52f, 4f, 12f, 4f, 20f, 4f, 12f)
+            }
+        }
+
+        // --- 5. ПЛАЩ (Cloak) ---
+        // Рисуем в самом конце, чтобы он перекрывал тело и руки (как рюкзак)
+        if (!isFront && cloak != null) {
+            val kCloak = cloak.width.toFloat() / 64f
+            val isCloakHD = cloak.width > 64
+            // Плащ может быть HD, даже если скин обычный
+            val cloakSampling = if (isCloakHD) samplingLinear else samplingNearest
+
+            // ВАЖНО: h.java использует координаты (1,1) (Front) для спины плаща.
+            // Стандартный (12,1) там не используется.
+            val cloakSrc = org.jetbrains.skia.Rect.makeXYWH(1f * kCloak, 1f * kCloak, 10f * kCloak, 16f * kCloak)
+            val cloakDst = org.jetbrains.skia.Rect.makeXYWH(3f * scale, 8f * scale, 10f * scale, 16f * scale)
+
+            canvas.drawImageRect(cloak, cloakSrc, cloakDst, cloakSampling, paint, true)
+        }
+
+        return output
     }
 }

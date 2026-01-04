@@ -43,7 +43,7 @@ import hivens.launcher.di.appModule
 import hivens.launcher.di.networkModule
 import hivens.ui.components.GlassCard
 import hivens.ui.components.SeasonalEffectsLayer
-import hivens.ui.logic.LaunchUseCase
+import hivens.ui.logic.LauncherController
 import hivens.ui.screens.*
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.utils.GameConsoleService
@@ -63,7 +63,7 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 val uiModule = module {
-    singleOf(::LaunchUseCase)
+    singleOf(::LauncherController)
 }
 
 sealed class AppState {

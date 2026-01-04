@@ -33,6 +33,6 @@ interface IFileDownloadService {
         extraCheckSum: String?,
         ignoredFiles: Set<String>?,
         messageUI: ((String) -> Unit)?,
-        progressUI: ((Int, Int) -> Unit)?
+        progressUI: ((Int, Int, Long, Long, String) -> Unit)?
     )
 }
