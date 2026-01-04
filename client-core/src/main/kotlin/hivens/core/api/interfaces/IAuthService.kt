@@ -21,5 +21,5 @@ interface IAuthService {
      * @throws IOException в случае сетевых ошибок (I/O, таймауты, DNS).
      */
     @Throws(AuthException::class, IOException::class)
-    fun login(username: String, password: String, serverId: String): SessionData
+    suspend fun login(username: String, password: String, serverId: String): SessionData
 }

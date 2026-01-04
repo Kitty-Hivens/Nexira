@@ -20,7 +20,6 @@ object AppConfig {
     const val BASE_URL = "https://www.smartycraft.ru"
     const val AUTH_URL = "$BASE_URL/launcher2/index.php"
     const val OFFICIAL_JAR_URL = "$BASE_URL/downloads/smartycraft.jar"
-    const val SKINS_URL = "$BASE_URL/skins/"
 
     // Таймауты
     const val TIMEOUT_CONNECT = 30_000L

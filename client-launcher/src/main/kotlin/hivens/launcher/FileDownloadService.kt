@@ -8,22 +8,12 @@ import hivens.core.util.ZipUtils
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
-import io.ktor.http.isSuccess
-import io.ktor.utils.io.jvm.javaio.*
-import io.ktor.utils.io.readAvailable
+import io.ktor.http.*
+import io.ktor.utils.io.*
+import kotlinx.coroutines.*
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
-import kotlinx.coroutines.time.delay
-import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 import java.io.FileOutputStream
 import java.io.IOException
@@ -49,7 +39,7 @@ class FileDownloadService(
         )
     }
 
-    override fun processSession(
+    override suspend fun processSession(
         session: SessionData,
         serverId: String,
         targetDir: Path,
@@ -57,11 +47,11 @@ class FileDownloadService(
         ignoredFiles: Set<String>?,
         messageUI: ((String) -> Unit)?,
         progressUI: ((Int, Int, Long, Long, String) -> Unit)?
-    ) {
+    ) = withContext(Dispatchers.IO) {
         val manifest = session.fileManifest ?: throw IOException("Манифест файлов пуст!")
         Files.createDirectories(targetDir)
 
-        // 1. Получаем карту Path -> FileData (теперь храним весь объект, чтобы достать размер)
+        // 1. Получаем карту Path -> FileData
         val filesMap = flattenManifest(manifest)
 
         // 2. Фильтрация
@@ -74,9 +64,7 @@ class FileDownloadService(
         }
 
         // 3. Скачивание с подсчетом байтов
-        runBlocking {
-            downloadMissingFiles(targetDir, filesMap, messageUI, progressUI)
-        }
+        downloadMissingFiles(targetDir, filesMap, messageUI, progressUI)
 
         // 4. Extra.zip (конфиги)
         processExtraZip(targetDir, filesMap, extraCheckSum, messageUI)
@@ -106,6 +94,10 @@ class FileDownloadService(
         messageUI: ((String) -> Unit)?,
         progressUI: ((Int, Int, Long, Long, String) -> Unit)?
     ) {
+        // ЭТАП 1: Проверка хешей
+        messageUI?.invoke("Сверка хеш-сумм...")
+
+        // Тут происходит тяжелая работа (чтение файлов с диска)
         val filesToDownload = files.filter { (path, data) ->
             isFileMissingOrChanged(baseDir.resolve(normalizePath(path)), data.md5)
         }
@@ -114,7 +106,13 @@ class FileDownloadService(
         // Считаем общий размер (если size нет, будет 0)
         val totalBytesToDownload = filesToDownload.values.sumOf { it.size }
 
-        if (totalFilesCount == 0) return
+        if (totalFilesCount == 0) {
+            messageUI?.invoke("Файлы проверены, обновлений нет.")
+            return
+        }
+
+        // ЭТАП 2: Скачивание
+        messageUI?.invoke("Загрузка обновлений ($totalFilesCount файлов)...")
 
         // Атомики для потокобезопасного счета
         val currentFileCounter = AtomicInteger(0)
@@ -124,9 +122,8 @@ class FileDownloadService(
         val startTime = System.currentTimeMillis()
 
         coroutineScope {
-            // 1. ЗАПУСКАЕМ ТИКЕР (Наблюдатель)
-            // Он обновляет UI ровно 10 раз в секунду. Никакого дребезжания.
-            val monitorJob = launch(Dispatchers.Main) { // Обновляем в Main, чтобы UI не тупил
+            // Тикер для UI
+            val monitorJob = launch(Dispatchers.Main) {
                 while (isActive) {
                     val currentBytes = downloadedBytesGlobal.get()
                     val currentFiles = currentFileCounter.get()
@@ -143,14 +140,12 @@ class FileDownloadService(
                         speed
                     )
 
-                    delay(100) // 10 FPS обновление
-
-                    // Если всё скачали - выходим из цикла монитора
+                    delay(100)
                     if (currentFiles >= totalFilesCount && currentBytes >= totalBytesToDownload) break
                 }
             }
 
-            // 2. ЗАПУСКАЕМ ЗАГРУЗКУ (Рабочие лошадки)
+            // Скачивание
             val tasks = filesToDownload.map { (rawPath, _) ->
                 async(Dispatchers.IO) {
                     if (!isActive) throw CancellationException()
@@ -176,7 +171,7 @@ class FileDownloadService(
             try {
                 tasks.awaitAll()
             } finally {
-                monitorJob.cancel() // Убиваем монитор при любом исходе (успех или отмена)
+                monitorJob.cancel()
             }
 
             // Финальный апдейт (100%)
@@ -216,17 +211,11 @@ class FileDownloadService(
         }
     }
 
-
     private fun formatSpeed(bytesPerSec: Double): String {
         val kb = bytesPerSec / 1024
         if (kb < 1024) return "${kb.roundToInt()} KB/s"
         val mb = kb / 1024
         return String.format("%.1f MB/s", mb)
-    }
-
-    // Для совместимости с интерфейсом (если вызывается отдельно)
-    override fun downloadFile(relativePath: String, destinationPath: Path) {
-        runBlocking { downloadFileInternal(relativePath, destinationPath) }
     }
 
     /**
@@ -305,8 +294,6 @@ class FileDownloadService(
         }
         return md.digest().joinToString("") { "%02x".format(it) }
     }
-
-    private fun shorten(p: String) = if (p.length > 30) "..." + p.takeLast(30) else p
 
     private fun cleanupIgnoredFiles(baseDir: Path, ignoredFiles: Set<String>) {
         if (ignoredFiles.isEmpty()) return
