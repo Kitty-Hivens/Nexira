@@ -1,3 +1,5 @@
+[![Qodana](https://github.com/Kitty-Hivens/Aura-Launcher/actions/workflows/qodana_code_quality.yml/badge.svg)](https://github.com/Kitty-Hivens/Aura-Launcher/actions/workflows/qodana_code_quality.yml)
+
 # Aura Launcher (Unofficial)
 
 > **Неофициальный** лаунчер для проекта [SmartyCraft](https://smartycraft.ru).
