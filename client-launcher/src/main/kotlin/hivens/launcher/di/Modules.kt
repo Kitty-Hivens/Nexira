@@ -14,7 +14,11 @@ import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.serialization.json.Json
+import okhttp3.OkHttpClient
 import org.koin.core.module.dsl.singleOf
 import org.koin.dsl.module
 import java.net.InetSocketAddress
@@ -27,9 +31,6 @@ import java.util.concurrent.TimeUnit
  */
 val networkModule = module {
 
-    /**
-     * Глобальная конфигурация JSON.
-     */
     single<Json> {
         Json {
             ignoreUnknownKeys = true
@@ -40,10 +41,11 @@ val networkModule = module {
     }
 
     /**
-     * Основной HTTP-клиент.
-     * Использует движок OkHttp под капотом для поддержки SOCKS прокси с авторизацией.
+     * HTTP-клиент (OkHttp).
+     * SOCKS прокси включен всегда.
      */
-    single<HttpClient> {
+    single<OkHttpClient> {
+        // Глобальная авторизация для SOCKS (Java API)
         java.net.Authenticator.setDefault(object : java.net.Authenticator() {
             override fun getPasswordAuthentication(): java.net.PasswordAuthentication {
                 return java.net.PasswordAuthentication(
@@ -53,23 +55,22 @@ val networkModule = module {
             }
         })
 
-        HttpClient(OkHttp) {
-            // Настройка движка (специфично для JVM/OkHttp)
-            engine {
-                config {
-                    // Настройка прокси
-                    proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress(AppConfig.Proxy.HOST, AppConfig.Proxy.PORT)))
-                    // Аутентификация на прокси
-                    proxyAuthenticator { _, response ->
-                        val credential = okhttp3.Credentials.basic(AppConfig.Proxy.USER, AppConfig.Proxy.PASS)
-                        response.request.newBuilder()
-                            .header("Proxy-Authorization", credential)
-                            .build()
-                    }
+        val builder = OkHttpClient.Builder()
+            .connectTimeout(AppConfig.TIMEOUT_CONNECT, TimeUnit.MILLISECONDS)
+            .readTimeout(AppConfig.TIMEOUT_READ, TimeUnit.MILLISECONDS)
 
-                    connectTimeout(30, TimeUnit.SECONDS)
-                    readTimeout(300, TimeUnit.SECONDS)
-                }
+        // Настройка прокси
+        builder.proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress(AppConfig.Proxy.HOST, AppConfig.Proxy.PORT)))
+
+        builder.build()
+    }
+
+    single<HttpClient> {
+        val okHttpInstance = get<OkHttpClient>()
+
+        HttpClient(OkHttp) {
+            engine {
+                preconfigured = okHttpInstance
             }
 
             // Плагины Ktor
@@ -84,8 +85,8 @@ val networkModule = module {
             }
 
             defaultRequest {
-                // Эмуляция User-Agent, чтобы сервер не отверг запрос
-                header("User-Agent", "SMARTYlauncher/3.6.2")
+                // User-Agent строго по конфигу
+                header("User-Agent", "SMARTYlauncher/${AppConfig.LAUNCHER_VERSION}")
                 contentType(ContentType.Application.Json)
             }
         }
@@ -100,12 +101,15 @@ val networkModule = module {
  * Модуль основных компонентов приложения.
  */
 val appModule = module {
+    // AppScope: Жизненный цикл равен времени работы приложения.
+    // Используем для запуска игры, чтобы он не прерывался при смене экранов.
+    single<CoroutineScope> { CoroutineScope(SupervisorJob() + Dispatchers.IO) }
 
     /**
      * Рабочая директория приложения (.aura).
      */
     single(createdAtStart = true) {
-        Paths.get(System.getProperty("user.home"), ".aura")
+        Paths.get(System.getProperty("user.home"), AppConfig.WORK_DIR_NAME)
     }
 
     // Менеджеры и сервисы
@@ -113,7 +117,7 @@ val appModule = module {
 
     single<ISettingsService> {
         val dataDir: java.nio.file.Path = get()
-        SettingsService(get(), dataDir.resolve("settings.json"))
+        SettingsService(get(), dataDir.resolve(AppConfig.FILES_SETTINGS))
     }
 
     single<IFileIntegrityService> { FileIntegrityService() }

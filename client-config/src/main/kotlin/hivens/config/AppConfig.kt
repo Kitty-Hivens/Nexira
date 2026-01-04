@@ -47,7 +47,6 @@ object AppConfig {
     // 5. ПРОКСИ
     // ==========================================
     object Proxy {
-        const val ENABLED = true
         const val HOST = "proxy.smartycraft.ru"
         const val PORT = 1080
         const val USER = "proxyuser"
