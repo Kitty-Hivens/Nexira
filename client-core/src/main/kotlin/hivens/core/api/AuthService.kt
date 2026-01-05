@@ -101,7 +101,10 @@ class AuthService(
             throw AuthException(AuthStatus.INTERNAL_ERROR, "Ошибка сети: ${e.message}")
         }
 
-        if (response.status != AuthStatus.OK && response.status != AuthStatus.LOGIN) {
+        if (response.status != AuthStatus.OK &&
+            response.status != AuthStatus.LOGIN &&
+            response.status != AuthStatus.ACTIVE) {
+
             val msg = when (response.status) {
                 AuthStatus.BAD_LOGIN -> "Пользователь не найден"
                 AuthStatus.PASSWORD -> "Неверный пароль"
