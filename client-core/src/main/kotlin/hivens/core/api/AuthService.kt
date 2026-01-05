@@ -101,15 +101,14 @@ class AuthService(
             throw AuthException(AuthStatus.INTERNAL_ERROR, "Ошибка сети: ${e.message}")
         }
 
-        if (response.status != AuthStatus.OK &&
-            response.status != AuthStatus.LOGIN &&
-            response.status != AuthStatus.ACTIVE) {
-
+        // Логика проверки статуса
+        if (response.status != AuthStatus.OK && response.status != AuthStatus.LOGIN) {
             val msg = when (response.status) {
                 AuthStatus.BAD_LOGIN -> "Пользователь не найден"
                 AuthStatus.PASSWORD -> "Неверный пароль"
                 AuthStatus.NEED_2FA -> "Требуется 2FA"
                 AuthStatus.BANNED -> "Аккаунт заблокирован"
+                AuthStatus.ACTIVE -> "Аккаунт не активирован. Проверьте почту."
                 else -> "Ошибка сервера: ${response.status}"
             }
             throw AuthException(response.status ?: AuthStatus.INTERNAL_ERROR, msg)
