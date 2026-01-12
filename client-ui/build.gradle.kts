@@ -76,7 +76,8 @@ compose.desktop {
             targetFormats(
                 org.jetbrains.compose.desktop.application.dsl.TargetFormat.AppImage,
                 org.jetbrains.compose.desktop.application.dsl.TargetFormat.Deb,
-                org.jetbrains.compose.desktop.application.dsl.TargetFormat.Rpm
+                org.jetbrains.compose.desktop.application.dsl.TargetFormat.Rpm,
+                org.jetbrains.compose.desktop.application.dsl.TargetFormat.Msi
             )
 
             buildTypes.release.proguard {
@@ -125,6 +126,17 @@ tasks.withType<KotlinJvmCompile>().configureEach {
             "-Xtype-optimizations",
             "-Xjvm-default=all",
             "-Xlambdas=indy"
+        )
+    }
+}
+
+tasks.configureEach {
+    if (name.contains("checkRuntime")) {
+        dependsOn(
+            ":client-config:generateBuildConfig",
+            ":client-config:processResources",
+            ":client-core:processResources",
+            ":client-launcher:processResources"
         )
     }
 }

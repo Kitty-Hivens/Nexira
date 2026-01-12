@@ -39,25 +39,31 @@ jobs:
           BUILD="b268.49"
           
           if [ "${{ matrix.os }}" == "windows-latest" ]; then
-            # Windows x64 SDK (.tar.gz лучше распаковывается в bash)
             FILE="jbrsdk-$VERSION-windows-x64-$BUILD.tar.gz"
             curl -fL "$BASE_URL/$FILE" -o jbr.tar.gz
             tar -xzf jbr.tar.gz --strip-components=1
+            echo "JAVA_HOME=$(pwd)" >> $GITHUB_ENV
           elif [ "${{ matrix.os }}" == "ubuntu-latest" ]; then
-            # Linux x64 SDK
             FILE="jbrsdk-$VERSION-linux-x64-$BUILD.tar.gz"
             curl -fL "$BASE_URL/$FILE" -o jbr.tar.gz
             tar -xzf jbr.tar.gz --strip-components=1
+            echo "JAVA_HOME=$(pwd)" >> $GITHUB_ENV
           else
-            # macOS aarch64 (macos-latest на GitHub теперь работает на M1)
-            # Если упадет, заменим на x64
+            # ДЛЯ MACOS: JBRSDK на Mac имеет вложенную структуру Contents/Home
             FILE="jbrsdk-$VERSION-osx-aarch64-$BUILD.tar.gz"
             curl -fL "$BASE_URL/$FILE" -o jbr.tar.gz
-            tar -xzf jbr.tar.gz --strip-components=1
+            tar -xzf jbr.tar.gz
+            # Ищем, куда именно распаковалось (обычно в папку .jdk)
+            JDK_PATH=$(find . -name "Home" -type d | head -n 1)
+            echo "JAVA_HOME=$GITHUB_WORKSPACE/$JDK_PATH" >> $GITHUB_ENV
           fi
           
-          echo "JAVA_HOME=$(pwd)" >> $GITHUB_ENV
-          echo "$(pwd)/bin" >> $GITHUB_PATH
+          # Добавляем bin в PATH в любом случае
+          if [ "${{ matrix.os }}" == "macos-latest" ]; then
+             echo "$GITHUB_WORKSPACE/$JDK_PATH/bin" >> $GITHUB_PATH
+          else
+             echo "$(pwd)/bin" >> $GITHUB_PATH
+          fi
 
       - name: Verify Environment
         run: java -version
