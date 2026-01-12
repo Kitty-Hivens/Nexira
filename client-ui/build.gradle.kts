@@ -1,3 +1,4 @@
+import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
 
@@ -74,10 +75,11 @@ compose.desktop {
         mainClass = "hivens.ui.MainKt"
         nativeDistributions {
             targetFormats(
-                org.jetbrains.compose.desktop.application.dsl.TargetFormat.AppImage,
-                org.jetbrains.compose.desktop.application.dsl.TargetFormat.Deb,
-                org.jetbrains.compose.desktop.application.dsl.TargetFormat.Rpm,
-                org.jetbrains.compose.desktop.application.dsl.TargetFormat.Msi
+                TargetFormat.AppImage,
+                TargetFormat.Deb,
+                TargetFormat.Rpm,
+                TargetFormat.Msi,
+                TargetFormat.Deb
             )
 
             buildTypes.release.proguard {

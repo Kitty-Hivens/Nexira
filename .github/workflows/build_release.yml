@@ -17,55 +17,52 @@ jobs:
       matrix:
         include:
           - os: windows-latest
-            format: msi
+            tasks: "packageMsi packageDistribution"
             artifact_name: windows-files
           - os: ubuntu-latest
-            format: deb rpm appimage
+            tasks: "packageDeb packageRpm packageAppImage"
             artifact_name: linux-files
           - os: macos-latest
-            format: dmg
+            tasks: "packageDmg"
             artifact_name: macos-file
     runs-on: ${{ matrix.os }}
 
     steps:
       - uses: actions/checkout@v4
 
-      # 1. Загрузка JBR 25.0.1b268.49
       - name: Setup JetBrains Runtime 25
         shell: bash
         run: |
           BASE_URL="https://cache-redirector.jetbrains.com/intellij-jbr"
           VERSION="25.0.1"
           BUILD="b268.49"
+          mkdir -p $GITHUB_WORKSPACE/jbr_home
           
           if [ "${{ matrix.os }}" == "windows-latest" ]; then
             FILE="jbrsdk-$VERSION-windows-x64-$BUILD.tar.gz"
             curl -fL "$BASE_URL/$FILE" -o jbr.tar.gz
-            tar -xzf jbr.tar.gz --strip-components=1
-            echo "JAVA_HOME=$(pwd)" >> $GITHUB_ENV
+            tar -xzf jbr.tar.gz -C $GITHUB_WORKSPACE/jbr_home --strip-components=1
           elif [ "${{ matrix.os }}" == "ubuntu-latest" ]; then
             FILE="jbrsdk-$VERSION-linux-x64-$BUILD.tar.gz"
             curl -fL "$BASE_URL/$FILE" -o jbr.tar.gz
-            tar -xzf jbr.tar.gz --strip-components=1
-            echo "JAVA_HOME=$(pwd)" >> $GITHUB_ENV
+            tar -xzf jbr.tar.gz -C $GITHUB_WORKSPACE/jbr_home --strip-components=1
           else
-            # ДЛЯ MACOS: JBRSDK на Mac имеет вложенную структуру Contents/Home
             FILE="jbrsdk-$VERSION-osx-aarch64-$BUILD.tar.gz"
             curl -fL "$BASE_URL/$FILE" -o jbr.tar.gz
-            tar -xzf jbr.tar.gz
-            # Ищем, куда именно распаковалось (обычно в папку .jdk)
-            JDK_PATH=$(find . -name "Home" -type d | head -n 1)
-            echo "JAVA_HOME=$GITHUB_WORKSPACE/$JDK_PATH" >> $GITHUB_ENV
+            tar -xzf jbr.tar.gz -C $GITHUB_WORKSPACE/jbr_home --strip-components=1
           fi
           
-          # Добавляем bin в PATH в любом случае
+          # Для macOS путь может быть глубже
           if [ "${{ matrix.os }}" == "macos-latest" ]; then
-             echo "$GITHUB_WORKSPACE/$JDK_PATH/bin" >> $GITHUB_PATH
+             REAL_PATH=$(find $GITHUB_WORKSPACE/jbr_home -name "Home" -type d | head -n 1 || echo "$GITHUB_WORKSPACE/jbr_home")
+             echo "JAVA_HOME=$REAL_PATH" >> $GITHUB_ENV
+             echo "$REAL_PATH/bin" >> $GITHUB_PATH
           else
-             echo "$(pwd)/bin" >> $GITHUB_PATH
+             echo "JAVA_HOME=$GITHUB_WORKSPACE/jbr_home" >> $GITHUB_ENV
+             echo "$GITHUB_WORKSPACE/jbr_home/bin" >> $GITHUB_PATH
           fi
 
-      - name: Verify Environment
+      - name: Verify Java
         run: java -version
 
       - uses: gradle/actions/setup-gradle@v3
@@ -79,8 +76,9 @@ jobs:
         shell: bash
         run: |
           chmod +x gradlew
+          # Запускаем задачи из матрицы напрямую
           ./gradlew clean :client-ui:packageDistribution \
-          $(echo "${{ matrix.format }}" | sed 's/\([^ ]*\)/:client-ui:package\u\1/g') \
+          $(echo "${{ matrix.tasks }}" | sed 's/\([^ ]*\)/:client-ui:\1/g') \
           -Pversion=${{ github.ref_name }} \
           -Dorg.gradle.jvmargs="-Xmx4g -XX:+UseParallelGC"
 
