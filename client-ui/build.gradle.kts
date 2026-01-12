@@ -1,7 +1,19 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
+
+val composeVersion: String by project
+val iconsVersion: String by project
+val coilVersion: String by project
+val coilNetworkVersion: String by project
+val filekitVersion: String by project
+val koinVersion: String by project
+val koinComposeVersion: String by project
+val ktorVersion: String by project
+
 plugins {
     kotlin("multiplatform")
-    id("org.jetbrains.compose") version "1.9.3"
-    id("org.jetbrains.kotlin.plugin.compose") version "2.1.0"
+    id("org.jetbrains.compose") version "1.11.0-alpha01"
+    id("org.jetbrains.kotlin.plugin.compose") version "2.3.0"
     id("com.github.gmazzo.buildconfig")
 }
 
@@ -14,22 +26,20 @@ repositories {
 }
 
 kotlin {
-    // Объявляем цель Desktop (JVM)
     jvm("desktop")
 
     sourceSets {
         val commonMain by getting {
             dependencies {
-                implementation(compose.runtime)
-                implementation(compose.foundation)
-                implementation(compose.material)
-                implementation(compose.ui)
-                implementation(compose.components.resources)
-                implementation(compose.materialIconsExtended)
+                implementation("org.jetbrains.compose.runtime:runtime:$composeVersion")
+                implementation("org.jetbrains.compose.foundation:foundation:$composeVersion")
+                implementation("org.jetbrains.compose.material:material:$composeVersion")
+                implementation("org.jetbrains.compose.ui:ui:$composeVersion")
+                implementation("org.jetbrains.compose.components:components-resources:$composeVersion")
+                implementation("org.jetbrains.compose.material:material-icons-extended:$iconsVersion")
 
-                // Coil (Multiplatform)
-                implementation("io.coil-kt.coil3:coil-compose:3.3.0")
-                implementation("io.coil-kt.coil3:coil-network-okhttp:3.0.4")
+                implementation("io.coil-kt.coil3:coil-compose:$coilVersion")
+                implementation("io.coil-kt.coil3:coil-network-okhttp:$coilNetworkVersion")
             }
         }
 
@@ -37,30 +47,23 @@ kotlin {
             dependencies {
                 implementation(compose.desktop.currentOs)
 
-                // Проектные зависимости (оставляем здесь, так как они JVM)
                 implementation(project(":client-config"))
                 implementation(project(":client-core"))
                 implementation(project(":client-launcher"))
 
-                implementation("io.github.vinceglb:filekit-core:0.12.0")
-                implementation("io.github.vinceglb:filekit-dialogs-compose:0.12.0")
-
-                // Koin для Desktop
-                implementation("io.insert-koin:koin-core:3.5.3")
-                implementation("io.insert-koin:koin-compose:1.1.2")
-
-                // Desktop-specific Coroutines
+                implementation("io.github.vinceglb:filekit-core:$filekitVersion")
+                implementation("io.github.vinceglb:filekit-dialogs-compose:$filekitVersion")
+                implementation("io.insert-koin:koin-core:$koinVersion")
+                implementation("io.insert-koin:koin-compose:$koinComposeVersion")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.9.0")
-
                 implementation("ch.qos.logback:logback-classic:1.4.14")
             }
         }
     }
 }
 
-// Настройка генератора конфига
 buildConfig {
-    packageName("hivens.ui") // Пакет, где будет лежать класс
+    packageName("hivens.ui")
     buildConfigField("String", "FORK_VERSION", "\"${project.version}\"")
     buildConfigField("long", "BUILD_TIME", "${System.currentTimeMillis()}L")
     buildConfigField("String", "APP_NAME", "\"Aura Launcher\"")
@@ -71,34 +74,57 @@ compose.desktop {
         mainClass = "hivens.ui.MainKt"
         nativeDistributions {
             targetFormats(
-                org.jetbrains.compose.desktop.application.dsl.TargetFormat.Dmg,
-                org.jetbrains.compose.desktop.application.dsl.TargetFormat.Exe,
-                org.jetbrains.compose.desktop.application.dsl.TargetFormat.Msi,
+                org.jetbrains.compose.desktop.application.dsl.TargetFormat.AppImage,
                 org.jetbrains.compose.desktop.application.dsl.TargetFormat.Deb,
-                org.jetbrains.compose.desktop.application.dsl.TargetFormat.Rpm,
-                org.jetbrains.compose.desktop.application.dsl.TargetFormat.AppImage
+                org.jetbrains.compose.desktop.application.dsl.TargetFormat.Rpm
             )
-            packageName = "AuraLauncher"
 
+            buildTypes.release.proguard {
+                isEnabled = true
+                optimize = true
+                configurationFiles.from(project.file("compose-desktop.pro"))
+            }
+
+            packageName = "AuraLauncher"
             val cleanVersion = project.version.toString().removePrefix("v").substringBefore("-")
-            // Если версия начинается с "0." (например 0.1.0), превращаем её в 1.0.0
-            // Иначе оставляем как есть.
             val safeVersion = if (cleanVersion.startsWith("0") || cleanVersion.isEmpty()) "1.0.0" else cleanVersion
 
-            
-            println("Packaging version: $safeVersion (Original: ${project.version})")
-
             packageVersion = safeVersion
-
             description = "Aura Launcher v${project.version}"
             copyright = "© 2026 Hivens"
             vendor = "Hivens"
 
             linux {
                 packageName = "aura-launcher"
-                debMaintainer = "hivens@smartycraft.ru"
+                debMaintainer = "https://github.com/Kitty-Hivens"
                 appCategory = "Game"
             }
         }
+
+        jvmArgs(
+            "-Dawt.useSystemAAFontSettings=on",
+            "-Djdk.gtk.version=3",
+            "-Dwayland.debug.children=true",
+            "-Dsun.java2d.uiScale=1",
+            "-D_JAVA_AWT_WM_NONREPARENTING=1",
+            "--enable-native-access=ALL-UNNAMED",
+            "-Djdk.gtk.verbose=true",
+            "-Dnet.java.awt.embedded=true",
+            "-Dskiko.render.backend=SOFTWARE",
+            "-Drobot.need_x11=false"
+        )
+    }
+}
+
+// Конфигурация компилятора K2 под JDK 25
+tasks.withType<KotlinJvmCompile>().configureEach {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_25)
+        freeCompilerArgs.addAll(
+            "-Xbackend-threads=0",
+            "-Xtype-optimizations",
+            "-Xjvm-default=all",
+            "-Xlambdas=indy"
+        )
     }
 }

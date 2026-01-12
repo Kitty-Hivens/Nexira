@@ -1,5 +1,5 @@
 plugins {
-    kotlin("jvm") version "2.1.0" apply false
+    kotlin("jvm") version "2.3.0" apply false
     id("java")
     id("com.github.gmazzo.buildconfig") version "5.3.5" apply false
 }
@@ -35,8 +35,8 @@ subprojects {
     afterEvaluate {
         if (plugins.hasPlugin("java")) {
             configure<JavaPluginExtension> {
-                sourceCompatibility = JavaVersion.VERSION_21
-                targetCompatibility = JavaVersion.VERSION_21
+                sourceCompatibility = JavaVersion.VERSION_25
+                targetCompatibility = JavaVersion.VERSION_25
             }
         }
     }
