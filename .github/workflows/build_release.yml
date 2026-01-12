@@ -13,6 +13,7 @@ jobs:
   build-all:
     name: Build on ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: windows-latest
@@ -29,45 +30,64 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # 1. Установка JetBrains Runtime 25 (Wakefield Support)
-      - name: Setup JetBrains Runtime
-        uses: actions/setup-java@v4
-        with:
-            distribution: 'jetbrains'
-            java-version: '25.0.1+268.49'
-            java-package: 'jdk'
+      # 1. Ручная установка JBR 25.0.1b268.49
+      - name: Setup JetBrains Runtime 25
+        shell: bash
+        run: |
+          TAG="jbr-release-25.0.1b268.49"
+          if [ "${{ matrix.os }}" == "windows-latest" ]; then
+            URL="https://github.com/JetBrains/JetBrainsRuntime/releases/download/$TAG/jbrsdk-25.0.1-windows-x64-b268.49.zip"
+            wget -q $URL -O jbr.zip
+            7z x jbr.zip -ojbr_root
+            # Вытягиваем из вложенной папки в корень для корректного JAVA_HOME
+            mv jbr_root/jbrsdk-25.0.1-x64-b268.49/* .
+          elif [ "${{ matrix.os }}" == "ubuntu-latest" ]; then
+            URL="https://github.com/JetBrains/JetBrainsRuntime/releases/download/$TAG/jbrsdk-25.0.1-linux-x64-b268.49.tar.gz"
+            wget -q $URL -O jbr.tar.gz
+            tar -xzf jbr.tar.gz --strip-components=1
+          else
+            URL="https://github.com/JetBrains/JetBrainsRuntime/releases/download/$TAG/jbrsdk-25.0.1-osx-x64-b268.49.tar.gz"
+            wget -q $URL -O jbr.tar.gz
+            tar -xzf jbr.tar.gz --strip-components=1
+          fi
+          echo "JAVA_HOME=$(pwd)" >> $GITHUB_ENV
+          echo "$(pwd)/bin" >> $GITHUB_PATH
+
+      - name: Verify Environment
+        run: java -version
 
       - uses: gradle/actions/setup-gradle@v3
 
-      - name: Install Linux Deps
+      - name: Install Linux Build Tools
         if: matrix.os == 'ubuntu-latest'
         run: sudo apt-get update && sudo apt-get install -y libgl1 libgl1-mesa-dri xorg-dev rpm binutils libfuse2 file
 
-      # 2. Сборка с агрессивными оптимизациями
+      # 2. Сборка (Агрессивные флаги и очистка кэша)
       - name: Package Application
         shell: bash
         run: |
+          chmod +x gradlew
           ./gradlew clean :client-ui:packageDistribution \
           $(echo "${{ matrix.format }}" | sed 's/\([^ ]*\)/:client-ui:package\u\1/g') \
           -Pversion=${{ github.ref_name }} \
           -Dorg.gradle.jvmargs="-Xmx4g -XX:+UseParallelGC"
 
-      # 3. Подготовка артефактов (Windows)
-      - name: Prepare Windows Artifacts
+      # 3. Финализация артефактов
+      - name: Prepare Windows Files
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
           Get-ChildItem client-ui/build/compose/binaries/main/msi/*.msi | Rename-Item -NewName "AuraLauncher-Setup.msi"
-          Move-Item client-ui/build/compose/binaries/main/msi/AuraLauncher-Setup.msi .
           Compress-Archive -Path client-ui/build/compose/binaries/main/app/* -DestinationPath AuraLauncher-Win-Portable.zip
 
-      # 4. Сборка AppImage (Linux)
-      - name: Build AppImage
-        if: matrix.os == 'ubuntu-latest'
+      - name: Prepare Linux/macOS Files
+        if: matrix.os != 'windows-latest'
         shell: bash
         run: |
           find client-ui/build/compose/binaries -name "*.deb" -exec mv {} AuraLauncher.deb \;
           find client-ui/build/compose/binaries -name "*.rpm" -exec mv {} AuraLauncher.rpm \;
+          find client-ui/build/compose/binaries -name "*.dmg" -exec mv {} AuraLauncher.dmg \;
+          find client-ui/build/compose/binaries -name "*.AppImage" -exec mv {} AuraLauncher.AppImage \;
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
@@ -83,17 +103,17 @@ jobs:
           if-no-files-found: error
 
   publish-release:
-    name: Publish Release
+    name: Create Release
     needs: build-all
     runs-on: ubuntu-latest
     steps:
-      - name: Download Artifacts
+      - name: Download All Artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
           merge-multiple: true
 
-      - name: Create Release
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ github.ref_name }}
