@@ -34,22 +34,24 @@ jobs:
       - name: Setup JetBrains Runtime 25
         shell: bash
         run: |
-          # Тег со скриншота
-          TAG="jbr-release-25.0.1b268.49"
-          BASE_URL="https://github.com/JetBrains/JetBrainsRuntime/releases/download/$TAG"
+          BASE_URL="https://cache-redirector.jetbrains.com/intellij-jbr"
+          VERSION="25.0.1"
+          BUILD="b268.49"
           
           if [ "${{ matrix.os }}" == "windows-latest" ]; then
-            # Внимание: тут дефис перед 'b', а в теге его нет!
-            FILE="jbrsdk-25.0.1-windows-x64-b268.49.zip"
-            curl -fL "$BASE_URL/$FILE" -o jbr.zip
-            7z x jbr.zip -ojbr_root
-            mv jbr_root/*/* . || mv jbr_root/* .
+            # Windows x64 SDK (.tar.gz лучше распаковывается в bash)
+            FILE="jbrsdk-$VERSION-windows-x64-$BUILD.tar.gz"
+            curl -fL "$BASE_URL/$FILE" -o jbr.tar.gz
+            tar -xzf jbr.tar.gz --strip-components=1
           elif [ "${{ matrix.os }}" == "ubuntu-latest" ]; then
-            FILE="jbrsdk-25.0.1-linux-x64-b268.49.tar.gz"
+            # Linux x64 SDK
+            FILE="jbrsdk-$VERSION-linux-x64-$BUILD.tar.gz"
             curl -fL "$BASE_URL/$FILE" -o jbr.tar.gz
             tar -xzf jbr.tar.gz --strip-components=1
           else
-            FILE="jbrsdk-25.0.1-osx-x64-b268.49.tar.gz"
+            # macOS aarch64 (macos-latest на GitHub теперь работает на M1)
+            # Если упадет, заменим на x64
+            FILE="jbrsdk-$VERSION-osx-aarch64-$BUILD.tar.gz"
             curl -fL "$BASE_URL/$FILE" -o jbr.tar.gz
             tar -xzf jbr.tar.gz --strip-components=1
           fi
