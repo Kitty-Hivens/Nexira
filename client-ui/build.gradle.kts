@@ -79,7 +79,7 @@ compose.desktop {
                 TargetFormat.Deb,
                 TargetFormat.Rpm,
                 TargetFormat.Msi,
-                TargetFormat.Deb
+                TargetFormat.Dmg
             )
 
             buildTypes.release.proguard {
