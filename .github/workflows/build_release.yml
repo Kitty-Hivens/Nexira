@@ -1,4 +1,4 @@
-name: Build and Publish (Win Fix + JBR 25)
+name: Build and Publish
 
 on:
   workflow_dispatch:
@@ -17,17 +17,17 @@ jobs:
       matrix:
         include:
           - os: windows-latest
-            # Для Windows берем ZIP (важно для setup-java)
+            # ZIP для Windows
             jbr_url: "https://cache-redirector.jetbrains.com/intellij-jbr/jbrsdk-25.0.1-windows-x64-b268.49.zip"
-            # На Windows tasks разделяем пробелом, gradle сам поймет
             tasks: "packageMsi packageDistribution"
             artifact_name: windows-files
           - os: ubuntu-latest
+            # TAR.GZ для Linux
             jbr_url: "https://cache-redirector.jetbrains.com/intellij-jbr/jbrsdk-25.0.1-linux-x64-b268.49.tar.gz"
             tasks: "packageDeb packageRpm packageAppImage"
             artifact_name: linux-files
           - os: macos-latest
-            # Для Mac M1 (GitHub M1 runners)
+            # TAR.GZ для macOS
             jbr_url: "https://cache-redirector.jetbrains.com/intellij-jbr/jbrsdk-25.0.1-osx-aarch64-b268.49.tar.gz"
             tasks: "packageDmg"
             artifact_name: macos-file
@@ -36,21 +36,36 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # 1. Просто скачиваем файл. Никакой распаковки руками.
-      - name: Download JBR 25
+      # 1. Скачиваем и распаковываем JBR (РУЧКАМИ)
+      - name: Setup JBR 25 (Manual)
         shell: bash
         run: |
-          echo "Downloading from ${{ matrix.jbr_url }}"
-          curl -L "${{ matrix.jbr_url }}" -o java_dist.archive
-
-      # 2. Магия: скармливаем архив экшену. Он сам распакует и настроит пути.
-      - name: Install JBR from File
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'jdkfile'
-          jdkFile: java_dist.archive
-          java-version: '25'
-          architecture: ${{ matrix.os == 'macos-latest' && 'aarch64' || 'x64' }}
+          # Создаем папку в workspace
+          mkdir -p jbr_home
+          
+          echo "Downloading ${{ matrix.jbr_url }}"
+          
+          if [ "${{ matrix.os }}" == "windows-latest" ]; then
+            curl -L "${{ matrix.jbr_url }}" -o jbr.zip
+            7z x jbr.zip -ojbr_home
+            cd jbr_home && if [ $(ls | wc -l) -eq 1 ]; then mv * .. && cd .. && rmdir jbr_home/$(ls jbr_home); fi
+          
+          else
+            # Linux/Mac: качаем TAR.GZ
+            curl -L "${{ matrix.jbr_url }}" -o jbr.tar.gz
+            tar -xzf jbr.tar.gz -C jbr_home --strip-components=1
+          fi
+          
+          # Определяем JAVA_HOME
+          if [ "${{ matrix.os }}" == "macos-latest" ]; then
+             # На маке ищем папку Home
+             JHOME=$(find $(pwd)/jbr_home -name "Home" -type d | head -n 1)
+             echo "JAVA_HOME=$JHOME" >> $GITHUB_ENV
+             echo "$JHOME/bin" >> $GITHUB_PATH
+          else
+             echo "JAVA_HOME=$(pwd)/jbr_home" >> $GITHUB_ENV
+             echo "$(pwd)/jbr_home/bin" >> $GITHUB_PATH
+          fi
 
       - name: Verify Java
         run: java -version
@@ -65,7 +80,6 @@ jobs:
         shell: bash
         run: |
           chmod +x gradlew
-          # Запускаем сборку
           ./gradlew clean :client-ui:packageDistribution \
           $(echo "${{ matrix.tasks }}" | sed 's/\([^ ]*\)/:client-ui:\1/g') \
           -Pversion=${{ github.ref_name }} \
@@ -74,13 +88,11 @@ jobs:
       - name: Collect Artifacts
         shell: bash
         run: |
-          # Собираем всё в кучу
           find client-ui/build/compose/binaries -name "*.msi" -exec cp {} AuraLauncher-Setup.msi \; 2>/dev/null || true
           find client-ui/build/compose/binaries -name "*.deb" -exec cp {} AuraLauncher.deb \; 2>/dev/null || true
           find client-ui/build/compose/binaries -name "*.rpm" -exec cp {} AuraLauncher.rpm \; 2>/dev/null || true
           find client-ui/build/compose/binaries -name "*.dmg" -exec cp {} AuraLauncher.dmg \; 2>/dev/null || true
           find client-ui/build/compose/binaries -name "*.AppImage" -exec cp {} AuraLauncher.AppImage \; 2>/dev/null || true
-          
           if [ "${{ matrix.os }}" == "windows-latest" ]; then
             powershell "Compress-Archive -Path client-ui/build/compose/binaries/main/app/* -DestinationPath AuraLauncher-Win-Portable.zip"
           fi
@@ -113,6 +125,4 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
-          draft: false
-          prerelease: ${{ contains(github.ref, '-') }}
           files: artifacts/*
