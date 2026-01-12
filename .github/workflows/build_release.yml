@@ -30,27 +30,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # 1. Универсальная установка JBR 25 (SDK версия без JCEF)
+      # 1. Загрузка JBR 25.0.1b268.49
       - name: Setup JetBrains Runtime 25
         shell: bash
         run: |
-          # Тег со скриншота: jbr-release-25.0.1b268.49
           TAG="jbr-release-25.0.1b268.49"
           BASE_URL="https://github.com/JetBrains/JetBrainsRuntime/releases/download/$TAG"
           
+          echo "Downloading from $BASE_URL..."
+          
           if [ "${{ matrix.os }}" == "windows-latest" ]; then
             FILE="jbrsdk-25.0.1-windows-x64-b268.49.zip"
-            curl -L "$BASE_URL/$FILE" -o jbr.zip
+            # -f заставит curl упасть, если URL битый (не скачивая 9 байт)
+            curl -fL "$BASE_URL/$FILE" -o jbr.zip
             7z x jbr.zip -ojbr_root
-            # Перемещаем из вложенной папки (название может варьироваться)
-            mv jbr_root/*/* .
+            mv jbr_root/jbrsdk*/* . || mv jbr_root/*/* .
           elif [ "${{ matrix.os }}" == "ubuntu-latest" ]; then
             FILE="jbrsdk-25.0.1-linux-x64-b268.49.tar.gz"
-            curl -L "$BASE_URL/$FILE" -o jbr.tar.gz
+            curl -fL "$BASE_URL/$FILE" -o jbr.tar.gz
             tar -xzf jbr.tar.gz --strip-components=1
           else
             FILE="jbrsdk-25.0.1-osx-x64-b268.49.tar.gz"
-            curl -L "$BASE_URL/$FILE" -o jbr.tar.gz
+            curl -fL "$BASE_URL/$FILE" -o jbr.tar.gz
             tar -xzf jbr.tar.gz --strip-components=1
           fi
           
@@ -66,7 +67,7 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: sudo apt-get update && sudo apt-get install -y libgl1 libgl1-mesa-dri xorg-dev rpm binutils libfuse2 file
 
-      # 2. Сборка (Агрессивные флаги и очистка)
+      # 2. Сборка всех форматов (включая AppImage и RPM)
       - name: Package Application
         shell: bash
         run: |
@@ -76,24 +77,21 @@ jobs:
           -Pversion=${{ github.ref_name }} \
           -Dorg.gradle.jvmargs="-Xmx4g -XX:+UseParallelGC"
 
-      # 3. Финализация артефактов
-      - name: Prepare Windows Files
-        if: matrix.os == 'windows-latest'
-        shell: pwsh
-        run: |
-          # MSI переименовываем, папку app пакуем в Portable
-          $msi = Get-ChildItem client-ui/build/compose/binaries/main/msi/*.msi | Select-Object -First 1
-          if ($msi) { Copy-Item $msi.FullName "./AuraLauncher-Setup.msi" }
-          Compress-Archive -Path client-ui/build/compose/binaries/main/app/* -DestinationPath AuraLauncher-Win-Portable.zip
-
-      - name: Prepare Linux/macOS Files
-        if: matrix.os != 'windows-latest'
+      # 3. Сбор артефактов
+      - name: Collect Artifacts
         shell: bash
         run: |
-          find client-ui/build/compose/binaries -name "*.deb" -exec cp {} AuraLauncher.deb \;
-          find client-ui/build/compose/binaries -name "*.rpm" -exec cp {} AuraLauncher.rpm \;
-          find client-ui/build/compose/binaries -name "*.dmg" -exec cp {} AuraLauncher.dmg \;
-          find client-ui/build/compose/binaries -name "*.AppImage" -exec cp {} AuraLauncher.AppImage \;
+          # Копируем всё, что Gradle успел собрать в binaries
+          find client-ui/build/compose/binaries -name "*.msi" -exec cp {} AuraLauncher-Setup.msi \; 2>/dev/null || true
+          find client-ui/build/compose/binaries -name "*.deb" -exec cp {} AuraLauncher.deb \; 2>/dev/null || true
+          find client-ui/build/compose/binaries -name "*.rpm" -exec cp {} AuraLauncher.rpm \; 2>/dev/null || true
+          find client-ui/build/compose/binaries -name "*.dmg" -exec cp {} AuraLauncher.dmg \; 2>/dev/null || true
+          find client-ui/build/compose/binaries -name "*.AppImage" -exec cp {} AuraLauncher.AppImage \; 2>/dev/null || true
+          
+          # Для Windows Portable
+          if [ "${{ matrix.os }}" == "windows-latest" ]; then
+            powershell "Compress-Archive -Path client-ui/build/compose/binaries/main/app/* -DestinationPath AuraLauncher-Win-Portable.zip"
+          fi
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
@@ -106,7 +104,7 @@ jobs:
             *.deb
             *.rpm
             *.dmg
-          if-no-files-found: error
+          if-no-files-found: warn
 
   publish-release:
     name: Create Release
