@@ -42,7 +42,7 @@ jobs:
 
       # Сборка MSI и Distro
       - name: Build Windows Targets
-        run: ./gradlew.bat clean :client-ui:packageMsi :client-ui:packageDistribution "-Pversion=${{ github.ref_name }}" -Dorg.gradle.jvmargs="-Xmx2g"
+        run: ./gradlew.bat clean :client-ui:packageMsi :client-ui:packageDistribution "-Pversion=${{ github.ref_name }}"
 
       - name: Prepare Artifacts
         shell: pwsh
