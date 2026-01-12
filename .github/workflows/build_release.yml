@@ -1,4 +1,4 @@
-name: Build and Publish
+name: Build and Publish (Restore & Adapt)
 
 on:
   workflow_dispatch:
@@ -10,119 +10,145 @@ permissions:
   contents: write
 
 jobs:
-  build-all:
-    name: Build on ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: windows-latest
-            # ZIP для Windows
-            jbr_url: "https://cache-redirector.jetbrains.com/intellij-jbr/jbrsdk-25.0.1-windows-x64-b268.49.zip"
-            tasks: "packageMsi packageDistribution"
-            artifact_name: windows-files
-          - os: ubuntu-latest
-            # TAR.GZ для Linux
-            jbr_url: "https://cache-redirector.jetbrains.com/intellij-jbr/jbrsdk-25.0.1-linux-x64-b268.49.tar.gz"
-            tasks: "packageDeb packageRpm packageAppImage"
-            artifact_name: linux-files
-          - os: macos-latest
-            # TAR.GZ для macOS
-            jbr_url: "https://cache-redirector.jetbrains.com/intellij-jbr/jbrsdk-25.0.1-osx-aarch64-b268.49.tar.gz"
-            tasks: "packageDmg"
-            artifact_name: macos-file
-    runs-on: ${{ matrix.os }}
-
+  # --- 1. WINDOWS (MSI Installer + Portable ZIP) ---
+  build-windows:
+    name: Build Windows
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
 
-      # 1. Скачиваем и распаковываем JBR (РУЧКАМИ)
+      # [NEW] Manual JBR 25 Setup
       - name: Setup JBR 25 (Manual)
         shell: bash
         run: |
-          # Создаем папку в workspace
           mkdir -p jbr_home
-          
-          echo "Downloading ${{ matrix.jbr_url }}"
-          
-          if [ "${{ matrix.os }}" == "windows-latest" ]; then
-            curl -L "${{ matrix.jbr_url }}" -o jbr.zip
-            7z x jbr.zip -ojbr_home
-            cd jbr_home && if [ $(ls | wc -l) -eq 1 ]; then mv * .. && cd .. && rmdir jbr_home/$(ls jbr_home); fi
-          
-          else
-            # Linux/Mac: качаем TAR.GZ
-            curl -L "${{ matrix.jbr_url }}" -o jbr.tar.gz
-            tar -xzf jbr.tar.gz -C jbr_home --strip-components=1
-          fi
-          
-          # Определяем JAVA_HOME
-          if [ "${{ matrix.os }}" == "macos-latest" ]; then
-             # На маке ищем папку Home
-             JHOME=$(find $(pwd)/jbr_home -name "Home" -type d | head -n 1)
-             echo "JAVA_HOME=$JHOME" >> $GITHUB_ENV
-             echo "$JHOME/bin" >> $GITHUB_PATH
-          else
-             echo "JAVA_HOME=$(pwd)/jbr_home" >> $GITHUB_ENV
-             echo "$(pwd)/jbr_home/bin" >> $GITHUB_PATH
-          fi
-
-      - name: Verify Java
-        run: java -version
+          curl -L "https://cache-redirector.jetbrains.com/intellij-jbr/jbrsdk-25.0.1-windows-x64-b268.49.zip" -o jbr.zip
+          7z x jbr.zip -ojbr_home
+          # Flatten directory structure if needed
+          cd jbr_home && if [ $(ls | wc -l) -eq 1 ]; then mv * .. && cd .. && rmdir jbr_home/$(ls jbr_home); fi
+          echo "JAVA_HOME=$(pwd)/jbr_home" >> $GITHUB_ENV
+          echo "$(pwd)/jbr_home/bin" >> $GITHUB_PATH
 
       - uses: gradle/actions/setup-gradle@v3
 
-      - name: Install Linux Build Tools
-        if: matrix.os == 'ubuntu-latest'
-        run: sudo apt-get update && sudo apt-get install -y libgl1 libgl1-mesa-dri xorg-dev rpm binutils libfuse2 file
+      - name: Build Windows Targets
+        run: ./gradlew.bat clean :client-ui:packageMsi :client-ui:packageDistribution "-Pversion=${{ github.ref_name }}" -Dorg.gradle.jvmargs="-Xmx2g"
 
-      - name: Package Application
-        shell: bash
+      - name: Prepare Artifacts
+        shell: pwsh
         run: |
-          chmod +x gradlew
-          ./gradlew clean :client-ui:packageDistribution \
-          $(echo "${{ matrix.tasks }}" | sed 's/\([^ ]*\)/:client-ui:\1/g') \
-          -Pversion=${{ github.ref_name }} \
-          -Dorg.gradle.jvmargs="-Xmx4g -XX:+UseParallelGC"
+          Get-ChildItem client-ui/build/compose/binaries/main/msi/*.msi | Rename-Item -NewName "AuraLauncher-Setup.msi"
+          Move-Item client-ui/build/compose/binaries/main/msi/AuraLauncher-Setup.msi .
+          Compress-Archive -Path client-ui/build/compose/binaries/main/app/* -DestinationPath AuraLauncher-Win-Portable.zip
 
-      - name: Collect Artifacts
-        shell: bash
-        run: |
-          find client-ui/build/compose/binaries -name "*.msi" -exec cp {} AuraLauncher-Setup.msi \; 2>/dev/null || true
-          find client-ui/build/compose/binaries -name "*.deb" -exec cp {} AuraLauncher.deb \; 2>/dev/null || true
-          find client-ui/build/compose/binaries -name "*.rpm" -exec cp {} AuraLauncher.rpm \; 2>/dev/null || true
-          find client-ui/build/compose/binaries -name "*.dmg" -exec cp {} AuraLauncher.dmg \; 2>/dev/null || true
-          find client-ui/build/compose/binaries -name "*.AppImage" -exec cp {} AuraLauncher.AppImage \; 2>/dev/null || true
-          if [ "${{ matrix.os }}" == "windows-latest" ]; then
-            powershell "Compress-Archive -Path client-ui/build/compose/binaries/main/app/* -DestinationPath AuraLauncher-Win-Portable.zip"
-          fi
-
-      - name: Upload Artifacts
+      - name: Upload Windows Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact_name }}
+          name: windows-files
           path: |
-            *.msi
-            *.zip
-            *.AppImage
-            *.deb
-            *.rpm
-            *.dmg
+            AuraLauncher-Setup.msi
+            AuraLauncher-Win-Portable.zip
           if-no-files-found: warn
 
-  publish-release:
-    name: Create Release
-    needs: build-all
+  # --- 2. LINUX (AppImage, Deb, Rpm) ---
+  build-linux:
+    name: Build Linux
     runs-on: ubuntu-latest
     steps:
-      - name: Download All Artifacts
+      - uses: actions/checkout@v4
+
+      # [NEW] Manual JBR 25 Setup
+      - name: Setup JBR 25 (Manual)
+        shell: bash
+        run: |
+          curl -L "https://cache-redirector.jetbrains.com/intellij-jbr/jbrsdk-25.0.1-linux-x64-b268.49.tar.gz" -o jbr.tar.gz
+          mkdir -p jbr_home
+          tar -xzf jbr.tar.gz -C jbr_home --strip-components=1
+          echo "JAVA_HOME=$(pwd)/jbr_home" >> $GITHUB_ENV
+          echo "$(pwd)/jbr_home/bin" >> $GITHUB_PATH
+
+      - uses: gradle/actions/setup-gradle@v3
+      - run: chmod +x gradlew
+
+      - name: Install Dependencies
+        run: sudo apt-get update && sudo apt-get install -y libgl1 libgl1-mesa-dri xorg-dev rpm binutils libfuse2 file
+
+      # Сборка через Gradle (AppImage плагин у тебя вроде настроен в build.gradle.kts)
+      # Если нет, вернем ручной метод с appimagetool, но пока попробуем так
+      - name: Build Linux Targets
+        run: ./gradlew clean :client-ui:packageAppImage :client-ui:packageDeb :client-ui:packageRpm -Pversion=${{ github.ref_name }}
+
+      - name: Prepare Artifacts
+        shell: bash
+        run: |
+          find client-ui/build/compose/binaries -name "*.AppImage" -exec cp {} AuraLauncher.AppImage \; || true
+          find client-ui/build/compose/binaries -name "*.deb" -exec cp {} AuraLauncher.deb \; || true
+          find client-ui/build/compose/binaries -name "*.rpm" -exec cp {} AuraLauncher.rpm \; || true
+
+      - name: Upload Linux Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-files
+          path: |
+            AuraLauncher.AppImage
+            AuraLauncher.deb
+            AuraLauncher.rpm
+          if-no-files-found: warn
+
+  # --- 3. MACOS (DMG) ---
+  build-macos:
+    name: Build macOS
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # [NEW] Manual JBR 25 Setup (ARM64)
+      - name: Setup JBR 25 (Manual)
+        shell: bash
+        run: |
+          curl -L "https://cache-redirector.jetbrains.com/intellij-jbr/jbrsdk-25.0.1-osx-aarch64-b268.49.tar.gz" -o jbr.tar.gz
+          mkdir -p jbr_home
+          tar -xzf jbr.tar.gz -C jbr_home
+          # Find Home dir
+          JHOME=$(find $(pwd)/jbr_home -name "Home" -type d | head -n 1)
+          echo "JAVA_HOME=$JHOME" >> $GITHUB_ENV
+          echo "$JHOME/bin" >> $GITHUB_PATH
+
+      - uses: gradle/actions/setup-gradle@v3
+      - run: chmod +x gradlew
+
+      - name: Build DMG
+        run: ./gradlew clean :client-ui:packageDmg -Pversion=${{ github.ref_name }}
+
+      - name: Prepare Artifact
+        shell: bash
+        run: |
+          find client-ui/build/compose/binaries -name "*.dmg" -exec cp {} AuraLauncher.dmg \;
+
+      - name: Upload macOS Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-file
+          path: AuraLauncher.dmg
+          if-no-files-found: warn
+
+  # --- 4. CREATE RELEASE ---
+  publish-release:
+    name: Publish Release
+    needs: [build-windows, build-linux, build-macos]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
           merge-multiple: true
-      - name: Create GitHub Release
+
+      - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: ${{ contains(github.ref, '-') }}
           files: artifacts/*
