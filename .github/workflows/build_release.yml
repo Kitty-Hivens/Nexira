@@ -31,9 +31,11 @@ jobs:
 
       # 1. Установка JetBrains Runtime 25 (Wakefield Support)
       - name: Setup JetBrains Runtime
-        uses: JetBrains/setup-jbr@v2
+        uses: actions/setup-java@v4
         with:
-          jbr-version: '25.0.1'
+            distribution: 'jetbrains'
+            java-version: '25.0.1+268.49'
+            java-package: 'jdk'
 
       - uses: gradle/actions/setup-gradle@v3
 
