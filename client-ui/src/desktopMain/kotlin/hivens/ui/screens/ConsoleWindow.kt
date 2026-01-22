@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ClipEntry
@@ -29,6 +30,7 @@ import hivens.ui.utils.LogType
 import kotlinx.coroutines.launch
 import java.awt.datatransfer.StringSelection
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun ConsoleWindow(onClose: () -> Unit) {
     val windowState = rememberWindowState(width = 900.dp, height = 600.dp)

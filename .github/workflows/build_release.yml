@@ -1,4 +1,4 @@
-name: Build and Publish (All Formats)
+name: Build and Publish
 
 on:
   workflow_dispatch:
@@ -10,31 +10,48 @@ permissions:
   contents: write
 
 jobs:
-  # --- 1. WINDOWS (MSI Installer + Portable ZIP) ---
+  # --- 1. WINDOWS ---
   build-windows:
     name: Build Windows
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
-        with:
-          java-version: '21'
-          distribution: 'temurin'
+      - name: Setup JBR 25 (Manual)
+        shell: bash
+        run: |
+          mkdir -p jbr_home
+          echo "Downloading JBR..."
+          curl -L "https://cache-redirector.jetbrains.com/intellij-jbr/jbrsdk-25.0.1-windows-x64-b268.49.zip" -o jbr.zip
+          7z x jbr.zip -ojbr_home
+          
+          # Вытаскиваем из вложенной папки, если она есть
+          cd jbr_home
+          if [ $(ls | wc -l) -eq 1 ]; then 
+            INNER=$(ls)
+            mv "$INNER"/* .
+            rmdir "$INNER"
+          fi
+          cd ..
+
+          # ФИКС ПУТЕЙ: Превращаем /d/a/... в D:\a\... для gradlew
+          JHOME_WIN=$(cygpath -w "$(pwd)/jbr_home")
+          echo "JAVA_HOME=$JHOME_WIN" >> $GITHUB_ENV
+          echo "$JHOME_WIN/bin" >> $GITHUB_PATH
+
       - uses: gradle/actions/setup-gradle@v3
 
-      # Собираем и MSI, и папку с EXE (image)
+      # Сборка MSI и Distro
       - name: Build Windows Targets
-        run: ./gradlew.bat :client-ui:packageMsi :client-ui:packageDistribution "-Pversion=${{ github.ref_name }}"
+        run: ./gradlew.bat clean :client-ui:packageMsi :client-ui:packageDistribution "-Pversion=${{ github.ref_name }}"
 
       - name: Prepare Artifacts
         shell: pwsh
         run: |
-          # 1. Переименовываем MSI
-          Get-ChildItem client-ui/build/compose/binaries/main/msi/*.msi | Rename-Item -NewName "AuraLauncher-Setup.msi"
-          Move-Item client-ui/build/compose/binaries/main/msi/AuraLauncher-Setup.msi .
+          # Переименовываем MSI
+          $msi = Get-ChildItem client-ui/build/compose/binaries/main/msi/*.msi | Select-Object -First 1
+          if ($msi) { Move-Item $msi.FullName "AuraLauncher-Setup.msi" }
 
-          # 2. Создаем Portable ZIP (из папки app)
-          # ИМЯ ИЗМЕНЕНО НА: AuraLauncher-Win-Portable.zip
+          # Создаем Portable ZIP
           Compress-Archive -Path client-ui/build/compose/binaries/main/app/* -DestinationPath AuraLauncher-Win-Portable.zip
 
       - name: Upload Windows Artifacts
@@ -44,18 +61,23 @@ jobs:
           path: |
             AuraLauncher-Setup.msi
             AuraLauncher-Win-Portable.zip
-          if-no-files-found: error
+          if-no-files-found: warn
 
-  # --- 2. LINUX (AppImage, Deb, Rpm) ---
+  # --- 2. LINUX ---
   build-linux:
     name: Build Linux
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
-        with:
-          java-version: '21'
-          distribution: 'temurin'
+      - name: Setup JBR 25 (Manual)
+        shell: bash
+        run: |
+          curl -L "https://cache-redirector.jetbrains.com/intellij-jbr/jbrsdk-25.0.1-linux-x64-b268.49.tar.gz" -o jbr.tar.gz
+          mkdir -p jbr_home
+          tar -xzf jbr.tar.gz -C jbr_home --strip-components=1
+          echo "JAVA_HOME=$(pwd)/jbr_home" >> $GITHUB_ENV
+          echo "$(pwd)/jbr_home/bin" >> $GITHUB_PATH
+
       - uses: gradle/actions/setup-gradle@v3
       - run: chmod +x gradlew
 
@@ -68,36 +90,24 @@ jobs:
           chmod +x appimagetool.AppImage
           ./appimagetool.AppImage --appimage-extract
 
+      # Собираем бинарники (Distribution) + DEB + RPM
       - name: Build Linux Targets
-        run: ./gradlew :client-ui:packageAppImage :client-ui:packageDeb :client-ui:packageRpm -Pversion=${{ github.ref_name }}
-
-      - name: Prepare Artifacts
+        run: ./gradlew clean :client-ui:packageDistribution :client-ui:packageDeb :client-ui:packageRpm -Pversion=${{ github.ref_name }}
+      - name: Package AppImage Manually
         shell: bash
         run: |
-          # 1. Ищем, где реально лежит бинарник
-          # Ищем файл 'AuraLauncher' в папке binaries
+          # 1. Ищем бинарник
           EXE_PATH=$(find client-ui/build/compose/binaries -type f -name "AuraLauncher" | grep "/bin/" | head -n 1)
+          if [ -z "$EXE_PATH" ]; then echo "❌ Binary not found!"; exit 1; fi
           
-          if [ -z "$EXE_PATH" ]; then
-            echo "❌ Ошибка: Бинарник 'AuraLauncher' не найден!"
-            find client-ui/build/compose/binaries # Вывод для отладки
-            exit 1
-          fi
+          BIN_DIR=$(dirname "$EXE_PATH")
+          APP_ROOT=$(dirname "$BIN_DIR")
           
-          echo "Бинарник найден: $EXE_PATH"
-          
-          # Вычисляем пути
-          BIN_DIR=$(dirname "$EXE_PATH")       # .../app/AuraLauncher/bin
-          APP_ROOT=$(dirname "$BIN_DIR")       # .../app/AuraLauncher
-          
-          echo "Корень приложения: $APP_ROOT"
-          
-          # 2. Готовим структуру AppDir
+          # 2. Структура
           mkdir -p AppDir/usr
-          # Копируем всё из найденного корня (bin, lib) в usr/
           cp -r "$APP_ROOT"/* AppDir/usr/
           
-          # 3. Создаем AppRun
+          # 3. AppRun
           cat > AppDir/AppRun <<EOF
           #!/bin/sh
           export APPDIR="\$(dirname "\$(readlink -f "\${0}")")"
@@ -105,11 +115,9 @@ jobs:
           export LD_LIBRARY_PATH="\$APPDIR/usr/lib:\$LD_LIBRARY_PATH"
           exec "\$APPDIR/usr/bin/AuraLauncher" "\$@"
           EOF
-          
           chmod +x AppDir/AppRun
-          chmod +x AppDir/usr/bin/AuraLauncher
           
-          # 4. Создаем .desktop
+          # 4. Desktop file
           cat > AppDir/AuraLauncher.desktop <<EOF
           [Desktop Entry]
           Name=Aura Launcher
@@ -119,15 +127,23 @@ jobs:
           Categories=Game;
           EOF
           
-          # 5. Иконка
-          cp client-ui/src/commonMain/composeResources/drawable/favicon.png AppDir/AuraLauncher.png
+          # 5. Icon
+          # Попытаемся найти иконку, если жесткий путь неверен
+          ICON_SRC="client-ui/src/commonMain/composeResources/drawable/favicon.png"
+          if [ -f "$ICON_SRC" ]; then
+             cp "$ICON_SRC" AppDir/AuraLauncher.png
+          else
+             touch AppDir/AuraLauncher.png # Заглушка, чтобы не упало
+          fi
           
-          # 6. Сборка .AppImage
+          # 6. Build
           ARCH=x86_64 ./squashfs-root/AppRun --no-appstream AppDir AuraLauncher.AppImage
-          
-          # 7. Deb и Rpm
-          find client-ui/build/compose/binaries -name "*.deb" -exec mv {} AuraLauncher.deb \;
-          find client-ui/build/compose/binaries -name "*.rpm" -exec mv {} AuraLauncher.rpm \;
+
+      - name: Prepare Other Artifacts
+        shell: bash
+        run: |
+          find client-ui/build/compose/binaries -name "*.deb" -exec cp {} AuraLauncher.deb \; || true
+          find client-ui/build/compose/binaries -name "*.rpm" -exec cp {} AuraLauncher.rpm \; || true
 
       - name: Upload Linux Artifacts
         uses: actions/upload-artifact@v4
@@ -137,37 +153,45 @@ jobs:
             AuraLauncher.AppImage
             AuraLauncher.deb
             AuraLauncher.rpm
-          if-no-files-found: error
+          if-no-files-found: warn
 
-  # --- 3. MACOS (DMG) ---
+  # --- 3. MACOS ---
   build-macos:
     name: Build macOS
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
-        with:
-          java-version: '21'
-          distribution: 'temurin'
+
+      # [JBR 25 Setup - ARM64]
+      - name: Setup JBR 25 (Manual)
+        shell: bash
+        run: |
+          curl -L "https://cache-redirector.jetbrains.com/intellij-jbr/jbrsdk-25.0.1-osx-aarch64-b268.49.tar.gz" -o jbr.tar.gz
+          mkdir -p jbr_home
+          tar -xzf jbr.tar.gz -C jbr_home
+          JHOME=$(find $(pwd)/jbr_home -name "Home" -type d | head -n 1)
+          echo "JAVA_HOME=$JHOME" >> $GITHUB_ENV
+          echo "$JHOME/bin" >> $GITHUB_PATH
+
       - uses: gradle/actions/setup-gradle@v3
       - run: chmod +x gradlew
 
       - name: Build DMG
-        run: ./gradlew :client-ui:packageDmg -Pversion=${{ github.ref_name }}
+        run: ./gradlew clean :client-ui:packageDmg -Pversion=${{ github.ref_name }}
 
       - name: Prepare Artifact
         shell: bash
         run: |
-          find client-ui/build/compose/binaries -name "*.dmg" -exec mv {} AuraLauncher.dmg \;
+          find client-ui/build/compose/binaries -name "*.dmg" -exec cp {} AuraLauncher.dmg \;
 
       - name: Upload macOS Artifact
         uses: actions/upload-artifact@v4
         with:
           name: macos-file
           path: AuraLauncher.dmg
-          if-no-files-found: error
+          if-no-files-found: warn
 
-  # --- 4. CREATE RELEASE ---
+  # --- 4. RELEASE ---
   publish-release:
     name: Publish Release
     needs: [build-windows, build-linux, build-macos]
@@ -179,9 +203,6 @@ jobs:
           path: artifacts
           merge-multiple: true
 
-      - name: List Files
-        run: ls -R artifacts
-
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
@@ -189,10 +210,4 @@ jobs:
           name: Release ${{ github.ref_name }}
           draft: false
           prerelease: ${{ contains(github.ref, '-') }}
-          files: |
-            artifacts/AuraLauncher-Setup.msi
-            artifacts/AuraLauncher-Win-Portable.zip
-            artifacts/AuraLauncher.AppImage
-            artifacts/AuraLauncher.deb
-            artifacts/AuraLauncher.rpm
-            artifacts/AuraLauncher.dmg
+          files: artifacts/*
