@@ -1,13 +1,13 @@
 package hivens.config
 
 /**
- * Основная конфигурация лаунчера.
- * Здесь лежат только настройки логики, сети и инфраструктуры.
- * Никакого UI.
+ * Basic launcher configuration.
+ * Here are only the logic, network and infrastructure settings.
+ * No UI.
  */
 object AppConfig {
     // ==========================================
-    // 1. МЕТАДАННЫЕ
+    // 1. METADATA
     // ==========================================
     const val LAUNCHER_VERSION = "3.6.2"
     const val BRANDING_NAME = "smartycraft"
@@ -15,18 +15,18 @@ object AppConfig {
     const val CLIENT_VERSION = BuildConfig.FORK_VERSION
 
     // ==========================================
-    // 2. СЕТЬ И API
+    // 2. NETWORK & API
     // ==========================================
     const val BASE_URL = "https://www.smartycraft.ru"
     const val AUTH_URL = "$BASE_URL/launcher2/index.php"
     const val OFFICIAL_JAR_URL = "$BASE_URL/downloads/smartycraft.jar"
 
-    // Таймауты
+    // Timeouts
     const val TIMEOUT_CONNECT = 30_000L
     const val TIMEOUT_READ = 300_000L
 
     // ==========================================
-    // 3. ФАЙЛОВАЯ СИСТЕМА
+    // 3. FILE SYSTEM
     // ==========================================
     const val APP_DIR = ".aura"
     const val FILES_SETTINGS = "settings.json"
@@ -34,7 +34,7 @@ object AppConfig {
     const val FILES_HASH_CACHE = "smarty_hash.cache"
 
     // ==========================================
-    // 4. ЛЕГАСИ ПАРАМЕТРЫ (для совместимости с бэком)
+    // 4. LEGACY PARAMETERS (for compatibility with backend)
     // ==========================================
     const val DEFAULT_SERVER_ID = "Industrial"
     const val DEFAULT_LAUNCHER_HASH = "5515a4bdd5f532faf0db61b8263d1952"
@@ -43,7 +43,7 @@ object AppConfig {
     const val PROTOCOL_DEFAULT_CSUM = "d41d8cd98f00b204e9800998ecf8427e"
 
     // ==========================================
-    // 5. ПРОКСИ
+    // 5. PROXY
     // ==========================================
     object Proxy {
         const val HOST = "proxy.smartycraft.ru"

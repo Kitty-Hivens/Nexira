@@ -54,13 +54,13 @@ class AuthService(
     )
 
     override suspend fun login(username: String, password: String, serverId: String): SessionData {
-        logger.info("Вход через API V3 (сервер: {})...", serverId)
+        logger.info("Login via API V3 (server: {})...", serverId)
 
         val passwordEncoded = getMD5(password)
         val clientSessionId = UUID.randomUUID().toString().replace("-", "")
         val is64 = System.getProperty("os.arch").contains("64")
 
-        // Собираем объект запроса
+        // Building request object
         val requestPayload = AuthRequest(
             login = username,
             password = passwordEncoded,
@@ -74,7 +74,7 @@ class AuthService(
             javaHome = System.getProperty("java.home")
         )
 
-        // Сериализуем в строку JSON для отправки в поле формы
+        // Serialize to JSON string
         val jsonString = json.encodeToString(requestPayload)
 
         val response: AuthResponse = try {
@@ -85,39 +85,39 @@ class AuthService(
                     append("json", jsonString)
                 }
             )
-            // Читаем тело ответа как строку для ручной обработки ошибок
+            // Reading the response body as a string for manual error handling
             val rawBody = call.body<String>().trim()
 
-            // Обработка текстовых ошибок сервера
-            if (rawBody.contains("Bad login", ignoreCase = true)) throw AuthException(AuthStatus.BAD_LOGIN, "Неверный логин или пароль")
-            if (rawBody.contains("User not found", ignoreCase = true)) throw AuthException(AuthStatus.BAD_LOGIN, "Пользователь не найден")
+            // Handling text server errors
+            if (rawBody.contains("Bad login", ignoreCase = true)) throw AuthException(AuthStatus.BAD_LOGIN, "Invalid login or password")
+            if (rawBody.contains("User not found", ignoreCase = true)) throw AuthException(AuthStatus.BAD_LOGIN, "User not found")
 
-            // Парсим JSON
+            // Parse JSON
             json.decodeFromString(rawBody)
 
         } catch (e: Exception) {
             if (e is AuthException) throw e
-            logger.error("Ошибка авторизации", e)
-            throw AuthException(AuthStatus.INTERNAL_ERROR, "Ошибка сети: ${e.message}")
+            logger.error("Authorization error", e)
+            throw AuthException(AuthStatus.INTERNAL_ERROR, "Network Error: ${e.message}")
         }
 
-        // Логика проверки статуса
+        // Status check logic
         if (response.status != AuthStatus.OK && response.status != AuthStatus.LOGIN) {
             val msg = when (response.status) {
-                AuthStatus.BAD_LOGIN -> "Пользователь не найден"
-                AuthStatus.PASSWORD -> "Неверный пароль"
-                AuthStatus.NEED_2FA -> "Требуется 2FA"
-                AuthStatus.BANNED -> "Аккаунт заблокирован"
-                AuthStatus.ACTIVE -> "Аккаунт не активирован. Проверьте почту."
-                else -> "Ошибка сервера: ${response.status}"
+                AuthStatus.BAD_LOGIN -> "User not found"
+                AuthStatus.PASSWORD -> "Invalid password"
+                AuthStatus.NEED_2FA -> "2FA required"
+                AuthStatus.BANNED -> "Account blocked"
+                AuthStatus.ACTIVE -> "Account is not activated. Check your email."
+                else -> "Server error: ${response.status}"
             }
             throw AuthException(response.status ?: AuthStatus.INTERNAL_ERROR, msg)
         }
 
-        // Только если статус ОК, проверяем данные профиля
+        // Only if the status is OK, check the profile data
         if (response.uuid == null || response.playername == null) {
-            // Если пароль верный (OK), но сервер не прислал профиль — это внутренняя ошибка
-            throw AuthException(AuthStatus.INTERNAL_ERROR, "Неполные данные профиля")
+            // If the password is correct (OK), but the server did not send the profile, this is an internal error
+            throw AuthException(AuthStatus.INTERNAL_ERROR, "Incomplete profile data")
         }
 
         val finalGameToken = generateGameToken(response.uid, response.session)

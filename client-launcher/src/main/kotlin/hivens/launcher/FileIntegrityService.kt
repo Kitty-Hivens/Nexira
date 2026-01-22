@@ -10,8 +10,8 @@ import java.security.MessageDigest
 import java.security.NoSuchAlgorithmException
 
 /**
- * Реализация сервиса проверки целостности файлов.
- * Использует MD5 для вычисления хэшей.
+ * Implementation of a file integrity check service.
+ * Uses MD5 to calculate hashes.
  */
 class FileIntegrityService : IFileIntegrityService {
 
@@ -74,12 +74,12 @@ class FileIntegrityService : IFileIntegrityService {
                 val status = checkFile(absolutePath, expectedHash)
 
                 if (status != FileStatus.VALID) {
-                    // Файл отсутствует или поврежден, его нужно загрузить
+                    // File is missing or corrupted, needs to be downloaded
                     mismatchedFiles[relativePath] = expectedHash
                 }
             } catch (e: IOException) {
                 log.error("Failed to check integrity for {}", absolutePath, e)
-                // Принудительно добавляем файл в список на загрузку, если произошла ошибка I/O
+                // Force add file to download list if I/O error occurred
                 mismatchedFiles[relativePath] = expectedHash
             }
         }

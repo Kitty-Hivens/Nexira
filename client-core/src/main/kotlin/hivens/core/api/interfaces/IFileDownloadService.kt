@@ -5,18 +5,18 @@ import java.io.IOException
 import java.nio.file.Path
 
 /**
- * Контракт для сервиса загрузки файлов клиента.
+ * Contract for client file download service.
  */
 interface IFileDownloadService {
     /**
-     * Запускает полный процесс обработки сессии (парсинг манифеста, скачивание файлов, распаковка extra.zip).
-     * * @param session Сессия пользователя (содержит манифест файлов).
-     * @param serverId ID сервера (для логов).
-     * @param targetDir Папка клиента.
-     * @param extraCheckSum MD5 хеш для extra.zip (опционально).
-     * @param ignoredFiles Список игнорируемых файлов (опционально).
-     * @param messageUI Лямбда для сообщений UI (опционально).
-     * @param progressUI Лямбда для прогресса (текущее, всего) (опционально).
+     * Starts the full session processing (parsing the manifest, downloading files, unpacking extra.zip).
+     * * @param session User session (contains file manifest).
+     * @param serverId Server ID (for logs).
+     * @param targetDir Client folder.
+     * @param extraCheckSum MD5 hash for extra.zip (optional).
+     * @param ignoredFiles List of ignored files (optional).
+     * @param messageUI Lambda for UI messages (optional).
+     * @param progressUI Lambda for progress (current, total) (optional).
      */
     @Throws(IOException::class)
     suspend fun processSession(

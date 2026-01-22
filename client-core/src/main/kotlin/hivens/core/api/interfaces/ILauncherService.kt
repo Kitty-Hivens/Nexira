@@ -7,20 +7,20 @@ import java.io.IOException
 import java.nio.file.Path
 
 /**
- * Контракт для сервиса запуска клиента Minecraft.
+ * Contract for the Minecraft client launch service.
  */
 interface ILauncherService {
 
     /**
-     * Собирает и выполняет команду запуска клиента Minecraft.
+     * Collects and executes the Minecraft client launch command.
      *
-     * @param sessionData Данные сессии (accessToken, uuid, playerName).
-     * @param serverProfile Данные о выбранном сервере (версия, имя).
-     * @param clientRootPath Абсолютный путь к корню клиента.
-     * @param javaExecutablePath Абсолютный путь к исполняемому файлу java.
-     * @param allocatedMemoryMB Объем выделяемой памяти в МБ (e.g., 4096).
-     * @return Запущенный процесс (Process) для мониторинга.
-     * @throws IOException в случае ошибки I/O при запуске.
+     * @param sessionData Session data (accessToken, uuid, playerName).
+     * @param serverProfile Data about the selected server (version, name).
+     * @param clientRootPath The absolute path to the client root.
+     * @param javaExecutablePath The absolute path to the java executable.
+     * @param allocatedMemoryMB The amount of allocated memory in MB (e.g., 4096).
+     * @return The running process (Process) to monitor.
+     * @throws IOException if there is an I/O error at startup.
      */
     @Throws(IOException::class)
     suspend fun launchClient(

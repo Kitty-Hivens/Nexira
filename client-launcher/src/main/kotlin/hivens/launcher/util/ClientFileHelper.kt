@@ -6,13 +6,13 @@ import java.nio.file.Files
 import java.nio.file.Path
 
 /**
- * Утилитарный класс для общих операций с файлами клиента.
- * Устраняет дублирование кода между менеджерами.
+ * Utility class for general operations with client files.
+ * Eliminates code duplication between managers.
  */
 object ClientFileHelper {
 
     /**
-     * Безопасно создает директорию, если она не существует.
+     * Safely creates a directory if it does not exist.
      */
     fun ensureDirectoryExists(dir: Path) {
         if (!Files.exists(dir)) {
@@ -21,12 +21,12 @@ object ClientFileHelper {
     }
 
     /**
-     * Очищает директорию от всех файлов, кроме разрешенных (allowedFiles).
-     * Используется для синхронизации папки mods и natives.
+     * Clears the directory of all files except allowedFiles.
+     * Used to synchronize the mods and natives folders.
      *
-     * @param dir Целевая папка.
-     * @param allowedFiles Набор имен файлов, которые нужно оставить.
-     * @param logger Логгер вызывающего класса для записи операций.
+     * @param dir Target folder.
+     * @param allowedFiles The set of file names to keep.
+     * @param logger The calling class's logger for recording operations.
      */
     fun cleanDirectory(dir: Path, allowedFiles: Set<String>, logger: Logger) {
         if (!Files.exists(dir)) return
@@ -36,7 +36,7 @@ object ClientFileHelper {
                 stream.filter { Files.isRegularFile(it) }
                     .forEach { path ->
                         val fileName = path.fileName.toString()
-                        // Удаляем всё, что не в белом списке и похоже на исполняемые файлы/архивы
+                        // We delete everything that is not in the white list and looks like executable files/archives
                         val isRelevantExtension = fileName.endsWith(".jar") || 
                                                   fileName.endsWith(".zip") || 
                                                   fileName.endsWith(".litemod") || 

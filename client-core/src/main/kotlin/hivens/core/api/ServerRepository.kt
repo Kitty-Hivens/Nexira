@@ -19,7 +19,6 @@ class ServerRepository(
 ) {
     private val logger = LoggerFactory.getLogger("ServerRepository")
     private val cachedHashFile = File(AppConfig.FILES_HASH_CACHE)
-    // Устаревший хеш, который был зашит в коде
     private var currentHash = AppConfig.DEFAULT_LAUNCHER_HASH
 
     init {
@@ -32,29 +31,29 @@ class ServerRepository(
     }
 
     /**
-     * Получает данные дашборда. Если сервер просит обновление (UPDATE) — 
-     * скачивает JAR, обновляет хеш и повторяет запрос.
+     * Retrieves dashboard data. If the server requests an update (UPDATE) -
+     * downloads the JAR, updates the hash and repeats the request.
      */
     suspend fun fetchDashboard(): SmartyResponse {
         var response = requestDashboard(currentHash)
 
         if (response.status == "UPDATE") {
-            logger.info("Статус UPDATE. Начинаем обновление хеша...")
+            logger.info("UPDATE status. Let's start updating the hash...")
             val newHash = updateLauncherHash()
             if (newHash != null) {
                 currentHash = newHash
                 saveHash(newHash)
                 response = requestDashboard(newHash)
             } else {
-                logger.error("Не удалось обновить лаунчер. Возвращаем как есть.")
+                logger.error("Launcher update failed. We return it as is.")
             }
         }
         return response
     }
 
     private suspend fun requestDashboard(hash: String): SmartyResponse {
-        // Формируем JSON вручную, так как сервер ожидает строку JSON внутри поля формы "json"
-        // Это специфика старого PHP бэкенда SmartyCraft
+        // We generate JSON manually, since the server expects a JSON string inside the "json" form field
+        // This is a specificity of the old SmartyCraft PHP backend
         val requestPayload = DashboardRequest(
             version = AppConfig.LAUNCHER_VERSION,
             cheksum = hash
@@ -69,13 +68,13 @@ class ServerRepository(
                     append("json", payload)
                 }))
             }
-            // Читаем как строку, игнорируя Content-Type: text/html
+            // Read as a string, ignoring Content-Type: text/html
             val responseText = response.body<String>()
 
-            // Ручной парсинг
+            // Manual parsing
             json.decodeFromString<SmartyResponse>(responseText)
         } catch (e: Exception) {
-            logger.error("Ошибка получения дашборда", e)
+            logger.error("Error receiving dashboard", e)
             SmartyResponse(status = "ERROR", message = e.message)
         }
     }
@@ -87,7 +86,7 @@ class ServerRepository(
             val digest = md.digest(bytes)
             digest.joinToString("") { "%02x".format(it) }
         } catch (e: Exception) {
-            logger.error("Ошибка скачивания обновления", e)
+            logger.error("Error downloading update", e)
             null
         }
     }

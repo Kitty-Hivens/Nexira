@@ -4,7 +4,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * Продвинутая модель опциональной модификации.
+ * Advanced optional modification model.
  */
 @Serializable
 data class OptionalMod(

@@ -24,8 +24,8 @@ class JavaManagerService(
     private val runtimesDir: Path = baseDir.resolve("runtimes")
 
     /**
-     * Возвращает путь к исполняемому файлу Java.
-     * Если нужной версии нет — скачивает её.
+     * Returns the path to the Java executable.
+     * If the required version is not available, it downloads it.
      */
     suspend fun getJavaPath(version: String): Path = withContext(Dispatchers.IO) {
         val javaVersion = detectJavaVersion(version)
@@ -37,11 +37,11 @@ class JavaManagerService(
 
         findJavaExecutable(targetDir)?.let { return@withContext it }
 
-        log.info("Java {} ({}/{}) не найдена локально. Начинаем загрузку...", javaVersion, os, arch)
+        log.info("Java {} ({}/{}) was not found locally. We are starting to download...", javaVersion, os, arch)
         downloadAndUnpack(javaVersion, targetDir)
 
         val executable = findJavaExecutable(targetDir)
-            ?: throw IOException("Java была скачана, но исполняемый файл не найден!")
+            ?: throw IOException("Java was downloaded, but the executable file was not found!")
 
         if (os != "win") {
             setExecutablePermissions(executable)
@@ -60,24 +60,24 @@ class JavaManagerService(
 
     private suspend fun downloadAndUnpack(version: Int, targetDir: Path) {
         val url = getDownloadUrl(version)
-            ?: throw IOException("Нет сборки Java для этой системы (${getOsName()} ${getArchName()})")
+            ?: throw IOException("There is no Java build for this system (${getOsName()} ${getArchName()})")
 
         val isZip = url.endsWith(".zip")
         val archive = Files.createTempFile("java_pkg", if (isZip) ".zip" else ".tar.gz")
 
         try {
-            log.info("Скачивание Java: $url")
+            log.info("Download Java: $url")
 
             httpClient.prepareGet(url).execute { httpResponse ->
                 if (!httpResponse.status.isSuccess()) {
-                    throw IOException("Ошибка загрузки: ${httpResponse.status}")
+                    throw IOException("Loading error: ${httpResponse.status}")
                 }
                 val channel = httpResponse.bodyAsChannel()
                 val fileStream = FileOutputStream(archive.toFile())
                 channel.copyTo(fileStream)
             }
 
-            log.info("Распаковка в $targetDir")
+            log.info("Unpacking to $targetDir")
             deleteDirectoryRecursively(targetDir)
             Files.createDirectories(targetDir)
 
@@ -106,7 +106,7 @@ class JavaManagerService(
             arch.contains("aarch64") || arch.contains("arm64") -> "arm64"
             arch.contains("64") -> "x64"
             arch.contains("86") || arch.contains("32") -> "x32"
-            else -> "x64" // Дефолт для странных случаев
+            else -> "x64" // Default for strange cases
         }
     }
 
@@ -127,10 +127,10 @@ class JavaManagerService(
         if (!Files.exists(path)) return
         Files.walkFileTree(path, object : SimpleFileVisitor<Path>() {
             override fun visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult {
-                // Снимаем атрибуты Read-Only перед удалением
+                // Remove Read-Only attributes before deleting
                 try {
                     Files.setAttribute(file, "dos:readonly", false)
-                } catch (_: Exception) { /* Игнорируем на не-Windows */ }
+                } catch (_: Exception) { /* Ignorable on non-Windows */ }
 
                 Files.delete(file)
                 return FileVisitResult.CONTINUE
@@ -144,17 +144,17 @@ class JavaManagerService(
 
     private fun setExecutablePermissions(path: Path) {
         try {
-            // Работает на Unix-системах (Linux/Mac)
+            // Works on Unix systems (Linux/Mac)
             val permissions = Files.getPosixFilePermissions(path).toMutableSet()
-            // Добавляем rwx-r-x-r-x
+            // Add rwx-r-x-r-x
             permissions.add(PosixFilePermission.OWNER_EXECUTE)
             permissions.add(PosixFilePermission.GROUP_EXECUTE)
             permissions.add(PosixFilePermission.OTHERS_EXECUTE)
             Files.setPosixFilePermissions(path, permissions)
         } catch (_: UnsupportedOperationException) {
-            // На Windows игнорируем
+            // Ignorable on Windows
         } catch (e: Exception) {
-            log.warn("Не удалось установить права на исполнение для $path: ${e.message}")
+            log.warn("Failed to set execution rights for $path: ${e.message}")
         }
     }
 
@@ -162,7 +162,7 @@ class JavaManagerService(
         ZipInputStream(FileInputStream(zip)).use { zis ->
             var entry = zis.nextEntry
             while (entry != null) {
-                // Защита от Zip Slip уязвимости
+                // Protection against Zip Slip vulnerabilities
                 val resolvedPath = dest.resolve(entry.name).normalize()
                 if (!resolvedPath.startsWith(dest)) {
                     throw IOException("Zip entry is outside of the target dir: ${entry.name}")
@@ -196,8 +196,8 @@ class JavaManagerService(
                             } else {
                                 Files.createDirectories(resolvedPath.parent)
                                 Files.copy(tai, resolvedPath, StandardCopyOption.REPLACE_EXISTING)
-                                // Восстановление прав на исполнение из архива (для Linux/Mac)
-                                if (getOsName() != "win" && (entry.mode and 0b001_000_001) != 0) { // Проверяем бит execute
+                                // Restoring execution rights from an archive (for Linux/Mac)
+                                if (getOsName() != "win" && (entry.mode and 0b001_000_001) != 0) { // Checking the execute bit
                                     setExecutablePermissions(resolvedPath)
                                 }
                             }
@@ -213,27 +213,27 @@ class JavaManagerService(
         val os = getOsName()
         val arch = getArchName()
         return when (version) {
-            8 -> when {
-                os == "win" && arch == "x64" -> "https://download.bell-sw.com/java/8u472+9/bellsoft-jdk8u472+9-windows-amd64-full.zip"
-                os == "win" && arch == "x32" -> "https://download.bell-sw.com/java/8u472+9/bellsoft-jdk8u472+9-windows-i586.zip"
-                os == "linux" && arch == "x64" -> "https://download.bell-sw.com/java/8u472+9/bellsoft-jdk8u472+9-linux-amd64-full.tar.gz"
-                os == "mac" && arch == "x64" -> "https://download.bell-sw.com/java/8u472+9/bellsoft-jdk8u472+9-macos-amd64-full.tar.gz"
-                os == "mac" && arch == "arm64" -> "https://download.bell-sw.com/java/8u472+9/bellsoft-jdk8u472+9-macos-aarch64.tar.gz"
+            8 -> when (os) {
+                "win" if arch == "x64" -> "https://download.bell-sw.com/java/8u472+9/bellsoft-jdk8u472+9-windows-amd64-full.zip"
+                "win" if arch == "x32" -> "https://download.bell-sw.com/java/8u472+9/bellsoft-jdk8u472+9-windows-i586.zip"
+                "linux" if arch == "x64" -> "https://download.bell-sw.com/java/8u472+9/bellsoft-jdk8u472+9-linux-amd64-full.tar.gz"
+                "mac" if arch == "x64" -> "https://download.bell-sw.com/java/8u472+9/bellsoft-jdk8u472+9-macos-amd64-full.tar.gz"
+                "mac" if arch == "arm64" -> "https://download.bell-sw.com/java/8u472+9/bellsoft-jdk8u472+9-macos-aarch64.tar.gz"
                 else -> null
             }
-            17 -> when {
-                os == "win" && arch == "x64" -> "https://download.bell-sw.com/java/17.0.17+15/bellsoft-jdk17.0.17+15-windows-amd64-full.zip"
-                os == "win" && arch == "x32" -> "https://download.bell-sw.com/java/17.0.17+15/bellsoft-jdk17.0.17+15-windows-i586-full.zip"
-                os == "linux" && arch == "x64" -> "https://download.bell-sw.com/java/17.0.17+15/bellsoft-jdk17.0.17+15-linux-amd64-full.tar.gz"
-                os == "mac" && arch == "x64" -> "https://download.bell-sw.com/java/17.0.17+15/bellsoft-jdk17.0.17+15-macos-amd64-full.tar.gz"
-                os == "mac" && arch == "arm64" -> "https://download.bell-sw.com/java/17.0.17+15/bellsoft-jdk17.0.17+15-macos-aarch64-full.tar.gz"
+            17 -> when (os) {
+                "win" if arch == "x64" -> "https://download.bell-sw.com/java/17.0.17+15/bellsoft-jdk17.0.17+15-windows-amd64-full.zip"
+                "win" if arch == "x32" -> "https://download.bell-sw.com/java/17.0.17+15/bellsoft-jdk17.0.17+15-windows-i586-full.zip"
+                "linux" if arch == "x64" -> "https://download.bell-sw.com/java/17.0.17+15/bellsoft-jdk17.0.17+15-linux-amd64-full.tar.gz"
+                "mac" if arch == "x64" -> "https://download.bell-sw.com/java/17.0.17+15/bellsoft-jdk17.0.17+15-macos-amd64-full.tar.gz"
+                "mac" if arch == "arm64" -> "https://download.bell-sw.com/java/17.0.17+15/bellsoft-jdk17.0.17+15-macos-aarch64-full.tar.gz"
                 else -> null
             }
-            21 -> when {
-                os == "win" && arch == "x64" -> "https://download.bell-sw.com/java/21.0.9+15/bellsoft-jdk21.0.9+15-windows-amd64-full.zip"
-                os == "linux" && arch == "x64" -> "https://download.bell-sw.com/java/21.0.9+15/bellsoft-jdk21.0.9+15-linux-amd64-full.tar.gz"
-                os == "mac" && arch == "x64" -> "https://download.bell-sw.com/java/21.0.9+15/bellsoft-jdk21.0.9+15-macos-amd64-full.tar.gz"
-                os == "mac" && arch == "arm64" -> "https://download.bell-sw.com/java/21.0.9+15/bellsoft-jdk21.0.9+15-macos-aarch64-full.tar.gz"
+            21 -> when (os) {
+                "win" if arch == "x64" -> "https://download.bell-sw.com/java/21.0.9+15/bellsoft-jdk21.0.9+15-windows-amd64-full.zip"
+                "linux" if arch == "x64" -> "https://download.bell-sw.com/java/21.0.9+15/bellsoft-jdk21.0.9+15-linux-amd64-full.tar.gz"
+                "mac" if arch == "x64" -> "https://download.bell-sw.com/java/21.0.9+15/bellsoft-jdk21.0.9+15-macos-amd64-full.tar.gz"
+                "mac" if arch == "arm64" -> "https://download.bell-sw.com/java/21.0.9+15/bellsoft-jdk21.0.9+15-macos-aarch64-full.tar.gz"
                 else -> null
             }
             else -> null

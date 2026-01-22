@@ -119,7 +119,7 @@ compose.desktop {
     }
 }
 
-// Конфигурация компилятора K2 под JDK 25
+// K2 compiler configuration under JDK 25
 tasks.withType<KotlinJvmCompile>().configureEach {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_25)

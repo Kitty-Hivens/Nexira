@@ -9,14 +9,14 @@ import androidx.compose.material.lightColors
 import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.Color
 
-// --- ЦВЕТОВЫЕ ПАЛИТРЫ ---
+// --- COLOR PALETTES ---
 
 private val DarkColorPalette = CelestiaColors(
-    primary = Color(0xFFBB86FC),       // Мягкий фиолетовый
+    primary = Color(0xFFBB86FC), // Soft purple
     primaryVariant = Color(0xFF3700B3),
     secondary = Color(0xFF03DAC6),
-    background = Color(0xFF121212),    // Почти черный, но не #000
-    surface = Color(0xFF1E1E1E),       // Чуть светлее для карточек
+    background = Color(0xFF121212), // Almost black, but not #000
+    surface = Color(0xFF1E1E1E), // A little lighter for cards
     error = Color(0xFFCF6679),
     onPrimary = Color.Black,
     onSecondary = Color.Black,
@@ -24,8 +24,8 @@ private val DarkColorPalette = CelestiaColors(
     onSurface = Color.White,
     textPrimary = Color(0xFFEEEEEE),
     textSecondary = Color(0xFFB0B0B0),
-    glassBackground = Color(0xFF000000), // Основа для стекла
-    glassAlpha = 0.60f,                  // Прозрачность стекла (темное)
+    glassBackground = Color(0xFF000000), // Base for glass
+    glassAlpha = 0.60f, // Glass transparency (dark)
     success = Color(0xFF4CAF50)
 )
 

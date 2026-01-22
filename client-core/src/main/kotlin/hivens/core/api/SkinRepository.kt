@@ -15,7 +15,7 @@ import java.security.MessageDigest
 
 class SkinRepository(
     private val client: HttpClient,
-    private val json: Json // Инжектим Json для ручной сериализации payload
+    private val json: Json
 ) {
     private val logger = LoggerFactory.getLogger("SkinRepository")
 
@@ -23,11 +23,11 @@ class SkinRepository(
         val type = if (isCloak) "cloak" else "skin"
         val action = if (isCloak) "cloakupload" else "skinupload"
         
-        // 1. Подготовка JSON payload (login)
+        // 1. Preparation JSON payload (login)
         val jsonPayload = """{"login":"${session.playerName}"}"""
 
-        // 2. Генерация подписи (MD5)
-        // Логика из SmartyNetworkService: MD5( (time/10) + "|" + uid + "|" + login )
+        // 2. Generation of signatures (MD5)
+        // Logic from SmartyNetworkService: MD5( (time/10) + "|" + uid + "|" + login )
         val timestamp = System.currentTimeMillis() / 1000L / 10L
         val signString = "$timestamp|${session.uid}|${session.playerName}"
         val checkHash = getMD5(signString)
@@ -47,10 +47,10 @@ class SkinRepository(
                 ))
             }
 
-            // Обработка ответа. Сервер может вернуть JSON или просто текст.
+            // Response processing. The server can return JSON or just text.
             val bodyText = response.body<String>().trim()
             
-            // Попытка распарсить как JSON
+            // Trying to parse as JSON
             if (bodyText.startsWith("{")) {
                 try {
                     val respObj = json.decodeFromString<SmartyResponse>(bodyText)
@@ -64,17 +64,17 @@ class SkinRepository(
             return bodyText
             
         } catch (e: Exception) {
-            logger.error("Ошибка загрузки ассета", e)
-            "Ошибка соединения: ${e.message}"
+            logger.error("Error loading asset", e)
+            "Connection error: ${e.message}"
         }
     }
 
     private fun mapErrorStatus(status: String?): String {
         return when (status) {
-            "SIZE" -> "Ошибка: Неверный размер (нужен 64x32/64x64)"
-            "TYPE" -> "Ошибка: Неверный формат файла"
-            "HD" -> "Ошибка: HD скины доступны только премиум аккаунтам"
-            else -> "Ошибка сервера: $status"
+            "SIZE" -> "Error: Invalid size (need 64x32/64x64)"
+            "TYPE" -> "Error: Invalid file format"
+            "HD" -> "Error: HD skins are not available on your account"
+            else -> "Server error: $status"
         }
     }
 

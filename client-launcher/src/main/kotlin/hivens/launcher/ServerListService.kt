@@ -30,7 +30,7 @@ class ServerListService(private val repository: ServerRepository) : IServerListS
             try {
                 val response = repository.fetchDashboard()
 
-                // Маппинг данных
+                // Data mapping
                 val servers = response.servers.map { getProfile(it) }
                 val news = response.news.map { newsDto ->
                     val imageName = if (newsDto.image.endsWith(".jpg")) newsDto.image else "${newsDto.image}.jpg"
@@ -39,7 +39,7 @@ class ServerListService(private val repository: ServerRepository) : IServerListS
                     NewsItem(
                         id = newsDto.id,
                         title = newsDto.name,
-                        description = "Просмотров: ${newsDto.views}",
+                        description = "Views: ${newsDto.views}",
                         date = formatTimestamp(newsDto.date),
                         imageUrl = imageUrl
                     )
