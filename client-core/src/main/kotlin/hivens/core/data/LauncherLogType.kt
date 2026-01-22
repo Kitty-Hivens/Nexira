@@ -1,7 +1,7 @@
 package hivens.core.data
 
 /**
- * Тип сообщения лога, приходящего от процесса Minecraft.
+ * Type of log message coming from the Minecraft process.
  */
 enum class LauncherLogType {
     INFO,

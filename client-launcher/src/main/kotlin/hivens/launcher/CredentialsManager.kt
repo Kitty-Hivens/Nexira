@@ -16,21 +16,21 @@ class CredentialsManager(
     private val log = LoggerFactory.getLogger(CredentialsManager::class.java)
     private val credentialsFile = workDir.resolve("credentials.json")
 
-    // DTO для хранения только нужных полей (безопаснее, чем дампить весь SessionData)
+    // DTO to store only the fields you need (safer than dumping the entire SessionData)
     @Serializable
     private data class SavedCredentials(
         val username: String,
         val accessToken: String,
         val uuid: String,
         val uid: String? = null,
-        // Пароль хранить в открытом виде плохо, но для совместимости с SessionData сохраняем. TODO
-        // В идеале здесь должно быть шифрование или использование OS Keyring.
-        // Для простоты кодируем в Base64, чтобы он не лежал plain-text'ом (защита "от честных людей").
+        // It’s bad to store the password in clear text, but for compatibility with SessionData we save it. TODO
+        // Ideally, there should be encryption or use of OS Keyring.
+        // For simplicity, we encode it in Base64 so that it is not plain-text (protection “from honest people”).
         val savedPasswordBase64: String? = null
     )
 
     fun save(session: SessionData) {
-        // Сохраняем, только если пользователь просил или сессия валидна
+        // We save only if the user requested or the session is valid
         if (session.accessToken.isBlank()) return
 
         try {
@@ -52,7 +52,7 @@ class CredentialsManager(
             Files.writeString(credentialsFile, text)
 
         } catch (e: IOException) {
-            log.error("Не удалось сохранить данные входа", e)
+            log.error("Could not save login information", e)
         }
     }
 
@@ -67,18 +67,18 @@ class CredentialsManager(
                 String(Base64.getDecoder().decode(it))
             }
 
-            // Восстанавливаем SessionData.
-            // Остальные поля (manifest, balance) подтянутся при обновлении профиля.
+            // Restoring SessionData.
+            // The remaining fields (manifest, balance) will be updated when the profile is updated.
             SessionData(
                 playerName = data.username,
                 accessToken = data.accessToken,
                 uuid = data.uuid,
                 uid = data.uid ?: "",
                 cachedPassword = passwordDecoded,
-                status = null // Статус неизвестен до повторной проверки
+                status = null // Status unknown until rechecked
             )
         } catch (e: Exception) {
-            log.error("Ошибка чтения файла credentials.json", e)
+            log.error("Error reading credentials.json file", e)
             null
         }
     }
@@ -87,7 +87,7 @@ class CredentialsManager(
         try {
             Files.deleteIfExists(credentialsFile)
         } catch (e: IOException) {
-            log.warn("Не удалось удалить файл credentials", e)
+            log.warn("Failed to delete credentials file", e)
         }
     }
 }

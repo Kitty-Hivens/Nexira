@@ -3,15 +3,15 @@ plugins {
     id("com.github.gmazzo.buildconfig")
 }
 
-// Настраиваем генерацию класса
+// Set up class generation
 buildConfig {
-    // Указываем пакет, куда сгенерируется класс
+    // Specify the package where the class will be generated
     packageName("hivens.config")
 
-    // Генерируем поле VERSION, беря его из project.version
-    // project.version уже установлено в корневом скрипте
+    // Generate the VERSION field, taking it from project.version
+    // project.version is already installed in the root script
     buildConfigField("String", "FORK_VERSION", "\"${project.version}\"")
 
-    // И время сборки...
+    // And build time...
     buildConfigField("long", "BUILD_TIME", "${System.currentTimeMillis()}L")
 }

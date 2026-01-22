@@ -7,25 +7,25 @@ import java.util.*
 @Serializable
 enum class SeasonTheme(val title: String) {
     @SerialName("AUTO")
-    AUTO("Автоматически"),
+    AUTO("Automatically"),
 
     @SerialName("NONE")
-    NONE("Отключено"),
+    NONE("Disabled"),
 
     @SerialName("WINTER")
-    WINTER("Зима (Снег)"),
+    WINTER("Winter (Snow)"),
 
     @SerialName("NEW_YEAR")
-    NEW_YEAR("Новый год"),
+    NEW_YEAR("New Year"),
 
     @SerialName("SPRING")
-    SPRING("Весна (Сакура)"),
+    SPRING("Spring (Sakura)"),
 
     @SerialName("SUMMER")
-    SUMMER("Лето (Светлячки)"),
+    SUMMER("Summer (Fireflies)"),
 
     @SerialName("AUTUMN")
-    AUTUMN("Осень (Листопад)");
+    AUTUMN("Autumn (Leaf fall)");
 
     companion object {
         fun getCurrentSeasonalTheme(): SeasonTheme {

@@ -10,13 +10,13 @@ interface IManifestProcessorService {
     fun processManifest(version: String): FileManifest?
 
     /**
-     * Рекурсивно "выпрямляет" (flattens) древовидный манифест файлов.
-     * @return Плоская карта путь -> данные.
+     * Recursively "flattens" the tree file manifest.
+     * @return Flat map path -> data.
      */
     fun flattenManifest(manifest: FileManifest): Map<String, FileData>
 
     /**
-     * Возвращает список опциональных модификаций для конкретного профиля.
+     * Returns a list of optional modifications for a specific profile.
      */
     fun getOptionalModsForClient(profile: ServerProfile): List<OptionalMod>
 }
