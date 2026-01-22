@@ -7,20 +7,20 @@ import java.io.InputStreamReader
 import kotlin.concurrent.thread
 
 /**
- * Компонент асинхронного перехвата потоков ввода-вывода (IO Pipe).
+ * Component for asynchronous interception of I/O streams (IO Pipe).
  *
- * Обеспечивает перенаправление `STDOUT` и `STDERR` дочернего процесса
- * в callback-функцию GUI без блокировки основного потока.
+ * Provides redirection of `STDOUT` and `STDERR` of the child process
+ * into a GUI callback function without blocking the main thread.
  */
 internal class ProcessLogHandler {
     
     /**
-     * Подключает слушатели к потокам процесса.
+     * Connects listeners to process threads.
      *
-     * Создает демонические потоки, живущие до завершения процесса игры.
+     * Creates demonic threads that live until the game process ends.
      *
-     * @param process Целевой процесс.
-     * @param onLog Функция-обработчик строки лога.
+     * @param process The target process.
+     * @param onLog Log line handler function.
      */
     fun attach(process: Process, onLog: (String, LauncherLogType) -> Unit) {
         pipeOutput(process.inputStream, LauncherLogType.INFO, onLog)
@@ -47,7 +47,7 @@ internal class ProcessLogHandler {
                     if (finalType == LauncherLogType.ERROR) System.err.println(text) else println(text)
                 }
             } catch (_: Exception) {
-                // Игнорируем EOF при завершении процесса
+                // Ignore EOF when terminating the process
             }
         }
     }

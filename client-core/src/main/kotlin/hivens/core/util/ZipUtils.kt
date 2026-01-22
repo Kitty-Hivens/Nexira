@@ -18,11 +18,11 @@ object ZipUtils {
             while (zipEntry != null) {
                 val newFile = File(destDir, zipEntry.name)
 
-                // Защита от Zip Slip (уязвимость выхода за пределы папки)
+                // Zip Slip protection (preventing path traversal vulnerability)
                 val destDirPath = destDir.canonicalPath
                 val destFilePath = newFile.canonicalPath
                 if (!destFilePath.startsWith(destDirPath + File.separator)) {
-                    logger.warn("Пропущена попытка выхода за пределы папки при распаковке: {}", zipEntry.name)
+                    logger.warn("Missed attempt to go outside the folder when unpacking: {}", zipEntry.name)
                     zipEntry = zis.nextEntry
                     continue
                 }

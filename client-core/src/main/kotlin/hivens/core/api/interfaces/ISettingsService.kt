@@ -4,13 +4,13 @@ import hivens.core.data.SettingsData
 
 interface ISettingsService {
     /**
-     * Возвращает текущие настройки (из кэша памяти).
-     * Если не загружены — загружает.
+     * Returns current settings (from memory cache).
+     * If not loaded, it loads.
      */
     fun getSettings(): SettingsData
 
     /**
-     * Сохраняет настройки на диск.
+     * Saves settings to disk.
      */
     fun saveSettings(settings: SettingsData)
 }

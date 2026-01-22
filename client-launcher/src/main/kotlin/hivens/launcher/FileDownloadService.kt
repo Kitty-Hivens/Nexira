@@ -32,7 +32,7 @@ class FileDownloadService(
         private val logger = LoggerFactory.getLogger(FileDownloadService::class.java)
         private const val DOWNLOAD_BASE_URL = "https://www.smartycraft.ru/launcher/clients/"
 
-        // Папки, которые нельзя "обрезать" при нормализации путей
+        // Directories that cannot be "trimmed" during path normalization
         private val ROOT_DIRS = setOf(
             "mods", "config", "bin", "assets", "libraries", "resources",
             "saves", "resourcepacks", "shaderpacks", "natives"
@@ -48,13 +48,13 @@ class FileDownloadService(
         messageUI: ((String) -> Unit)?,
         progressUI: ((Int, Int, Long, Long, String) -> Unit)?
     ) = withContext(Dispatchers.IO) {
-        val manifest = session.fileManifest ?: throw IOException("Манифест файлов пуст!")
+        val manifest = session.fileManifest ?: throw IOException("File manifest is empty!")
         Files.createDirectories(targetDir)
 
-        // 1. Получаем карту Path -> FileData
+        // 1. Flatten manifest
         val filesMap = flattenManifest(manifest)
 
-        // 2. Фильтрация
+        // 2. Filtering
         if (!ignoredFiles.isNullOrEmpty()) {
             filesMap.keys.removeIf { relativePath ->
                 val clean = normalizePath(relativePath)
@@ -63,15 +63,15 @@ class FileDownloadService(
             cleanupIgnoredFiles(targetDir, ignoredFiles)
         }
 
-        // 3. Скачивание с подсчетом байтов
+        // 3. Downloading
         downloadMissingFiles(targetDir, filesMap, messageUI, progressUI)
 
-        // 4. Extra.zip (конфиги)
+        // 4. Processing Extra.zip
         processExtraZip(targetDir, filesMap, extraCheckSum, messageUI)
     }
 
     /**
-     * Рекурсивно обходит манифест и собирает все файлы в одну карту.
+     * Recursively traverses the manifest and collects all files into one map.
      */
     private fun flattenManifest(manifest: FileManifest): MutableMap<String, FileData> {
         val result = HashMap<String, FileData>()
@@ -94,35 +94,35 @@ class FileDownloadService(
         messageUI: ((String) -> Unit)?,
         progressUI: ((Int, Int, Long, Long, String) -> Unit)?
     ) {
-        // ЭТАП 1: Проверка хешей
-        messageUI?.invoke("Сверка хеш-сумм...")
+        // STEP 1: Checking hashes
+        messageUI?.invoke("Checking file integrity...")
 
-        // Тут происходит тяжелая работа (чтение файлов с диска)
+        // Heavy operation (reading files from disk)
         val filesToDownload = files.filter { (path, data) ->
             isFileMissingOrChanged(baseDir.resolve(normalizePath(path)), data.md5)
         }
 
         val totalFilesCount = filesToDownload.size
-        // Считаем общий размер (если size нет, будет 0)
+        // We count the total size (if there is no size, it will be 0)
         val totalBytesToDownload = filesToDownload.values.sumOf { it.size }
 
         if (totalFilesCount == 0) {
-            messageUI?.invoke("Файлы проверены, обновлений нет.")
+            messageUI?.invoke("Files verified, no updates found.")
             return
         }
 
-        // ЭТАП 2: Скачивание
-        messageUI?.invoke("Загрузка обновлений ($totalFilesCount файлов)...")
+        // STEP 2: Download
+        messageUI?.invoke("Downloading updates ($totalFilesCount files)...")
 
-        // Атомики для потокобезопасного счета
+        // Atomics for thread-safe counting
         val currentFileCounter = AtomicInteger(0)
         val downloadedBytesGlobal = AtomicLong(0)
-        val semaphore = Semaphore(5) // Ограничение в 5 потоков
+        val semaphore = Semaphore(5) // Limit of 5 threads
 
         val startTime = System.currentTimeMillis()
 
         coroutineScope {
-            // Тикер для UI
+            // Ticker for UI
             val monitorJob = launch(Dispatchers.Main) {
                 while (isActive) {
                     val currentBytes = downloadedBytesGlobal.get()
@@ -145,7 +145,7 @@ class FileDownloadService(
                 }
             }
 
-            // Скачивание
+            // Downloading
             val tasks = filesToDownload.map { (rawPath, _) ->
                 async(Dispatchers.IO) {
                     if (!isActive) throw CancellationException()
@@ -157,7 +157,7 @@ class FileDownloadService(
                         val targetFile = baseDir.resolve(cleanPath)
 
                         downloadFileInternal(rawPath, targetFile) { bytesRead ->
-                            // Просто увеличиваем счетчик. UI не трогаем.
+                            // We just increase the counter. We don't touch the UI.
                             downloadedBytesGlobal.addAndGet(bytesRead.toLong())
                             if (!isActive) throw CancellationException()
                         }
@@ -167,14 +167,14 @@ class FileDownloadService(
                 }
             }
 
-            // Ждем завершения всех загрузок
+            // We are waiting for all downloads to complete
             try {
                 tasks.awaitAll()
             } finally {
                 monitorJob.cancel()
             }
 
-            // Финальный апдейт (100%)
+            // Final update (100%)
             if (isActive) {
                 progressUI?.invoke(
                     totalFilesCount, totalFilesCount,
@@ -219,19 +219,19 @@ class FileDownloadService(
     }
 
     /**
-     * Проверяет, нужно ли качать файл (нет файла, пустой, или хеш не совпал).
+     * Checks whether the file needs to be downloaded (no file, empty, or the hash does not match).
      */
     private fun isFileMissingOrChanged(file: Path, expectedMd5: String): Boolean {
         if (!Files.exists(file)) return true
         if (Files.isDirectory(file)) return false
-        if (expectedMd5 == "any") return false // "any" хеш означает "не проверять"
+        if (expectedMd5 == "any") return false // "any" hash means "do not check"
 
         return try {
             if (Files.size(file) == 0L) return true
             val localMd5 = calculateMD5(file)
             !localMd5.equals(expectedMd5, ignoreCase = true)
         } catch (_: Exception) {
-            true // При любой ошибке чтения лучше перекачать
+            true // In case of any reading error, it is better to re-download
         }
     }
 
@@ -247,13 +247,13 @@ class FileDownloadService(
         if (Files.exists(localZip)) {
             var needUnzip = true
 
-            // Если сервер прислал хеш для проверки конфигов (extraCheckSum)
+            // If the server sent a hash to check configs (extraCheckSum)
             if (!serverCheckSum.isNullOrEmpty()) {
                 val localHash = try {
                     calculateMD5(localZip)
                 } catch(_: Exception) { "" }
 
-                // Если хеш на диске совпадает с тем, что требует сервер профиля — распаковка не нужна
+                // If the hash on disk matches what the profile server requires, no unpacking is needed
                 if (localHash.equals(serverCheckSum, ignoreCase = true)) {
                     needUnzip = false
                 }
@@ -261,27 +261,27 @@ class FileDownloadService(
 
             if (needUnzip) {
                 try {
-                    messageUI?.invoke("Настройка клиента...")
+                    messageUI?.invoke("Setting up the client...")
                     ZipUtils.unzip(localZip.toFile(), baseDir.toFile())
                 } catch (e: Exception) {
-                    logger.error("Ошибка распаковки extra.zip", e)
+                    logger.error("Error unpacking extra.zip", e)
                 }
             }
         }
     }
 
     /**
-     * Убирает префиксы типа "Industrial/mods/..." -> "mods/..."
+     * Removes prefixes like "Industrial/mods/..." -> "mods/..."
      */
     private fun normalizePath(rawPath: String): String {
         val parts = rawPath.split("/")
         if (parts.size < 2) return rawPath
 
-        // Если первая часть пути похожа на стандартную папку, оставляем как есть
+        // If the first part of the path looks like a standard folder, leave it as is
         val root = parts[0]
         if (ROOT_DIRS.any { root.startsWith(it) }) return rawPath
 
-        // Иначе отрезаем первую папку (это имя сервера/сборки)
+        // Otherwise, cut off the first folder (this is the name of the server/build)
         return rawPath.substring(root.length + 1)
     }
 
@@ -303,7 +303,7 @@ class FileDownloadService(
 
         if (Files.exists(modsDir)) {
             try {
-                // Рекурсивный поиск файлов для удаления
+                // Recursive search for files to delete
                 Files.walk(modsDir)
                     .filter { Files.isRegularFile(it) }
                     .forEach { file ->
@@ -313,17 +313,17 @@ class FileDownloadService(
                                 Files.delete(file)
                                 deletedCount++
                             } catch (e: Exception) {
-                                logger.warn("Не удалось удалить отключенный мод: $fileName", e)
+                                logger.warn("Failed to remove disabled mod: $fileName", e)
                             }
                         }
                     }
             } catch (e: Exception) {
-                logger.error("Ошибка очистки папки mods: ${e.message}")
+                logger.error("Error cleaning mods folder: ${e.message}")
             }
         }
 
         if (deletedCount > 0) {
-            logger.info("Очистка клиента: удалено $deletedCount выключенных модов.")
+            logger.info("Client cleanup: deleted $deletedCount disabled mods.")
         }
     }
 }

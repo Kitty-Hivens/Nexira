@@ -3,7 +3,7 @@ package hivens.core.api
 import hivens.core.data.AuthStatus
 
 /**
- * Исключение, выбрасываемое при неудачной аутентификации на сервере.
+ * The exception thrown when authentication to the server fails.
  */
 class AuthException(
     val status: AuthStatus,

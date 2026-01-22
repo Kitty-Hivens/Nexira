@@ -17,17 +17,17 @@ class ProfileManager(
     private val log = LoggerFactory.getLogger(ProfileManager::class.java)
     private val fileName = AppConfig.FILES_PROFILES
 
-    // Хранилище профилей
+    // Profile storage
     private val profiles = ConcurrentHashMap<String, InstanceProfile>()
 
-    // Хранилище избранного (НОВОЕ)
-    // Используем synchronizedSet или просто HashSet с синхронизацией при записи,
-    // но для простоты чтения в UI сделаем копирование при get.
+    // Favorites Vault
+    // We use synchronizedSet or simply HashSet with synchronization when writing,
+    // but for ease of reading in the UI, we’ll make a copy during get.
     private val _favorites = ConcurrentHashMap.newKeySet<String>()
 
     var lastServerId: String? = null
 
-    // Публичный доступ к избранному (для UI)
+    // Public access to favorites (for UI)
     val favoriteServers: Set<String>
         get() = _favorites.toSet()
 
@@ -43,7 +43,7 @@ class ProfileManager(
     }
 
     /**
-     * Переключает статус избранного для сервера.
+     * Toggles the favorite status for the server.
      */
     fun toggleFavorite(assetDir: String) {
         if (_favorites.contains(assetDir)) {
@@ -72,7 +72,7 @@ class ProfileManager(
             val container = try {
                 json.decodeFromString<ProfilesContainer>(text)
             } catch (_: Exception) {
-                // Поддержка старого формата (миграция)
+                // Old format support (migration)
                 try {
                     val map = json.decodeFromString<Map<String, InstanceProfile>>(text)
                     ProfilesContainer(null, map)
@@ -84,7 +84,7 @@ class ProfileManager(
 
             container.profiles.forEach { (k, v) -> profiles[k] = v }
 
-            // Загружаем избранное
+            // Loading favorites
             _favorites.clear()
             _favorites.addAll(container.favorites)
 

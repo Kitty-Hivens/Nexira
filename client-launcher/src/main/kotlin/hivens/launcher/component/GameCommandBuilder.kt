@@ -9,13 +9,13 @@ import java.io.File
 import java.nio.file.Path
 
 /**
- * Фабрика командной строки процесса (Process Command Factory).
+ * Process Command Factory.
  */
 internal class GameCommandBuilder {
     private val logger = LoggerFactory.getLogger(GameCommandBuilder::class.java)
 
     /**
-     * Immutable-конфигурация версии.
+     * Immutable version configuration.
      */
     private data class VersionConfig(
         val mainClass: String,
@@ -26,7 +26,7 @@ internal class GameCommandBuilder {
         val programArgs: List<String> = emptyList()
     )
 
-    // Registry конфигураций версий
+    // Registry of version configurations
     private val configs = mapOf(
         "1.7.10" to VersionConfig(
             mainClass = "net.minecraft.launchwrapper.Launch",
@@ -67,16 +67,16 @@ internal class GameCommandBuilder {
     )
 
     /**
-     * Возвращает путь к директории нативных библиотек для указанной версии.
+     * Returns the path to the native libraries directory for the specified version.
      */
     fun getNativesDir(version: String): String {
         return getConfig(version).nativesDir
     }
 
     /**
-     * Собирает список аргументов для [ProcessBuilder].
+     * Collects a list of arguments for [ProcessBuilder].
      *
-     * @return Упорядоченный список строк, готовый к передаче в процесс ОС.
+     * @return An ordered list of strings, ready to be passed to the OS process.
      */
     fun build(
         javaExec: String,
@@ -123,7 +123,6 @@ internal class GameCommandBuilder {
             args.add("-Dio.netty.native.workdir=" + nativesPath.toAbsolutePath())
             args.add("-DlibraryDirectory=" + libDir.toAbsolutePath())
 
-            // FIX: Добавил "client" в начало списка игнорируемых модулей
             val ignoreList = "client,securejarhandler-3.0.8.jar,asm-9.7.jar,asm-commons-9.7.jar,asm-tree-9.7.jar,asm-util-9.7.jar,asm-analysis-9.7.jar,bootstraplauncher-2.0.2.jar,JarJarFileSystems-0.4.1.jar,client-extra,neoforge-,neoforge-21.1.504.jar"
             args.add("-DignoreList=$ignoreList")
             args.add("-DmergeModules=jna-5.10.0.jar,jna-platform-5.10.0.jar")
@@ -191,7 +190,7 @@ internal class GameCommandBuilder {
     private fun getConfig(version: String): VersionConfig {
         return configs[version]
             ?: configs.entries.find { version.startsWith(it.key) }?.value
-            ?: throw IllegalArgumentException("Неподдерживаемая версия клиента: $version")
+            ?: throw IllegalArgumentException("Unsupported client version: $version")
     }
 
     private fun buildMinecraftArgs(

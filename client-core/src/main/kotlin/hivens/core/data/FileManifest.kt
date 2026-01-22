@@ -4,7 +4,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * Модель данных (DTO) для манифеста файлов клиента.
+ * Data model (DTO) for the client file manifest.
  */
 @Serializable
 data class FileManifest(

@@ -4,10 +4,9 @@ plugins {
     id("com.github.gmazzo.buildconfig") version "5.3.5" apply false
 }
 
-// 1. Функция для получения версии из Git (для локальной сборки)
+// 1. Function to get version from Git (for local build)
 fun getGitVersion(providerFactory: ProviderFactory): String {
     return try {
-        // Использование providers.exec (современный API)
         val version = providerFactory.exec {
             commandLine("git", "describe", "--tags", "--always", "--dirty")
         }.standardOutput.asText.get().trim()
@@ -19,7 +18,7 @@ fun getGitVersion(providerFactory: ProviderFactory): String {
     }
 }
 
-// 2. Итоговая версия
+// 2. Final version
 val appVersion = providers.gradleProperty("version")
     .getOrElse(getGitVersion(providers))
 
