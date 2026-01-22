@@ -6,6 +6,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 enum class AuthStatus {
     @SerialName("OK") OK,
+    @SerialName("ACTIVE") ACTIVE,
     @SerialName("LOGIN") LOGIN,
     @SerialName("BAD_LOGIN") BAD_LOGIN,
     @SerialName("NEED_2FA") NEED_2FA,

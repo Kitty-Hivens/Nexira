@@ -8,6 +8,7 @@ import org.jetbrains.skia.ColorAlphaType
 import org.jetbrains.skia.ImageInfo
 import java.io.ByteArrayOutputStream
 import java.net.HttpURLConnection
+import java.net.URI
 import java.net.URL
 
 /**
@@ -77,7 +78,7 @@ object SkinManager {
 
     private fun downloadTexture(url: String): org.jetbrains.skia.Image? {
         return try {
-            val conn = URL(url).openConnection() as HttpURLConnection
+            val conn = URI.create(url).toURL().openConnection() as HttpURLConnection
             conn.connectTimeout = 3000
             conn.readTimeout = 3000
             conn.setRequestProperty("User-Agent", "Mozilla/5.0") // Притворяемся браузером
@@ -89,7 +90,7 @@ object SkinManager {
                 out.toByteArray()
             }
             org.jetbrains.skia.Image.makeFromEncoded(bytes)
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             null
         }
     }
