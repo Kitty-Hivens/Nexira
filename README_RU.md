@@ -3,7 +3,7 @@
 <div align="center">
 
 ![Version](https://img.shields.io/badge/version-1.2.3--dev-blueviolet?style=for-the-badge)
-![Kotlin](https://img.shields.io/badge/Kotlin-2.0-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white)
+![Kotlin](https://img.shields.io/badge/Kotlin-2.3.0-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white)
 ![Compose](https://img.shields.io/badge/Compose-Multiplatform-4285F4?style=for-the-badge&logo=jetpackcompose&logoColor=white)
 ![License](https://img.shields.io/badge/License-GPLv3-green?style=for-the-badge)
 
@@ -77,7 +77,7 @@
 ## 🛠️ Сборка из исходников
 
 Для тех, кто любит ковыряться внутри.
-Вам понадобится **JDK 21** или выше.
+Вам понадобится **JDK 25** или выше.
 
 1.  **Клонируйте репозиторий:**
     ```bash

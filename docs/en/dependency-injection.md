@@ -1,9 +1,3 @@
-Here is the comprehensive documentation for the Dependency Injection system. It covers the Koin setup, module organization, and a step-by-step guide for adding new services without breaking the architecture.
-
-Create the file: `docs/en/dependency-injection.md`
-
----
-
 # Dependency Injection (Koin)
 
 > **Module:** `docs/en/dependency-injection.md`
@@ -52,11 +46,11 @@ fun main() {
 
 The graph is split into three logical modules to maintain separation of concerns.
 
-| Module Name         | Source File                         | Scope              | Description                                                                                                                |
-|---------------------|-------------------------------------|--------------------|----------------------------------------------------------------------------------------------------------------------------|
-| **`networkModule`** | `client-launcher/.../di/Modules.kt` | **Singleton**      | Provides low-level infrastructure: `OkHttpClient`, `Retrofit`, and JSON parsers. These are expensive objects created once. |
-| **`appModule`**     | `client-launcher/.../di/Modules.kt` | **Singleton**      | The "Service Mesh". Binds abstract interfaces from `client-core` to concrete implementations in `client-launcher`.         |
-| **`uiModule`**      | `client-ui/.../ui/Main.kt`          | **Factory/Single** | UI Controllers and ViewModels. Defined in the UI layer because `client-launcher` cannot see UI classes.                    |
+| Module Name         | Source File                         | Scope              | Description                                                                                                                                 |
+|---------------------|-------------------------------------|--------------------|---------------------------------------------------------------------------------------------------------------------------------------------|
+| **`networkModule`** | `client-launcher/.../di/Modules.kt` | **Singleton**      | Provides low-level infrastructure: `OkHttpClient` (Engine), `HttpClient` (Ktor), and JSON config. These are expensive objects created once. |
+| **`appModule`**     | `client-launcher/.../di/Modules.kt` | **Singleton**      | The "Service Mesh". Binds abstract interfaces from `client-core` to concrete implementations in `client-launcher`.                          |
+| **`uiModule`**      | `client-ui/.../ui/Main.kt`          | **Factory/Single** | UI Controllers and ViewModels. Defined in the UI layer because `client-launcher` cannot see UI classes.                                     |
 
 ---
 
@@ -64,25 +58,56 @@ The graph is split into three logical modules to maintain separation of concerns
 
 ### 3.1 Network Module (`networkModule`)
 
-Handles external connectivity. Note how `Retrofit` depends on `OkHttpClient` via `get()`.
+Handles external connectivity. We use **Ktor Client** backed by the **OkHttp** engine. The `OkHttpClient` is configured separately to support SOCKS proxies and shared across the application.
 
 ```kotlin
 val networkModule = module {
-    // 1. Http Client
-    single {
+    // 1. JSON Configuration (Kotlinx Serialization)
+    single<Json> {
+        Json {
+            ignoreUnknownKeys = true
+            prettyPrint = true
+            isLenient = true
+            encodeDefaults = true
+        }
+    }
+
+    // 2. OkHttp Engine (SOCKS Proxy & Timeouts)
+    single<OkHttpClient> {
+        // Proxy Authentication setup...
         OkHttpClient.Builder()
-            .callTimeout(30, TimeUnit.SECONDS)
+            .connectTimeout(AppConfig.TIMEOUT_CONNECT, TimeUnit.MILLISECONDS)
+            .readTimeout(AppConfig.TIMEOUT_READ, TimeUnit.MILLISECONDS)
+            .proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress(AppConfig.Proxy.HOST, AppConfig.Proxy.PORT)))
             .build()
     }
 
-    // 2. Retrofit Instance
-    single {
-        Retrofit.Builder()
-            .baseUrl(AppConfig.API_BASE_URL)
-            .client(get()) // Injects the OkHttpClient defined above
-            .addConverterFactory(Json.asConverterFactory("application/json".toMediaType()))
-            .build()
+    // 3. Ktor HttpClient
+    single<HttpClient> {
+        val okHttpInstance = get<OkHttpClient>()
+
+        HttpClient(OkHttp) {
+            engine { preconfigured = okHttpInstance }
+            
+            install(ContentNegotiation) {
+                json(get()) // Injects the Json instance above
+            }
+            
+            install(HttpTimeout) {
+                requestTimeoutMillis = 600_000
+                connectTimeoutMillis = 30_000
+            }
+            
+            defaultRequest {
+                header("User-Agent", "SMARTYlauncher/${AppConfig.LAUNCHER_VERSION}")
+                contentType(ContentType.Application.Json)
+            }
+        }
     }
+    
+    // Repositories (using singleOf for constructor injection)
+    singleOf(::ServerRepository)
+    singleOf(::SkinRepository)
 }
 
 ```
@@ -97,14 +122,12 @@ val appModule = module {
     single<ILauncherService> { LauncherService(get(), get()) }
     single<IAuthService> { AuthService(get()) }
     single<ISettingsService> { SettingsService() }
-    
-    // Repositories
-    single { SkinRepository(get()) }
 }
 
 ```
 
 * **`single<Interface> { Impl() }`**: This tells Koin: *"Whenever someone asks for `Interface`, give them this singleton instance of `Impl`"*.
+* **`singleOf(::Class)`**: A modern Koin DSL feature that automatically resolves all constructor parameters.
 
 ### 3.3 UI Module (`uiModule`)
 
@@ -112,8 +135,7 @@ Controllers are often state-holders. While they are usually singletons in this d
 
 ```kotlin
 val uiModule = module {
-    // Injection using Constructor Reference (::)
-    // Equivalent to: single { LauncherController(get(), get(), ...) }
+    // Injection using Constructor Reference
     singleOf(::LauncherController)
 }
 
@@ -218,7 +240,7 @@ class LauncherController(
 
 **Error:** `No definition found for class '...' Check your definitions!`
 **Cause:** You forgot **Step 3**. The class exists, but Koin doesn't know about it.
-**Fix:** Add `single { ... }` to `Modules.kt`.
+**Fix:** Add `single { ... }` or `singleOf(...)` to `Modules.kt`.
 
 ### `InstanceCreationException`
 

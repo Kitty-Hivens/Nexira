@@ -20,11 +20,11 @@ Das System ist in vier verschiedene Schichten unterteilt:
 
 3.  **Infrastruktur-/Service-Schicht (`client-launcher`)**:
     * **Verantwortlichkeit:** Implementiert die Kern-Geschäftslogik, die in `client-core` definiert ist. Behandelt Datei-E/A, Netzwerk, Hashing und OS-Prozessmanagement.
-    * **Tech:** Retrofit, OkHttp, `java.lang.ProcessBuilder`.
+    * **Tech:** Ktor Client (OkHttp Engine), `java.lang.ProcessBuilder`.
 
 4.  **Domänen- & Vertragsschicht (`client-core`)**:
     * **Verantwortlichkeit:** Definiert *was* (Schnittstellen) und die *Daten* (DTOs), aber nicht das *wie*.
-    * **Einschränkung:** Reines Kotlin. Keine Framework-Abhängigkeiten (Retrofit, Compose usw.).
+    * **Einschränkung:** Reines Kotlin. Keine Framework-Abhängigkeiten (Ktor, Compose usw.).
 
 ## 2. Modulaufbau
 
@@ -39,7 +39,7 @@ Das Projekt verwendet eine Multi-Modul-Gradle-Struktur, um die Trennung von Vera
 
 ## 3. Dependency Injection (Koin)
 
-Die Anwendung baut ihren Objektgrafen zur Laufzeit mit **Koin** auf. Der Graph ist streng hierarchisch.
+Die Anwendung baut ihren Objektgraphen zur Laufzeit mit **Koin** auf. Der Graph ist streng hierarchisch.
 
 ### Initialisierung
 
@@ -54,8 +54,8 @@ startKoin {
 ### Moduldefinitionen
 
 1. **`networkModule`** (Quelle: `client-launcher/di/Modules.kt`):
-* Stellt Singleton-Instanzen von `OkHttpClient` und `Retrofit` bereit.
-* Konfiguriert Timeouts und Logging-Interceptors.
+* Stellt Singleton-Instanzen von `OkHttpClient` (Engine) und `HttpClient` (Ktor) bereit.
+* Konfiguriert SOCKS-Proxy, Timeouts und JSON-Serialisierung.
 
 
 2. **`appModule`** (Quelle: `client-launcher/di/Modules.kt`):
