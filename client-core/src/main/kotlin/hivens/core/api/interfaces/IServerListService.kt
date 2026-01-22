@@ -6,12 +6,12 @@ import java.util.concurrent.CompletableFuture
 
 interface IServerListService {
     /**
-     * Асинхронно получает список профилей серверов.
+     * Asynchronously retrieves a list of server profiles.
      */
     fun fetchProfiles(): CompletableFuture<List<ServerProfile>>
 
     /**
-     * Получает полные данные для дашборда: серверы + новости.
+     * Receives complete data for the dashboard: servers + news.
      */
     fun fetchDashboardData(): CompletableFuture<DashboardData>
 }

@@ -27,7 +27,7 @@ import java.nio.file.Paths
 import java.util.concurrent.TimeUnit
 
 /**
- * Модуль, отвечающий за сетевое взаимодействие.
+ * Module responsible for network interaction.
  */
 val networkModule = module {
 
@@ -41,11 +41,11 @@ val networkModule = module {
     }
 
     /**
-     * HTTP-клиент (OkHttp).
-     * SOCKS прокси включен всегда.
+     * HTTP client (OkHttp).
+     * SOCKS proxy is always enabled.
      */
     single<OkHttpClient> {
-        // Глобальная авторизация для SOCKS (Java API)
+        // Global authorization for SOCKS (Java API)
         java.net.Authenticator.setDefault(object : java.net.Authenticator() {
             override fun getPasswordAuthentication(): java.net.PasswordAuthentication {
                 return java.net.PasswordAuthentication(
@@ -59,7 +59,7 @@ val networkModule = module {
             .connectTimeout(AppConfig.TIMEOUT_CONNECT, TimeUnit.MILLISECONDS)
             .readTimeout(AppConfig.TIMEOUT_READ, TimeUnit.MILLISECONDS)
 
-        // Настройка прокси
+        // Proxy setting
         builder.proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress(AppConfig.Proxy.HOST, AppConfig.Proxy.PORT)))
 
         builder.build()
@@ -73,46 +73,46 @@ val networkModule = module {
                 preconfigured = okHttpInstance
             }
 
-            // Плагины Ktor
+            // Ktor plugins
             install(ContentNegotiation) {
                 json(get())
             }
 
             install(HttpTimeout) {
-                requestTimeoutMillis = 600_000 // 10 минут
-                connectTimeoutMillis = 30_000  // 30 сек на подключение
-                socketTimeoutMillis = 600_000  // 10 минут на ожидание пакетов
+                requestTimeoutMillis = 600_000 // 10 minutes
+                connectTimeoutMillis = 30_000 // 30 seconds to connect
+                socketTimeoutMillis = 600_000 // 10 minutes to wait for packets
             }
 
             defaultRequest {
-                // User-Agent строго по конфигу
+                // User-Agent strictly according to the config
                 header("User-Agent", "SMARTYlauncher/${AppConfig.LAUNCHER_VERSION}")
                 contentType(ContentType.Application.Json)
             }
         }
     }
 
-    // Репозитории
+    // Repositories
     singleOf(::ServerRepository)
     singleOf(::SkinRepository)
 }
 
 /**
- * Модуль основных компонентов приложения.
+ * Module of the main components of the application.
  */
 val appModule = module {
-    // AppScope: Жизненный цикл равен времени работы приложения.
-    // Используем для запуска игры, чтобы он не прерывался при смене экранов.
+    // AppScope: The life cycle is equal to the running time of the application.
+    // We use it to launch the game so that it is not interrupted when changing screens.
     single<CoroutineScope> { CoroutineScope(SupervisorJob() + Dispatchers.IO) }
 
     /**
-     * Рабочая директория приложения (.aura).
+     * Application working directory (.aura).
      */
     single(createdAtStart = true) {
         Paths.get(System.getProperty("user.home"), AppConfig.APP_DIR)
     }
 
-    // Менеджеры и сервисы
+    // Managers and services
     single { CredentialsManager(get(), get()) }
 
     single<ISettingsService> {
@@ -134,8 +134,8 @@ val appModule = module {
     single<IServerListService> { ServerListService(get()) }
 
     /**
-     * Основной сервис запуска.
-     * Теперь принимает EnvironmentPreparer через DI.
+     * Basic launch service.
+     * Now accepts EnvironmentPreparer via DI.
      */
     single<ILauncherService> {
         LauncherService(

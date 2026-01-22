@@ -14,8 +14,8 @@ class ManifestProcessorService(
     private val log = LoggerFactory.getLogger(ManifestProcessorService::class.java)
 
     override fun processManifest(version: String): FileManifest {
-        // В текущей архитектуре манифест приходит уже готовым в SessionData,
-        // этот метод в оригинале был заглушкой, оставляем заглушкой.
+        // In the current architecture, the manifest comes already prepared in SessionData,
+        // This method was originally a stub; we leave it as a stub.
         return FileManifest()
     }
 
@@ -42,13 +42,13 @@ class ManifestProcessorService(
             try {
                 val mod = json.decodeFromJsonElement<OptionalMod>(modData)
 
-                // Заполняем пропуски, если их нет в JSON
+                // Fill in the blanks if they are not in the JSON
                 if (mod.id.isEmpty()) mod.id = modId
                 if (mod.jars.isEmpty()) mod.jars = mutableListOf("$modId.jar")
 
                 result.add(mod)
             } catch (e: Exception) {
-                log.error("Ошибка парсинга конфигурации мода '$modId': ${e.message}")
+                log.error("Error parsing mod configuration '$modId': ${e.message}")
             }
         }
         return result

@@ -21,7 +21,7 @@ import java.util.stream.Collectors
 class EnvironmentPreparer(private val httpClient: HttpClient) {
     private val log = LoggerFactory.getLogger(EnvironmentPreparer::class.java)
 
-    // Модули для Modern версий (1.13+)
+    // Modules for Modern versions (1.13+)
     private val lwjgl3Modules = listOf(
         "lwjgl", "lwjgl-jemalloc", "lwjgl-openal", "lwjgl-opengl",
         "lwjgl-glfw", "lwjgl-stb", "lwjgl-tinyfd"
@@ -33,13 +33,13 @@ class EnvironmentPreparer(private val httpClient: HttpClient) {
         val nativesDir = clientRoot.resolve(nativesDirName)
         val osSuffix = getOsSuffix()
 
-        // 1. Проверка: Если папка валидна, ничего не делаем
+        // 1. Check: If the folder is valid, we do nothing
         if (isFolderValidForOs(nativesDir, osSuffix)) {
             log.info("Natives valid for $osSuffix ($version).")
             return@withContext
         }
 
-        // Чистим папку перед новой попыткой
+        // Cleaning the folder before trying again
         if (Files.exists(nativesDir)) {
             ClientFileHelper.cleanDirectory(nativesDir, emptySet(), log)
         }
@@ -47,7 +47,7 @@ class EnvironmentPreparer(private val httpClient: HttpClient) {
 
         log.info("Preparing natives for $version ($osSuffix)...")
 
-        // 2. Попытка найти локальный Zip (от сервера)
+        // 2. Trying to find local Zip (from server)
         val targetZipName = "natives-$version-$osSuffix.zip"
         val genericZipName = "natives-$version.zip"
 
@@ -75,7 +75,7 @@ class EnvironmentPreparer(private val httpClient: HttpClient) {
             }
         }
 
-        // 3. Скачивание через Ktor
+        // 3. Download via Ktor
         if (!unpackedSuccessfully) {
             log.warn("Natives missing. Downloading via Ktor...")
 
@@ -95,12 +95,12 @@ class EnvironmentPreparer(private val httpClient: HttpClient) {
     }
 
     /**
-     * Скачивание для СТАРЫХ версий (1.7.10, 1.12.2) -> LWJGL 2
+     * Downloading for old versions (1.7.10, 1.12.2) -> LWJGL 2
      */
     private suspend fun downloadLegacyLWJGL2(destDir: Path, os: String, version: String) {
-        val mavenOs = if (os == "macos") "macosx" else os // LWJGL 2 использовал 'macosx'
+        val mavenOs = if (os == "macos") "macosx" else os // LWJGL 2 used 'macosx'
 
-        // Список файлов для LWJGL 2
+        // List of files for LWJGL 2
         val artifacts = mapOf(
             "https://repo1.maven.org/maven2/org/lwjgl/lwjgl/lwjgl-platform/$version/lwjgl-platform-$version-natives-$mavenOs.jar" to "lwjgl_platform",
             "https://repo1.maven.org/maven2/net/java/jinput/jinput-platform/2.0.5/jinput-platform-2.0.5-natives-$mavenOs.jar" to "jinput_platform"
@@ -113,7 +113,7 @@ class EnvironmentPreparer(private val httpClient: HttpClient) {
     }
 
     /**
-     * Скачивание для новых версий (1.13+) -> LWJGL 3
+     * Download for new versions (1.13+) -> LWJGL 3
      */
     private suspend fun downloadModernLWJGL3(destDir: Path, os: String) {
         val mavenOsClassifier = "natives-$os"
@@ -151,7 +151,7 @@ class EnvironmentPreparer(private val httpClient: HttpClient) {
     }
 
     /**
-     * Вытаскивает .so/.dll в корень папки, если они лежат в подпапках
+     * Pulls .so/.dll to the root of the folder if they are in subfolders
      */
     private fun flattenNatives(dir: Path) {
         try {
@@ -197,21 +197,21 @@ class EnvironmentPreparer(private val httpClient: HttpClient) {
 
         var needUnzip = false
         if (Files.exists(assetsZip)) {
-            // Если папки assets нет или в objects пустовато - распаковываем
+            // If there is no assets folder or objects are empty, unpack it
             if (!Files.exists(assetsDir) || !Files.exists(objectsDir)) {
                 needUnzip = true
             } else {
                 try {
-                    // Грубая проверка: если файлов мало, значит распаковка была кривой
+                    // Rough check: if there are few files, then the unpacking was incorrect
                     if (Files.list(objectsDir).count() < 10) needUnzip = true
                 } catch (_: Exception) { needUnzip = true }
             }
         } else {
-            // Если запрошенного архива нет, попробуем найти стандартный assets.zip
+            // If the requested archive is not available, let's try to find the standard assets.zip
             val fallbackZip = clientRoot.resolve("assets.zip")
             if (Files.exists(fallbackZip)) {
                 log.info("Requested $assetsZipName not found, but assets.zip exists. Using fallback.")
-                // Рекурсивный вызов, но с правильным именем
+                // Recursive call, but with the right name
                 prepareAssets(clientRoot, "assets.zip")
                 return
             }

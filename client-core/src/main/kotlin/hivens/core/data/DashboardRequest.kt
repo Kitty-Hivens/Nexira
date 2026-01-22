@@ -5,7 +5,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class DashboardRequest(
         val version: String,
-        val cheksum: String, // Бейте палками админа проекта, не разработчиков лаунчера!
+        val cheksum: String, // Typo in external API (admin's fault, not ours!)
         val format: String = "jar",
         val testModeKey: String = "false",
         val debug: String = "false"

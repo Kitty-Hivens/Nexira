@@ -1,15 +1,15 @@
 package hivens.core.data
 
 /**
- * Определяет статус локального файла во время проверки целостности.
+ * Determines the status of a local file during an integrity check.
  */
 enum class FileStatus {
-    /** Файл отсутствует на диске. */
+    /** The file is missing from the disk. */
     MISSING,
 
-    /** Файл присутствует, но хэш-сумма не совпадает (поврежден/устарел). */
+    /** The file is present, but the hash does not match (corrupt/outdated). */
     MISMATCH,
 
-    /** Файл присутствует и хэш-сумма совпадает (валидный). */
+    /** The file is present and the hash sum matches (valid). */
     VALID
 }

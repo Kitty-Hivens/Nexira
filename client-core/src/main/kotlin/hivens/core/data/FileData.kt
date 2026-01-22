@@ -4,7 +4,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * Модель данных (DTO) для отдельного файла в манифесте.
+ * Data model (DTO) for a separate file in the manifest.
  */
 @Serializable
 data class FileData(
