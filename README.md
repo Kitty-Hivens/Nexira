@@ -1,68 +1,91 @@
 # Aura Launcher (Unofficial)
 
-> **Неофициальный** лаунчер для проекта [SmartyCraft](https://smartycraft.ru).
-> Создан как легкая, быстрая и открытая альтернатива официальному клиенту.
+<div align="center">
 
-**Aura Launcher** — это современный клиент, написанный с нуля на **Kotlin** с использованием **Compose Multiplatform**.
-В отличие от оригинала, он не требует старой Java, работает мгновенно и поддерживает нативный запуск на Linux и macOS без костылей.
+![Version](https://img.shields.io/badge/version-1.2.3--dev-blueviolet?style=for-the-badge)
+![Kotlin](https://img.shields.io/badge/Kotlin-2.0-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white)
+![Compose](https://img.shields.io/badge/Compose-Multiplatform-4285F4?style=for-the-badge&logo=jetpackcompose&logoColor=white)
+![License](https://img.shields.io/badge/License-GPLv3-green?style=for-the-badge)
+
+<br>
+
+**[ 🇬🇧 English ]** | [ 🇷🇺 Русский ](README_RU.md) | [ 🇩🇪 Deutsch ](README_DE.md)
+
+</div>
+
+> **An unofficial** launcher for the [SmartyCraft](https://smartycraft.ru) project.
+> Created as a lightweight, fast, and open alternative to the official client.
+
+**Aura Launcher** is more than just a "Play" button. It is a modern home for your game, written from scratch in **Kotlin** using **Compose Multiplatform**.
+
+We believe that launching your favorite server shouldn't feel like interacting with a relic from 2013. Unlike the original client, Aura doesn't drag along ancient Java versions, starts instantly, and respects your operating system — whether you're on Linux, Windows, or macOS.
 
 <p align="center">
-  <img src="assets/servers.png" alt="Server Selection" width="750">
+  <img src="assets/servers.png" alt="Server Selection" width="800" style="border-radius: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);">
 </p>
 
-## Галерея
+## ✨ Why Aura?
 
-### Авторизация и Профиль
-| Вход в аккаунт | Профиль игрока |
-|:---:|:---:|
+We built Aura because we love efficient software.
+
+* **Breathe Easy:** No bloat. The interface is powered by **Compose Desktop**, making it responsive and resource-efficient.
+* **Atmospheric:** The launcher lives with you. It features dynamic **seasonal themes**—from gentle winter snowfall to summer fireflies—that automatically adapt to the time of year (or your mood).
+* **Linux First:** We don't treat Linux as a second-class citizen. Aura offers a native experience with AppImage support, seamless Wayland integration, and no "dancing with tambourines" required to get Java working.
+* **Transparent & Open:** You deserve to know what runs on your machine. Our code is 100% open source under GPLv3.
+
+## 🎨 Gallery
+
+### Login & Profile
+|                        Account Login                         |                      Player Profile                       |
+|:------------------------------------------------------------:|:---------------------------------------------------------:|
 | <img src="assets/login.png" alt="Login Screen" width="100%"> | <img src="assets/profile.png" alt="Profile" width="100%"> |
 
-### Настройки
-| Настройки лаунчера | Настройки клиента |
-|:---:|:---:|
+### Settings & Customization
+|                              Global Settings                              |                          Client Configuration                           |
+|:-------------------------------------------------------------------------:|:-----------------------------------------------------------------------:|
 | <img src="assets/main_settings.png" alt="Launcher Settings" width="100%"> | <img src="assets/server_settings.png" alt="Game Settings" width="100%"> |
 
 ---
 
-## Особенности
+## 📚 Documentation
 
-* **Только SmartyCraft:** Лаунчер преднастроен для работы исключительно с серверами проекта SmartyCraft.
-* **Linux First:** Полноценная поддержка Linux. AppImage запускается сразу, без танцев с бубном и установки Java 8 вручную.
-* **Производительность:** Написан на современном стеке (Compose Desktop). Потребляет меньше ресурсов, запускается за секунду.
-* **Кроссплатформенность:**
-    * **Windows** (.msi установщик, Portable .zip)
-    * **Linux** (AppImage, .deb, .rpm)
-    * **macOS** (.dmg, поддержка Apple Silicon)
-* **Open Source:** Исходный код полностью открыт (GPLv3). Вы видите, что запускаете на своем компьютере.
+For developers, contributors, and the curious.
+We maintain detailed technical documentation covering the architecture, seasonal engine, and network stack.
 
-## Установка
+👉 **[Explore the Developer Wiki](docs/en/index.md)**
 
-Все готовые сборки можно найти в разделе **[Releases](../../releases)**.
+---
 
-### Linux
-* **AppImage:** Самый простой вариант. Скачайте, сделайте файл исполняемым (`chmod +x AuraLauncher.AppImage`) и запускайте.
-* **DEB:** Для Ubuntu/Debian/Mint.
-* **RPM:** Для Fedora/RedHat/OpenSUSE.
+## 🚀 Installation
 
-### Windows
-* Скачайте и запустите `.msi` установщик.
-* Лаунчер сам подтянет нужную Java для игры. Вам ничего настраивать не нужно.
+Grab the latest version from our **[Releases](https://github.com/Kitty-Hivens/Aura-Launcher/releases)** page.
 
-### macOS
-* Скачайте `.dmg` образ.
-* Перетащите приложение в папку `Applications`.
+### 🐧 Linux
+We prioritize your experience.
+* **AppImage:** The universal key. Just download, make it executable (`chmod +x AuraLauncher.AppImage`), and launch.
+* **Native Packages:** `.deb` (Debian/Ubuntu/Mint) and `.rpm` (Fedora/RedHat/OpenSUSE) are also available for a seamless system integration.
 
-## Сборка из исходников
+### 🪟 Windows
+* Download and run the `.msi` installer.
+* Aura handles the Java environment for the game automatically. No manual configuration needed.
 
-Для сборки требуется **JDK 21**.
+### 🍎 macOS
+* Download the `.dmg` image.
+* Drag and drop the application into your `Applications` folder.
+* *Supports both Intel and Apple Silicon.*
 
-1.  Клонируйте репозиторий:
+## 🛠️ Building from Source
+
+For those who like to tinker.
+You will need **JDK 21** or higher.
+
+1.  **Clone the repository:**
     ```bash
     git clone https://github.com/Kitty-Hivens/Aura-Launcher.git
     cd Aura-Launcher
     ```
 
-2.  Запустите сборку для вашей ОС:
+2.  **Build the distribution:**
     * **Linux / macOS:**
         ```bash
         ./gradlew :client-ui:packageDistribution
@@ -72,15 +95,23 @@
         gradlew.bat :client-ui:packageDistribution
         ```
 
-3.  Готовые файлы будут находиться в папке:
+3.  **Locate the artifacts:**
+    Your fresh build will be waiting in:
     `client-ui/build/compose/binaries/main/`
 
-## Дисклеймер
+## ⚖️ Disclaimer
 
-Этот проект является **неофициальным** программным обеспечением. Разработчик Aura Launcher никак не связан с администрацией SmartyCraft.
-Все права на контент серверов, моды и торговые марки принадлежат их законным владельцам.
+This project is **unofficial software**.
+The developer of Aura Launcher is not affiliated with the administration of SmartyCraft.
+All rights to server content, mods, and trademarks belong to their respective legal owners.
 
-## Лицензия
+## 📄 License
 
-Проект распространяется под лицензией **GNU GPL v3**.
-Это гарантирует, что программа (и любые её модификации) всегда будет оставаться свободной и с открытым исходным кодом.
+This project is distributed under the **GNU GPL v3** license.
+This guarantees that Aura (and any modifications to it) will always remain free and open source.
+
+---
+
+<div align="center">
+  <i>Made with 💜 and Kotlin by <a href="https://github.com/Kitty-Hivens">Kitty-Hivens</a></i>
+</div>
