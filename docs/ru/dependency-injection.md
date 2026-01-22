@@ -45,11 +45,11 @@ fun main() {
 
 Граф разделен на три логических модуля для поддержания разделения ответственности.
 
-| Имя модуля          | Исходный файл                       | Scope (Область)    | Описание                                                                                                                             |
-|---------------------|-------------------------------------|--------------------|--------------------------------------------------------------------------------------------------------------------------------------|
-| **`networkModule`** | `client-launcher/.../di/Modules.kt` | **Singleton**      | Предоставляет низкоуровневую инфраструктуру: `OkHttpClient`, `Retrofit` и JSON парсеры. Это "тяжелые" объекты, создаваемые один раз. |
-| **`appModule`**     | `client-launcher/.../di/Modules.kt` | **Singleton**      | "Связующее звено сервисов". Связывает абстрактные интерфейсы из `client-core` с конкретными реализациями в `client-launcher`.        |
-| **`uiModule`**      | `client-ui/.../ui/Main.kt`          | **Factory/Single** | UI Контроллеры и ViewModels. Определены в UI слое, так как `client-launcher` не видит классы UI.                                     |
+| Имя модуля          | Исходный файл                       | Scope (Область)    | Описание                                                                                                                                              |
+|---------------------|-------------------------------------|--------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **`networkModule`** | `client-launcher/.../di/Modules.kt` | **Singleton**      | Предоставляет низкоуровневую инфраструктуру: `OkHttpClient` (Движок), `HttpClient` (Ktor) и конфиг JSON. Это "тяжелые" объекты, создаваемые один раз. |
+| **`appModule`**     | `client-launcher/.../di/Modules.kt` | **Singleton**      | "Связующее звено сервисов". Связывает абстрактные интерфейсы из `client-core` с конкретными реализациями в `client-launcher`.                         |
+| **`uiModule`**      | `client-ui/.../ui/Main.kt`          | **Factory/Single** | UI Контроллеры и ViewModels. Определены в UI слое, так как `client-launcher` не видит классы UI.                                                      |
 
 ---
 
@@ -57,25 +57,56 @@ fun main() {
 
 ### 3.1 Сетевой модуль (`networkModule`)
 
-Обрабатывает внешние подключения. Обратите внимание, как `Retrofit` зависит от `OkHttpClient` через `get()`.
+Обрабатывает внешние подключения. Мы используем **Ktor Client**, работающий на движке **OkHttp**. `OkHttpClient` настраивается отдельно для поддержки SOCKS прокси и используется совместно во всем приложении.
 
 ```kotlin
 val networkModule = module {
-    // 1. Http Client
-    single {
+    // 1. JSON Конфигурация (Kotlinx Serialization)
+    single<Json> {
+        Json {
+            ignoreUnknownKeys = true
+            prettyPrint = true
+            isLenient = true
+            encodeDefaults = true
+        }
+    }
+
+    // 2. Движок OkHttp (SOCKS Прокси и Таймауты)
+    single<OkHttpClient> {
+        // Настройка аутентификации Прокси...
         OkHttpClient.Builder()
-            .callTimeout(30, TimeUnit.SECONDS)
+            .connectTimeout(AppConfig.TIMEOUT_CONNECT, TimeUnit.MILLISECONDS)
+            .readTimeout(AppConfig.TIMEOUT_READ, TimeUnit.MILLISECONDS)
+            .proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress(AppConfig.Proxy.HOST, AppConfig.Proxy.PORT)))
             .build()
     }
 
-    // 2. Retrofit Instance
-    single {
-        Retrofit.Builder()
-            .baseUrl(AppConfig.API_BASE_URL)
-            .client(get()) // Внедряет OkHttpClient, определенный выше
-            .addConverterFactory(Json.asConverterFactory("application/json".toMediaType()))
-            .build()
+    // 3. Ktor HttpClient
+    single<HttpClient> {
+        val okHttpInstance = get<OkHttpClient>()
+
+        HttpClient(OkHttp) {
+            engine { preconfigured = okHttpInstance }
+            
+            install(ContentNegotiation) {
+                json(get()) // Внедряет экземпляр Json, определенный выше
+            }
+            
+            install(HttpTimeout) {
+                requestTimeoutMillis = 600_000
+                connectTimeoutMillis = 30_000
+            }
+            
+            defaultRequest {
+                header("User-Agent", "SMARTYlauncher/${AppConfig.LAUNCHER_VERSION}")
+                contentType(ContentType.Application.Json)
+            }
+        }
     }
+    
+    // Репозитории (используя singleOf для внедрения через конструктор)
+    singleOf(::ServerRepository)
+    singleOf(::SkinRepository)
 }
 ```
 
@@ -89,13 +120,11 @@ val appModule = module {
     single<ILauncherService> { LauncherService(get(), get()) }
     single<IAuthService> { AuthService(get()) }
     single<ISettingsService> { SettingsService() }
-    
-    // Репозитории
-    single { SkinRepository(get()) }
 }
 ```
 
 * **`single<Interface> { Impl() }`**: Это говорит Koin: *"Когда кто-то просит `Interface`, дай ему этот единственный экземпляр `Impl`"*.
+* **`singleOf(::Class)`**: Современная фича DSL Koin, которая автоматически разрешает все параметры конструктора.
 
 ### 3.3 UI Модуль (`uiModule`)
 
@@ -103,8 +132,7 @@ val appModule = module {
 
 ```kotlin
 val uiModule = module {
-    // Внедрение через ссылку на конструктор (::)
-    // Эквивалентно: single { LauncherController(get(), get(), ...) }
+    // Внедрение через ссылку на конструктор
     singleOf(::LauncherController)
 }
 ```
@@ -202,7 +230,7 @@ class LauncherController(
 
 **Ошибка:** `No definition found for class '...' Check your definitions!`
 **Причина:** Вы забыли **Шаг 3**. Класс существует, но Koin о нем не знает.
-**Решение:** Добавьте `single { ... }` в `Modules.kt`.
+**Решение:** Добавьте `single { ... }` или `singleOf(...)` в `Modules.kt`.
 
 ### `InstanceCreationException`
 

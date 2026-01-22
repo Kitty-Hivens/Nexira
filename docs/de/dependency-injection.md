@@ -1,7 +1,7 @@
 # Dependency Injection (Koin)
 
 > **Modul:** `docs/de/dependency-injection.md`
-> **Kontext:** Verwaltung des Objektgrafen, Service-Verkabelung und Auflösung von Abhängigkeiten zur Laufzeit.
+> **Kontext:** Verwaltung des Objektgraphen, Service-Verkabelung und Auflösung von Abhängigkeiten zur Laufzeit.
 
 ## 1. Übersicht
 
@@ -15,9 +15,9 @@ Der Aura Launcher verwendet **Koin**, ein pragmatisches Framework für Dependenc
 
 ---
 
-## 2. Der Abhängigkeitsgraf
+## 2. Der Abhängigkeitsgraph
 
-Der DI-Graf wird hierarchisch aufgebaut, um die Schichten der Clean Architecture des Projekts zu respektieren. Der Graph wird einmalig während des Anwendungsstarts initialisiert.
+Der DI-Graph wird hierarchisch aufgebaut, um die Schichten der Clean Architecture des Projekts zu respektieren. Der Graph wird einmalig während des Anwendungsstarts initialisiert.
 
 ### 2.1 Initialisierung
 
@@ -45,11 +45,11 @@ fun main() {
 
 Der Graph ist in drei logische Module unterteilt, um die Trennung der Verantwortlichkeiten (Separation of Concerns) zu wahren.
 
-| Modulname           | Quelldatei                          | Scope (Gültigkeitsbereich) | Beschreibung                                                                                                                                  |
-|---------------------|-------------------------------------|----------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------|
-| **`networkModule`** | `client-launcher/.../di/Modules.kt` | **Singleton**              | Stellt Low-Level-Infrastruktur bereit: `OkHttpClient`, `Retrofit` und JSON-Parser. Dies sind "teure" Objekte, die nur einmal erstellt werden. |
-| **`appModule`**     | `client-launcher/.../di/Modules.kt` | **Singleton**              | Das "Service-Geflecht". Bindet abstrakte Schnittstellen aus `client-core` an konkrete Implementierungen in `client-launcher`.                 |
-| **`uiModule`**      | `client-ui/.../ui/Main.kt`          | **Factory/Single**         | UI-Controller und ViewModels. In der UI-Schicht definiert, da `client-launcher` keine UI-Klassen sehen kann.                                  |
+| Modulname           | Quelldatei                          | Scope (Gültigkeitsbereich) | Beschreibung                                                                                                                                                    |
+|---------------------|-------------------------------------|----------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **`networkModule`** | `client-launcher/.../di/Modules.kt` | **Singleton**              | Stellt Low-Level-Infrastruktur bereit: `OkHttpClient` (Engine), `HttpClient` (Ktor) und JSON-Konfig. Dies sind "teure" Objekte, die nur einmal erstellt werden. |
+| **`appModule`**     | `client-launcher/.../di/Modules.kt` | **Singleton**              | Das "Service-Geflecht". Bindet abstrakte Schnittstellen aus `client-core` an konkrete Implementierungen in `client-launcher`.                                   |
+| **`uiModule`**      | `client-ui/.../ui/Main.kt`          | **Factory/Single**         | UI-Controller und ViewModels. In der UI-Schicht definiert, da `client-launcher` keine UI-Klassen sehen kann.                                                    |
 
 ---
 
@@ -57,29 +57,60 @@ Der Graph ist in drei logische Module unterteilt, um die Trennung der Verantwort
 
 ### 3.1 Netzwerk-Modul (`networkModule`)
 
-Behandelt externe Verbindungen. Beachten Sie, wie `Retrofit` über `get()` von `OkHttpClient` abhängt.
+Behandelt externe Verbindungen. Wir verwenden **Ktor Client**, der auf der **OkHttp**-Engine basiert. Der `OkHttpClient` wird separat konfiguriert, um SOCKS-Proxys zu unterstützen, und wird anwendungsweit geteilt.
 
 ```kotlin
 val networkModule = module {
-    // 1. Http Client
-    single {
+    // 1. JSON-Konfiguration (Kotlinx Serialization)
+    single<Json> {
+        Json {
+            ignoreUnknownKeys = true
+            prettyPrint = true
+            isLenient = true
+            encodeDefaults = true
+        }
+    }
+
+    // 2. OkHttp-Engine (SOCKS Proxy & Timeouts)
+    single<OkHttpClient> {
+        // Proxy-Authentifizierungseinrichtung...
         OkHttpClient.Builder()
-            .callTimeout(30, TimeUnit.SECONDS)
+            .connectTimeout(AppConfig.TIMEOUT_CONNECT, TimeUnit.MILLISECONDS)
+            .readTimeout(AppConfig.TIMEOUT_READ, TimeUnit.MILLISECONDS)
+            .proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress(AppConfig.Proxy.HOST, AppConfig.Proxy.PORT)))
             .build()
     }
 
-    // 2. Retrofit Instanz
-    single {
-        Retrofit.Builder()
-            .baseUrl(AppConfig.API_BASE_URL)
-            .client(get()) // Injiziert den oben definierten OkHttpClient
-            .addConverterFactory(Json.asConverterFactory("application/json".toMediaType()))
-            .build()
+    // 3. Ktor HttpClient
+    single<HttpClient> {
+        val okHttpInstance = get<OkHttpClient>()
+
+        HttpClient(OkHttp) {
+            engine { preconfigured = okHttpInstance }
+            
+            install(ContentNegotiation) {
+                json(get()) // Injiziert die obige Json-Instanz
+            }
+            
+            install(HttpTimeout) {
+                requestTimeoutMillis = 600_000
+                connectTimeoutMillis = 30_000
+            }
+            
+            defaultRequest {
+                header("User-Agent", "SMARTYlauncher/${AppConfig.LAUNCHER_VERSION}")
+                contentType(ContentType.Application.Json)
+            }
+        }
     }
+    
+    // Repositories (verwendet singleOf für Konstruktor-Injektion)
+    singleOf(::ServerRepository)
+    singleOf(::SkinRepository)
 }
 ```
 
-### 3.2 Anwendung-Modul (`appModule`)
+### 3.2 Anwendungs-Modul (`appModule`)
 
 Hier geschieht die Bindung im Sinne der "Clean Architecture". Wir mappen das **Interface** (Vertrag) auf die **Implementierung**.
 
@@ -87,15 +118,13 @@ Hier geschieht die Bindung im Sinne der "Clean Architecture". Wir mappen das **I
 val appModule = module {
     // Services
     single<ILauncherService> { LauncherService(get(), get()) }
-    single<IAuthService> { AuthService(get()) }
+    single<IAuthService> { AuthService(get()) } // Injiziert HttpClient
     single<ISettingsService> { SettingsService() }
-    
-    // Repositories
-    single { SkinRepository(get()) }
 }
 ```
 
 * **`single<Interface> { Impl() }`**: Dies sagt Koin: *"Wann immer jemand nach `Interface` fragt, gib ihm diese einzige Instanz von `Impl`"*.
+* **`singleOf(::Class)`**: Ein modernes Koin-DSL-Feature, das automatisch alle Konstruktorparameter auflöst.
 
 ### 3.3 UI-Modul (`uiModule`)
 
@@ -103,8 +132,7 @@ Controller sind oft Zustandsbehälter. Obwohl sie in dieser Desktop-App meist Si
 
 ```kotlin
 val uiModule = module {
-    // Injektion per Konstruktor-Referenz (::)
-    // Äquivalent zu: single { LauncherController(get(), get(), ...) }
+    // Injektion mittels Konstruktor-Referenz
     singleOf(::LauncherController)
 }
 ```
@@ -202,7 +230,7 @@ class LauncherController(
 
 **Fehler:** `No definition found for class '...' Check your definitions!`
 **Ursache:** Sie haben **Schritt 3** vergessen. Die Klasse existiert, aber Koin weiß nichts davon.
-**Lösung:** Fügen Sie `single { ... }` in `Modules.kt` hinzu.
+**Lösung:** Fügen Sie `single { ... }` oder `singleOf(...)` in `Modules.kt` hinzu.
 
 ### `InstanceCreationException`
 
@@ -212,6 +240,6 @@ class LauncherController(
 
 ### Zirkuläre Abhängigkeit (Circular Dependency)
 
-**Fehler:** `StackOverflow` beim Start.
+**Fehler:** `StackOverflow` während des Starts.
 **Ursache:** Service A benötigt Service B, und Service B benötigt Service A.
 **Lösung:** Refactoring der Logik. Lagern Sie die gemeinsame Logik in einen dritten Service C aus oder verwenden Sie `by inject()` (Lazy) innerhalb einer der Klassen (nicht empfohlen).

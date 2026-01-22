@@ -24,7 +24,7 @@ Before touching game files, the launcher ensures the host environment is ready. 
 
 **Service:** `JavaManagerService`
 
-The launcher does not rely on the system-wide `JAVA_HOME`. It strictly requires a specific Java version (currently configured for Java 21/25 compatibility).
+The launcher does not rely on the system-wide `JAVA_HOME`. It strictly requires a specific Java version for the game process (currently **Java 8, 17, or 21** depending on the Minecraft version).
 
 1. **Check:** Verifies if a valid JRE exists at the internal path (e.g., `updates/jre`).
 2. **Validation:** Runs `java -version` to confirm the binary is executable and matches the required version architecture.

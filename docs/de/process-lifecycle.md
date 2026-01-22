@@ -24,7 +24,7 @@ Bevor Spieldateien berührt werden, stellt der Launcher sicher, dass die Host-Um
 
 **Service:** `JavaManagerService`
 
-Der Launcher verlässt sich nicht auf das systemweite `JAVA_HOME`. Er verlangt strikt eine spezifische Java-Version (aktuell konfiguriert für Java 21/25 Kompatibilität).
+Der Launcher verlässt sich nicht auf das systemweite `JAVA_HOME`. Er verlangt strikt eine spezifische Java-Version für den Spielprozess (derzeit **Java 8, 17 oder 21**, abhängig von der Minecraft-Version).
 
 1.  **Prüfung:** Verifiziert, ob eine gültige JRE im internen Pfad existiert (z. B. `updates/jre`).
 2.  **Validierung:** Führt `java -version` aus, um zu bestätigen, dass die Binärdatei ausführbar ist und der geforderten Version/Architektur entspricht.

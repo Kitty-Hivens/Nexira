@@ -20,11 +20,11 @@ The system is stratified into four distinct layers:
 
 3. **Infrastructure/Service Layer (`client-launcher`)**:
     * **Responsibility:** Implements the core business logic defined in `client-core`. Handles file I/O, networking, hashing, and OS process management.
-    * **Tech:** Retrofit, OkHttp, `java.lang.ProcessBuilder`.
+    * **Tech:** Ktor Client (OkHttp Engine), `java.lang.ProcessBuilder`.
 
 4. **Domain & Contract Layer (`client-core`)**:
     * **Responsibility:** Defines *what* (Interfaces) and the *data* (DTOs), but not the *how*.
-    * **Constraint:** Pure Kotlin. No framework dependencies (Retrofit, Compose, etc.).
+    * **Constraint:** Pure Kotlin. No framework dependencies (Ktor, Compose, etc.).
 
 ## 2. Module Breakdown
 
@@ -54,8 +54,8 @@ startKoin {
 ### Module Definitions
 
 1. **`networkModule`** (Source: `client-launcher/di/Modules.kt`):
-    * Provides singleton instances of `OkHttpClient` and `Retrofit`.
-    * Configures timeouts and logging interceptors.
+    * Provides singleton instances of `OkHttpClient` (Engine) and `HttpClient` (Ktor).
+    * Configures SOCKS proxy, timeouts, and JSON serialization.
 
 2. **`appModule`** (Source: `client-launcher/di/Modules.kt`):
     * Binds Core Interfaces to Launcher Implementations.
