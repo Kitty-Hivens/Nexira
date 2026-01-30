@@ -9,7 +9,7 @@ object AppConfig {
     // ==========================================
     // 1. METADATA
     // ==========================================
-    const val LAUNCHER_VERSION = "3.6.2"
+    const val LAUNCHER_VERSION = "3.6.3"
     const val BRANDING_NAME = "smartycraft"
     const val APP_TITLE = "Aura Launcher"
     const val CLIENT_VERSION = BuildConfig.FORK_VERSION
