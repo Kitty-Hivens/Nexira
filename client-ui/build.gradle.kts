@@ -97,6 +97,14 @@ compose.desktop {
             copyright = "© 2026 Hivens"
             vendor = "Hivens"
 
+            windows {
+                upgradeUuid = "30571060-3129-4503-b09e-716912389146"
+                menuGroup = "Aura Launcher"
+                shortcut = true
+                dirChooser = true
+                iconFile.set(project.file("src/commonMain/composeResources/drawable/icon.ico"))
+            }
+
             linux {
                 packageName = "aura-launcher"
                 debMaintainer = "https://github.com/Kitty-Hivens"
