@@ -207,10 +207,6 @@ tasks.withType<KotlinJvmCompile>().configureEach {
             "-jvm-default=no-compatibility",
             "-Xlambdas=indy",
 
-            // Compose Compiler optimizations
-            "-P", "plugin:androidx.compose.compiler.plugins.kotlin:featureFlag=StrongSkipping",
-            "-P", "plugin:androidx.compose.compiler.plugins.kotlin:featureFlag=OptimizeNonSkippingGroups",
-
             // Disable debug features
             "-P", "plugin:androidx.compose.compiler.plugins.kotlin:liveLiterals=false",
 
