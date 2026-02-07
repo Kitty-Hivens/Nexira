@@ -43,7 +43,6 @@ jobs:
       - uses: gradle/actions/setup-gradle@v3
         with:
           cache-read-only: false
-          gradle-home-cache-cleanup: false # TODO
 
       # ====================================================================
       # BUILD WITH OPTIMIZATIONS
@@ -53,8 +52,7 @@ jobs:
           ./gradlew.bat clean :client-ui:packageMsi :client-ui:packageDistribution `
             "-Pversion=${{ github.ref_name }}" `
             "--no-daemon" `
-            "--max-workers=4" `
-            "-Dorg.gradle.jvmargs=-Xmx6g"
+            "--max-workers=4"
 
       - name: Prepare Artifacts
         shell: pwsh
@@ -77,7 +75,7 @@ jobs:
           $msi = "AuraLauncher-Setup.msi"
           if (Test-Path $msi) {
             Write-Host "Compressing $msi with UPX..."
-            upx --best --lzma $msi
+            upx --best --lzma $msi 2>$null || echo "UPX failed for MSI (expected)"
           }
           
           $zip = "AuraLauncher-Win-Portable.zip"
@@ -85,7 +83,7 @@ jobs:
             Expand-Archive -Path $zip -DestinationPath temp_extract
             Get-ChildItem temp_extract -Recurse -Include *.exe,*.dll | ForEach-Object {
               Write-Host "Compressing $($_.Name)..."
-              upx --best --lzma $_.FullName
+              upx --best --lzma $_.FullName 2>$null || echo "Skipped $($_.Name)"
             }
             Remove-Item $zip -Force
             Compress-Archive -Path temp_extract/* -DestinationPath $zip -CompressionLevel Optimal
@@ -109,7 +107,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup JBR 25 (Minimal)
+      - name: Setup JBR 25
         shell: bash
         run: |
           curl -L "https://cache-redirector.jetbrains.com/intellij-jbr/jbrsdk-25.0.1-linux-x64-b268.49.tar.gz" -o jbr.tar.gz
@@ -121,7 +119,6 @@ jobs:
       - uses: gradle/actions/setup-gradle@v3
         with:
           cache-read-only: false
-          gradle-home-cache-cleanup: false # TODO
 
       - run: chmod +x gradlew
 
@@ -141,8 +138,7 @@ jobs:
           ./gradlew clean :client-ui:packageDistribution :client-ui:packageDeb :client-ui:packageRpm \
             -Pversion=${{ github.ref_name }} \
             --no-daemon \
-            --max-workers=4 \
-            -Dorg.gradle.jvmargs=-Xmx6g
+            --max-workers=4
 
       - name: Package AppImage Manually
         shell: bash
@@ -192,18 +188,24 @@ jobs:
           if [ -f "AuraLauncher.AppImage" ]; then
             echo "Compressing AppImage contents..."
             chmod +x AuraLauncher.AppImage
-            ./AuraLauncher.AppImage --appimage-extract
+            ./AuraLauncher.AppImage --appimage-extract || echo "Extraction failed, skipping UPX"
           
-            find squashfs-root -type f \( -name "*.so*" -o -perm -111 \) | while read file; do
-              if file "$file" | grep -q ELF; then
-                echo "Compressing $file..."
-                upx --best --lzma "$file" 2>/dev/null || true
+            if [ -d "squashfs-root" ]; then
+              find squashfs-root -type f \( -name "*.so*" -o -perm -111 \) | while read file; do
+                if file "$file" | grep -q ELF; then
+                  echo "Compressing $file..."
+                  upx --best --lzma "$file" 2>/dev/null || true
+                fi
+              done
+          
+              ARCH=x86_64 ./squashfs-root/AppRun --no-appstream squashfs-root AuraLauncher-compressed.AppImage 2>/dev/null || echo "Repackaging failed, using original"
+          
+              if [ -f "AuraLauncher-compressed.AppImage" ]; then
+                mv AuraLauncher-compressed.AppImage AuraLauncher.AppImage
               fi
-            done
           
-            ARCH=x86_64 ./squashfs-root/AppRun --appimage-extract-and-run --no-appstream squashfs-root AuraLauncher-compressed.AppImage
-            mv AuraLauncher-compressed.AppImage AuraLauncher.AppImage
-            rm -rf squashfs-root
+              rm -rf squashfs-root
+            fi
           fi
 
       - name: Prepare Other Artifacts
@@ -243,7 +245,6 @@ jobs:
       - uses: gradle/actions/setup-gradle@v3
         with:
           cache-read-only: false
-          gradle-home-cache-cleanup: false # TODO
 
       - run: chmod +x gradlew
 
@@ -252,8 +253,7 @@ jobs:
           ./gradlew clean :client-ui:packageDmg \
             -Pversion=${{ github.ref_name }} \
             --no-daemon \
-            --max-workers=4 \
-            -Dorg.gradle.jvmargs=-Xmx6g
+            --max-workers=4
 
       - name: Prepare Artifact
         shell: bash
@@ -271,17 +271,19 @@ jobs:
         run: |
           if [ -f "AuraLauncher.dmg" ]; then
             echo "Mounting DMG..."
-            hdiutil attach AuraLauncher.dmg -mountpoint /Volumes/Aura
+            hdiutil attach AuraLauncher.dmg -mountpoint /Volumes/Aura || echo "Mount failed, skipping UPX"
           
-            echo "Compressing binaries..."
-            find /Volumes/Aura -type f -perm +111 | while read file; do
-              if file "$file" | grep -q Mach-O; then
-                echo "Compressing $file..."
-                upx --best --lzma "$file" 2>/dev/null || true
-              fi
-            done
+            if [ -d "/Volumes/Aura" ]; then
+              echo "Compressing binaries..."
+              find /Volumes/Aura -type f -perm +111 | while read file; do
+                if file "$file" | grep -q Mach-O; then
+                  echo "Compressing $file..."
+                  upx --best --lzma "$file" 2>/dev/null || true
+                fi
+              done
           
-            hdiutil detach /Volumes/Aura
+              hdiutil detach /Volumes/Aura
+            fi
           fi
 
       - name: Upload macOS Artifact
