@@ -198,13 +198,14 @@ tasks.withType<KotlinJvmCompile>().configureEach {
         freeCompilerArgs.addAll(
             // Backend optimizations
             "-Xbackend-threads=0",
-            "-Xtype-optimizations",
-            "-Xjvm-default=all",
+            "-jvm-default=all",
             "-Xlambdas=indy",
 
             // Compose Compiler optimizations
-            "-P", "plugin:androidx.compose.compiler.plugins.kotlin:strongSkipping=true",
-            "-P", "plugin:androidx.compose.compiler.plugins.kotlin:nonSkippingGroupOptimization=true",
+            "-P", "plugin:androidx.compose.compiler.plugins.kotlin:featureFlag=StrongSkipping",
+            "-P", "plugin:androidx.compose.compiler.plugins.kotlin:featureFlag=OptimizeNonSkippingGroups",
+
+            // Disable debug features
             "-P", "plugin:androidx.compose.compiler.plugins.kotlin:liveLiterals=false",
             "-P", "plugin:androidx.compose.compiler.plugins.kotlin:sourceInformation=false",
 
