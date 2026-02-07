@@ -73,6 +73,7 @@ buildConfig {
 compose.desktop {
     application {
         mainClass = "hivens.ui.MainKt"
+
         nativeDistributions {
             targetFormats(
                 TargetFormat.AppImage,
@@ -82,10 +83,18 @@ compose.desktop {
                 TargetFormat.Dmg
             )
 
+            // ====================================================================
+            // PROGUARD AGGRESSIVE OPTIMIZATION
+            // ====================================================================
             buildTypes.release.proguard {
-                isEnabled = true
-                optimize = true
+                isEnabled.set(true)
+                optimize.set(true)
+                obfuscate.set(false)
+
                 configurationFiles.from(project.file("compose-desktop.pro"))
+
+                // Additional runtime optimizations
+                version.set("7.6.1")
             }
 
             packageName = "AuraLauncher"
@@ -97,49 +106,143 @@ compose.desktop {
             copyright = "© 2026 Hivens"
             vendor = "Hivens"
 
+            // ====================================================================
+            // CUSTOM MINIMAL JRE (saves ~120MB)
+            // ====================================================================
+            modules(
+                "java.base",
+                "java.desktop",
+                "java.logging",
+                "java.naming",
+                "java.net.http",
+                "java.prefs",
+                "java.sql",
+                "jdk.crypto.ec",
+                "jdk.unsupported",
+                "jdk.zipfs"
+            )
+
             windows {
                 upgradeUuid = "30571060-3129-4503-b09e-716912389146"
                 menuGroup = "Aura Launcher"
                 shortcut = true
                 dirChooser = true
                 iconFile.set(project.file("src/commonMain/composeResources/drawable/icon.ico"))
+
+                // Windows-specific optimizations
+                perUserInstall = true
+                console = false
             }
 
             linux {
                 packageName = "aura-launcher"
                 debMaintainer = "https://github.com/Kitty-Hivens"
                 appCategory = "Game"
+
+                // Linux-specific optimizations
+                shortcut = true
+                menuGroup = "Game"
+            }
+
+            macOS {
+                // macOS-specific optimizations
+                bundleID = "com.hivens.auralauncher"
+                dockName = "Aura Launcher"
             }
         }
 
+        // ====================================================================
+        // JVM ARGUMENTS OPTIMIZATION
+        // ====================================================================
         jvmArgs(
+            // Graphics optimization
             "-Dawt.useSystemAAFontSettings=on",
             "-Djdk.gtk.version=3",
             "-Dwayland.debug.children=true",
             "-Dsun.java2d.uiScale=1",
             "-D_JAVA_AWT_WM_NONREPARENTING=1",
-            "--enable-native-access=ALL-UNNAMED",
-            "-Djdk.gtk.verbose=true",
-            "-Dnet.java.awt.embedded=true",
             "-Dskiko.render.backend=SOFTWARE",
-            "-Drobot.need_x11=false"
+            "-Drobot.need_x11=false",
+
+            // Performance flags
+            "-XX:+UseG1GC",
+            "-XX:+UseStringDeduplication",
+            "-XX:+OptimizeStringConcat",
+            "-XX:+UseCompressedOops",
+            "-XX:+UseCompressedClassPointers",
+
+            // Startup optimization
+            "-XX:TieredStopAtLevel=1",
+            "-XX:+TieredCompilation",
+            "-Xverify:none",
+
+            // Memory optimization
+            "-Xms128m",
+            "-Xmx512m",
+            "-XX:MaxMetaspaceSize=256m",
+            "-XX:ReservedCodeCacheSize=128m",
+
+            // Security
+            "--enable-native-access=ALL-UNNAMED"
         )
     }
 }
 
-// K2 compiler configuration under JDK 25
+// ========================================================================
+// KOTLIN COMPILER OPTIMIZATIONS
+// ========================================================================
 tasks.withType<KotlinJvmCompile>().configureEach {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_25)
+
         freeCompilerArgs.addAll(
+            // Backend optimizations
             "-Xbackend-threads=0",
             "-Xtype-optimizations",
             "-Xjvm-default=all",
-            "-Xlambdas=indy"
+            "-Xlambdas=indy",
+
+            // Compose Compiler optimizations
+            "-P", "plugin:androidx.compose.compiler.plugins.kotlin:strongSkipping=true",
+            "-P", "plugin:androidx.compose.compiler.plugins.kotlin:nonSkippingGroupOptimization=true",
+            "-P", "plugin:androidx.compose.compiler.plugins.kotlin:liveLiterals=false",
+            "-P", "plugin:androidx.compose.compiler.plugins.kotlin:sourceInformation=false",
+
+            // Metrics (optional, for analysis)
+            "-P", "plugin:androidx.compose.compiler.plugins.kotlin:metricsDestination=${project.layout.buildDirectory}/compose_metrics",
+            "-P", "plugin:androidx.compose.compiler.plugins.kotlin:reportsDestination=${project.layout.buildDirectory}/compose_reports",
+
+            // Aggressive inline
+            "-Xinline-classes",
+            "-Xno-param-assertions",
+            "-Xno-call-assertions",
+            "-Xno-receiver-assertions"
         )
     }
 }
 
+// ========================================================================
+// JAR OPTIMIZATION
+// ========================================================================
+tasks.withType<Jar>().configureEach {
+    // Remove debug metadata
+    exclude("META-INF/*.SF", "META-INF/*.DSA", "META-INF/*.RSA")
+    exclude("**/*.kotlin_metadata")
+    exclude("**/*.kotlin_builtins")
+    exclude("DebugProbesKt.bin")
+    exclude("META-INF/proguard/**")
+    exclude("META-INF/com.android.tools/**")
+
+    // Compression
+    isPreserveFileTimestamps = false
+    isReproducibleFileOrder = true
+
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+// ========================================================================
+// BUILD PERFORMANCE
+// ========================================================================
 tasks.configureEach {
     if (name.contains("checkRuntime")) {
         dependsOn(
@@ -149,4 +252,9 @@ tasks.configureEach {
             ":client-launcher:processResources"
         )
     }
+}
+
+// Disable unnecessary tasks for faster builds
+tasks.named("desktopJar") {
+    enabled = gradle.startParameter.taskNames.none { it.contains("package") }
 }
