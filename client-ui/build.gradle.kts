@@ -198,7 +198,7 @@ tasks.withType<KotlinJvmCompile>().configureEach {
         freeCompilerArgs.addAll(
             // Backend optimizations
             "-Xbackend-threads=0",
-            "-jvm-default=all",
+            "-Xjvm-default=all",
             "-Xlambdas=indy",
 
             // Compose Compiler optimizations
