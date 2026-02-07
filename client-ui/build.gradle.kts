@@ -13,7 +13,7 @@ val ktorVersion: String by project
 
 plugins {
     kotlin("multiplatform")
-    id("org.jetbrains.compose") version "1.11.0-alpha01"
+    id("org.jetbrains.compose") version "1.11.0-alpha02"
     id("org.jetbrains.kotlin.plugin.compose") version "2.3.0"
     id("com.github.gmazzo.buildconfig")
 }
@@ -188,6 +188,12 @@ compose.desktop {
     }
 }
 
+compose.resources {
+    publicResClass = true
+    packageOfResClass = "hivens.ui.generated.resources"
+    generateResClass = always
+}
+
 // ========================================================================
 // KOTLIN COMPILER OPTIMIZATIONS
 // ========================================================================
@@ -207,11 +213,10 @@ tasks.withType<KotlinJvmCompile>().configureEach {
 
             // Disable debug features
             "-P", "plugin:androidx.compose.compiler.plugins.kotlin:liveLiterals=false",
-            "-P", "plugin:androidx.compose.compiler.plugins.kotlin:sourceInformation=false",
 
             // Metrics (optional, for analysis)
-            "-P", "plugin:androidx.compose.compiler.plugins.kotlin:metricsDestination=${project.layout.buildDirectory}/compose_metrics",
-            "-P", "plugin:androidx.compose.compiler.plugins.kotlin:reportsDestination=${project.layout.buildDirectory}/compose_reports",
+            "-P", "plugin:androidx.compose.compiler.plugins.kotlin:metricsDestination=${project.layout.buildDirectory.get().asFile.absolutePath}/compose_metrics",
+            "-P", "plugin:androidx.compose.compiler.plugins.kotlin:reportsDestination=${project.layout.buildDirectory.get().asFile.absolutePath}/compose_reports",
 
             // Aggressive inline
             "-Xinline-classes",
@@ -253,9 +258,4 @@ tasks.configureEach {
             ":client-launcher:processResources"
         )
     }
-}
-
-// Disable unnecessary tasks for faster builds
-tasks.named("desktopJar") {
-    enabled = gradle.startParameter.taskNames.none { it.contains("package") }
 }
