@@ -43,7 +43,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v3
         with:
           cache-read-only: false
-          gradle-home-cache-cleanup: true
+          gradle-home-cache-cleanup: false # TODO
 
       # ====================================================================
       # BUILD WITH OPTIMIZATIONS
@@ -121,7 +121,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v3
         with:
           cache-read-only: false
-          gradle-home-cache-cleanup: true
+          gradle-home-cache-cleanup: false # TODO
 
       - run: chmod +x gradlew
 
@@ -243,7 +243,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v3
         with:
           cache-read-only: false
-          gradle-home-cache-cleanup: true
+          gradle-home-cache-cleanup: false # TODO
 
       - run: chmod +x gradlew
 
