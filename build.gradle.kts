@@ -4,7 +4,6 @@ plugins {
     id("com.github.gmazzo.buildconfig") version "5.3.5" apply false
 }
 
-// 1. Function to get version from Git (for local build)
 fun getGitVersion(providerFactory: ProviderFactory): String {
     return try {
         val version = providerFactory.exec {
@@ -18,7 +17,6 @@ fun getGitVersion(providerFactory: ProviderFactory): String {
     }
 }
 
-// 2. Final version
 val appVersion = providers.gradleProperty("version")
     .getOrElse(getGitVersion(providers))
 
@@ -39,4 +37,43 @@ subprojects {
             }
         }
     }
+
+    // ====================================================================
+    // AGGRESSIVE BUILD OPTIMIZATIONS
+    // ====================================================================
+    tasks.withType<JavaCompile>().configureEach {
+        options.apply {
+            isFork = true
+            isIncremental = true
+
+            forkOptions.apply {
+                memoryMaximumSize = "2g"
+                jvmArgs = listOf(
+                    "-XX:+UseParallelGC",
+                    "-XX:CICompilerCount=2"
+                )
+            }
+
+            compilerArgs.addAll(listOf(
+                "-Xlint:none",
+                "-parameters"
+            ))
+        }
+    }
+
+    tasks.withType<Test>().configureEach {
+        maxParallelForks = Runtime.getRuntime().availableProcessors()
+
+        jvmArgs(
+            "-Xmx1g",
+            "-XX:+UseParallelGC"
+        )
+    }
+}
+
+// ========================================================================
+// GRADLE DAEMON OPTIMIZATION
+// ========================================================================
+gradle.startParameter.apply {
+    maxWorkerCount = Runtime.getRuntime().availableProcessors()
 }
