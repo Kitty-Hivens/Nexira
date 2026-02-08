@@ -1,4 +1,4 @@
-name: Build and Publish (Optimized)
+name: Build and Release
 
 on:
   workflow_dispatch:
@@ -17,10 +17,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # ====================================================================
-      # OPTIMIZED JBR 25 SETUP
-      # ====================================================================
-      - name: Setup JBR 25 (Minimal)
+      - name: Setup JBR 25
         shell: bash
         run: |
           mkdir -p jbr_home
@@ -44,23 +41,21 @@ jobs:
         with:
           cache-read-only: false
 
-      # ====================================================================
-      # BUILD WITH OPTIMIZATIONS
-      # ====================================================================
-      - name: Build Windows Targets
+      - name: Build Windows (Release)
         run: |
-          ./gradlew.bat clean :client-ui:packageMsi :client-ui:packageDistribution `
+          ./gradlew.bat clean :client-ui:packageReleaseDistributionForCurrentOS :client-ui:packageReleaseMsi `
             "-Pversion=${{ github.ref_name }}" `
+            "-Pcompose.desktop.buildType=release" `
             "--no-daemon" `
             "--max-workers=4"
 
       - name: Prepare Artifacts
         shell: pwsh
         run: |
-          $msi = Get-ChildItem client-ui/build/compose/binaries/main/msi/*.msi | Select-Object -First 1
+          $msi = Get-ChildItem client-ui/build/compose/binaries/main-release/msi/*.msi | Select-Object -First 1
           if ($msi) { Move-Item $msi.FullName "AuraLauncher-Setup.msi" }
 
-          Compress-Archive -Path client-ui/build/compose/binaries/main/app/* -DestinationPath AuraLauncher-Win-Portable.zip -CompressionLevel Optimal
+          Compress-Archive -Path client-ui/build/compose/binaries/main-release/app/* -DestinationPath AuraLauncher-Win-Portable.zip -CompressionLevel Optimal
 
       # ====================================================================
       # UPX COMPRESSION (40-50% size reduction)
@@ -69,13 +64,12 @@ jobs:
         shell: pwsh
         run: choco install upx -y
 
-      - name: Compress with UPX
+      - name: Compress Binaries
         shell: pwsh
         run: |
           $msi = "AuraLauncher-Setup.msi"
           if (Test-Path $msi) {
-            Write-Host "Compressing $msi with UPX..."
-            upx --best --lzma $msi 2>$null || echo "UPX failed for MSI (expected)"
+            upx --best --lzma $msi 2>$null || echo "UPX skipped for MSI"
           }
           
           $zip = "AuraLauncher-Win-Portable.zip"
@@ -133,18 +127,19 @@ jobs:
           chmod +x appimagetool.AppImage
           ./appimagetool.AppImage --appimage-extract
 
-      - name: Build Linux Targets
+      - name: Build Linux (Release)
         run: |
-          ./gradlew clean :client-ui:packageDistribution :client-ui:packageDeb :client-ui:packageRpm \
+          ./gradlew clean :client-ui:packageReleaseDistributionForCurrentOS :client-ui:packageReleaseDeb :client-ui:packageReleaseRpm \
             -Pversion=${{ github.ref_name }} \
+            -Pcompose.desktop.buildType=release \
             --no-daemon \
             --max-workers=4
 
-      - name: Package AppImage Manually
+      - name: Package AppImage
         shell: bash
         run: |
           EXE_PATH=$(find client-ui/build/compose/binaries -type f -name "AuraLauncher" | grep "/bin/" | head -n 1)
-          if [ -z "$EXE_PATH" ]; then echo "❌ Binary not found!"; exit 1; fi
+          if [ -z "$EXE_PATH" ]; then echo "Binary not found!"; exit 1; fi
           
           BIN_DIR=$(dirname "$EXE_PATH")
           APP_ROOT=$(dirname "$BIN_DIR")
@@ -179,16 +174,13 @@ jobs:
           
           ARCH=x86_64 ./squashfs-root/AppRun --no-appstream AppDir AuraLauncher.AppImage
 
-      # ====================================================================
-      # UPX COMPRESSION FOR LINUX
-      # ====================================================================
-      - name: Compress with UPX
+      - name: Compress Binaries
         shell: bash
         run: |
           if [ -f "AuraLauncher.AppImage" ]; then
             echo "Compressing AppImage contents..."
             chmod +x AuraLauncher.AppImage
-            ./AuraLauncher.AppImage --appimage-extract || echo "Extraction failed, skipping UPX"
+            ./AuraLauncher.AppImage --appimage-extract || echo "Extraction failed"
           
             if [ -d "squashfs-root" ]; then
               find squashfs-root -type f \( -name "*.so*" -o -perm -111 \) | while read file; do
@@ -198,7 +190,7 @@ jobs:
                 fi
               done
           
-              ARCH=x86_64 ./squashfs-root/AppRun --no-appstream squashfs-root AuraLauncher-compressed.AppImage 2>/dev/null || echo "Repackaging failed, using original"
+              ARCH=x86_64 ./squashfs-root/AppRun --no-appstream squashfs-root AuraLauncher-compressed.AppImage 2>/dev/null || echo "Repackaging failed"
           
               if [ -f "AuraLauncher-compressed.AppImage" ]; then
                 mv AuraLauncher-compressed.AppImage AuraLauncher.AppImage
@@ -232,7 +224,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup JBR 25 (Minimal)
+      - name: Setup JBR 25
         shell: bash
         run: |
           curl -L "https://cache-redirector.jetbrains.com/intellij-jbr/jbrsdk-25.0.1-osx-aarch64-b268.49.tar.gz" -o jbr.tar.gz
@@ -248,10 +240,11 @@ jobs:
 
       - run: chmod +x gradlew
 
-      - name: Build DMG
+      - name: Build DMG (Release)
         run: |
-          ./gradlew clean :client-ui:packageDmg \
+          ./gradlew clean :client-ui:packageReleaseDmg \
             -Pversion=${{ github.ref_name }} \
+            -Pcompose.desktop.buildType=release \
             --no-daemon \
             --max-workers=4
 
@@ -266,12 +259,11 @@ jobs:
       - name: Install UPX
         run: brew install upx
 
-      - name: Compress with UPX
+      - name: Compress Binaries
         shell: bash
         run: |
           if [ -f "AuraLauncher.dmg" ]; then
-            echo "Mounting DMG..."
-            hdiutil attach AuraLauncher.dmg -mountpoint /Volumes/Aura || echo "Mount failed, skipping UPX"
+            hdiutil attach AuraLauncher.dmg -mountpoint /Volumes/Aura || echo "Mount failed"
           
             if [ -d "/Volumes/Aura" ]; then
               echo "Compressing binaries..."
@@ -310,21 +302,14 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ github.ref_name }}
-          name: Release ${{ github.ref_name }} (Optimized)
+          name: Release ${{ github.ref_name }}
           draft: false
           prerelease: ${{ contains(github.ref, '-') }}
           files: artifacts/*
           body: |
-            ## 🚀 Optimized Build
+            ## Aura Launcher ${{ github.ref_name }}
             
-            This release includes aggressive optimizations:
-            - ProGuard R8 optimization (-60% size)
-            - UPX compression (-40% binary size)
-            - Minimal JRE modules (-120MB runtime)
-            - Compose strong skipping mode
-            - Aggressive compiler flags
-            
-            **Performance improvements:**
-            - ~60% smaller distribution
-            - ~50% faster startup
-            - ~40% less RAM usage
+            **Downloads:**
+            - Windows: `AuraLauncher-Setup.msi` (installer), `AuraLauncher-Win-Portable.zip` (portable)
+            - Linux: `AuraLauncher.AppImage`, `AuraLauncher.deb`, `AuraLauncher.rpm`
+            - macOS: `AuraLauncher.dmg`
