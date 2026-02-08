@@ -37,7 +37,7 @@ object AppConfig {
     // 4. LEGACY PARAMETERS (for compatibility with backend)
     // ==========================================
     const val DEFAULT_SERVER_ID = "Industrial"
-    const val DEFAULT_LAUNCHER_HASH = "5515a4bdd5f532faf0db61b8263d1952"
+    const val DEFAULT_LAUNCHER_HASH = "0714d6ea824454d0af31a02373eef703"
     const val AUTH_SALT = "sdgsdfhgosd8dfrg"
     const val PROTOCOL_DEFAULT_JAR = "smartycraft.jar"
     const val PROTOCOL_DEFAULT_CSUM = "d41d8cd98f00b204e9800998ecf8427e"

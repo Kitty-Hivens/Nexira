@@ -28,8 +28,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.*
-import hivens.client_ui.generated.resources.Res
-import hivens.client_ui.generated.resources.favicon
 import hivens.config.AppConfig
 import hivens.core.api.SkinRepository
 import hivens.core.api.interfaces.IAuthService
@@ -43,6 +41,8 @@ import hivens.launcher.di.appModule
 import hivens.launcher.di.networkModule
 import hivens.ui.components.GlassCard
 import hivens.ui.components.SeasonalEffectsLayer
+import hivens.ui.generated.resources.Res
+import hivens.ui.generated.resources.favicon
 import hivens.ui.logic.LauncherController
 import hivens.ui.screens.*
 import hivens.ui.theme.CelestiaTheme
@@ -92,6 +92,7 @@ fun main() {
             height = 650.dp,
             position = WindowPosition(Alignment.Center)
         )
+        @Suppress("UNUSED_VALUE")
         var isDarkTheme by remember { mutableStateOf(true) }
         var isAppVisible by remember { mutableStateOf(true) }
 
