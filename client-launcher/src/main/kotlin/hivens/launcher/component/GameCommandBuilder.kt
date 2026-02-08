@@ -178,11 +178,7 @@ internal class GameCommandBuilder {
 
     private fun getNeoForgeModules(): List<String> = listOf(
         "cpw/mods/securejarhandler/3.0.8/securejarhandler-3.0.8.jar",
-        "org/ow2/asm/asm/9.7/asm-9.7.jar",
-        "org/ow2/asm/asm-commons/9.7/asm-commons-9.7.jar",
-        "org/ow2/asm/asm-tree/9.7/asm-tree-9.7.jar",
-        "org/ow2/asm/asm-util/9.7/asm-util-9.7.jar",
-        "org/ow2/asm/asm-analysis/9.7/asm-analysis-9.7.jar",
+        "cpw/mods/modlauncher/11.0.5/modlauncher-11.0.5.jar",
         "cpw/mods/bootstraplauncher/2.0.2/bootstraplauncher-2.0.2.jar",
         "net/neoforged/JarJarFileSystems/0.4.1/JarJarFileSystems-0.4.1.jar"
     )
@@ -211,7 +207,7 @@ internal class GameCommandBuilder {
         args.add("--userType"); args.add("mojang")
 
         if (assetIndex == "1.21.1") {
-            args.add("--fml.neoForgeVersion"); args.add("21.1.504")
+            args.add("--fml.neoForgeVersion"); args.add("21.1.505")
             args.add("--fml.fmlVersion"); args.add("4.0.34")
             args.add("--fml.mcVersion"); args.add("1.21.1")
             args.add("--fml.neoFormVersion"); args.add("20240808.144430")
