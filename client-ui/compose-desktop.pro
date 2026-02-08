@@ -1,86 +1,60 @@
-# Aura Launcher - Aggressive Optimization Rules
-# Target: -60% binary size, -50% startup time
-
 # ============================================================================
-# CORE OPTIMIZATIONS
+# Aura Launcher - ProGuard Rules
+# Java 25 | Compose Multiplatform | ProGuard 7.8+
 # ============================================================================
 
+# --- Core Settings ---
 -dontobfuscate
--optimizationpasses 7
 -allowaccessmodification
--mergeinterfacesaggressively
 -repackageclasses ''
+-optimizationpasses 3
 
-# Aggressive dead code elimination
--optimizations !code/simplification/arithmetic,!code/simplification/cast,!field/*,!class/merging/*
+# --- Kotlin & Coroutines ---
+-keep class kotlinx.coroutines.** { *; }
+-keep class kotlinx.coroutines.swing.** { *; }
+-keep class kotlinx.coroutines.internal.** { *; }
+-keep class kotlinx.coroutines.scheduling.** { *; }
+-keep class kotlinx.atomicfu.** { *; }
 
-# ============================================================================
-# KOTLIN RUNTIME STRIPPING
-# ============================================================================
+-keepnames class * implements kotlinx.coroutines.internal.MainDispatcherFactory
+-keepnames class * implements kotlinx.coroutines.CoroutineExceptionHandler
 
-# Remove Kotlin intrinsics checks in release
--assumenosideeffects class kotlin.jvm.internal.Intrinsics {
-    public static void check*(...);
-    public static void throwParameterIsNullException(...);
-    public static void throwNpe(...);
-}
-
-# Inline kotlin collections
--assumenosideeffects class kotlin.collections.** {
-    static void check*(...);
-}
-
-# ============================================================================
-# LOGGING ELIMINATION (Production builds)
-# ============================================================================
-
--assumenosideeffects class org.slf4j.Logger {
-    public *** trace(...);
-    public *** debug(...);
-    public *** info(...);
-}
-
--assumenosideeffects class ch.qos.logback.** {
-    public protected *;
-}
-
-# ============================================================================
-# COMPOSE DESKTOP OPTIMIZATIONS
-# ============================================================================
-
--keep class androidx.compose.** { *; }
--keep class org.jetbrains.skia.** { *; }
+# --- Compose & Skiko (Graphics) ---
 -keep class org.jetbrains.skiko.** { *; }
+-keep class org.jetbrains.skia.** { *; }
+-keep class androidx.compose.** { *; }
 
--dontwarn androidx.compose.**
--dontwarn org.jetbrains.skia.**
--dontwarn org.jetbrains.skiko.**
-
-# Keep @Composable functions metadata
--keepattributes *Annotation*,Signature,InnerClasses,EnclosingMethod
-
-# ============================================================================
-# KTOR CLIENT OPTIMIZATION
-# ============================================================================
-
+# --- Ktor & Network ---
+-keep class io.ktor.** { *; }
 -keep class io.ktor.client.** { *; }
--keep class io.ktor.http.** { *; }
 -keep class io.ktor.utils.io.** { *; }
 
--dontwarn io.ktor.**
+# Fix for Ktor AttributesJvmBase NPE
+-keepclassmembers class io.ktor.util.AttributesJvmBase {
+    public <methods>;
+}
 
-# OkHttp engine specifics
+# OkHttp
 -keep class okhttp3.** { *; }
 -keep interface okhttp3.** { *; }
--dontwarn okhttp3.**
--dontwarn okio.**
 
-# ============================================================================
-# KOTLINX SERIALIZATION
-# ============================================================================
+# --- Coil 3 (Image Loading) ---
+-keep class coil3.** { *; }
+-keepnames class * implements coil3.ImageLoaderFactory
 
--keepattributes *Annotation*, InnerClasses
--dontnote kotlinx.serialization.**
+# --- Dependency Injection (Koin) ---
+-keep class org.koin.** { *; }
+-keep class hivens.launcher.di.** { *; }
+
+# --- Application Code ---
+-keep class hivens.ui.MainKt { *; }
+-keep class hivens.ui.** { *; }
+-keep class hivens.launcher.** { *; }
+-keep class hivens.core.** { *; }
+
+# --- Serialization & Data Classes ---
+-keepattributes *Annotation*, InnerClasses, Signature, EnclosingMethod
+-keep class kotlinx.serialization.** { *; }
 
 -keep,includedescriptorclasses class hivens.core.**$$serializer { *; }
 -keepclassmembers class hivens.core.** {
@@ -90,50 +64,44 @@
     kotlinx.serialization.KSerializer serializer(...);
 }
 
-# ============================================================================
-# KOIN DI OPTIMIZATION
-# ============================================================================
+# --- Logging & SPI ---
+-keep class ch.qos.logback.** { *; }
+-keep class org.slf4j.** { *; }
 
--keep class org.koin.** { *; }
--keep class hivens.launcher.di.** { *; }
+-keepnames class * implements org.slf4j.spi.SLF4JServiceProvider
+-keepnames class * implements ch.qos.logback.core.spi.LifeCycle
+-keepnames class * implements java.util.spi.ToolProvider
 
-# ============================================================================
-# APPLICATION ENTRY POINTS
-# ============================================================================
+# --- Resources ---
+-adaptresourcefilecontents META-INF/services/**
+-adaptresourcefilenames **.png,**.jpg,**.jpeg,**.gif,**.ico,**.properties
 
--keep class hivens.ui.MainKt { *; }
--keep class hivens.ui.** { *; }
-
-# Keep data classes
--keepclassmembers class hivens.core.data.** {
-    <fields>;
-    <init>(...);
-}
-
-# ============================================================================
-# NATIVE LIBRARIES
-# ============================================================================
-
--keepclasseswithmembernames,includedescriptorclasses class * {
+# --- Native Methods (JNI) ---
+-keepclasseswithmembernames class * {
     native <methods>;
 }
 
-# ============================================================================
-# SECURITY: Remove debug info
-# ============================================================================
+# --- Suppress Warnings ---
+-dontwarn ch.qos.logback.**
+-dontwarn org.slf4j.**
+-dontwarn jakarta.**
+-dontwarn javax.**
+-dontwarn org.apache.commons.**
+-dontwarn org.tukaani.**
+-dontwarn com.github.luben.zstd.**
+-dontwarn org.brotli.**
+-dontwarn io.ktor.**
+-dontwarn kotlinx.**
+-dontwarn okhttp3.**
+-dontwarn okio.**
+-dontwarn coil3.**
+-dontwarn com.sun.jna.**
+-dontwarn org.freedesktop.dbus.**
+-dontwarn sun.misc.**
+-dontwarn org.objectweb.asm.**
+-dontwarn androidx.compose.**
+-dontwarn org.jetbrains.**
 
--assumenosideeffects class kotlin.jvm.internal.Reflection {
-    public static ** get*(...);
-}
-
-# Remove source file names and line numbers (reduce size)
--renamesourcefileattribute SourceFile
--keepattributes SourceFile,LineNumberTable
-
-# ============================================================================
-# RESOURCE SHRINKING
-# ============================================================================
-
-# Remove unused resources
--adaptresourcefilenames **.png,**.jpg,**.jpeg,**.gif
--adaptresourcefilecontents **.MF,**.xml,**.properties
+# --- Ignored Notes ---
+-dontnote module-info
+-dontnote **.kotlin_module
