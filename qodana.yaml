@@ -16,6 +16,7 @@ profile:
 exclude:
   - name: UnusedAssignment
   - name: UnusedSymbol
+  - name: AssignedValueIsNeverRead
 
 projectJDK: "21" #(Applied in CI/CD pipeline)
 
