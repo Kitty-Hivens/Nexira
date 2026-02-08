@@ -12,11 +12,7 @@ fun UpdateManager() {
     val scope = rememberCoroutineScope()
     
     var availableUpdate by remember { mutableStateOf<LauncherUpdate?>(null) }
-
-    @Suppress("UNUSED_VALUE")
     var showDialog by remember { mutableStateOf(false) }
-
-    @Suppress("UNUSED_VALUE")
     var showNotification by remember { mutableStateOf(false) }
 
     // Проверка при запуске

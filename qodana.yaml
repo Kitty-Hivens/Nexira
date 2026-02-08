@@ -13,10 +13,9 @@ profile:
 #  - name: <SomeEnabledInspectionId>
 
 #Disable inspections
-#exclude:
-#  - name: <SomeDisabledInspectionId>
-#    paths:
-#      - <path/where/not/run/inspection>
+exclude:
+  - name: UnusedAssignment
+  - name: UnusedSymbol
 
 projectJDK: "21" #(Applied in CI/CD pipeline)
 
