@@ -17,6 +17,7 @@ exclude:
   - name: UnusedAssignment
   - name: UnusedSymbol
   - name: AssignedValueIsNeverRead
+  - name: HasPlatformType
 
 projectJDK: "21" #(Applied in CI/CD pipeline)
 
