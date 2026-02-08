@@ -1,3 +1,5 @@
+[![Qodana](https://github.com/Kitty-Hivens/Aura-Launcher/actions/workflows/qodana_code_quality.yml/badge.svg)](https://github.com/Kitty-Hivens/Aura-Launcher/actions/workflows/qodana_code_quality.yml)
+
 # Aura Launcher (Unofficial)
 
 <div align="center">
