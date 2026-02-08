@@ -94,7 +94,7 @@ compose.desktop {
                 configurationFiles.from(project.file("compose-desktop.pro"))
 
                 // Additional runtime optimizations
-                version.set("7.6.1")
+                version.set("7.8.2")
             }
 
             packageName = "AuraLauncher"
