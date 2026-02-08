@@ -93,7 +93,6 @@ fun main() {
             height = 650.dp,
             position = WindowPosition(Alignment.Center)
         )
-        @Suppress("UNUSED_VALUE")
         var isDarkTheme by remember { mutableStateOf(true) }
         var isAppVisible by remember { mutableStateOf(true) }
 
