@@ -4,12 +4,15 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.core.api.interfaces.ISettingsService
@@ -22,7 +25,8 @@ import org.koin.compose.koinInject
 fun SettingsScreen(
     isDarkTheme: Boolean,
     onToggleTheme: () -> Unit,
-    onThemeChanged: (SeasonTheme) -> Unit
+    onThemeChanged: (SeasonTheme) -> Unit,
+    onOpenThemePicker: () -> Unit
 ) {
     val settingsService: ISettingsService = koinInject()
 
@@ -72,21 +76,63 @@ fun SettingsScreen(
                 // --- Секция: Интерфейс ---
                 item {
                     SettingsSectionTitle("Интерфейс")
+                    
+                    // Theme Picker
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable(onClick = onOpenThemePicker)
+                            .background(CelestiaTheme.colors.primary.copy(alpha = 0.1f))
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Default.Star,
+                                contentDescription = null,
+                                tint = CelestiaTheme.colors.primary,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(Modifier.width(16.dp))
+                            Column {
+                                Text(
+                                    "Выбор темы",
+                                    color = CelestiaTheme.colors.textPrimary,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    "Кастомизируйте цветовую схему",
+                                    style = MaterialTheme.typography.caption,
+                                    color = CelestiaTheme.colors.textSecondary
+                                )
+                            }
+                        }
+                        
+                        Icon(
+                            Icons.Default.ArrowDropDown,
+                            contentDescription = null,
+                            tint = CelestiaTheme.colors.primary
+                        )
+                    }
+
+                    Spacer(Modifier.height(16.dp))
 
                     // Темная тема
                     var themeSwitchState by remember(isDarkTheme) { mutableStateOf(isDarkTheme) }
                     SettingsSwitchRow(
                         title = "Темная тема",
-                        checked = themeSwitchState, // Используем локальную переменную
+                        checked = themeSwitchState,
                         onCheckedChange = { isChecked ->
-                            themeSwitchState = isChecked // 1. Мгновенно двигаем ползунок
-                            onToggleTheme()              // 2. Запускаем тяжелую смену темы
+                            themeSwitchState = isChecked
+                            onToggleTheme()
                         }
                     )
 
                     Spacer(Modifier.height(16.dp))
 
-                    // Сезонный эффект (Выпадающий список)
+                    // Сезонный эффект
                     Row(
                         Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -118,7 +164,7 @@ fun SettingsScreen(
                                         selectedTheme = theme
                                         isThemeDropdownExpanded = false
                                         onThemeChanged(theme)
-                                        save() // Сохраняем сразу при выборе
+                                        save()
                                     }) {
                                         Text(theme.title, color = CelestiaTheme.colors.textPrimary)
                                     }
@@ -137,12 +183,10 @@ fun SettingsScreen(
                         checked = closeAfterStart,
                         onCheckedChange = {
                             closeAfterStart = it
-                            save() // Сохраняем сразу
+                            save()
                         }
                     )
                 }
-
-                // Секция памяти удалена, как и просили
             }
         }
 

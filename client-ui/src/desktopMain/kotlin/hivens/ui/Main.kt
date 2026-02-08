@@ -47,6 +47,8 @@ import hivens.ui.generated.resources.favicon
 import hivens.ui.logic.LauncherController
 import hivens.ui.screens.*
 import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.CustomTheme
+import hivens.ui.theme.ThemeManager
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.utils.SkinManager
 import kotlinx.coroutines.Dispatchers
@@ -68,15 +70,16 @@ val uiModule = module {
 }
 
 sealed class AppState {
-    data object Splash : AppState()                         // Экран инициализации
-    data object Login : AppState()                          // Экран входа
-    data class Shell(val session: SessionData) : AppState() // Основной интерфейс
+    data object Splash : AppState()
+    data object Login : AppState()
+    data class Shell(val session: SessionData) : AppState()
 }
 
 sealed class ShellScreen {
     data object Home : ShellScreen()
     data object Profile : ShellScreen()
     data object GlobalSettings : ShellScreen()
+    data object ThemePicker : ShellScreen() // ← НОВОЕ
     data object News : ShellScreen()
     data class ServerSettings(val server: ServerProfile) : ShellScreen()
     data class ServerDetails(val server: ServerProfile) : ShellScreen()
@@ -129,14 +132,23 @@ fun main() {
                 undecorated = true,
                 transparent = true
             ) {
-                CelestiaTheme(useDarkTheme = isDarkTheme) {
+                // Загружаем кастомную тему
+                val dataDirectory: java.nio.file.Path = koinInject()
+                val themeManager = remember { ThemeManager(dataDirectory) }
+                var customTheme by remember { mutableStateOf(themeManager.loadTheme()) }
+
+                CelestiaTheme(useDarkTheme = isDarkTheme, customTheme = customTheme) {
                     AppContent(
                         isDarkTheme = isDarkTheme,
                         onToggleTheme = { isDarkTheme = !isDarkTheme },
-                        onCloseApp = ::exitApplication
+                        onCloseApp = ::exitApplication,
+                        customTheme = customTheme,
+                        onCustomThemeChanged = { newTheme ->
+                            customTheme = newTheme
+                            themeManager.saveTheme(newTheme)
+                        }
                     )
 
-                    // Слой обновлений поверх основного контента
                     UpdateManager()
                 }
             }
@@ -145,26 +157,28 @@ fun main() {
 }
 
 @Composable
-fun AppContent(isDarkTheme: Boolean, onToggleTheme: () -> Unit, onCloseApp: () -> Unit) {
+fun AppContent(
+    isDarkTheme: Boolean,
+    onToggleTheme: () -> Unit,
+    onCloseApp: () -> Unit,
+    customTheme: CustomTheme,
+    onCustomThemeChanged: (CustomTheme) -> Unit
+) {
     val credentialsManager: CredentialsManager = koinInject()
     val authService: IAuthService = koinInject()
     val profileManager: ProfileManager = koinInject()
     val settingsService: ISettingsService = koinInject()
 
-    // Начинаем со SplashScreen
     var appState by remember { mutableStateOf<AppState>(AppState.Splash) }
     var seasonalTheme by remember { mutableStateOf(settingsService.getSettings().seasonalTheme) }
 
-    // Логика инициализации (Запускается один раз в фоне)
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
-            // Имитация загрузки, чтобы юзер увидел лого (убирает мелькание белого экрана)
             delay(800)
 
             val savedSession = credentialsManager.load()
             var nextState: AppState = AppState.Login
 
-            // Пробуем авто-вход без блокировки UI
             if (savedSession?.cachedPassword != null) {
                 try {
                     val lastServer = profileManager.lastServerId ?: AppConfig.DEFAULT_SERVER_ID
@@ -174,7 +188,6 @@ fun AppContent(isDarkTheme: Boolean, onToggleTheme: () -> Unit, onCloseApp: () -
                     LoggerFactory.getLogger("AppContent").warn("Auto-login failed: ${e.message}")
                 }
             }
-            // Переключаем состояние
             appState = nextState
         }
     }
@@ -182,7 +195,6 @@ fun AppContent(isDarkTheme: Boolean, onToggleTheme: () -> Unit, onCloseApp: () -
     Box(Modifier.fillMaxSize().background(MaterialTheme.colors.background)) {
         CelestiaBackground(isDarkTheme = isDarkTheme, currentTheme = seasonalTheme)
 
-        // Плавная смена экранов
         Crossfade(targetState = appState, animationSpec = tween(500)) { state ->
             when (state) {
                 is AppState.Splash -> SplashScreen()
@@ -192,7 +204,9 @@ fun AppContent(isDarkTheme: Boolean, onToggleTheme: () -> Unit, onCloseApp: () -
                     onToggleTheme = onToggleTheme,
                     onLogout = { credentialsManager.clear(); appState = AppState.Login },
                     onCloseApp = onCloseApp,
-                    onThemeChanged = { newTheme -> seasonalTheme = newTheme }
+                    onThemeChanged = { newTheme -> seasonalTheme = newTheme },
+                    customTheme = customTheme,
+                    onCustomThemeChanged = onCustomThemeChanged
                 )
             }
         }
@@ -257,7 +271,9 @@ fun ShellUI(
     onToggleTheme: () -> Unit,
     onLogout: () -> Unit,
     onCloseApp: () -> Unit,
-    onThemeChanged: (SeasonTheme) -> Unit
+    onThemeChanged: (SeasonTheme) -> Unit,
+    customTheme: CustomTheme,
+    onCustomThemeChanged: (CustomTheme) -> Unit
 ) {
     val skinRepository: SkinRepository = koinInject()
     var currentSession by remember { mutableStateOf(initialSession) }
@@ -288,7 +304,7 @@ fun ShellUI(
 
                 NavButton(Icons.Default.Home, currentScreen is ShellScreen.Home || currentScreen is ShellScreen.ServerSettings || currentScreen is ShellScreen.News) { currentScreen = ShellScreen.Home }
                 NavButton(Icons.Default.Person, currentScreen is ShellScreen.Profile) { currentScreen = ShellScreen.Profile }
-                NavButton(Icons.Default.Settings, currentScreen is ShellScreen.GlobalSettings) { currentScreen = ShellScreen.GlobalSettings }
+                NavButton(Icons.Default.Settings, currentScreen is ShellScreen.GlobalSettings || currentScreen is ShellScreen.ThemePicker) { currentScreen = ShellScreen.GlobalSettings }
 
                 Spacer(Modifier.weight(1f))
 
@@ -335,7 +351,16 @@ fun ShellUI(
                     is ShellScreen.GlobalSettings -> SettingsScreen(
                         isDarkTheme = true,
                         onToggleTheme = onToggleTheme,
-                        onThemeChanged = onThemeChanged
+                        onThemeChanged = onThemeChanged,
+                        onOpenThemePicker = { currentScreen = ShellScreen.ThemePicker }
+                    )
+                    is ShellScreen.ThemePicker -> ThemePickerScreen(
+                        currentTheme = customTheme,
+                        onThemeSelected = { newTheme ->
+                            onCustomThemeChanged(newTheme)
+                            currentScreen = ShellScreen.GlobalSettings
+                        },
+                        onBack = { currentScreen = ShellScreen.GlobalSettings }
                     )
                     is ShellScreen.ServerSettings -> ServerSettingsScreen(server = screen.server, onBack = { currentScreen = ShellScreen.Home })
                     is ShellScreen.ServerDetails -> ServerDetailScreen(server = screen.server, onBack = { currentScreen = ShellScreen.Home })
