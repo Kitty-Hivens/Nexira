@@ -7,6 +7,7 @@ import hivens.core.api.SkinRepository
 import hivens.core.api.interfaces.*
 import hivens.launcher.*
 import hivens.launcher.component.EnvironmentPreparer
+import hivens.launcher.update.UpdateService
 import io.ktor.client.*
 import io.ktor.client.engine.okhttp.*
 import io.ktor.client.plugins.*
@@ -143,6 +144,15 @@ val appModule = module {
             profileManager = get(),
             javaManager = get(),
             envPreparer = get()
+        )
+    }
+
+    // Update Service
+    single {
+        UpdateService(
+            httpClient = get(),
+            json = get(),
+            dataDirectory = get()
         )
     }
 }

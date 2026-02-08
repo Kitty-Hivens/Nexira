@@ -41,6 +41,7 @@ import hivens.launcher.di.appModule
 import hivens.launcher.di.networkModule
 import hivens.ui.components.GlassCard
 import hivens.ui.components.SeasonalEffectsLayer
+import hivens.ui.components.UpdateManager
 import hivens.ui.generated.resources.Res
 import hivens.ui.generated.resources.favicon
 import hivens.ui.logic.LauncherController
@@ -92,7 +93,6 @@ fun main() {
             height = 650.dp,
             position = WindowPosition(Alignment.Center)
         )
-        @Suppress("UNUSED_VALUE")
         var isDarkTheme by remember { mutableStateOf(true) }
         var isAppVisible by remember { mutableStateOf(true) }
 
@@ -135,6 +135,9 @@ fun main() {
                         onToggleTheme = { isDarkTheme = !isDarkTheme },
                         onCloseApp = ::exitApplication
                     )
+
+                    // Слой обновлений поверх основного контента
+                    UpdateManager()
                 }
             }
         }
