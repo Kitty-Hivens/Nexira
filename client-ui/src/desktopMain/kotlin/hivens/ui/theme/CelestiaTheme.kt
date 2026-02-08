@@ -74,21 +74,28 @@ val LocalCelestiaColors = staticCompositionLocalOf<CelestiaColors> {
     error("No CelestiaColors provided")
 }
 
-// --- ТЕМА С АНИМАЦИЕЙ ---
+// --- ТЕМА С АНИМАЦИЕЙ И ПОДДЕРЖКОЙ КАСТОМНЫХ ТЕМ ---
 
 @Composable
 fun CelestiaTheme(
     useDarkTheme: Boolean = true,
+    customTheme: CustomTheme? = null,
     content: @Composable () -> Unit
 ) {
-    val targetColors = if (useDarkTheme) DarkColorPalette else LightColorPalette
+    // Если есть кастомная тема - используем её, иначе дефолтную
+    val targetColors = customTheme?.toCelestiaColors(useDarkTheme)
+        ?: if (useDarkTheme) DarkColorPalette else LightColorPalette
 
     // Анимация смены цветов (500мс)
     val animSpec = remember { TweenSpec<Color>(durationMillis = 500) }
 
     val animatedPrimary by animateColorAsState(targetColors.primary, animSpec)
+    val animatedPrimaryVariant by animateColorAsState(targetColors.primaryVariant, animSpec)
+    val animatedSecondary by animateColorAsState(targetColors.secondary, animSpec)
     val animatedBackground by animateColorAsState(targetColors.background, animSpec)
     val animatedSurface by animateColorAsState(targetColors.surface, animSpec)
+    val animatedError by animateColorAsState(targetColors.error, animSpec)
+    val animatedSuccess by animateColorAsState(targetColors.success, animSpec)
     val animatedTextPrimary by animateColorAsState(targetColors.textPrimary, animSpec)
     val animatedTextSecondary by animateColorAsState(targetColors.textSecondary, animSpec)
     val animatedGlassBg by animateColorAsState(targetColors.glassBackground, animSpec)
@@ -99,8 +106,12 @@ fun CelestiaTheme(
     // Собираем анимированную палитру
     val animatedPalette = targetColors.copy(
         primary = animatedPrimary,
+        primaryVariant = animatedPrimaryVariant,
+        secondary = animatedSecondary,
         background = animatedBackground,
         surface = animatedSurface,
+        error = animatedError,
+        success = animatedSuccess,
         textPrimary = animatedTextPrimary,
         textSecondary = animatedTextSecondary,
         glassBackground = animatedGlassBg,
@@ -111,15 +122,27 @@ fun CelestiaTheme(
     val materialColors = if (useDarkTheme) {
         darkColors(
             primary = animatedPalette.primary,
-            surface = animatedPalette.surface,
+            primaryVariant = animatedPalette.primaryVariant,
+            secondary = animatedPalette.secondary,
             background = animatedPalette.background,
+            surface = animatedPalette.surface,
+            error = animatedPalette.error,
+            onPrimary = animatedPalette.onPrimary,
+            onSecondary = animatedPalette.onSecondary,
+            onBackground = animatedPalette.onBackground,
             onSurface = animatedPalette.onSurface
         )
     } else {
         lightColors(
             primary = animatedPalette.primary,
-            surface = animatedPalette.surface,
+            primaryVariant = animatedPalette.primaryVariant,
+            secondary = animatedPalette.secondary,
             background = animatedPalette.background,
+            surface = animatedPalette.surface,
+            error = animatedPalette.error,
+            onPrimary = animatedPalette.onPrimary,
+            onSecondary = animatedPalette.onSecondary,
+            onBackground = animatedPalette.onBackground,
             onSurface = animatedPalette.onSurface
         )
     }
@@ -129,7 +152,6 @@ fun CelestiaTheme(
     ) {
         MaterialTheme(
             colors = materialColors,
-            shapes = MaterialTheme.shapes, // Можно кастомизировать шейпы тут
             content = content
         )
     }
