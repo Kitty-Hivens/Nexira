@@ -247,16 +247,16 @@ class UpdateService(
     }
 
     private fun compareVersions(v1: String, v2: String): Int {
-        val parts1 = v1.split('.', '-').first().split('.').map { it.toIntOrNull() ?: 0 }
-        val parts2 = v2.split('.', '-').first().split('.').map { it.toIntOrNull() ?: 0 }
-        
+        val parts1 = v1.substringBefore('-').split('.').map { it.toIntOrNull() ?: 0 }
+        val parts2 = v2.substringBefore('-').split('.').map { it.toIntOrNull() ?: 0 }
+
         for (i in 0 until maxOf(parts1.size, parts2.size)) {
             val p1 = parts1.getOrNull(i) ?: 0
             val p2 = parts2.getOrNull(i) ?: 0
-            
+
             if (p1 != p2) return p1.compareTo(p2)
         }
-        
+
         return 0
     }
 }
