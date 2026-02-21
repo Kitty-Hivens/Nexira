@@ -102,11 +102,15 @@ internal class GameCommandBuilder {
         }
 
         // 3. System Properties (Launcher Identity)
+        // ЭКСПЕРИМЕНТ: Отключаем "костыльную" идентификацию лаунчера через параметры запуска.
+        // Если сервер пустит и без них — значит бекенд уже проверяет сборку адекватными методами.
+        /*
         args.add("-Dminecraft.api.auth.host=${AppConfig.BASE_URL}/launcher/")
         args.add("-Dminecraft.api.account.host=${AppConfig.BASE_URL}/launcher/")
         args.add("-Dminecraft.api.session.host=${AppConfig.BASE_URL}/launcher/")
         args.add("-Dminecraft.launcher.brand=${AppConfig.BRANDING_NAME}")
         args.add("-Dminecraft.launcher.version=${AppConfig.LAUNCHER_VERSION}")
+        */
 
         // 4. Natives Configuration
         val nativesPath = clientRoot.resolve(config.nativesDir)
