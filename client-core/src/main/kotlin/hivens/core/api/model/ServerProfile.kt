@@ -12,7 +12,9 @@ data class ServerProfile(
     var port: Int = 0,
     var assetDir: String = "",
     var extraCheckSum: String? = null,
-    var optionalModsData: Map<String, JsonElement>? = null
+    var optionalModsData: Map<String, JsonElement>? = null,
+    var neoForgeArgs: Map<String, String>? = null,
+    var ignoreModulesList: String? = null
 ) {
     override fun toString(): String {
         return title ?: name

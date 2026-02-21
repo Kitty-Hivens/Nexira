@@ -1,6 +1,5 @@
 package hivens.launcher.component
 
-import hivens.config.AppConfig
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.InstanceProfile
 import hivens.core.data.SessionData
@@ -39,7 +38,7 @@ internal class GameCommandBuilder {
             mainClass = "net.minecraft.launchwrapper.Launch",
             tweakClass = "net.minecraftforge.fml.common.launcher.FMLTweaker",
             assetIndex = "1.12.2",
-            jvmArgs = listOf("-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1NewSizePercent=20", "-XX:MaxGCPauseMillis=50", "-Dfml.ignoreInvalidMinecraftCertificates=true"),
+            jvmArgs = listOf("-Dfml.ignoreInvalidMinecraftCertificates=true"),
             nativesDir = "bin/natives-1.12.2"
         ),
         "1.21.1" to VersionConfig(
@@ -47,10 +46,8 @@ internal class GameCommandBuilder {
             tweakClass = null,
             assetIndex = "1.21.1",
             jvmArgs = listOf(
-                // GC Optimization
-                "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1NewSizePercent=20", "-XX:MaxGCPauseMillis=50",
-                // Java 9+ Modules Export
-                "--add-modules=ALL-MODULE-PATH", "--add-reads=org.openjdk.nashorn=ALL-UNNAMED",
+                // Java 9+ Modules Export (Mandatory for Java 21)
+                "--add-modules=ALL-MODULE-PATH",
                 "--add-modules=jdk.naming.dns", "--add-exports=jdk.naming.dns/com.sun.jndi.dns=java.naming",
                 "--add-opens=java.base/java.util.jar=ALL-UNNAMED", "--add-opens=java.base/java.lang.invoke=ALL-UNNAMED",
                 "--add-opens=java.base/java.lang=ALL-UNNAMED", "--add-opens=java.base/java.util=ALL-UNNAMED",
@@ -101,22 +98,11 @@ internal class GameCommandBuilder {
             args.add("-Djava.awt.headless=false")
         }
 
-        // 3. System Properties (Launcher Identity)
-        // ЭКСПЕРИМЕНТ: Отключаем "костыльную" идентификацию лаунчера через параметры запуска.
-        // Если сервер пустит и без них — значит бекенд уже проверяет сборку адекватными методами.
-        /*
-        args.add("-Dminecraft.api.auth.host=${AppConfig.BASE_URL}/launcher/")
-        args.add("-Dminecraft.api.account.host=${AppConfig.BASE_URL}/launcher/")
-        args.add("-Dminecraft.api.session.host=${AppConfig.BASE_URL}/launcher/")
-        args.add("-Dminecraft.launcher.brand=${AppConfig.BRANDING_NAME}")
-        args.add("-Dminecraft.launcher.version=${AppConfig.LAUNCHER_VERSION}")
-        */
-
-        // 4. Natives Configuration
+        // 3. Natives Configuration
         val nativesPath = clientRoot.resolve(config.nativesDir)
         args.add("-Djava.library.path=" + nativesPath.toAbsolutePath())
 
-        // 5. NeoForge Environment (1.21+)
+        // 4. NeoForge Environment (1.21+)
         if (config.assetIndex == "1.21.1") {
             val libDirStandard = clientRoot.resolve("libraries")
             val libDirCustom = clientRoot.resolve("libraries-1.21.1")
@@ -126,21 +112,26 @@ internal class GameCommandBuilder {
             args.add("-Dorg.lwjgl.system.SharedLibraryExtractPath=" + nativesPath.toAbsolutePath())
             args.add("-Dio.netty.native.workdir=" + nativesPath.toAbsolutePath())
             args.add("-DlibraryDirectory=" + libDir.toAbsolutePath())
-
-            val ignoreList = "client,securejarhandler-3.0.8.jar,asm-9.7.jar,asm-commons-9.7.jar,asm-tree-9.7.jar,asm-util-9.7.jar,asm-analysis-9.7.jar,bootstraplauncher-2.0.2.jar,JarJarFileSystems-0.4.1.jar,client-extra,neoforge-,neoforge-21.1.504.jar"
+            val defaultIgnore = "client,securejarhandler,asm,bootstraplauncher,JarJarFileSystems,client-extra,neoforge-"
+            val ignoreList = serverProfile.ignoreModulesList?.takeIf { it.isNotBlank() } ?: defaultIgnore
             args.add("-DignoreList=$ignoreList")
-            args.add("-DmergeModules=jna-5.10.0.jar,jna-platform-5.10.0.jar")
+            args.add("-DmergeModules=jna-5.14.0.jar,jna-platform-5.14.0.jar")
         }
 
-        // 6. Memory Allocation
-        args.addAll(config.jvmArgs)
+        // 5. Memory Allocation & Custom JVM Args
+        val (gcArgs, systemArgs) = config.jvmArgs.partition { it.startsWith("-XX:") }
+        args.addAll(systemArgs)
+
         if (!userProfile.jvmArgs.isNullOrEmpty()) {
             args.addAll(userProfile.jvmArgs!!.split(" "))
+        } else {
+            args.addAll(gcArgs)
         }
+
         args.add("-Xms512M")
         args.add("-Xmx${memoryMB}M")
 
-        // 7. Java 9+ Module Path (NeoForge)
+        // 6. Java 9+ Module Path (NeoForge)
         if (config.assetIndex == "1.21.1") {
             val modules = getNeoForgeModules()
             val libDirStandard = clientRoot.resolve("libraries")
@@ -163,13 +154,13 @@ internal class GameCommandBuilder {
             }
         }
 
-        // 8. Classpath & Entry Point
+        // 7. Classpath & Entry Point
         args.add("-cp")
         args.add(classpath)
         args.add(config.mainClass)
         args.addAll(config.programArgs)
 
-        // 9. Game Arguments
+        // 8. Game Arguments
         args.addAll(buildMinecraftArgs(session, serverProfile, clientRoot, config.assetIndex))
 
         if (config.tweakClass != null) {
@@ -181,10 +172,49 @@ internal class GameCommandBuilder {
     }
 
     private fun getNeoForgeModules(): List<String> = listOf(
+        // Core Launch Infrastructure
         "cpw/mods/securejarhandler/3.0.8/securejarhandler-3.0.8.jar",
         "cpw/mods/modlauncher/11.0.5/modlauncher-11.0.5.jar",
         "cpw/mods/bootstraplauncher/2.0.2/bootstraplauncher-2.0.2.jar",
-        "net/neoforged/JarJarFileSystems/0.4.1/JarJarFileSystems-0.4.1.jar"
+        "net/neoforged/JarJarFileSystems/0.4.1/JarJarFileSystems-0.4.1.jar",
+        "net/sf/jopt-simple/jopt-simple/5.0.4/jopt-simple-5.0.4.jar",
+
+        // NeoForge System Modules
+        "net/neoforged/fancymodloader/loader/4.0.42/loader-4.0.42.jar",
+        "net/neoforged/fancymodloader/earlydisplay/4.0.42/earlydisplay-4.0.42.jar",
+        "net/neoforged/bus/8.0.5/bus-8.0.5.jar",
+        "net/neoforged/coremods/7.0.3/coremods-7.0.3.jar",
+        "net/neoforged/srgutils/1.0.0/srgutils-1.0.0.jar",
+
+        // Transformers & Parsers
+        "net/neoforged/accesstransformers/10.0.1/accesstransformers-10.0.1.jar",
+        "net/neoforged/accesstransformers/at-modlauncher/10.0.1/at-modlauncher-10.0.1.jar",
+        "org/antlr/antlr4-runtime/4.13.1/antlr4-runtime-4.13.1.jar",
+
+        // Essential Dependencies
+        "net/jodah/typetools/0.6.3/typetools-0.6.3.jar",
+        "com/electronwill/night-config/core/3.8.3/core-3.8.3.jar",
+        "com/electronwill/night-config/toml/3.8.3/toml-3.8.3.jar",
+        "com/google/guava/guava/32.1.2-jre/guava-32.1.2-jre.jar",
+        "it/unimi/dsi/fastutil/8.5.12/fastutil-8.5.12.jar",
+        "net/fabricmc/sponge-mixin/0.15.2+mixin.0.8.7/sponge-mixin-0.15.2+mixin.0.8.7.jar",
+
+        // Utils, Logging & Console
+        "org/apache/logging/log4j/log4j-api/2.22.1/log4j-api-2.22.1.jar",
+        "org/apache/logging/log4j/log4j-core/2.22.1/log4j-core-2.22.1.jar",
+        "org/apache/logging/log4j/log4j-slf4j2-impl/2.22.1/log4j-slf4j2-impl-2.22.1.jar",
+        "org/slf4j/slf4j-api/2.0.9/slf4j-api-2.0.9.jar",
+        "com/google/code/gson/gson/2.10.1/gson-2.10.1.jar",
+        "net/minecrell/terminalconsoleappender/1.3.0/terminalconsoleappender-1.3.0.jar",
+        "org/jline/jline-reader/3.20.0/jline-reader-3.20.0.jar",
+        "org/jline/jline-terminal/3.20.0/jline-terminal-3.20.0.jar",
+
+        // ASM
+        "org/ow2/asm/asm/9.8/asm-9.8.jar",
+        "org/ow2/asm/asm-commons/9.8/asm-commons-9.8.jar",
+        "org/ow2/asm/asm-tree/9.8/asm-tree-9.8.jar",
+        "org/ow2/asm/asm-util/9.8/asm-util-9.8.jar",
+        "org/ow2/asm/asm-analysis/9.8/asm-analysis-9.8.jar"
     )
 
     private fun getConfig(version: String): VersionConfig {
@@ -211,10 +241,15 @@ internal class GameCommandBuilder {
         args.add("--userType"); args.add("mojang")
 
         if (assetIndex == "1.21.1") {
-            args.add("--fml.neoForgeVersion"); args.add("21.1.505")
-            args.add("--fml.fmlVersion"); args.add("4.0.34")
-            args.add("--fml.mcVersion"); args.add("1.21.1")
-            args.add("--fml.neoFormVersion"); args.add("20240808.144430")
+            val forgeVersion = profile.neoForgeArgs?.get("neoForgeVersion")?.takeIf { it.isNotBlank() } ?: "21.1.505"
+            val fmlVersion = profile.neoForgeArgs?.get("fmlVersion")?.takeIf { it.isNotBlank() } ?: "4.0.42"
+            val mcVersion = profile.neoForgeArgs?.get("mcVersion")?.takeIf { it.isNotBlank() } ?: "1.21.1"
+            val neoFormVersion = profile.neoForgeArgs?.get("neoFormVersion")?.takeIf { it.isNotBlank() } ?: "20240808.144430"
+
+            args.add("--fml.neoForgeVersion"); args.add(forgeVersion)
+            args.add("--fml.fmlVersion"); args.add(fmlVersion)
+            args.add("--fml.mcVersion"); args.add(mcVersion)
+            args.add("--fml.neoFormVersion"); args.add(neoFormVersion)
         }
         return args
     }
