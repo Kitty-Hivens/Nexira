@@ -1,5 +1,6 @@
 package hivens.launcher.component
 
+import hivens.config.AppConfig
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.InstanceProfile
 import hivens.core.data.SessionData
@@ -98,29 +99,46 @@ internal class GameCommandBuilder {
             args.add("-Djava.awt.headless=false")
         }
 
-        // 3. Natives Configuration
+        // 3. System Properties (Launcher Identity & Custom Authlib)
+        args.add("-Dminecraft.api.auth.host=${AppConfig.BASE_URL}/launcher/")
+        args.add("-Dminecraft.api.account.host=${AppConfig.BASE_URL}/launcher/")
+        args.add("-Dminecraft.api.session.host=${AppConfig.BASE_URL}/launcher/")
+        args.add("-Dminecraft.launcher.brand=${AppConfig.BRANDING_NAME}")
+        args.add("-Dminecraft.launcher.version=${AppConfig.LAUNCHER_VERSION}")
+
+        // 4. Natives Configuration
         val nativesPath = clientRoot.resolve(config.nativesDir)
         args.add("-Djava.library.path=" + nativesPath.toAbsolutePath())
 
-        // 4. NeoForge Environment (1.21+)
-        if (config.assetIndex == "1.21.1") {
+        // Determine if the environment requires modern module-based loading (e.g. NeoForge 1.20.6+)
+        val isModernEnvironment = config.mainClass.contains("BootstrapLauncher")
+
+        // 5. NeoForge / Modern Environment
+        if (isModernEnvironment || config.assetIndex == "1.21.1") {
             val libDirStandard = clientRoot.resolve("libraries")
-            val libDirCustom = clientRoot.resolve("libraries-1.21.1")
+            // Dynamically resolve library directory based on asset index
+            val libDirCustom = clientRoot.resolve("libraries-${config.assetIndex}")
             val libDir = if (libDirCustom.resolve("cpw").toFile().exists()) libDirCustom else libDirStandard
 
             args.add("-Djna.tmpdir=" + nativesPath.toAbsolutePath())
             args.add("-Dorg.lwjgl.system.SharedLibraryExtractPath=" + nativesPath.toAbsolutePath())
             args.add("-Dio.netty.native.workdir=" + nativesPath.toAbsolutePath())
             args.add("-DlibraryDirectory=" + libDir.toAbsolutePath())
+
             val defaultIgnore = "client,securejarhandler,asm,bootstraplauncher,JarJarFileSystems,client-extra,neoforge-"
             val ignoreList = serverProfile.ignoreModulesList?.takeIf { it.isNotBlank() } ?: defaultIgnore
             args.add("-DignoreList=$ignoreList")
             args.add("-DmergeModules=jna-5.14.0.jar,jna-platform-5.14.0.jar")
         }
 
-        // 5. Memory Allocation & Custom JVM Args
+        // 6. Memory Allocation & Custom JVM Args
         val (gcArgs, systemArgs) = config.jvmArgs.partition { it.startsWith("-XX:") }
         args.addAll(systemArgs)
+
+        // Java 21+ Vector API optimization for faster data structures in mods (e.g., JEI, Ars Nouveau)
+        if (isModernEnvironment || config.assetIndex == "1.21.1") {
+            args.add("--add-modules=jdk.incubator.vector")
+        }
 
         if (!userProfile.jvmArgs.isNullOrEmpty()) {
             args.addAll(userProfile.jvmArgs!!.split(" "))
@@ -131,36 +149,48 @@ internal class GameCommandBuilder {
         args.add("-Xms512M")
         args.add("-Xmx${memoryMB}M")
 
-        // 6. Java 9+ Module Path (NeoForge)
-        if (config.assetIndex == "1.21.1") {
-            val modules = getNeoForgeModules()
-            val libDirStandard = clientRoot.resolve("libraries")
-            val libDirCustom = clientRoot.resolve("libraries-1.21.1")
-            val libDir = if (libDirCustom.resolve("cpw").toFile().exists()) libDirCustom else libDirStandard
+        // 7. Java 9+ Module Path (NeoForge / Modern Forge) dynamically resolved
+        var validModules = emptyList<String>()
+        if (isModernEnvironment || config.assetIndex == "1.21.1") {
+            // Strictly ONLY Bootstraplauncher, SecureJarHandler, ASM, and JarJar belong in the Module Path (-p).
+            val jvmModuleKeywords = listOf(
+                "securejarhandler",
+                "bootstraplauncher",
+                "ow2/asm",
+                "jarjar"
+            )
 
-            val validModules = modules.map { libDir.resolve(it) }
-                .filter {
-                    val exists = it.toFile().exists()
-                    if (!exists) logger.warn("Module missing: $it")
-                    exists
-                }
-                .map { it.toAbsolutePath().toString() }
+            // Dynamically extract boot modules directly from the resolved classpath
+            validModules = classpath.split(File.pathSeparator).filter { path ->
+                val lowerPath = path.lowercase().replace("\\", "/")
+                jvmModuleKeywords.any { lowerPath.contains(it) }
+            }
 
             if (validModules.isNotEmpty()) {
                 args.add("-p")
-                args.add(java.lang.String.join(File.pathSeparator, validModules))
+                args.add(validModules.joinToString(File.pathSeparator))
             } else {
-                logger.error("CRITICAL: No NeoForge modules found in $libDir!")
+                logger.error("CRITICAL: No NeoForge boot modules found in classpath!")
             }
         }
 
-        // 7. Classpath & Entry Point
+        // 8. Classpath & Entry Point
         args.add("-cp")
-        args.add(classpath)
+        if (isModernEnvironment || config.assetIndex == "1.21.1") {
+            // Remove ONLY the strict boot modules from Classpath. All other libraries stay.
+            val cleanClasspath = classpath.split(File.pathSeparator)
+                .filter { path -> !validModules.contains(path) }
+                .joinToString(File.pathSeparator)
+
+            args.add(cleanClasspath.ifBlank { classpath })
+        } else {
+            args.add(classpath)
+        }
+
         args.add(config.mainClass)
         args.addAll(config.programArgs)
 
-        // 8. Game Arguments
+        // 9. Game Arguments
         args.addAll(buildMinecraftArgs(session, serverProfile, clientRoot, config.assetIndex))
 
         if (config.tweakClass != null) {
@@ -171,6 +201,7 @@ internal class GameCommandBuilder {
         return args
     }
 
+    @Deprecated("Legacy explicit module list. Modules are now resolved dynamically from the classpath.", level = DeprecationLevel.WARNING)
     private fun getNeoForgeModules(): List<String> = listOf(
         // Core Launch Infrastructure
         "cpw/mods/securejarhandler/3.0.8/securejarhandler-3.0.8.jar",
@@ -241,15 +272,24 @@ internal class GameCommandBuilder {
         args.add("--userType"); args.add("mojang")
 
         if (assetIndex == "1.21.1") {
-            val forgeVersion = profile.neoForgeArgs?.get("neoForgeVersion")?.takeIf { it.isNotBlank() } ?: "21.1.505"
-            val fmlVersion = profile.neoForgeArgs?.get("fmlVersion")?.takeIf { it.isNotBlank() } ?: "4.0.42"
-            val mcVersion = profile.neoForgeArgs?.get("mcVersion")?.takeIf { it.isNotBlank() } ?: "1.21.1"
-            val neoFormVersion = profile.neoForgeArgs?.get("neoFormVersion")?.takeIf { it.isNotBlank() } ?: "20240808.144430"
+            // Default required arguments to prevent MissingRequiredOptionsException
+            val defaultFmlArgs = mapOf(
+                "neoForgeVersion" to "21.1.505",
+                "fmlVersion" to "4.0.42",
+                "mcVersion" to "1.21.1",
+                "neoFormVersion" to "20240808.144430"
+            )
 
-            args.add("--fml.neoForgeVersion"); args.add(forgeVersion)
-            args.add("--fml.fmlVersion"); args.add(fmlVersion)
-            args.add("--fml.mcVersion"); args.add(mcVersion)
-            args.add("--fml.neoFormVersion"); args.add(neoFormVersion)
+            // Merge defaults with backend arguments. Backend arguments will override defaults if present.
+            val backendArgs = profile.neoForgeArgs ?: emptyMap()
+            val finalFmlArgs = defaultFmlArgs + backendArgs
+
+            finalFmlArgs.forEach { (key, value) ->
+                if (value.isNotBlank()) {
+                    args.add("--fml.$key")
+                    args.add(value)
+                }
+            }
         }
         return args
     }
