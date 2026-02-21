@@ -1,5 +1,6 @@
 package hivens.launcher
 
+import hivens.config.AppConfig
 import hivens.core.api.interfaces.IFileDownloadService
 import hivens.core.data.FileData
 import hivens.core.data.FileManifest
@@ -30,7 +31,6 @@ class FileDownloadService(
 
     companion object {
         private val logger = LoggerFactory.getLogger(FileDownloadService::class.java)
-        private const val DOWNLOAD_BASE_URL = "https://www.smartycraft.ru/launcher/clients/"
 
         // Directories that cannot be "trimmed" during path normalization
         private val ROOT_DIRS = setOf(
@@ -99,7 +99,8 @@ class FileDownloadService(
 
         // Heavy operation (reading files from disk)
         val filesToDownload = files.filter { (path, data) ->
-            isFileMissingOrChanged(baseDir.resolve(normalizePath(path)), data.md5)
+            val cleanPath = normalizePath(path)
+            isFileMissingOrChanged(baseDir.resolve(cleanPath), data.md5, cleanPath)
         }
 
         val totalFilesCount = filesToDownload.size
@@ -190,7 +191,7 @@ class FileDownloadService(
         localPath: Path,
         onBytesRead: ((Int) -> Unit)? = null
     ) {
-        val url = DOWNLOAD_BASE_URL + serverPath.replace(" ", "%20")
+        val url = "${AppConfig.BASE_URL}/launcher/clients/" + serverPath.replace(" ", "%20")
         withContext(Dispatchers.IO) {
             if (localPath.parent != null) Files.createDirectories(localPath.parent)
 
@@ -220,14 +221,27 @@ class FileDownloadService(
 
     /**
      * Checks whether the file needs to be downloaded (no file, empty, or the hash does not match).
+     * Includes protection for user-specific config files.
      */
-    private fun isFileMissingOrChanged(file: Path, expectedMd5: String): Boolean {
+    private fun isFileMissingOrChanged(file: Path, expectedMd5: String, relativePath: String): Boolean {
         if (!Files.exists(file)) return true
         if (Files.isDirectory(file)) return false
         if (expectedMd5 == "any") return false // "any" hash means "do not check"
+        val lowerPath = relativePath.lowercase().replace("\\", "/")
+        val isProtectedClientConfig = lowerPath.endsWith("options.txt") ||
+                lowerPath.endsWith("servers.dat") ||
+                lowerPath.contains("xaerominimap") ||
+                lowerPath.contains("xaeroworldmap") ||
+                lowerPath.contains("voxelmap") ||
+                lowerPath.contains("journeymap") ||
+                lowerPath.contains("jei")
 
         return try {
             if (Files.size(file) == 0L) return true
+
+            // Если файл защищен и он уже существует (size > 0), мы запрещаем его перезапись!
+            if (isProtectedClientConfig) return false
+
             val localMd5 = calculateMD5(file)
             !localMd5.equals(expectedMd5, ignoreCase = true)
         } catch (_: Exception) {
@@ -246,15 +260,20 @@ class FileDownloadService(
 
         if (Files.exists(localZip)) {
             var needUnzip = true
+            val localHash = try { calculateMD5(localZip) } catch(_: Exception) { "" }
+            val markerFile = baseDir.resolve(".extra_unpacked_hash")
 
             // If the server sent a hash to check configs (extraCheckSum)
             if (!serverCheckSum.isNullOrEmpty()) {
-                val localHash = try {
-                    calculateMD5(localZip)
+                if (localHash.equals(serverCheckSum, ignoreCase = true)) {
+                    needUnzip = false
+                }
+            } else {
+                val lastUnpackedHash = try {
+                    if (Files.exists(markerFile)) Files.readString(markerFile) else ""
                 } catch(_: Exception) { "" }
 
-                // If the hash on disk matches what the profile server requires, no unpacking is needed
-                if (localHash.equals(serverCheckSum, ignoreCase = true)) {
+                if (localHash == lastUnpackedHash && localHash.isNotEmpty()) {
                     needUnzip = false
                 }
             }
@@ -263,6 +282,7 @@ class FileDownloadService(
                 try {
                     messageUI?.invoke("Setting up the client...")
                     ZipUtils.unzip(localZip.toFile(), baseDir.toFile())
+                    try { Files.writeString(markerFile, localHash) } catch(_: Exception) {}
                 } catch (e: Exception) {
                     logger.error("Error unpacking extra.zip", e)
                 }

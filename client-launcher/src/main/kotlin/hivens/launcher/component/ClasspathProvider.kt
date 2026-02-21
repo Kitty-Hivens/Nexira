@@ -109,6 +109,16 @@ class ClasspathProvider(
             return false
         }
 
+        val normalizedPath = path.toString().replace("\\", "/")
+
+        if (normalizedPath.contains("/net/minecraft/client/") && fileName.startsWith("client-")) {
+            return false
+        }
+
+        if (normalizedPath.contains("/net/minecraftforge/") && fileName.contains("srgutils")) {
+            return false
+        }
+
         return true
     }
 
