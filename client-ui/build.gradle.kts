@@ -76,10 +76,15 @@ compose.desktop {
 
         nativeDistributions {
             targetFormats(
-                TargetFormat.AppImage,
-                TargetFormat.Deb,
-                TargetFormat.Rpm,
-                TargetFormat.Msi,
+                // Windows: distributable dir is fed into Inno Setup (setup.iss).
+                // MSI removed — replaced by Inno Setup EXE (issue #51).
+                TargetFormat.Exe,
+
+                // Linux: AppImage assembled manually in CI to embed a bundled JRE
+                // and inject .desktop / AppStream metainfo (issue #53).
+                // DEB and RPM removed.
+
+                // macOS: unchanged.
                 TargetFormat.Dmg
             )
 
@@ -102,7 +107,7 @@ compose.desktop {
             val safeVersion = if (cleanVersion.startsWith("0") || cleanVersion.isEmpty()) "1.0.0" else cleanVersion
 
             packageVersion = safeVersion
-            description = "Aura Launcher v${project.version}"
+            description = "Aura Launcher v${project.version} (unofficial)"
             copyright = "© 2026 Hivens"
             vendor = "Hivens"
 
@@ -129,23 +134,18 @@ compose.desktop {
                 dirChooser = true
                 iconFile.set(project.file("src/commonMain/composeResources/drawable/icon.ico"))
 
-                // Windows-specific optimizations
-                perUserInstall = true
+                // perUserInstall removed — Inno Setup handles privilege escalation
+                // via PrivilegesRequired=lowest in setup.iss
                 console = false
             }
 
             linux {
-                packageName = "aura-launcher"
-                debMaintainer = "https://github.com/Kitty-Hivens"
-                appCategory = "Game"
-
-                // Linux-specific optimizations
-                shortcut = true
-                menuGroup = "Game"
+                // packageName / debMaintainer / appCategory removed —
+                // DEB and RPM are no longer shipped; AppImage is assembled in CI.
+                iconFile.set(project.file("src/commonMain/composeResources/drawable/icon.png"))
             }
 
             macOS {
-                // macOS-specific optimizations
                 bundleID = "com.hivens.auralauncher"
                 dockName = "Aura Launcher"
             }
@@ -253,4 +253,18 @@ tasks.configureEach {
             ":client-launcher:processResources"
         )
     }
+}
+
+// ========================================================================
+// PORTABLE ZIP (Windows)
+// For local dev use; CI also runs this step independently.
+// ========================================================================
+tasks.register<Zip>("packageWindowsPortableZip") {
+    group = "compose desktop"
+    description = "Packages the Windows distributable as a portable ZIP"
+    dependsOn("createReleaseDistributable")
+
+    from(layout.buildDirectory.dir("compose/binaries/main-release/app"))
+    archiveFileName.set("AuraLauncher-${project.version}-Windows-Portable.zip")
+    destinationDirectory.set(layout.buildDirectory.dir("compose/binaries/main-release"))
 }

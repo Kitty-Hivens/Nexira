@@ -1,0 +1,14 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Aura Launcher
+GenericName=Game Launcher
+Comment=Launch and manage your Aura games
+Icon=aura-launcher
+Exec=env BAMF_DESKTOP_FILE_HINT=%k aura-launcher %U
+Terminal=false
+StartupNotify=true
+StartupWMClass=AuraLauncher
+Categories=Game;
+MimeType=x-scheme-handler/aura;
+Keywords=launcher;game;hivens;aura;
