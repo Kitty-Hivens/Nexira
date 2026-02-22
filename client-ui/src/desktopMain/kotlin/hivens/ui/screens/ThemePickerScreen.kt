@@ -24,6 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import hivens.ui.components.GlassCard
+import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.*
 
 @Composable
@@ -32,6 +33,7 @@ fun ThemePickerScreen(
     onThemeSelected: (CustomTheme) -> Unit,
     onBack: () -> Unit
 ) {
+    val s = LocalStrings.current
     var selectedTheme by remember { mutableStateOf(currentTheme) }
     val themes = remember { ThemePresets.getAll() }
 
@@ -40,7 +42,6 @@ fun ThemePickerScreen(
             .fillMaxSize()
             .padding(24.dp)
     ) {
-        // Header
         Row(
             modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -50,30 +51,27 @@ fun ThemePickerScreen(
                 IconButton(onClick = onBack) {
                     Icon(
                         Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Назад",
+                        contentDescription = s.navBack,
                         tint = CelestiaTheme.colors.primary
                     )
                 }
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    "ВЫБОР ТЕМЫ",
+                    s.themePickerTitle,
                     style = MaterialTheme.typography.h5,
                     fontWeight = FontWeight.Black,
                     color = CelestiaTheme.colors.textPrimary
                 )
             }
 
-            // Apply button
             Button(
                 onClick = { onThemeSelected(selectedTheme) },
-                colors = ButtonDefaults.buttonColors(
-                    backgroundColor = CelestiaTheme.colors.primary
-                ),
+                colors = ButtonDefaults.buttonColors(backgroundColor = CelestiaTheme.colors.primary),
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Icon(Icons.Default.Check, contentDescription = null, tint = Color.White)
                 Spacer(Modifier.width(8.dp))
-                Text("ПРИМЕНИТЬ", color = Color.White, fontWeight = FontWeight.Bold)
+                Text(s.themePickerApply, color = Color.White, fontWeight = FontWeight.Bold)
             }
         }
 
@@ -81,16 +79,8 @@ fun ThemePickerScreen(
             modifier = Modifier.fillMaxSize(),
             horizontalArrangement = Arrangement.spacedBy(24.dp)
         ) {
-            // Themes Grid
-            Box(
-                modifier = Modifier
-                    .weight(2f)
-                    .fillMaxHeight()
-            ) {
-                GlassCard(
-                    modifier = Modifier.fillMaxSize(),
-                    shape = RoundedCornerShape(16.dp)
-                ) {
+            Box(modifier = Modifier.weight(2f).fillMaxHeight()) {
+                GlassCard(modifier = Modifier.fillMaxSize(), shape = RoundedCornerShape(16.dp)) {
                     LazyVerticalGrid(
                         columns = GridCells.Fixed(2),
                         contentPadding = PaddingValues(16.dp),
@@ -101,6 +91,7 @@ fun ThemePickerScreen(
                             ThemeCard(
                                 theme = theme,
                                 isSelected = theme == selectedTheme,
+                                selectedLabel = s.themePickerSelected,
                                 onClick = { selectedTheme = theme }
                             )
                         }
@@ -108,13 +99,8 @@ fun ThemePickerScreen(
                 }
             }
 
-            // Preview Panel
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-            ) {
-                ThemePreviewPanel(theme = selectedTheme)
+            Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                ThemePreviewPanel(theme = selectedTheme, s = s)
             }
         }
     }
@@ -124,6 +110,7 @@ fun ThemePickerScreen(
 fun ThemeCard(
     theme: CustomTheme,
     isSelected: Boolean,
+    selectedLabel: String,
     onClick: () -> Unit
 ) {
     val scale by animateFloatAsState(
@@ -131,11 +118,7 @@ fun ThemeCard(
         animationSpec = spring(dampingRatio = 0.7f, stiffness = 300f)
     )
 
-    Box(
-        modifier = Modifier
-            .aspectRatio(1.2f)
-            .scale(scale)
-    ) {
+    Box(modifier = Modifier.aspectRatio(1.2f).scale(scale)) {
         GlassCard(
             modifier = Modifier
                 .fillMaxSize()
@@ -157,7 +140,6 @@ fun ThemeCard(
                 modifier = Modifier.fillMaxSize().padding(16.dp),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
-                // Theme name
                 Column {
                     Text(
                         theme.name,
@@ -167,9 +149,9 @@ fun ThemeCard(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                    
+
                     Spacer(Modifier.height(4.dp))
-                    
+
                     if (isSelected) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -186,7 +168,7 @@ fun ThemeCard(
                             )
                             Spacer(Modifier.width(4.dp))
                             Text(
-                                "Выбрана",
+                                selectedLabel,
                                 style = MaterialTheme.typography.caption,
                                 color = CustomTheme.parseHexColor(theme.primary),
                                 fontWeight = FontWeight.Bold
@@ -195,10 +177,7 @@ fun ThemeCard(
                     }
                 }
 
-                // Color palette
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     ColorCircle(CustomTheme.parseHexColor(theme.primary))
                     ColorCircle(CustomTheme.parseHexColor(theme.secondary))
                     ColorCircle(CustomTheme.parseHexColor(theme.accent))
@@ -221,17 +200,15 @@ fun ColorCircle(color: Color) {
 }
 
 @Composable
-fun ThemePreviewPanel(theme: CustomTheme) {
+fun ThemePreviewPanel(theme: CustomTheme, s: hivens.ui.i18n.AppStrings) {
     GlassCard(
         modifier = Modifier.fillMaxSize(),
         shape = RoundedCornerShape(16.dp),
         backgroundColor = CustomTheme.parseHexColor(theme.background).copy(alpha = 0.8f)
     ) {
-        Column(
-            modifier = Modifier.fillMaxSize().padding(24.dp)
-        ) {
+        Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
             Text(
-                "ПРЕДПРОСМОТР",
+                s.themePickerPreview,
                 style = MaterialTheme.typography.caption,
                 color = CustomTheme.parseHexColor(theme.primary),
                 fontWeight = FontWeight.Bold
@@ -239,33 +216,25 @@ fun ThemePreviewPanel(theme: CustomTheme) {
 
             Spacer(Modifier.height(24.dp))
 
-            // Theme info
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                ColorRow("Primary", theme.primary)
-                ColorRow("Secondary", theme.secondary)
-                ColorRow("Background", theme.background)
-                ColorRow("Surface", theme.surface)
-                ColorRow("Accent", theme.accent)
-                ColorRow("Success", theme.success)
-                ColorRow("Error", theme.error)
+                ColorRow(s.themePickerColorPrimary,    theme.primary)
+                ColorRow(s.themePickerColorSecondary,  theme.secondary)
+                ColorRow(s.themePickerColorBackground, theme.background)
+                ColorRow(s.themePickerColorSurface,    theme.surface)
+                ColorRow(s.themePickerColorAccent,     theme.accent)
+                ColorRow(s.themePickerColorSuccess,    theme.success)
+                ColorRow(s.themePickerColorError,      theme.error)
             }
 
             Spacer(Modifier.height(24.dp))
 
-            // Sample buttons
             Button(
                 onClick = { },
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(
-                    backgroundColor = CustomTheme.parseHexColor(theme.primary)
-                ),
+                colors = ButtonDefaults.buttonColors(backgroundColor = CustomTheme.parseHexColor(theme.primary)),
                 shape = RoundedCornerShape(12.dp)
             ) {
-                Text(
-                    "Sample Button",
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold
-                )
+                Text(s.themePickerBtnSample, color = Color.White, fontWeight = FontWeight.Bold)
             }
 
             Spacer(Modifier.height(12.dp))
@@ -276,11 +245,7 @@ fun ThemePreviewPanel(theme: CustomTheme) {
                 border = BorderStroke(2.dp, CustomTheme.parseHexColor(theme.primary)),
                 shape = RoundedCornerShape(12.dp)
             ) {
-                Text(
-                    "Outlined Button",
-                    color = CustomTheme.parseHexColor(theme.primary),
-                    fontWeight = FontWeight.Bold
-                )
+                Text(s.themePickerBtnOutlined, color = CustomTheme.parseHexColor(theme.primary), fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -293,12 +258,8 @@ fun ColorRow(label: String, hexColor: String) {
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            label,
-            style = MaterialTheme.typography.body2,
-            color = CelestiaTheme.colors.textSecondary
-        )
-        
+        Text(label, style = MaterialTheme.typography.body2, color = CelestiaTheme.colors.textSecondary)
+
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -310,7 +271,6 @@ fun ColorRow(label: String, hexColor: String) {
                     .background(CustomTheme.parseHexColor(hexColor))
                     .border(1.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(4.dp))
             )
-            
             Text(
                 hexColor,
                 style = MaterialTheme.typography.caption,

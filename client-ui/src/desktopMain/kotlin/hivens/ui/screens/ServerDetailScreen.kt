@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import hivens.config.AppConfig
 import hivens.core.api.model.ServerProfile
 import hivens.ui.components.GlassCard
+import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -35,7 +36,8 @@ fun ServerDetailScreen(
     server: ServerProfile,
     onBack: () -> Unit
 ) {
-    // Формируем правильный путь к папке клиента
+    val s = LocalStrings.current
+
     val assetsPath = remember(server) {
         val userHome = System.getProperty("user.home")
         val os = System.getProperty("os.name").lowercase()
@@ -51,16 +53,13 @@ fun ServerDetailScreen(
     var bannerImage by remember { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
     var isLoading by remember { mutableStateOf(true) }
 
-    // Загрузка данных (файлов)
     LaunchedEffect(server) {
         withContext(Dispatchers.IO) {
-            // Читаем описание
             val descFile = File(assetsPath, "description.txt")
             if (descFile.exists()) {
                 description = descFile.readText()
             }
 
-            // Читаем картинку
             val imgFile = File(assetsPath, "banner.png")
             if (imgFile.exists()) {
                 try {
@@ -69,30 +68,32 @@ fun ServerDetailScreen(
                     e.printStackTrace()
                 }
             }
-            // Завершаем загрузку
             isLoading = false
         }
     }
 
     Column(Modifier.fillMaxSize().padding(16.dp)) {
-        // Хедер
         Row(Modifier.fillMaxWidth().padding(bottom = 16.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = CelestiaTheme.colors.textPrimary)
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, s.navBack, tint = CelestiaTheme.colors.textPrimary)
             }
             Spacer(Modifier.width(8.dp))
-            Text("ИНФОРМАЦИЯ О СЕРВЕРЕ", style = MaterialTheme.typography.h6, color = CelestiaTheme.colors.textSecondary, fontWeight = FontWeight.Bold)
+            Text(
+                s.serverDetailTitle,
+                style = MaterialTheme.typography.h6,
+                color = CelestiaTheme.colors.textSecondary,
+                fontWeight = FontWeight.Bold
+            )
         }
 
         GlassCard(Modifier.weight(1f).fillMaxWidth()) {
-            // ЛОГИКА ЗАГРУЗКИ: Если грузимся - показываем крутилку, иначе контент
             if (isLoading) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = CelestiaTheme.colors.primary)
                 }
             } else {
                 Row(Modifier.fillMaxSize()) {
-                    // Левая часть: Текст
+                    // Left: text
                     Column(Modifier.weight(1.5f).padding(32.dp)) {
                         Text(
                             text = server.title?.uppercase() ?: server.name,
@@ -119,14 +120,17 @@ fun ServerDetailScreen(
                                         lineHeight = MaterialTheme.typography.body1.fontSize * 1.5
                                     )
                                 } else {
-                                    // Если описания нет - показываем точный путь
-                                    MissingDataWarning(assetsPath.absolutePath, "description.txt")
+                                    MissingDataWarning(
+                                        title = s.serverDetailMissingTitle,
+                                        body = s.serverDetailMissingPath(assetsPath.absolutePath, "description.txt"),
+                                        path = assetsPath.absolutePath
+                                    )
                                 }
                             }
                         }
                     }
 
-                    // Правая часть: Картинка
+                    // Right: image
                     Box(
                         modifier = Modifier
                             .weight(1f)
@@ -146,9 +150,9 @@ fun ServerDetailScreen(
                             )
                         } else {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text("Нет изображения", color = Color.Gray)
+                                Text(s.serverDetailNoImage, color = Color.Gray)
                                 Spacer(Modifier.height(8.dp))
-                                Text("banner.png", style = MaterialTheme.typography.caption, color = Color.DarkGray)
+                                Text(s.serverDetailNoImageHint, style = MaterialTheme.typography.caption, color = Color.DarkGray)
                             }
                         }
                     }
@@ -171,7 +175,7 @@ private fun Tag(text: String) {
 }
 
 @Composable
-private fun MissingDataWarning(path: String, file: String) {
+private fun MissingDataWarning(title: String, body: String, path: String) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -184,9 +188,9 @@ private fun MissingDataWarning(path: String, file: String) {
         Icon(Icons.Default.Warning, null, tint = Color(0xFFFFAA00))
         Spacer(Modifier.width(16.dp))
         Column {
-            Text("Информация отсутствует", style = MaterialTheme.typography.subtitle2, color = Color(0xFFFFAA00), fontWeight = FontWeight.Bold)
+            Text(title, style = MaterialTheme.typography.subtitle2, color = Color(0xFFFFAA00), fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(4.dp))
-            Text("Создайте файл $file в папке:", style = MaterialTheme.typography.caption, color = Color.White.copy(alpha = 0.7f))
+            Text(body, style = MaterialTheme.typography.caption, color = Color.White.copy(alpha = 0.7f))
             Text(path, style = MaterialTheme.typography.caption, color = Color.White.copy(alpha = 0.5f), fontFamily = FontFamily.Monospace)
         }
     }

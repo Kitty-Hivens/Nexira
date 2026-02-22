@@ -31,6 +31,7 @@ interface AppStrings {
     val navSettings: String
     val navConsole: String
     val navLogout: String
+    val navBack: String
 
     // --- Dashboard ---
     fun dashboardWelcome(name: String): String
@@ -62,6 +63,7 @@ interface AppStrings {
 
     // --- Profile Screen ---
     val profileTitle: String
+    val profileStatusLabel: String
     val profileStatusOnline: String
     val profileStatusOffline: String
     val profileBalance: String
@@ -71,6 +73,7 @@ interface AppStrings {
     val profileSkinFront: String
     val profileSkinBack: String
     val profileSkinLoading: String
+    val profileRefresh: String
 
     // --- Settings Screen ---
     val settingsTitle: String
@@ -110,11 +113,13 @@ interface AppStrings {
     val serverDetailTitle: String
     val serverDetailLoading: String
     val serverDetailNoImage: String
+    val serverDetailNoImageHint: String
     val serverDetailMissingTitle: String
     val serverDetailMissingBody: String
     fun serverDetailMissingPath(path: String, file: String): String
 
     // --- Server Settings ---
+    val serverSettingsSubtitle: String
     val serverSettingsSectionSystem: String
     val serverSettingsSectionMods: String
     val serverSettingsRam: String
@@ -139,6 +144,10 @@ interface AppStrings {
     val updateInstall: String
     val updateRetry: String
     val updateErrorTitle: String
+    val updateErrorUnknown: String
+    val updateScheduleFailed: String
+    fun updateVersion(version: String): String
+    val updateDetails: String
 
     // --- Console ---
     val consoleTitle: String
