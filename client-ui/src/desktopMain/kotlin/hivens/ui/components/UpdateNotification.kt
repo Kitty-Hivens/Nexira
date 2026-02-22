@@ -21,17 +21,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import hivens.core.data.LauncherUpdate
+import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
 
-/**
- * Небольшое всплывающее уведомление об обновлении (появляется в правом верхнем углу).
- */
 @Composable
 fun UpdateNotification(
     update: LauncherUpdate,
     onOpenDialog: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    val s = LocalStrings.current
     var isVisible by remember { mutableStateOf(true) }
 
     AnimatedVisibility(
@@ -68,25 +67,21 @@ fun UpdateNotification(
                         tint = if (update.isCritical) Color.White else CelestiaTheme.colors.primary,
                         modifier = Modifier.size(24.dp)
                     )
-                    
+
                     Spacer(Modifier.width(12.dp))
-                    
+
                     Column(Modifier.weight(1f)) {
                         Text(
-                            text = if (update.isCritical) {
-                                "Критическое обновление!"
-                            } else {
-                                "Доступно обновление"
-                            },
+                            text = if (update.isCritical) s.updateTitleCritical else s.updateTitle,
                             style = MaterialTheme.typography.subtitle1,
                             fontWeight = FontWeight.Bold,
                             color = if (update.isCritical) Color.White else CelestiaTheme.colors.textPrimary
                         )
-                        
+
                         Spacer(Modifier.height(4.dp))
-                        
+
                         Text(
-                            text = "Версия ${update.version}",
+                            text = s.updateVersion(update.version),
                             style = MaterialTheme.typography.body2,
                             color = if (update.isCritical) {
                                 Color.White.copy(alpha = 0.9f)
@@ -94,9 +89,9 @@ fun UpdateNotification(
                                 CelestiaTheme.colors.textSecondary
                             }
                         )
-                        
+
                         Spacer(Modifier.height(12.dp))
-                        
+
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             TextButton(
                                 onClick = {
@@ -113,12 +108,12 @@ fun UpdateNotification(
                                 )
                             ) {
                                 Text(
-                                    "Подробнее",
+                                    s.updateDetails,
                                     color = if (update.isCritical) Color.White else CelestiaTheme.colors.primary,
                                     fontWeight = FontWeight.Bold
                                 )
                             }
-                            
+
                             if (!update.isCritical) {
                                 TextButton(
                                     onClick = {
@@ -126,18 +121,18 @@ fun UpdateNotification(
                                         onDismiss()
                                     }
                                 ) {
-                                    Text("Позже", color = CelestiaTheme.colors.textSecondary)
+                                    Text(s.updateLater, color = CelestiaTheme.colors.textSecondary)
                                 }
                             }
                         }
                     }
-                    
+
                     if (!update.isCritical) {
                         Spacer(Modifier.width(8.dp))
-                        
+
                         Icon(
                             imageVector = Icons.Default.Close,
-                            contentDescription = "Закрыть",
+                            contentDescription = s.navBack,
                             tint = CelestiaTheme.colors.textSecondary,
                             modifier = Modifier
                                 .size(20.dp)
@@ -152,7 +147,6 @@ fun UpdateNotification(
         }
     }
 
-    // Auto-dismiss non-critical notifications after 15 seconds
     if (!update.isCritical) {
         LaunchedEffect(Unit) {
             kotlinx.coroutines.delay(15000)

@@ -22,6 +22,7 @@ import hivens.core.api.SkinRepository
 import hivens.core.data.SessionData
 import hivens.ui.components.CelestiaButton
 import hivens.ui.components.GlassCard
+import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.utils.SkinManager
 import kotlinx.coroutines.Dispatchers
@@ -35,6 +36,7 @@ import javax.swing.JFrame
 
 @Composable
 fun ProfileScreen(session: SessionData, skinRepository: SkinRepository) {
+    val s = LocalStrings.current
     var frontSkin by remember { mutableStateOf<ImageBitmap?>(null) }
     var backSkin by remember { mutableStateOf<ImageBitmap?>(null) }
     var uploadStatus by remember { mutableStateOf("") }
@@ -51,11 +53,11 @@ fun ProfileScreen(session: SessionData, skinRepository: SkinRepository) {
     LaunchedEffect(Unit) { loadSkins() }
 
     Column(Modifier.fillMaxSize().padding(24.dp)) {
-        Text("ПРОФИЛЬ", style = MaterialTheme.typography.h4, color = CelestiaTheme.colors.textPrimary)
+        Text(s.profileTitle, style = MaterialTheme.typography.h4, color = CelestiaTheme.colors.textPrimary)
         Spacer(Modifier.height(24.dp))
 
         Row(Modifier.fillMaxSize()) {
-            // Левая часть (Скин)
+            // Skin preview
             GlassCard(Modifier.weight(1f).fillMaxHeight()) {
                 Box(Modifier.fillMaxSize()) {
                     Column(
@@ -67,47 +69,48 @@ fun ProfileScreen(session: SessionData, skinRepository: SkinRepository) {
                             Row(horizontalArrangement = Arrangement.spacedBy(32.dp)) {
                                 Image(
                                     painter = BitmapPainter(frontSkin!!),
-                                    contentDescription = "Front",
+                                    contentDescription = s.profileSkinFront,
                                     modifier = Modifier.height(300.dp).width(150.dp)
                                 )
                                 if (backSkin != null) {
                                     Image(
                                         painter = BitmapPainter(backSkin!!),
-                                        contentDescription = "Back",
+                                        contentDescription = s.profileSkinBack,
                                         modifier = Modifier.height(300.dp).width(150.dp)
                                     )
                                 }
                             }
                         } else {
-                            Text("Загрузка скина...", color = CelestiaTheme.colors.textSecondary)
+                            Text(s.profileSkinLoading, color = CelestiaTheme.colors.textSecondary)
                         }
                     }
                     IconButton(
                         onClick = { SkinManager.invalidate(session.playerName); loadSkins() },
                         modifier = Modifier.align(Alignment.TopEnd).padding(16.dp)
                     ) {
-                        Icon(Icons.Default.Refresh, "Обновить", tint = CelestiaTheme.colors.textPrimary)
+                        Icon(Icons.Default.Refresh, s.profileRefresh, tint = CelestiaTheme.colors.textPrimary)
                     }
                 }
             }
 
             Spacer(Modifier.width(24.dp))
 
-            // Правая часть (Инфо и действия)
+            // Info & actions
             Column(Modifier.width(320.dp).fillMaxHeight()) {
                 GlassCard(Modifier.fillMaxWidth().weight(1f)) {
                     Column(Modifier.padding(24.dp)) {
                         Text(session.playerName, style = MaterialTheme.typography.h5, color = CelestiaTheme.colors.textPrimary)
 
-                        val status = if (session.accessToken.length > 10) "Авторизован" else "Оффлайн"
+                        val isOnline = session.accessToken.length > 10
+                        val statusText = if (isOnline) s.profileStatusOnline else s.profileStatusOffline
                         Text(
-                            "Статус: $status",
-                            color = if (session.accessToken.length > 10) CelestiaTheme.colors.success else CelestiaTheme.colors.error
+                            "${s.profileStatusLabel}: $statusText",
+                            color = if (isOnline) CelestiaTheme.colors.success else CelestiaTheme.colors.error
                         )
 
                         Spacer(Modifier.height(24.dp))
 
-                        // Баланс
+                        // Balance
                         GlassCard(
                             modifier = Modifier.fillMaxWidth(),
                             backgroundColor = CelestiaTheme.colors.background.copy(alpha = 0.4f),
@@ -121,12 +124,12 @@ fun ProfileScreen(session: SessionData, skinRepository: SkinRepository) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(
                                         imageVector = Icons.Default.Star,
-                                        contentDescription = "Balance",
+                                        contentDescription = s.profileBalance,
                                         tint = Color(0xFFFFD700),
                                         modifier = Modifier.size(24.dp)
                                     )
                                     Spacer(Modifier.width(12.dp))
-                                    Text("Баланс", color = CelestiaTheme.colors.textSecondary)
+                                    Text(s.profileBalance, color = CelestiaTheme.colors.textSecondary)
                                 }
                                 Text(
                                     text = "${session.balance} ⛃",
@@ -139,18 +142,20 @@ fun ProfileScreen(session: SessionData, skinRepository: SkinRepository) {
 
                         Spacer(Modifier.height(32.dp))
 
-                        // Статус загрузки
+                        // Upload status
                         if (uploadStatus.isNotEmpty()) {
                             Text(
                                 text = uploadStatus,
-                                color = if (uploadStatus.startsWith("Ошибка")) CelestiaTheme.colors.error else CelestiaTheme.colors.success,
+                                color = if (uploadStatus.startsWith("Ошибка") || uploadStatus.startsWith("Error") || uploadStatus.startsWith("Fehler"))
+                                    CelestiaTheme.colors.error
+                                else
+                                    CelestiaTheme.colors.success,
                                 style = MaterialTheme.typography.caption,
                                 modifier = Modifier.padding(bottom = 8.dp)
                             )
                         }
 
-                        // Кнопки
-                        CelestiaButton("Пополнить баланс", onClick = {
+                        CelestiaButton(s.profileTopUp, onClick = {
                             try {
                                 val url = "http://smartycraft.ru/cabinet"
                                 if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
@@ -161,17 +166,16 @@ fun ProfileScreen(session: SessionData, skinRepository: SkinRepository) {
 
                         Spacer(Modifier.height(16.dp))
 
-                        CelestiaButton("Загрузить скин", onClick = {
-                            val file = pickImage("Выберите скин (PNG)")
+                        CelestiaButton(s.profileUploadSkin, onClick = {
+                            val file = pickImage(s.profileUploadSkin)
                             if (file != null) {
-                                uploadStatus = "Загрузка..."
+                                uploadStatus = s.profileUploadSkinLoading
                                 scope.launch {
                                     val result = withContext(Dispatchers.IO) {
-                                        // Вызываем новый метод из SkinRepository
                                         skinRepository.uploadSkin(file, false, session)
                                     }
                                     uploadStatus = result
-                                    if (!result.startsWith("Ошибка")) {
+                                    if (!result.startsWith("Ошибка") && !result.startsWith("Error")) {
                                         SkinManager.invalidate(session.playerName)
                                         loadSkins()
                                     }

@@ -39,7 +39,7 @@ internal class GameCommandBuilder {
             mainClass = "net.minecraft.launchwrapper.Launch",
             tweakClass = "net.minecraftforge.fml.common.launcher.FMLTweaker",
             assetIndex = "1.12.2",
-            jvmArgs = listOf("-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1NewSizePercent=20", "-XX:MaxGCPauseMillis=50", "-Dfml.ignoreInvalidMinecraftCertificates=true"),
+            jvmArgs = listOf("-Dfml.ignoreInvalidMinecraftCertificates=true"),
             nativesDir = "bin/natives-1.12.2"
         ),
         "1.21.1" to VersionConfig(
@@ -47,10 +47,8 @@ internal class GameCommandBuilder {
             tweakClass = null,
             assetIndex = "1.21.1",
             jvmArgs = listOf(
-                // GC Optimization
-                "-XX:+UseG1GC", "-XX:+UnlockExperimentalVMOptions", "-XX:G1NewSizePercent=20", "-XX:MaxGCPauseMillis=50",
-                // Java 9+ Modules Export
-                "--add-modules=ALL-MODULE-PATH", "--add-reads=org.openjdk.nashorn=ALL-UNNAMED",
+                // Java 9+ Modules Export (Mandatory for Java 21)
+                "--add-modules=ALL-MODULE-PATH",
                 "--add-modules=jdk.naming.dns", "--add-exports=jdk.naming.dns/com.sun.jndi.dns=java.naming",
                 "--add-opens=java.base/java.util.jar=ALL-UNNAMED", "--add-opens=java.base/java.lang.invoke=ALL-UNNAMED",
                 "--add-opens=java.base/java.lang=ALL-UNNAMED", "--add-opens=java.base/java.util=ALL-UNNAMED",
@@ -101,7 +99,7 @@ internal class GameCommandBuilder {
             args.add("-Djava.awt.headless=false")
         }
 
-        // 3. System Properties (Launcher Identity)
+        // 3. System Properties (Launcher Identity & Custom Authlib)
         args.add("-Dminecraft.api.auth.host=${AppConfig.BASE_URL}/launcher/")
         args.add("-Dminecraft.api.account.host=${AppConfig.BASE_URL}/launcher/")
         args.add("-Dminecraft.api.session.host=${AppConfig.BASE_URL}/launcher/")
@@ -112,10 +110,14 @@ internal class GameCommandBuilder {
         val nativesPath = clientRoot.resolve(config.nativesDir)
         args.add("-Djava.library.path=" + nativesPath.toAbsolutePath())
 
-        // 5. NeoForge Environment (1.21+)
-        if (config.assetIndex == "1.21.1") {
+        // Determine if the environment requires modern module-based loading (e.g. NeoForge 1.20.6+)
+        val isModernEnvironment = config.mainClass.contains("BootstrapLauncher")
+
+        // 5. NeoForge / Modern Environment
+        if (isModernEnvironment || config.assetIndex == "1.21.1") {
             val libDirStandard = clientRoot.resolve("libraries")
-            val libDirCustom = clientRoot.resolve("libraries-1.21.1")
+            // Dynamically resolve library directory based on asset index
+            val libDirCustom = clientRoot.resolve("libraries-${config.assetIndex}")
             val libDir = if (libDirCustom.resolve("cpw").toFile().exists()) libDirCustom else libDirStandard
 
             args.add("-Djna.tmpdir=" + nativesPath.toAbsolutePath())
@@ -123,45 +125,68 @@ internal class GameCommandBuilder {
             args.add("-Dio.netty.native.workdir=" + nativesPath.toAbsolutePath())
             args.add("-DlibraryDirectory=" + libDir.toAbsolutePath())
 
-            val ignoreList = "client,securejarhandler-3.0.8.jar,asm-9.7.jar,asm-commons-9.7.jar,asm-tree-9.7.jar,asm-util-9.7.jar,asm-analysis-9.7.jar,bootstraplauncher-2.0.2.jar,JarJarFileSystems-0.4.1.jar,client-extra,neoforge-,neoforge-21.1.504.jar"
+            val defaultIgnore = "client,securejarhandler,asm,bootstraplauncher,JarJarFileSystems,client-extra,neoforge-"
+            val ignoreList = serverProfile.ignoreModulesList?.takeIf { it.isNotBlank() } ?: defaultIgnore
             args.add("-DignoreList=$ignoreList")
-            args.add("-DmergeModules=jna-5.10.0.jar,jna-platform-5.10.0.jar")
+            args.add("-DmergeModules=jna-5.14.0.jar,jna-platform-5.14.0.jar")
         }
 
-        // 6. Memory Allocation
-        args.addAll(config.jvmArgs)
+        // 6. Memory Allocation & Custom JVM Args
+        val (gcArgs, systemArgs) = config.jvmArgs.partition { it.startsWith("-XX:") }
+        args.addAll(systemArgs)
+
+        // Java 21+ Vector API optimization for faster data structures in mods (e.g., JEI, Ars Nouveau)
+        if (isModernEnvironment || config.assetIndex == "1.21.1") {
+            args.add("--add-modules=jdk.incubator.vector")
+        }
+
         if (!userProfile.jvmArgs.isNullOrEmpty()) {
             args.addAll(userProfile.jvmArgs!!.split(" "))
+        } else {
+            args.addAll(gcArgs)
         }
+
         args.add("-Xms512M")
         args.add("-Xmx${memoryMB}M")
 
-        // 7. Java 9+ Module Path (NeoForge)
-        if (config.assetIndex == "1.21.1") {
-            val modules = getNeoForgeModules()
-            val libDirStandard = clientRoot.resolve("libraries")
-            val libDirCustom = clientRoot.resolve("libraries-1.21.1")
-            val libDir = if (libDirCustom.resolve("cpw").toFile().exists()) libDirCustom else libDirStandard
+        // 7. Java 9+ Module Path (NeoForge / Modern Forge) dynamically resolved
+        var validModules = emptyList<String>()
+        if (isModernEnvironment || config.assetIndex == "1.21.1") {
+            // Strictly ONLY Bootstraplauncher, SecureJarHandler, ASM, and JarJar belong in the Module Path (-p).
+            val jvmModuleKeywords = listOf(
+                "securejarhandler",
+                "bootstraplauncher",
+                "ow2/asm",
+                "jarjar"
+            )
 
-            val validModules = modules.map { libDir.resolve(it) }
-                .filter {
-                    val exists = it.toFile().exists()
-                    if (!exists) logger.warn("Module missing: $it")
-                    exists
-                }
-                .map { it.toAbsolutePath().toString() }
+            // Dynamically extract boot modules directly from the resolved classpath
+            validModules = classpath.split(File.pathSeparator).filter { path ->
+                val lowerPath = path.lowercase().replace("\\", "/")
+                jvmModuleKeywords.any { lowerPath.contains(it) }
+            }
 
             if (validModules.isNotEmpty()) {
                 args.add("-p")
-                args.add(java.lang.String.join(File.pathSeparator, validModules))
+                args.add(validModules.joinToString(File.pathSeparator))
             } else {
-                logger.error("CRITICAL: No NeoForge modules found in $libDir!")
+                logger.error("CRITICAL: No NeoForge boot modules found in classpath!")
             }
         }
 
         // 8. Classpath & Entry Point
         args.add("-cp")
-        args.add(classpath)
+        if (isModernEnvironment || config.assetIndex == "1.21.1") {
+            // Remove ONLY the strict boot modules from Classpath. All other libraries stay.
+            val cleanClasspath = classpath.split(File.pathSeparator)
+                .filter { path -> !validModules.contains(path) }
+                .joinToString(File.pathSeparator)
+
+            args.add(cleanClasspath.ifBlank { classpath })
+        } else {
+            args.add(classpath)
+        }
+
         args.add(config.mainClass)
         args.addAll(config.programArgs)
 
@@ -176,11 +201,51 @@ internal class GameCommandBuilder {
         return args
     }
 
+    @Deprecated("Legacy explicit module list. Modules are now resolved dynamically from the classpath.", level = DeprecationLevel.WARNING)
     private fun getNeoForgeModules(): List<String> = listOf(
+        // Core Launch Infrastructure
         "cpw/mods/securejarhandler/3.0.8/securejarhandler-3.0.8.jar",
         "cpw/mods/modlauncher/11.0.5/modlauncher-11.0.5.jar",
         "cpw/mods/bootstraplauncher/2.0.2/bootstraplauncher-2.0.2.jar",
-        "net/neoforged/JarJarFileSystems/0.4.1/JarJarFileSystems-0.4.1.jar"
+        "net/neoforged/JarJarFileSystems/0.4.1/JarJarFileSystems-0.4.1.jar",
+        "net/sf/jopt-simple/jopt-simple/5.0.4/jopt-simple-5.0.4.jar",
+
+        // NeoForge System Modules
+        "net/neoforged/fancymodloader/loader/4.0.42/loader-4.0.42.jar",
+        "net/neoforged/fancymodloader/earlydisplay/4.0.42/earlydisplay-4.0.42.jar",
+        "net/neoforged/bus/8.0.5/bus-8.0.5.jar",
+        "net/neoforged/coremods/7.0.3/coremods-7.0.3.jar",
+        "net/neoforged/srgutils/1.0.0/srgutils-1.0.0.jar",
+
+        // Transformers & Parsers
+        "net/neoforged/accesstransformers/10.0.1/accesstransformers-10.0.1.jar",
+        "net/neoforged/accesstransformers/at-modlauncher/10.0.1/at-modlauncher-10.0.1.jar",
+        "org/antlr/antlr4-runtime/4.13.1/antlr4-runtime-4.13.1.jar",
+
+        // Essential Dependencies
+        "net/jodah/typetools/0.6.3/typetools-0.6.3.jar",
+        "com/electronwill/night-config/core/3.8.3/core-3.8.3.jar",
+        "com/electronwill/night-config/toml/3.8.3/toml-3.8.3.jar",
+        "com/google/guava/guava/32.1.2-jre/guava-32.1.2-jre.jar",
+        "it/unimi/dsi/fastutil/8.5.12/fastutil-8.5.12.jar",
+        "net/fabricmc/sponge-mixin/0.15.2+mixin.0.8.7/sponge-mixin-0.15.2+mixin.0.8.7.jar",
+
+        // Utils, Logging & Console
+        "org/apache/logging/log4j/log4j-api/2.22.1/log4j-api-2.22.1.jar",
+        "org/apache/logging/log4j/log4j-core/2.22.1/log4j-core-2.22.1.jar",
+        "org/apache/logging/log4j/log4j-slf4j2-impl/2.22.1/log4j-slf4j2-impl-2.22.1.jar",
+        "org/slf4j/slf4j-api/2.0.9/slf4j-api-2.0.9.jar",
+        "com/google/code/gson/gson/2.10.1/gson-2.10.1.jar",
+        "net/minecrell/terminalconsoleappender/1.3.0/terminalconsoleappender-1.3.0.jar",
+        "org/jline/jline-reader/3.20.0/jline-reader-3.20.0.jar",
+        "org/jline/jline-terminal/3.20.0/jline-terminal-3.20.0.jar",
+
+        // ASM
+        "org/ow2/asm/asm/9.8/asm-9.8.jar",
+        "org/ow2/asm/asm-commons/9.8/asm-commons-9.8.jar",
+        "org/ow2/asm/asm-tree/9.8/asm-tree-9.8.jar",
+        "org/ow2/asm/asm-util/9.8/asm-util-9.8.jar",
+        "org/ow2/asm/asm-analysis/9.8/asm-analysis-9.8.jar"
     )
 
     private fun getConfig(version: String): VersionConfig {
@@ -207,10 +272,24 @@ internal class GameCommandBuilder {
         args.add("--userType"); args.add("mojang")
 
         if (assetIndex == "1.21.1") {
-            args.add("--fml.neoForgeVersion"); args.add("21.1.505")
-            args.add("--fml.fmlVersion"); args.add("4.0.34")
-            args.add("--fml.mcVersion"); args.add("1.21.1")
-            args.add("--fml.neoFormVersion"); args.add("20240808.144430")
+            // Default required arguments to prevent MissingRequiredOptionsException
+            val defaultFmlArgs = mapOf(
+                "neoForgeVersion" to "21.1.505",
+                "fmlVersion" to "4.0.42",
+                "mcVersion" to "1.21.1",
+                "neoFormVersion" to "20240808.144430"
+            )
+
+            // Merge defaults with backend arguments. Backend arguments will override defaults if present.
+            val backendArgs = profile.neoForgeArgs ?: emptyMap()
+            val finalFmlArgs = defaultFmlArgs + backendArgs
+
+            finalFmlArgs.forEach { (key, value) ->
+                if (value.isNotBlank()) {
+                    args.add("--fml.$key")
+                    args.add(value)
+                }
+            }
         }
         return args
     }

@@ -49,3 +49,4 @@ bin/
 .idea/vcs.xml
 /.kotlin/
 client-ui/smarty_hash.cache
+/client-ui/logs/

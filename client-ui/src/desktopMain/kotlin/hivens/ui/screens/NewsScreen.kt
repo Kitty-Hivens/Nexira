@@ -29,28 +29,22 @@ import org.koin.compose.koinInject
 import hivens.core.data.NewsItem
 import hivens.core.api.interfaces.IServerListService
 import hivens.ui.components.GlassCard
+import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/**
- * Экран просмотра новостей проекта.
- *
- * <p>Загружает новости через [IServerListService] и отображает их в списке.
- * Использует Coil для асинхронной загрузки изображений с поддержкой общего OkHttpClient.</p>
- */
 @Composable
 fun NewsScreen(
     onBack: () -> Unit
 ) {
-    // Внедрение зависимостей
     val httpClient: OkHttpClient = koinInject()
     val serverListService: IServerListService = koinInject()
+    val s = LocalStrings.current
 
     var newsList by remember { mutableStateOf<List<NewsItem>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
 
-    // Настройка Coil ImageLoader с использованием нашего OkHttpClient
     val context = LocalPlatformContext.current
     val imageLoader = remember {
         ImageLoader.Builder(context)
@@ -63,7 +57,6 @@ fun NewsScreen(
     LaunchedEffect(Unit) {
         try {
             val dashboardData = withContext(Dispatchers.IO) {
-                // Если сервис использует CompletableFuture (Legacy), вызываем get()
                 serverListService.fetchDashboardData().get()
             }
             newsList = dashboardData.news
@@ -77,35 +70,31 @@ fun NewsScreen(
     Column(
         modifier = Modifier.fillMaxSize().padding(24.dp)
     ) {
-        // Заголовок
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.padding(bottom = 24.dp)
         ) {
             IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = CelestiaTheme.colors.textPrimary)
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, s.navBack, tint = CelestiaTheme.colors.textPrimary)
             }
             Spacer(modifier = Modifier.width(16.dp))
-            Text("НОВОСТИ ПРОЕКТА", style = MaterialTheme.typography.h4, color = CelestiaTheme.colors.textPrimary)
+            Text(s.newsTitle, style = MaterialTheme.typography.h4, color = CelestiaTheme.colors.textPrimary)
         }
 
-        // Контент
         GlassCard(modifier = Modifier.fillMaxSize()) {
-            if (isLoading) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("Загрузка новостей...", color = CelestiaTheme.colors.textSecondary)
+            when {
+                isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(s.newsLoading, color = CelestiaTheme.colors.textSecondary)
                 }
-            } else if (newsList.isEmpty()) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("Новостей пока нет...", color = CelestiaTheme.colors.textSecondary)
+                newsList.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(s.newsEmpty, color = CelestiaTheme.colors.textSecondary)
                 }
-            } else {
-                LazyColumn(
+                else -> LazyColumn(
                     contentPadding = PaddingValues(24.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     items(newsList) { item ->
-                        NewsCard(item, imageLoader)
+                        NewsCard(item, imageLoader, s.newsNoImage)
                     }
                 }
             }
@@ -114,14 +103,13 @@ fun NewsScreen(
 }
 
 @Composable
-fun NewsCard(item: NewsItem, imageLoader: ImageLoader) {
+fun NewsCard(item: NewsItem, imageLoader: ImageLoader, noImageLabel: String) {
     GlassCard(
         modifier = Modifier.fillMaxWidth().height(140.dp),
         backgroundColor = CelestiaTheme.colors.surface.copy(alpha = 0.3f),
         shape = RoundedCornerShape(16.dp)
     ) {
         Row(modifier = Modifier.fillMaxSize()) {
-            // Изображение новости
             if (item.imageUrl != null) {
                 AsyncImage(
                     model = ImageRequest.Builder(LocalPlatformContext.current)
@@ -139,7 +127,6 @@ fun NewsCard(item: NewsItem, imageLoader: ImageLoader) {
                         .background(CelestiaTheme.colors.background.copy(alpha = 0.5f))
                 )
             } else {
-                // Заглушка, если картинки нет
                 Box(
                     modifier = Modifier
                         .width(200.dp)
@@ -149,11 +136,10 @@ fun NewsCard(item: NewsItem, imageLoader: ImageLoader) {
                         .background(CelestiaTheme.colors.surface.copy(alpha = 0.5f)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("NO IMG", color = CelestiaTheme.colors.textSecondary)
+                    Text(noImageLabel, color = CelestiaTheme.colors.textSecondary)
                 }
             }
 
-            // Текстовое описание
             Column(
                 modifier = Modifier.fillMaxSize().padding(16.dp),
                 verticalArrangement = Arrangement.SpaceBetween

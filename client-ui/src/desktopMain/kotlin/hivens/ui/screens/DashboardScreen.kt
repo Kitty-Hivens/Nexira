@@ -28,6 +28,7 @@ import hivens.launcher.ProfileManager
 import hivens.ui.components.GlassCard
 import hivens.ui.components.LaunchControlPanel
 import hivens.ui.components.SquareServerCard
+import hivens.ui.i18n.LocalStrings
 import hivens.ui.logic.LaunchState
 import hivens.ui.logic.LauncherController
 import hivens.ui.theme.CelestiaTheme
@@ -51,6 +52,7 @@ fun DashboardScreen(
     val settingsService: ISettingsService = koinInject()
     val profileManager: ProfileManager = koinInject()
     val controller: LauncherController = koinInject()
+    val s = LocalStrings.current
 
     val launchState by controller.state.collectAsState()
 
@@ -60,7 +62,6 @@ fun DashboardScreen(
     var favoriteTrigger by remember { mutableStateOf(0) }
     val favorites = remember(favoriteTrigger) { profileManager.favoriteServers }
 
-    // ЛОГИКА: Закрытие приложения после запуска (Fix "Parameter onCloseApp is never used")
     LaunchedEffect(launchState) {
         if (launchState is LaunchState.GameRunning) {
             val settings = settingsService.getSettings()
@@ -70,7 +71,6 @@ fun DashboardScreen(
         }
     }
 
-    // ЛОГИКА: Загрузка серверов
     LaunchedEffect(Unit) {
         if (servers.isEmpty()) {
             try {
@@ -93,7 +93,6 @@ fun DashboardScreen(
         }
     }
 
-    // Синхронизация выбора из Main
     LaunchedEffect(initialSelectedServer) {
         if (initialSelectedServer != null) {
             selectedServerState = initialSelectedServer
@@ -102,27 +101,24 @@ fun DashboardScreen(
 
     Column(Modifier.fillMaxSize().padding(16.dp)) {
 
-        // --- ХЕДЕР: Приветствие и Кнопка Новостей ---
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "ДОБРО ПОЖАЛОВАТЬ, ${session.playerName.uppercase()}",
+                text = s.dashboardWelcome(session.playerName.uppercase()),
                 style = MaterialTheme.typography.h5,
                 color = CelestiaTheme.colors.textPrimary.copy(alpha = 0.7f)
             )
 
-            // Кнопка НОВОСТИ
             IconButton(
                 onClick = onOpenNews,
-                // Блокируем кнопку, если идет загрузка, чтобы не ломать стейт
                 enabled = launchState is LaunchState.Idle || launchState is LaunchState.Error
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.List,
-                    contentDescription = "Новости",
+                    contentDescription = s.dashboardNews,
                     tint = CelestiaTheme.colors.textSecondary,
                     modifier = Modifier.size(32.dp)
                 )
@@ -131,12 +127,11 @@ fun DashboardScreen(
 
         Spacer(Modifier.height(24.dp))
 
-        // ОСНОВНОЙ КОНТЕЙНЕР
         GlassCard(Modifier.weight(1f).fillMaxWidth()) {
             Column(Modifier.padding(24.dp)) {
 
                 Text(
-                    "ДОСТУПНЫЕ СЕРВЕРЫ",
+                    s.dashboardServers,
                     style = MaterialTheme.typography.caption,
                     color = CelestiaTheme.colors.textSecondary,
                     fontWeight = FontWeight.Bold
@@ -186,7 +181,6 @@ fun DashboardScreen(
 
                 Spacer(Modifier.height(24.dp))
 
-                // ПАНЕЛЬ ЗАПУСКА
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
