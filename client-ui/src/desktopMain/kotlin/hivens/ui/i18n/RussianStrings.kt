@@ -162,6 +162,11 @@ object RussianStrings : AppStrings {
     override val seasonSummer = "Лето (Светлячки)"
     override val seasonAutumn = "Осень (Листопад)"
 
+    // Settings: Diagnostics
+    override val settingsSectionDiagnostics = "Диагностика"
+    override val settingsOpenLogs = "Открыть логи"
+    override val settingsOpenCrashReports = "Отчёты о сбоях"
+
     // File Manager
     override val fileCheckIntegrity = "Проверка целостности файлов..."
     override val fileNoUpdates = "Файлы проверены, обновлений нет."

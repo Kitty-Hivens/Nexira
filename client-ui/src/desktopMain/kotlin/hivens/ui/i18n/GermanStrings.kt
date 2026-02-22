@@ -162,6 +162,11 @@ object GermanStrings : AppStrings {
     override val seasonSummer = "Sommer (Glühwürmchen)"
     override val seasonAutumn = "Herbst (Blätterfall)"
 
+    // Settings: Diagnostics
+    override val settingsSectionDiagnostics = "Diagnose"
+    override val settingsOpenLogs = "Log-Ordner öffnen"
+    override val settingsOpenCrashReports = "Absturzberichte"
+
     // File Manager
     override val fileCheckIntegrity = "Dateiintegrität wird überprüft..."
     override val fileNoUpdates = "Dateien überprüft, keine Updates gefunden."

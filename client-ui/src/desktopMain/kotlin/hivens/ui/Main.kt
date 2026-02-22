@@ -35,6 +35,7 @@ import hivens.core.api.interfaces.ISettingsService
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.SeasonTheme
 import hivens.core.data.SessionData
+import hivens.launcher.CrashReporter
 import hivens.launcher.CredentialsManager
 import hivens.launcher.ProfileManager
 import hivens.launcher.di.appModule
@@ -65,6 +66,7 @@ import org.koin.core.context.stopKoin
 import org.koin.core.module.dsl.singleOf
 import org.koin.dsl.module
 import org.slf4j.LoggerFactory
+import javax.swing.SwingUtilities
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -89,6 +91,24 @@ sealed class ShellScreen {
 }
 
 fun main() {
+    // ── Global crash handler ─────────────────────────────────────────────────
+    Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+        val logger = LoggerFactory.getLogger("CrashHandler")
+        logger.error("Uncaught exception on thread '${thread.name}'", throwable)
+
+        try {
+            val report = CrashReporter.generate(throwable, thread)
+            val reportFile = CrashReporter.saveToDisk(report)
+            logger.error("Crash report saved: ${reportFile.absolutePath}")
+
+            SwingUtilities.invokeLater {
+                CrashReporter.showCrashDialog(report, reportFile)
+            }
+        } catch (e: Exception) {
+            logger.error("Failed to generate crash report", e)
+        }
+    }
+
     startKoin {
         modules(networkModule, appModule, uiModule)
     }
@@ -132,7 +152,7 @@ fun main() {
                 )
 
                 if (GameConsoleService.shouldShowConsole) {
-                    ConsoleWindow(onClose = { GameConsoleService.hide() })
+                    ConsoleWindow(isDarkTheme = isDarkTheme, onClose = { GameConsoleService.hide() })
                 }
 
                 val dataDirectory: java.nio.file.Path = koinInject()
@@ -146,7 +166,8 @@ fun main() {
                     resizable = false,
                     visible = isAppVisible,
                     icon = trayIcon,
-                    undecorated = true
+                    undecorated = true,
+                    transparent = false
                 ) {
                     CelestiaTheme(useDarkTheme = isDarkTheme, customTheme = customTheme) {
                         AppContent(
@@ -196,6 +217,7 @@ fun AppContent(
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
             delay(800)
+            CrashReporter.lastAction = "Auto-login"
             val savedSession = credentialsManager.load()
             var nextState: AppState = AppState.Login
             if (savedSession?.cachedPassword != null) {
@@ -207,6 +229,7 @@ fun AppContent(
                     LoggerFactory.getLogger("AppContent").warn("Auto-login failed: ${e.message}")
                 }
             }
+            CrashReporter.lastAction = "Idle — login screen"
             appState = nextState
         }
     }
@@ -299,6 +322,11 @@ fun ShellUI(
     var selectedServer by remember { mutableStateOf<ServerProfile?>(null) }
     var faceBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
     val s = LocalStrings.current
+
+    // Breadcrumb tracking
+    LaunchedEffect(currentScreen) {
+        CrashReporter.lastAction = "Screen: ${currentScreen::class.simpleName}"
+    }
 
     LaunchedEffect(currentSession.playerName) {
         faceBitmap = SkinManager.getSkinFront(currentSession.playerName)

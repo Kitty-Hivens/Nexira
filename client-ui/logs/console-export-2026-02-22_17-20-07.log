@@ -1,0 +1,504 @@
+─────────── Session started 17:19:43 ───────────
+[17:19:43] Aura Launcher...
+[17:19:43] → TechnoMagic
+[17:19:43] Успешный вход. UUID: 1e86dc3ad14dc24f4706915bb7d8593a
+[17:19:46] Запуск процесса...
+[17:19:46] Running TechnoMagic...
+[17:19:46] CMD: /home/haru/.aura/runtimes/java-8-linux-x64/jdk8u472-full/bin/java -noverify -Dminecraft.api.auth.host=https://www.smartycraft.ru/launcher/ -Dminecraft.api.account.host=https://www.smartycraft.ru/launcher/ -Dminecraft.api.session.host=https://www.smartycraft.ru/launcher/ -Dminecraft.launcher.brand=smartycraft -Dminecraft.launcher.version=3.6.3 -Djava.library.path=/home/haru/.aura/clients/TechnoMagic/bin/natives-1.12.2 -Dfml.ignoreInvalidMinecraftCertificates=true -Xms512M -Xmx8456M -cp /home/haru/.aura/clients/TechnoMagic/libraries-1.12.2/asm-all-5.2.jar:/home/haru/.aura/clients/TechnoMagic/libraries-1.12.2/launchwrapper-1.12.jar:/home/haru/.aura/clients/TechnoMagic/bin/smartycraft-1.12.2.jar:/home/haru/.aura/clients/TechnoMagic/libraries-1.12.2/akka-actor_2.11-2.3.3.jar:/home/haru/.aura/clients/TechnoMagic/libraries-1.12.2/authlib-1.5.25.jar:/home/haru/.aura/clients/TechnoMagic/libraries-1.12.2/codecjorbis-20101023.jar:/home/haru/.aura/clients/TechnoMagic/libraries-1.12.2/codecwav-20101023.jar:/home/haru/.aura/clients/TechnoMagic/libraries-1.12.2/commons-codec-1.10.jar:/home/haru/.aura/clients/TechnoMagic/libraries-1.12.2/commons-compress-1.8.1.jar:/home/haru/.aura/clients/TechnoMagic/libraries-1.12.2/commons-io-2.5.jar:/home/haru/.aura/clients/TechnoMagic/libraries-1.12.2/commons-lang3-3.5.jar:/home/haru/.aura/clients/TechnoMagic/libraries-1.12.2/commons-logging-1.1.3.jar:/home/haru/.aura/clients/TechnoMagic/libraries-1.12.2/config-1.2.1.jar:/home/haru/.aura/clients/TechnoMagic/libraries-1.12.2/fastutil-7.1.0.jar:/home/haru/.aura/clients/TechnoMagic/libraries-1.12.2/forge-1.12.2-14.23.5.2922-universal.jar:/home/haru/.aura/clients/TechnoMagic/libraries-1.12.2/gson-2.8.0.jar:/home/haru/.aura/clients/TechnoMagic/libraries-1.12.2/guava-21.0.jar:/home/haru/.aura/clients/TechnoMagic/libraries-1.12.2/httpclient-4.3.3.jar:/home/haru/.aura/clients/TechnoMagic/libraries-1.12.2/httpcore-4.3.2.jar:/home/haru/.aura/clients/TechnoMagic/libraries-1.12.2/icu4j-core-mojang-51.2.jar:/home/haru/.aura/clients/TechnoMagic/libraries-1.12.2/java-objc-bridge-1.0.0.jar:/home/haru/.aura/clients/TechnoMagic/libraries-1.12.2/jinput-2.0.5.jar:/home/haru/.aura/clients/TechnoMagic/libraries-1.12.2/jinput-platform-2.0.5-natives-windows.jar:/home/haru/.aura/clients/TechnoMagic/libraries-1.12.2/jline-2.13.jar:/home/haru/.aura/clients/TechnoMagic/libraries-1.12.2/jna-4.4.0.jar:/home/haru/.aura/clients/TechnoMagic/libraries-1.12.2/jopt-simple-5.0.3.jar:/home/haru/.aura/clients/TechnoMagic/libraries-1.12.2/jutils-1.0.0.jar:/home/haru/.aura/clients/TechnoMagic/libraries-1.12.2/libraryjavasound-20101123.jar:/home/haru/.aura/clients/TechnoMagic/libraries-1.12.2/librarylwjglopenal-20100824.jar:/home/haru/.aura/clients/TechnoMagic/libraries-1.12.2/log4j-api-2.17.1.jar:/home/haru/.aura/clients/TechnoMagic/libraries-1.12.2/log4j-core-2.17.1.jar:/home/haru/.aura/clients/TechnoMagic/libraries-1.12.2/lwjgl-2.9.4-nightly-20150209.jar:/home/haru/.aura/clients/TechnoMagic/libraries-1.12.2/lwjgl-platform-2.9.4-nightly-20150209-natives-windows.jar:/home/haru/.aura/clients/TechnoMagic/libraries-1.12.2/lwjgl_util-2.9.4-nightly-20150209.jar:/home/haru/.aura/clients/TechnoMagic/libraries-1.12.2/lzma-0.0.1.jar:/home/haru/.aura/clients/TechnoMagic/libraries-1.12.2/maven-artifact-3.5.3.jar:/home/haru/.aura/clients/TechnoMagic/libraries-1.12.2/netty-all-4.1.9.Final.jar:/home/haru/.aura/clients/TechnoMagic/libraries-1.12.2/oshi-core-1.1.jar:/home/haru/.aura/clients/TechnoMagic/libraries-1.12.2/patchy-1.1.jar:/home/haru/.aura/clients/TechnoMagic/libraries-1.12.2/platform-3.4.0.jar:/home/haru/.aura/clients/TechnoMagic/libraries-1.12.2/realms-1.10.22.jar:/home/haru/.aura/clients/TechnoMagic/libraries-1.12.2/scala-actors-migration_2.11-1.1.0.jar:/home/haru/.aura/clients/TechnoMagic/libraries-1.12.2/scala-compiler-2.11.1.jar:/home/haru/.aura/clients/TechnoMagic/libraries-1.12.2/scala-continuations-library_2.11-1.0.2.jar:/home/haru/.aura/clients/TechnoMagic/libraries-1.12.2/scala-continuations-plugin_2.11.1-1.0.2.jar:/home/haru/.aura/clients/TechnoMagic/libraries-1.12.2/scala-library-2.11.1.jar:/home/haru/.aura/clients/TechnoMagic/libraries-1.12.2/scala-parser-combinators_2.11-1.0.1.jar:/home/haru/.aura/clients/TechnoMagic/libraries-1.12.2/scala-reflect-2.11.1.jar:/home/haru/.aura/clients/TechnoMagic/libraries-1.12.2/scala-swing_2.11-1.0.1.jar:/home/haru/.aura/clients/TechnoMagic/libraries-1.12.2/scala-xml_2.11-1.0.2.jar:/home/haru/.aura/clients/TechnoMagic/libraries-1.12.2/soundsystem-20120107.jar:/home/haru/.aura/clients/TechnoMagic/libraries-1.12.2/text2speech-1.10.3-natives-windows.jar:/home/haru/.aura/clients/TechnoMagic/libraries-1.12.2/text2speech-1.10.3.jar:/home/haru/.aura/clients/TechnoMagic/libraries-1.12.2/trove4j-3.0.3.jar:/home/haru/.aura/clients/TechnoMagic/libraries-1.12.2/vecmath-1.5.2.jar net.minecraft.launchwrapper.Launch --username NoLikeHumans --version Forge 1.12.2 --gameDir /home/haru/.aura/clients/TechnoMagic --assetsDir /home/haru/.aura/clients/TechnoMagic/assets --assetIndex 1.12.2 --uuid 1e86dc3ad14dc24f4706915bb7d8593a --accessToken 2564d442f9c43d27fb0ad6157ba92ba6 --userProperties {} --userType mojang --tweakClass net.minecraftforge.fml.common.launcher.FMLTweaker
+[17:19:48] [17:19:48] [main/INFO]: Loading tweak class name net.minecraftforge.fml.common.launcher.FMLTweaker
+[17:19:48] [17:19:48] [main/INFO]: Using primary tweak class name net.minecraftforge.fml.common.launcher.FMLTweaker
+[17:19:48] [17:19:48] [main/INFO]: Calling tweak class net.minecraftforge.fml.common.launcher.FMLTweaker
+[17:19:48] [17:19:48] [main/INFO]: Forge Mod Loader version 14.23.5.2854 for Minecraft 1.12.2 loading
+[17:19:48] [17:19:48] [main/INFO]: Java is OpenJDK 64-Bit Server VM, version 1.8.0_472, running on Linux:amd64:6.18.9-arch1-2, installed at /home/haru/.aura/runtimes/java-8-linux-x64/jdk8u472-full/jre
+[17:19:48] [17:19:48] [main/ERROR]: Apache Maven library folder was not in the format expected. Using default libraries directory.
+[17:19:48] [17:19:48] [main/ERROR]: Full: /home/haru/.aura/clients/TechnoMagic/libraries-1.12.2/maven-artifact-3.5.3.jar
+[17:19:48] [17:19:48] [main/ERROR]: Trimmed: /home/haru/.aura/clients/technomagic/
+[17:19:49] [17:19:49] [main/WARN]: The coremod FMLCorePlugin (net.minecraftforge.fml.relauncher.FMLCorePlugin) is not signed!
+[17:19:49] [17:19:49] [main/WARN]: The coremod FMLForgePlugin (net.minecraftforge.classloading.FMLForgePlugin) is not signed!
+[17:19:49] [17:19:49] [main/INFO]: Searching /home/haru/.aura/clients/TechnoMagic/mods for mods
+[17:19:49] [17:19:49] [main/INFO]: Searching /home/haru/.aura/clients/TechnoMagic/mods/1.12.2 for mods
+[17:19:49] [17:19:49] [main/WARN]: Found FMLCorePluginContainsFMLMod marker in AstralSorcery.jar. This is not recommended, @Mods should be in a separate jar from the coremod.
+[17:19:49] [17:19:49] [main/WARN]: The coremod hellfirepvp.astralsorcery.core.AstralCore does not have a MCVersion annotation, it may cause issues with this version of Minecraft
+[17:19:49] [17:19:49] [main/WARN]: The coremod AstralCore (hellfirepvp.astralsorcery.core.AstralCore) is not signed!
+[17:19:49] [17:19:49] [main/INFO]: [AstralCore] Initialized.
+[17:19:49] [17:19:49] [main/INFO]: Loading tweaker codechicken.asm.internal.Tweaker from ChickenASM-1.12-1.0.2.7.jar
+[17:19:49] [17:19:49] [main/WARN]: Found FMLCorePluginContainsFMLMod marker in FoamFix.jar. This is not recommended, @Mods should be in a separate jar from the coremod.
+[17:19:49] [17:19:49] [main/WARN]: The coremod pl.asie.foamfix.coremod.FoamFixCore does not have a MCVersion annotation, it may cause issues with this version of Minecraft
+[17:19:49] [17:19:49] [main/WARN]: Found FMLCorePluginContainsFMLMod marker in HammerLib.jar. This is not recommended, @Mods should be in a separate jar from the coremod.
+[17:19:49] [17:19:49] [main/WARN]: Found FMLCorePluginContainsFMLMod marker in InventoryTweaks.jar. This is not recommended, @Mods should be in a separate jar from the coremod.
+[17:19:49] [17:19:49] [main/WARN]: The coremod invtweaks.forge.asm.FMLPlugin does not have a MCVersion annotation, it may cause issues with this version of Minecraft
+[17:19:49] [17:19:49] [main/WARN]: Found FMLCorePluginContainsFMLMod marker in Mekanism.jar. This is not recommended, @Mods should be in a separate jar from the coremod.
+[17:19:49] [17:19:49] [main/WARN]: The coremod mekanism.coremod.MekanismCoremod does not have a MCVersion annotation, it may cause issues with this version of Minecraft
+[17:19:49] [17:19:49] [main/WARN]: The coremod MekanismCoremod (mekanism.coremod.MekanismCoremod) is not signed!
+[17:19:49] [17:19:49] [main/INFO]: Loading tweaker optifine.OptiFineForgeTweaker from OptiFine.jar
+[17:19:49] [17:19:49] [main/WARN]: Found FMLCorePluginContainsFMLMod marker in Quark.jar. This is not recommended, @Mods should be in a separate jar from the coremod.
+[17:19:49] [17:19:49] [main/WARN]: The coremod Quark Plugin (vazkii.quark.base.asm.LoadingPlugin) is not signed!
+[17:19:49] [17:19:49] [main/WARN]: Found FMLCorePluginContainsFMLMod marker in Smarty-1.12.2.jar. This is not recommended, @Mods should be in a separate jar from the coremod.
+[17:19:49] [17:19:49] [main/WARN]: The coremod Smarty (ru.smartycraft.CoreMod) is not signed!
+[17:19:49] [17:19:49] [main/WARN]: Found FMLCorePluginContainsFMLMod marker in ThaumicAdditions.jar. This is not recommended, @Mods should be in a separate jar from the coremod.
+[17:19:49] [17:19:49] [main/WARN]: The coremod TARCore (org.zeith.thaumicadditions.asm.TARCore) is not signed!
+[17:19:49] [17:19:49] [main/WARN]: Found FMLCorePluginContainsFMLMod marker in ThaumicAugmentation.jar. This is not recommended, @Mods should be in a separate jar from the coremod.
+[17:19:49] [17:19:49] [main/WARN]: The coremod Thaumic Augmentation Core Plugin (thecodex6824.thaumicaugmentation.core.ThaumicAugmentationCore) is not signed!
+[17:19:49] [17:19:49] [main/INFO]: Loading tweaker org.spongepowered.asm.launch.MixinTweaker from VoxelMap.jar
+[17:19:49] [17:19:49] [main/WARN]: The coremod blusunrize.immersiveengineering.common.asm.IELoadingPlugin does not have a MCVersion annotation, it may cause issues with this version of Minecraft
+[17:19:49] [17:19:49] [main/WARN]: The coremod IELoadingPlugin (blusunrize.immersiveengineering.common.asm.IELoadingPlugin) is not signed!
+[17:19:49] [17:19:49] [main/INFO]: Loading tweaker org.spongepowered.asm.launch.MixinTweaker from Phosphor.jar
+[17:19:49] [17:19:49] [main/INFO]: Loading tweak class name net.minecraftforge.fml.common.launcher.FMLInjectionAndSortingTweaker
+[17:19:49] [17:19:49] [main/INFO]: Loading tweak class name codechicken.asm.internal.Tweaker
+[17:19:49] [17:19:49] [main/INFO]: Loading tweak class name optifine.OptiFineForgeTweaker
+[17:19:49] [17:19:49] [main/INFO]: Loading tweak class name org.spongepowered.asm.launch.MixinTweaker
+[17:19:49] [17:19:49] [main/INFO]: SpongePowered MIXIN Subsystem Version=0.8 Source=file:/home/haru/.aura/clients/TechnoMagic/mods/1.12.2/VoxelMap.jar Service=LaunchWrapper Env=CLIENT
+[17:19:49] [17:19:49] [main/DEBUG]: Instantiating coremod class PhosphorFMLLoadingPlugin
+[17:19:49] [17:19:49] [main/DEBUG]: The coremod me.jellysquid.mods.phosphor.core.PhosphorFMLLoadingPlugin requested minecraft version 1.12.2 and minecraft is 1.12.2. It will be loaded.
+[17:19:49] [17:19:49] [main/DEBUG]: Found signing certificates for coremod PhosphorFMLLoadingPlugin (me.jellysquid.mods.phosphor.core.PhosphorFMLLoadingPlugin)
+[17:19:49] [17:19:49] [main/DEBUG]: Found certificate f0387d288626cc2d937daa504e74af570c52a2f1
+[17:19:49] [17:19:49] [main/DEBUG]: Enqueued coremod PhosphorFMLLoadingPlugin
+[17:19:49] [17:19:49] [main/WARN]: Tweak class name org.spongepowered.asm.launch.MixinTweaker has already been visited -- skipping
+[17:19:49] [17:19:49] [main/INFO]: Loading tweak class name net.minecraftforge.fml.common.launcher.FMLDeobfTweaker
+[17:19:49] [17:19:49] [main/INFO]: Calling tweak class net.minecraftforge.fml.common.launcher.FMLInjectionAndSortingTweaker
+[17:19:49] [17:19:49] [main/INFO]: Calling tweak class net.minecraftforge.fml.common.launcher.FMLInjectionAndSortingTweaker
+[17:19:49] [17:19:49] [main/INFO]: Calling tweak class optifine.OptiFineForgeTweaker
+[17:19:49] [17:19:49] [main/INFO]: [optifine.OptiFineForgeTweaker:dbg:56]: OptiFineForgeTweaker: acceptOptions
+[17:19:49] [17:19:49] [main/INFO]: [optifine.OptiFineForgeTweaker:dbg:56]: OptiFineForgeTweaker: injectIntoClassLoader
+[17:19:49] [17:19:49] [main/INFO]: [optifine.OptiFineClassTransformer:dbg:242]: OptiFine ClassTransformer
+[17:19:49] [17:19:49] [main/INFO]: [optifine.OptiFineClassTransformer:dbg:242]: OptiFine ZIP file: /home/haru/.aura/clients/TechnoMagic/mods/1.12.2/OptiFine.jar
+[17:19:49] [17:19:49] [main/INFO]: Calling tweak class net.minecraftforge.fml.relauncher.CoreModManager$FMLPluginWrapper
+[17:19:49] [17:19:49] [main/DEBUG]: Injecting coremod FMLCorePlugin \{net.minecraftforge.fml.relauncher.FMLCorePlugin\} class transformers
+[17:19:49] [17:19:49] [main/TRACE]: Registering transformer net.minecraftforge.fml.common.asm.transformers.SideTransformer
+[17:19:49] [17:19:49] [main/TRACE]: Registering transformer net.minecraftforge.fml.common.asm.transformers.EventSubscriptionTransformer
+[17:19:49] [17:19:49] [main/TRACE]: Registering transformer net.minecraftforge.fml.common.asm.transformers.EventSubscriberTransformer
+[17:19:49] [17:19:49] [main/TRACE]: Registering transformer net.minecraftforge.fml.common.asm.transformers.SoundEngineFixTransformer
+[17:19:49] [17:19:49] [main/DEBUG]: Injection complete
+[17:19:49] [17:19:49] [main/DEBUG]: Running coremod plugin for FMLCorePlugin \{net.minecraftforge.fml.relauncher.FMLCorePlugin\}
+[17:19:49] [17:19:49] [main/DEBUG]: Running coremod plugin FMLCorePlugin
+[17:19:51] [17:19:51] [main/ERROR]: The minecraft jar file:/home/haru/.aura/clients/TechnoMagic/bin/smartycraft-1.12.2.jar!/net/minecraft/client/ClientBrandRetriever.class appears to be corrupt! There has been CRITICAL TAMPERING WITH MINECRAFT, it is highly unlikely minecraft will work! STOP NOW, get a clean copy and try again!
+[17:19:51] [17:19:51] [main/ERROR]: FML has been ordered to ignore the invalid or missing minecraft certificate. This is very likely to cause a problem!
+[17:19:51] [17:19:51] [main/ERROR]: Technical information: ClientBrandRetriever was at jar:file:/home/haru/.aura/clients/TechnoMagic/bin/smartycraft-1.12.2.jar!/net/minecraft/client/ClientBrandRetriever.class, there were 0 certificates for it
+[17:19:51] [17:19:51] [main/ERROR]: FML appears to be missing any signature data. This is not a good thing
+[17:19:51] [17:19:51] [main/DEBUG]: Coremod plugin class FMLCorePlugin run successfully
+[17:19:51] [17:19:51] [main/INFO]: Calling tweak class net.minecraftforge.fml.relauncher.CoreModManager$FMLPluginWrapper
+[17:19:51] [17:19:51] [main/DEBUG]: Injecting coremod FMLForgePlugin \{net.minecraftforge.classloading.FMLForgePlugin\} class transformers
+[17:19:51] [17:19:51] [main/DEBUG]: Injection complete
+[17:19:51] [17:19:51] [main/DEBUG]: Running coremod plugin for FMLForgePlugin \{net.minecraftforge.classloading.FMLForgePlugin\}
+[17:19:51] [17:19:51] [main/DEBUG]: Running coremod plugin FMLForgePlugin
+[17:19:51] [17:19:51] [main/DEBUG]: Coremod plugin class FMLForgePlugin run successfully
+[17:19:51] [17:19:51] [main/INFO]: Calling tweak class net.minecraftforge.fml.relauncher.CoreModManager$FMLPluginWrapper
+[17:19:51] [17:19:51] [main/DEBUG]: Injecting coremod HCASM \{com.zeitheron.hammercore.asm.HCASM\} class transformers
+[17:19:51] [17:19:51] [main/TRACE]: Registering transformer com.zeitheron.hammercore.asm.HammerCoreTransformer
+[17:19:51] [17:19:51] [main/DEBUG]: Injection complete
+[17:19:51] [17:19:51] [main/DEBUG]: Running coremod plugin for HCASM \{com.zeitheron.hammercore.asm.HCASM\}
+[17:19:51] [17:19:51] [main/DEBUG]: Running coremod plugin HCASM
+[17:19:51] [17:19:51] [main/DEBUG]: Coremod plugin class HCASM run successfully
+[17:19:51] [17:19:51] [main/INFO]: Calling tweak class net.minecraftforge.fml.relauncher.CoreModManager$FMLPluginWrapper
+[17:19:51] [17:19:51] [main/DEBUG]: Injecting coremod TARCore \{org.zeith.thaumicadditions.asm.TARCore\} class transformers
+[17:19:51] [17:19:51] [main/DEBUG]: Injection complete
+[17:19:51] [17:19:51] [main/DEBUG]: Running coremod plugin for TARCore \{org.zeith.thaumicadditions.asm.TARCore\}
+[17:19:51] [17:19:51] [main/DEBUG]: Running coremod plugin TARCore
+[17:19:51] [17:19:51] [main/DEBUG]: Coremod plugin class TARCore run successfully
+[17:19:51] [17:19:51] [main/INFO]: Calling tweak class codechicken.asm.internal.Tweaker
+[17:19:51] [17:19:51] [main/INFO]: [codechicken.asm.internal.Tweaker:injectIntoClassLoader:30]: false
+[17:19:51] [17:19:51] [main/INFO]: Calling tweak class org.spongepowered.asm.launch.MixinTweaker
+[17:19:51] [17:19:51] [main/INFO]: Compatibility level set to JAVA_8
+[17:19:51] [17:19:51] [main/DEBUG]: Injecting coremod PhosphorFMLLoadingPlugin \{me.jellysquid.mods.phosphor.core.PhosphorFMLLoadingPlugin\} class transformers
+[17:19:51] [17:19:51] [main/DEBUG]: Injection complete
+[17:19:51] [17:19:51] [main/DEBUG]: Running coremod plugin for PhosphorFMLLoadingPlugin \{me.jellysquid.mods.phosphor.core.PhosphorFMLLoadingPlugin\}
+[17:19:51] [17:19:51] [main/DEBUG]: Running coremod plugin PhosphorFMLLoadingPlugin
+[17:19:51] [17:19:51] [main/DEBUG]: Coremod plugin class PhosphorFMLLoadingPlugin run successfully
+[17:19:51] [17:19:51] [main/INFO]: Calling tweak class net.minecraftforge.fml.common.launcher.FMLDeobfTweaker
+[17:19:51] [17:19:51] [main/INFO]: [AstralTransformer] Loading patches...
+[17:19:52] [17:19:52] [main/INFO]: [AstralTransformer] Initialized! Loaded 14 class patches!
+[17:19:52] [17:19:52] [main/DEBUG]: Validating minecraft
+[17:19:52] [17:19:52] [main/INFO]: Calling tweak class net.minecraftforge.fml.relauncher.CoreModManager$FMLPluginWrapper
+[17:19:52] [17:19:52] [main/INFO]: Calling tweak class net.minecraftforge.fml.relauncher.CoreModManager$FMLPluginWrapper
+[17:19:52] [17:19:52] [main/INFO]: Calling tweak class net.minecraftforge.fml.relauncher.CoreModManager$FMLPluginWrapper
+[17:19:52] [17:19:52] [main/INFO]: Calling tweak class net.minecraftforge.fml.relauncher.CoreModManager$FMLPluginWrapper
+[17:19:52] [17:19:52] [main/INFO]: Calling tweak class net.minecraftforge.fml.relauncher.CoreModManager$FMLPluginWrapper
+[17:19:52] [17:19:52] [main/INFO]: Calling tweak class net.minecraftforge.fml.relauncher.CoreModManager$FMLPluginWrapper
+[17:19:52] [17:19:52] [main/INFO]: Calling tweak class net.minecraftforge.fml.relauncher.CoreModManager$FMLPluginWrapper
+[17:19:52] [17:19:52] [main/INFO]: Calling tweak class net.minecraftforge.fml.relauncher.CoreModManager$FMLPluginWrapper
+[17:19:52] [17:19:52] [main/INFO]: Calling tweak class net.minecraftforge.fml.relauncher.CoreModManager$FMLPluginWrapper
+[17:19:52] [17:19:52] [main/INFO]: Loading tweak class name net.minecraftforge.fml.common.launcher.TerminalTweaker
+[17:19:52] [17:19:52] [main/INFO]: Loading tweak class name org.spongepowered.asm.mixin.EnvironmentStateTweaker
+[17:19:52] [17:19:52] [main/INFO]: Calling tweak class net.minecraftforge.fml.common.launcher.TerminalTweaker
+[17:19:52] [17:19:52] [main/INFO]: Calling tweak class org.spongepowered.asm.mixin.EnvironmentStateTweaker
+[17:19:52] [17:19:52] [main/INFO]: [optifine.OptiFineForgeTweaker:dbg:56]: OptiFineForgeTweaker: getLaunchArguments
+[17:19:52] [17:19:52] [main/INFO]: Transforming net.minecraft.client.renderer.entity.Render
+[17:19:52] [17:19:52] [main/INFO]: Applying Transformation to method (Names [renderEntityOnFire, func_76977_a] Descriptor (Lnet/minecraft/entity/Entity;DDDF)V)
+[17:19:52] [17:19:52] [main/INFO]: Located Method, patching...
+[17:19:52] [17:19:52] [main/INFO]: Patch result: true
+[17:19:52] [17:19:52] [main/INFO]: [AstralTransformer] Transforming buq : net.minecraft.client.renderer.EntityRenderer with 1 patches!
+[17:19:52] [17:19:52] [main/INFO]: [AstralTransformer] Applied patch PATCHENTITYRENDEREREXTENDEDENTITYREACH
+[17:19:52] [17:19:52] [main/INFO]: Transforming net.minecraft.client.renderer.EntityRenderer
+[17:19:52] [17:19:52] [main/INFO]: Applying Transformation to method (Names [renderWorldPass, func_175068_a] Descriptor (IFJ)V)
+[17:19:52] [17:19:52] [main/INFO]: Located Method, patching...
+[17:19:52] [17:19:52] [main/INFO]: Located patch target node INVOKEVIRTUAL net/minecraft/client/renderer/EntityRenderer.func_78479_a (FI)V
+[17:19:52] [17:19:52] [main/INFO]: Patch result: true
+[17:19:52] [17:19:52] [main/INFO]: Successfully transformed class net.minecraft.client.renderer.RenderGlobal
+[17:19:52] [17:19:52] [main/INFO]: A re-entrant transformer '$wrapper.ru.smartycraft.asm.ASMTransformer' was detected and will no longer process meta class data
+[17:19:52] [17:19:52] [main/INFO]: [pl.asie.patchy.helpers.ConstructorReplacingTransformer$FFMethodVisitor:visitTypeInsn:73]: Replaced NEW for net/minecraft/util/ClassInheritanceMultiMap to pl/asie/foamfix/coremod/common/FoamyClassInheritanceMultiMap
+[17:19:52] [17:19:52] [main/INFO]: [pl.asie.patchy.helpers.ConstructorReplacingTransformer$FFMethodVisitor:visitMethodInsn:85]: Replaced INVOKESPECIAL for net/minecraft/util/ClassInheritanceMultiMap to pl/asie/foamfix/coremod/common/FoamyClassInheritanceMultiMap
+[17:19:52] [17:19:52] [main/INFO]: A re-entrant transformer '$wrapper.pl.asie.foamfix.coremod.FoamFixTransformer' was detected and will no longer process meta class data
+[17:19:52] [17:19:52] [main/INFO]: Transforming Class [net.minecraft.world.chunk.storage.ExtendedBlockStorage], Method [func_76663_a]
+[17:19:52] [17:19:52] [main/INFO]: Transforming net.minecraft.world.chunk.storage.ExtendedBlockStorage Finished.
+[17:19:52] [17:19:52] [main/INFO]: A re-entrant transformer '$wrapper.com.enderio.core.common.transform.EnderCoreTransformer' was detected and will no longer process meta class data
+[17:19:52] [17:19:52] [main/INFO]: Transforming net.minecraft.world.World (amu)...
+[17:19:52] [17:19:52] [main/INFO]:   -Patching World
+[17:19:52] [17:19:52] [main/INFO]:     -Modified method 'k', replaced nx.e()V with HC call.
+[17:19:52] [17:19:52] [main/INFO]: A re-entrant transformer '$wrapper.com.zeitheron.hammercore.asm.HammerCoreTransformer' was detected and will no longer process meta class data
+[17:19:52] [17:19:52] [main/INFO]: [AstralTransformer] Transforming amu : net.minecraft.world.World with 2 patches!
+[17:19:52] [17:19:52] [main/INFO]: [AstralTransformer] Applied patch PATCHSUNBRIGHTNESSWORLDCLIENT
+[17:19:52] [17:19:52] [main/INFO]: [AstralTransformer] Applied patch PATCHSUNBRIGHTNESSWORLDCOMMON
+[17:19:53] [17:19:53] [main/INFO]: Launching wrapped minecraft {net.minecraft.client.main.Main}
+[17:19:53] [17:19:53] [Client thread/INFO]: [pl.asie.foamfix.coremod.FoamFixTransformer:spliceClasses:111]: Spliced in METHOD: net.minecraft.client.util.SearchTreeManager.func_110549_a
+[17:19:53] [17:19:53] [Client thread/INFO]: Transforming net.minecraft.profiler.Profiler (rl)...
+[17:19:53] [17:19:53] [Client thread/INFO]:   -Patched startSection!
+[17:19:53] [17:19:53] [Client thread/INFO]:   -Patched endSection!
+[17:19:53] [17:19:53] [Client thread/INFO]:   -Patched endStartSection!
+[17:19:53] [17:19:53] [Client thread/INFO]: Transforming net.minecraftforge.client.ForgeHooksClient (net.minecraftforge.client.ForgeHooksClient)...
+[17:19:53] [17:19:53] [Client thread/INFO]:   -Patched handleCameraTransforms!
+[17:19:53] [17:19:53] [Client thread/INFO]: Setting user: NoLikeHumans
+[17:19:53] [17:19:53] [Client thread/INFO]: Successfully transformed class net.minecraft.block.Block
+[17:19:53] [17:19:53] [Client thread/INFO]: Transforming net.minecraft.enchantment.Enchantment
+[17:19:53] [17:19:53] [Client thread/INFO]: Applying Transformation to method (Names [canApply, func_92089_a] Descriptor (Lnet/minecraft/item/ItemStack;)Z)
+[17:19:53] [17:19:53] [Client thread/INFO]: Located Method, patching...
+[17:19:53] [17:19:53] [Client thread/INFO]: Located patch target node IRETURN
+[17:19:53] [17:19:53] [Client thread/INFO]: Patch result: true
+[17:19:53] [17:19:53] [Client thread/INFO]: [pl.asie.foamfix.coremod.FoamFixTransformer:spliceClasses:111]: Spliced in METHOD: net.minecraft.block.state.BlockStateContainer.createState
+[17:19:53] [17:19:53] [Client thread/INFO]: Successfully transformed class net.minecraft.block.state.BlockStateContainer$StateImplementation
+[17:19:53] [17:19:53] [Client thread/INFO]: [pl.asie.foamfix.coremod.FoamFixTransformer:spliceClasses:111]: Spliced in METHOD: net.minecraft.block.properties.PropertyEnum.equals
+[17:19:53] [17:19:53] [Client thread/INFO]: [pl.asie.foamfix.coremod.FoamFixTransformer:spliceClasses:111]: Spliced in METHOD: net.minecraft.block.properties.PropertyEnum.hashCode
+[17:19:53] [17:19:53] [Client thread/INFO]: [pl.asie.foamfix.coremod.FoamFixTransformer:spliceClasses:158]: Added FIELD: net.minecraft.block.properties.PropertyEnum.foamfix_hashCode
+[17:19:53] [17:19:53] [Client thread/INFO]: [pl.asie.foamfix.coremod.FoamFixTransformer:spliceClasses:158]: Added FIELD: net.minecraft.block.properties.PropertyEnum.foamfix_hashCode_calced
+[17:19:53] [17:19:53] [Client thread/INFO]: [pl.asie.foamfix.coremod.FoamFixTransformer:spliceClasses:111]: Spliced in METHOD: net.minecraft.block.properties.PropertyInteger.hashCode
+[17:19:53] [17:19:53] [Client thread/INFO]: [pl.asie.foamfix.coremod.FoamFixTransformer:spliceClasses:158]: Added FIELD: net.minecraft.block.properties.PropertyInteger.foamfix_hashCode
+[17:19:53] [17:19:53] [Client thread/INFO]: [pl.asie.foamfix.coremod.FoamFixTransformer:spliceClasses:158]: Added FIELD: net.minecraft.block.properties.PropertyInteger.foamfix_hashCode_calced
+[17:19:53] [17:19:53] [Client thread/INFO]: [pl.asie.foamfix.coremod.FoamFixTransformer:spliceClasses:111]: Spliced in METHOD: net.minecraft.block.properties.PropertyBool.equals
+[17:19:53] [17:19:53] [Client thread/INFO]: [pl.asie.foamfix.coremod.FoamFixTransformer:spliceClasses:111]: Spliced in METHOD: net.minecraft.block.properties.PropertyBool.hashCode
+[17:19:54] [17:19:54] [Client thread/INFO]: [AstralTransformer] Transforming aip : net.minecraft.item.ItemStack with 2 patches!
+[17:19:54] [17:19:54] [Client thread/INFO]: [AstralTransformer] Applied patch PATCHMODIFYENCHANTMENTLEVELSTOOLTIP
+[17:19:54] [17:19:54] [Client thread/INFO]: [AstralTransformer] Applied patch PATCHMODIFYENCHANTMENTLEVELSTOOLTIPEVENT
+[17:19:54] [17:19:54] [Client thread/INFO]: Transforming net.minecraft.item.ItemStack
+[17:19:54] [17:19:54] [Client thread/INFO]: Applying Transformation to method (Names [getTextComponent, func_151000_E] Descriptor ()Lnet/minecraft/util/text/ITextComponent;)
+[17:19:54] [17:19:54] [Client thread/INFO]: Located Method, patching...
+[17:19:54] [17:19:54] [Client thread/INFO]: Located patch target node ARETURN
+[17:19:54] [17:19:54] [Client thread/INFO]: Patch result: true
+[17:19:54] [17:19:54] [Client thread/INFO]: Transforming net.minecraft.block.BlockDynamicLiquid
+[17:19:54] [17:19:54] [Client thread/INFO]: Applying Transformation to method (Names [isBlocked, func_176372_g] Descriptor (Lnet/minecraft/world/World;Lnet/minecraft/util/math/BlockPos;Lnet/minecraft/block/state/IBlockState;)Z)
+[17:19:54] [17:19:54] [Client thread/INFO]: Located Method, patching...
+[17:19:54] [17:19:54] [Client thread/INFO]: Located patch target node IRETURN
+[17:19:54] [17:19:54] [Client thread/INFO]: Located patch target node IRETURN
+[17:19:54] [17:19:54] [Client thread/INFO]: Patch result: true
+[17:19:54] [17:19:54] [Client thread/INFO]: Transforming net.minecraft.entity.EntityLivingBase (vp)...
+[17:19:54] [17:19:54] [Client thread/INFO]:   -Patching EntityLivingBase
+[17:19:54] [17:19:54] [Client thread/INFO]:     -Modified method 'onItemUseFinish': added event call.
+[17:19:54] [17:19:54] [Client thread/INFO]: [AstralTransformer] Transforming vp : net.minecraft.entity.EntityLivingBase with 4 patches!
+[17:19:54] [17:19:54] [Client thread/INFO]: [AstralTransformer] Applied patch PATCHAPPLYPOTIONEFFECTEVENT
+[17:19:54] [17:19:54] [Client thread/INFO]: [AstralTransformer] Applied patch PATCHENTITYLIVINGBASEWATERSLOWDOWN
+[17:19:54] [17:19:54] [Client thread/INFO]: [AstralTransformer] Applied patch PATCHSETPLAYERATTRIBUTE
+[17:19:54] [17:19:54] [Client thread/INFO]: [AstralTransformer] Applied patch PATCHUPDATEELYTRA
+[17:19:54] [17:19:54] [Client thread/INFO]: Successfully transformed class net.minecraft.entity.EntityLivingBase
+[17:19:54] [17:19:54] [Client thread/INFO]: Transforming net.minecraft.entity.Entity
+[17:19:54] [17:19:54] [Client thread/INFO]: Applying Transformation to method (Names [move, func_70091_d] Descriptor (Lnet/minecraft/entity/MoverType;DDD)V)
+[17:19:54] [17:19:54] [Client thread/INFO]: Located Method, patching...
+[17:19:54] [17:19:54] [Client thread/INFO]: Patch result: true
+[17:19:54] [17:19:54] [Client thread/INFO]: Located Method, patching...
+[17:19:54] [17:19:54] [Client thread/INFO]: Located patch target node INVOKEVIRTUAL net/minecraft/entity/Entity.func_145775_I ()V
+[17:19:54] [17:19:54] [Client thread/INFO]: Patch result: true
+[17:19:54] [17:19:54] [Client thread/INFO]: Applying Transformation to method (Names [onEntityUpdate, func_70030_z] Descriptor ()V)
+[17:19:54] [17:19:54] [Client thread/INFO]: Located Method, patching...
+[17:19:54] [17:19:54] [Client thread/INFO]: Patch result: true
+[17:19:54] [17:19:54] [Client thread/INFO]: [pl.asie.foamfix.coremod.FoamFixTransformer:spliceClasses:111]: Spliced in METHOD: net.minecraft.block.BlockBed.func_189540_a
+[17:19:54] [17:19:54] [Client thread/INFO]: Transforming net.minecraft.block.BlockPistonBase
+[17:19:54] [17:19:54] [Client thread/INFO]: Applying Transformation to method (Names [canPush, func_185646_a] Descriptor (Lnet/minecraft/block/state/IBlockState;Lnet/minecraft/world/World;Lnet/minecraft/util/math/BlockPos;Lnet/minecraft/util/EnumFacing;ZLnet/minecraft/util/EnumFacing;)Z)
+[17:19:54] [17:19:54] [Client thread/INFO]: Located Method, patching...
+[17:19:54] [17:19:54] [Client thread/INFO]: Located patch target node INVOKEVIRTUAL net/minecraft/block/Block.hasTileEntity (Lnet/minecraft/block/state/IBlockState;)Z
+[17:19:54] [17:19:54] [Client thread/INFO]: Patch result: true
+[17:19:54] [17:19:54] [Client thread/INFO]: Applying Transformation to method (Names [doMove, func_176319_a] Descriptor (Lnet/minecraft/world/World;Lnet/minecraft/util/math/BlockPos;Lnet/minecraft/util/EnumFacing;Z)Z)
+[17:19:54] [17:19:54] [Client thread/INFO]: Located Method, patching...
+[17:19:54] [17:19:54] [Client thread/INFO]: Located patch target node INVOKEVIRTUAL net/minecraft/block/state/BlockPistonStructureHelper.func_177254_c ()Ljava/util/List;
+[17:19:54] [17:19:54] [Client thread/INFO]: Patch result: true
+[17:19:54] [17:19:54] [Client thread/INFO]: Applying Transformation to method (Names [doMove, func_176319_a] Descriptor (Lnet/minecraft/world/World;Lnet/minecraft/util/math/BlockPos;Lnet/minecraft/util/EnumFacing;Z)Z)
+[17:19:54] [17:19:54] [Client thread/INFO]: Located Method, patching...
+[17:19:54] [17:19:54] [Client thread/INFO]: Located patch target node INVOKESPECIAL net/minecraft/block/state/BlockPistonStructureHelper.<init> (Lnet/minecraft/world/World;Lnet/minecraft/util/math/BlockPos;Lnet/minecraft/util/EnumFacing;Z)V
+[17:19:54] [17:19:54] [Client thread/INFO]: Patch result: true
+[17:19:54] [17:19:54] [Client thread/INFO]: Applying Transformation to method (Names [checkForMove, func_176316_e] Descriptor (Lnet/minecraft/world/World;Lnet/minecraft/util/math/BlockPos;Lnet/minecraft/block/state/IBlockState;)V)
+[17:19:54] [17:19:54] [Client thread/INFO]: Located Method, patching...
+[17:19:54] [17:19:54] [Client thread/INFO]: Located patch target node INVOKESPECIAL net/minecraft/block/state/BlockPistonStructureHelper.<init> (Lnet/minecraft/world/World;Lnet/minecraft/util/math/BlockPos;Lnet/minecraft/util/EnumFacing;Z)V
+[17:19:54] [17:19:54] [Client thread/INFO]: Patch result: true
+[17:19:54] [17:19:54] [Client thread/INFO]: [pl.asie.patchy.helpers.ConstructorReplacingTransformer$FFMethodVisitor:visitTypeInsn:73]: Replaced NEW for net/minecraft/tileentity/TileEntityHopper to pl/asie/foamfix/common/TileEntityFasterHopper
+[17:19:54] [17:19:54] [Client thread/INFO]: [pl.asie.patchy.helpers.ConstructorReplacingTransformer$FFMethodVisitor:visitMethodInsn:85]: Replaced INVOKESPECIAL for net/minecraft/tileentity/TileEntityHopper to pl/asie/foamfix/common/TileEntityFasterHopper
+[17:19:55] [17:19:55] [Client thread/INFO]: Transforming net.minecraft.enchantment.EnchantmentDamage
+[17:19:55] [17:19:55] [Client thread/INFO]: Applying Transformation to method (Names [canApply, func_92089_a] Descriptor (Lnet/minecraft/item/ItemStack;)Z)
+[17:19:55] [17:19:55] [Client thread/INFO]: Located Method, patching...
+[17:19:55] [17:19:55] [Client thread/INFO]: Located patch target node IRETURN
+[17:19:55] [17:19:55] [Client thread/INFO]: Located patch target node IRETURN
+[17:19:55] [17:19:55] [Client thread/INFO]: Patch result: true
+[17:19:55] [17:19:55] [Client thread/INFO]: Successfully transformed class net.minecraft.item.ItemSpade
+[17:19:55] [17:19:55] [Client thread/INFO]: Transforming Class [net.minecraft.entity.item.EntityItemFrame], Method [func_184230_a]
+[17:19:55] [17:19:55] [Client thread/INFO]: Transforming net.minecraft.entity.item.EntityItemFrame Finished.
+[17:19:55] [17:19:55] [Client thread/INFO]: Transforming net.minecraft.item.ItemBanner
+[17:19:55] [17:19:55] [Client thread/INFO]: Applying Transformation to method (Names [appendHoverTextFromTileEntityTag, func_185054_a] Descriptor (Lnet/minecraft/item/ItemStack;Ljava/util/List;)V)
+[17:19:55] [17:19:55] [Client thread/INFO]: Located Method, patching...
+[17:19:55] [17:19:55] [Client thread/INFO]: Located patch target node BIPUSH 6
+[17:19:55] [17:19:55] [Client thread/INFO]: Patch result: true
+[17:19:55] [17:19:55] [Client thread/INFO]: Transforming net.minecraft.entity.item.EntityItem (acl)...
+[17:19:55] [17:19:55] [Client thread/INFO]:   -Patching EntityItem
+[17:19:55] [17:19:55] [Client thread/INFO]:     -Modified method 'attackEntityFrom': added event call.
+[17:19:55] [17:19:55] [Client thread/INFO]: Transforming net.minecraft.entity.item.EntityItem
+[17:19:55] [17:19:55] [Client thread/INFO]: Applying Transformation to method (Names [onUpdate, func_70071_h_] Descriptor ()V)
+[17:19:55] [17:19:55] [Client thread/INFO]: Located Method, patching...
+[17:19:55] [17:19:55] [Client thread/INFO]: Patch result: true
+[17:19:55] [17:19:55] [Client thread/INFO]: Transforming net.minecraft.world.World (amu)...
+[17:19:55] [17:19:55] [Client thread/INFO]:   -Patching World
+[17:19:55] [17:19:55] [Client thread/INFO]:     -Modified method 'k', replaced nx.e()V with HC call.
+[17:19:55] [17:19:55] [Client thread/INFO]: [AstralTransformer] Transforming amu : net.minecraft.world.World with 2 patches!
+[17:19:55] [17:19:55] [Client thread/INFO]: [AstralTransformer] Applied patch PATCHSUNBRIGHTNESSWORLDCLIENT
+[17:19:55] [17:19:55] [Client thread/INFO]: [AstralTransformer] Applied patch PATCHSUNBRIGHTNESSWORLDCOMMON
+[17:19:55] [17:19:55] [Client thread/INFO]: [pl.asie.foamfix.coremod.FoamFixTransformer:spliceClasses:98]: Added INTERFACE: pl/asie/foamfix/coremod/patches/IFoamFixWorldRemovable
+[17:19:55] [17:19:55] [Client thread/INFO]: [pl.asie.foamfix.coremod.FoamFixTransformer:spliceClasses:135]: Added METHOD: net.minecraft.world.World.foamfix_removeUnloadedEntities
+[17:19:55] [17:19:55] [Client thread/INFO]: Transforming net.minecraft.entity.item.EntityMinecart
+[17:19:55] [17:19:55] [Client thread/INFO]: Applying Transformation to method (Names [killMinecart, func_94095_a] Descriptor (Lnet/minecraft/util/DamageSource;)V)
+[17:19:55] [17:19:55] [Client thread/INFO]: Located Method, patching...
+[17:19:55] [17:19:55] [Client thread/INFO]: Located patch target node INVOKEVIRTUAL net/minecraft/entity/item/EntityMinecart.func_70099_a (Lnet/minecraft/item/ItemStack;F)Lnet/minecraft/entity/item/EntityItem;
+[17:19:55] [17:19:55] [Client thread/INFO]: Patch result: true
+[17:19:55] [17:19:55] [Client thread/INFO]: Transforming net.minecraft.entity.item.EntityBoat
+[17:19:55] [17:19:55] [Client thread/INFO]: Applying Transformation to method (Names [attackEntityFrom, func_70097_a] Descriptor (Lnet/minecraft/util/DamageSource;F)Z)
+[17:19:55] [17:19:55] [Client thread/INFO]: Located Method, patching...
+[17:19:55] [17:19:55] [Client thread/INFO]: Located patch target node INVOKEVIRTUAL net/minecraft/entity/item/EntityBoat.func_145778_a (Lnet/minecraft/item/Item;IF)Lnet/minecraft/entity/item/EntityItem;
+[17:19:55] [17:19:55] [Client thread/INFO]: Patch result: true
+[17:19:55] [17:19:55] [Client thread/INFO]: Transforming net.minecraft.entity.player.EntityPlayer finished, added func_184613_cA() overriding EntityLivingBase
+[17:19:56] [17:19:56] [Client thread/INFO]: Transforming net.minecraft.item.crafting.RecipesBanners$RecipeAddPattern
+[17:19:56] [17:19:56] [Client thread/INFO]: Applying Transformation to method (Names [matches, func_77569_a] Descriptor (Lnet/minecraft/inventory/InventoryCrafting;Lnet/minecraft/world/World;)Z)
+[17:19:56] [17:19:56] [Client thread/INFO]: Located Method, patching...
+[17:19:56] [17:19:56] [Client thread/INFO]: Located patch target node INVOKESTATIC net/minecraft/tileentity/TileEntityBanner.func_175113_c (Lnet/minecraft/item/ItemStack;)I
+[17:19:56] [17:19:56] [Client thread/INFO]: Patch result: true
+[17:19:56] [17:19:56] [Client thread/INFO]: Transforming net.minecraft.tileentity.TileEntityPiston
+[17:19:56] [17:19:56] [Client thread/INFO]: Applying Transformation to method (Names [update, func_73660_a] Descriptor ()V)
+[17:19:56] [17:19:56] [Client thread/INFO]: Located Method, patching...
+[17:19:56] [17:19:56] [Client thread/INFO]: Patch result: true
+[17:19:56] [17:19:56] [Client thread/INFO]: Applying Transformation to method (Names [clearPistonTileEntity, func_145866_f] Descriptor ()V)
+[17:19:56] [17:19:56] [Client thread/INFO]: Located Method, patching...
+[17:19:56] [17:19:56] [Client thread/INFO]: Located patch target node INVOKEVIRTUAL net/minecraft/world/World.func_180501_a (Lnet/minecraft/util/math/BlockPos;Lnet/minecraft/block/state/IBlockState;I)Z
+[17:19:56] [17:19:56] [Client thread/INFO]: Patch result: true
+[17:19:56] [17:19:56] [Client thread/INFO]: Applying Transformation to method (Names [update, func_73660_a] Descriptor ()V)
+[17:19:56] [17:19:56] [Client thread/INFO]: Located Method, patching...
+[17:19:56] [17:19:56] [Client thread/INFO]: Located patch target node INVOKEVIRTUAL net/minecraft/world/World.func_180501_a (Lnet/minecraft/util/math/BlockPos;Lnet/minecraft/block/state/IBlockState;I)Z
+[17:19:56] [17:19:56] [Client thread/INFO]: Patch result: true
+[17:19:56] [17:19:56] [Client thread/INFO]: [pl.asie.foamfix.coremod.FoamFixTransformer:spliceClasses:111]: Spliced in METHOD: net.minecraft.tileentity.TileEntity.func_190559_a
+[17:19:56] [17:19:56] [Client thread/INFO]: Patching GameSettings.datafix
+[17:19:56] [17:19:56] [Client thread/INFO]: [OptiFine] *** Reflector Forge ***
+[17:19:56] [17:19:56] [Client thread/INFO]: [AstralTransformer] Transforming buq : net.minecraft.client.renderer.EntityRenderer with 1 patches!
+[17:19:56] [17:19:56] [Client thread/INFO]: [AstralTransformer] Applied patch PATCHENTITYRENDEREREXTENDEDENTITYREACH
+[17:19:56] [17:19:56] [Client thread/INFO]: Transforming net.minecraft.client.renderer.EntityRenderer
+[17:19:56] [17:19:56] [Client thread/INFO]: Applying Transformation to method (Names [renderWorldPass, func_175068_a] Descriptor (IFJ)V)
+[17:19:56] [17:19:56] [Client thread/INFO]: Located Method, patching...
+[17:19:56] [17:19:56] [Client thread/INFO]: Located patch target node INVOKEVIRTUAL net/minecraft/client/renderer/EntityRenderer.func_78479_a (FI)V
+[17:19:56] [17:19:56] [Client thread/INFO]: Patch result: true
+[17:19:56] [17:19:56] [Client thread/INFO]: Transforming net.minecraft.client.renderer.entity.RenderManager (bzf)...
+[17:19:56] [17:19:56] [Client thread/INFO]:   -Patched renderEntity!
+[17:19:56] [17:19:56] [Client thread/INFO]: Transforming net.minecraft.client.renderer.entity.RenderManager
+[17:19:56] [17:19:56] [Client thread/INFO]: Applying Transformation to method (Names [renderEntity, func_188391_a] Descriptor (Lnet/minecraft/entity/Entity;DDDFFZ)V)
+[17:19:56] [17:19:56] [Client thread/INFO]: Located Method, patching...
+[17:19:56] [17:19:56] [Client thread/INFO]: Located patch target node INVOKEVIRTUAL net/minecraft/client/renderer/entity/Render.func_76986_a (Lnet/minecraft/entity/Entity;DDDFF)V
+[17:19:56] [17:19:56] [Client thread/INFO]: Patch result: true
+[17:19:56] [17:19:56] [Client thread/INFO]: Transforming net.minecraft.client.renderer.entity.Render
+[17:19:56] [17:19:56] [Client thread/INFO]: Applying Transformation to method (Names [renderEntityOnFire, func_76977_a] Descriptor (Lnet/minecraft/entity/Entity;DDDF)V)
+[17:19:56] [17:19:56] [Client thread/INFO]: Located Method, patching...
+[17:19:56] [17:19:56] [Client thread/INFO]: Patch result: true
+[17:19:56] [17:19:56] [Client thread/INFO]: Transforming net.minecraft.entity.Entity
+[17:19:56] [17:19:56] [Client thread/INFO]: Applying Transformation to method (Names [move, func_70091_d] Descriptor (Lnet/minecraft/entity/MoverType;DDD)V)
+[17:19:56] [17:19:56] [Client thread/INFO]: Located Method, patching...
+[17:19:56] [17:19:56] [Client thread/INFO]: Patch result: true
+[17:19:56] [17:19:56] [Client thread/INFO]: Located Method, patching...
+[17:19:56] [17:19:56] [Client thread/INFO]: Located patch target node INVOKEVIRTUAL net/minecraft/entity/Entity.func_145775_I ()V
+[17:19:56] [17:19:56] [Client thread/INFO]: Patch result: true
+[17:19:56] [17:19:56] [Client thread/INFO]: Applying Transformation to method (Names [onEntityUpdate, func_70030_z] Descriptor ()V)
+[17:19:56] [17:19:56] [Client thread/INFO]: Located Method, patching...
+[17:19:56] [17:19:56] [Client thread/INFO]: Patch result: true
+[17:19:56] [17:19:56] [Client thread/INFO]: [OptiFine] *** Reflector Vanilla ***
+[17:19:57] [17:19:57] [Client thread/INFO]: Transforming net.minecraft.client.gui.inventory.GuiContainer
+[17:19:57] [17:19:57] [Client thread/INFO]: Applying Transformation to method (Names [drawScreen, func_73863_a] Descriptor (IIF)V)
+[17:19:57] [17:19:57] [Client thread/INFO]: Located Method, patching...
+[17:19:57] [17:19:57] [Client thread/INFO]: Located patch target node INVOKEVIRTUAL net/minecraft/client/gui/inventory/GuiContainer.func_146979_b (II)V
+[17:19:57] [17:19:57] [Client thread/INFO]: Patch result: true
+[17:19:57] [17:19:57] [Client thread/INFO]: Transforming net.minecraft.client.model.ModelBiped
+[17:19:57] [17:19:57] [Client thread/INFO]: Applying Transformation to method (Names [setRotationAngles, func_78087_a] Descriptor (FFFFFFLnet/minecraft/entity/Entity;)V)
+[17:19:57] [17:19:57] [Client thread/INFO]: Located Method, patching...
+[17:19:57] [17:19:57] [Client thread/INFO]: Located patch target node RETURN
+[17:19:57] [17:19:57] [Client thread/INFO]: Patch result: true
+[17:19:57] [17:19:57] [Client thread/INFO]: Successfully transformed class net.minecraft.client.model.ModelBiped
+[17:19:57] [17:19:57] [Client thread/INFO]: Transforming net.minecraft.client.renderer.entity.RenderBoat
+[17:19:57] [17:19:57] [Client thread/INFO]: Applying Transformation to method (Names [doRender, func_188300_b] Descriptor (Lnet/minecraft/entity/item/EntityBoat;DDDFF)V)
+[17:19:57] [17:19:57] [Client thread/INFO]: Located Method, patching...
+[17:19:57] [17:19:57] [Client thread/INFO]: Located patch target node INVOKEINTERFACE net/minecraft/client/model/IMultipassModel.func_187054_b (Lnet/minecraft/entity/Entity;FFFFFF)V
+[17:19:57] [17:19:57] [Client thread/INFO]: Patch result: true
+[17:19:57] [17:19:57] [Client thread/WARN]: Skipping bad option: lastServer:
+[17:19:57] [17:19:57] [Client thread/INFO]: LWJGL Version: 2.9.4
+[17:19:57] [17:19:57] [Client thread/INFO]: [OptiFine] 
+[17:19:57] [17:19:57] [Client thread/INFO]: [OptiFine] OptiFine_1.12.2_HD_U_G5
+[17:19:57] [17:19:57] [Client thread/INFO]: [OptiFine] Build: 20210124-142939
+[17:19:57] [17:19:57] [Client thread/INFO]: [OptiFine] OS: Linux (amd64) version 6.18.9-arch1-2
+[17:19:57] [17:19:57] [Client thread/INFO]: [OptiFine] Java: 1.8.0_472, BellSoft
+[17:19:57] [17:19:57] [Client thread/INFO]: [OptiFine] VM: OpenJDK 64-Bit Server VM (mixed mode), BellSoft
+[17:19:57] [17:19:57] [Client thread/INFO]: [OptiFine] LWJGL: 2.9.4
+[17:19:57] [17:19:57] [Client thread/INFO]: [OptiFine] OpenGL: Mesa Intel(R) Iris(R) Xe Graphics (ADL GT2), version 4.6 (Compatibility Profile) Mesa 25.3.5-arch1.1, Intel
+[17:19:57] [17:19:57] [Client thread/INFO]: [OptiFine] OpenGL Version: 4.6.0
+[17:19:57] [17:19:57] [Client thread/INFO]: Transforming net.minecraft.client.renderer.GlStateManager (bus)...
+[17:19:57] [17:19:57] [Client thread/INFO]:   -Patched enableLighting!
+[17:19:57] [17:19:57] [Client thread/INFO]:   -Patched disableLighting!
+[17:19:57] [17:19:57] [Client thread/INFO]: [OptiFine] Maximum texture size: 16384x16384
+[17:19:57] [17:19:57] [VersionCheck/INFO]: [OptiFine] Checking for new version
+[17:19:57] [17:19:57] [Client thread/INFO]: [Shaders] OpenGL Version: 4.6 (Compatibility Profile) Mesa 25.3.5-arch1.1
+[17:19:57] [17:19:57] [Client thread/INFO]: [Shaders] Vendor:  Intel
+[17:19:57] [17:19:57] [Client thread/INFO]: [Shaders] Renderer: Mesa Intel(R) Iris(R) Xe Graphics (ADL GT2)
+[17:19:57] [17:19:57] [Client thread/INFO]: [Shaders] Capabilities:  2.0  2.1  3.0  3.2  4.0 
+[17:19:57] [17:19:57] [Client thread/INFO]: [Shaders] GL_MAX_DRAW_BUFFERS: 8
+[17:19:57] [17:19:57] [Client thread/INFO]: [Shaders] GL_MAX_COLOR_ATTACHMENTS_EXT: 8
+[17:19:57] [17:19:57] [Client thread/INFO]: [Shaders] GL_MAX_TEXTURE_IMAGE_UNITS: 32
+[17:19:57] [17:19:57] [Client thread/INFO]: [Shaders] Load shaders configuration.
+[17:19:57] [17:19:57] [Client thread/INFO]: [Shaders] Save shaders configuration.
+[17:19:57] [17:19:57] [Client thread/INFO]: [Shaders] No shaderpack loaded.
+[17:19:57] [17:19:57] [Client thread/INFO]: [OptiFine] [Shaders] Delayed loading of block mappings after resources are loaded
+[17:19:57] [17:19:57] [Client thread/INFO]: [OptiFine] [Shaders] Delayed loading of item mappings after resources are loaded
+[17:19:57] [17:19:57] [Client thread/INFO]: [OptiFine] [Shaders] Delayed loading of entity mappings after resources are loaded
+[17:19:57] [17:19:57] [Client thread/INFO]: Forge Mod Loader has detected optifine OptiFine_1.12.2_HD_U_G5, enabling compatibility features
+[17:19:57] [17:19:57] [Client thread/INFO]: -- System Details --
+[17:19:57] Details:
+[17:19:57] 	Minecraft Version: 1.12.2
+[17:19:57] 	Operating System: Linux (amd64) version 6.18.9-arch1-2
+[17:19:57] 	Java Version: 1.8.0_472, BellSoft
+[17:19:57] 	Java VM Version: OpenJDK 64-Bit Server VM (mixed mode), BellSoft
+[17:19:57] 	Memory: 617843552 bytes (589 MB) / 1011351552 bytes (964 MB) up to 7881621504 bytes (7516 MB)
+[17:19:57] 	JVM Flags: 3 total; -Xverify:none -Xms512M -Xmx8456M
+[17:19:57] 	IntCache: cache: 0, tcache: 0, allocated: 0, tallocated: 0
+[17:19:57] 	FML: 
+[17:19:57] 	Loaded coremods (and transformers): 
+[17:19:57] PhosphorFMLLoadingPlugin (Phosphor.jar)
+[17:19:57]   
+[17:19:57] Inventory Tweaks Coremod (InventoryTweaks.jar)
+[17:19:57]   invtweaks.forge.asm.ContainerTransformer
+[17:19:57] HCASM (HammerLib.jar)
+[17:19:57]   com.zeitheron.hammercore.asm.HammerCoreTransformer
+[17:19:57] IELoadingPlugin (ImmersiveEngineering-core-0.12-98.jar)
+[17:19:57]   blusunrize.immersiveengineering.common.asm.IEClassTransformer
+[17:19:57] MekanismCoremod (Mekanism.jar)
+[17:19:57]   mekanism.coremod.KeybindingMigrationHelper
+[17:19:57] Do not report to Forge! (If you haven't disabled the FoamFix coremod, try disabling it in the config! Note that this bit of text will still appear.) (FoamFix.jar)
+[17:19:57]   pl.asie.foamfix.coremod.FoamFixTransformer
+[17:19:57] EnderCorePlugin (EnderCore-1.12.2-0.5.76-core.jar)
+[17:19:57]   com.enderio.core.common.transform.EnderCoreTransformer
+[17:19:57]   com.enderio.core.common.transform.SimpleMixinPatcher
+[17:19:57] Thaumic Augmentation Core Plugin (ThaumicAugmentation.jar)
+[17:19:57]   thecodex6824.thaumicaugmentation.core.TATransformer
+[17:19:57] TARCore (ThaumicAdditions.jar)
+[17:19:57]   
+[17:19:57] Quark Plugin (Quark.jar)
+[17:19:57]   vazkii.quark.base.asm.ClassTransformer
+[17:19:57] Smarty (Smarty-1.12.2.jar)
+[17:19:57]   ru.smartycraft.asm.ASMTransformer
+[17:19:57] AstralCore (AstralSorcery.jar)
+[17:19:57]   
+[17:19:57] 	GL info: ' Vendor: 'Intel' Version: '4.6 (Compatibility Profile) Mesa 25.3.5-arch1.1' Renderer: 'Mesa Intel(R) Iris(R) Xe Graphics (ADL GT2)'
+[17:19:57] [17:19:57] [VersionCheck/INFO]: [OptiFine] Version found: G5
+[17:19:57] [17:19:57] [Client thread/INFO]: MinecraftForge v14.23.5.2854 Initialized
+[17:19:57] [17:19:57] [Client thread/INFO]: Starts to replace vanilla recipe ingredients with ore ingredients.
+[17:19:57] [17:19:57] [Client thread/INFO]: Invalid recipe found with multiple oredict ingredients in the same ingredient...
+[17:19:58] [17:19:58] [Client thread/INFO]: Replaced 1227 ore ingredients
+[17:19:58] [17:19:58] [Client thread/INFO]: Searching /home/haru/.aura/clients/TechnoMagic/mods for mods
+[17:19:58] [17:19:58] [Client thread/INFO]: Searching /home/haru/.aura/clients/TechnoMagic/mods/1.12.2 for mods
+[17:19:59] [17:19:59] [Client thread/WARN]: Mod codechickenlib is missing the required element 'version' and a version.properties file could not be found. Falling back to metadata version 3.2.3.358
+[17:19:59] [17:19:59] [Client thread/WARN]: Mod damageindicatorsmod is missing the required element 'version' and no fallback can be found. Substituting '1.0'.
+[17:20:00] [17:20:00] [Client thread/WARN]: Mod ironchest is missing the required element 'version' and a version.properties file could not be found. Falling back to metadata version 1.12.2-7.0.67.844
+[17:20:00] [17:20:00] [Client thread/WARN]: Mod mekanismgenerators is missing the required element 'version' and a version.properties file could not be found. Falling back to metadata version 1.12.2-9.8.3.homebaked
+[17:20:00] [17:20:00] [Client thread/WARN]: Mod mekanismtools is missing the required element 'version' and a version.properties file could not be found. Falling back to metadata version 1.12.2-9.8.3.homebaked
+[17:20:01] [17:20:01] [Thread-4/INFO]: Using sync timing. 200 frames of Display.update took 120262101 nanos
+[17:20:02] [17:20:02] [Client thread/INFO]: Forge Mod Loader has identified 80 mods to load
+[17:20:02] [17:20:02] [Client thread/INFO]: FML has found a non-mod file Smarty-1.12.2.jar in your mods directory. It will now be injected into your classpath. This could severe stability issues, it should be removed if possible.
+[17:20:02] [17:20:02] [Client thread/INFO]: FML has found a non-mod file AutoSave-1.12.2-1.0.11.jar in your mods directory. It will now be injected into your classpath. This could severe stability issues, it should be removed if possible.
+[17:20:02] [17:20:02] [Client thread/INFO]: FML has found a non-mod file AutoConfig-1.12.2-1.0.2.jar in your mods directory. It will now be injected into your classpath. This could severe stability issues, it should be removed if possible.
+[17:20:03] [17:20:03] [Client thread/INFO]: Attempting connection with missing mods [minecraft, mcp, FML, forge, foamfixcore, smarty, voxelmap, ae2stuff, appliedenergistics2, astralsorcery, autoreglib, baubles, bdlib, betterchat, botania, brandonscore, codechickenlib, customnpcs, damageindicatorsmod, discordrp, draconicadditions, draconicevolution, endercore, enderio, enderiobase, enderioconduitsappliedenergistics, enderioconduitsopencomputers, enderioconduitsrefinedstorage, enderioconduits, enderiointegrationforestry, enderiointegrationtic, enderiointegrationticlate, enderiomachines, enderiopowertools, extrabotany, foamfix, forestry, hammercore, hats, hatstand, waila, ichunutil, inventorytweaks, ironchest, jei, jeresources, lootcapacitortooltips, lunatriuscore, mekanism, mekanismgenerators, mekanismtools, moreoverlays, mousetweaks, nbtedit, norecipebook, potioncore, quark, reborncore, redstoneflux, schematica, servertabinfo, soundfilters, techreborn_compat, techreborn, trm, texfix, thaumcraft, thaumadditions, thaumicaugmentation, thaumicenergistics, thaumicjei, thaumicperiphery, thaumictinkerer, bspkrscore, treecapitator, variedcommodities, wailaharvestability, worldeditcuife2, immersiveengineering, phosphor-lighting] at CLIENT
+[17:20:03] [17:20:03] [Client thread/INFO]: Attempting connection with missing mods [minecraft, mcp, FML, forge, foamfixcore, smarty, voxelmap, ae2stuff, appliedenergistics2, astralsorcery, autoreglib, baubles, bdlib, betterchat, botania, brandonscore, codechickenlib, customnpcs, damageindicatorsmod, discordrp, draconicadditions, draconicevolution, endercore, enderio, enderiobase, enderioconduitsappliedenergistics, enderioconduitsopencomputers, enderioconduitsrefinedstorage, enderioconduits, enderiointegrationforestry, enderiointegrationtic, enderiointegrationticlate, enderiomachines, enderiopowertools, extrabotany, foamfix, forestry, hammercore, hats, hatstand, waila, ichunutil, inventorytweaks, ironchest, jei, jeresources, lootcapacitortooltips, lunatriuscore, mekanism, mekanismgenerators, mekanismtools, moreoverlays, mousetweaks, nbtedit, norecipebook, potioncore, quark, reborncore, redstoneflux, schematica, servertabinfo, soundfilters, techreborn_compat, techreborn, trm, texfix, thaumcraft, thaumadditions, thaumicaugmentation, thaumicenergistics, thaumicjei, thaumicperiphery, thaumictinkerer, bspkrscore, treecapitator, variedcommodities, wailaharvestability, worldeditcuife2, immersiveengineering, phosphor-lighting] at SERVER
+[17:20:04] [17:20:04] [Client thread/ERROR]: The mod appliedenergistics2 is expecting signature dfa4d3ac143316c6f32aa1a1beda1e34d42132e5 for source AppliedEnergistics2.jar, however there is no signature matching that description
+[17:20:04] [17:20:04] [Client thread/ERROR]: The mod astralsorcery is expecting signature a0f0b759d895c15ceb3e3bcb5f3c2db7c582edf0 for source AstralSorcery.jar, however there is no signature matching that description
+[17:20:04] [17:20:04] [Client thread/INFO]: Transforming net.minecraft.util.DamageSource
+[17:20:04] [17:20:04] [Client thread/INFO]: Applying Transformation to method (Names [causePlayerDamage, func_76365_a] Descriptor (Lnet/minecraft/entity/player/EntityPlayer;)Lnet/minecraft/util/DamageSource;)
+[17:20:04] [17:20:04] [Client thread/INFO]: Located Method, patching...
+[17:20:04] [17:20:04] [Client thread/INFO]: Patch result: true
+[17:20:04] [17:20:04] [Client thread/INFO]: [pl.asie.foamfix.coremod.patches.ReturnIfBooleanTruePatch:apply:89]: Added return if option true in net/minecraft/client/renderer/texture/TextureMap func_94248_c
+[17:20:04] [17:20:04] [Client thread/INFO]: [pl.asie.patchy.helpers.ConstructorReplacingTransformer$FFMethodVisitor:visitTypeInsn:73]: Replaced NEW for net/minecraft/client/renderer/texture/TextureAtlasSprite to pl/asie/foamfix/client/FastTextureAtlasSprite
+[17:20:04] [17:20:04] [Client thread/INFO]: [pl.asie.patchy.helpers.ConstructorReplacingTransformer$FFMethodVisitor:visitMethodInsn:85]: Replaced INVOKESPECIAL for net/minecraft/client/renderer/texture/TextureAtlasSprite to pl/asie/foamfix/client/FastTextureAtlasSprite
+[17:20:04] [17:20:04] [Client thread/INFO]: [AstralTransformer] Transforming thaumcraft.common.lib.events.PlayerEvents : thaumcraft.common.lib.events.PlayerEvents with 1 patches!
+[17:20:04] [17:20:04] [Client thread/INFO]: [AstralTransformer] Applied patch PATCHRUNICSHIELDINGHOOK
+[17:20:04] [17:20:04] [Client thread/INFO]: [AstralTransformer] Transforming wg : net.minecraft.entity.ai.attributes.AbstractAttributeMap with 1 patches!
+[17:20:04] [17:20:04] [Client thread/INFO]: [AstralTransformer] Applied patch PATCHADDPLAYERATTRIBUTE
+[17:20:04] [17:20:04] [Client thread/INFO]: [pl.asie.foamfix.coremod.patches.WorldServerRemovalPatch:apply:62]: Patched updateEntities in net/minecraft/world/WorldServer func_72939_s
+[17:20:04] [17:20:04] [Client thread/INFO]: Transforming net.minecraft.world.WorldServer
+[17:20:04] [17:20:04] [Client thread/INFO]: Applying Transformation to method (Names [areAllPlayersAsleep, func_73056_e] Descriptor ()Z)
+[17:20:04] [17:20:04] [Client thread/INFO]: Located Method, patching...
+[17:20:04] [17:20:04] [Client thread/INFO]: Patch result: true
+[17:20:04] [17:20:04] [Client thread/INFO]: Applying Transformation to method (Names [wakeAllPlayers, func_73053_d] Descriptor ()V)
+[17:20:04] [17:20:04] [Client thread/INFO]: Located Method, patching...
+[17:20:04] [17:20:04] [Client thread/INFO]: Patch result: true
+[17:20:04] [17:20:04] [Client thread/INFO]: Successfully transformed class net.minecraft.world.WorldServer
+[17:20:05] [17:20:05] [Client thread/INFO]: Successfully transformed class net.minecraft.client.renderer.RenderGlobal
+[17:20:05] [17:20:05] [Client thread/INFO]: [pl.asie.patchy.helpers.ConstructorReplacingTransformer$FFMethodVisitor:visitTypeInsn:73]: Replaced NEW for net/minecraft/util/ClassInheritanceMultiMap to pl/asie/foamfix/coremod/common/FoamyClassInheritanceMultiMap
+[17:20:05] [17:20:05] [Client thread/INFO]: [pl.asie.patchy.helpers.ConstructorReplacingTransformer$FFMethodVisitor:visitMethodInsn:85]: Replaced INVOKESPECIAL for net/minecraft/util/ClassInheritanceMultiMap to pl/asie/foamfix/coremod/common/FoamyClassInheritanceMultiMap
+[17:20:05] [17:20:05] [Client thread/WARN]: Static binding violation: PRIVATE @Overwrite method func_76615_h in mixins.phosphor.json:common.MixinChunk cannot reduce visibiliy of PUBLIC target method, visibility will be upgraded.
+[17:20:05] [17:20:05] [Client thread/INFO]: [pl.asie.foamfix.coremod.FoamFixTransformer:spliceClasses:98]: Added INTERFACE: pl/asie/foamfix/api/IFoamFixMobSpawnerLogic
+[17:20:05] [17:20:05] [Client thread/INFO]: [pl.asie.foamfix.coremod.FoamFixTransformer:spliceClasses:111]: Spliced in METHOD: net.minecraft.tileentity.MobSpawnerBaseLogic.func_98279_f
+[17:20:05] [17:20:05] [Client thread/INFO]: [pl.asie.foamfix.coremod.FoamFixTransformer:spliceClasses:158]: Added FIELD: net.minecraft.tileentity.MobSpawnerBaseLogic.foamfix_activatedCache
+[17:20:05] [17:20:05] [Client thread/INFO]: [pl.asie.foamfix.coremod.FoamFixTransformer:spliceClasses:158]: Added FIELD: net.minecraft.tileentity.MobSpawnerBaseLogic.foamfix_activatedCachePESize
+[17:20:05] [17:20:05] [Client thread/INFO]: [pl.asie.foamfix.coremod.FoamFixTransformer:spliceClasses:158]: Added FIELD: net.minecraft.tileentity.MobSpawnerBaseLogic.foamfix_activatedCacheTime
+[17:20:05] [17:20:05] [Client thread/INFO]: [pl.asie.foamfix.coremod.FoamFixTransformer:spliceClasses:158]: Added FIELD: net.minecraft.tileentity.MobSpawnerBaseLogic.foamfix_forcedCache
+[17:20:05] [17:20:05] [Client thread/INFO]: [pl.asie.foamfix.coremod.FoamFixTransformer:spliceClasses:158]: Added FIELD: net.minecraft.tileentity.MobSpawnerBaseLogic.foamfix_forcedCacheTime
+[17:20:05] [17:20:05] [Client thread/INFO]: [AstralTransformer] Transforming pa : net.minecraft.network.NetHandlerPlayServer with 1 patches!
+[17:20:05] [17:20:05] [Client thread/INFO]: [AstralTransformer] Applied patch PATCHSERVEREXTENDENTITYINTERACTREACH
+[17:20:05] [17:20:05] [Client thread/INFO]: Successfully transformed class net.minecraft.network.NetHandlerPlayServer
+[17:20:05] [17:20:05] [Client thread/ERROR]: The mod redstoneflux is expecting signature 8a6abf2cb9e141b866580d369ba6548732eff25f for source RedstoneFlux.jar, however there is no signature matching that description
+[17:20:05] [17:20:05] [Client thread/INFO]: Brandon's Core online! Waiting for Draconic Evolution to join the party....
+[17:20:05] [17:20:05] [Client thread/INFO]: Draconic Evolution online!
+[17:20:05] [17:20:05] [Client thread/INFO]: Hay! There you are! Now lets destroy some worlds!!
+[17:20:05] [17:20:05] [Client thread/INFO]: Sounds like fun! Lets get to it!
+[17:20:05] [17:20:05] [Client thread/ERROR]: The mod discordrp is expecting signature 5b6b19557df723bd85d474a32d64e4e191a2b42a for source DiscordRP.jar, however there is no signature matching that description
+[17:20:05] [17:20:05] [Client thread/INFO]: Hello World!
+[17:20:05] [17:20:05] [Client thread/INFO]: Asking dear Discord for available assets
+[17:20:06] [17:20:06] [Client thread/INFO]: Discord gave us 7 assets to work with hurray!
+[17:20:06] [17:20:06] [Client thread/WARN]: This version was not signed properly, this is probably a development build and will not receive any support, use at own risk!
+[17:20:06] [17:20:06] [Client thread/INFO]: Hello Minecraft!!!
+[17:20:06] [17:20:06] [Client thread/INFO]: I see you, Draconic Evolution...  Ready for a boost?
+[17:20:06] [17:20:06] [Client thread/INFO]: Upping the potential for my draconic arsonal?  You bet!!!
+[17:20:06] [17:20:06] [Client thread/INFO]: Then let's do this!
+[17:20:06] [17:20:06] [Client thread/INFO]: Hello Minecraft!!!
+[17:20:06] [17:20:06] [Client thread/INFO]: Found annotation mixin: crazypants.enderio.base.item.darksteel.upgrade.DarkSteelUpgradeMixin
+[17:20:06] [17:20:06] [Client thread/INFO]: Registered mixin.
+[17:20:06] [17:20:06] [Client thread/INFO]: Found annotation mixin: crazypants.enderio.base.paint.MobilityFlagForPaintedBlocksMixin
+[17:20:06] [17:20:06] [Client thread/INFO]: Registered mixin.
+[17:20:06] [17:20:06] [Client thread/INFO]: Found annotation mixin: crazypants.enderio.base.paint.MobilityFlagForPaintedBlocksMixin
+[17:20:06] [17:20:06] [Client thread/INFO]: Registered mixin.
+[17:20:06] [17:20:06] [Client thread/INFO]: Found annotation mixin: crazypants.enderio.base.paint.MobilityFlagForPaintedBlocksMixin
+[17:20:06] [17:20:06] [Client thread/INFO]: Registered mixin.
+[17:20:06] [17:20:06] [Client thread/INFO]: Found annotation mixin: crazypants.enderio.base.power.forge.item.InternalPoweredItemMixin
+[17:20:06] [17:20:06] [Client thread/INFO]: Registered mixin.
+[17:20:06] [17:20:06] [Client thread/INFO]: Found annotation mixin: crazypants.enderio.base.paint.MobilityFlagForPaintedBlocksMixin
+[17:20:06] [17:20:06] [Client thread/INFO]: Registered mixin.
+[17:20:06] [17:20:06] [Client thread/INFO]: Found annotation mixin: crazypants.enderio.base.integration.thaumcraft.ThaumcraftArmorMixin
+[17:20:06] [17:20:06] [Client thread/INFO]: Registered mixin.
+[17:20:06] [17:20:06] [Client thread/INFO]: Found mixin source class data for crazypants.enderio.base.item.darksteel.upgrade.DarkSteelUpgradeMixin.
+[17:20:06] [17:20:06] [Client thread/INFO]: Found interface target crazypants.enderio.api.upgrades.IDarkSteelItem
+[17:20:06] [17:20:06] [Client thread/INFO]: Found mixin source class data for crazypants.enderio.base.paint.MobilityFlagForPaintedBlocksMixin.
+[17:20:06] [17:20:06] [Client thread/INFO]: Found mixin source class data for crazypants.enderio.base.paint.MobilityFlagForPaintedBlocksMixin.
+[17:20:06] [17:20:06] [Client thread/INFO]: Found mixin source class data for crazypants.enderio.base.paint.MobilityFlagForPaintedBlocksMixin.
+[17:20:06] [17:20:06] [Client thread/INFO]: Found mixin source class data for crazypants.enderio.base.paint.MobilityFlagForPaintedBlocksMixin.
+[17:20:06] [17:20:06] [Client thread/INFO]: Found mixin source class data for crazypants.enderio.base.power.forge.item.InternalPoweredItemMixin.
+[17:20:06] [17:20:06] [Client thread/INFO]: Found interface target crazypants.enderio.base.power.forge.item.IInternalPoweredItem
+[17:20:06] [17:20:06] [Client thread/INFO]: Found mixin source class data for crazypants.enderio.base.integration.thaumcraft.ThaumcraftArmorMixin.
+[17:20:06] [17:20:06] [Client thread/INFO]: Found interface target crazypants.enderio.base.paint.IPaintable$ISolidBlockPaintableBlock
+[17:20:06] [17:20:06] [Client thread/INFO]: Found interface target crazypants.enderio.base.paint.IPaintable$IBlockPaintableBlock
+[17:20:06] [17:20:06] [Client thread/INFO]: Found interface target crazypants.enderio.base.paint.IPaintable$ITexturePaintableBlock
+[17:20:06] [17:20:06] [Client thread/INFO]: Found interface target crazypants.enderio.base.paint.IPaintable$INonSolidBlockPaintableBlock
+[17:20:06] [17:20:06] [Client thread/INFO]: Found 1 patch to apply to class crazypants.enderio.base.item.darksteel.ItemDarkSteelArmor from implemented interfaces: [crazypants/enderio/api/upgrades/IDarkSteelItem]
+[17:20:06] [17:20:06] [Client thread/INFO]: Patching 2 mixins onto class crazypants.enderio.base.item.darksteel.ItemDarkSteelArmor (ThaumcraftArmorMixin, DarkSteelUpgradeMixin)
+[17:20:06] [17:20:06] [Client thread/INFO]: Added 3 new interfaces: [thaumcraft/api/items/IVisDiscountGear, thaumcraft/api/items/IGoggles, thaumcraft/api/items/IRevealer]
+[17:20:06] [17:20:06] [Client thread/INFO]: Added 3 new methods: [showNodes(Lnet/minecraft/item/ItemStack;Lnet/minecraft/entity/EntityLivingBase;)Z, showIngamePopups(Lnet/minecraft/item/ItemStack;Lnet/minecraft/entity/EntityLivingBase;)Z, getVisDiscount(Lnet/minecraft/item/ItemStack;Lnet/minecraft/entity/player/EntityPlayer;)I]
+[17:20:06] [17:20:06] [Client thread/INFO]: Added 4 new methods: [initCapabilities(Lnet/minecraft/item/ItemStack;Lnet/minecraft/nbt/NBTTagCompound;)Lnet/minecraftforge/common/capabilities/ICapabilityProvider;, addCommonEntries(Lnet/minecraft/item/ItemStack;Lnet/minecraft/entity/player/EntityPlayer;Ljava/util/List;Z)V, addBasicEntries(Lnet/minecraft/item/ItemStack;Lnet/minecraft/entity/player/EntityPlayer;Ljava/util/List;Z)V, openUpgradeGui(Lnet/minecraft/entity/player/EntityPlayer;Lnet/minecraft/inventory/EntityEquipmentSlot;)V]
+[17:20:06] [17:20:06] [Client thread/INFO]: Successfully patched.
