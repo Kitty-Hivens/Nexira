@@ -169,6 +169,11 @@ interface AppStrings {
     val seasonSummer: String
     val seasonAutumn: String
 
+    // --- Settings: Diagnostics ---
+    val settingsSectionDiagnostics: String
+    val settingsOpenLogs: String
+    val settingsOpenCrashReports: String
+
     // --- File Manager ---
     val fileCheckIntegrity: String
     val fileNoUpdates: String

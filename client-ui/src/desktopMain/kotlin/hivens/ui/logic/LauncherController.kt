@@ -4,6 +4,7 @@ import hivens.core.api.interfaces.*
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.LauncherLogType
 import hivens.core.data.SessionData
+import hivens.launcher.CrashReporter
 import hivens.launcher.CredentialsManager
 import hivens.launcher.JavaManagerService
 import hivens.launcher.ProfileManager
@@ -50,9 +51,13 @@ class LauncherController : KoinComponent {
 
             try {
                 _state.value = LaunchState.Prepare(s.stateInit, 0.0f)
-                GameConsoleService.clear()
+
+                // Start new session — adds divider and opens auto-save file
+                GameConsoleService.startSession()
                 GameConsoleService.append("${s.appName}...", LogType.INFO)
                 GameConsoleService.append("→ ${server.name}", LogType.INFO)
+
+                CrashReporter.lastAction = "Launching: ${server.name}"
 
                 // 1. Auth
                 updateProgress(0.1f, s.stateAuth)
@@ -112,7 +117,9 @@ class LauncherController : KoinComponent {
                 }
 
                 // 5. Launch
+                CrashReporter.lastAction = "Game running: ${server.name}"
                 GameConsoleService.append(s.stateLaunching, LogType.INFO)
+
                 val process = launcherService.launchClientWithLogs(
                     sessionData = session,
                     serverProfile = server,
@@ -131,6 +138,8 @@ class LauncherController : KoinComponent {
                 _state.value = LaunchState.GameRunning(process)
 
                 val exitCode = process.waitFor()
+                CrashReporter.lastAction = "Game exited: ${server.name} (code $exitCode)"
+
                 if (exitCode != 0) {
                     _state.value = LaunchState.Error(s.stateExitCode(exitCode))
                     GameConsoleService.show()

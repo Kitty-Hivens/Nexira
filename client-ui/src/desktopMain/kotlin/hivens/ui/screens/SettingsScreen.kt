@@ -18,11 +18,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.data.SeasonTheme
+import hivens.ui.components.CelestiaButton
 import hivens.ui.components.GlassCard
 import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
 import org.koin.compose.koinInject
+import java.awt.Desktop
+import java.io.File
 
 @Composable
 fun SettingsScreen(
@@ -64,6 +67,11 @@ fun SettingsScreen(
         SeasonTheme.SPRING   -> s.seasonSpring
         SeasonTheme.SUMMER   -> s.seasonSummer
         SeasonTheme.AUTUMN   -> s.seasonAutumn
+    }
+
+    fun openFolder(path: String) {
+        val dir = File(path).also { it.mkdirs() }
+        if (Desktop.isDesktopSupported()) Desktop.getDesktop().open(dir)
     }
 
     Column(Modifier.fillMaxSize().padding(16.dp)) {
@@ -228,6 +236,31 @@ fun SettingsScreen(
                         checked = closeAfterStart,
                         onCheckedChange = { closeAfterStart = it; save() }
                     )
+                }
+
+                // ── Diagnostics ───────────────────────────────────────────────
+                item {
+                    SettingsSectionTitle(s.settingsSectionDiagnostics)
+
+                    val userHome = System.getProperty("user.home")
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        CelestiaButton(
+                            text = s.settingsOpenLogs,
+                            onClick = { openFolder("logs") },
+                            modifier = Modifier.weight(1f),
+                            primary = false
+                        )
+                        CelestiaButton(
+                            text = s.settingsOpenCrashReports,
+                            onClick = { openFolder("$userHome/.aura/crash-reports") },
+                            modifier = Modifier.weight(1f),
+                            primary = false
+                        )
+                    }
                 }
             }
         }
