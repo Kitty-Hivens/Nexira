@@ -29,6 +29,7 @@ import hivens.core.data.SessionData
 import hivens.launcher.CredentialsManager
 import hivens.launcher.ProfileManager
 import hivens.ui.components.GlassCard
+import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -36,42 +37,26 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 
-/**
- * Экран авторизации пользователя.
- *
- * <p>Обрабатывает ввод логина/пароля, анимацию ошибок (тряска) и
- * сохранение учетных данных.</p>
- *
- * @param onLoginSuccess Callback, вызываемый при успешной авторизации.
- */
 @Composable
 fun LoginScreen(onLoginSuccess: (SessionData) -> Unit) {
-    // Внедрение зависимостей
     val authService: IAuthService = koinInject()
     val profileManager: ProfileManager = koinInject()
     val credentialsManager: CredentialsManager = koinInject()
+    val s = LocalStrings.current
 
-    // Состояние полей ввода
     var login by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var rememberMe by remember { mutableStateOf(true) }
-
-    // Состояние UI
     var isLoading by remember { mutableStateOf(false) }
     var isSuccess by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
-
-    // Анимация появления и "тряски" при ошибке
     val shakeOffset = remember { Animatable(0f) }
     var isVisible by remember { mutableStateOf(false) }
-
-    // Замена удаленного цвета border на textSecondary с прозрачностью
     val borderColor = CelestiaTheme.colors.textSecondary.copy(alpha = 0.3f)
 
-    // Выносим стили, чтобы уменьшить размер кода
     val inputColors = TextFieldDefaults.outlinedTextFieldColors(
         textColor = CelestiaTheme.colors.textPrimary,
         focusedBorderColor = CelestiaTheme.colors.primary,
@@ -90,14 +75,8 @@ fun LoginScreen(onLoginSuccess: (SessionData) -> Unit) {
                 targetValue = 0f,
                 animationSpec = keyframes {
                     durationMillis = 400
-                    0f at 0
-                    (-10f) at 50
-                    10f at 100
-                    (-10f) at 150
-                    10f at 200
-                    (-5f) at 250
-                    5f at 300
-                    0f at 400
+                    0f at 0; (-10f) at 50; 10f at 100; (-10f) at 150
+                    10f at 200; (-5f) at 250; 5f at 300; 0f at 400
                 }
             )
         }
@@ -109,59 +88,40 @@ fun LoginScreen(onLoginSuccess: (SessionData) -> Unit) {
 
     fun doLogin() {
         if (login.isEmpty() || password.isEmpty()) {
-            errorMessage = "Введите логин и пароль"
+            errorMessage = s.loginErrorEmpty
             triggerShake()
             return
         }
-
         focusManager.clearFocus()
         isLoading = true
         errorMessage = null
-
         scope.launch {
             try {
-                // Выполняем авторизацию в IO потоке
                 val session = withContext(Dispatchers.IO) {
                     val lastServer = profileManager.lastServerId ?: "Industrial"
-                    val s = authService.login(login, password, lastServer)
-
-                    if (rememberMe) {
-                        credentialsManager.save(s)
-                    }
-                    s
+                    val sess = authService.login(login, password, lastServer)
+                    if (rememberMe) credentialsManager.save(sess)
+                    sess
                 }
-
-                // Успех
                 isLoading = false
                 isSuccess = true
                 delay(1500)
                 onLoginSuccess(session)
-
             } catch (e: Exception) {
                 isLoading = false
-                // Очищаем сообщение об ошибке от технического мусора
-                errorMessage = e.message?.replace("java.lang.Exception: ", "")
+                errorMessage = e.message
+                    ?.replace("java.lang.Exception: ", "")
                     ?.substringAfter("API: ")
-                    ?: "Ошибка входа"
+                    ?: s.loginErrorGeneric
                 triggerShake()
             }
         }
     }
 
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        AnimatedVisibility(
-            visible = isVisible,
-            enter = scaleIn(initialScale = 0.9f) + fadeIn(tween(500)),
-            exit = fadeOut()
-        ) {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        AnimatedVisibility(visible = isVisible, enter = scaleIn(initialScale = 0.9f) + fadeIn(tween(500)), exit = fadeOut()) {
             GlassCard(
-                modifier = Modifier
-                    .width(420.dp)
-                    .wrapContentHeight()
-                    .offset(x = shakeOffset.value.dp),
+                modifier = Modifier.width(420.dp).wrapContentHeight().offset(x = shakeOffset.value.dp),
                 shape = RoundedCornerShape(24.dp),
                 backgroundColor = CelestiaTheme.colors.glassBackground.copy(alpha = 0.4f)
             ) {
@@ -170,87 +130,54 @@ fun LoginScreen(onLoginSuccess: (SessionData) -> Unit) {
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
-                    Text(
-                        text = "Aura Client",
-                        style = MaterialTheme.typography.h4,
-                        fontWeight = FontWeight.Bold,
-                        color = CelestiaTheme.colors.textPrimary
-                    )
-                    Spacer(modifier = Modifier.height(32.dp))
+                    Text(s.loginTitle, style = MaterialTheme.typography.h4, fontWeight = FontWeight.Bold, color = CelestiaTheme.colors.textPrimary)
+                    Spacer(Modifier.height(32.dp))
 
-                    // Ошибка
-                    AnimatedVisibility(
-                        visible = errorMessage != null,
-                        enter = expandVertically() + fadeIn(),
-                        exit = shrinkVertically() + fadeOut()
-                    ) {
+                    // Error banner
+                    AnimatedVisibility(visible = errorMessage != null, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 16.dp)
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
                                 .background(CelestiaTheme.colors.error.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
                                 .padding(12.dp)
                         ) {
                             Icon(Icons.Default.Warning, null, tint = CelestiaTheme.colors.error)
                             Spacer(Modifier.width(8.dp))
-                            Text(
-                                text = errorMessage ?: "",
-                                color = CelestiaTheme.colors.error,
-                                style = MaterialTheme.typography.body2
-                            )
+                            Text(errorMessage ?: "", color = CelestiaTheme.colors.error, style = MaterialTheme.typography.body2)
                         }
                     }
 
-                    // Логин
                     OutlinedTextField(
-                        value = login,
-                        onValueChange = { login = it; errorMessage = null },
-                        label = { Text("Логин") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
+                        value = login, onValueChange = { login = it; errorMessage = null },
+                        label = { Text(s.loginUsername) },
+                        modifier = Modifier.fillMaxWidth(), singleLine = true,
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                         keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = inputColors
+                        shape = RoundedCornerShape(12.dp), colors = inputColors
                     )
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(Modifier.height(16.dp))
 
-                    // Пароль
                     OutlinedTextField(
-                        value = password,
-                        onValueChange = { password = it; errorMessage = null },
-                        label = { Text("Пароль") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
+                        value = password, onValueChange = { password = it; errorMessage = null },
+                        label = { Text(s.loginPassword) },
+                        modifier = Modifier.fillMaxWidth(), singleLine = true,
                         visualTransformation = PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
                         keyboardActions = KeyboardActions(onDone = { doLogin() }),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = inputColors
+                        shape = RoundedCornerShape(12.dp), colors = inputColors
                     )
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(Modifier.height(16.dp))
 
-                    // Чекбокс
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(
-                            checked = rememberMe,
-                            onCheckedChange = { rememberMe = it },
-                            colors = CheckboxDefaults.colors(
-                                checkedColor = CelestiaTheme.colors.primary,
-                                uncheckedColor = borderColor,
-                                checkmarkColor = CelestiaTheme.colors.onPrimary
-                            )
+                            checked = rememberMe, onCheckedChange = { rememberMe = it },
+                            colors = CheckboxDefaults.colors(checkedColor = CelestiaTheme.colors.primary, uncheckedColor = borderColor, checkmarkColor = CelestiaTheme.colors.onPrimary)
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Запомнить пароль", color = CelestiaTheme.colors.textPrimary)
+                        Spacer(Modifier.width(8.dp))
+                        Text(s.loginRemember, color = CelestiaTheme.colors.textPrimary)
                     }
-                    Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(Modifier.height(24.dp))
 
-                    // Кнопка
                     Button(
                         onClick = { doLogin() },
                         enabled = !isLoading && !isSuccess,
@@ -264,20 +191,16 @@ fun LoginScreen(onLoginSuccess: (SessionData) -> Unit) {
                         Crossfade(targetState = when {
                             isSuccess -> "SUCCESS"
                             isLoading -> "LOADING"
-                            else -> "IDLE"
+                            else      -> "IDLE"
                         }) { state ->
                             when (state) {
-                                "LOADING" -> CircularProgressIndicator(
-                                    color = Color.White,
-                                    modifier = Modifier.size(24.dp),
-                                    strokeWidth = 2.dp
-                                )
+                                "LOADING" -> CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
                                 "SUCCESS" -> Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(Icons.Default.Check, null, tint = Color.White)
                                     Spacer(Modifier.width(8.dp))
-                                    Text("УСПЕШНО", color = Color.White, fontWeight = FontWeight.Bold)
+                                    Text(s.loginSuccess, color = Color.White, fontWeight = FontWeight.Bold)
                                 }
-                                else -> Text("ВОЙТИ", color = Color.White, fontWeight = FontWeight.Bold)
+                                else -> Text(s.loginButton, color = Color.White, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
