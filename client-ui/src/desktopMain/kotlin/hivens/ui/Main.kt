@@ -146,8 +146,7 @@ fun main() {
                     resizable = false,
                     visible = isAppVisible,
                     icon = trayIcon,
-                    undecorated = true,
-                    transparent = true
+                    undecorated = true
                 ) {
                     CelestiaTheme(useDarkTheme = isDarkTheme, customTheme = customTheme) {
                         AppContent(
