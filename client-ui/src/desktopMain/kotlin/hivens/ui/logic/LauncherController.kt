@@ -7,6 +7,7 @@ import hivens.core.data.SessionData
 import hivens.launcher.CredentialsManager
 import hivens.launcher.JavaManagerService
 import hivens.launcher.ProfileManager
+import hivens.ui.i18n.I18n
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.utils.LogType
 import kotlinx.coroutines.*
@@ -36,7 +37,6 @@ class LauncherController : KoinComponent {
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var launchJob: Job? = null
 
-    // Добавили onSessionRefreshed для совместимости с Main.kt
     fun launch(
         currentSession: SessionData,
         server: ServerProfile,
@@ -45,14 +45,17 @@ class LauncherController : KoinComponent {
         if (_state.value is LaunchState.Prepare || _state.value is LaunchState.Downloading) return
 
         launchJob = appScope.launch {
-            try {
-                _state.value = LaunchState.Prepare("Инициализация...", 0.0f)
-                GameConsoleService.clear()
-                GameConsoleService.append("Запуск Minecraft...", LogType.INFO)
-                GameConsoleService.append("Цель: ${server.name}", LogType.INFO)
+            // Capture strings at launch time so the whole pipeline uses one locale
+            val s = I18n.s
 
-                // 1. Авторизация
-                updateProgress(0.1f, "Авторизация...")
+            try {
+                _state.value = LaunchState.Prepare(s.stateInit, 0.0f)
+                GameConsoleService.clear()
+                GameConsoleService.append("${s.appName}...", LogType.INFO)
+                GameConsoleService.append("→ ${server.name}", LogType.INFO)
+
+                // 1. Auth
+                updateProgress(0.1f, s.stateAuth)
                 var session = currentSession
                 val targetServerId = server.assetDir
 
@@ -60,20 +63,20 @@ class LauncherController : KoinComponent {
                     val pass = credentialsManager.load()?.cachedPassword ?: session.cachedPassword
                     if (!pass.isNullOrEmpty()) {
                         session = authService.login(session.playerName, pass, targetServerId)
-                        onSessionRefreshed?.invoke(session) // Сообщаем UI об обновлении сессии
-                        GameConsoleService.append("Успешный вход. UUID: ${session.uuid}", LogType.INFO)
+                        onSessionRefreshed?.invoke(session)
+                        GameConsoleService.append(s.authSuccess(session.uuid), LogType.INFO)
                     } else {
-                        GameConsoleService.append("Пароль не найден, используем текущую сессию.", LogType.WARN)
+                        GameConsoleService.append(s.stateNoPassword, LogType.WARN)
                     }
                 } catch (e: Exception) {
-                    GameConsoleService.append("Ошибка авторизации (оффлайн?): ${e.message}", LogType.WARN)
+                    GameConsoleService.append("${s.stateAuthFail}: ${e.message}", LogType.WARN)
                 }
 
-                // 2. Игнорируемые файлы
+                // 2. Ignored files
                 val ignoredFiles = calculateIgnoredFiles(server)
 
-                // 3. Скачивание
-                updateProgress(0.2f, "Синхронизация файлов...")
+                // 3. Download
+                updateProgress(0.2f, s.stateSync)
                 val clientDir = dataDirectory.resolve("clients").resolve(targetServerId)
                 if (!Files.exists(clientDir)) Files.createDirectories(clientDir)
 
@@ -86,10 +89,9 @@ class LauncherController : KoinComponent {
                     messageUI = { /* log */ },
                     progressUI = { current, total, bytesRead, totalBytes, speed ->
                         if (!isActive) return@processSession
-
                         val progressValue = if (totalBytes > 0) bytesRead.toFloat() / totalBytes.toFloat() else 0f
                         _state.value = LaunchState.Downloading(
-                            fileName = "Файл $current/$total",
+                            fileName = "${s.fileDownloading(total).substringBefore("(")}$current/$total",
                             currentFileIdx = current,
                             totalFiles = total,
                             downloadedBytes = bytesRead,
@@ -101,7 +103,7 @@ class LauncherController : KoinComponent {
                 )
 
                 // 4. Java
-                updateProgress(0.9f, "Подготовка JVM...")
+                updateProgress(0.9f, s.stateJvm)
                 val settings = settingsService.getSettings()
                 val javaPath = if (!settings.javaPath.isNullOrEmpty()) {
                     Path.of(settings.javaPath!!)
@@ -109,8 +111,8 @@ class LauncherController : KoinComponent {
                     javaManagerService.getJavaPath(server.version)
                 }
 
-                // 5. Запуск
-                GameConsoleService.append("Запуск процесса...", LogType.INFO)
+                // 5. Launch
+                GameConsoleService.append(s.stateLaunching, LogType.INFO)
                 val process = launcherService.launchClientWithLogs(
                     sessionData = session,
                     serverProfile = server,
@@ -118,9 +120,9 @@ class LauncherController : KoinComponent {
                     javaExecutablePath = javaPath,
                     allocatedMemoryMB = settings.memoryMB
                 ) { text, type ->
-                    val uiType = when(type) {
-                        LauncherLogType.INFO -> LogType.INFO
-                        LauncherLogType.WARN -> LogType.WARN
+                    val uiType = when (type) {
+                        LauncherLogType.INFO  -> LogType.INFO
+                        LauncherLogType.WARN  -> LogType.WARN
                         LauncherLogType.ERROR -> LogType.ERROR
                     }
                     GameConsoleService.append(text, uiType)
@@ -128,10 +130,9 @@ class LauncherController : KoinComponent {
 
                 _state.value = LaunchState.GameRunning(process)
 
-                // Ждем закрытия (в фоне)
                 val exitCode = process.waitFor()
                 if (exitCode != 0) {
-                    _state.value = LaunchState.Error("Игра закрылась с кодом $exitCode")
+                    _state.value = LaunchState.Error(s.stateExitCode(exitCode))
                     GameConsoleService.show()
                 } else {
                     _state.value = LaunchState.Idle
@@ -140,7 +141,7 @@ class LauncherController : KoinComponent {
             } catch (e: Exception) {
                 if (e !is CancellationException) {
                     e.printStackTrace()
-                    _state.value = LaunchState.Error("Ошибка: ${e.message}", e)
+                    _state.value = LaunchState.Error(s.stateError(e.message ?: ""), e)
                     GameConsoleService.show()
                 } else {
                     _state.value = LaunchState.Idle
@@ -165,11 +166,9 @@ class LauncherController : KoinComponent {
     private fun calculateIgnoredFiles(server: ServerProfile): Set<String> {
         val availableMods = manifestProcessor.getOptionalModsForClient(server)
         if (availableMods.isEmpty()) return emptySet()
-
         val ignored = HashSet<String>()
         val userProfile = profileManager.getProfile(server.assetDir)
         val userState = userProfile.optionalModsState
-
         for (mod in availableMods) {
             val isEnabled = userState[mod.id] ?: mod.isDefault
             if (!isEnabled) {

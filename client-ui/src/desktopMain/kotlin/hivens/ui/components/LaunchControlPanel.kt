@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import hivens.ui.i18n.LocalStrings
 import hivens.ui.logic.LaunchState
 import hivens.ui.theme.CelestiaTheme
 import java.text.DecimalFormat
@@ -22,8 +23,10 @@ fun LaunchControlPanel(
     onAbort: () -> Unit,
     onClearError: () -> Unit
 ) {
+    val s = LocalStrings.current
+
     Column(Modifier.fillMaxWidth()) {
-        // СТАТУС БАР
+        // Status row
         Row(
             Modifier.fillMaxWidth().height(20.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -31,21 +34,19 @@ fun LaunchControlPanel(
         ) {
             when (state) {
                 is LaunchState.Idle -> {
-                    Text("Готов к игре", style = MaterialTheme.typography.caption, color = CelestiaTheme.colors.textSecondary)
+                    Text(s.launchReady, style = MaterialTheme.typography.caption, color = CelestiaTheme.colors.textSecondary)
                 }
                 is LaunchState.Prepare -> {
-                    // Используем stepName, если он есть, иначе просто текст
                     Text(state.stepName, style = MaterialTheme.typography.caption, color = CelestiaTheme.colors.textSecondary)
                 }
                 is LaunchState.Downloading -> {
-                    val downloadedMb = state.downloadedBytes / 1024.0 / 1024.0
-                    val totalMb = state.totalBytes / 1024.0 / 1024.0
-                    val format = DecimalFormat("#0.0")
-
+                    val fmt = DecimalFormat("#0.0")
+                    val dlMb  = state.downloadedBytes / 1024.0 / 1024.0
+                    val totMb = state.totalBytes / 1024.0 / 1024.0
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Загрузка: ", style = MaterialTheme.typography.caption, color = CelestiaTheme.colors.textSecondary)
+                        Text("${s.launchDownloading} ", style = MaterialTheme.typography.caption, color = CelestiaTheme.colors.textSecondary)
                         Text(
-                            "${format.format(downloadedMb)} / ${format.format(totalMb)} MB (${state.speedStr})",
+                            "${fmt.format(dlMb)} / ${fmt.format(totMb)} MB (${state.speedStr})",
                             style = MaterialTheme.typography.caption,
                             color = CelestiaTheme.colors.primary,
                             fontWeight = FontWeight.Bold
@@ -53,25 +54,23 @@ fun LaunchControlPanel(
                     }
                 }
                 is LaunchState.Error -> {
-                    // message вместо error
                     Text(state.message, style = MaterialTheme.typography.caption, color = CelestiaTheme.colors.error)
                 }
                 is LaunchState.GameRunning -> {
-                    Text("Игра запущена", style = MaterialTheme.typography.caption, color = CelestiaTheme.colors.success)
+                    Text(s.launchRunning, style = MaterialTheme.typography.caption, color = CelestiaTheme.colors.success)
                 }
             }
         }
 
         Spacer(Modifier.height(8.dp))
 
-        // ПРОГРЕСС БАР
-        val progress = when(state) {
-            is LaunchState.Prepare -> state.progress
+        // Progress bar
+        val progress = when (state) {
+            is LaunchState.Prepare     -> state.progress
             is LaunchState.Downloading -> state.progress
             is LaunchState.GameRunning -> 1.0f
             else -> 0f
         }
-
         if (state !is LaunchState.Idle && state !is LaunchState.Error) {
             LinearProgressIndicator(
                 progress = progress,
@@ -80,20 +79,18 @@ fun LaunchControlPanel(
                 color = CelestiaTheme.colors.primary
             )
         } else {
-            // Пустое место, чтобы интерфейс не прыгал
             Spacer(Modifier.height(6.dp))
         }
 
         Spacer(Modifier.height(16.dp))
 
-        // КНОПКА ДЕЙСТВИЯ
+        // Action button
         val btnText = when (state) {
-            is LaunchState.Downloading, is LaunchState.Prepare -> "ОТМЕНА"
-            is LaunchState.GameRunning -> "ЗАПУЩЕНО"
-            is LaunchState.Error -> "СБРОСИТЬ ОШИБКУ"
-            else -> "ИГРАТЬ"
+            is LaunchState.Downloading, is LaunchState.Prepare -> s.launchAbort
+            is LaunchState.GameRunning -> s.launchRunning.uppercase()
+            is LaunchState.Error       -> s.launchResetError
+            else -> s.launchButton
         }
-
         CelestiaButton(
             text = btnText,
             enabled = state !is LaunchState.GameRunning,
