@@ -35,6 +35,7 @@ import hivens.core.api.interfaces.ISettingsService
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.SeasonTheme
 import hivens.core.data.SessionData
+import hivens.launcher.CrashReporter
 import hivens.launcher.CredentialsManager
 import hivens.launcher.ProfileManager
 import hivens.launcher.di.appModule
@@ -44,6 +45,9 @@ import hivens.ui.components.SeasonalEffectsLayer
 import hivens.ui.components.UpdateManager
 import hivens.ui.generated.resources.Res
 import hivens.ui.generated.resources.favicon
+import hivens.ui.i18n.AppLocale
+import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.LocaleProvider
 import hivens.ui.logic.LauncherController
 import hivens.ui.screens.*
 import hivens.ui.theme.CelestiaTheme
@@ -62,6 +66,7 @@ import org.koin.core.context.stopKoin
 import org.koin.core.module.dsl.singleOf
 import org.koin.dsl.module
 import org.slf4j.LoggerFactory
+import javax.swing.SwingUtilities
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -79,13 +84,31 @@ sealed class ShellScreen {
     data object Home : ShellScreen()
     data object Profile : ShellScreen()
     data object GlobalSettings : ShellScreen()
-    data object ThemePicker : ShellScreen() // ← НОВОЕ
+    data object ThemePicker : ShellScreen()
     data object News : ShellScreen()
     data class ServerSettings(val server: ServerProfile) : ShellScreen()
     data class ServerDetails(val server: ServerProfile) : ShellScreen()
 }
 
 fun main() {
+    // ── Global crash handler ─────────────────────────────────────────────────
+    Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+        val logger = LoggerFactory.getLogger("CrashHandler")
+        logger.error("Uncaught exception on thread '${thread.name}'", throwable)
+
+        try {
+            val report = CrashReporter.generate(throwable, thread)
+            val reportFile = CrashReporter.saveToDisk(report)
+            logger.error("Crash report saved: ${reportFile.absolutePath}")
+
+            SwingUtilities.invokeLater {
+                CrashReporter.showCrashDialog(report, reportFile)
+            }
+        } catch (e: Exception) {
+            logger.error("Failed to generate crash report", e)
+        }
+    }
+
     startKoin {
         modules(networkModule, appModule, uiModule)
     }
@@ -105,51 +128,67 @@ fun main() {
 
         val trayIcon = painterResource(Res.drawable.favicon)
 
-        Tray(
-            icon = trayIcon,
-            tooltip = "${AppConfig.APP_TITLE} v${AppConfig.CLIENT_VERSION.removePrefix("v")}",
-            onAction = { isAppVisible = !isAppVisible },
-            menu = {
-                Item("Показать/Скрыть", onClick = { isAppVisible = !isAppVisible })
-                Item("Открыть консоль", onClick = { GameConsoleService.show() })
-                Separator()
-                Item("Выход", onClick = ::exitApplication)
-            }
-        )
-
-        if (GameConsoleService.shouldShowConsole) {
-            ConsoleWindow(onClose = { GameConsoleService.hide() })
-        }
-
         KoinContext {
-            Window(
-                onCloseRequest = ::exitApplication,
-                state = windowState,
-                title = AppConfig.APP_TITLE,
-                resizable = false,
-                visible = isAppVisible,
-                icon = trayIcon,
-                undecorated = true,
-                transparent = true
-            ) {
-                // Загружаем кастомную тему
+            val settingsService: ISettingsService = koinInject()
+
+            // ── Locale state (read from persisted settings) ──
+            var currentLocale by remember {
+                mutableStateOf(AppLocale.fromTag(settingsService.getSettings().locale))
+            }
+
+            LocaleProvider(locale = currentLocale) {
+                val s = LocalStrings.current
+
+                Tray(
+                    icon = trayIcon,
+                    tooltip = "${AppConfig.APP_TITLE} v${AppConfig.CLIENT_VERSION.removePrefix("v")}",
+                    onAction = { isAppVisible = !isAppVisible },
+                    menu = {
+                        Item(s.trayShowHide, onClick = { isAppVisible = !isAppVisible })
+                        Item(s.trayConsole, onClick = { GameConsoleService.show() })
+                        Separator()
+                        Item(s.trayExit, onClick = ::exitApplication)
+                    }
+                )
+
+                if (GameConsoleService.shouldShowConsole) {
+                    ConsoleWindow(isDarkTheme = isDarkTheme, onClose = { GameConsoleService.hide() })
+                }
+
                 val dataDirectory: java.nio.file.Path = koinInject()
                 val themeManager = remember { ThemeManager(dataDirectory) }
                 var customTheme by remember { mutableStateOf(themeManager.loadTheme()) }
 
-                CelestiaTheme(useDarkTheme = isDarkTheme, customTheme = customTheme) {
-                    AppContent(
-                        isDarkTheme = isDarkTheme,
-                        onToggleTheme = { isDarkTheme = !isDarkTheme },
-                        onCloseApp = ::exitApplication,
-                        customTheme = customTheme,
-                        onCustomThemeChanged = { newTheme ->
-                            customTheme = newTheme
-                            themeManager.saveTheme(newTheme)
-                        }
-                    )
-
-                    UpdateManager()
+                Window(
+                    onCloseRequest = ::exitApplication,
+                    state = windowState,
+                    title = AppConfig.APP_TITLE,
+                    resizable = false,
+                    visible = isAppVisible,
+                    icon = trayIcon,
+                    undecorated = true,
+                    transparent = false
+                ) {
+                    CelestiaTheme(useDarkTheme = isDarkTheme, customTheme = customTheme) {
+                        AppContent(
+                            isDarkTheme = isDarkTheme,
+                            onToggleTheme = { isDarkTheme = !isDarkTheme },
+                            onCloseApp = ::exitApplication,
+                            customTheme = customTheme,
+                            onCustomThemeChanged = { newTheme ->
+                                customTheme = newTheme
+                                themeManager.saveTheme(newTheme)
+                            },
+                            currentLocale = currentLocale,
+                            onLocaleChanged = { newLocale ->
+                                currentLocale = newLocale
+                                // Persist immediately
+                                val settings = settingsService.getSettings()
+                                settingsService.saveSettings(settings.copy(locale = newLocale.tag))
+                            }
+                        )
+                        UpdateManager()
+                    }
                 }
             }
         }
@@ -162,12 +201,15 @@ fun AppContent(
     onToggleTheme: () -> Unit,
     onCloseApp: () -> Unit,
     customTheme: CustomTheme,
-    onCustomThemeChanged: (CustomTheme) -> Unit
+    onCustomThemeChanged: (CustomTheme) -> Unit,
+    currentLocale: AppLocale,
+    onLocaleChanged: (AppLocale) -> Unit
 ) {
     val credentialsManager: CredentialsManager = koinInject()
     val authService: IAuthService = koinInject()
     val profileManager: ProfileManager = koinInject()
     val settingsService: ISettingsService = koinInject()
+    val s = LocalStrings.current
 
     var appState by remember { mutableStateOf<AppState>(AppState.Splash) }
     var seasonalTheme by remember { mutableStateOf(settingsService.getSettings().seasonalTheme) }
@@ -175,10 +217,9 @@ fun AppContent(
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
             delay(800)
-
+            CrashReporter.lastAction = "Auto-login"
             val savedSession = credentialsManager.load()
             var nextState: AppState = AppState.Login
-
             if (savedSession?.cachedPassword != null) {
                 try {
                     val lastServer = profileManager.lastServerId ?: AppConfig.DEFAULT_SERVER_ID
@@ -188,6 +229,7 @@ fun AppContent(
                     LoggerFactory.getLogger("AppContent").warn("Auto-login failed: ${e.message}")
                 }
             }
+            CrashReporter.lastAction = "Idle — login screen"
             appState = nextState
         }
     }
@@ -206,7 +248,9 @@ fun AppContent(
                     onCloseApp = onCloseApp,
                     onThemeChanged = { newTheme -> seasonalTheme = newTheme },
                     customTheme = customTheme,
-                    onCustomThemeChanged = onCustomThemeChanged
+                    onCustomThemeChanged = onCustomThemeChanged,
+                    currentLocale = currentLocale,
+                    onLocaleChanged = onLocaleChanged
                 )
             }
         }
@@ -215,10 +259,8 @@ fun AppContent(
 
 @Composable
 fun SplashScreen() {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
+    val s = LocalStrings.current
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Icon(
                 painter = painterResource(Res.drawable.favicon),
@@ -230,7 +272,7 @@ fun SplashScreen() {
             CircularProgressIndicator(color = CelestiaTheme.colors.primary)
             Spacer(Modifier.height(16.dp))
             Text(
-                "Aura Launcher v${AppConfig.CLIENT_VERSION.removePrefix("v")}",
+                "${s.appName} v${AppConfig.CLIENT_VERSION.removePrefix("v")}",
                 style = MaterialTheme.typography.caption,
                 color = CelestiaTheme.colors.textSecondary
             )
@@ -251,17 +293,14 @@ fun CelestiaBackground(isDarkTheme: Boolean, currentTheme: SeasonTheme) {
     val glowAlpha = if (isDarkTheme) 0.1f else 0.05f
 
     Canvas(modifier = Modifier.fillMaxSize()) {
-        val width = size.width
-        val height = size.height
+        val width = size.width; val height = size.height
         val x1 = width * 0.5f + cos(t) * width * 0.3f
         val y1 = height * 0.5f + sin(t) * height * 0.2f
         val x2 = width * 0.5f + cos(t + 3.14f) * width * 0.3f
         val y2 = height * 0.5f + sin(t * 0.8f) * height * 0.2f
-
         drawRect(brush = Brush.radialGradient(colors = listOf(primaryColor.copy(alpha = bgAlpha), Color.Transparent), center = Offset(x1, y1), radius = width * 0.6f))
         drawRect(brush = Brush.radialGradient(colors = listOf(successColor.copy(alpha = glowAlpha), Color.Transparent), center = Offset(x2, y2), radius = width * 0.5f))
     }
-
     SeasonalEffectsLayer(theme = currentTheme)
 }
 
@@ -273,28 +312,47 @@ fun ShellUI(
     onCloseApp: () -> Unit,
     onThemeChanged: (SeasonTheme) -> Unit,
     customTheme: CustomTheme,
-    onCustomThemeChanged: (CustomTheme) -> Unit
+    onCustomThemeChanged: (CustomTheme) -> Unit,
+    currentLocale: AppLocale,
+    onLocaleChanged: (AppLocale) -> Unit
 ) {
     val skinRepository: SkinRepository = koinInject()
     var currentSession by remember { mutableStateOf(initialSession) }
     var currentScreen by remember { mutableStateOf<ShellScreen>(ShellScreen.Home) }
     var selectedServer by remember { mutableStateOf<ServerProfile?>(null) }
     var faceBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
+    val s = LocalStrings.current
+
+    // Breadcrumb tracking
+    LaunchedEffect(currentScreen) {
+        CrashReporter.lastAction = "Screen: ${currentScreen::class.simpleName}"
+    }
 
     LaunchedEffect(currentSession.playerName) {
         faceBitmap = SkinManager.getSkinFront(currentSession.playerName)
     }
 
     Row(Modifier.fillMaxSize().padding(24.dp)) {
+        // ── Sidebar ──────────────────────────────────────────────────────────
         GlassCard(modifier = Modifier.width(80.dp).fillMaxHeight(), shape = MaterialTheme.shapes.large) {
             Column(
                 Modifier.fillMaxSize().padding(vertical = 32.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(32.dp)
             ) {
-                Box(Modifier.size(48.dp).clip(CircleShape).background(CelestiaTheme.colors.surface).border(1.dp, CelestiaTheme.colors.primary.copy(alpha = 0.5f), CircleShape), contentAlignment = Alignment.TopCenter) {
+                Box(
+                    Modifier.size(48.dp).clip(CircleShape).background(CelestiaTheme.colors.surface)
+                        .border(1.dp, CelestiaTheme.colors.primary.copy(alpha = 0.5f), CircleShape),
+                    contentAlignment = Alignment.TopCenter
+                ) {
                     if (faceBitmap != null) {
-                        Image(painter = BitmapPainter(faceBitmap!!), contentDescription = null, modifier = Modifier.size(48.dp).offset(y = 4.dp), contentScale = ContentScale.Crop, alignment = Alignment.TopCenter)
+                        Image(
+                            painter = BitmapPainter(faceBitmap!!),
+                            contentDescription = null,
+                            modifier = Modifier.size(48.dp).offset(y = 4.dp),
+                            contentScale = ContentScale.Crop,
+                            alignment = Alignment.TopCenter
+                        )
                     } else {
                         Text(currentSession.playerName.take(1).uppercase(), color = CelestiaTheme.colors.primary, modifier = Modifier.align(Alignment.Center))
                     }
@@ -311,21 +369,18 @@ fun ShellUI(
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     val isConsoleOpen = GameConsoleService.shouldShowConsole
                     IconButton(
-                        onClick = {
-                            if (isConsoleOpen) GameConsoleService.hide()
-                            else GameConsoleService.show()
-                        },
+                        onClick = { if (isConsoleOpen) GameConsoleService.hide() else GameConsoleService.show() },
                         modifier = Modifier.size(32.dp)
                     ) {
                         Icon(
                             Icons.Default.Build,
-                            contentDescription = "Debug Console",
+                            contentDescription = s.navConsole,
                             tint = if (isConsoleOpen) CelestiaTheme.colors.primary else CelestiaTheme.colors.textSecondary.copy(alpha = 0.3f),
                             modifier = Modifier.size(20.dp)
                         )
                     }
                     IconButton(onClick = onLogout) {
-                        Icon(Icons.AutoMirrored.Filled.ExitToApp, "Logout", tint = CelestiaTheme.colors.error.copy(alpha = 0.8f))
+                        Icon(Icons.AutoMirrored.Filled.ExitToApp, s.navLogout, tint = CelestiaTheme.colors.error.copy(alpha = 0.8f))
                     }
                 }
             }
@@ -333,6 +388,7 @@ fun ShellUI(
 
         Spacer(Modifier.width(24.dp))
 
+        // ── Main content ─────────────────────────────────────────────────────
         Box(Modifier.weight(1f).fillMaxHeight()) {
             Crossfade(targetState = currentScreen) { screen ->
                 when (screen) {
@@ -352,14 +408,13 @@ fun ShellUI(
                         isDarkTheme = true,
                         onToggleTheme = onToggleTheme,
                         onThemeChanged = onThemeChanged,
-                        onOpenThemePicker = { currentScreen = ShellScreen.ThemePicker }
+                        onOpenThemePicker = { currentScreen = ShellScreen.ThemePicker },
+                        currentLocale = currentLocale,
+                        onLocaleChanged = onLocaleChanged
                     )
                     is ShellScreen.ThemePicker -> ThemePickerScreen(
                         currentTheme = customTheme,
-                        onThemeSelected = { newTheme ->
-                            onCustomThemeChanged(newTheme)
-                            currentScreen = ShellScreen.GlobalSettings
-                        },
+                        onThemeSelected = { newTheme -> onCustomThemeChanged(newTheme); currentScreen = ShellScreen.GlobalSettings },
                         onBack = { currentScreen = ShellScreen.GlobalSettings }
                     )
                     is ShellScreen.ServerSettings -> ServerSettingsScreen(server = screen.server, onBack = { currentScreen = ShellScreen.Home })
@@ -373,6 +428,10 @@ fun ShellUI(
 @Composable
 fun NavButton(icon: ImageVector, isSelected: Boolean, onClick: () -> Unit) {
     IconButton(onClick = onClick) {
-        Icon(icon, contentDescription = null, tint = if (isSelected) CelestiaTheme.colors.primary else CelestiaTheme.colors.textSecondary.copy(alpha = 0.5f), modifier = Modifier.size(32.dp))
+        Icon(
+            icon, contentDescription = null,
+            tint = if (isSelected) CelestiaTheme.colors.primary else CelestiaTheme.colors.textSecondary.copy(alpha = 0.5f),
+            modifier = Modifier.size(32.dp)
+        )
     }
 }

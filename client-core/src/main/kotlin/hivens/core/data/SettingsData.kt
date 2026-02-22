@@ -13,7 +13,9 @@ data class SettingsData(
     var savedUsername: String? = null,
     var savedUuid: String? = null,
     var savedAccessToken: String? = null,
-    var savedFileManifest: FileManifest? = null
+    var savedFileManifest: FileManifest? = null,
+    /** BCP-47 language tag: "ru", "en", "de" */
+    var locale: String = "en"
 ) {
     companion object {
         fun defaults(): SettingsData {
@@ -22,6 +24,7 @@ data class SettingsData(
             data.memoryMB = 4096
             data.isDarkTheme = true
             data.saveCredentials = true
+            data.locale = "en"
             return data
         }
     }

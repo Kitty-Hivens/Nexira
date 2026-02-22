@@ -24,11 +24,11 @@ object UpdateApplicator {
 
     // ========== WINDOWS ==========
 
-    private fun scheduleWindowsUpdate(msiPath: Path) {
+    private fun scheduleWindowsUpdate(installerPath: Path) {
         try {
             val psScript = Files.createTempFile("aura_update", ".ps1")
             val launcherPath = getCurrentExecutable()
-            
+
             psScript.toFile().writeText("""
                 # Wait for launcher to exit
                 Start-Sleep -Seconds 2
@@ -36,9 +36,9 @@ object UpdateApplicator {
                 # Ensure all processes are closed
                 Get-Process -Name "AuraLauncher" -ErrorAction SilentlyContinue | Stop-Process -Force
                 
-                # Run MSI installer
+                # Run installer silently (Inno Setup /SILENT flag)
                 Write-Host "Installing update..."
-                Start-Process -FilePath "msiexec.exe" -ArgumentList "/i", "`"$msiPath`"", "/quiet", "/norestart" -Wait
+                Start-Process -FilePath "$installerPath" -ArgumentList "/SILENT", "/NORESTART" -Wait
                 
                 # Wait for installation
                 Start-Sleep -Seconds 3
@@ -54,10 +54,10 @@ object UpdateApplicator {
                 # Cleanup
                 Start-Sleep -Seconds 2
                 Remove-Item "$psScript" -Force -ErrorAction SilentlyContinue
-                Remove-Item "$msiPath" -Force -ErrorAction SilentlyContinue
+                Remove-Item "$installerPath" -Force -ErrorAction SilentlyContinue
             """.trimIndent())
 
-            logger.info("Scheduled Windows update: $msiPath")
+            logger.info("Scheduled Windows update: $installerPath")
 
             Runtime.getRuntime().addShutdownHook(Thread {
                 try {
@@ -83,7 +83,10 @@ object UpdateApplicator {
     private fun scheduleMacUpdate(dmgPath: Path) {
         try {
             val scriptPath = Files.createTempFile("aura_update", ".sh")
-            
+            val currentBinary = getCurrentExecutable()
+            val currentAppBundle = currentBinary.parent?.parent?.parent ?: Paths.get("/Applications/AuraLauncher.app")
+            val targetDir = currentAppBundle.parent ?: Paths.get("/Applications")
+
             scriptPath.toFile().writeText("""
                 #!/bin/bash
                 set -e
@@ -106,11 +109,11 @@ object UpdateApplicator {
                 
                 # Remove old version
                 echo "Removing old version..."
-                rm -rf /Applications/AuraLauncher.app || true
+                rm -rf "$currentAppBundle" || true
                 
                 # Copy new version
                 echo "Installing new version..."
-                cp -R /Volumes/AuraUpdate/AuraLauncher.app /Applications/
+                cp -R /Volumes/AuraUpdate/AuraLauncher.app "$targetDir/"
                 
                 # Unmount DMG
                 echo "Cleaning up..."
@@ -120,14 +123,14 @@ object UpdateApplicator {
                 # Relaunch
                 echo "Launching updated version..."
                 sleep 1
-                open /Applications/AuraLauncher.app
+                open "$targetDir/AuraLauncher.app"
                 
                 # Cleanup script
                 rm -f "$scriptPath"
             """.trimIndent())
 
             scriptPath.toFile().setExecutable(true)
-            logger.info("Scheduled macOS update: $dmgPath")
+            logger.info("Scheduled macOS update: $dmgPath targeting $targetDir")
 
             Runtime.getRuntime().addShutdownHook(Thread {
                 try {
@@ -148,9 +151,16 @@ object UpdateApplicator {
     private fun scheduleLinuxUpdate(appImagePath: Path) {
         try {
             val currentExe = getCurrentExecutable()
+            val downloadedFileName = appImagePath.fileName.toString()
+            val targetExe = if (downloadedFileName.contains("AuraLauncher", ignoreCase = true) && downloadedFileName.endsWith(".AppImage", ignoreCase = true)) {
+                currentExe.resolveSibling(downloadedFileName)
+            } else {
+                currentExe
+            }
+
             val backupPath = Paths.get("$currentExe.backup")
 
-            logger.info("Scheduled Linux update: $currentExe -> $appImagePath")
+            logger.info("Scheduled Linux update: $currentExe -> $targetExe")
 
             Runtime.getRuntime().addShutdownHook(Thread {
                 try {
@@ -162,13 +172,13 @@ object UpdateApplicator {
                         logger.info("Backed up current version")
                     }
 
-                    // Copy new version
-                    Files.copy(appImagePath, currentExe, StandardCopyOption.REPLACE_EXISTING)
-                    logger.info("Copied new version")
+                    // Copy new version to the target path
+                    Files.copy(appImagePath, targetExe, StandardCopyOption.REPLACE_EXISTING)
+                    logger.info("Copied new version to $targetExe")
 
                     // Set executable permissions
                     try {
-                        Files.setPosixFilePermissions(currentExe, setOf(
+                        Files.setPosixFilePermissions(targetExe, setOf(
                             PosixFilePermission.OWNER_READ,
                             PosixFilePermission.OWNER_WRITE,
                             PosixFilePermission.OWNER_EXECUTE,
@@ -178,23 +188,34 @@ object UpdateApplicator {
                             PosixFilePermission.OTHERS_EXECUTE
                         ))
                     } catch (_: UnsupportedOperationException) {
-                        currentExe.toFile().setExecutable(true)
+                        targetExe.toFile().setExecutable(true)
                     }
                     logger.info("Set executable permissions")
 
+                    if (currentExe != targetExe) {
+                        updateLinuxDesktopShortcuts(currentExe, targetExe)
+                    }
+
                     // Relaunch
                     logger.info("Relaunching updated version...")
-                    val process = ProcessBuilder(currentExe.toString()).start()
+                    val process = ProcessBuilder(targetExe.toString()).start()
 
                     // Cleanup
                     Thread.sleep(2000)
                     if (process.isAlive) {
                         Files.deleteIfExists(backupPath)
                         Files.deleteIfExists(appImagePath)
+                        if (currentExe != targetExe) {
+                            Files.deleteIfExists(currentExe)
+                        }
                         logger.info("Update completed successfully")
                     } else {
                         // Rollback on failure
                         logger.error("New version failed to start, rolling back...")
+                        if (currentExe != targetExe) {
+                            Files.deleteIfExists(targetExe)
+                            updateLinuxDesktopShortcuts(targetExe, currentExe)
+                        }
                         Files.move(backupPath, currentExe, StandardCopyOption.REPLACE_EXISTING)
                         ProcessBuilder(currentExe.toString()).start()
                     }
@@ -203,6 +224,9 @@ object UpdateApplicator {
                     logger.error("Update failed, attempting rollback", e)
                     try {
                         if (Files.exists(backupPath)) {
+                            if (currentExe != targetExe) {
+                                updateLinuxDesktopShortcuts(targetExe, currentExe)
+                            }
                             Files.move(backupPath, currentExe, StandardCopyOption.REPLACE_EXISTING)
                             ProcessBuilder(currentExe.toString()).start()
                         }
@@ -215,6 +239,34 @@ object UpdateApplicator {
         } catch (e: Exception) {
             logger.error("Failed to schedule Linux update", e)
             throw e
+        }
+    }
+
+    private fun updateLinuxDesktopShortcuts(oldExe: Path, newExe: Path) {
+        try {
+            val userHome = System.getProperty("user.home") ?: return
+            val applicationsDir = Paths.get(userHome, ".local", "share", "applications")
+
+            if (!Files.exists(applicationsDir)) return
+
+            Files.list(applicationsDir).use { stream ->
+                stream.forEach { desktopFile ->
+                    if (desktopFile.toString().endsWith(".desktop")) {
+                        try {
+                            val content = Files.readString(desktopFile)
+                            if (content.contains(oldExe.toString())) {
+                                val updatedContent = content.replace(oldExe.toString(), newExe.toString())
+                                Files.writeString(desktopFile, updatedContent)
+                                logger.info("Updated desktop shortcut: ${desktopFile.fileName}")
+                            }
+                        } catch (e: Exception) {
+                            logger.warn("Failed to update desktop file: ${desktopFile.fileName}", e)
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            logger.warn("Failed to scan for desktop shortcuts", e)
         }
     }
 
@@ -233,11 +285,24 @@ object UpdateApplicator {
                 Paths.get(userDir).resolve("../MacOS/AuraLauncher")
             }
             OS.isLinux -> {
-                try {
-                    Paths.get("/proc/self/exe").toRealPath()
-                } catch (_: Exception) {
-                    val classPath = System.getProperty("java.class.path")
-                    Paths.get(classPath.split(":").first())
+                // When running as AppImage, the runtime automatically sets $APPIMAGE
+                // to the real path of the .AppImage file on disk.
+                //
+                // DO NOT use /proc/self/exe here — it resolves to the temporary FUSE
+                // mount point (e.g. /tmp/.mount_AuraLaXXXXX/usr/bin/AuraLauncher)
+                // which is gone the moment the process exits. Writing the update
+                // there would silently succeed but have zero effect.
+                val appImageEnv = System.getenv("APPIMAGE")
+                if (!appImageEnv.isNullOrBlank()) {
+                    Paths.get(appImageEnv)
+                } else {
+                    // Fallback for dev/non-AppImage environments
+                    try {
+                        Paths.get("/proc/self/exe").toRealPath()
+                    } catch (_: Exception) {
+                        val classPath = System.getProperty("java.class.path")
+                        Paths.get(classPath.split(":").first())
+                    }
                 }
             }
             else -> Paths.get("AuraLauncher")

@@ -20,6 +20,7 @@ import androidx.compose.ui.window.Dialog
 import hivens.core.data.LauncherUpdate
 import hivens.launcher.update.UpdateApplicator
 import hivens.launcher.update.UpdateService
+import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
 import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
@@ -32,6 +33,7 @@ fun UpdateDialog(
     updateService: UpdateService,
     onDismiss: () -> Unit
 ) {
+    val s = LocalStrings.current
     val logger = LoggerFactory.getLogger("UpdateDialog")
     val scope = rememberCoroutineScope()
 
@@ -46,7 +48,7 @@ fun UpdateDialog(
             elevation = 8.dp
         ) {
             Column(Modifier.padding(24.dp)) {
-                
+
                 // Header
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -61,7 +63,7 @@ fun UpdateDialog(
                     Spacer(Modifier.width(12.dp))
                     Column {
                         Text(
-                            text = if (update.isCritical) "КРИТИЧЕСКОЕ ОБНОВЛЕНИЕ" else "Доступно обновление",
+                            text = if (update.isCritical) s.updateTitleCritical else s.updateTitle,
                             style = MaterialTheme.typography.h6,
                             color = if (update.isCritical) CelestiaTheme.colors.error else CelestiaTheme.colors.textPrimary,
                             fontWeight = FontWeight.Bold
@@ -84,7 +86,7 @@ fun UpdateDialog(
                             .padding(12.dp)
                     ) {
                         Text(
-                            "Это обновление содержит критические исправления безопасности.",
+                            s.updateCriticalBanner,
                             style = MaterialTheme.typography.body2,
                             color = CelestiaTheme.colors.error,
                             fontWeight = FontWeight.Medium
@@ -98,13 +100,13 @@ fun UpdateDialog(
 
                 // Changelog
                 Text(
-                    "Что нового:",
+                    s.updateChangelog,
                     style = MaterialTheme.typography.subtitle2,
                     color = CelestiaTheme.colors.textPrimary,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(Modifier.height(8.dp))
-                
+
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -129,8 +131,7 @@ fun UpdateDialog(
                     exit = shrinkVertically() + fadeOut()
                 ) {
                     if (downloadState is DownloadState.Downloading) {
-                        val state = downloadState as DownloadState.Downloading
-                        DownloadProgress(state)
+                        DownloadProgress(downloadState as DownloadState.Downloading)
                     }
                 }
 
@@ -144,16 +145,12 @@ fun UpdateDialog(
                     ) {
                         Column {
                             Text(
-                                "Ошибка загрузки",
+                                s.updateErrorTitle,
                                 style = MaterialTheme.typography.subtitle2,
                                 color = CelestiaTheme.colors.error,
                                 fontWeight = FontWeight.Bold
                             )
-                            Text(
-                                error,
-                                style = MaterialTheme.typography.body2,
-                                color = CelestiaTheme.colors.error
-                            )
+                            Text(error, style = MaterialTheme.typography.body2, color = CelestiaTheme.colors.error)
                         }
                     }
                     Spacer(Modifier.height(16.dp))
@@ -165,16 +162,14 @@ fun UpdateDialog(
                     horizontalArrangement = Arrangement.End,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    
-                    // "Later" button (non-critical only)
+
                     if (!update.isCritical && downloadState !is DownloadState.Downloading) {
                         TextButton(onClick = onDismiss) {
-                            Text("Позже", color = CelestiaTheme.colors.textSecondary)
+                            Text(s.updateLater, color = CelestiaTheme.colors.textSecondary)
                         }
                         Spacer(Modifier.width(8.dp))
                     }
 
-                    // Main action button
                     when (downloadState) {
                         is DownloadState.Idle -> {
                             Button(
@@ -182,38 +177,32 @@ fun UpdateDialog(
                                     scope.launch {
                                         downloadState = DownloadState.Downloading(0L, 0L, 0.0)
                                         errorMessage = null
-                                        
+
                                         try {
                                             val installerPath = updateService.downloadUpdate(update) { downloaded, total, speed ->
                                                 downloadState = DownloadState.Downloading(downloaded, total, speed)
                                             }
-                                            
                                             downloadState = DownloadState.Ready(installerPath.toString())
-                                            
                                         } catch (e: Exception) {
                                             logger.error("Download failed", e)
-                                            errorMessage = e.message ?: "Неизвестная ошибка"
+                                            errorMessage = e.message ?: s.updateErrorUnknown
                                             downloadState = DownloadState.Failed
                                         }
                                     }
                                 },
                                 colors = ButtonDefaults.buttonColors(
-                                    backgroundColor = if (update.isCritical) {
-                                        CelestiaTheme.colors.error
-                                    } else {
-                                        CelestiaTheme.colors.primary
-                                    }
+                                    backgroundColor = if (update.isCritical) CelestiaTheme.colors.error else CelestiaTheme.colors.primary
                                 ),
                                 shape = RoundedCornerShape(8.dp)
                             ) {
                                 Text(
-                                    if (update.isCritical) "СКАЧАТЬ СЕЙЧАС" else "Скачать и установить",
+                                    if (update.isCritical) s.updateDownloadNow else s.updateDownload,
                                     color = Color.White,
                                     fontWeight = FontWeight.Bold
                                 )
                             }
                         }
-                        
+
                         is DownloadState.Downloading -> {
                             Button(
                                 onClick = { },
@@ -230,10 +219,10 @@ fun UpdateDialog(
                                     strokeWidth = 2.dp
                                 )
                                 Spacer(Modifier.width(8.dp))
-                                Text("Загрузка...", color = Color.White)
+                                Text(s.updateDownloading, color = Color.White)
                             }
                         }
-                        
+
                         is DownloadState.Ready -> {
                             val path = (downloadState as DownloadState.Ready).installerPath
                             Button(
@@ -244,35 +233,27 @@ fun UpdateDialog(
                                         exitProcess(0)
                                     } catch (e: Exception) {
                                         logger.error("Failed to schedule update", e)
-                                        errorMessage = "Не удалось запланировать обновление: ${e.message}"
+                                        errorMessage = "${s.updateScheduleFailed}: ${e.message}"
                                         downloadState = DownloadState.Failed
                                     }
                                 },
-                                colors = ButtonDefaults.buttonColors(
-                                    backgroundColor = Color(0xFF4CAF50)
-                                ),
+                                colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF4CAF50)),
                                 shape = RoundedCornerShape(8.dp)
                             ) {
-                                Text(
-                                    "Установить и перезапустить",
-                                    color = Color.White,
-                                    fontWeight = FontWeight.Bold
-                                )
+                                Text(s.updateInstall, color = Color.White, fontWeight = FontWeight.Bold)
                             }
                         }
-                        
+
                         is DownloadState.Failed -> {
                             Button(
                                 onClick = {
                                     errorMessage = null
                                     downloadState = DownloadState.Idle
                                 },
-                                colors = ButtonDefaults.buttonColors(
-                                    backgroundColor = CelestiaTheme.colors.primary
-                                ),
+                                colors = ButtonDefaults.buttonColors(backgroundColor = CelestiaTheme.colors.primary),
                                 shape = RoundedCornerShape(8.dp)
                             ) {
-                                Text("Повторить", color = Color.White)
+                                Text(s.updateRetry, color = Color.White)
                             }
                         }
                     }
@@ -312,22 +293,20 @@ private fun DownloadProgress(state: DownloadState.Downloading) {
                 )
             }
         }
-        
+
         Spacer(Modifier.height(8.dp))
-        
+
         val progress = if (state.total > 0) {
             (state.downloaded.toFloat() / state.total).coerceIn(0f, 1f)
-        } else {
-            0f
-        }
-        
+        } else 0f
+
         LinearProgressIndicator(
             progress = progress,
             modifier = Modifier.fillMaxWidth().height(8.dp),
             backgroundColor = CelestiaTheme.colors.surface,
             color = CelestiaTheme.colors.primary
         )
-        
+
         if (state.total > 0) {
             Spacer(Modifier.height(4.dp))
             Text(
@@ -337,7 +316,7 @@ private fun DownloadProgress(state: DownloadState.Downloading) {
                 modifier = Modifier.align(Alignment.End)
             )
         }
-        
+
         Spacer(Modifier.height(16.dp))
     }
 }
