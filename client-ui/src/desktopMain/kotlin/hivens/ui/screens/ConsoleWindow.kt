@@ -1,27 +1,21 @@
 package hivens.ui.screens
 
-import androidx.compose.foundation.HorizontalScrollbar
-import androidx.compose.foundation.ScrollState
-import androidx.compose.foundation.VerticalScrollbar
-import androidx.compose.foundation.background
+import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.rememberScrollbarAdapter
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.WrapText
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.WrapText
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
@@ -31,6 +25,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -211,7 +206,7 @@ private fun ConsoleContent(
                     // Wrap toggle
                     IconButton(onClick = { wrapText = !wrapText }) {
                         Icon(
-                            Icons.Default.WrapText,
+                            Icons.AutoMirrored.Filled.WrapText,
                             "Wrap",
                             tint = if (wrapText) Color(0xFF4CAF50) else textColor.copy(alpha = 0.4f)
                         )
@@ -427,7 +422,7 @@ private fun buildHighlightedText(
     searchQuery: String,
     baseColor: Color,
     type: LogType
-): androidx.compose.ui.text.AnnotatedString {
+): AnnotatedString {
     return buildAnnotatedString {
         // First pass: apply keyword highlights on top of base color
         var cursor = 0
