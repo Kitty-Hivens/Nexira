@@ -26,6 +26,7 @@ object EnglishStrings : AppStrings {
     override val navSettings = "Settings"
     override val navConsole = "Console"
     override val navLogout = "Log out"
+    override val navBack = "Back"
 
     // Dashboard
     override fun dashboardWelcome(name: String) = "WELCOME BACK, $name"
@@ -55,6 +56,7 @@ object EnglishStrings : AppStrings {
 
     // Profile
     override val profileTitle = "PROFILE"
+    override val profileStatusLabel = "Status"
     override val profileStatusOnline = "Authenticated"
     override val profileStatusOffline = "Offline"
     override val profileBalance = "Balance"
@@ -64,6 +66,7 @@ object EnglishStrings : AppStrings {
     override val profileSkinFront = "Front"
     override val profileSkinBack = "Back"
     override val profileSkinLoading = "Loading skin..."
+    override val profileRefresh = "Refresh"
 
     // Settings
     override val settingsTitle = "GLOBAL SETTINGS"
@@ -103,11 +106,13 @@ object EnglishStrings : AppStrings {
     override val serverDetailTitle = "SERVER INFORMATION"
     override val serverDetailLoading = ""
     override val serverDetailNoImage = "No image"
+    override val serverDetailNoImageHint = "banner.png"
     override val serverDetailMissingTitle = "Information missing"
     override val serverDetailMissingBody = "Create the file in the folder:"
     override fun serverDetailMissingPath(path: String, file: String) = "Create $file in:"
 
     // Server Settings
+    override val serverSettingsSubtitle = "Launch settings"
     override val serverSettingsSectionSystem = "SYSTEM"
     override val serverSettingsSectionMods = "MODIFICATIONS"
     override val serverSettingsRam = "RAM"
@@ -132,6 +137,10 @@ object EnglishStrings : AppStrings {
     override val updateInstall = "Install and restart"
     override val updateRetry = "Retry"
     override val updateErrorTitle = "Download error"
+    override val updateErrorUnknown = "Unknown error"
+    override val updateScheduleFailed = "Failed to schedule update"
+    override fun updateVersion(version: String) = "Version $version"
+    override val updateDetails = "Details"
 
     // Console
     override val consoleTitle = "Debug Console"

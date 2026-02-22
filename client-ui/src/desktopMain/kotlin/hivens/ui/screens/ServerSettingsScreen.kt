@@ -26,6 +26,7 @@ import hivens.core.data.OptionalMod
 import hivens.launcher.ProfileManager
 import hivens.ui.components.CelestiaButton
 import hivens.ui.components.GlassCard
+import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
 import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.dialogs.FileKitMode
@@ -44,6 +45,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
     val profileManager: ProfileManager = koinInject()
     val manifestProcessorService: IManifestProcessorService = koinInject()
     val dataDirectory: Path = koinInject()
+    val s = LocalStrings.current
 
     var mods by remember { mutableStateOf<List<OptionalMod>>(emptyList()) }
     var profile by remember { mutableStateOf<InstanceProfile?>(null) }
@@ -54,7 +56,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
     val modStates = remember { mutableStateMapOf<String, Boolean>() }
     var modsLoaded by remember { mutableStateOf(false) }
 
-    val scope = rememberCoroutineScope() // Нужен для запуска FileKit
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(server) {
         val p = profileManager.getProfile(server.assetDir)
@@ -93,24 +95,25 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
     Column(Modifier.fillMaxSize().padding(24.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = { saveProfile(); onBack() }) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Назад", tint = CelestiaTheme.colors.textPrimary)
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, s.navBack, tint = CelestiaTheme.colors.textPrimary)
             }
             Spacer(Modifier.width(8.dp))
             Column {
                 Text(server.title?.uppercase() ?: "SERVER", style = MaterialTheme.typography.h5, color = CelestiaTheme.colors.textPrimary)
-                Text("Настройки запуска", style = MaterialTheme.typography.caption, color = CelestiaTheme.colors.textSecondary)
+                Text(s.serverSettingsSubtitle, style = MaterialTheme.typography.caption, color = CelestiaTheme.colors.textSecondary)
             }
         }
 
         Spacer(Modifier.height(24.dp))
 
         Row(Modifier.fillMaxSize()) {
+            // System settings
             GlassCard(Modifier.weight(1f).fillMaxHeight()) {
                 Column(Modifier.padding(24.dp).verticalScroll(rememberScrollState())) {
-                    Text("СИСТЕМА", style = MaterialTheme.typography.subtitle2, color = CelestiaTheme.colors.primary)
+                    Text(s.serverSettingsSectionSystem, style = MaterialTheme.typography.subtitle2, color = CelestiaTheme.colors.primary)
                     Spacer(Modifier.height(16.dp))
 
-                    Text("ОЗУ: ${memory.roundToInt()} MB", color = CelestiaTheme.colors.textSecondary)
+                    Text(s.serverSettingsRamValue(memory.roundToInt()), color = CelestiaTheme.colors.textSecondary)
                     Slider(
                         value = memory,
                         onValueChange = { memory = it },
@@ -127,7 +130,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                     Divider(color = borderColor)
                     Spacer(Modifier.height(24.dp))
 
-                    Text("Версия Java", color = CelestiaTheme.colors.textPrimary, style = MaterialTheme.typography.body2)
+                    Text(s.serverSettingsJava, color = CelestiaTheme.colors.textPrimary, style = MaterialTheme.typography.body2)
                     Spacer(Modifier.height(8.dp))
 
                     OutlinedTextField(
@@ -137,7 +140,10 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                             .fillMaxWidth()
                             .onFocusChanged { it.isFocused },
                         placeholder = {
-                            Text("Автоматически ($recommendedJavaLabel)", color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.5f))
+                            Text(
+                                s.serverSettingsJavaAuto(recommendedJavaLabel),
+                                color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.5f)
+                            )
                         },
                         singleLine = true,
                         colors = TextFieldDefaults.outlinedTextFieldColors(
@@ -153,7 +159,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                                     val file = FileKit.openFilePicker(
                                         type = FileKitType.File(extensions = listOf("exe", "bin")),
                                         mode = FileKitMode.Single,
-                                        title = "Выберите Java"
+                                        title = s.serverSettingsPickJava
                                     )
                                     file?.path?.let { javaPath = it }
                                 }
@@ -166,21 +172,23 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                     if (javaPath.isEmpty()) {
                         Spacer(Modifier.height(4.dp))
                         Text(
-                            "Оставьте пустым для использования встроенной Java",
+                            s.serverSettingsJavaHint,
                             style = MaterialTheme.typography.caption,
                             color = CelestiaTheme.colors.textSecondary
                         )
                     }
 
                     Spacer(Modifier.weight(1f))
-                    CelestiaButton("Открыть папку", onClick = {
+
+                    CelestiaButton(s.serverSettingsOpenFolder, onClick = {
                         val path = dataDirectory.resolve("clients").resolve(server.assetDir)
                         if (!path.toFile().exists()) path.toFile().mkdirs()
                         Desktop.getDesktop().open(path.toFile())
                     }, modifier = Modifier.fillMaxWidth(), primary = false)
 
                     Spacer(Modifier.height(12.dp))
-                    CelestiaButton("Сбросить клиент", onClick = {
+
+                    CelestiaButton(s.serverSettingsReset, onClick = {
                         val path = dataDirectory.resolve("clients").resolve(server.assetDir)
                         path.toFile().deleteRecursively()
                         saveProfile()
@@ -191,14 +199,15 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
 
             Spacer(Modifier.width(24.dp))
 
+            // Mods
             GlassCard(Modifier.weight(1f).fillMaxHeight()) {
                 Column(Modifier.padding(24.dp)) {
-                    Text("МОДИФИКАЦИИ", style = MaterialTheme.typography.subtitle2, color = CelestiaTheme.colors.primary)
+                    Text(s.serverSettingsSectionMods, style = MaterialTheme.typography.subtitle2, color = CelestiaTheme.colors.primary)
                     Spacer(Modifier.height(16.dp))
 
                     if (mods.isEmpty() && modsLoaded) {
                         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text("Нет опциональных модов", color = CelestiaTheme.colors.textSecondary)
+                            Text(s.serverSettingsNoMods, color = CelestiaTheme.colors.textSecondary)
                         }
                     } else {
                         AnimatedVisibility(
@@ -214,7 +223,6 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                                         isChecked = currentState,
                                         onToggle = { isChecked ->
                                             modStates[mod.id] = isChecked
-                                            // Если включаем мод, выключаем конфликтующие
                                             if (isChecked) {
                                                 mod.excludings.forEach { conflict -> modStates[conflict] = false }
                                             }
@@ -295,7 +303,7 @@ fun ModItemRow(mod: OptionalMod, isChecked: Boolean, onToggle: (Boolean) -> Unit
                     ) {
                         Icon(
                             imageVector = Icons.Default.Info,
-                            contentDescription = "Info",
+                            contentDescription = null,
                             tint = if (expanded) CelestiaTheme.colors.primary else CelestiaTheme.colors.textSecondary.copy(alpha = 0.5f)
                         )
                     }

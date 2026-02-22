@@ -26,6 +26,7 @@ object GermanStrings : AppStrings {
     override val navSettings = "Einstellungen"
     override val navConsole = "Konsole"
     override val navLogout = "Abmelden"
+    override val navBack = "Zurück"
 
     // Dashboard
     override fun dashboardWelcome(name: String) = "WILLKOMMEN ZURÜCK, $name"
@@ -55,6 +56,7 @@ object GermanStrings : AppStrings {
 
     // Profile
     override val profileTitle = "PROFIL"
+    override val profileStatusLabel = "Status"
     override val profileStatusOnline = "Angemeldet"
     override val profileStatusOffline = "Offline"
     override val profileBalance = "Guthaben"
@@ -64,6 +66,7 @@ object GermanStrings : AppStrings {
     override val profileSkinFront = "Vorderseite"
     override val profileSkinBack = "Rückseite"
     override val profileSkinLoading = "Skin wird geladen..."
+    override val profileRefresh = "Aktualisieren"
 
     // Settings
     override val settingsTitle = "GLOBALE EINSTELLUNGEN"
@@ -103,11 +106,13 @@ object GermanStrings : AppStrings {
     override val serverDetailTitle = "SERVER-INFORMATIONEN"
     override val serverDetailLoading = ""
     override val serverDetailNoImage = "Kein Bild"
+    override val serverDetailNoImageHint = "banner.png"
     override val serverDetailMissingTitle = "Informationen fehlen"
     override val serverDetailMissingBody = "Erstelle die Datei im Ordner:"
     override fun serverDetailMissingPath(path: String, file: String) = "Erstelle $file in:"
 
     // Server Settings
+    override val serverSettingsSubtitle = "Starteinstellungen"
     override val serverSettingsSectionSystem = "SYSTEM"
     override val serverSettingsSectionMods = "MODIFIKATIONEN"
     override val serverSettingsRam = "RAM"
@@ -132,6 +137,10 @@ object GermanStrings : AppStrings {
     override val updateInstall = "Installieren und neustarten"
     override val updateRetry = "Erneut versuchen"
     override val updateErrorTitle = "Download-Fehler"
+    override val updateErrorUnknown = "Unbekannter Fehler"
+    override val updateScheduleFailed = "Update konnte nicht geplant werden"
+    override fun updateVersion(version: String) = "Version $version"
+    override val updateDetails = "Details"
 
     // Console
     override val consoleTitle = "Debug-Konsole"

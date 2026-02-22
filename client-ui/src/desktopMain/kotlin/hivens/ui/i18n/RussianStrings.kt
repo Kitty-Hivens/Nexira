@@ -26,6 +26,7 @@ object RussianStrings : AppStrings {
     override val navSettings = "Настройки"
     override val navConsole = "Консоль"
     override val navLogout = "Выйти"
+    override val navBack = "Назад"
 
     // Dashboard
     override fun dashboardWelcome(name: String) = "ДОБРО ПОЖАЛОВАТЬ, $name"
@@ -55,6 +56,7 @@ object RussianStrings : AppStrings {
 
     // Profile
     override val profileTitle = "ПРОФИЛЬ"
+    override val profileStatusLabel = "Статус"
     override val profileStatusOnline = "Авторизован"
     override val profileStatusOffline = "Оффлайн"
     override val profileBalance = "Баланс"
@@ -64,6 +66,7 @@ object RussianStrings : AppStrings {
     override val profileSkinFront = "Front"
     override val profileSkinBack = "Back"
     override val profileSkinLoading = "Загрузка скина..."
+    override val profileRefresh = "Обновить"
 
     // Settings
     override val settingsTitle = "ГЛОБАЛЬНЫЕ НАСТРОЙКИ"
@@ -103,11 +106,13 @@ object RussianStrings : AppStrings {
     override val serverDetailTitle = "ИНФОРМАЦИЯ О СЕРВЕРЕ"
     override val serverDetailLoading = ""
     override val serverDetailNoImage = "Нет изображения"
+    override val serverDetailNoImageHint = "banner.png"
     override val serverDetailMissingTitle = "Информация отсутствует"
     override val serverDetailMissingBody = "Создайте файл в папке:"
     override fun serverDetailMissingPath(path: String, file: String) = "Создайте файл $file в папке:"
 
     // Server Settings
+    override val serverSettingsSubtitle = "Настройки запуска"
     override val serverSettingsSectionSystem = "СИСТЕМА"
     override val serverSettingsSectionMods = "МОДИФИКАЦИИ"
     override val serverSettingsRam = "ОЗУ"
@@ -132,6 +137,10 @@ object RussianStrings : AppStrings {
     override val updateInstall = "Установить и перезапустить"
     override val updateRetry = "Повторить"
     override val updateErrorTitle = "Ошибка загрузки"
+    override val updateErrorUnknown = "Неизвестная ошибка"
+    override val updateScheduleFailed = "Не удалось запланировать обновление"
+    override fun updateVersion(version: String) = "Версия $version"
+    override val updateDetails = "Подробнее"
 
     // Console
     override val consoleTitle = "Debug Console"
