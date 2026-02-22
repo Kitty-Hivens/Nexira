@@ -336,7 +336,7 @@ private fun FilterChip(label: String, active: Boolean, activeColor: Color, onTog
     Surface(
         shape = RoundedCornerShape(6.dp),
         color = bg,
-        border = androidx.compose.foundation.BorderStroke(1.dp, border),
+        border = BorderStroke(1.dp, border),
         onClick = { onToggle(!active) }
     ) {
         Text(
@@ -369,7 +369,7 @@ private fun LogLine(
         LogType.INFO  -> if (isDarkTheme) Color(0xFFCCCCCC) else Color(0xFF212121)
         LogType.WARN  -> Color(0xFFFFD54F)
         LogType.ERROR -> Color(0xFFEF5350)
-        LogType.DIVIDER -> Color.Transparent
+        //LogType.DIVIDER -> Color.Transparent
     }
 
     val hasOwnTimestamp = log.text.matches(TIMESTAMP_REGEX)
