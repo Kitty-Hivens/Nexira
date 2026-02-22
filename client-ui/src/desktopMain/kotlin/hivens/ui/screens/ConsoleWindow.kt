@@ -26,9 +26,12 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.rememberWindowState
 import hivens.ui.utils.GameConsoleService
+import hivens.ui.utils.LogEntry
 import hivens.ui.utils.LogType
 import kotlinx.coroutines.launch
 import java.awt.datatransfer.StringSelection
+
+private val TIMESTAMP_REGEX = Regex("^\\[\\d{2}:\\d{2}:\\d{2}].*")
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
@@ -39,7 +42,9 @@ fun ConsoleWindow(onClose: () -> Unit) {
         onCloseRequest = onClose,
         state = windowState,
         title = "Debug Console",
-        alwaysOnTop = false
+        alwaysOnTop = false,
+        transparent = false,
+        undecorated = false
     ) {
         val clipboard = LocalClipboard.current
         val scope = rememberCoroutineScope()
@@ -49,9 +54,11 @@ fun ConsoleWindow(onClose: () -> Unit) {
         }
 
         MaterialTheme(colors = darkColors()) {
-            Surface(color = Color(0xFF121212)) {
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                color = Color(0xFF121212)
+            ) {
                 Column(Modifier.fillMaxSize()) {
-                    // Toolbar
                     Row(
                         Modifier.fillMaxWidth().background(Color(0xFF1E1E1E)).padding(8.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -65,10 +72,10 @@ fun ConsoleWindow(onClose: () -> Unit) {
                         )
 
                         Row {
-                            // Кнопка копирования
                             IconButton(onClick = {
-                                val fullLog = logsCopy.joinToString("\n") {
-                                    "[${it.timestamp}] ${it.text}"
+                                val fullLog = logsCopy.joinToString("\n") { entry ->
+                                    if (entry.text.matches(TIMESTAMP_REGEX)) entry.text
+                                    else "[${entry.timestamp}] ${entry.text}"
                                 }
                                 scope.launch {
                                     val selection = StringSelection(fullLog)
@@ -78,18 +85,15 @@ fun ConsoleWindow(onClose: () -> Unit) {
                                 Icon(Icons.Default.ContentCopy, "Copy All", tint = Color.Gray)
                             }
 
-                            // Кнопка очистки
                             IconButton(onClick = { GameConsoleService.clear() }) {
                                 Icon(Icons.Default.Delete, "Clear", tint = Color.Gray)
                             }
                         }
                     }
 
-                    // Logs Area
                     Box(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 8.dp)) {
                         val listState = rememberLazyListState()
 
-                        // Автоскролл
                         LaunchedEffect(logsCopy.size) {
                             if (logsCopy.isNotEmpty()) {
                                 listState.scrollToItem(logsCopy.lastIndex)
@@ -116,20 +120,24 @@ fun ConsoleWindow(onClose: () -> Unit) {
 }
 
 @Composable
-fun LogLine(log: hivens.ui.utils.LogEntry) {
+fun LogLine(log: LogEntry) {
     val color = when (log.type) {
         LogType.INFO -> Color(0xFFCCCCCC)
         LogType.WARN -> Color(0xFFFFD54F)
         LogType.ERROR -> Color(0xFFEF5350)
     }
 
+    val hasOwnTimestamp = log.text.matches(TIMESTAMP_REGEX)
+
     Row(Modifier.padding(vertical = 2.dp)) {
-        Text(
-            text = "[${log.timestamp}] ",
-            color = Color.Gray,
-            fontFamily = FontFamily.Monospace,
-            fontSize = 12.sp
-        )
+        if (!hasOwnTimestamp) {
+            Text(
+                text = "[${log.timestamp}] ",
+                color = Color.Gray,
+                fontFamily = FontFamily.Monospace,
+                fontSize = 12.sp
+            )
+        }
         Text(
             text = log.text,
             color = color,
