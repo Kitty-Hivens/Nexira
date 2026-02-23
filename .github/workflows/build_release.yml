@@ -160,14 +160,25 @@ jobs:
         run: |
           APPDIR="AppDir"
           JAR=$(ls client-ui/build/compose/jars/*-release*.jar | head -1)
+          
+          # 1. Build the minimal JRE first — jlink refuses to write into an existing dir
+          jlink \
+            --output "$APPDIR/usr" \
+            --add-modules java.base,java.desktop,java.logging,java.naming,java.net.http,java.prefs,java.sql,jdk.crypto.ec,jdk.unsupported,jdk.zipfs \
+            --no-header-files \
+            --no-man-pages \
+            --strip-debug \
+            --compress=2
+
+          # 2. Now create the remaining subdirs (usr/bin already exists from jlink)
           mkdir -p \
-            "$APPDIR/usr/bin" \
             "$APPDIR/usr/lib" \
             "$APPDIR/usr/share/applications" \
             "$APPDIR/usr/share/icons/hicolor/256x256/apps" \
             "$APPDIR/usr/share/icons/hicolor/512x512/apps" \
             "$APPDIR/usr/share/metainfo"
 
+          # 3. AppRun entry-point
           cat > "$APPDIR/AppRun" << 'EOF'
           #!/bin/sh
           HERE="$(dirname "$(readlink -f "$0")")"
@@ -177,14 +188,7 @@ jobs:
           EOF
           chmod +x "$APPDIR/AppRun"
 
-          jlink \
-            --output "$APPDIR/usr" \
-            --add-modules java.base,java.desktop,java.logging,java.naming,java.net.http,java.prefs,java.sql,jdk.crypto.ec,jdk.unsupported,jdk.zipfs \
-            --no-header-files \
-            --no-man-pages \
-            --strip-debug \
-            --compress=2
-
+          # 4. Copy assets
           cp "$JAR" "$APPDIR/usr/lib/aura-launcher.jar"
           cp resources/aura-launcher.desktop "$APPDIR/usr/share/applications/"
           cp resources/aura-launcher.desktop "$APPDIR/"
