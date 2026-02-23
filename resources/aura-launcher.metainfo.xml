@@ -4,7 +4,7 @@
      Lint: appstreamcli validate aura-launcher.metainfo.xml
 -->
 <component type="desktop-application">
-    <id>io.github.kitty_hivens.AuraLauncher</id>
+    <id>io.github.kitty_hivens.auralauncher</id>
 
     <name>Aura Launcher</name>
     <summary>Launch and manage your Aura games</summary>
@@ -18,22 +18,13 @@
             authentication, game library management, automatic updates, and launching
             your Aura titles — all from a single, lightweight application.
         </p>
-        <p>Features include:</p>
-        <ul>
-            <li>One-click game installation and updates</li>
-            <li>Offline mode support</li>
-            <li>Over-the-air self-updates with automatic rollback on failure</li>
-            <li>Customisable game launch options</li>
-        </ul>
     </description>
 
     <url type="homepage">https://github.com/Kitty-Hivens/Aura-Launcher</url>
     <url type="bugtracker">https://github.com/Kitty-Hivens/Aura-Launcher/issues</url>
-    <url type="vcs-browser">https://github.com/Kitty-Hivens/Aura-Launcher</url>
+    <url type="vcs">https://github.com/Kitty-Hivens/Aura-Launcher</url>
 
-    <developer id="io.github.kitty_hivens">
-        <name>Hivens</name>
-    </developer>
+    <developer_name>Hivens</developer_name>
 
     <!-- Launchable ties this metainfo to the .desktop file -->
     <launchable type="desktop-id">aura-launcher.desktop</launchable>
@@ -41,13 +32,6 @@
     <provides>
         <binary>aura-launcher</binary>
     </provides>
-
-    <screenshots>
-        <screenshot type="default">
-            <caption>Main launcher window</caption>
-            <image>https://raw.githubusercontent.com/Kitty-Hivens/Aura-Launcher/stable/docs/screenshots/main.png</image>
-        </screenshot>
-    </screenshots>
 
     <categories>
         <category>Game</category>
@@ -68,14 +52,8 @@
     </requires>
 
     <releases>
-        <!-- Populated automatically by the release workflow via appstreamcli -->
-        <!-- Example entry (remove before publishing; CI will inject real ones):
-        <release version="1.3.0" date="2026-02-22">
-          <url type="details">https://github.com/Kitty-Hivens/Aura-Launcher/releases/tag/v1.2.3</url>
-          <description>
-            <p>Bug fixes and performance improvements.</p>
-          </description>
+        <release version="1.0.0" date="2026-02-21">
+            <description><p>Initial release support</p></description>
         </release>
-        -->
     </releases>
 </component>
