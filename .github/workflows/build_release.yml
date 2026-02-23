@@ -147,14 +147,14 @@ jobs:
         run: desktop-file-validate resources/aura-launcher.desktop
 
       - name: Validate AppStream metainfo
-        run: appstreamcli validate --pedantic resources/aura-launcher.metainfo.xml
+        run: appstreamcli validate --pedantic resources/io.github.kitty_hivens.auralauncher.metainfo.xml
 
       - name: Inject release entry into metainfo
         run: |
           DATE=$(date -u +%Y-%m-%d)
           sed -i \
-            "s|    </releases>|    <release version=\"$APP_VERSION\" date=\"$DATE\">\n      <url type=\"details\">https://github.com/Kitty-Hivens/Aura-Launcher/releases/tag/v$APP_VERSION</url>\n    </release>\n    </releases>|" \
-            resources/aura-launcher.metainfo.xml
+            "s|    <releases>|    <releases>\n    <release version=\"$APP_VERSION\" date=\"$DATE\">\n      <url type=\"details\">https://github.com/Kitty-Hivens/Aura-Launcher/releases/tag/v$APP_VERSION</url>\n    </release>|" \
+            resources/io.github.kitty_hivens.auralauncher.metainfo.xml
 
       - name: Assemble AppDir
         run: |
@@ -196,8 +196,8 @@ jobs:
           cp resources/icons/512x512.png "$APPDIR/usr/share/icons/hicolor/512x512/apps/aura-launcher.png"
           cp resources/icons/256x256.png "$APPDIR/aura-launcher.png"
           # Provide both names so appimagetool finds AppStream metadata
-          cp resources/aura-launcher.metainfo.xml "$APPDIR/usr/share/metainfo/aura-launcher.metainfo.xml"
-          cp resources/aura-launcher.metainfo.xml "$APPDIR/usr/share/metainfo/aura-launcher.appdata.xml"
+          cp resources/io.github.kitty_hivens.auralauncher.metainfo.xml "$APPDIR/usr/share/metainfo/io.github.kitty_hivens.auralauncher.metainfo.xml"
+          cp resources/io.github.kitty_hivens.auralauncher.metainfo.xml "$APPDIR/usr/share/metainfo/io.github.kitty_hivens.auralauncher.appdata.xml"
 
       - name: Build AppImage
         run: |
