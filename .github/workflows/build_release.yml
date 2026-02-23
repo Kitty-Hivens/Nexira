@@ -170,7 +170,7 @@ jobs:
             --strip-debug \
             --compress=2
 
-          # 2. Now create the remaining subdirs (usr/bin already exists from jlink)
+          # 2. Create remaining subdirs (usr/bin already exists from jlink)
           mkdir -p \
             "$APPDIR/usr/lib" \
             "$APPDIR/usr/share/applications" \
@@ -195,12 +195,13 @@ jobs:
           cp resources/icons/256x256.png "$APPDIR/usr/share/icons/hicolor/256x256/apps/aura-launcher.png"
           cp resources/icons/512x512.png "$APPDIR/usr/share/icons/hicolor/512x512/apps/aura-launcher.png"
           cp resources/icons/256x256.png "$APPDIR/aura-launcher.png"
-          cp resources/aura-launcher.metainfo.xml "$APPDIR/usr/share/metainfo/"
+          # Provide both names so appimagetool finds AppStream metadata
+          cp resources/aura-launcher.metainfo.xml "$APPDIR/usr/share/metainfo/aura-launcher.metainfo.xml"
+          cp resources/aura-launcher.metainfo.xml "$APPDIR/usr/share/metainfo/aura-launcher.appdata.xml"
 
       - name: Build AppImage
         run: |
           ARCH=x86_64 appimagetool \
-            --comp gzip \
             AppDir \
             "AuraLauncher-$APP_VERSION-x86_64.AppImage"
 
