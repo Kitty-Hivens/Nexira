@@ -1,10 +1,5 @@
 package hivens.ui.i18n
 
-// ============================================================================
-// AppStrings — centralised string contract for all UI text
-// Add new keys here, then implement in each language object below.
-// ============================================================================
-
 interface AppStrings {
 
     // --- App ---
@@ -47,7 +42,7 @@ interface AppStrings {
     val launchResetError: String
     val launchDownloading: String
 
-    // --- Launcher States (non-composable use via I18n object) ---
+    // --- Launcher States ---
     val stateInit: String
     val stateAuth: String
     val stateAuthFail: String
@@ -74,6 +69,10 @@ interface AppStrings {
     val profileSkinBack: String
     val profileSkinLoading: String
     val profileRefresh: String
+    /** Shown in green after a successful skin upload. */
+    val profileUploadSuccess: String
+    /** Shown in red after a failed skin upload. */
+    fun profileUploadError(msg: String): String
 
     // --- Settings Screen ---
     val settingsTitle: String
