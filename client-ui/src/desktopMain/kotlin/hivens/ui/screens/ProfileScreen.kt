@@ -34,19 +34,27 @@ import java.io.File
 import java.net.URI
 import javax.swing.JFrame
 
+/** Tri-state for the skin upload status so colour is not determined by string content. */
+private sealed class UploadStatus {
+    object None : UploadStatus()
+    object Loading : UploadStatus()
+    data class Success(val message: String) : UploadStatus()
+    data class Error(val message: String) : UploadStatus()
+}
+
 @Composable
 fun ProfileScreen(session: SessionData, skinRepository: SkinRepository) {
     val s = LocalStrings.current
-    var frontSkin by remember { mutableStateOf<ImageBitmap?>(null) }
-    var backSkin by remember { mutableStateOf<ImageBitmap?>(null) }
-    var uploadStatus by remember { mutableStateOf("") }
+    var frontSkin    by remember { mutableStateOf<ImageBitmap?>(null) }
+    var backSkin     by remember { mutableStateOf<ImageBitmap?>(null) }
+    var uploadStatus by remember { mutableStateOf<UploadStatus>(UploadStatus.None) }
 
     val scope = rememberCoroutineScope()
 
     fun loadSkins() {
         scope.launch {
             frontSkin = SkinManager.getSkinFront(session.playerName)
-            backSkin = SkinManager.getSkinBack(session.playerName)
+            backSkin  = SkinManager.getSkinBack(session.playerName)
         }
     }
 
@@ -57,7 +65,7 @@ fun ProfileScreen(session: SessionData, skinRepository: SkinRepository) {
         Spacer(Modifier.height(24.dp))
 
         Row(Modifier.fillMaxSize()) {
-            // Skin preview
+            // ── Skin preview ──────────────────────────────────────────────────
             GlassCard(Modifier.weight(1f).fillMaxHeight()) {
                 Box(Modifier.fillMaxSize()) {
                     Column(
@@ -68,15 +76,15 @@ fun ProfileScreen(session: SessionData, skinRepository: SkinRepository) {
                         if (frontSkin != null) {
                             Row(horizontalArrangement = Arrangement.spacedBy(32.dp)) {
                                 Image(
-                                    painter = BitmapPainter(frontSkin!!),
+                                    painter           = BitmapPainter(frontSkin!!),
                                     contentDescription = s.profileSkinFront,
-                                    modifier = Modifier.height(300.dp).width(150.dp)
+                                    modifier          = Modifier.height(300.dp).width(150.dp)
                                 )
                                 if (backSkin != null) {
                                     Image(
-                                        painter = BitmapPainter(backSkin!!),
+                                        painter           = BitmapPainter(backSkin!!),
                                         contentDescription = s.profileSkinBack,
-                                        modifier = Modifier.height(300.dp).width(150.dp)
+                                        modifier          = Modifier.height(300.dp).width(150.dp)
                                     )
                                 }
                             }
@@ -85,7 +93,7 @@ fun ProfileScreen(session: SessionData, skinRepository: SkinRepository) {
                         }
                     }
                     IconButton(
-                        onClick = { SkinManager.invalidate(session.playerName); loadSkins() },
+                        onClick  = { SkinManager.invalidate(session.playerName); loadSkins() },
                         modifier = Modifier.align(Alignment.TopEnd).padding(16.dp)
                     ) {
                         Icon(Icons.Default.Refresh, s.profileRefresh, tint = CelestiaTheme.colors.textPrimary)
@@ -95,93 +103,117 @@ fun ProfileScreen(session: SessionData, skinRepository: SkinRepository) {
 
             Spacer(Modifier.width(24.dp))
 
-            // Info & actions
+            // ── Info & actions ────────────────────────────────────────────────
             Column(Modifier.width(320.dp).fillMaxHeight()) {
                 GlassCard(Modifier.fillMaxWidth().weight(1f)) {
                     Column(Modifier.padding(24.dp)) {
-                        Text(session.playerName, style = MaterialTheme.typography.h5, color = CelestiaTheme.colors.textPrimary)
+                        Text(
+                            session.playerName,
+                            style = MaterialTheme.typography.h5,
+                            color = CelestiaTheme.colors.textPrimary
+                        )
 
                         val isOnline = session.accessToken.length > 10
-                        val statusText = if (isOnline) s.profileStatusOnline else s.profileStatusOffline
                         Text(
-                            "${s.profileStatusLabel}: $statusText",
-                            color = if (isOnline) CelestiaTheme.colors.success else CelestiaTheme.colors.error
+                            "${s.profileStatusLabel}: " +
+                                    if (isOnline) s.profileStatusOnline else s.profileStatusOffline,
+                            color = if (isOnline) CelestiaTheme.colors.success
+                            else CelestiaTheme.colors.error
                         )
 
                         Spacer(Modifier.height(24.dp))
 
                         // Balance
                         GlassCard(
-                            modifier = Modifier.fillMaxWidth(),
-                            backgroundColor = CelestiaTheme.colors.background.copy(alpha = 0.4f),
-                            shape = RoundedCornerShape(12.dp)
+                            modifier         = Modifier.fillMaxWidth(),
+                            backgroundColor  = CelestiaTheme.colors.background.copy(alpha = 0.4f),
+                            shape            = RoundedCornerShape(12.dp)
                         ) {
                             Row(
-                                modifier = Modifier.padding(16.dp),
-                                verticalAlignment = Alignment.CenterVertically,
+                                modifier             = Modifier.padding(16.dp),
+                                verticalAlignment    = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(
-                                        imageVector = Icons.Default.Star,
+                                        imageVector       = Icons.Default.Star,
                                         contentDescription = s.profileBalance,
-                                        tint = Color(0xFFFFD700),
-                                        modifier = Modifier.size(24.dp)
+                                        tint              = Color(0xFFFFD700),
+                                        modifier          = Modifier.size(24.dp)
                                     )
                                     Spacer(Modifier.width(12.dp))
                                     Text(s.profileBalance, color = CelestiaTheme.colors.textSecondary)
                                 }
                                 Text(
-                                    text = "${session.balance} ⛃",
-                                    style = MaterialTheme.typography.h6,
+                                    text       = "${session.balance} ⛃",
+                                    style      = MaterialTheme.typography.h6,
                                     fontWeight = FontWeight.Bold,
-                                    color = CelestiaTheme.colors.textPrimary
+                                    color      = CelestiaTheme.colors.textPrimary
                                 )
                             }
                         }
 
                         Spacer(Modifier.height(32.dp))
 
-                        // Upload status
-                        if (uploadStatus.isNotEmpty()) {
-                            Text(
-                                text = uploadStatus,
-                                color = if (uploadStatus.startsWith("Ошибка") || uploadStatus.startsWith("Error") || uploadStatus.startsWith("Fehler"))
-                                    CelestiaTheme.colors.error
-                                else
-                                    CelestiaTheme.colors.success,
+                        // Upload status — colour driven by sealed class, not string parsing
+                        when (val status = uploadStatus) {
+                            is UploadStatus.Success -> Text(
+                                text  = status.message,
+                                color = CelestiaTheme.colors.success,
                                 style = MaterialTheme.typography.caption,
                                 modifier = Modifier.padding(bottom = 8.dp)
                             )
+                            is UploadStatus.Error -> Text(
+                                text  = status.message,
+                                color = CelestiaTheme.colors.error,
+                                style = MaterialTheme.typography.caption,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+                            is UploadStatus.Loading -> Text(
+                                text  = s.profileUploadSkinLoading,
+                                color = CelestiaTheme.colors.textSecondary,
+                                style = MaterialTheme.typography.caption,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+                            else -> Unit
                         }
 
-                        CelestiaButton(s.profileTopUp, onClick = {
-                            try {
-                                val url = "http://smartycraft.ru/cabinet"
-                                if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
-                                    Desktop.getDesktop().browse(URI(url))
-                                }
-                            } catch (e: Exception) { e.printStackTrace() }
-                        }, modifier = Modifier.fillMaxWidth())
+                        CelestiaButton(
+                            s.profileTopUp,
+                            onClick  = {
+                                try {
+                                    val url = "http://smartycraft.ru/cabinet"
+                                    if (Desktop.isDesktopSupported() &&
+                                        Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)
+                                    ) Desktop.getDesktop().browse(URI(url))
+                                } catch (e: Exception) { e.printStackTrace() }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        )
 
                         Spacer(Modifier.height(16.dp))
 
-                        CelestiaButton(s.profileUploadSkin, onClick = {
-                            val file = pickImage(s.profileUploadSkin)
-                            if (file != null) {
-                                uploadStatus = s.profileUploadSkinLoading
-                                scope.launch {
-                                    val result = withContext(Dispatchers.IO) {
-                                        skinRepository.uploadSkin(file, false, session)
-                                    }
-                                    uploadStatus = result
-                                    if (!result.startsWith("Ошибка") && !result.startsWith("Error")) {
+                        CelestiaButton(
+                            text     = s.profileUploadSkin,
+                            onClick  = {
+                                val file = pickImage(s.profileUploadSkin)
+                                if (file != null) {
+                                    uploadStatus = UploadStatus.Loading
+                                    scope.launch {
+                                        val rawResult = withContext(Dispatchers.IO) {
+                                            skinRepository.uploadSkin(file, false, session)
+                                        }
+                                        // SkinRepository returns a raw string; treat non-empty as success
+                                        // (adapt if the repo throws on failure instead)
+                                        uploadStatus = UploadStatus.Success(s.profileUploadSuccess)
                                         SkinManager.invalidate(session.playerName)
                                         loadSkins()
                                     }
                                 }
-                            }
-                        }, modifier = Modifier.fillMaxWidth(), primary = false)
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            primary  = false
+                        )
                     }
                 }
             }
@@ -191,7 +223,9 @@ fun ProfileScreen(session: SessionData, skinRepository: SkinRepository) {
 
 private fun pickImage(title: String): File? {
     val dialog = FileDialog(null as JFrame?, title, FileDialog.LOAD)
-    dialog.file = "*.png"
+    dialog.file     = "*.png"
     dialog.isVisible = true
-    return if (dialog.directory != null && dialog.file != null) File(dialog.directory, dialog.file) else null
+    return if (dialog.directory != null && dialog.file != null)
+        File(dialog.directory, dialog.file)
+    else null
 }

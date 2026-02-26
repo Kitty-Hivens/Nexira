@@ -26,57 +26,77 @@ fun LaunchControlPanel(
     val s = LocalStrings.current
 
     Column(Modifier.fillMaxWidth()) {
-        // Status row
+        // ── Status row ────────────────────────────────────────────────────────
         Row(
             Modifier.fillMaxWidth().height(20.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment     = Alignment.CenterVertically
         ) {
             when (state) {
                 is LaunchState.Idle -> {
-                    Text(s.launchReady, style = MaterialTheme.typography.caption, color = CelestiaTheme.colors.textSecondary)
+                    Text(
+                        s.launchReady,
+                        style = MaterialTheme.typography.caption,
+                        color = CelestiaTheme.colors.textSecondary
+                    )
                 }
                 is LaunchState.Prepare -> {
-                    Text(state.stepName, style = MaterialTheme.typography.caption, color = CelestiaTheme.colors.textSecondary)
+                    Text(
+                        state.stepName,
+                        style = MaterialTheme.typography.caption,
+                        color = CelestiaTheme.colors.textSecondary
+                    )
                 }
                 is LaunchState.Downloading -> {
-                    val fmt = DecimalFormat("#0.0")
+                    val fmt   = DecimalFormat("#0.0")
                     val dlMb  = state.downloadedBytes / 1024.0 / 1024.0
-                    val totMb = state.totalBytes / 1024.0 / 1024.0
+                    val totMb = state.totalBytes      / 1024.0 / 1024.0
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("${s.launchDownloading} ", style = MaterialTheme.typography.caption, color = CelestiaTheme.colors.textSecondary)
+                        Text(
+                            "${s.launchDownloading} ",
+                            style = MaterialTheme.typography.caption,
+                            color = CelestiaTheme.colors.textSecondary
+                        )
                         Text(
                             "${fmt.format(dlMb)} / ${fmt.format(totMb)} MB (${state.speedStr})",
-                            style = MaterialTheme.typography.caption,
-                            color = CelestiaTheme.colors.primary,
+                            style      = MaterialTheme.typography.caption,
+                            color      = CelestiaTheme.colors.primary,
                             fontWeight = FontWeight.Bold
                         )
                     }
                 }
                 is LaunchState.Error -> {
-                    Text(state.message, style = MaterialTheme.typography.caption, color = CelestiaTheme.colors.error)
+                    Text(
+                        state.message,
+                        style = MaterialTheme.typography.caption,
+                        color = CelestiaTheme.colors.error
+                    )
                 }
                 is LaunchState.GameRunning -> {
-                    Text(s.launchRunning, style = MaterialTheme.typography.caption, color = CelestiaTheme.colors.success)
+                    Text(
+                        s.launchRunning,
+                        style = MaterialTheme.typography.caption,
+                        color = CelestiaTheme.colors.success
+                    )
                 }
             }
         }
 
         Spacer(Modifier.height(8.dp))
 
-        // Progress bar
+        // ── Progress bar ──────────────────────────────────────────────────────
         val progress = when (state) {
             is LaunchState.Prepare     -> state.progress
             is LaunchState.Downloading -> state.progress
             is LaunchState.GameRunning -> 1.0f
-            else -> 0f
+            else                       -> 0f
         }
         if (state !is LaunchState.Idle && state !is LaunchState.Error) {
             LinearProgressIndicator(
-                progress = progress,
-                modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+                progress        = progress,
+                modifier        = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
                 backgroundColor = CelestiaTheme.colors.surface,
-                color = CelestiaTheme.colors.primary
+                color           = CelestiaTheme.colors.primary
             )
         } else {
             Spacer(Modifier.height(6.dp))
@@ -84,21 +104,24 @@ fun LaunchControlPanel(
 
         Spacer(Modifier.height(16.dp))
 
-        // Action button
+        // ── Action button ─────────────────────────────────────────────────────
         val btnText = when (state) {
             is LaunchState.Downloading, is LaunchState.Prepare -> s.launchAbort
-            is LaunchState.GameRunning -> s.launchRunning.uppercase()
-            is LaunchState.Error       -> s.launchResetError
-            else -> s.launchButton
+            is LaunchState.GameRunning                         -> s.launchRunning.uppercase()
+            is LaunchState.Error                               -> s.launchResetError
+            else                                               -> s.launchButton
         }
+
         CelestiaButton(
-            text = btnText,
+            text    = btnText,
             enabled = state !is LaunchState.GameRunning,
+            // Pulse when ready to play
+            glowing = state is LaunchState.Idle,
             onClick = {
                 when (state) {
                     is LaunchState.Downloading, is LaunchState.Prepare -> onAbort()
-                    is LaunchState.Error -> onClearError()
-                    else -> onLaunch()
+                    is LaunchState.Error                               -> onClearError()
+                    else                                               -> onLaunch()
                 }
             },
             modifier = Modifier.fillMaxWidth().height(50.dp)
