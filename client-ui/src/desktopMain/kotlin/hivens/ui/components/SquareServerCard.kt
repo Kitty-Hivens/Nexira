@@ -41,6 +41,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import hivens.config.AppConfig
 import hivens.core.api.model.ServerProfile
+import hivens.ui.effects.neonBorder
+import hivens.ui.effects.shimmerOverlay
 import hivens.ui.theme.CelestiaTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -64,24 +66,21 @@ fun SquareServerCard(
 
     var serverIcon by remember { mutableStateOf<ImageBitmap?>(null) }
 
-    // Загрузка иконки/постера
+    // Load icon from disk
     LaunchedEffect(profile) {
         withContext(Dispatchers.IO) {
             val userHome = System.getProperty("user.home")
-            val os = System.getProperty("os.name").lowercase()
-            val baseDir = when {
+            val os       = System.getProperty("os.name").lowercase()
+            val baseDir  = when {
                 os.contains("win") -> "$userHome/AppData/Roaming/${AppConfig.APP_DIR}"
                 os.contains("mac") -> "$userHome/Library/Application Support/${AppConfig.APP_DIR}"
-                else -> "$userHome/${AppConfig.APP_DIR}"
+                else               -> "$userHome/${AppConfig.APP_DIR}"
             }
-            // Ищем файл icon.png
+            // Looking for icon.png file
             val iconFile = File(baseDir, "clients/${profile.assetDir}/icon.png")
             if (iconFile.exists()) {
-                try {
-                    serverIcon = ImageIO.read(iconFile)?.toComposeImageBitmap()
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
+                try { serverIcon = ImageIO.read(iconFile)?.toComposeImageBitmap() }
+                catch (e: Exception) { e.printStackTrace() }
             }
         }
     }
@@ -89,38 +88,48 @@ fun SquareServerCard(
     val showActions = isHovered || isFocused
     val scale by animateFloatAsState(if (showActions) 1.02f else 1.0f)
 
-    // Цвет рамки
-    val borderColor by animateColorAsState(
-        if (isFocused) Color.White else if (isSelected) CelestiaTheme.colors.primary else Color.White.copy(alpha = 0.1f)
-    )
-
     Box(
         modifier = Modifier
             .aspectRatio(1f)
             .scale(scale)
             .clip(RoundedCornerShape(24.dp))
-            .border(2.dp, borderColor, RoundedCornerShape(24.dp))
-            // Обработчики нажатий
+            // Neon border when selected, plain when focused/default
+            .let { m ->
+                when {
+                    isSelected -> m.neonBorder(
+                        color        = CelestiaTheme.colors.primary,
+                        cornerRadius = 24.dp,
+                        strokeWidth  = 2.dp
+                    )
+                    isFocused  -> m.border(2.dp, Color.White, RoundedCornerShape(24.dp))
+                    else       -> m.border(1.dp, Color.White.copy(alpha = 0.10f), RoundedCornerShape(24.dp))
+                }
+            }
+            // Shimmer on hover (not when already glowing with neon)
+            .shimmerOverlay(enabled = isHovered && !isSelected)
+            // Interaction
             .clickable(interactionSource = interactionSource, indication = null) { onSelect() }
             .hoverable(interactionSource)
             .focusable(interactionSource = interactionSource)
             .onKeyEvent { event ->
-                if (event.type == KeyEventType.KeyUp && (event.key == Key.Enter || event.key == Key.NumPadEnter)) {
+                if (event.type == KeyEventType.KeyUp &&
+                    (event.key == Key.Enter || event.key == Key.NumPadEnter)
+                ) {
                     if (isSelected) onLaunch() else onSelect()
                     true
                 } else false
             }
     ) {
-        // --- СЛОЙ 1: ФОН ---
+        // ── LAYER 1: Background ───────────────────────────────────────────────
         if (serverIcon != null) {
-            // Если есть картинка - рисуем её на весь фон
+            // If there is a picture, draw it across the entire background.
             Image(
-                painter = BitmapPainter(serverIcon!!),
+                painter      = BitmapPainter(serverIcon!!),
                 contentDescription = null,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop // Заполняем весь квадрат, обрезая лишнее
+                modifier     = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
             )
-            // Добавляем затемнение снизу, чтобы текст читался
+            // Gradient scrim so text is readable
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -130,34 +139,35 @@ fun SquareServerCard(
                                 Color.Transparent,
                                 Color.Black.copy(alpha = 0.5f),
                                 Color.Black.copy(alpha = 0.9f)
-                            ),
-                            startY = 0f
+                            )
                         )
                     )
             )
         } else {
-            // Если картинки нет - рисуем стандартный абстрактный градиент
+            // If there is no picture, draw a standard abstract gradient
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(
                         brush = Brush.verticalGradient(
-                            colors = if (isSelected) listOf(Color(0xFF252535).copy(alpha = 0.9f), Color(0xFF15151A).copy(alpha = 0.95f))
-                            else listOf(Color(0xFF202025).copy(alpha = 0.6f), Color(0xFF101012).copy(alpha = 0.7f))
+                            colors = if (isSelected)
+                                listOf(Color(0xFF252535).copy(alpha = 0.9f), Color(0xFF15151A).copy(alpha = 0.95f))
+                            else
+                                listOf(Color(0xFF202025).copy(alpha = 0.6f), Color(0xFF101012).copy(alpha = 0.7f))
                         )
                     )
             )
         }
 
-        // --- СЛОЙ 2: КОНТЕНТ (Текст и т.д.) ---
+        // ── LAYER 2: Text content ─────────────────────────────────────────────
         Column(
             modifier = Modifier.fillMaxSize().padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center // Если картинка есть, текст уйдет вниз
+            verticalArrangement = Arrangement.Center
         ) {
 
             if (serverIcon == null) {
-                // Показываем кружок с буквами ТОЛЬКО если нет картинки
+                // Show a circle with letters ONLY if there is no picture
                 Box(
                     modifier = Modifier
                         .size(64.dp)
@@ -166,63 +176,59 @@ fun SquareServerCard(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = profile.name.take(2).uppercase(),
+                        text  = profile.name.take(2).uppercase(),
                         style = MaterialTheme.typography.h4,
                         color = CelestiaTheme.colors.primary
                     )
                 }
                 Spacer(Modifier.height(16.dp))
             } else {
-                // Если картинка есть, толкаем текст в самый низ
+                // If there is a picture, push the text to the very bottom
                 Spacer(Modifier.weight(1f))
             }
 
-            // Название сервера
+            // Server name
             Text(
-                text = profile.title ?: profile.name,
-                style = MaterialTheme.typography.h6,
+                text      = profile.title ?: profile.name,
+                style     = MaterialTheme.typography.h6,
                 fontWeight = FontWeight.Bold,
-                color = Color.White,
+                color     = Color.White,
                 textAlign = TextAlign.Center,
-                maxLines = 1
+                maxLines  = 1
             )
 
             Spacer(Modifier.height(4.dp))
 
-            // Версия
+            // Version
             Text(
-                text = profile.version,
+                text  = profile.version,
                 style = MaterialTheme.typography.caption,
-                color = if (serverIcon != null) Color.LightGray else Color.Gray // Чуть светлее на темной картинке
+                color = if (serverIcon != null) Color.LightGray else Color.Gray
             )
-
-            // Если картинка есть - нужен небольшой отступ снизу, чтобы текст не прилипал к кнопкам
-            if (serverIcon != null) {
-                Spacer(Modifier.height(8.dp))
-            }
+            if (serverIcon != null) Spacer(Modifier.height(8.dp))
         }
 
-        // --- СЛОЙ 3: КНОПКИ ---
+        // ── LAYER 3: Action buttons ───────────────────────────────────────────
         AnimatedVisibility(
-            visible = showActions,
-            enter = fadeIn() + slideInVertically { 20 },
-            exit = fadeOut() + slideOutVertically { 20 },
+            visible  = showActions,
+            enter    = fadeIn() + slideInVertically { 20 },
+            exit     = fadeOut() + slideOutVertically { 20 },
             modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 12.dp)
         ) {
             Row(
                 modifier = Modifier
                     .clip(RoundedCornerShape(12.dp))
-                    .background(Color.Black.copy(alpha = 0.8f)) // Подложка под кнопками
+                    .background(Color.Black.copy(alpha = 0.8f))
                     .padding(4.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 HoverIconButton(
-                    icon = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                    icon  = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                     color = if (isFavorite) Color.Red else Color.White,
                     onClick = onToggleFav
                 )
                 HoverIconButton(Icons.Default.Settings, onClick = onSettings)
-                HoverIconButton(Icons.Default.Info, onClick = onDetails)
+                HoverIconButton(Icons.Default.Info,     onClick = onDetails)
             }
         }
     }
