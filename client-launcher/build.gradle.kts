@@ -17,4 +17,17 @@ dependencies {
     implementation("io.ktor:ktor-client-okhttp:$ktorVersion")
     implementation("io.ktor:ktor-client-content-negotiation:$ktorVersion")
     implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
+
+    // ─── TEST ────────────────────────────────────────────────────────────────
+    testImplementation(kotlin("test"))
+    testImplementation("io.ktor:ktor-client-mock:$ktorVersion")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
+    testImplementation("io.mockk:mockk:1.13.12")
+    testImplementation("org.slf4j:slf4j-simple:2.0.12")
+    // MockClientFactory и другие тестовые утилиты из client-core
+    testImplementation(testFixtures(project(":client-core")))
+}
+
+tasks.test {
+    useJUnitPlatform()
 }
