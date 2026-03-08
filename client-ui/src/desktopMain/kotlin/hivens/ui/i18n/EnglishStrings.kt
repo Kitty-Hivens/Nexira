@@ -155,15 +155,6 @@ object EnglishStrings : AppStrings {
     override val trayConsole  = "Open console"
     override val trayExit     = "Exit"
 
-    // Seasons
-    override val seasonAuto    = "Automatic"
-    override val seasonNone    = "Disabled"
-    override val seasonWinter  = "Winter (Snow)"
-    override val seasonNewYear = "New Year"
-    override val seasonSpring  = "Spring (Sakura)"
-    override val seasonSummer  = "Summer (Fireflies)"
-    override val seasonAutumn  = "Autumn (Leaves)"
-
     // Settings: Diagnostics
     override val settingsSectionDiagnostics = "Diagnostics"
     override val settingsOpenLogs           = "Open logs folder"

@@ -34,6 +34,7 @@ import org.koin.compose.koinInject
 @Composable
 fun AppLayout(
     appState: AppState,
+    onCloseApp: () -> Unit,
     currentScreen: Screen,
     onScreenChange: (Screen) -> Unit,
     onLogin: (SessionData) -> Unit,
@@ -80,7 +81,7 @@ fun AppLayout(
                                 initialSelectedServer = selectedServer,
                                 onServerSelected      = { selectedServer = it },
                                 onSessionUpdated      = { currentSession = it },
-                                onCloseApp            = {},
+                                onCloseApp            = onCloseApp,
                                 onOpenServerSettings  = { onScreenChange(Screen.ServerSettings(it)) },
                                 onOpenNews            = { onScreenChange(Screen.News) },
                                 onOpenDetails         = { onScreenChange(Screen.ServerDetails(it)) }
@@ -102,7 +103,6 @@ fun AppLayout(
                         SettingsScreen(
                             isDarkTheme       = isDarkTheme,
                             onToggleTheme     = onToggleDarkTheme,
-                            onThemeChanged    = {},   // SeasonalEffectsLayer removed
                             onOpenThemePicker = { onScreenChange(Screen.ThemePicker) },
                             currentLocale     = currentLocale,
                             onLocaleChanged   = onLocaleChanged
