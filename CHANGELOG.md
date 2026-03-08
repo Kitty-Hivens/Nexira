@@ -15,6 +15,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `MockClientFactory` test fixture shared across modules via `java-test-fixtures`
 - Test jobs added as a prerequisite for `changelog` / `build` steps in the release workflow
 
+### Fixed
+- `exitApplication` now correctly wired through `AppRoot` → `AppLayout` → `DashboardScreen`;
+  "close after game starts" setting now actually closes the launcher
+
+### Removed
+- Dead method `getNeoForgeModules()` from `GameCommandBuilder` (`@Deprecated`, never called)
+- Unused `onThemeChanged: (SeasonTheme) -> Unit` parameter from `SettingsScreen`
+- Leftover seasonal-effects strings from all three locales (`seasonAuto/None/Winter/NewYear/Spring/Summer/Autumn`)
+- `seasonalTheme` field from `SettingsData` and corresponding entries in `AppStrings`
+
 ### Changed
 - `client-core` and `client-launcher` build scripts updated with test dependencies:
   `ktor-client-mock`, `kotlinx-coroutines-test`, `mockk`, `slf4j-simple`
