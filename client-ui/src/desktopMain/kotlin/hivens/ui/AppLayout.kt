@@ -1,0 +1,308 @@
+package hivens.ui
+
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.material.CircularProgressIndicator
+import androidx.compose.material.Icon
+import androidx.compose.material.IconButton
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.dp
+import hivens.core.api.SkinRepository
+import hivens.core.api.model.ServerProfile
+import hivens.core.data.SessionData
+import hivens.ui.i18n.AppLocale
+import hivens.ui.screens.*
+import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.CustomTheme
+import hivens.ui.utils.GameConsoleService
+import org.koin.compose.koinInject
+
+// ─── Layout ──────────────────────────────────────────────────────────────────
+
+@Composable
+fun AppLayout(
+    appState: AppState,
+    currentScreen: Screen,
+    onScreenChange: (Screen) -> Unit,
+    onLogin: (SessionData) -> Unit,
+    onLogout: () -> Unit,
+    isDarkTheme: Boolean,
+    onToggleDarkTheme: () -> Unit,
+    customTheme: CustomTheme,
+    onCustomThemeChanged: (CustomTheme) -> Unit,
+    currentLocale: AppLocale,
+    onLocaleChanged: (AppLocale) -> Unit
+) {
+    val skinRepository: SkinRepository = koinInject()
+
+    // Session can be refreshed by DashboardScreen on auth-retry
+    var currentSession by remember(appState) {
+        mutableStateOf((appState as? AppState.Authenticated)?.session)
+    }
+    var selectedServer by remember { mutableStateOf<ServerProfile?>(null) }
+
+    Row(Modifier.fillMaxSize().background(CelestiaTheme.colors.background)) {
+
+        // ── Sidebar 52dp ──────────────────────────────────────────────────────
+        AppSidebar(
+            currentScreen   = currentScreen,
+            isAuthenticated = appState is AppState.Authenticated,
+            onScreenChange  = onScreenChange,
+            onLogout        = onLogout
+        )
+
+        SidebarDivider()
+
+        // ── Main content ──────────────────────────────────────────────────────
+        Box(Modifier.weight(1f).fillMaxHeight()) {
+            Crossfade(
+                targetState  = currentScreen,
+                animationSpec = tween(180)
+            ) { screen ->
+                when (screen) {
+                    Screen.Home -> {
+                        val session = currentSession
+                        if (session != null) {
+                            DashboardScreen(
+                                session               = session,
+                                initialSelectedServer = selectedServer,
+                                onServerSelected      = { selectedServer = it },
+                                onSessionUpdated      = { currentSession = it },
+                                onCloseApp            = {},
+                                onOpenServerSettings  = { onScreenChange(Screen.ServerSettings(it)) },
+                                onOpenNews            = { onScreenChange(Screen.News) },
+                                onOpenDetails         = { onScreenChange(Screen.ServerDetails(it)) }
+                            )
+                        } else {
+                            ContentLoadingPlaceholder()
+                        }
+                    }
+
+                    Screen.News ->
+                        NewsScreen(onBack = { onScreenChange(Screen.Home) })
+
+                    Screen.Profile ->
+                        currentSession?.let {
+                            ProfileScreen(session = it, skinRepository = skinRepository)
+                        }
+
+                    Screen.Settings ->
+                        SettingsScreen(
+                            isDarkTheme       = isDarkTheme,
+                            onToggleTheme     = onToggleDarkTheme,
+                            onThemeChanged    = {},   // SeasonalEffectsLayer removed
+                            onOpenThemePicker = { onScreenChange(Screen.ThemePicker) },
+                            currentLocale     = currentLocale,
+                            onLocaleChanged   = onLocaleChanged
+                        )
+
+                    Screen.ThemePicker ->
+                        ThemePickerScreen(
+                            currentTheme    = customTheme,
+                            onThemeSelected = { newTheme ->
+                                onCustomThemeChanged(newTheme)
+                                onScreenChange(Screen.Settings)
+                            },
+                            onBack = { onScreenChange(Screen.Settings) }
+                        )
+
+                    is Screen.ServerSettings ->
+                        ServerSettingsScreen(
+                            server = screen.server,
+                            onBack = { onScreenChange(Screen.Home) }
+                        )
+
+                    is Screen.ServerDetails ->
+                        ServerDetailScreen(
+                            server = screen.server,
+                            onBack = { onScreenChange(Screen.Home) }
+                        )
+                }
+            }
+        }
+
+        SidebarDivider()
+
+        // ── Right panel 264dp ─────────────────────────────────────────────────
+        RightPanel(
+            appState  = appState,
+            onLogin   = onLogin,
+            onLogout  = onLogout,
+            modifier  = Modifier.width(264.dp).fillMaxHeight()
+        )
+    }
+}
+
+// ─── Sidebar ─────────────────────────────────────────────────────────────────
+
+@Composable
+fun AppSidebar(
+    currentScreen: Screen,
+    isAuthenticated: Boolean,
+    onScreenChange: (Screen) -> Unit,
+    onLogout: () -> Unit
+) {
+    val homeActive     = currentScreen is Screen.Home
+            || currentScreen is Screen.ServerSettings
+            || currentScreen is Screen.ServerDetails
+            || currentScreen is Screen.News
+    val profileActive  = currentScreen is Screen.Profile
+    val settingsActive = currentScreen is Screen.Settings || currentScreen is Screen.ThemePicker
+
+    Column(
+        modifier = Modifier
+            .width(64.dp)
+            .fillMaxHeight()
+            .background(CelestiaTheme.colors.surface.copy(alpha = 0.35f)),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.SpaceBetween
+    ) {
+        // ── Nav items ─────────────────────────────────────────────────────────
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.padding(top = 16.dp)
+        ) {
+            SidebarNavItem(
+                icon     = Icons.Default.Home,
+                selected = homeActive,
+                onClick  = { onScreenChange(Screen.Home) }
+            )
+            SidebarNavItem(
+                icon     = Icons.Default.Person,
+                selected = profileActive,
+                enabled  = isAuthenticated,
+                onClick  = { onScreenChange(Screen.Profile) }
+            )
+            SidebarNavItem(
+                icon     = Icons.Default.Settings,
+                selected = settingsActive,
+                onClick  = { onScreenChange(Screen.Settings) }
+            )
+        }
+
+        // ── Bottom actions ────────────────────────────────────────────────────
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.padding(bottom = 16.dp)
+        ) {
+            SidebarIconButton(
+                icon  = Icons.Default.Build,
+                tint  = if (GameConsoleService.shouldShowConsole) CelestiaTheme.colors.primary
+                else CelestiaTheme.colors.textSecondary.copy(alpha = 0.55f),
+                onClick = {
+                    if (GameConsoleService.shouldShowConsole) GameConsoleService.hide()
+                    else GameConsoleService.show()
+                }
+            )
+            if (isAuthenticated) {
+                SidebarIconButton(
+                    icon    = Icons.AutoMirrored.Filled.ExitToApp,
+                    tint    = CelestiaTheme.colors.error.copy(alpha = 0.75f),
+                    onClick = onLogout
+                )
+            }
+        }
+    }
+}
+
+// ─── Private components ───────────────────────────────────────────────────────
+
+@Composable
+private fun SidebarNavItem(
+    icon: ImageVector,
+    selected: Boolean,
+    enabled: Boolean = true,
+    onClick: () -> Unit
+) {
+    val tint = when {
+        !enabled -> CelestiaTheme.colors.textSecondary.copy(alpha = 0.2f)
+        selected -> CelestiaTheme.colors.primary
+        else     -> CelestiaTheme.colors.textSecondary.copy(alpha = 0.70f)
+    }
+    Box(
+        modifier = Modifier
+            .width(64.dp)
+            .height(50.dp)
+            .background(
+                if (selected) CelestiaTheme.colors.primary.copy(alpha = 0.13f)
+                else Color.Transparent
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        if (selected) {
+            Box(
+                Modifier
+                    .align(Alignment.CenterStart)
+                    .width(3.dp)
+                    .height(26.dp)
+                    .background(
+                        color = CelestiaTheme.colors.primary,
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(topEnd = 3.dp, bottomEnd = 3.dp)
+                    )
+            )
+        }
+        IconButton(
+            onClick  = onClick,
+            enabled  = enabled,
+            modifier = Modifier.size(44.dp)
+        ) {
+            Icon(
+                imageVector       = icon,
+                contentDescription = null,
+                tint              = tint,
+                modifier          = Modifier.size(24.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun SidebarIconButton(
+    icon: ImageVector,
+    tint: Color,
+    onClick: () -> Unit
+) {
+    IconButton(onClick = onClick, modifier = Modifier.size(48.dp)) {
+        Icon(
+            imageVector       = icon,
+            contentDescription = null,
+            tint              = tint,
+            modifier          = Modifier.size(22.dp)
+        )
+    }
+}
+
+@Composable
+private fun SidebarDivider() {
+    Box(
+        Modifier
+            .width(1.dp)
+            .fillMaxHeight()
+            .background(CelestiaTheme.colors.surface.copy(alpha = 0.6f))
+    )
+}
+
+@Composable
+private fun ContentLoadingPlaceholder() {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        CircularProgressIndicator(
+            color        = CelestiaTheme.colors.primary.copy(alpha = 0.35f),
+            modifier     = Modifier.size(28.dp),
+            strokeWidth  = 2.dp
+        )
+    }
+}
