@@ -9,9 +9,6 @@ data class SettingsData(
     var isDarkTheme: Boolean = true,
     var closeAfterStart: Boolean = true,
     var saveCredentials: Boolean = true,
-    var savedUsername: String? = null,
-    var savedUuid: String? = null,
-    var savedAccessToken: String? = null,
     var savedFileManifest: FileManifest? = null,
     /** BCP-47 language tag: "ru", "en", "de" */
     var locale: String = "en"

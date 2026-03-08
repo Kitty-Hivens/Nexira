@@ -6,9 +6,6 @@ object EnglishStrings : AppStrings {
     override val appName = "Aura Launcher"
     override val appVersion get() = appName
 
-    // Splash
-    override val splashLoading = "Loading..."
-
     // Login
     override val loginTitle        = "Aura Client"
     override val loginUsername     = "Username"

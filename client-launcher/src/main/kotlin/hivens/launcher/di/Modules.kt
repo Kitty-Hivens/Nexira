@@ -15,9 +15,6 @@ import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import org.koin.core.module.dsl.singleOf
@@ -102,10 +99,6 @@ val networkModule = module {
  * Module of the main components of the application.
  */
 val appModule = module {
-    // AppScope: The life cycle is equal to the running time of the application.
-    // We use it to launch the game so that it is not interrupted when changing screens.
-    single<CoroutineScope> { CoroutineScope(SupervisorJob() + Dispatchers.IO) }
-
     /**
      * Application working directory (.aura).
      */
@@ -121,7 +114,6 @@ val appModule = module {
         SettingsService(get(), dataDir.resolve(AppConfig.FILES_SETTINGS))
     }
 
-    single<IFileIntegrityService> { FileIntegrityService() }
     single<IFileDownloadService> { FileDownloadService(get()) }
 
     single<IManifestProcessorService> { ManifestProcessorService(get()) }
