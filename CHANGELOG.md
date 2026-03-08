@@ -22,6 +22,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   were merged onto a single line
 
 ### Changed
+- `client-ui`: migrated from Compose Material 2 to Material 3 (`material` → `material3`);
+  `material-icons-extended` dependency retained from M2 artifact pending icon migration
+- `CelestiaTheme`: `darkColors()`/`lightColors()` → `darkColorScheme()`/`lightColorScheme()`;
+  `MaterialTheme(colors=…)` → `MaterialTheme(colorScheme=…)`; `primaryVariant` removed from
+  M3 scheme (value folded into `primary`); `surfaceVariant` and `outline` slots now wired
+  through both `CelestiaColors` and the M3 `ColorScheme`
+- `CelestiaColors`: added `surfaceVariant: Color` and `outline: Color` fields; both palettes
+  (dark/light) supply explicit values (`#444444` / `#CCCCCC`)
+- `CustomTheme.toCelestiaColors()`: derives `surfaceVariant` from `surface` at 70 % alpha
+  and `outline` from the dark/light default; keeps custom-theme JSON schema backwards-compatible
 - `client-core` and `client-launcher` build scripts updated with test dependencies:
   `ktor-client-mock`, `kotlinx-coroutines-test`, `mockk`, `slf4j-simple`
 - Complete UI overhaul: replaced undecorated fullscreen window with native resizable window
