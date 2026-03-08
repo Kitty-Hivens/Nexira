@@ -25,6 +25,7 @@ data class CustomTheme(
             secondary = parseHexColor(secondary),
             background = parseHexColor(background),
             surface = parseHexColor(surface),
+            surfaceVariant = parseHexColor(surface).copy(alpha = 0.7f),
             error = parseHexColor(error),
             onPrimary = if (isDark) Color.Black else Color.White,
             onSecondary = Color.Black,
@@ -34,7 +35,8 @@ data class CustomTheme(
             textSecondary = if (isDark) Color(0xFFB0B0B0) else Color(0xFF78909C),
             glassBackground = parseHexColor(background),
             glassAlpha = if (isDark) 0.6f else 0.65f,
-            success = parseHexColor(success)
+            success = parseHexColor(success),
+            outline = if (isDark) Color(0xFF444444) else Color(0xFFCCCCCC)
         )
     }
     
