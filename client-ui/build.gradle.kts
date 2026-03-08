@@ -159,9 +159,7 @@ compose.desktop {
             "-Dawt.useSystemAAFontSettings=on",
             "-Djdk.gtk.version=3",
             "-Dwayland.debug.children=true",
-            "-Dsun.java2d.uiScale=1",
             "-D_JAVA_AWT_WM_NONREPARENTING=1",
-            "-Dskiko.render.backend=SOFTWARE",
             "-Drobot.need_x11=false",
 
             // Performance flags

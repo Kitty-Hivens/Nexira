@@ -18,6 +18,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Changed
 - `client-core` and `client-launcher` build scripts updated with test dependencies:
   `ktor-client-mock`, `kotlinx-coroutines-test`, `mockk`, `slf4j-simple`
+- Complete UI overhaul: replaced undecorated fullscreen window with native resizable window
+- `AppLayout`: 3-column layout — icon-only sidebar (64dp) + content area + right panel (264dp)
+- `AppSidebar`: left-edge active indicator, icon-only nav items, no labels
+- `SquareServerCard`: palette-based gradients (8 color pairs), hover scale animation,
+  animated action buttons overlay; icon loaded from asset dir
+- `DashboardScreen`: `GridCells.Adaptive(220dp)`, removed GlassCard wrapper
+- `RightPanel`: unified auth section (login form / account panel) + Hivens news placeholder
+- `SettingsScreen`: removed seasonal effects dropdown section
+- Auto-login on startup runs immediately without splash delay
+
+### Removed
+- `SplashScreen` and `AppState.Splash`
+- `CelestiaBackground`, `ShellUI`, `SeasonalEffectsLayer` canvas effects
+- `LoginScreen` (logic moved into `RightPanel` as `LoginPanel`)
+- `AuroraEffect.kt`, `Particle.kt` — no longer referenced
 
 ## [1.3.0] - 2026-03-06
 

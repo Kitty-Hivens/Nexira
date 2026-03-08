@@ -7,14 +7,9 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.Icon
-import androidx.compose.material.IconButton
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -25,7 +20,6 @@ import hivens.core.api.interfaces.ISettingsService
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.SessionData
 import hivens.launcher.ProfileManager
-import hivens.ui.components.GlassCard
 import hivens.ui.components.LaunchControlPanel
 import hivens.ui.components.SquareServerCard
 import hivens.ui.i18n.LocalStrings
@@ -49,157 +43,116 @@ fun DashboardScreen(
     onOpenDetails: (ServerProfile) -> Unit
 ) {
     val serverListService: IServerListService = koinInject()
-    val settingsService: ISettingsService = koinInject()
-    val profileManager: ProfileManager = koinInject()
-    val controller: LauncherController = koinInject()
+    val settingsService: ISettingsService     = koinInject()
+    val profileManager: ProfileManager        = koinInject()
+    val controller: LauncherController        = koinInject()
     val s = LocalStrings.current
 
     val launchState by controller.state.collectAsState()
 
-    var servers by remember { mutableStateOf<List<ServerProfile>>(emptyList()) }
+    var servers             by remember { mutableStateOf<List<ServerProfile>>(emptyList()) }
     var selectedServerState by remember { mutableStateOf(initialSelectedServer) }
-
-    var favoriteTrigger by remember { mutableStateOf(0) }
+    var favoriteTrigger     by remember { mutableStateOf(0) }
     val favorites = remember(favoriteTrigger) { profileManager.favoriteServers }
 
     LaunchedEffect(launchState) {
         if (launchState is LaunchState.GameRunning) {
-            val settings = settingsService.getSettings()
-            if (settings.closeAfterStart) {
-                onCloseApp()
-            }
+            if (settingsService.getSettings().closeAfterStart) onCloseApp()
         }
     }
 
     LaunchedEffect(Unit) {
         if (servers.isEmpty()) {
             try {
-                val data = withContext(Dispatchers.IO) {
-                    serverListService.fetchDashboardData().get()
-                }
+                val data = withContext(Dispatchers.IO) { serverListService.fetchDashboardData().get() }
                 servers = data.servers
 
                 if (selectedServerState == null) {
-                    val lastId = profileManager.lastServerId
+                    val lastId  = profileManager.lastServerId
                     val default = servers.find { it.assetDir == lastId } ?: servers.firstOrNull()
-                    if (default != null) {
-                        selectedServerState = default
-                        onServerSelected(default)
-                    }
+                    if (default != null) { selectedServerState = default; onServerSelected(default) }
                 }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
+            } catch (_: Exception) {}
         }
     }
 
     LaunchedEffect(initialSelectedServer) {
-        if (initialSelectedServer != null) {
-            selectedServerState = initialSelectedServer
-        }
+        if (initialSelectedServer != null) selectedServerState = initialSelectedServer
     }
 
-    Column(Modifier.fillMaxSize().padding(16.dp)) {
+    Column(Modifier.fillMaxSize().padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 16.dp)) {
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = s.dashboardWelcome(session.playerName.uppercase()),
-                style = MaterialTheme.typography.h5,
-                color = CelestiaTheme.colors.textPrimary.copy(alpha = 0.7f)
-            )
+        // ── Header ────────────────────────────────────────────────────────────
+        Text(
+            text      = s.dashboardWelcome(session.playerName),
+            style     = MaterialTheme.typography.subtitle1,
+            fontWeight = FontWeight.Medium,
+            color     = CelestiaTheme.colors.textSecondary
+        )
 
-            IconButton(
-                onClick = onOpenNews,
-                enabled = launchState is LaunchState.Idle || launchState is LaunchState.Error
+        Spacer(Modifier.height(4.dp))
+
+        Text(
+            text      = s.dashboardServers,
+            style     = MaterialTheme.typography.caption,
+            color     = CelestiaTheme.colors.textSecondary.copy(alpha = 0.55f),
+            fontWeight = FontWeight.Bold
+        )
+
+        Spacer(Modifier.height(16.dp))
+
+        // ── Server grid ───────────────────────────────────────────────────────
+        Box(Modifier.weight(1f).fillMaxWidth()) {
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(minSize = 220.dp),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                verticalArrangement   = Arrangement.spacedBy(14.dp),
+                contentPadding        = PaddingValues(bottom = 8.dp),
+                modifier              = Modifier.fillMaxSize()
             ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.List,
-                    contentDescription = s.dashboardNews,
-                    tint = CelestiaTheme.colors.textSecondary,
-                    modifier = Modifier.size(32.dp)
-                )
-            }
-        }
-
-        Spacer(Modifier.height(24.dp))
-
-        GlassCard(Modifier.weight(1f).fillMaxWidth()) {
-            Column(Modifier.padding(24.dp)) {
-
-                Text(
-                    s.dashboardServers,
-                    style = MaterialTheme.typography.caption,
-                    color = CelestiaTheme.colors.textSecondary,
-                    fontWeight = FontWeight.Bold
-                )
-
-                Spacer(Modifier.height(16.dp))
-
-                Box(Modifier.weight(1f)) {
-                    LazyVerticalGrid(
-                        columns = GridCells.Adaptive(minSize = 180.dp),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
-                        contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp, start = 8.dp, end = 8.dp)
-                    ) {
-                        val sortedServers = servers.sortedByDescending { favorites.contains(it.assetDir) }
-
-                        items(sortedServers) { srv ->
-                            val isSelected = srv == selectedServerState
-
-                            SquareServerCard(
-                                profile = srv,
-                                isSelected = isSelected,
-                                isFavorite = favorites.contains(srv.assetDir),
-                                onSelect = {
-                                    if (launchState is LaunchState.Idle || launchState is LaunchState.Error) {
-                                        selectedServerState = srv
-                                        onServerSelected(srv)
-                                        profileManager.lastServerId = srv.assetDir
-                                        profileManager.save()
-                                    }
-                                },
-                                onLaunch = {
-                                    if (selectedServerState != null && (launchState is LaunchState.Idle || launchState is LaunchState.Error)) {
-                                        controller.launch(session, selectedServerState!!, onSessionUpdated)
-                                    }
-                                },
-                                onSettings = { onOpenServerSettings(srv) },
-                                onDetails = { onOpenDetails(srv) },
-                                onToggleFav = {
-                                    profileManager.toggleFavorite(srv.assetDir)
-                                    favoriteTrigger++
-                                }
-                            )
-                        }
-                    }
-                }
-
-                Spacer(Modifier.height(24.dp))
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(16.dp))
-                        .background(Color.Black.copy(alpha = 0.2f), RoundedCornerShape(16.dp))
-                        .padding(16.dp)
-                ) {
-                    LaunchControlPanel(
-                        state = launchState,
+                val sortedServers = servers.sortedByDescending { favorites.contains(it.assetDir) }
+                items(sortedServers) { srv ->
+                    SquareServerCard(
+                        profile    = srv,
+                        isSelected = srv == selectedServerState,
+                        isFavorite = favorites.contains(srv.assetDir),
+                        onSelect   = {
+                            if (launchState is LaunchState.Idle || launchState is LaunchState.Error) {
+                                selectedServerState = srv
+                                onServerSelected(srv)
+                                profileManager.lastServerId = srv.assetDir
+                                profileManager.save()
+                            }
+                        },
                         onLaunch = {
-                            if (selectedServerState != null) {
+                            if (selectedServerState != null && (launchState is LaunchState.Idle || launchState is LaunchState.Error)) {
                                 controller.launch(session, selectedServerState!!, onSessionUpdated)
                             }
                         },
-                        onAbort = { controller.abort() },
-                        onClearError = { controller.clearError() }
+                        onSettings  = { onOpenServerSettings(srv) },
+                        onDetails   = { onOpenDetails(srv) },
+                        onToggleFav = { profileManager.toggleFavorite(srv.assetDir); favoriteTrigger++ }
                     )
                 }
             }
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        // ── Launch control ────────────────────────────────────────────────────
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(1.dp, Color.White.copy(alpha = 0.06f), RoundedCornerShape(14.dp))
+                .background(Color.Black.copy(alpha = 0.18f), RoundedCornerShape(14.dp))
+                .padding(horizontal = 16.dp, vertical = 14.dp)
+        ) {
+            LaunchControlPanel(
+                state        = launchState,
+                onLaunch     = { selectedServerState?.let { controller.launch(session, it, onSessionUpdated) } },
+                onAbort      = { controller.abort() },
+                onClearError = { controller.clearError() }
+            )
         }
     }
 }
