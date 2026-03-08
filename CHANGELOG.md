@@ -18,12 +18,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Fixed
 - `exitApplication` now correctly wired through `AppRoot` → `AppLayout` → `DashboardScreen`;
   "close after game starts" setting now actually closes the launcher
-
-### Removed
-- Dead method `getNeoForgeModules()` from `GameCommandBuilder` (`@Deprecated`, never called)
-- Unused `onThemeChanged: (SeasonTheme) -> Unit` parameter from `SettingsScreen`
-- Leftover seasonal-effects strings from all three locales (`seasonAuto/None/Winter/NewYear/Spring/Summer/Autumn`)
-- `seasonalTheme` field from `SettingsData` and corresponding entries in `AppStrings`
+- Malformed import block in `ManifestProcessorService.kt` where two `import` statements
+  were merged onto a single line
 
 ### Changed
 - `client-core` and `client-launcher` build scripts updated with test dependencies:
@@ -43,6 +39,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `CelestiaBackground`, `ShellUI`, `SeasonalEffectsLayer` canvas effects
 - `LoginScreen` (logic moved into `RightPanel` as `LoginPanel`)
 - `AuroraEffect.kt`, `Particle.kt` — no longer referenced
+- Dead method `getNeoForgeModules()` from `GameCommandBuilder` (`@Deprecated`, never called)
+- Unused `onThemeChanged: (SeasonTheme) -> Unit` parameter from `SettingsScreen`
+- Leftover seasonal-effects strings from all three locales (`seasonAuto/None/Winter/NewYear/Spring/Summer/Autumn`)
+- `seasonalTheme` field from `SettingsData` and corresponding entries in `AppStrings`
+- `SeasonTheme.kt` (`client-core`) — entire file deleted; no consumers remain after
+  seasonal-effects removal
+- `IFileIntegrityService` + `FileIntegrityService` (`client-core`) — never injected;
+  MD5 verification is handled internally by `FileDownloadService`; Koin binding removed
+- `SettingsData` legacy credential fields: `savedUsername`, `savedUuid`, `savedAccessToken`,
+  `savedFileManifest` — never read or written after session state was delegated to
+  `CredentialsManager`
+- `IManifestProcessorService.processManifest()` — stub returning empty `FileManifest()`,
+  zero call sites; removed from interface and implementation
+- `IServerListService.fetchProfiles()` — zero call sites; all consumers use
+  `fetchDashboardData().thenApply { it.servers }`; removed from interface and `ServerListService`
+- `single<CoroutineScope>` binding in `appModule` — `LauncherController` creates its own
+  scope directly, injected binding was unreachable
+- `AppStrings.splashLoading` and matching keys in `RussianStrings`, `EnglishStrings`,
+  `GermanStrings` — orphaned after `SplashScreen` removal
 
 ## [1.3.0] - 2026-03-06
 

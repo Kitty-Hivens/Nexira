@@ -6,9 +6,6 @@ interface AppStrings {
     val appName: String
     val appVersion: String
 
-    // --- Splash ---
-    val splashLoading: String
-
     // --- Login ---
     val loginTitle: String
     val loginUsername: String
