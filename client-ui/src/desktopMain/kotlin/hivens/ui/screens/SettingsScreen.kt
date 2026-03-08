@@ -30,7 +30,6 @@ import java.io.File
 fun SettingsScreen(
     isDarkTheme: Boolean,
     onToggleTheme: () -> Unit,
-    onThemeChanged: (hivens.core.data.SeasonTheme) -> Unit, // kept for API compat, unused
     onOpenThemePicker: () -> Unit,
     currentLocale: AppLocale,
     onLocaleChanged: (AppLocale) -> Unit

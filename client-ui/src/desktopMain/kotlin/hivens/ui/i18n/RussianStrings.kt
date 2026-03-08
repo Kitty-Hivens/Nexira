@@ -155,15 +155,6 @@ object RussianStrings : AppStrings {
     override val trayConsole  = "Открыть консоль"
     override val trayExit     = "Выход"
 
-    // Seasons
-    override val seasonAuto    = "Автоматически"
-    override val seasonNone    = "Отключено"
-    override val seasonWinter  = "Зима (Снег)"
-    override val seasonNewYear = "Новый год"
-    override val seasonSpring  = "Весна (Сакура)"
-    override val seasonSummer  = "Лето (Светлячки)"
-    override val seasonAutumn  = "Осень (Листопад)"
-
     // Settings: Diagnostics
     override val settingsSectionDiagnostics = "Диагностика"
     override val settingsOpenLogs           = "Открыть логи"

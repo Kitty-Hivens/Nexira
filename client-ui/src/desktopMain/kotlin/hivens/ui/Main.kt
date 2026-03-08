@@ -121,6 +121,7 @@ fun main() {
                 ) {
                     CelestiaTheme(useDarkTheme = isDarkTheme, customTheme = customTheme) {
                         AppRoot(
+                            onCloseApp           = ::exitApplication,
                             isDarkTheme          = isDarkTheme,
                             onToggleDarkTheme    = { isDarkTheme = !isDarkTheme },
                             customTheme          = customTheme,
@@ -147,6 +148,7 @@ fun main() {
 
 @Composable
 fun AppRoot(
+    onCloseApp: () -> Unit,
     isDarkTheme: Boolean,
     onToggleDarkTheme: () -> Unit,
     customTheme: CustomTheme,
@@ -181,6 +183,7 @@ fun AppRoot(
 
     AppLayout(
         appState             = appState,
+        onCloseApp           = onCloseApp,
         currentScreen        = currentScreen,
         onScreenChange       = { currentScreen = it },
         onLogin              = { session -> appState = AppState.Authenticated(session) },

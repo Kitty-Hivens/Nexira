@@ -159,15 +159,6 @@ interface AppStrings {
     val trayConsole: String
     val trayExit: String
 
-    // --- Season Themes ---
-    val seasonAuto: String
-    val seasonNone: String
-    val seasonWinter: String
-    val seasonNewYear: String
-    val seasonSpring: String
-    val seasonSummer: String
-    val seasonAutumn: String
-
     // --- Settings: Diagnostics ---
     val settingsSectionDiagnostics: String
     val settingsOpenLogs: String
