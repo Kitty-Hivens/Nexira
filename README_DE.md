@@ -20,10 +20,6 @@
 
 Wir glauben, dass sich das Starten deines Lieblingsservers nicht anfühlen sollte wie die Interaktion mit einem Relikt aus 2013. Im Gegensatz zum Original-Client schleppt Aura keine uralten Java-Versionen mit sich herum, startet sofort und respektiert dein Betriebssystem — egal ob Linux, Windows oder macOS.
 
-<p align="center">
-  <img src="assets/servers.png" alt="Serverauswahl" width="800" style="border-radius: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);">
-</p>
-
 ## ✨ Warum Aura?
 
 Wir haben Aura gebaut, weil wir effiziente Software lieben.
@@ -32,18 +28,6 @@ Wir haben Aura gebaut, weil wir effiziente Software lieben.
 * **Atmosphärisch:** Der Launcher lebt mit dir. Er bietet dynamische **saisonale Themen** — vom sanften winterlichen Schneefall bis zu sommerlichen Glühwürmchen — die sich automatisch an die Jahreszeit (oder deine Stimmung) anpassen.
 * **Linux First:** Wir behandeln Linux-Nutzer nicht als Bürger zweiter Klasse. Aura bietet ein natives Erlebnis: AppImage-Support, nahtlose Wayland-Integration und kein "Gefrickel", um Java zum Laufen zu bringen.
 * **Transparent & Offen:** Du verdienst es zu wissen, was auf deinem Rechner läuft. Unser Code ist zu 100% Open Source unter der GPLv3-Lizenz.
-
-## 🎨 Galerie
-
-### Login & Profil
-|                          Account Login                           |                      Spielerprofil                       |
-|:----------------------------------------------------------------:|:--------------------------------------------------------:|
-| <img src="assets/login.png" alt="Login-Bildschirm" width="100%"> | <img src="assets/profile.png" alt="Profil" width="100%"> |
-
-### Einstellungen & Anpassung
-|                             Globale Einstellungen                              |                             Client-Konfiguration                             |
-|:------------------------------------------------------------------------------:|:----------------------------------------------------------------------------:|
-| <img src="assets/main_settings.png" alt="Launcher-Einstellungen" width="100%"> | <img src="assets/server_settings.png" alt="Spieleinstellungen" width="100%"> |
 
 ---
 
