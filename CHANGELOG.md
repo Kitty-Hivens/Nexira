@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Added
+- `CompactNewsFeed`: shimmer skeleton loader replaces spinner while news is being fetched;
+  each news card is now clickable and opens `BASE_URL/news/{id}` in the system browser;
+  subtle `›` arrow hint marks items as interactive
 - Unit tests for `AuthService`: covers all `AuthStatus` variants, plain-text server errors,
   malformed JSON responses, HTTP 500, AES token decryption fallback, UUID sanitization,
   and `serverId` propagation
@@ -62,6 +65,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   `focusedContainerColor` in `RightPanel` and `ServerSettingsScreen`
 - Typography tokens updated to M3 equivalents (`subtitle1→titleMedium`, `caption→bodySmall`,
   `h5→headlineSmall`, `overline→labelSmall`, etc.)
+- `SquareServerCard`: hardcoded dark colors replaced with `CelestiaTheme.colors` tokens —
+  card overlay, action bar, border, server name text, and badge background now adapt to
+  light / dark theme
+- `DashboardScreen`: launch control panel container and border use theme tokens instead of
+  `Color.Black` / `Color.White` literals
+- `ServerDetailScreen`: right banner block and `MissingDataWarning` background replaced with
+  theme-aware colors; `MissingDataWarning` now uses a semi-transparent amber tint in both themes
+
 
 ### Removed
 - `SplashScreen` and `AppState.Splash`
@@ -87,6 +98,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   scope directly, injected binding was unreachable
 - `AppStrings.splashLoading` and matching keys in `RussianStrings`, `EnglishStrings`,
   `GermanStrings` — orphaned after `SplashScreen` removal
+- `NewsScreen.kt` — was marked `@Deprecated`; removed from navigation (`Screen` sealed class,
+  `AppLayout` `Crossfade`); `onOpenNews` callback removed from `DashboardScreen`; news
+  content is fully covered by `CompactNewsFeed` in the right panel
 
 ## [1.3.0] - 2026-03-06
 
