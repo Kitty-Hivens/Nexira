@@ -4,9 +4,7 @@ import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.material.CircularProgressIndicator
-import androidx.compose.material.Icon
-import androidx.compose.material.IconButton
+import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.Build
@@ -16,7 +14,6 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import hivens.core.api.SkinRepository
@@ -64,14 +61,16 @@ fun AppLayout(
             onLogout        = onLogout
         )
 
-        SidebarDivider()
+        VerticalDivider(
+            modifier = Modifier.fillMaxHeight(),
+            color    = CelestiaTheme.colors.surface.copy(alpha = 0.6f)
+        )
 
         // ── Main content ──────────────────────────────────────────────────────
         Box(Modifier.weight(1f).fillMaxHeight()) {
             Crossfade(
-                targetState  = currentScreen,
-                animationSpec = tween(180)
-            ) { screen ->
+                targetState   = currentScreen,
+                animationSpec = tween(180)) { screen ->
                 when (screen) {
                     Screen.Home -> {
                         val session = currentSession
@@ -133,19 +132,22 @@ fun AppLayout(
             }
         }
 
-        SidebarDivider()
+        VerticalDivider(
+            modifier = Modifier.fillMaxHeight(),
+            color    = CelestiaTheme.colors.surface.copy(alpha = 0.6f)
+        )
 
         // ── Right panel 264dp ─────────────────────────────────────────────────
         RightPanel(
-            appState  = appState,
-            onLogin   = onLogin,
-            onLogout  = onLogout,
-            modifier  = Modifier.width(264.dp).fillMaxHeight()
+            appState = appState,
+            onLogin  = onLogin,
+            onLogout = onLogout,
+            modifier = Modifier.width(264.dp).fillMaxHeight()
         )
     }
 }
 
-// ─── Sidebar ─────────────────────────────────────────────────────────────────
+// ─── Sidebar — M3 NavigationRail ─────────────────────────────────────────────
 
 @Composable
 fun AppSidebar(
@@ -154,72 +156,75 @@ fun AppSidebar(
     onScreenChange: (Screen) -> Unit,
     onLogout: () -> Unit
 ) {
-    val homeActive     = currentScreen is Screen.Home
+    val homeActive = currentScreen is Screen.Home
             || currentScreen is Screen.ServerSettings
             || currentScreen is Screen.ServerDetails
             || currentScreen is Screen.News
     val profileActive  = currentScreen is Screen.Profile
     val settingsActive = currentScreen is Screen.Settings || currentScreen is Screen.ThemePicker
 
-    Column(
-        modifier = Modifier
-            .width(64.dp)
-            .fillMaxHeight()
-            .background(CelestiaTheme.colors.surface.copy(alpha = 0.35f)),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.SpaceBetween
+    NavigationRail(
+        modifier       = Modifier.width(64.dp).fillMaxHeight(),
+        containerColor = CelestiaTheme.colors.surface.copy(alpha = 0.35f),
+        contentColor   = CelestiaTheme.colors.textSecondary
     ) {
-        // ── Nav items ─────────────────────────────────────────────────────────
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-            modifier = Modifier.padding(top = 16.dp)
+        // ── Nav items ─────────────────────────────────────────────────────
+        Spacer(Modifier.height(8.dp))
+
+        SidebarNavItem(
+            icon     = Icons.Default.Home,
+            selected = homeActive,
+            onClick  = { onScreenChange(Screen.Home) }
+        )
+        SidebarNavItem(
+            icon     = Icons.Default.Person,
+            selected = profileActive,
+            enabled  = isAuthenticated,
+            onClick  = { onScreenChange(Screen.Profile) }
+        )
+        SidebarNavItem(
+            icon     = Icons.Default.Settings,
+            selected = settingsActive,
+            onClick  = { onScreenChange(Screen.Settings) }
+        )
+
+        // ── Bottom actions ────────────────────────────────────────────────
+        Spacer(Modifier.weight(1f))
+
+        IconButton(
+            onClick  = {
+                if (GameConsoleService.shouldShowConsole) GameConsoleService.hide()
+                else GameConsoleService.show()
+            },
+            modifier = Modifier.size(48.dp)
         ) {
-            SidebarNavItem(
-                icon     = Icons.Default.Home,
-                selected = homeActive,
-                onClick  = { onScreenChange(Screen.Home) }
-            )
-            SidebarNavItem(
-                icon     = Icons.Default.Person,
-                selected = profileActive,
-                enabled  = isAuthenticated,
-                onClick  = { onScreenChange(Screen.Profile) }
-            )
-            SidebarNavItem(
-                icon     = Icons.Default.Settings,
-                selected = settingsActive,
-                onClick  = { onScreenChange(Screen.Settings) }
+            Icon(
+                imageVector        = Icons.Default.Build,
+                contentDescription = null,
+                tint               = if (GameConsoleService.shouldShowConsole)
+                    CelestiaTheme.colors.primary
+                else
+                    CelestiaTheme.colors.textSecondary.copy(alpha = 0.55f),
+                modifier           = Modifier.size(22.dp)
             )
         }
 
-        // ── Bottom actions ────────────────────────────────────────────────────
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-            modifier = Modifier.padding(bottom = 16.dp)
-        ) {
-            SidebarIconButton(
-                icon  = Icons.Default.Build,
-                tint  = if (GameConsoleService.shouldShowConsole) CelestiaTheme.colors.primary
-                else CelestiaTheme.colors.textSecondary.copy(alpha = 0.55f),
-                onClick = {
-                    if (GameConsoleService.shouldShowConsole) GameConsoleService.hide()
-                    else GameConsoleService.show()
-                }
-            )
-            if (isAuthenticated) {
-                SidebarIconButton(
-                    icon    = Icons.AutoMirrored.Filled.ExitToApp,
-                    tint    = CelestiaTheme.colors.error.copy(alpha = 0.75f),
-                    onClick = onLogout
+        if (isAuthenticated) {
+            IconButton(onClick = onLogout, modifier = Modifier.size(48.dp)) {
+                Icon(
+                    imageVector        = Icons.AutoMirrored.Filled.ExitToApp,
+                    contentDescription = null,
+                    tint               = CelestiaTheme.colors.error.copy(alpha = 0.75f),
+                    modifier           = Modifier.size(22.dp)
                 )
             }
         }
+
+        Spacer(Modifier.height(8.dp))
     }
 }
 
-// ─── Private components ───────────────────────────────────────────────────────
+// ─── NavigationRailItem wrapper (icon-only, no label) ────────────────────────
 
 @Composable
 private fun SidebarNavItem(
@@ -228,73 +233,30 @@ private fun SidebarNavItem(
     enabled: Boolean = true,
     onClick: () -> Unit
 ) {
-    val tint = when {
-        !enabled -> CelestiaTheme.colors.textSecondary.copy(alpha = 0.2f)
-        selected -> CelestiaTheme.colors.primary
-        else     -> CelestiaTheme.colors.textSecondary.copy(alpha = 0.70f)
-    }
-    Box(
-        modifier = Modifier
-            .width(64.dp)
-            .height(50.dp)
-            .background(
-                if (selected) CelestiaTheme.colors.primary.copy(alpha = 0.13f)
-                else Color.Transparent
-            ),
-        contentAlignment = Alignment.Center
-    ) {
-        if (selected) {
-            Box(
-                Modifier
-                    .align(Alignment.CenterStart)
-                    .width(3.dp)
-                    .height(26.dp)
-                    .background(
-                        color = CelestiaTheme.colors.primary,
-                        shape = androidx.compose.foundation.shape.RoundedCornerShape(topEnd = 3.dp, bottomEnd = 3.dp)
-                    )
-            )
-        }
-        IconButton(
-            onClick  = onClick,
-            enabled  = enabled,
-            modifier = Modifier.size(44.dp)
-        ) {
+    NavigationRailItem(
+        icon = {
             Icon(
-                imageVector       = icon,
+                imageVector        = icon,
                 contentDescription = null,
-                tint              = tint,
-                modifier          = Modifier.size(24.dp)
+                modifier           = Modifier.size(24.dp)
             )
-        }
-    }
-}
-
-@Composable
-private fun SidebarIconButton(
-    icon: ImageVector,
-    tint: Color,
-    onClick: () -> Unit
-) {
-    IconButton(onClick = onClick, modifier = Modifier.size(48.dp)) {
-        Icon(
-            imageVector       = icon,
-            contentDescription = null,
-            tint              = tint,
-            modifier          = Modifier.size(22.dp)
+        },
+        selected        = selected,
+        onClick         = onClick,
+        enabled         = enabled,
+        label           = null,
+        alwaysShowLabel = false,
+        colors          = NavigationRailItemDefaults.colors(
+            selectedIconColor   = CelestiaTheme.colors.primary,
+            unselectedIconColor = CelestiaTheme.colors.textSecondary.copy(
+                alpha = if (enabled) 0.70f else 0.20f
+            ),
+            indicatorColor      = CelestiaTheme.colors.primary.copy(alpha = 0.13f)
         )
-    }
-}
-
-@Composable
-private fun SidebarDivider() {
-    Box(
-        Modifier
-            .width(1.dp)
-            .fillMaxHeight()
-            .background(CelestiaTheme.colors.surface.copy(alpha = 0.6f))
     )
 }
+
+// ─── Loading placeholder ──────────────────────────────────────────────────────
 
 @Composable
 private fun ContentLoadingPlaceholder() {

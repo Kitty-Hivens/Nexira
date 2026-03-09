@@ -43,6 +43,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `RightPanel`: unified auth section (login form / account panel) + Hivens news placeholder
 - `SettingsScreen`: removed seasonal effects dropdown section
 - Auto-login on startup runs immediately without splash delay
+- `client-ui`: migrated from Compose Material 2 to Material 3 (`material` → `material3`);
+  `material-icons-extended` dependency retained from M2 artifact pending icon migration
+- `AppSidebar`: replaced custom 64dp sidebar implementation with M3 `NavigationRail` +
+  `NavigationRailItem`; active indicator, sizing and accessibility now handled by the component
+- `GlassCard`: `Surface(border=…, elevation=…)` → `OutlinedCard` + `CardDefaults`
+- `ConsoleWindow`: custom filter toggle chips → M3 `FilterChip`; `darkColors()`/`lightColors()`
+  → `darkColorScheme()`/`lightColorScheme()`; `DropdownMenuItem` updated to text-lambda API
+- `UpdateDialog`: `Dialog + Surface` → `BasicAlertDialog`
+- `ServerSettingsScreen`: `TooltipArea` (M2 ExperimentalMaterialApi) → `TooltipBox` +
+  `PlainTooltip`; tooltip position provider updated to
+  `rememberTooltipPositionProvider(TooltipAnchorPosition.Above)`
+- `LinearProgressIndicator`: `progress = value` → `progress = { value }` (M3 lambda API)
+  across `LaunchControlPanel` and `UpdateDialog`
+- `Divider` → `HorizontalDivider` / `VerticalDivider` throughout all screens
+- `ButtonDefaults.buttonColors(backgroundColor=…)` → `containerColor=…` throughout
+- `OutlinedTextFieldDefaults`: `textColor`/`backgroundColor` → `focusedTextColor`/
+  `focusedContainerColor` in `RightPanel` and `ServerSettingsScreen`
+- Typography tokens updated to M3 equivalents (`subtitle1→titleMedium`, `caption→bodySmall`,
+  `h5→headlineSmall`, `overline→labelSmall`, etc.)
 
 ### Removed
 - `SplashScreen` and `AppState.Splash`

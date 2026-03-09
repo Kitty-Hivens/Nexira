@@ -3,13 +3,10 @@ package hivens.ui.screens
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.Icon
-import androidx.compose.material.IconButton
-import androidx.compose.material.MaterialTheme
-import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,20 +33,20 @@ import javax.swing.JFrame
 
 /** Tri-state for the skin upload status so colour is not determined by string content. */
 private sealed class UploadStatus {
-    object None : UploadStatus()
+    object None    : UploadStatus()
     object Loading : UploadStatus()
     data class Success(val message: String) : UploadStatus()
-    data class Error(val message: String) : UploadStatus()
+    data class Error(val message: String)   : UploadStatus()
 }
 
 @Composable
 fun ProfileScreen(session: SessionData, skinRepository: SkinRepository) {
-    val s = LocalStrings.current
+    val s            = LocalStrings.current
     var frontSkin    by remember { mutableStateOf<ImageBitmap?>(null) }
     var backSkin     by remember { mutableStateOf<ImageBitmap?>(null) }
     var uploadStatus by remember { mutableStateOf<UploadStatus>(UploadStatus.None) }
 
-    val scope = rememberCoroutineScope()
+    val scope        = rememberCoroutineScope()
 
     fun loadSkins() {
         scope.launch {
@@ -61,7 +58,7 @@ fun ProfileScreen(session: SessionData, skinRepository: SkinRepository) {
     LaunchedEffect(Unit) { loadSkins() }
 
     Column(Modifier.fillMaxSize().padding(24.dp)) {
-        Text(s.profileTitle, style = MaterialTheme.typography.h4, color = CelestiaTheme.colors.textPrimary)
+        Text(s.profileTitle, style = MaterialTheme.typography.displaySmall, color = CelestiaTheme.colors.textPrimary)
         Spacer(Modifier.height(24.dp))
 
         Row(Modifier.fillMaxSize()) {
@@ -76,15 +73,15 @@ fun ProfileScreen(session: SessionData, skinRepository: SkinRepository) {
                         if (frontSkin != null) {
                             Row(horizontalArrangement = Arrangement.spacedBy(32.dp)) {
                                 Image(
-                                    painter           = BitmapPainter(frontSkin!!),
+                                    painter            = BitmapPainter(frontSkin!!),
                                     contentDescription = s.profileSkinFront,
-                                    modifier          = Modifier.height(300.dp).width(150.dp)
+                                    modifier           = Modifier.height(300.dp).width(150.dp)
                                 )
                                 if (backSkin != null) {
                                     Image(
-                                        painter           = BitmapPainter(backSkin!!),
+                                        painter            = BitmapPainter(backSkin!!),
                                         contentDescription = s.profileSkinBack,
-                                        modifier          = Modifier.height(300.dp).width(150.dp)
+                                        modifier           = Modifier.height(300.dp).width(150.dp)
                                     )
                                 }
                             }
@@ -109,7 +106,7 @@ fun ProfileScreen(session: SessionData, skinRepository: SkinRepository) {
                     Column(Modifier.padding(24.dp)) {
                         Text(
                             session.playerName,
-                            style = MaterialTheme.typography.h5,
+                            style = MaterialTheme.typography.headlineSmall,
                             color = CelestiaTheme.colors.textPrimary
                         )
 
@@ -123,30 +120,25 @@ fun ProfileScreen(session: SessionData, skinRepository: SkinRepository) {
 
                         Spacer(Modifier.height(24.dp))
 
-                        // Balance
+                        // Balance card
                         GlassCard(
-                            modifier         = Modifier.fillMaxWidth(),
-                            backgroundColor  = CelestiaTheme.colors.background.copy(alpha = 0.4f),
-                            shape            = RoundedCornerShape(12.dp)
+                            modifier        = Modifier.fillMaxWidth(),
+                            backgroundColor = CelestiaTheme.colors.background.copy(alpha = 0.4f),
+                            shape           = RoundedCornerShape(12.dp)
                         ) {
                             Row(
-                                modifier             = Modifier.padding(16.dp),
-                                verticalAlignment    = Alignment.CenterVertically,
+                                modifier              = Modifier.padding(16.dp),
+                                verticalAlignment     = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector       = Icons.Default.Star,
-                                        contentDescription = s.profileBalance,
-                                        tint              = Color(0xFFFFD700),
-                                        modifier          = Modifier.size(24.dp)
-                                    )
+                                    Icon(Icons.Default.Star, s.profileBalance, tint = Color(0xFFFFD700), modifier = Modifier.size(24.dp))
                                     Spacer(Modifier.width(12.dp))
                                     Text(s.profileBalance, color = CelestiaTheme.colors.textSecondary)
                                 }
                                 Text(
                                     text       = "${session.balance} ⛃",
-                                    style      = MaterialTheme.typography.h6,
+                                    style      = MaterialTheme.typography.titleLarge,
                                     fontWeight = FontWeight.Bold,
                                     color      = CelestiaTheme.colors.textPrimary
                                 )
@@ -155,24 +147,24 @@ fun ProfileScreen(session: SessionData, skinRepository: SkinRepository) {
 
                         Spacer(Modifier.height(32.dp))
 
-                        // Upload status — colour driven by sealed class, not string parsing
+                        // Upload status
                         when (val status = uploadStatus) {
                             is UploadStatus.Success -> Text(
-                                text  = status.message,
-                                color = CelestiaTheme.colors.success,
-                                style = MaterialTheme.typography.caption,
+                                status.message,
+                                color    = CelestiaTheme.colors.success,
+                                style    = MaterialTheme.typography.bodySmall,
                                 modifier = Modifier.padding(bottom = 8.dp)
                             )
                             is UploadStatus.Error -> Text(
-                                text  = status.message,
-                                color = CelestiaTheme.colors.error,
-                                style = MaterialTheme.typography.caption,
+                                status.message,
+                                color    = CelestiaTheme.colors.error,
+                                style    = MaterialTheme.typography.bodySmall,
                                 modifier = Modifier.padding(bottom = 8.dp)
                             )
                             is UploadStatus.Loading -> Text(
-                                text  = s.profileUploadSkinLoading,
-                                color = CelestiaTheme.colors.textSecondary,
-                                style = MaterialTheme.typography.caption,
+                                s.profileUploadSkinLoading,
+                                color    = CelestiaTheme.colors.textSecondary,
+                                style    = MaterialTheme.typography.bodySmall,
                                 modifier = Modifier.padding(bottom = 8.dp)
                             )
                             else -> Unit
@@ -181,12 +173,12 @@ fun ProfileScreen(session: SessionData, skinRepository: SkinRepository) {
                         CelestiaButton(
                             s.profileTopUp,
                             onClick  = {
-                                try {
+                                runCatching {
                                     val url = "http://smartycraft.ru/cabinet"
                                     if (Desktop.isDesktopSupported() &&
-                                        Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)
-                                    ) Desktop.getDesktop().browse(URI(url))
-                                } catch (e: Exception) { e.printStackTrace() }
+                                        Desktop.getDesktop().isSupported(Desktop.Action.BROWSE))
+                                        Desktop.getDesktop().browse(URI(url))
+                                }
                             },
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -200,7 +192,7 @@ fun ProfileScreen(session: SessionData, skinRepository: SkinRepository) {
                                 if (file != null) {
                                     uploadStatus = UploadStatus.Loading
                                     scope.launch {
-                                        val rawResult = withContext(Dispatchers.IO) {
+                                        withContext(Dispatchers.IO) {
                                             skinRepository.uploadSkin(file, false, session)
                                         }
                                         // SkinRepository returns a raw string; treat non-empty as success
@@ -223,7 +215,7 @@ fun ProfileScreen(session: SessionData, skinRepository: SkinRepository) {
 
 private fun pickImage(title: String): File? {
     val dialog = FileDialog(null as JFrame?, title, FileDialog.LOAD)
-    dialog.file     = "*.png"
+    dialog.file      = "*.png"
     dialog.isVisible = true
     return if (dialog.directory != null && dialog.file != null)
         File(dialog.directory, dialog.file)

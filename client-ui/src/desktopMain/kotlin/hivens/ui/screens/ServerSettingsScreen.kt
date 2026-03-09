@@ -7,11 +7,12 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material3.*
+import androidx.compose.material3.TooltipDefaults.rememberTooltipPositionProvider
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,25 +43,23 @@ import kotlin.math.roundToInt
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
-    val profileManager: ProfileManager = koinInject()
+    val profileManager: ProfileManager               = koinInject()
     val manifestProcessorService: IManifestProcessorService = koinInject()
-    val dataDirectory: Path = koinInject()
+    val dataDirectory: Path                          = koinInject()
     val s = LocalStrings.current
 
-    var mods by remember { mutableStateOf<List<OptionalMod>>(emptyList()) }
-    var profile by remember { mutableStateOf<InstanceProfile?>(null) }
+    var mods       by remember { mutableStateOf<List<OptionalMod>>(emptyList()) }
+    var profile    by remember { mutableStateOf<InstanceProfile?>(null) }
+    var javaPath   by remember { mutableStateOf("") }
+    var memory     by remember { mutableStateOf(4096f) }
 
-    var javaPath by remember { mutableStateOf("") }
-    var memory by remember { mutableStateOf(4096f) }
-
-    val modStates = remember { mutableStateMapOf<String, Boolean>() }
+    val modStates  = remember { mutableStateMapOf<String, Boolean>() }
     var modsLoaded by remember { mutableStateOf(false) }
-
-    val scope = rememberCoroutineScope()
+    val scope      = rememberCoroutineScope()
 
     LaunchedEffect(server) {
         val p = profileManager.getProfile(server.assetDir)
-        profile = p
+        profile  = p
         javaPath = p.javaPath ?: ""
         if (p.memoryMb > 0) memory = p.memoryMb.toFloat()
 
@@ -99,8 +98,8 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
             }
             Spacer(Modifier.width(8.dp))
             Column {
-                Text(server.title?.uppercase() ?: "SERVER", style = MaterialTheme.typography.h5, color = CelestiaTheme.colors.textPrimary)
-                Text(s.serverSettingsSubtitle, style = MaterialTheme.typography.caption, color = CelestiaTheme.colors.textSecondary)
+                Text(server.title?.uppercase() ?: "SERVER", style = MaterialTheme.typography.headlineSmall, color = CelestiaTheme.colors.textPrimary)
+                Text(s.serverSettingsSubtitle, style = MaterialTheme.typography.bodySmall, color = CelestiaTheme.colors.textSecondary)
             }
         }
 
@@ -110,55 +109,57 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
             // System settings
             GlassCard(Modifier.weight(1f).fillMaxHeight()) {
                 Column(Modifier.padding(24.dp).verticalScroll(rememberScrollState())) {
-                    Text(s.serverSettingsSectionSystem, style = MaterialTheme.typography.subtitle2, color = CelestiaTheme.colors.primary)
+                    Text(s.serverSettingsSectionSystem, style = MaterialTheme.typography.titleSmall, color = CelestiaTheme.colors.primary)
                     Spacer(Modifier.height(16.dp))
 
                     Text(s.serverSettingsRamValue(memory.roundToInt()), color = CelestiaTheme.colors.textSecondary)
                     Slider(
-                        value = memory,
+                        value         = memory,
                         onValueChange = { memory = it },
-                        valueRange = 1024f..16384f,
-                        steps = 30,
-                        colors = SliderDefaults.colors(
-                            thumbColor = CelestiaTheme.colors.primary,
-                            activeTrackColor = CelestiaTheme.colors.primary,
+                        valueRange    = 1024f..16384f,
+                        steps         = 30,
+                        colors        = SliderDefaults.colors(
+                            thumbColor         = CelestiaTheme.colors.primary,
+                            activeTrackColor   = CelestiaTheme.colors.primary,
                             inactiveTrackColor = borderColor
                         )
                     )
 
                     Spacer(Modifier.height(24.dp))
-                    Divider(color = borderColor)
+                    HorizontalDivider(color = borderColor)
                     Spacer(Modifier.height(24.dp))
 
-                    Text(s.serverSettingsJava, color = CelestiaTheme.colors.textPrimary, style = MaterialTheme.typography.body2)
+                    Text(s.serverSettingsJava, color = CelestiaTheme.colors.textPrimary, style = MaterialTheme.typography.bodyMedium)
                     Spacer(Modifier.height(8.dp))
 
                     OutlinedTextField(
-                        value = javaPath,
+                        value         = javaPath,
                         onValueChange = { javaPath = it },
-                        modifier = Modifier
+                        modifier      = Modifier
                             .fillMaxWidth()
                             .onFocusChanged { it.isFocused },
-                        placeholder = {
+                        placeholder   = {
                             Text(
                                 s.serverSettingsJavaAuto(recommendedJavaLabel),
                                 color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.5f)
                             )
                         },
                         singleLine = true,
-                        colors = TextFieldDefaults.outlinedTextFieldColors(
-                            textColor = CelestiaTheme.colors.textPrimary,
-                            cursorColor = CelestiaTheme.colors.primary,
-                            focusedBorderColor = CelestiaTheme.colors.primary,
-                            unfocusedBorderColor = borderColor,
-                            backgroundColor = Color.Transparent
+                        colors     = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor        = CelestiaTheme.colors.textPrimary,
+                            unfocusedTextColor      = CelestiaTheme.colors.textPrimary,
+                            cursorColor             = CelestiaTheme.colors.primary,
+                            focusedBorderColor      = CelestiaTheme.colors.primary,
+                            unfocusedBorderColor    = borderColor,
+                            focusedContainerColor   = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent
                         ),
                         trailingIcon = {
                             IconButton(onClick = {
                                 scope.launch {
                                     val file = FileKit.openFilePicker(
-                                        type = FileKitType.File(extensions = listOf("exe", "bin")),
-                                        mode = FileKitMode.Single,
+                                        type  = FileKitType.File(extensions = listOf("exe", "bin")),
+                                        mode  = FileKitMode.Single,
                                         title = s.serverSettingsPickJava
                                     )
                                     file?.path?.let { javaPath = it }
@@ -173,7 +174,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                         Spacer(Modifier.height(4.dp))
                         Text(
                             s.serverSettingsJavaHint,
-                            style = MaterialTheme.typography.caption,
+                            style = MaterialTheme.typography.bodySmall,
                             color = CelestiaTheme.colors.textSecondary
                         )
                     }
@@ -199,10 +200,10 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
 
             Spacer(Modifier.width(24.dp))
 
-            // Mods
+            // ── Mods ─────────────────────────────────────────────────────────
             GlassCard(Modifier.weight(1f).fillMaxHeight()) {
                 Column(Modifier.padding(24.dp)) {
-                    Text(s.serverSettingsSectionMods, style = MaterialTheme.typography.subtitle2, color = CelestiaTheme.colors.primary)
+                    Text(s.serverSettingsSectionMods, style = MaterialTheme.typography.titleSmall, color = CelestiaTheme.colors.primary)
                     Spacer(Modifier.height(16.dp))
 
                     if (mods.isEmpty() && modsLoaded) {
@@ -212,16 +213,16 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                     } else {
                         AnimatedVisibility(
                             visible = modsLoaded,
-                            enter = slideInVertically(initialOffsetY = { 50 }, animationSpec = tween(500)) + fadeIn(tween(500))
+                            enter   = slideInVertically(initialOffsetY = { 50 }, animationSpec = tween(500)) + fadeIn(tween(500))
                         ) {
                             LazyColumn(Modifier.fillMaxSize()) {
                                 items(mods) { mod ->
                                     val currentState = modStates[mod.id] ?: mod.isDefault
 
                                     ModItemRow(
-                                        mod = mod,
+                                        mod       = mod,
                                         isChecked = currentState,
-                                        onToggle = { isChecked ->
+                                        onToggle  = { isChecked ->
                                             modStates[mod.id] = isChecked
                                             if (isChecked) {
                                                 mod.excludings.forEach { conflict -> modStates[conflict] = false }
@@ -240,37 +241,29 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun ModItemRow(mod: OptionalMod, isChecked: Boolean, onToggle: (Boolean) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
 
     val backgroundColor by animateColorAsState(
-        targetValue = if (isChecked) CelestiaTheme.colors.primary.copy(alpha = 0.15f) else CelestiaTheme.colors.background.copy(alpha = 0.3f),
+        targetValue   = if (isChecked) CelestiaTheme.colors.primary.copy(alpha = 0.15f)
+        else CelestiaTheme.colors.background.copy(alpha = 0.3f),
         animationSpec = tween(300)
     )
 
     val borderColor = if (isChecked) CelestiaTheme.colors.primary.copy(alpha = 0.5f) else Color.Transparent
 
-    TooltipArea(
+    TooltipBox(
+        positionProvider = rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
         tooltip = {
             if (!mod.description.isNullOrEmpty()) {
-                Surface(
-                    color = Color.Black.copy(alpha = 0.9f),
-                    shape = RoundedCornerShape(8.dp),
-                    elevation = 4.dp,
-                    modifier = Modifier.padding(10.dp).widthIn(max = 300.dp)
-                ) {
-                    Text(
-                        text = mod.description!!,
-                        color = Color.White,
-                        modifier = Modifier.padding(12.dp),
-                        style = MaterialTheme.typography.caption
-                    )
+                PlainTooltip {
+                    Text(mod.description!!, style = MaterialTheme.typography.bodySmall)
                 }
             }
         },
-        delayMillis = 600
+        state = rememberTooltipState()
     ) {
         Column(
             modifier = Modifier
@@ -284,27 +277,27 @@ fun ModItemRow(mod: OptionalMod, isChecked: Boolean, onToggle: (Boolean) -> Unit
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Checkbox(
-                    checked = isChecked,
+                    checked         = isChecked,
                     onCheckedChange = null,
-                    colors = CheckboxDefaults.colors(
-                        checkedColor = CelestiaTheme.colors.primary,
+                    colors          = CheckboxDefaults.colors(
+                        checkedColor   = CelestiaTheme.colors.primary,
                         uncheckedColor = CelestiaTheme.colors.textSecondary.copy(alpha = 0.5f)
                     )
                 )
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
-                    Text(mod.name, style = MaterialTheme.typography.body2, color = CelestiaTheme.colors.textPrimary)
+                    Text(mod.name, style = MaterialTheme.typography.bodyMedium, color = CelestiaTheme.colors.textPrimary)
                 }
 
                 if (!mod.description.isNullOrEmpty()) {
                     IconButton(
-                        onClick = { expanded = !expanded },
+                        onClick  = { expanded = !expanded },
                         modifier = Modifier.size(24.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Info,
+                            imageVector        = Icons.Default.Info,
                             contentDescription = null,
-                            tint = if (expanded) CelestiaTheme.colors.primary else CelestiaTheme.colors.textSecondary.copy(alpha = 0.5f)
+                            tint               = if (expanded) CelestiaTheme.colors.primary else CelestiaTheme.colors.textSecondary.copy(alpha = 0.5f)
                         )
                     }
                 }
@@ -312,12 +305,12 @@ fun ModItemRow(mod: OptionalMod, isChecked: Boolean, onToggle: (Boolean) -> Unit
 
             if (expanded && !mod.description.isNullOrEmpty()) {
                 Spacer(Modifier.height(8.dp))
-                Divider(color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.2f))
+                HorizontalDivider(color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.2f))
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    text = mod.description!!,
-                    style = MaterialTheme.typography.caption,
-                    color = CelestiaTheme.colors.textSecondary,
+                    text     = mod.description!!,
+                    style    = MaterialTheme.typography.bodySmall,
+                    color    = CelestiaTheme.colors.textSecondary,
                     modifier = Modifier.padding(start = 32.dp)
                 )
             }
