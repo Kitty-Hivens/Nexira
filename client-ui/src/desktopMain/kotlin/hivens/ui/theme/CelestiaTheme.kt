@@ -83,8 +83,19 @@ fun CelestiaTheme(
     content: @Composable () -> Unit
 ) {
     // If there is a custom theme, use it, otherwise use the default one
-    val targetColors = customTheme?.toCelestiaColors(useDarkTheme)
-        ?: if (useDarkTheme) DarkColorPalette else LightColorPalette
+    val baseColors = if (useDarkTheme) DarkColorPalette else LightColorPalette
+
+    val targetColors = if (customTheme != null) {
+        baseColors.copy(
+            primary        = CustomTheme.parseHexColor(customTheme.primary),
+            primaryVariant = CustomTheme.parseHexColor(customTheme.primary).copy(alpha = 0.8f),
+            secondary      = CustomTheme.parseHexColor(customTheme.secondary),
+            success        = CustomTheme.parseHexColor(customTheme.success),
+            error          = CustomTheme.parseHexColor(customTheme.error),
+        )
+    } else {
+        baseColors
+    }
 
     // Color change animation (500ms)
     val animSpec = remember { TweenSpec<Color>(durationMillis = 500) }
