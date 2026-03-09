@@ -10,7 +10,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.*
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -67,8 +67,8 @@ fun RightPanel(
                 .background(CelestiaTheme.colors.surface.copy(alpha = 0.22f))
         ) {
             when (appState) {
-                AppState.Loading         -> AuthLoadingSlot()
-                AppState.Unauthenticated -> LoginPanel(onLogin = onLogin)
+                AppState.Loading          -> AuthLoadingSlot()
+                AppState.Unauthenticated  -> LoginPanel(onLogin = onLogin)
                 is AppState.Authenticated -> AccountPanel(
                     session  = appState.session,
                     onLogout = onLogout
@@ -76,10 +76,7 @@ fun RightPanel(
             }
         }
 
-        Divider(
-            color     = CelestiaTheme.colors.surface.copy(alpha = 0.7f),
-            thickness = 1.dp
-        )
+        HorizontalDivider(color = CelestiaTheme.colors.surface.copy(alpha = 0.7f))
 
         // ── News feed (bottom) ────────────────────────────────────────────────
         CompactNewsFeed(modifier = Modifier.weight(1f).fillMaxWidth())
@@ -103,14 +100,16 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
     var isLoading    by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
-    val inputColors = TextFieldDefaults.outlinedTextFieldColors(
-        textColor            = CelestiaTheme.colors.textPrimary,
-        focusedBorderColor   = CelestiaTheme.colors.primary,
-        unfocusedBorderColor = CelestiaTheme.colors.textSecondary.copy(alpha = 0.22f),
-        focusedLabelColor    = CelestiaTheme.colors.primary,
-        unfocusedLabelColor  = CelestiaTheme.colors.textSecondary,
-        cursorColor          = CelestiaTheme.colors.primary,
-        backgroundColor      = Color.Transparent
+    val fieldColors = OutlinedTextFieldDefaults.colors(
+        focusedTextColor        = CelestiaTheme.colors.textPrimary,
+        unfocusedTextColor      = CelestiaTheme.colors.textPrimary,
+        focusedBorderColor      = CelestiaTheme.colors.primary,
+        unfocusedBorderColor    = CelestiaTheme.colors.textSecondary.copy(alpha = 0.22f),
+        focusedLabelColor       = CelestiaTheme.colors.primary,
+        unfocusedLabelColor     = CelestiaTheme.colors.textSecondary,
+        cursorColor             = CelestiaTheme.colors.primary,
+        focusedContainerColor   = Color.Transparent,
+        unfocusedContainerColor = Color.Transparent
     )
 
     fun doLogin() {
@@ -145,7 +144,7 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
     ) {
         Text(
             text       = s.loginTitle,
-            style      = MaterialTheme.typography.subtitle1,
+            style      = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
             color      = CelestiaTheme.colors.textPrimary
         )
@@ -153,7 +152,7 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
         AnimatedVisibility(visible = errorMessage != null) {
             Text(
                 text     = errorMessage ?: "",
-                style    = MaterialTheme.typography.caption,
+                style    = MaterialTheme.typography.bodySmall,
                 color    = CelestiaTheme.colors.error,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -173,21 +172,24 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
             singleLine    = true,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
             keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
-            shape  = RoundedCornerShape(8.dp),
-            colors = inputColors
+            shape          = RoundedCornerShape(8.dp),
+            colors         = fieldColors
         )
 
         OutlinedTextField(
-            value                  = password,
-            onValueChange          = { password = it; errorMessage = null },
-            label                  = { Text(s.loginPassword) },
-            modifier               = Modifier.fillMaxWidth(),
-            singleLine             = true,
-            visualTransformation   = PasswordVisualTransformation(),
-            keyboardOptions        = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
-            keyboardActions        = KeyboardActions(onDone = { doLogin() }),
-            shape  = RoundedCornerShape(8.dp),
-            colors = inputColors
+            value                = password,
+            onValueChange        = { password = it; errorMessage = null },
+            label                = { Text(s.loginPassword) },
+            modifier             = Modifier.fillMaxWidth(),
+            singleLine           = true,
+            visualTransformation = PasswordVisualTransformation(),
+            keyboardOptions      = KeyboardOptions(
+                keyboardType = KeyboardType.Password,
+                imeAction    = ImeAction.Done
+            ),
+            keyboardActions = KeyboardActions(onDone = { doLogin() }),
+            shape   = RoundedCornerShape(8.dp),
+            colors  = fieldColors
         )
 
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -201,20 +203,21 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
             )
             Text(
                 text  = s.loginRemember,
-                style = MaterialTheme.typography.caption,
+                style = MaterialTheme.typography.bodySmall,
                 color = CelestiaTheme.colors.textSecondary
             )
         }
 
         Button(
-            onClick  = { doLogin() },
-            enabled  = !isLoading,
-            modifier = Modifier.fillMaxWidth().height(42.dp),
-            shape    = RoundedCornerShape(8.dp),
-            colors   = ButtonDefaults.buttonColors(
-                backgroundColor         = CelestiaTheme.colors.primary,
-                disabledBackgroundColor = CelestiaTheme.colors.primary.copy(alpha = 0.5f)
-            )
+            onClick   = { doLogin() },
+            enabled   = !isLoading,
+            modifier  = Modifier.fillMaxWidth().height(42.dp),
+            shape     = RoundedCornerShape(8.dp),
+            colors    = ButtonDefaults.buttonColors(
+                containerColor         = CelestiaTheme.colors.primary,
+                disabledContainerColor = CelestiaTheme.colors.primary.copy(alpha = 0.5f)
+            ),
+            elevation = ButtonDefaults.buttonElevation(0.dp)
         ) {
             if (isLoading) {
                 CircularProgressIndicator(
@@ -257,11 +260,11 @@ fun AccountPanel(session: SessionData, onLogout: () -> Unit) {
         ) {
             if (faceBitmap != null) {
                 Image(
-                    painter           = BitmapPainter(faceBitmap!!),
+                    painter            = BitmapPainter(faceBitmap!!),
                     contentDescription = null,
-                    modifier          = Modifier.size(38.dp),
-                    contentScale      = ContentScale.Crop,
-                    alignment         = Alignment.TopCenter
+                    modifier           = Modifier.size(38.dp),
+                    contentScale       = ContentScale.Crop,
+                    alignment          = Alignment.TopCenter
                 )
             } else {
                 Text(
@@ -275,7 +278,7 @@ fun AccountPanel(session: SessionData, onLogout: () -> Unit) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text       = session.playerName,
-                style      = MaterialTheme.typography.subtitle2,
+                style      = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
                 color      = CelestiaTheme.colors.textPrimary,
                 maxLines   = 1,
@@ -283,7 +286,7 @@ fun AccountPanel(session: SessionData, onLogout: () -> Unit) {
             )
             Text(
                 text  = s.profileStatusOnline,
-                style = MaterialTheme.typography.caption,
+                style = MaterialTheme.typography.bodySmall,
                 color = CelestiaTheme.colors.success
             )
         }
@@ -294,7 +297,7 @@ fun AccountPanel(session: SessionData, onLogout: () -> Unit) {
         ) {
             Text(
                 text  = s.navLogout,
-                style = MaterialTheme.typography.caption,
+                style = MaterialTheme.typography.bodySmall,
                 color = CelestiaTheme.colors.error.copy(alpha = 0.65f)
             )
         }
@@ -330,17 +333,14 @@ fun CompactNewsFeed(modifier: Modifier = Modifier) {
     Column(modifier = modifier) {
         // Section header
         Text(
-            text     = s.newsTitle,
-            style    = MaterialTheme.typography.caption,
+            text       = s.newsTitle,
+            style      = MaterialTheme.typography.bodySmall,
             fontWeight = FontWeight.Bold,
-            color    = CelestiaTheme.colors.textSecondary,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
+            color      = CelestiaTheme.colors.textSecondary,
+            modifier   = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
         )
 
-        Divider(
-            color     = CelestiaTheme.colors.surface.copy(alpha = 0.6f),
-            thickness = 1.dp
-        )
+        HorizontalDivider(color = CelestiaTheme.colors.surface.copy(alpha = 0.6f))
 
         when {
             loading -> Box(
@@ -360,7 +360,7 @@ fun CompactNewsFeed(modifier: Modifier = Modifier) {
             ) {
                 Text(
                     text  = s.newsEmpty,
-                    style = MaterialTheme.typography.caption,
+                    style = MaterialTheme.typography.bodySmall,
                     color = CelestiaTheme.colors.textSecondary
                 )
             }
@@ -368,10 +368,9 @@ fun CompactNewsFeed(modifier: Modifier = Modifier) {
             else -> LazyColumn(contentPadding = PaddingValues(vertical = 4.dp)) {
                 items(news) { item ->
                     CompactNewsItem(item = item, imageLoader = imageLoader)
-                    Divider(
-                        color     = CelestiaTheme.colors.surface.copy(alpha = 0.4f),
-                        thickness = 1.dp,
-                        modifier  = Modifier.padding(horizontal = 16.dp)
+                    HorizontalDivider(
+                        color    = CelestiaTheme.colors.surface.copy(alpha = 0.4f),
+                        modifier = Modifier.padding(horizontal = 16.dp)
                     )
                 }
             }
@@ -386,7 +385,7 @@ private fun CompactNewsItem(item: NewsItem, imageLoader: ImageLoader) {
             .fillMaxWidth()
             .clickable {}   // TODO: open URL when NewsItem gets one
             .padding(horizontal = 16.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         // Thumbnail
@@ -413,7 +412,7 @@ private fun CompactNewsItem(item: NewsItem, imageLoader: ImageLoader) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text       = item.title,
-                style      = MaterialTheme.typography.caption,
+                style      = MaterialTheme.typography.bodySmall,
                 fontWeight = FontWeight.Medium,
                 color      = CelestiaTheme.colors.textPrimary,
                 maxLines   = 2,
@@ -422,7 +421,7 @@ private fun CompactNewsItem(item: NewsItem, imageLoader: ImageLoader) {
             Spacer(Modifier.height(2.dp))
             Text(
                 text  = item.date,
-                style = MaterialTheme.typography.overline,
+                style = MaterialTheme.typography.labelSmall,
                 color = CelestiaTheme.colors.primary.copy(alpha = 0.7f)
             )
         }

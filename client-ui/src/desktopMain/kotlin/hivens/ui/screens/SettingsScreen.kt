@@ -5,11 +5,11 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -37,10 +37,10 @@ fun SettingsScreen(
     val settingsService: ISettingsService = koinInject()
     val s = LocalStrings.current
 
-    val initialSettings = remember { settingsService.getSettings() }
-    var closeAfterStart by remember { mutableStateOf(initialSettings.closeAfterStart) }
-    var isLangDropdownExpanded by remember { mutableStateOf(false) }
-    var showSavedMessage by remember { mutableStateOf(false) }
+    val initialSettings    = remember { settingsService.getSettings() }
+    var closeAfterStart    by remember { mutableStateOf(initialSettings.closeAfterStart) }
+    var langDropdownExpanded by remember { mutableStateOf(false) }
+    var showSavedMessage   by remember { mutableStateOf(false) }
 
     fun save() {
         val current = settingsService.getSettings()
@@ -55,9 +55,9 @@ fun SettingsScreen(
 
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         Text(
-            text = s.settingsTitle,
-            style = MaterialTheme.typography.h5,
-            color = CelestiaTheme.colors.textPrimary,
+            text       = s.settingsTitle,
+            style      = MaterialTheme.typography.headlineSmall,
+            color      = CelestiaTheme.colors.textPrimary,
             fontWeight = FontWeight.Bold
         )
 
@@ -65,12 +65,12 @@ fun SettingsScreen(
 
         GlassCard(Modifier.weight(1f).fillMaxWidth()) {
             LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(24.dp),
+                modifier            = Modifier.fillMaxSize(),
+                contentPadding      = PaddingValues(24.dp),
                 verticalArrangement = Arrangement.spacedBy(24.dp)
             ) {
 
-                // ── Interface ────────────────────────────────────────────────
+                // ── Interface ─────────────────────────────────────────────────
                 item {
                     SettingsSectionTitle(s.settingsSectionUI)
 
@@ -81,7 +81,7 @@ fun SettingsScreen(
                             .clip(RoundedCornerShape(12.dp))
                             .background(CelestiaTheme.colors.background.copy(alpha = 0.4f))
                             .padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
+                        verticalAlignment     = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -92,7 +92,9 @@ fun SettingsScreen(
 
                         Box {
                             Row(
-                                Modifier.clickable { isLangDropdownExpanded = true }.padding(8.dp),
+                                Modifier
+                                    .clickable { langDropdownExpanded = true }
+                                    .padding(8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(currentLocale.displayName, color = CelestiaTheme.colors.primary, fontWeight = FontWeight.Bold)
@@ -100,18 +102,23 @@ fun SettingsScreen(
                             }
 
                             DropdownMenu(
-                                expanded = isLangDropdownExpanded,
-                                onDismissRequest = { isLangDropdownExpanded = false },
-                                modifier = Modifier.background(CelestiaTheme.colors.surface)
+                                expanded         = langDropdownExpanded,
+                                onDismissRequest = { langDropdownExpanded = false },
+                                containerColor   = CelestiaTheme.colors.surface
                             ) {
                                 AppLocale.entries.forEach { locale ->
-                                    DropdownMenuItem(onClick = { isLangDropdownExpanded = false; onLocaleChanged(locale) }) {
-                                        Text(
-                                            locale.displayName,
-                                            color = if (locale == currentLocale) CelestiaTheme.colors.primary else CelestiaTheme.colors.textPrimary,
-                                            fontWeight = if (locale == currentLocale) FontWeight.Bold else FontWeight.Normal
-                                        )
-                                    }
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                locale.displayName,
+                                                color      = if (locale == currentLocale) CelestiaTheme.colors.primary
+                                                else CelestiaTheme.colors.textPrimary,
+                                                fontWeight = if (locale == currentLocale) FontWeight.Bold
+                                                else FontWeight.Normal
+                                            )
+                                        },
+                                        onClick = { langDropdownExpanded = false; onLocaleChanged(locale) }
+                                    )
                                 }
                             }
                         }
@@ -127,7 +134,7 @@ fun SettingsScreen(
                             .clickable(onClick = onOpenThemePicker)
                             .background(CelestiaTheme.colors.primary.copy(alpha = 0.1f))
                             .padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
+                        verticalAlignment     = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -135,7 +142,7 @@ fun SettingsScreen(
                             Spacer(Modifier.width(16.dp))
                             Column {
                                 Text(s.settingsThemePicker, color = CelestiaTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
-                                Text(s.settingsThemePickerSub, style = MaterialTheme.typography.caption, color = CelestiaTheme.colors.textSecondary)
+                                Text(s.settingsThemePickerSub, style = MaterialTheme.typography.bodySmall, color = CelestiaTheme.colors.textSecondary)
                             }
                         }
                         Icon(Icons.Default.ArrowDropDown, null, tint = CelestiaTheme.colors.primary)
@@ -146,18 +153,18 @@ fun SettingsScreen(
                     // Dark theme toggle
                     var themeSwitchState by remember(isDarkTheme) { mutableStateOf(isDarkTheme) }
                     SettingsSwitchRow(
-                        title = s.settingsDarkTheme,
-                        checked = themeSwitchState,
+                        title           = s.settingsDarkTheme,
+                        checked         = themeSwitchState,
                         onCheckedChange = { isChecked -> themeSwitchState = isChecked; onToggleTheme() }
                     )
                 }
 
-                // ── Behavior ─────────────────────────────────────────────────
+                // ── Behavior ──────────────────────────────────────────────────
                 item {
                     SettingsSectionTitle(s.settingsSectionBehavior)
                     SettingsSwitchRow(
-                        title = s.settingsCloseAfterLaunch,
-                        checked = closeAfterStart,
+                        title           = s.settingsCloseAfterLaunch,
+                        checked         = closeAfterStart,
                         onCheckedChange = { closeAfterStart = it; save() }
                     )
                 }
@@ -168,8 +175,18 @@ fun SettingsScreen(
 
                     val userHome = System.getProperty("user.home")
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        CelestiaButton(s.settingsOpenLogs, onClick = { openFolder("logs") }, modifier = Modifier.weight(1f), primary = false)
-                        CelestiaButton(s.settingsOpenCrashReports, onClick = { openFolder("$userHome/.aura/crash-reports") }, modifier = Modifier.weight(1f), primary = false)
+                        CelestiaButton(
+                            s.settingsOpenLogs,
+                            onClick  = { openFolder("logs") },
+                            modifier = Modifier.weight(1f),
+                            primary  = false
+                        )
+                        CelestiaButton(
+                            s.settingsOpenCrashReports,
+                            onClick  = { openFolder("$userHome/.aura/crash-reports") },
+                            modifier = Modifier.weight(1f),
+                            primary  = false
+                        )
                     }
                 }
             }
@@ -178,7 +195,7 @@ fun SettingsScreen(
         if (showSavedMessage) {
             Spacer(Modifier.height(8.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                Text(s.settingsSaved, color = CelestiaTheme.colors.success, style = MaterialTheme.typography.caption)
+                Text(s.settingsSaved, color = CelestiaTheme.colors.success, style = MaterialTheme.typography.bodySmall)
             }
             LaunchedEffect(showSavedMessage) {
                 if (showSavedMessage) { kotlinx.coroutines.delay(2000); showSavedMessage = false }
@@ -189,22 +206,31 @@ fun SettingsScreen(
 
 @Composable
 private fun SettingsSectionTitle(text: String) {
-    Text(text.uppercase(), style = MaterialTheme.typography.caption, color = CelestiaTheme.colors.primary, fontWeight = FontWeight.Bold)
+    Text(
+        text.uppercase(),
+        style      = MaterialTheme.typography.bodySmall,
+        color      = CelestiaTheme.colors.primary,
+        fontWeight = FontWeight.Bold
+    )
     Spacer(Modifier.height(8.dp))
-    Divider(color = CelestiaTheme.colors.primary.copy(alpha = 0.3f))
+    HorizontalDivider(color = CelestiaTheme.colors.primary.copy(alpha = 0.3f))
     Spacer(Modifier.height(16.dp))
 }
 
 @Composable
 private fun SettingsSwitchRow(title: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-        Text(title, style = MaterialTheme.typography.body1, color = CelestiaTheme.colors.textPrimary)
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment     = Alignment.CenterVertically
+    ) {
+        Text(title, style = MaterialTheme.typography.bodyLarge, color = CelestiaTheme.colors.textPrimary)
         Switch(
-            checked = checked,
+            checked         = checked,
             onCheckedChange = onCheckedChange,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = CelestiaTheme.colors.primary,
-                checkedTrackColor = CelestiaTheme.colors.primary.copy(alpha = 0.5f)
+            colors          = SwitchDefaults.colors(
+                checkedThumbColor  = CelestiaTheme.colors.primary,
+                checkedTrackColor  = CelestiaTheme.colors.primary.copy(alpha = 0.5f)
             )
         )
     }

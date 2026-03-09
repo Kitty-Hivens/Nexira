@@ -6,10 +6,10 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,33 +40,27 @@ fun ServerDetailScreen(
 
     val assetsPath = remember(server) {
         val userHome = System.getProperty("user.home")
-        val os = System.getProperty("os.name").lowercase()
-        val baseDir = when {
+        val os       = System.getProperty("os.name").lowercase()
+        val baseDir  = when {
             os.contains("win") -> "$userHome/AppData/Roaming/${AppConfig.APP_DIR}"
             os.contains("mac") -> "$userHome/Library/Application Support/${AppConfig.APP_DIR}"
-            else -> "$userHome/${AppConfig.APP_DIR}"
+            else               -> "$userHome/${AppConfig.APP_DIR}"
         }
         File(baseDir, "clients/${server.assetDir}")
     }
 
     var description by remember { mutableStateOf<String?>(null) }
     var bannerImage by remember { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
-    var isLoading by remember { mutableStateOf(true) }
+    var isLoading   by remember { mutableStateOf(true) }
 
     LaunchedEffect(server) {
         withContext(Dispatchers.IO) {
             val descFile = File(assetsPath, "description.txt")
-            if (descFile.exists()) {
-                description = descFile.readText()
-            }
+            if (descFile.exists()) description = descFile.readText()
 
             val imgFile = File(assetsPath, "banner.png")
             if (imgFile.exists()) {
-                try {
-                    bannerImage = ImageIO.read(imgFile)?.toComposeImageBitmap()
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
+                runCatching { bannerImage = ImageIO.read(imgFile)?.toComposeImageBitmap() }
             }
             isLoading = false
         }
@@ -80,8 +74,8 @@ fun ServerDetailScreen(
             Spacer(Modifier.width(8.dp))
             Text(
                 s.serverDetailTitle,
-                style = MaterialTheme.typography.h6,
-                color = CelestiaTheme.colors.textSecondary,
+                style      = MaterialTheme.typography.titleLarge,
+                color      = CelestiaTheme.colors.textSecondary,
                 fontWeight = FontWeight.Bold
             )
         }
@@ -96,16 +90,16 @@ fun ServerDetailScreen(
                     // Left: text
                     Column(Modifier.weight(1.5f).padding(32.dp)) {
                         Text(
-                            text = server.title?.uppercase() ?: server.name,
-                            style = MaterialTheme.typography.h3,
+                            text       = server.title?.uppercase() ?: server.name,
+                            style      = MaterialTheme.typography.displaySmall,
                             fontWeight = FontWeight.Black,
-                            color = CelestiaTheme.colors.textPrimary
+                            color      = CelestiaTheme.colors.textPrimary
                         )
 
                         Row(Modifier.padding(vertical = 16.dp)) {
-                            Tag(server.version)
+                            ServerTag(server.version)
                             Spacer(Modifier.width(8.dp))
-                            Tag(server.assetDir)
+                            ServerTag(server.assetDir)
                         }
 
                         Spacer(Modifier.height(16.dp))
@@ -114,16 +108,16 @@ fun ServerDetailScreen(
                             item {
                                 if (description != null) {
                                     Text(
-                                        text = description!!,
-                                        style = MaterialTheme.typography.body1,
-                                        color = CelestiaTheme.colors.textPrimary.copy(alpha = 0.8f),
-                                        lineHeight = MaterialTheme.typography.body1.fontSize * 1.5
+                                        text       = description!!,
+                                        style      = MaterialTheme.typography.bodyLarge,
+                                        color      = CelestiaTheme.colors.textPrimary.copy(alpha = 0.8f),
+                                        lineHeight = MaterialTheme.typography.bodyLarge.fontSize * 1.5
                                     )
                                 } else {
                                     MissingDataWarning(
                                         title = s.serverDetailMissingTitle,
-                                        body = s.serverDetailMissingPath(assetsPath.absolutePath, "description.txt"),
-                                        path = assetsPath.absolutePath
+                                        body  = s.serverDetailMissingPath(assetsPath.absolutePath, "description.txt"),
+                                        path  = assetsPath.absolutePath
                                     )
                                 }
                             }
@@ -143,16 +137,16 @@ fun ServerDetailScreen(
                     ) {
                         if (bannerImage != null) {
                             Image(
-                                painter = BitmapPainter(bannerImage!!),
+                                painter            = BitmapPainter(bannerImage!!),
                                 contentDescription = null,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize()
+                                contentScale       = ContentScale.Crop,
+                                modifier           = Modifier.fillMaxSize()
                             )
                         } else {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(s.serverDetailNoImage, color = Color.Gray)
                                 Spacer(Modifier.height(8.dp))
-                                Text(s.serverDetailNoImageHint, style = MaterialTheme.typography.caption, color = Color.DarkGray)
+                                Text(s.serverDetailNoImageHint, style = MaterialTheme.typography.bodySmall, color = Color.DarkGray)
                             }
                         }
                     }
@@ -163,14 +157,19 @@ fun ServerDetailScreen(
 }
 
 @Composable
-private fun Tag(text: String) {
+private fun ServerTag(text: String) {
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(4.dp))
             .background(CelestiaTheme.colors.primary.copy(alpha = 0.2f))
             .padding(horizontal = 8.dp, vertical = 4.dp)
     ) {
-        Text(text, style = MaterialTheme.typography.caption, color = CelestiaTheme.colors.primary, fontWeight = FontWeight.Bold)
+        Text(
+            text       = text,
+            style      = MaterialTheme.typography.bodySmall,
+            color      = CelestiaTheme.colors.primary,
+            fontWeight = FontWeight.Bold
+        )
     }
 }
 
@@ -188,10 +187,10 @@ private fun MissingDataWarning(title: String, body: String, path: String) {
         Icon(Icons.Default.Warning, null, tint = Color(0xFFFFAA00))
         Spacer(Modifier.width(16.dp))
         Column {
-            Text(title, style = MaterialTheme.typography.subtitle2, color = Color(0xFFFFAA00), fontWeight = FontWeight.Bold)
+            Text(title, style = MaterialTheme.typography.titleSmall, color = Color(0xFFFFAA00), fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(4.dp))
-            Text(body, style = MaterialTheme.typography.caption, color = Color.White.copy(alpha = 0.7f))
-            Text(path, style = MaterialTheme.typography.caption, color = Color.White.copy(alpha = 0.5f), fontFamily = FontFamily.Monospace)
+            Text(body, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.7f))
+            Text(path, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.5f), fontFamily = FontFamily.Monospace)
         }
     }
 }

@@ -13,15 +13,12 @@ import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.Icon
-import androidx.compose.material.IconButton
-import androidx.compose.material.MaterialTheme
-import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -99,7 +96,7 @@ fun SquareServerCard(
             // Looking for icon.png file
             val iconFile = File(baseDir, "clients/${profile.assetDir}/icon.png")
             if (iconFile.exists()) {
-                try { serverIcon = ImageIO.read(iconFile)?.toComposeImageBitmap() } catch (_: Exception) {}
+                runCatching { serverIcon = ImageIO.read(iconFile)?.toComposeImageBitmap() }
             }
         }
     }
@@ -139,10 +136,10 @@ fun SquareServerCard(
         if (serverIcon != null) {
             // If there is a picture, draw it across the entire background.
             Image(
-                painter      = BitmapPainter(serverIcon!!),
+                painter            = BitmapPainter(serverIcon!!),
                 contentDescription = null,
-                modifier     = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
+                modifier           = Modifier.fillMaxSize(),
+                contentScale       = ContentScale.Crop
             )
             // Gradient scrim so text is readable
             Box(
@@ -189,7 +186,7 @@ fun SquareServerCard(
 
         // ── LAYER 2: Content ──────────────────────────────────────────────────
         Column(
-            modifier = Modifier.fillMaxSize().padding(14.dp),
+            modifier            = Modifier.fillMaxSize().padding(14.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
@@ -197,11 +194,11 @@ fun SquareServerCard(
             if (serverIcon == null) {
                 // Big abbreviation with gradient color
                 Text(
-                    text      = profile.name.take(2).uppercase(),
-                    fontSize  = 32.sp,
+                    text       = profile.name.take(2).uppercase(),
+                    fontSize   = 32.sp,
                     fontWeight = FontWeight.Black,
-                    color     = colorA,
-                    textAlign = TextAlign.Center
+                    color      = colorA,
+                    textAlign  = TextAlign.Center
                 )
                 Spacer(Modifier.height(10.dp))
             } else {
@@ -209,10 +206,10 @@ fun SquareServerCard(
                 Spacer(Modifier.weight(1f))
             }
 
-            // Server name
+            // M3 typography: subtitle1 → titleMedium
             Text(
                 text       = profile.title ?: profile.name,
-                style      = MaterialTheme.typography.subtitle1,
+                style      = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color      = Color.White,
                 textAlign  = TextAlign.Center,
@@ -221,20 +218,17 @@ fun SquareServerCard(
 
             Spacer(Modifier.height(3.dp))
 
-            // Version badge
+            // Version badge — M3: overline → labelSmall
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(4.dp))
-                    .background(
-                        if (serverIcon != null) Color.Black.copy(alpha = 0.4f)
-                        else colorB.copy(alpha = 0.22f)
-                    )
+                    .background(if (serverIcon != null) Color.Black.copy(0.4f) else colorB.copy(0.22f))
                     .padding(horizontal = 7.dp, vertical = 2.dp)
             ) {
                 Text(
-                    text  = profile.version,
-                    style = MaterialTheme.typography.overline,
-                    color = if (serverIcon != null) Color.LightGray else colorA.copy(alpha = 0.9f),
+                    text       = profile.version,
+                    style      = MaterialTheme.typography.labelSmall,
+                    color      = if (serverIcon != null) Color.LightGray else colorA.copy(0.9f),
                     fontWeight = FontWeight.Medium
                 )
             }
@@ -252,13 +246,13 @@ fun SquareServerCard(
             Row(
                 modifier = Modifier
                     .clip(RoundedCornerShape(10.dp))
-                    .background(Color.Black.copy(alpha = 0.82f))
+                    .background(Color.Black.copy(0.82f))
                     .padding(4.dp),
                 horizontalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 CardIconButton(
                     icon  = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                    color = if (isFavorite) Color(0xFFEF4444) else Color.White.copy(alpha = 0.8f),
+                    color = if (isFavorite) Color(0xFFEF4444) else Color.White.copy(0.8f),
                     onClick = onToggleFav
                 )
                 CardIconButton(Icons.Default.Settings, onClick = onSettings)
@@ -269,7 +263,7 @@ fun SquareServerCard(
 }
 
 @Composable
-private fun CardIconButton(icon: ImageVector, color: Color = Color.White.copy(alpha = 0.8f), onClick: () -> Unit) {
+private fun CardIconButton(icon: ImageVector, color: Color = Color.White.copy(0.8f), onClick: () -> Unit) {
     IconButton(onClick = onClick, modifier = Modifier.size(30.dp)) {
         Icon(icon, null, tint = color, modifier = Modifier.size(16.dp))
     }

@@ -7,8 +7,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.MaterialTheme
-import androidx.compose.material.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
@@ -84,18 +83,18 @@ fun DashboardScreen(
 
         // ── Header ────────────────────────────────────────────────────────────
         Text(
-            text      = s.dashboardWelcome(session.playerName),
-            style     = MaterialTheme.typography.subtitle1,
+            text       = s.dashboardWelcome(session.playerName),
+            style      = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Medium,
-            color     = CelestiaTheme.colors.textSecondary
+            color      = CelestiaTheme.colors.textSecondary
         )
 
         Spacer(Modifier.height(4.dp))
 
         Text(
-            text      = s.dashboardServers,
-            style     = MaterialTheme.typography.caption,
-            color     = CelestiaTheme.colors.textSecondary.copy(alpha = 0.55f),
+            text       = s.dashboardServers,
+            style      = MaterialTheme.typography.bodySmall,
+            color      = CelestiaTheme.colors.textSecondary.copy(alpha = 0.55f),
             fontWeight = FontWeight.Bold
         )
 
@@ -104,7 +103,7 @@ fun DashboardScreen(
         // ── Server grid ───────────────────────────────────────────────────────
         Box(Modifier.weight(1f).fillMaxWidth()) {
             LazyVerticalGrid(
-                columns = GridCells.Adaptive(minSize = 220.dp),
+                columns               = GridCells.Adaptive(minSize = 220.dp),
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
                 verticalArrangement   = Arrangement.spacedBy(14.dp),
                 contentPadding        = PaddingValues(bottom = 8.dp),

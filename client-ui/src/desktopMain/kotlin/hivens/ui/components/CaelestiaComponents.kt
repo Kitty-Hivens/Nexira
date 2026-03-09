@@ -3,13 +3,15 @@ package hivens.ui.components
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.*
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.unit.dp
 import hivens.ui.effects.pulsatingGlow
+import hivens.ui.theme.CelestiaTheme
 
 /**
  * Main Celestia container — translucent, with a thin border.
@@ -21,32 +23,32 @@ import hivens.ui.effects.pulsatingGlow
 fun GlassCard(
     modifier: Modifier = Modifier,
     shape: Shape = MaterialTheme.shapes.medium,
-    backgroundColor: Color = MaterialTheme.colors.surface.copy(alpha = 0.7f),
+    backgroundColor: Color = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
     borderColor: Color = Color.Unspecified,
     content: @Composable BoxScope.() -> Unit
 ) {
     val resolvedBorder = when {
         borderColor != Color.Unspecified -> borderColor
-        MaterialTheme.colors.isLight     -> Color(0xFFCCCCCC)
-        else                             -> Color(0xFF2C2C2C)
+        MaterialTheme.colorScheme.surface.luminance() < 0.5f -> Color(0xFF2C2C2C)
+        else -> Color(0xFFCCCCCC)
     }
 
-    Surface(
+    OutlinedCard(
         modifier  = modifier,
         shape     = shape,
-        color     = backgroundColor,
+        colors    = CardDefaults.outlinedCardColors(containerColor = backgroundColor),
         border    = BorderStroke(1.dp, resolvedBorder),
-        elevation = 0.dp
+        elevation = CardDefaults.outlinedCardElevation(defaultElevation = 0.dp)
     ) {
-        Box(content = content)
+        Box(modifier = Modifier.fillMaxSize(), content = content)
     }
 }
 
 /**
- * Celestia button.
+ * Кнопка Celestia.
  *
- * Setting [glowing] = true enables a pulsating neon glow behind the button —
- * perfect for the PLAY button in the Idle state.
+ * [glowing] = true включает пульсирующий неоновый эффект —
+ * идеально для кнопки PLAY в состоянии Idle.
  */
 @Composable
 fun CelestiaButton(
@@ -57,26 +59,39 @@ fun CelestiaButton(
     primary: Boolean = true,
     glowing: Boolean = false
 ) {
-    val glowColor = MaterialTheme.colors.primary
+    val glowColor = MaterialTheme.colorScheme.primary
 
-    Button(
-        onClick   = onClick,
-        modifier  = modifier
-            .height(48.dp)
-            .let { if (glowing) it.pulsatingGlow(glowColor, cornerRadius = 12.dp) else it },
-        enabled   = enabled,
-        shape     = RoundedCornerShape(12.dp),
-        colors    = ButtonDefaults.buttonColors(
-            backgroundColor      = if (primary) MaterialTheme.colors.primary else Color.Transparent,
-            contentColor         = if (primary) MaterialTheme.colors.onPrimary else MaterialTheme.colors.onSurface,
-            disabledBackgroundColor = if (primary)
-                MaterialTheme.colors.primary.copy(alpha = 0.5f)
-            else
-                Color.Transparent
-        ),
-        border    = if (!primary) BorderStroke(1.dp, Color(0xFF444444)) else null,
-        elevation = null
-    ) {
-        Text(text)
+    if (primary) {
+        Button(
+            onClick = onClick,
+            modifier = modifier
+                .height(48.dp)
+                .let { if (glowing) it.pulsatingGlow(glowColor, cornerRadius = 12.dp) else it },
+            enabled = enabled,
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = CelestiaTheme.colors.primary,
+                contentColor = Color.White,
+                disabledContainerColor = CelestiaTheme.colors.primary.copy(alpha = 0.5f),
+                disabledContentColor = Color.White.copy(alpha = 0.6f)
+            ),
+            elevation = ButtonDefaults.buttonElevation(0.dp, 0.dp, 0.dp)
+        ) {
+            Text(text)
+        }
+    } else {
+        OutlinedButton(
+            onClick = onClick,
+            modifier = modifier.height(48.dp),
+            enabled = enabled,
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.outlinedButtonColors(
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+            ),
+            border = BorderStroke(1.dp, Color(0xFF444444))
+        ) {
+            Text(text)
+        }
     }
 }
