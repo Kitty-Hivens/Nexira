@@ -22,10 +22,6 @@
 
 We believe that launching your favorite server shouldn't feel like interacting with a relic from 2013. Unlike the original client, Aura doesn't drag along ancient Java versions, starts instantly, and respects your operating system — whether you're on Linux, Windows, or macOS.
 
-<p align="center">
-  <img src="assets/servers.png" alt="Server Selection" width="800" style="border-radius: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);">
-</p>
-
 ## ✨ Why Aura?
 
 We built Aura because we love efficient software.
@@ -34,18 +30,6 @@ We built Aura because we love efficient software.
 * **Atmospheric:** The launcher lives with you. It features dynamic **seasonal themes**—from gentle winter snowfall to summer fireflies—that automatically adapt to the time of year (or your mood).
 * **Linux First:** We don't treat Linux as a second-class citizen. Aura offers a native experience with AppImage support, seamless Wayland integration, and no "dancing with tambourines" required to get Java working.
 * **Transparent & Open:** You deserve to know what runs on your machine. Our code is 100% open source under GPLv3.
-
-## 🎨 Gallery
-
-### Login & Profile
-|                        Account Login                         |                      Player Profile                       |
-|:------------------------------------------------------------:|:---------------------------------------------------------:|
-| <img src="assets/login.png" alt="Login Screen" width="100%"> | <img src="assets/profile.png" alt="Profile" width="100%"> |
-
-### Settings & Customization
-|                              Global Settings                              |                          Client Configuration                           |
-|:-------------------------------------------------------------------------:|:-----------------------------------------------------------------------:|
-| <img src="assets/main_settings.png" alt="Launcher Settings" width="100%"> | <img src="assets/server_settings.png" alt="Game Settings" width="100%"> |
 
 ---
 
