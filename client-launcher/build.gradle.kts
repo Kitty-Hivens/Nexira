@@ -7,7 +7,7 @@ dependencies {
     implementation(project(":client-core"))
     implementation(project(":client-config"))
 
-    implementation("org.apache.commons:commons-compress:1.26.1")
+    implementation("org.apache.commons:commons-compress:1.28.0")
     implementation("io.insert-koin:koin-core:3.5.3")
     implementation("org.slf4j:slf4j-api:2.0.12")
 

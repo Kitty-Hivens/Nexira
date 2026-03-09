@@ -57,7 +57,7 @@ kotlin {
                 implementation("io.insert-koin:koin-core:$koinVersion")
                 implementation("io.insert-koin:koin-compose:$koinComposeVersion")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.9.0")
-                implementation("ch.qos.logback:logback-classic:1.4.14")
+                implementation("ch.qos.logback:logback-classic:1.5.32")
             }
         }
     }
