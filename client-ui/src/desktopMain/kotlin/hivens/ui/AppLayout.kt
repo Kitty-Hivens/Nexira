@@ -20,6 +20,8 @@ import hivens.core.api.SkinRepository
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.SessionData
 import hivens.ui.i18n.AppLocale
+import hivens.ui.i18n.LocalStrings
+import hivens.ui.i18n.LocaleProvider
 import hivens.ui.screens.*
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.CustomTheme
@@ -82,16 +84,12 @@ fun AppLayout(
                                 onSessionUpdated      = { currentSession = it },
                                 onCloseApp            = onCloseApp,
                                 onOpenServerSettings  = { onScreenChange(Screen.ServerSettings(it)) },
-                                onOpenNews            = { onScreenChange(Screen.News) },
                                 onOpenDetails         = { onScreenChange(Screen.ServerDetails(it)) }
                             )
                         } else {
                             ContentLoadingPlaceholder()
                         }
                     }
-
-                    Screen.News ->
-                        NewsScreen(onBack = { onScreenChange(Screen.Home) })
 
                     Screen.Profile ->
                         currentSession?.let {
@@ -147,7 +145,7 @@ fun AppLayout(
     }
 }
 
-// ─── Sidebar — M3 NavigationRail ─────────────────────────────────────────────
+// ─── Sidebar ─────────────────────────────────────────────────────────────────
 
 @Composable
 fun AppSidebar(
@@ -159,7 +157,6 @@ fun AppSidebar(
     val homeActive = currentScreen is Screen.Home
             || currentScreen is Screen.ServerSettings
             || currentScreen is Screen.ServerDetails
-            || currentScreen is Screen.News
     val profileActive  = currentScreen is Screen.Profile
     val settingsActive = currentScreen is Screen.Settings || currentScreen is Screen.ThemePicker
 

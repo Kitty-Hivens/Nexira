@@ -105,6 +105,16 @@ fun SquareServerCard(
     val scale by animateFloatAsState(if (showActions) 1.02f else 1.0f)
     val (colorA, colorB) = remember(profile.name) { serverPalette(profile.name) }
 
+    // ── Theme-aware overlay colors ─────────────────────────────────────────
+    val bgBase      = CelestiaTheme.colors.background
+    val surfaceBase = CelestiaTheme.colors.surface
+    // In dark theme bg is near-black; in light theme it's light gray — both look correct.
+    val cardOverlay     = bgBase.copy(alpha = 0.65f)
+    val actionBarColor  = surfaceBase.copy(alpha = 0.92f)
+    val scrimMid        = bgBase.copy(alpha = 0.50f)
+    val scrimBottom     = bgBase.copy(alpha = 0.92f)
+    val badgeBgFallback = colorB.copy(0.22f)
+
     Box(
         modifier = Modifier
             .aspectRatio(1f)
@@ -113,8 +123,8 @@ fun SquareServerCard(
             .let { m ->
                 when {
                     isSelected -> m.neonBorder(CelestiaTheme.colors.primary, cornerRadius = 20.dp, strokeWidth = 2.dp)
-                    isFocused  -> m.border(2.dp, Color.White, RoundedCornerShape(20.dp))
-                    else       -> m.border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(20.dp))
+                    isFocused  -> m.border(2.dp, CelestiaTheme.colors.textPrimary, RoundedCornerShape(20.dp))
+                    else       -> m.border(1.dp, CelestiaTheme.colors.outline.copy(alpha = 0.25f), RoundedCornerShape(20.dp))
                 }
             }
             // Shimmer on hover (not when already glowing with neon)
@@ -141,7 +151,7 @@ fun SquareServerCard(
                 modifier           = Modifier.fillMaxSize(),
                 contentScale       = ContentScale.Crop
             )
-            // Gradient scrim so text is readable
+            // Gradient scrim — uses theme background color so it blends in both themes
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -149,8 +159,8 @@ fun SquareServerCard(
                         Brush.verticalGradient(
                             colors = listOf(
                                 Color.Transparent,
-                                Color.Black.copy(alpha = 0.5f),
-                                Color.Black.copy(alpha = 0.92f)
+                                scrimMid,
+                                scrimBottom
                             )
                         )
                     )
@@ -168,7 +178,7 @@ fun SquareServerCard(
                             )
                         )
                     )
-                    .background(Color(0xFF0E0E16).copy(alpha = 0.65f))
+                    .background(cardOverlay)
             )
             // Subtle diagonal accent stripe
             Box(
@@ -206,29 +216,30 @@ fun SquareServerCard(
                 Spacer(Modifier.weight(1f))
             }
 
-            // M3 typography: subtitle1 → titleMedium
             Text(
                 text       = profile.title ?: profile.name,
                 style      = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color      = Color.White,
+                color      = CelestiaTheme.colors.textPrimary,
                 textAlign  = TextAlign.Center,
                 maxLines   = 1
             )
 
             Spacer(Modifier.height(3.dp))
 
-            // Version badge — M3: overline → labelSmall
+            // Version badge
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(4.dp))
-                    .background(if (serverIcon != null) Color.Black.copy(0.4f) else colorB.copy(0.22f))
+                    .background(
+                        if (serverIcon != null) surfaceBase.copy(0.55f) else badgeBgFallback
+                    )
                     .padding(horizontal = 7.dp, vertical = 2.dp)
             ) {
                 Text(
                     text       = profile.version,
                     style      = MaterialTheme.typography.labelSmall,
-                    color      = if (serverIcon != null) Color.LightGray else colorA.copy(0.9f),
+                    color      = if (serverIcon != null) CelestiaTheme.colors.textSecondary else colorA.copy(0.9f),
                     fontWeight = FontWeight.Medium
                 )
             }
@@ -246,17 +257,18 @@ fun SquareServerCard(
             Row(
                 modifier = Modifier
                     .clip(RoundedCornerShape(10.dp))
-                    .background(Color.Black.copy(0.82f))
+                    .background(actionBarColor)
+                    .border(1.dp, CelestiaTheme.colors.outline.copy(alpha = 0.3f), RoundedCornerShape(10.dp))
                     .padding(4.dp),
                 horizontalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 CardIconButton(
                     icon  = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                    color = if (isFavorite) Color(0xFFEF4444) else Color.White.copy(0.8f),
+                    color = if (isFavorite) Color(0xFFEF4444) else CelestiaTheme.colors.textSecondary,
                     onClick = onToggleFav
                 )
-                CardIconButton(Icons.Default.Settings, onClick = onSettings)
-                CardIconButton(Icons.Default.Info, onClick = onDetails)
+                CardIconButton(Icons.Default.Settings, color = CelestiaTheme.colors.textSecondary, onClick = onSettings)
+                CardIconButton(Icons.Default.Info,     color = CelestiaTheme.colors.textSecondary, onClick = onDetails)
             }
         }
     }

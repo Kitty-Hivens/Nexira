@@ -131,8 +131,12 @@ fun ServerDetailScreen(
                             .fillMaxHeight()
                             .padding(16.dp)
                             .clip(RoundedCornerShape(16.dp))
-                            .background(Color.Black.copy(alpha = 0.3f))
-                            .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(16.dp)),
+                            .background(CelestiaTheme.colors.surface.copy(alpha = 0.5f))
+                            .border(
+                                1.dp,
+                                CelestiaTheme.colors.outline.copy(alpha = 0.2f),
+                                RoundedCornerShape(16.dp)
+                            ),
                         contentAlignment = Alignment.Center
                     ) {
                         if (bannerImage != null) {
@@ -144,9 +148,13 @@ fun ServerDetailScreen(
                             )
                         } else {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(s.serverDetailNoImage, color = Color.Gray)
+                                Text(s.serverDetailNoImage, color = CelestiaTheme.colors.textSecondary)
                                 Spacer(Modifier.height(8.dp))
-                                Text(s.serverDetailNoImageHint, style = MaterialTheme.typography.bodySmall, color = Color.DarkGray)
+                                Text(
+                                    s.serverDetailNoImageHint,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.5f)
+                                )
                             }
                         }
                     }
@@ -179,7 +187,7 @@ private fun MissingDataWarning(title: String, body: String, path: String) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .background(Color(0xFF332200).copy(alpha = 0.5f))
+            .background(Color(0xFFFFAA00).copy(alpha = 0.12f))
             .border(1.dp, Color(0xFFFFAA00).copy(alpha = 0.3f), RoundedCornerShape(12.dp))
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -189,8 +197,8 @@ private fun MissingDataWarning(title: String, body: String, path: String) {
         Column {
             Text(title, style = MaterialTheme.typography.titleSmall, color = Color(0xFFFFAA00), fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(4.dp))
-            Text(body, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.7f))
-            Text(path, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.5f), fontFamily = FontFamily.Monospace)
+            Text(body, style = MaterialTheme.typography.bodySmall, color = CelestiaTheme.colors.textPrimary.copy(alpha = 0.7f))
+            Text(path, style = MaterialTheme.typography.bodySmall, color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.6f), fontFamily = FontFamily.Monospace)
         }
     }
 }
