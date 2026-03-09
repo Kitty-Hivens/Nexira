@@ -23,6 +23,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   "close after game starts" setting now actually closes the launcher
 - Malformed import block in `ManifestProcessorService.kt` where two `import` statements
   were merged onto a single line
+- Light theme no longer renders with dark background: `CelestiaTheme` now applies
+  `DarkColorPalette` / `LightColorPalette` as the base and only overlays accent colors
+  from `CustomTheme`, so the background, surface and text colors always match the selected
+  brightness mode
+- Dark/light theme preference is now persisted across restarts: `Main.kt` reads
+  `SettingsData.isDarkTheme` on startup and writes it back via `ISettingsService` whenever
+  the toggle is flipped
 
 ### Changed
 - `client-ui`: migrated from Compose Material 2 to Material 3 (`material` → `material3`);

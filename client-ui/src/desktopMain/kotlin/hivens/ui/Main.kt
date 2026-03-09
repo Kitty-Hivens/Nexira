@@ -83,7 +83,7 @@ fun main() {
         KoinContext {
             val settingsService: ISettingsService = koinInject()
 
-            var isDarkTheme   by remember { mutableStateOf(true) }
+            var isDarkTheme   by remember { mutableStateOf(settingsService.getSettings().isDarkTheme) }
             var currentLocale by remember {
                 mutableStateOf(AppLocale.fromTag(settingsService.getSettings().locale))
             }
@@ -122,7 +122,11 @@ fun main() {
                         AppRoot(
                             onCloseApp           = ::exitApplication,
                             isDarkTheme          = isDarkTheme,
-                            onToggleDarkTheme    = { isDarkTheme = !isDarkTheme },
+                            onToggleDarkTheme = {
+                                isDarkTheme = !isDarkTheme
+                                val current = settingsService.getSettings()
+                                settingsService.saveSettings(current.copy(isDarkTheme = isDarkTheme))
+                            },
                             customTheme          = customTheme,
                             onCustomThemeChanged = { newTheme ->
                                 customTheme = newTheme
