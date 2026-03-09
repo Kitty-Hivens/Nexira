@@ -56,7 +56,6 @@ sealed class Screen {
     object Profile     : Screen()
     object Settings    : Screen()
     object ThemePicker : Screen()
-    object News        : Screen()
     data class ServerSettings(val server: hivens.core.api.model.ServerProfile) : Screen()
     data class ServerDetails (val server: hivens.core.api.model.ServerProfile) : Screen()
 }

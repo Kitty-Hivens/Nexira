@@ -11,7 +11,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.core.api.interfaces.IServerListService
@@ -38,7 +37,6 @@ fun DashboardScreen(
     onSessionUpdated: (SessionData) -> Unit,
     onCloseApp: () -> Unit,
     onOpenServerSettings: (ServerProfile) -> Unit,
-    onOpenNews: () -> Unit,
     onOpenDetails: (ServerProfile) -> Unit
 ) {
     val serverListService: IServerListService = koinInject()
@@ -142,8 +140,15 @@ fun DashboardScreen(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .border(1.dp, Color.White.copy(alpha = 0.06f), RoundedCornerShape(14.dp))
-                .background(Color.Black.copy(alpha = 0.18f), RoundedCornerShape(14.dp))
+                .border(
+                    width = 1.dp,
+                    color = CelestiaTheme.colors.outline.copy(alpha = 0.25f),
+                    shape = RoundedCornerShape(14.dp)
+                )
+                .background(
+                    color = CelestiaTheme.colors.surface.copy(alpha = 0.45f),
+                    shape = RoundedCornerShape(14.dp)
+                )
                 .padding(horizontal = 16.dp, vertical = 14.dp)
         ) {
             LaunchControlPanel(

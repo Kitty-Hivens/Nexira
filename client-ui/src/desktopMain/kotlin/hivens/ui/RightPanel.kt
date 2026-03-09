@@ -1,6 +1,6 @@
 package hivens.ui
 
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -16,6 +16,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.painter.BitmapPainter
@@ -48,6 +50,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import org.koin.compose.koinInject
+import java.awt.Desktop
+import java.net.URI
 
 // ─── Right Panel ─────────────────────────────────────────────────────────────
 
@@ -87,11 +91,11 @@ fun RightPanel(
 
 @Composable
 fun LoginPanel(onLogin: (SessionData) -> Unit) {
-    val authService: IAuthService          = koinInject()
+    val authService: IAuthService              = koinInject()
     val credentialsManager: CredentialsManager = koinInject()
-    val profileManager: ProfileManager     = koinInject()
-    val s     = LocalStrings.current
-    val scope = rememberCoroutineScope()
+    val profileManager: ProfileManager         = koinInject()
+    val s            = LocalStrings.current
+    val scope        = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
 
     var login        by remember { mutableStateOf("") }
@@ -149,7 +153,7 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
             color      = CelestiaTheme.colors.textPrimary
         )
 
-        AnimatedVisibility(visible = errorMessage != null) {
+        if (errorMessage != null) {
             Text(
                 text     = errorMessage ?: "",
                 style    = MaterialTheme.typography.bodySmall,
@@ -247,7 +251,7 @@ fun AccountPanel(session: SessionData, onLogout: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         // Face
@@ -343,16 +347,7 @@ fun CompactNewsFeed(modifier: Modifier = Modifier) {
         HorizontalDivider(color = CelestiaTheme.colors.surface.copy(alpha = 0.6f))
 
         when {
-            loading -> Box(
-                Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator(
-                    color       = CelestiaTheme.colors.primary.copy(alpha = 0.4f),
-                    modifier    = Modifier.size(20.dp),
-                    strokeWidth = 2.dp
-                )
-            }
+            loading -> NewsSkeleton()
 
             news.isEmpty() -> Box(
                 Modifier.fillMaxSize(),
@@ -378,12 +373,116 @@ fun CompactNewsFeed(modifier: Modifier = Modifier) {
     }
 }
 
+// ─── Skeleton loader ──────────────────────────────────────────────────────────
+
 @Composable
-private fun CompactNewsItem(item: NewsItem, imageLoader: ImageLoader) {
+private fun NewsSkeleton() {
+    val shimmerColors = listOf(
+        CelestiaTheme.colors.surface.copy(alpha = 0.6f),
+        CelestiaTheme.colors.surface.copy(alpha = 0.25f),
+        CelestiaTheme.colors.surface.copy(alpha = 0.6f),
+    )
+
+    val transition = rememberInfiniteTransition(label = "skeleton")
+    val translateAnim by transition.animateFloat(
+        initialValue  = 0f,
+        targetValue   = 1000f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1200, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "shimmer"
+    )
+
+    val brush = Brush.linearGradient(
+        colors = shimmerColors,
+        start  = Offset(translateAnim - 300f, 0f),
+        end    = Offset(translateAnim, 0f)
+    )
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        repeat(4) {
+            SkeletonNewsItem(brush)
+            HorizontalDivider(
+                color    = CelestiaTheme.colors.surface.copy(alpha = 0.4f),
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun SkeletonNewsItem(brush: Brush) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable {}   // TODO: open URL when NewsItem gets one
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment     = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        // Thumbnail placeholder
+        Box(
+            modifier = Modifier
+                .size(38.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(brush)
+        )
+
+        Column(
+            modifier            = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            // Title line
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.85f)
+                    .height(12.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(brush)
+            )
+            // Second title line (shorter)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.55f)
+                    .height(10.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(brush)
+            )
+            // Date line
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.35f)
+                    .height(9.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(brush)
+            )
+        }
+    }
+}
+
+// ─── News item ────────────────────────────────────────────────────────────────
+
+@Composable
+private fun CompactNewsItem(item: NewsItem, imageLoader: ImageLoader) {
+    // Try to open a URL if the NewsItem has one (currently description holds "Views: N",
+    // but we keep the click hook ready for when the backend sends real URLs)
+    val canOpenUrl = item.imageUrl != null  // reuse as proxy; swap for item.url when available
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = canOpenUrl) {
+                // Build a best-effort URL from the image URL pattern:
+                // https://smartycraft.ru/images/news/mini/news1.jpg  →  https://smartycraft.ru/news{id}
+                try {
+                    val url = "${AppConfig.BASE_URL}/news${item.id}"
+                    if (Desktop.isDesktopSupported() &&
+                        Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)
+                    ) {
+                        Desktop.getDesktop().browse(URI(url))
+                    }
+                } catch (_: Exception) {}
+            }
             .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -423,6 +522,15 @@ private fun CompactNewsItem(item: NewsItem, imageLoader: ImageLoader) {
                 text  = item.date,
                 style = MaterialTheme.typography.labelSmall,
                 color = CelestiaTheme.colors.primary.copy(alpha = 0.7f)
+            )
+        }
+
+        // Subtle arrow hint that item is clickable
+        if (canOpenUrl) {
+            Text(
+                text  = "›",
+                style = MaterialTheme.typography.bodyMedium,
+                color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.4f)
             )
         }
     }
