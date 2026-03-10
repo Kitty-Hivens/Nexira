@@ -50,10 +50,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **`UpdateService.extractChecksum`**: only matched `SHA256: file - hash` plain-text
   format, but `build_release.yml` emits markdown table `| \`file\` | \`hash\` |`;
   added markdown table parser as the primary extraction path
-  - `ConsoleWindow.buildHighlightedText`: tail text was appended inside
+- `ConsoleWindow.buildHighlightedText`: tail text was appended inside
   `forEach` loop — with N keyword matches the remaining text was
   duplicated N times; text with zero matches was not rendered at all;
   tail-append block moved outside the loop
+- `ProfileScreen`: skin upload result was ignored — status always set
+  to `Success` even on server errors (SIZE, TYPE, HD); now checks the
+  `uploadSkin()` return value and displays the actual error message;
+  network exceptions are also caught and shown in UI
 
 ### Changed
 - `client-ui`: migrated from Compose Material 2 to Material 3 (`material` → `material3`);
