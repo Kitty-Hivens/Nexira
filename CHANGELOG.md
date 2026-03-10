@@ -15,8 +15,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Unit tests for `ServerRepository`: covers normal dashboard flow, empty server list,
   `UPDATE` cycle with JAR re-fetch, JAR download failure, HTTP 500, malformed JSON,
   infinite `UPDATE` loop guard, and server field mapping
+- Unit tests for `UpdateService`: covers `compareVersions` (semver, prerelease, mixed
+  segment counts), `findAssetForCurrentOS` (correct platform selection, Portable ZIP
+  exclusion, empty asset list), `extractChecksum` (markdown table format, plain-text
+  format, null body, multi-file lookup), `verifyChecksum` (correct/incorrect/empty/
+  case-insensitive), `checkForUpdate` integration (newer version, up-to-date, downgrade,
+  CRITICAL detection, HTTP errors, malformed JSON, missing assets, null body),
+  `shouldCheck` cooldown, and `cleanupOldUpdates` file filtering
 - `MockClientFactory` test fixture shared across modules via `java-test-fixtures`
 - Test jobs added as a prerequisite for `changelog` / `build` steps in the release workflow
+- `scripts/verify-release.sh`: pre-release smoke test that verifies GitHub release assets
+  match what `UpdateService.findAssetForCurrentOS()` expects, validates SHA256 checksums,
+  and checks naming conventions; supports `--draft`, tag arguments, and `DRY_RUN` mode
+- `.github/workflows/verify_release.yml`: runs `verify-release.sh` automatically after
+  the Release workflow completes; also runs `UpdateServiceTest` as a separate job
 
 ### Fixed
 - `exitApplication` now correctly wired through `AppRoot` → `AppLayout` → `DashboardScreen`;
@@ -30,6 +42,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Dark/light theme preference is now persisted across restarts: `Main.kt` reads
   `SettingsData.isDarkTheme` on startup and writes it back via `ISettingsService` whenever
   the toggle is flipped
+- **`UpdateService.findAssetForCurrentOS`**: was matching `.msi` on Windows, but CI
+  produces `.exe` via Inno Setup — auto-update silently failed on every Windows release;
+  now matches `*Setup*.exe` and explicitly excludes Portable ZIP
+- **`UpdateService.cleanupOldUpdates`**: regex matched `.msi` instead of `.exe` —
+  old installers were never cleaned up on Windows
+- **`UpdateService.extractChecksum`**: only matched `SHA256: file - hash` plain-text
+  format, but `build_release.yml` emits markdown table `| \`file\` | \`hash\` |`;
+  added markdown table parser as the primary extraction path
 
 ### Changed
 - `client-ui`: migrated from Compose Material 2 to Material 3 (`material` → `material3`);
@@ -79,7 +99,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   `Color.Black` / `Color.White` literals
 - `ServerDetailScreen`: right banner block and `MissingDataWarning` background replaced with
   theme-aware colors; `MissingDataWarning` now uses a semi-transparent amber tint in both themes
-
+- `UpdateService`: five previously-private methods (`compareVersions`, `findAssetForCurrentOS`,
+  `extractChecksum`, `verifyChecksum`, `shouldCheck`) changed to `internal` visibility
+  for unit-test access without exposing them in the public API
 
 ### Removed
 - `SplashScreen` and `AppState.Splash`

@@ -28,7 +28,7 @@ class UpdateService(
     private val logger = LoggerFactory.getLogger(UpdateService::class.java)
     private val updateDir = dataDirectory.resolve("updates")
     private val lastCheckFile = updateDir.resolve(".last_check")
-    
+
     companion object {
         private const val GITHUB_API = "https://api.github.com/repos/Kitty-Hivens/Aura-Launcher/releases/latest"
         private const val CHECK_INTERVAL_HOURS = 12L
@@ -51,11 +51,11 @@ class UpdateService(
             }
 
             logger.info("Checking for launcher updates...")
-            
+
             val response = httpClient.get(GITHUB_API) {
                 header("Accept", "application/vnd.github.v3+json")
             }
-            
+
             if (response.status.value != 200) {
                 logger.warn("GitHub API returned ${response.status}")
                 return@withContext null
@@ -63,10 +63,10 @@ class UpdateService(
 
             val release = json.decodeFromString<GitHubRelease>(response.bodyAsText())
             updateLastCheck()
-            
+
             val currentVersion = AppConfig.CLIENT_VERSION.removePrefix("v")
             val latestVersion = release.tagName.removePrefix("v")
-            
+
             if (compareVersions(latestVersion, currentVersion) <= 0) {
                 logger.info("Launcher is up to date ($currentVersion)")
                 return@withContext null
@@ -90,7 +90,7 @@ class UpdateService(
                 changelog = release.body ?: "No changelog available",
                 isCritical = isCritical
             )
-            
+
         } catch (e: Exception) {
             logger.error("Failed to check for updates", e)
             null
@@ -106,7 +106,7 @@ class UpdateService(
     ): Path = withContext(Dispatchers.IO) {
         val fileName = update.downloadUrl.substringAfterLast("/")
         val targetFile = updateDir.resolve(fileName)
-        
+
         if (Files.exists(targetFile) && verifyChecksum(targetFile, update.checksum)) {
             logger.info("Update file already downloaded and verified")
             return@withContext targetFile
@@ -114,7 +114,7 @@ class UpdateService(
 
         Files.deleteIfExists(targetFile)
         logger.info("Downloading update from ${update.downloadUrl}")
-        
+
         var lastUpdateTime = System.currentTimeMillis()
         var lastDownloadedBytes = 0L
 
@@ -170,7 +170,8 @@ class UpdateService(
         try {
             Files.list(updateDir).use { stream ->
                 stream
-                    .filter { it.fileName.toString().matches(Regex(".*\\.(msi|dmg|AppImage)$")) }
+                    // FIX: CI produces .exe (Inno Setup), not .msi — match actual artifact names
+                    .filter { it.fileName.toString().matches(Regex(".*\\.(exe|dmg|AppImage)$")) }
                     .forEach { file ->
                         runCatching { Files.delete(file) }
                             .onSuccess { logger.debug("Deleted old update: {}", file.fileName) }
@@ -181,9 +182,9 @@ class UpdateService(
         }
     }
 
-    // ========== PRIVATE HELPERS ==========
+    // ========== INTERNAL (visible for testing) ==========
 
-    private fun shouldCheck(): Boolean {
+    internal fun shouldCheck(): Boolean {
         if (!Files.exists(lastCheckFile)) return true
         
         return runCatching {
@@ -202,25 +203,47 @@ class UpdateService(
         }
     }
 
-    private fun findAssetForCurrentOS(assets: List<GitHubAsset>): GitHubAsset? {
+    /**
+     * Selects the correct installer asset for the current OS.
+     *
+     * Windows: `.exe`  (Inno Setup — see setup.iss / build_release.yml)
+     * macOS:   `.dmg`
+     * Linux:   `.AppImage`
+     */
+    internal fun findAssetForCurrentOS(assets: List<GitHubAsset>): GitHubAsset? {
         val osName = System.getProperty("os.name").lowercase()
         
         return when {
-            osName.contains("windows") -> assets.find { it.name.endsWith(".msi") }
+            // FIX: was .msi — CI builds .exe via Inno Setup, not MSI
+            osName.contains("windows") -> assets.find {
+                it.name.endsWith(".exe") && it.name.contains("Setup", ignoreCase = true)
+            }
             osName.contains("mac") -> assets.find { it.name.endsWith(".dmg") }
             osName.contains("linux") -> assets.find { it.name.endsWith(".AppImage") }
             else -> null
         }
     }
 
-    private fun extractChecksum(releaseBody: String?, fileName: String): String {
+    /**
+     * Extracts SHA256 checksum for [fileName] from the GitHub release body.
+     *
+     * Supports two formats commonly found in release notes:
+     *   1. Markdown table:  `| \`filename\` | \`hash\` |`
+     *   2. Plain text:      `SHA256: filename - hash`
+     */
+    internal fun extractChecksum(releaseBody: String?, fileName: String): String {
         if (releaseBody == null) return ""
-        
-        val pattern = """SHA256:\s*${Regex.escape(fileName)}\s*-\s*([a-fA-F0-9]{64})""".toRegex()
-        return pattern.find(releaseBody)?.groupValues?.get(1) ?: ""
+
+        // Format 1: Markdown table row  —  | `AuraLauncher-1.3.0-Setup.exe` | `abcdef...` |
+        val tablePattern = """\|\s*`${Regex.escape(fileName)}`\s*\|\s*`([a-fA-F0-9]{64})`\s*\|""".toRegex()
+        tablePattern.find(releaseBody)?.groupValues?.get(1)?.let { return it }
+
+        // Format 2: Plain text  —  SHA256: filename - hash
+        val plainPattern = """SHA256:\s*${Regex.escape(fileName)}\s*-\s*([a-fA-F0-9]{64})""".toRegex()
+        return plainPattern.find(releaseBody)?.groupValues?.get(1) ?: ""
     }
 
-    private fun verifyChecksum(file: Path, expectedChecksum: String): Boolean {
+    internal fun verifyChecksum(file: Path, expectedChecksum: String): Boolean {
         if (expectedChecksum.isEmpty()) {
             logger.warn("No checksum provided, skipping verification")
             return true
@@ -246,7 +269,7 @@ class UpdateService(
         }.getOrDefault(false)
     }
 
-    private fun compareVersions(v1: String, v2: String): Int {
+    internal fun compareVersions(v1: String, v2: String): Int {
         val parts1 = v1.substringBefore('-').split('.').map { it.toIntOrNull() ?: 0 }
         val parts2 = v2.substringBefore('-').split('.').map { it.toIntOrNull() ?: 0 }
 
