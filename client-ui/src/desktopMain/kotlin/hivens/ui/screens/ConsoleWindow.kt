@@ -367,7 +367,6 @@ private fun LogLine(
         LogType.INFO  -> if (isDarkTheme) Color(0xFFCCCCCC) else Color(0xFF212121)
         LogType.WARN  -> Color(0xFFFFD54F)
         LogType.ERROR -> Color(0xFFEF5350)
-        //LogType.DIVIDER -> Color.Transparent
     }
 
     val hasOwnTimestamp = log.text.matches(TIMESTAMP_REGEX)
@@ -453,11 +452,13 @@ private fun buildHighlightedText(
             )) { append(text.substring(match.range.first, match.range.last + 1)) }
             cursor = match.range.last + 1
         }
+    }
 
-        if (cursor < text.length) {
-            withStyle(SpanStyle(color = baseColor)) {
-                append(text.substring(cursor))
-            }
+    // FIX: Append remaining text AFTER the loop, not inside it.
+    // Also handles the case where there are no matches at all.
+    if (cursor < text.length) {
+        withStyle(SpanStyle(color = baseColor)) {
+            append(text.substring(cursor))
         }
     }
 }
