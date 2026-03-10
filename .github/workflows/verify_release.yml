@@ -1,0 +1,90 @@
+name: Verify Release
+
+# Runs automatically after the Release workflow completes,
+# or manually against any tag / the latest draft.
+#
+# What it checks:
+#   1. All expected platform assets exist (.exe, .dmg, .AppImage)
+#   2. Asset naming matches what UpdateService.findAssetForCurrentOS() expects
+#   3. SHA256SUMS.txt is present and every installer hash matches
+#   4. Release body contains extractable checksums
+#   5. Version tag follows semver
+#
+# This catches the class of bugs where CI builds correctly but
+# the update pipeline silently fails (e.g. the .msi → .exe mismatch).
+
+on:
+  workflow_run:
+    workflows: ["Release"]
+    types: [completed]
+
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to verify (e.g. v1.3.0, "latest", or "--draft")'
+        required: false
+        default: 'latest'
+
+jobs:
+  verify:
+    name: Verify Release Assets
+    runs-on: ubuntu-latest
+    # Only run if the Release workflow succeeded (or manual trigger)
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install jq
+        run: sudo apt-get install -y jq
+
+      - name: Resolve tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "value=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            # After Release workflow: use the tag that triggered it
+            TAG="${{ github.event.workflow_run.head_branch }}"
+            if [[ -z "$TAG" || "$TAG" == "master" ]]; then
+              echo "value=latest" >> "$GITHUB_OUTPUT"
+            else
+              echo "value=$TAG" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+
+      - name: Run verification
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          chmod +x scripts/verify-release.sh
+          ./scripts/verify-release.sh "${{ steps.tag.outputs.value }}"
+
+  # Separate job: run UpdateService unit tests to make sure
+  # the detection logic itself hasn't regressed.
+  unit-tests:
+    name: UpdateService Tests
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'jetbrains'
+          java-version: '25'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run UpdateService tests
+        run: ./gradlew :client-launcher:test --tests "hivens.launcher.update.UpdateServiceTest" --continue
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: update-service-test-report
+          path: client-launcher/build/reports/tests/
