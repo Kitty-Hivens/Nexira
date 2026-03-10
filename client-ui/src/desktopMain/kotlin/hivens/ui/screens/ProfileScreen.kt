@@ -192,14 +192,24 @@ fun ProfileScreen(session: SessionData, skinRepository: SkinRepository) {
                                 if (file != null) {
                                     uploadStatus = UploadStatus.Loading
                                     scope.launch {
-                                        withContext(Dispatchers.IO) {
-                                            skinRepository.uploadSkin(file, false, session)
+                                        try {
+                                            val result = withContext(Dispatchers.IO) {
+                                                skinRepository.uploadSkin(file, false, session)
+                                            }
+                                            // FIX: Check the result instead of assuming success.
+                                            // SkinRepository returns "OK" on success, error string otherwise.
+                                            if (result == "OK") {
+                                                uploadStatus = UploadStatus.Success(s.profileUploadSuccess)
+                                                SkinManager.invalidate(session.playerName)
+                                                loadSkins()
+                                            } else {
+                                                uploadStatus = UploadStatus.Error(s.profileUploadError(result))
+                                            }
+                                        } catch (e: Exception) {
+                                            uploadStatus = UploadStatus.Error(
+                                                s.profileUploadError(e.message ?: s.loginErrorGeneric)
+                                            )
                                         }
-                                        // SkinRepository returns a raw string; treat non-empty as success
-                                        // (adapt if the repo throws on failure instead)
-                                        uploadStatus = UploadStatus.Success(s.profileUploadSuccess)
-                                        SkinManager.invalidate(session.playerName)
-                                        loadSkins()
                                     }
                                 }
                             },
