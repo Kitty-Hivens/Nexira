@@ -29,6 +29,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   and checks naming conventions; supports `--draft`, tag arguments, and `DRY_RUN` mode
 - `.github/workflows/verify_release.yml`: runs `verify-release.sh` automatically after
   the Release workflow completes; also runs `UpdateServiceTest` as a separate job
+- Unit tests for `GameCommandBuilder`: covers all three version configs
+  (1.7.10 LaunchWrapper+FML, 1.12.2 LaunchWrapper+Forge, 1.21.1
+  BootstrapLauncher+NeoForge), JVM argument structure, module path
+  extraction, classpath boot-module filtering, memory flags, FML args,
+  custom `ignoreModulesList`, user JVM overrides, argument ordering,
+  version prefix matching, and unsupported version rejection
 
 ### Fixed
 - `exitApplication` now correctly wired through `AppRoot` → `AppLayout` → `DashboardScreen`;
