@@ -162,4 +162,25 @@ object RussianStrings : AppStrings {
     override val fileNoUpdates      = "Файлы проверены, обновлений нет."
     override fun fileDownloading(n: Int) = "Загрузка обновлений ($n файлов)..."
     override val fileClientSetup    = "Настройка клиента..."
+
+    // --- Settings: Offline Mode ---
+    override val settingsOfflineMode       = "Оффлайн-режим"
+    override val settingsOfflineModeDesc   = "Запуск без авторизации. Файлы не будут синхронизированы."
+
+    // --- Launcher States: Offline ---
+    override val stateOfflineSkipAuth      = "Оффлайн-режим — авторизация пропущена"
+    override val stateOfflineSkipSync      = "Оффлайн-режим — синхронизация пропущена, используем локальные файлы"
+    override val stateOfflineNoClient      = "Файлы клиента не найдены. Сначала скачайте их онлайн."
+
+    // --- Server Settings: Extended ---
+    override val serverSettingsJvmArgs     = "Аргументы JVM"
+    override val serverSettingsJvmArgsHint = "-XX:+UseZGC -Dfoo=bar"
+    override val serverSettingsResolution  = "Размер окна"
+    override val serverSettingsWidth       = "Ширина"
+    override val serverSettingsHeight      = "Высота"
+    override val serverSettingsFullscreen  = "Полный экран"
+    override val serverSettingsAutoConnect = "Автоподключение к серверу"
+
+    // --- Server Settings: Icon Upload ---
+    override val serverSettingsPickIcon    = "Выбрать иконку сервера"
 }

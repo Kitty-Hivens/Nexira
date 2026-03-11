@@ -35,6 +35,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   extraction, classpath boot-module filtering, memory flags, FML args,
   custom `ignoreModulesList`, user JVM overrides, argument ordering,
   version prefix matching, and unsupported version rejection
+- **Offline Mode** (#63): new toggle in Settings; when enabled, launcher skips
+  authentication and file sync, launching with locally cached client files.
+  Requires at least one prior online download.
+- **Full Server Settings UI** (#64): JVM arguments text field, window resolution
+  (width × height), fullscreen toggle, and auto-connect toggle now exposed in
+  ServerSettingsScreen; all fields already existed in `InstanceProfile` but had
+  no UI
+- **Server Icon Upload** (#66): clickable icon slot in server settings header;
+  picks a PNG/JPG and copies it to `clients/<assetDir>/icon.png` where
+  `SquareServerCard` already reads it from
+- **Disk Cache for Skins** (#61): `SkinManager` now caches rendered front/back
+  skins and raw textures to `~/.aura/skin-cache/` with 30-minute TTL;
+  eliminates redundant downloads on every screen navigation
+- **AES-256-GCM Credential Encryption** (#58): `CredentialsManager` replaces
+  Base64 encoding with AES-256-GCM; key derived via PBKDF2 from machine-specific
+  seed; transparently migrates old Base64 credentials on first load
 
 ### Fixed
 - `exitApplication` now correctly wired through `AppRoot` → `AppLayout` → `DashboardScreen`;
@@ -116,6 +132,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `UpdateService`: five previously-private methods (`compareVersions`, `findAssetForCurrentOS`,
   `extractChecksum`, `verifyChecksum`, `shouldCheck`) changed to `internal` visibility
   for unit-test access without exposing them in the public API
+- `SettingsData`: added `isOfflineMode: Boolean` field (default `false`)
+- `CredentialsManager`: credentials.json format version bumped to v2;
+  fields `encryptedPassword`, `passwordIv`, `version` added
+- `LauncherController`: auth and file-sync steps are now conditional on
+  offline mode setting
+- `AppRoot` auto-login: creates stub session from cached credentials when
+  offline mode is active
+- i18n: new strings added to `AppStrings`, `EnglishStrings`, `RussianStrings`,
+  `GermanStrings` for offline mode, server settings, and icon upload
 
 ### Removed
 - `SplashScreen` and `AppState.Splash`
