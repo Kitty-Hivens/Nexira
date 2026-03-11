@@ -1,6 +1,9 @@
 package hivens.ui
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.window.*
 import hivens.config.AppConfig
 import hivens.core.api.interfaces.IAuthService
@@ -11,6 +14,9 @@ import hivens.launcher.CredentialsManager
 import hivens.launcher.ProfileManager
 import hivens.launcher.di.appModule
 import hivens.launcher.di.networkModule
+import hivens.ui.background.BackgroundManager
+import hivens.ui.background.BackgroundSettings
+import hivens.ui.background.CustomBackground
 import hivens.ui.components.UpdateManager
 import hivens.ui.generated.resources.Res
 import hivens.ui.generated.resources.favicon
@@ -25,6 +31,7 @@ import hivens.ui.theme.ThemeManager
 import hivens.ui.utils.GameConsoleService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
 import org.jetbrains.compose.resources.painterResource
 import org.koin.compose.KoinContext
 import org.koin.compose.koinInject
@@ -52,10 +59,12 @@ sealed class AppState {
 // ─── Navigation ──────────────────────────────────────────────────────────────
 
 sealed class Screen {
-    object Home        : Screen()
-    object Profile     : Screen()
-    object Settings    : Screen()
-    object ThemePicker : Screen()
+    object Home               : Screen()
+    object Profile            : Screen()
+    object Settings           : Screen()
+    object ThemePicker        : Screen()
+    object About              : Screen()
+    object BackgroundSettings : Screen()
     data class ServerSettings(val server: hivens.core.api.model.ServerProfile) : Screen()
     data class ServerDetails (val server: hivens.core.api.model.ServerProfile) : Screen()
 }
@@ -162,19 +171,24 @@ fun AppRoot(
     val credentialsManager: CredentialsManager = koinInject()
     val authService: IAuthService              = koinInject()
     val profileManager: ProfileManager         = koinInject()
-    val settingsService: ISettingsService       = koinInject()
+    val settingsService: ISettingsService      = koinInject()
+    val dataDirectory: java.nio.file.Path      = koinInject()
+    val json: Json                             = koinInject()
 
     var appState      by remember { mutableStateOf<AppState>(AppState.Loading) }
     var currentScreen by remember { mutableStateOf<Screen>(Screen.Home) }
 
-    // Auto-login with offline mode support (#63)
+    // ── Background settings ───────────────────────────────────────────────
+    val backgroundManager = remember { BackgroundManager(dataDirectory, json) }
+    var backgroundSettings by remember { mutableStateOf(backgroundManager.load()) }
+
+    // ── Auto-login with offline mode support (#63) ────────────────────────
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
             val settings = settingsService.getSettings()
             val saved = credentialsManager.load()
 
             appState = when {
-                // Offline mode: create session from cached credentials without hitting the server
                 settings.isOfflineMode && saved != null -> {
                     val offlineSession = SessionData(
                         playerName = saved.playerName,
@@ -187,13 +201,7 @@ fun AppRoot(
                     )
                     AppState.Authenticated(offlineSession)
                 }
-
-                // Offline mode but no cached credentials — show login anyway
-                settings.isOfflineMode -> {
-                    AppState.Unauthenticated
-                }
-
-                // Online mode: try auto-login
+                settings.isOfflineMode -> AppState.Unauthenticated
                 saved?.cachedPassword != null -> {
                     try {
                         val server = profileManager.lastServerId ?: AppConfig.DEFAULT_SERVER_ID
@@ -203,24 +211,33 @@ fun AppRoot(
                         AppState.Unauthenticated
                     }
                 }
-
                 else -> AppState.Unauthenticated
             }
         }
     }
 
-    AppLayout(
-        appState             = appState,
-        onCloseApp           = onCloseApp,
-        currentScreen        = currentScreen,
-        onScreenChange       = { currentScreen = it },
-        onLogin              = { session -> appState = AppState.Authenticated(session) },
-        onLogout             = { credentialsManager.clear(); appState = AppState.Unauthenticated },
-        isDarkTheme          = isDarkTheme,
-        onToggleDarkTheme    = onToggleDarkTheme,
-        customTheme          = customTheme,
-        onCustomThemeChanged = onCustomThemeChanged,
-        currentLocale        = currentLocale,
-        onLocaleChanged      = onLocaleChanged
-    )
+    // ── Render: background behind layout ──────────────────────────────────
+    Box(Modifier.fillMaxSize()) {
+        CustomBackground(settings = backgroundSettings)
+
+        AppLayout(
+            appState             = appState,
+            onCloseApp           = onCloseApp,
+            currentScreen        = currentScreen,
+            onScreenChange       = { currentScreen = it },
+            onLogin              = { session -> appState = AppState.Authenticated(session) },
+            onLogout             = { credentialsManager.clear(); appState = AppState.Unauthenticated },
+            isDarkTheme          = isDarkTheme,
+            onToggleDarkTheme    = onToggleDarkTheme,
+            customTheme          = customTheme,
+            onCustomThemeChanged = onCustomThemeChanged,
+            currentLocale        = currentLocale,
+            onLocaleChanged      = onLocaleChanged,
+            backgroundSettings   = backgroundSettings,
+            onBackgroundSettingsChanged = { newSettings ->
+                backgroundSettings = newSettings
+                backgroundManager.save(newSettings)
+            }
+        )
+    }
 }

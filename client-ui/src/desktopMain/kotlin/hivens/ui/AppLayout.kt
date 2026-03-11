@@ -9,19 +9,20 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import hivens.core.api.SkinRepository
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.SessionData
+import hivens.ui.background.BackgroundSettings
 import hivens.ui.i18n.AppLocale
-import hivens.ui.i18n.LocalStrings
-import hivens.ui.i18n.LocaleProvider
 import hivens.ui.screens.*
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.CustomTheme
@@ -43,7 +44,9 @@ fun AppLayout(
     customTheme: CustomTheme,
     onCustomThemeChanged: (CustomTheme) -> Unit,
     currentLocale: AppLocale,
-    onLocaleChanged: (AppLocale) -> Unit
+    onLocaleChanged: (AppLocale) -> Unit,
+    backgroundSettings: BackgroundSettings = BackgroundSettings(),
+    onBackgroundSettingsChanged: (BackgroundSettings) -> Unit = {}
 ) {
     val skinRepository: SkinRepository = koinInject()
 
@@ -53,9 +56,13 @@ fun AppLayout(
     }
     var selectedServer by remember { mutableStateOf<ServerProfile?>(null) }
 
-    Row(Modifier.fillMaxSize().background(CelestiaTheme.colors.background)) {
+    // When custom background is active, make the row transparent so image shows through
+    val rowBackground = if (backgroundSettings.enabled) Color.Transparent
+    else CelestiaTheme.colors.background
 
-        // ── Sidebar 52dp ──────────────────────────────────────────────────────
+    Row(Modifier.fillMaxSize().background(rowBackground)) {
+
+        // ── Sidebar 64dp ──────────────────────────────────────────────────
         AppSidebar(
             currentScreen   = currentScreen,
             isAuthenticated = appState is AppState.Authenticated,
@@ -68,7 +75,7 @@ fun AppLayout(
             color    = CelestiaTheme.colors.surface.copy(alpha = 0.6f)
         )
 
-        // ── Main content ──────────────────────────────────────────────────────
+        // ── Main content ──────────────────────────────────────────────────
         Box(Modifier.weight(1f).fillMaxHeight()) {
             Crossfade(
                 targetState   = currentScreen,
@@ -102,7 +109,9 @@ fun AppLayout(
                             onToggleTheme     = onToggleDarkTheme,
                             onOpenThemePicker = { onScreenChange(Screen.ThemePicker) },
                             currentLocale     = currentLocale,
-                            onLocaleChanged   = onLocaleChanged
+                            onLocaleChanged   = onLocaleChanged,
+                            onOpenBackgroundSettings = { onScreenChange(Screen.BackgroundSettings) },
+                            onOpenAbout              = { onScreenChange(Screen.About) }
                         )
 
                     Screen.ThemePicker ->
@@ -113,6 +122,18 @@ fun AppLayout(
                                 onScreenChange(Screen.Settings)
                             },
                             onBack = { onScreenChange(Screen.Settings) }
+                        )
+
+                    Screen.About ->
+                        AboutScreen(
+                            onBack = { onScreenChange(Screen.Settings) }
+                        )
+
+                    Screen.BackgroundSettings ->
+                        BackgroundSettingsScreen(
+                            currentSettings     = backgroundSettings,
+                            onSettingsChanged   = onBackgroundSettingsChanged,
+                            onBack              = { onScreenChange(Screen.Settings) }
                         )
 
                     is Screen.ServerSettings ->
@@ -135,7 +156,7 @@ fun AppLayout(
             color    = CelestiaTheme.colors.surface.copy(alpha = 0.6f)
         )
 
-        // ── Right panel 264dp ─────────────────────────────────────────────────
+        // ── Right panel 264dp ─────────────────────────────────────────────
         RightPanel(
             appState = appState,
             onLogin  = onLogin,
@@ -158,7 +179,10 @@ fun AppSidebar(
             || currentScreen is Screen.ServerSettings
             || currentScreen is Screen.ServerDetails
     val profileActive  = currentScreen is Screen.Profile
-    val settingsActive = currentScreen is Screen.Settings || currentScreen is Screen.ThemePicker
+    val settingsActive = currentScreen is Screen.Settings
+            || currentScreen is Screen.ThemePicker
+            || currentScreen is Screen.BackgroundSettings
+    val aboutActive    = currentScreen is Screen.About
 
     NavigationRail(
         modifier       = Modifier.width(64.dp).fillMaxHeight(),
@@ -183,6 +207,11 @@ fun AppSidebar(
             icon     = Icons.Default.Settings,
             selected = settingsActive,
             onClick  = { onScreenChange(Screen.Settings) }
+        )
+        SidebarNavItem(
+            icon     = Icons.Default.Info,
+            selected = aboutActive,
+            onClick  = { onScreenChange(Screen.About) }
         )
 
         // ── Bottom actions ────────────────────────────────────────────────

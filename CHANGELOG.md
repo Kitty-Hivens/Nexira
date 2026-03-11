@@ -51,6 +51,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **AES-256-GCM Credential Encryption** (#58): `CredentialsManager` replaces
   Base64 encoding with AES-256-GCM; key derived via PBKDF2 from machine-specific
   seed; transparently migrates old Base64 credentials on first load
+- **Custom Background Wallpaper**: user-selectable image/GIF as launcher backdrop
+  with live-preview settings screen; supports blur (0–25 px), darkening overlay,
+  opacity, saturation adjustment, parallax effect (mouse-tracking), vignette,
+  color tint presets (navy / violet / emerald / bordeaux / steel), five scale
+  modes (cover / contain / stretch / original / tile), and horizontal/vertical
+  alignment; settings persisted in `background.json`
+- **About Screen**: launcher info card (version, build date, branding), creator
+  credits, technology stack list, GPLv3 license note, system info (OS, Java,
+  JVM heap), GitHub / Issues / Releases links; integrated update check with
+  full download-and-install flow via existing `UpdateDialog`
+- `RamSelector` component: replaces imprecise slider with preset buttons
+  (1–16 GB, filtered by system RAM) and manual MB input; shows system RAM
+  and recommended maximum
+- `ModItemCard` component: always-visible one-line description preview,
+  expandable full description, category badge, JAR file list, real-time
+  conflict warnings against currently enabled mods
+- `ServerGrid` component: adaptive grid (`GridCells.Adaptive(200.dp)`) with
+  `★ FAVORITES` / `AVAILABLE SERVERS` section headers and full-width span;
+  scales from 3 columns on 1080p to 5–6 on ultrawide
+- i18n: ~60 new string keys across `AppStrings`, `RussianStrings`,
+  `EnglishStrings`, `GermanStrings` covering RAM selector, mod cards,
+  server grid, background settings, and About screen
 
 ### Fixed
 - `exitApplication` now correctly wired through `AppRoot` → `AppLayout` → `DashboardScreen`;
@@ -80,6 +102,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   to `Success` even on server errors (SIZE, TYPE, HD); now checks the
   `uploadSkin()` return value and displays the actual error message;
   network exceptions are also caught and shown in UI
+- RAM allocation in server settings was imprecise: `Float` slider with 30 steps
+  between 1–16 GB made it impossible to set exact values like 3072 or 6144 MB;
+  replaced with `RamSelector` preset buttons + manual input
+- Mod descriptions were hidden behind a tooltip that required hover — easy to
+  miss; `ModItemCard` now always shows first line of description, with expand
+  for full text
 
 ### Changed
 - `client-ui`: migrated from Compose Material 2 to Material 3 (`material` → `material3`);
@@ -141,6 +169,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   offline mode is active
 - i18n: new strings added to `AppStrings`, `EnglishStrings`, `RussianStrings`,
   `GermanStrings` for offline mode, server settings, and icon upload
+- `DashboardScreen`: raw `LazyVerticalGrid` replaced with `ServerGrid` component;
+  servers split into `★ FAVORITES` and `AVAILABLE SERVERS` sections with full-width
+  headers; adaptive column count scales better on large/ultrawide monitors
+- `ServerSettingsScreen`: RAM `Slider` (Float, 30 steps) replaced with `RamSelector`
+  (preset buttons + exact MB input); `ModItemRow` + `TooltipBox` replaced with
+  `ModItemCard` (inline description, conflict detection); old `ModItemRow` composable
+  removed
+- `SettingsScreen`: added "Custom Background" and "About" shortcut cards in Interface
+  and new About section; accepts `onOpenBackgroundSettings` / `onOpenAbout` callbacks
+- `AppLayout`: `Row` background becomes `Color.Transparent` when custom background is
+  active, allowing wallpaper to show through; sidebar includes About (`Icons.Default.Info`)
+  navigation item; routes `Screen.About` and `Screen.BackgroundSettings`
+- `Main.kt` / `AppRoot`: `AppLayout` wrapped in `Box { CustomBackground(); AppLayout() }`;
+  `BackgroundManager` initialized alongside `ThemeManager`; background settings state
+  hoisted and persisted
 
 ### Removed
 - `SplashScreen` and `AppState.Splash`
@@ -169,6 +212,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `NewsScreen.kt` — was marked `@Deprecated`; removed from navigation (`Screen` sealed class,
   `AppLayout` `Crossfade`); `onOpenNews` callback removed from `DashboardScreen`; news
   content is fully covered by `CompactNewsFeed` in the right panel
+- `ModItemRow` composable and its `TooltipBox` wrapper from `ServerSettingsScreen` —
+  replaced by `ModItemCard` component
 
 ## [1.3.0] - 2026-03-06
 

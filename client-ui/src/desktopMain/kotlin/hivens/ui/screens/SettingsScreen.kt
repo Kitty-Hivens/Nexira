@@ -6,10 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.Language
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.WifiOff
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -17,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import hivens.config.AppConfig
 import hivens.core.api.interfaces.ISettingsService
 import hivens.ui.components.CelestiaButton
 import hivens.ui.components.GlassCard
@@ -33,7 +31,9 @@ fun SettingsScreen(
     onToggleTheme: () -> Unit,
     onOpenThemePicker: () -> Unit,
     currentLocale: AppLocale,
-    onLocaleChanged: (AppLocale) -> Unit
+    onLocaleChanged: (AppLocale) -> Unit,
+    onOpenBackgroundSettings: () -> Unit = {},
+    onOpenAbout: () -> Unit = {}
 ) {
     val settingsService: ISettingsService = koinInject()
     val s = LocalStrings.current
@@ -157,6 +157,30 @@ fun SettingsScreen(
 
                     Spacer(Modifier.height(16.dp))
 
+                    // Custom background shortcut
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable(onClick = onOpenBackgroundSettings)
+                            .background(CelestiaTheme.colors.surface.copy(alpha = 0.4f))
+                            .padding(16.dp),
+                        verticalAlignment     = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Wallpaper, null, tint = CelestiaTheme.colors.primary, modifier = Modifier.size(24.dp))
+                            Spacer(Modifier.width(16.dp))
+                            Column {
+                                Text(s.settingsBackground, color = CelestiaTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
+                                Text(s.settingsBackgroundSub, style = MaterialTheme.typography.bodySmall, color = CelestiaTheme.colors.textSecondary)
+                            }
+                        }
+                        Icon(Icons.Default.ChevronRight, null, tint = CelestiaTheme.colors.primary)
+                    }
+
+                    Spacer(Modifier.height(16.dp))
+
                     // Dark theme toggle
                     var themeSwitchState by remember(isDarkTheme) { mutableStateOf(isDarkTheme) }
                     SettingsSwitchRow(
@@ -240,6 +264,36 @@ fun SettingsScreen(
                             modifier = Modifier.weight(1f),
                             primary  = false
                         )
+                    }
+                }
+
+                // ── About ─────────────────────────────────────────────────────
+                item {
+                    SettingsSectionTitle(s.settingsSectionAbout)
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable(onClick = onOpenAbout)
+                            .background(CelestiaTheme.colors.surface.copy(alpha = 0.4f))
+                            .padding(16.dp),
+                        verticalAlignment     = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Info, null, tint = CelestiaTheme.colors.primary, modifier = Modifier.size(24.dp))
+                            Spacer(Modifier.width(16.dp))
+                            Column {
+                                Text(AppConfig.APP_TITLE, color = CelestiaTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
+                                Text(
+                                    "v${AppConfig.CLIENT_VERSION.removePrefix("v")} — GPLv3",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = CelestiaTheme.colors.textSecondary
+                                )
+                            }
+                        }
+                        Icon(Icons.Default.ChevronRight, null, tint = CelestiaTheme.colors.textSecondary)
                     }
                 }
             }

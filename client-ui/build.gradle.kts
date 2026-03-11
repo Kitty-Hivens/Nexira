@@ -16,6 +16,7 @@ plugins {
     id("org.jetbrains.compose") version "1.11.0-alpha02"
     id("org.jetbrains.kotlin.plugin.compose") version "2.3.0"
     id("com.github.gmazzo.buildconfig")
+    kotlin("plugin.serialization") version "2.1.0"
 }
 
 group = "hivens"
@@ -41,6 +42,7 @@ kotlin {
 
                 implementation("io.coil-kt.coil3:coil-compose:$coilVersion")
                 implementation("io.coil-kt.coil3:coil-network-okhttp:$coilNetworkVersion")
+                implementation("io.ktor:ktor-serialization-kotlinx-json:${ktorVersion}")
             }
         }
 

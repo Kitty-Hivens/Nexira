@@ -3,9 +3,6 @@ package hivens.ui.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -19,7 +16,7 @@ import hivens.core.api.model.ServerProfile
 import hivens.core.data.SessionData
 import hivens.launcher.ProfileManager
 import hivens.ui.components.LaunchControlPanel
-import hivens.ui.components.SquareServerCard
+import hivens.ui.components.ServerGrid
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.logic.LaunchState
 import hivens.ui.logic.LauncherController
@@ -98,40 +95,31 @@ fun DashboardScreen(
 
         Spacer(Modifier.height(16.dp))
 
-        // ── Server grid ───────────────────────────────────────────────────────
+        // ── Server grid (replaces raw LazyVerticalGrid) ───────────────────
         Box(Modifier.weight(1f).fillMaxWidth()) {
-            LazyVerticalGrid(
-                columns               = GridCells.Adaptive(minSize = 220.dp),
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
-                verticalArrangement   = Arrangement.spacedBy(14.dp),
-                contentPadding        = PaddingValues(bottom = 8.dp),
-                modifier              = Modifier.fillMaxSize()
-            ) {
-                val sortedServers = servers.sortedByDescending { favorites.contains(it.assetDir) }
-                items(sortedServers) { srv ->
-                    SquareServerCard(
-                        profile    = srv,
-                        isSelected = srv == selectedServerState,
-                        isFavorite = favorites.contains(srv.assetDir),
-                        onSelect   = {
-                            if (launchState is LaunchState.Idle || launchState is LaunchState.Error) {
-                                selectedServerState = srv
-                                onServerSelected(srv)
-                                profileManager.lastServerId = srv.assetDir
-                                profileManager.save()
-                            }
-                        },
-                        onLaunch = {
-                            if (selectedServerState != null && (launchState is LaunchState.Idle || launchState is LaunchState.Error)) {
-                                controller.launch(session, selectedServerState!!, onSessionUpdated)
-                            }
-                        },
-                        onSettings  = { onOpenServerSettings(srv) },
-                        onDetails   = { onOpenDetails(srv) },
-                        onToggleFav = { profileManager.toggleFavorite(srv.assetDir); favoriteTrigger++ }
-                    )
+            ServerGrid(
+                servers        = servers,
+                favorites      = favorites,
+                selectedServer = selectedServerState,
+                isLaunchable   = launchState is LaunchState.Idle || launchState is LaunchState.Error,
+                onSelect       = { srv ->
+                    selectedServerState = srv
+                    onServerSelected(srv)
+                    profileManager.lastServerId = srv.assetDir
+                    profileManager.save()
+                },
+                onLaunch = { srv ->
+                    selectedServerState = srv
+                    onServerSelected(srv)
+                    controller.launch(session, srv, onSessionUpdated)
+                },
+                onSettings  = { onOpenServerSettings(it) },
+                onDetails   = { onOpenDetails(it) },
+                onToggleFav = {
+                    profileManager.toggleFavorite(it.assetDir)
+                    favoriteTrigger++
                 }
-            }
+            )
         }
 
         Spacer(Modifier.height(12.dp))

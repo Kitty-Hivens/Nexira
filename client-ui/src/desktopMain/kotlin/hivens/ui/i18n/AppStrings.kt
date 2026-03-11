@@ -187,4 +187,99 @@ interface AppStrings {
 
     // --- Server Settings: Icon Upload ---
     val serverSettingsPickIcon: String
+
+    // =========================================================================
+    // RAM Selector
+    // =========================================================================
+    val ramCustomInputLabel: String
+    fun ramSystemHint(systemRam: String, recommended: String): String
+
+    // =========================================================================
+    // Mod cards
+    // =========================================================================
+    fun modConflictWarning(ids: String): String
+    fun modIncompatibleHint(ids: String): String
+
+    // =========================================================================
+    // Server grid
+    // =========================================================================
+    val serversFavorites: String
+
+    // =========================================================================
+    // Custom Background
+    // =========================================================================
+    val backgroundTitle: String
+    val backgroundSubtitle: String
+    val backgroundEnable: String
+    val backgroundSectionImage: String
+    val backgroundPickFile: String
+    val backgroundPickButton: String
+    val backgroundSectionScale: String
+    val backgroundScaleCover: String
+    val backgroundScaleContain: String
+    val backgroundScaleStretch: String
+    val backgroundScaleOriginal: String
+    val backgroundScaleTile: String
+    val backgroundSectionPosition: String
+    val backgroundAlignX: String
+    val backgroundAlignY: String
+    val backgroundSectionEffects: String
+    val backgroundBlur: String
+    val backgroundDarken: String
+    val backgroundOpacity: String
+    val backgroundSaturation: String
+    val backgroundParallax: String
+    val backgroundVignette: String
+    val backgroundSectionTint: String
+    val backgroundTintNone: String
+    val backgroundTintNavy: String
+    val backgroundTintViolet: String
+    val backgroundTintEmerald: String
+    val backgroundTintBordeaux: String
+    val backgroundTintSteel: String
+    val backgroundTintIntensity: String
+    val backgroundReset: String
+    val backgroundPreview: String
+    val backgroundPreviewServer: String
+
+    // --- Settings: Background shortcut ---
+    val settingsBackground: String
+    val settingsBackgroundSub: String
+
+    // =========================================================================
+    // About Screen
+    // =========================================================================
+    val aboutTitle: String
+    fun aboutDescription(branding: String): String
+    fun aboutBuildDate(date: String): String
+    val aboutSectionCreator: String
+    val aboutSectionTechnologies: String
+    val aboutSectionLicense: String
+    val aboutLicenseText: String
+    val aboutSectionUpdates: String
+    val aboutCurrentVersion: String
+    val aboutCheckUpdates: String
+    val aboutChecking: String
+    val aboutUpToDate: String
+    val aboutCheckAgain: String
+    fun aboutUpdateAvailable(version: String): String
+    val aboutCriticalUpdate: String
+    val aboutSectionSystem: String
+    val aboutOs: String
+    val aboutJvmHeap: String
+    val aboutSectionLinks: String
+    val aboutLinkGithub: String
+    val aboutLinkBugReport: String
+    val aboutLinkReleases: String
+
+    // --- Settings: About shortcut ---
+    val settingsSectionAbout: String
+
+    // --- Tech stack descriptions (for About screen) ---
+    val techKotlinDesc: String
+    val techComposeDesc: String
+    val techKtorDesc: String
+    val techKoinDesc: String
+    val techSkiaDesc: String
+    val techCoilDesc: String
 }
