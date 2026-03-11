@@ -183,4 +183,96 @@ object GermanStrings : AppStrings {
 
     // --- Server Settings: Icon Upload ---
     override val serverSettingsPickIcon    = "Server-Icon auswählen"
+
+    // =========================================================================
+    // RAM Selector
+    // =========================================================================
+    override val ramCustomInputLabel = "Eigener Wert:"
+    override fun ramSystemHint(systemRam: String, recommended: String) =
+        "System: $systemRam • Empfohlen max: $recommended"
+
+    // =========================================================================
+    // Mod cards
+    // =========================================================================
+    override fun modConflictWarning(ids: String) = "Konflikt mit: $ids"
+    override fun modIncompatibleHint(ids: String) = "Inkompatibel mit: $ids"
+
+    // =========================================================================
+    // Server grid
+    // =========================================================================
+    override val serversFavorites = "★ FAVORITEN"
+
+    // =========================================================================
+    // Custom Background
+    // =========================================================================
+    override val backgroundTitle          = "BENUTZERDEFINIERTER HINTERGRUND"
+    override val backgroundSubtitle       = "Launcher-Hintergrund anpassen"
+    override val backgroundEnable         = "Aktivieren"
+    override val backgroundSectionImage   = "BILD"
+    override val backgroundPickFile       = "Hintergrundbild auswählen"
+    override val backgroundPickButton     = "Datei auswählen"
+    override val backgroundSectionScale   = "SKALIERUNG"
+    override val backgroundScaleCover     = "Füllen"
+    override val backgroundScaleContain   = "Einpassen"
+    override val backgroundScaleStretch   = "Strecken"
+    override val backgroundScaleOriginal  = "Original"
+    override val backgroundScaleTile      = "Kacheln"
+    override val backgroundSectionPosition = "POSITION"
+    override val backgroundAlignX         = "Horizontal"
+    override val backgroundAlignY         = "Vertikal"
+    override val backgroundSectionEffects = "EFFEKTE"
+    override val backgroundBlur           = "Unschärfe"
+    override val backgroundDarken         = "Abdunkeln"
+    override val backgroundOpacity        = "Deckkraft"
+    override val backgroundSaturation     = "Sättigung"
+    override val backgroundParallax       = "Parallaxe"
+    override val backgroundVignette       = "Vignette"
+    override val backgroundSectionTint    = "FARBTÖNUNG"
+    override val backgroundTintNone       = "Keine"
+    override val backgroundTintNavy       = "Dunkelblau"
+    override val backgroundTintViolet     = "Violett"
+    override val backgroundTintEmerald    = "Smaragd"
+    override val backgroundTintBordeaux   = "Bordeaux"
+    override val backgroundTintSteel      = "Stahl"
+    override val backgroundTintIntensity  = "Intensität"
+    override val backgroundReset          = "Auf Standardwerte zurücksetzen"
+    override val backgroundPreview        = "VORSCHAU"
+    override val backgroundPreviewServer  = "Beispielserver"
+    override val settingsBackground       = "Benutzerdefinierter Hintergrund"
+    override val settingsBackgroundSub    = "Foto oder GIF als Launcher-Hintergrund"
+
+    // =========================================================================
+    // About Screen
+    // =========================================================================
+    override val aboutTitle                = "ÜBER DEN LAUNCHER"
+    override fun aboutDescription(branding: String) = "Inoffizieller Launcher für $branding"
+    override fun aboutBuildDate(date: String) = "Erstellt: $date"
+    override val aboutSectionCreator       = "ERSTELLER"
+    override val aboutSectionTechnologies  = "TECHNOLOGIEN"
+    override val aboutSectionLicense       = "LIZENZ"
+    override val aboutLicenseText          = "GPLv3 — Freie und quelloffene Software"
+    override val aboutSectionUpdates       = "UPDATES"
+    override val aboutCurrentVersion       = "Aktuelle Version"
+    override val aboutCheckUpdates         = "Auf Updates prüfen"
+    override val aboutChecking             = "Prüfe..."
+    override val aboutUpToDate             = "Sie sind auf dem neuesten Stand!"
+    override val aboutCheckAgain           = "Erneut prüfen"
+    override fun aboutUpdateAvailable(version: String) = "Version $version verfügbar"
+    override val aboutCriticalUpdate       = "Kritisches Update"
+    override val aboutSectionSystem        = "SYSTEM"
+    override val aboutOs                   = "Betriebssystem"
+    override val aboutJvmHeap             = "JVM Heap"
+    override val aboutSectionLinks         = "LINKS"
+    override val aboutLinkGithub           = "GitHub"
+    override val aboutLinkBugReport        = "Fehler melden"
+    override val aboutLinkReleases         = "Veröffentlichungen"
+    override val settingsSectionAbout      = "ÜBER"
+
+    // Tech stack descriptions
+    override val techKotlinDesc  = "Hauptsprache"
+    override val techComposeDesc = "UI-Framework"
+    override val techKtorDesc    = "HTTP-Client"
+    override val techKoinDesc    = "Dependency Injection"
+    override val techSkiaDesc    = "Skin-Rendering"
+    override val techCoilDesc    = "Bildladen"
 }
