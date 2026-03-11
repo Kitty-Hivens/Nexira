@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -37,14 +38,20 @@ fun SettingsScreen(
     val settingsService: ISettingsService = koinInject()
     val s = LocalStrings.current
 
-    val initialSettings    = remember { settingsService.getSettings() }
-    var closeAfterStart    by remember { mutableStateOf(initialSettings.closeAfterStart) }
-    var langDropdownExpanded by remember { mutableStateOf(false) }
-    var showSavedMessage   by remember { mutableStateOf(false) }
+    val initialSettings        = remember { settingsService.getSettings() }
+    var closeAfterStart        by remember { mutableStateOf(initialSettings.closeAfterStart) }
+    var isOfflineMode          by remember { mutableStateOf(initialSettings.isOfflineMode) }
+    var langDropdownExpanded   by remember { mutableStateOf(false) }
+    var showSavedMessage       by remember { mutableStateOf(false) }
 
     fun save() {
         val current = settingsService.getSettings()
-        settingsService.saveSettings(current.copy(closeAfterStart = closeAfterStart))
+        settingsService.saveSettings(
+            current.copy(
+                closeAfterStart = closeAfterStart,
+                isOfflineMode = isOfflineMode
+            )
+        )
         showSavedMessage = true
     }
 
@@ -167,6 +174,52 @@ fun SettingsScreen(
                         checked         = closeAfterStart,
                         onCheckedChange = { closeAfterStart = it; save() }
                     )
+
+                    Spacer(Modifier.height(16.dp))
+
+                    // Offline Mode
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(
+                                if (isOfflineMode) CelestiaTheme.colors.error.copy(alpha = 0.08f)
+                                else CelestiaTheme.colors.background.copy(alpha = 0.4f)
+                            )
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                            Icon(
+                                Icons.Default.WifiOff,
+                                null,
+                                tint = if (isOfflineMode) CelestiaTheme.colors.error else CelestiaTheme.colors.textSecondary,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(Modifier.width(16.dp))
+                            Column {
+                                Text(
+                                    s.settingsOfflineMode,
+                                    color = CelestiaTheme.colors.textPrimary,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    s.settingsOfflineModeDesc,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = CelestiaTheme.colors.textSecondary
+                                )
+                            }
+                        }
+                        Switch(
+                            checked = isOfflineMode,
+                            onCheckedChange = { isOfflineMode = it; save() },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = CelestiaTheme.colors.error,
+                                checkedTrackColor = CelestiaTheme.colors.error.copy(alpha = 0.5f)
+                            )
+                        )
+                    }
                 }
 
                 // ── Diagnostics ───────────────────────────────────────────────

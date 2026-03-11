@@ -48,6 +48,8 @@ class LauncherController : KoinComponent {
         launchJob = appScope.launch {
             // Capture strings at launch time so the whole pipeline uses one locale
             val s = I18n.s
+            val settings = settingsService.getSettings()
+            val isOffline = settings.isOfflineMode
 
             try {
                 _state.value = LaunchState.Prepare(s.stateInit, 0.0f)
@@ -55,61 +57,81 @@ class LauncherController : KoinComponent {
                 // Start new session — adds divider and opens auto-save file
                 GameConsoleService.startSession()
                 GameConsoleService.append("${s.appName}...", LogType.INFO)
-                GameConsoleService.append("→ ${server.name}", LogType.INFO)
+                GameConsoleService.append("→ ${server.name}" + if (isOffline) " [OFFLINE]" else "", LogType.INFO)
 
                 CrashReporter.lastAction = "Launching: ${server.name}"
 
-                // 1. Auth
+                // 1. Auth — skip in offline mode
                 updateProgress(0.1f, s.stateAuth)
                 var session = currentSession
                 val targetServerId = server.assetDir
 
-                try {
-                    val pass = credentialsManager.load()?.cachedPassword ?: session.cachedPassword
-                    if (!pass.isNullOrEmpty()) {
-                        session = authService.login(session.playerName, pass, targetServerId)
-                        onSessionRefreshed?.invoke(session)
-                        GameConsoleService.append(s.authSuccess(session.uuid), LogType.INFO)
-                    } else {
-                        GameConsoleService.append(s.stateNoPassword, LogType.WARN)
+                if (isOffline) {
+                    GameConsoleService.append(s.stateOfflineSkipAuth, LogType.WARN)
+                    // In offline mode, use whatever session we have (or a stub)
+                    if (session.accessToken.isBlank()) {
+                        session = session.copy(accessToken = "offline")
                     }
-                } catch (e: Exception) {
-                    GameConsoleService.append("${s.stateAuthFail}: ${e.message}", LogType.WARN)
+                } else {
+                    try {
+                        val pass = credentialsManager.load()?.cachedPassword ?: session.cachedPassword
+                        if (!pass.isNullOrEmpty()) {
+                            session = authService.login(session.playerName, pass, targetServerId)
+                            onSessionRefreshed?.invoke(session)
+                            GameConsoleService.append(s.authSuccess(session.uuid), LogType.INFO)
+                        } else {
+                            GameConsoleService.append(s.stateNoPassword, LogType.WARN)
+                        }
+                    } catch (e: Exception) {
+                        GameConsoleService.append("${s.stateAuthFail}: ${e.message}", LogType.WARN)
+                        // If auth fails and we're NOT in offline mode, we still try to continue
+                        // with the existing session (graceful degradation)
+                    }
                 }
 
                 // 2. Ignored files
                 val ignoredFiles = calculateIgnoredFiles(server)
 
-                // 3. Download
+                // 3. Download — skip in offline mode if client exists
                 updateProgress(0.2f, s.stateSync)
                 val clientDir = dataDirectory.resolve("clients").resolve(targetServerId)
                 if (!Files.exists(clientDir)) Files.createDirectories(clientDir)
 
-                downloadService.processSession(
-                    session = session,
-                    serverId = targetServerId,
-                    targetDir = clientDir,
-                    extraCheckSum = server.extraCheckSum,
-                    ignoredFiles = ignoredFiles,
-                    messageUI = { /* log */ },
-                    progressUI = { current, total, bytesRead, totalBytes, speed ->
-                        if (!isActive) return@processSession
-                        val progressValue = if (totalBytes > 0) bytesRead.toFloat() / totalBytes.toFloat() else 0f
-                        _state.value = LaunchState.Downloading(
-                            fileName = "${s.fileDownloading(total).substringBefore("(")}$current/$total",
-                            currentFileIdx = current,
-                            totalFiles = total,
-                            downloadedBytes = bytesRead,
-                            totalBytes = totalBytes,
-                            speedStr = speed,
-                            progress = progressValue
-                        )
+                if (isOffline) {
+                    // In offline mode, skip file sync but verify client exists
+                    val hasClient = Files.exists(clientDir) && Files.list(clientDir).count() > 0
+                    if (!hasClient) {
+                        _state.value = LaunchState.Error(s.stateOfflineNoClient)
+                        GameConsoleService.append(s.stateOfflineNoClient, LogType.ERROR)
+                        return@launch
                     }
-                )
+                    GameConsoleService.append(s.stateOfflineSkipSync, LogType.INFO)
+                } else {
+                    downloadService.processSession(
+                        session = session,
+                        serverId = targetServerId,
+                        targetDir = clientDir,
+                        extraCheckSum = server.extraCheckSum,
+                        ignoredFiles = ignoredFiles,
+                        messageUI = { /* log */ },
+                        progressUI = { current, total, bytesRead, totalBytes, speed ->
+                            if (!isActive) return@processSession
+                            val progressValue = if (totalBytes > 0) bytesRead.toFloat() / totalBytes.toFloat() else 0f
+                            _state.value = LaunchState.Downloading(
+                                fileName = "${s.fileDownloading(total).substringBefore("(")}$current/$total",
+                                currentFileIdx = current,
+                                totalFiles = total,
+                                downloadedBytes = bytesRead,
+                                totalBytes = totalBytes,
+                                speedStr = speed,
+                                progress = progressValue
+                            )
+                        }
+                    )
+                }
 
                 // 4. Java
                 updateProgress(0.9f, s.stateJvm)
-                val settings = settingsService.getSettings()
                 val javaPath = if (!settings.javaPath.isNullOrEmpty()) {
                     Path.of(settings.javaPath!!)
                 } else {

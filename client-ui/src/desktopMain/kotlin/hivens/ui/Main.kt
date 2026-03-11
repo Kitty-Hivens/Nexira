@@ -162,24 +162,49 @@ fun AppRoot(
     val credentialsManager: CredentialsManager = koinInject()
     val authService: IAuthService              = koinInject()
     val profileManager: ProfileManager         = koinInject()
+    val settingsService: ISettingsService       = koinInject()
 
     var appState      by remember { mutableStateOf<AppState>(AppState.Loading) }
     var currentScreen by remember { mutableStateOf<Screen>(Screen.Home) }
 
-    // Auto-login runs in background while the 3-column UI is already visible
+    // Auto-login with offline mode support (#63)
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
+            val settings = settingsService.getSettings()
             val saved = credentialsManager.load()
-            appState = if (saved?.cachedPassword != null) {
-                try {
-                    val server  = profileManager.lastServerId ?: AppConfig.DEFAULT_SERVER_ID
-                    val session = authService.login(saved.playerName, saved.cachedPassword!!, server)
-                    AppState.Authenticated(session)
-                } catch (_: Exception) {
+
+            appState = when {
+                // Offline mode: create session from cached credentials without hitting the server
+                settings.isOfflineMode && saved != null -> {
+                    val offlineSession = SessionData(
+                        playerName = saved.playerName,
+                        uuid = saved.uuid.ifBlank { "offline-${saved.playerName}" },
+                        uid = saved.uid,
+                        accessToken = "offline",
+                        cachedPassword = saved.cachedPassword,
+                        status = null,
+                        serverId = profileManager.lastServerId
+                    )
+                    AppState.Authenticated(offlineSession)
+                }
+
+                // Offline mode but no cached credentials — show login anyway
+                settings.isOfflineMode -> {
                     AppState.Unauthenticated
                 }
-            } else {
-                AppState.Unauthenticated
+
+                // Online mode: try auto-login
+                saved?.cachedPassword != null -> {
+                    try {
+                        val server = profileManager.lastServerId ?: AppConfig.DEFAULT_SERVER_ID
+                        val session = authService.login(saved.playerName, saved.cachedPassword!!, server)
+                        AppState.Authenticated(session)
+                    } catch (_: Exception) {
+                        AppState.Unauthenticated
+                    }
+                }
+
+                else -> AppState.Unauthenticated
             }
         }
     }

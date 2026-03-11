@@ -166,4 +166,25 @@ interface AppStrings {
     val fileNoUpdates: String
     fun fileDownloading(n: Int): String
     val fileClientSetup: String
+
+    // --- Settings: Offline Mode ---
+    val settingsOfflineMode: String
+    val settingsOfflineModeDesc: String
+
+    // --- Launcher States: Offline ---
+    val stateOfflineSkipAuth: String
+    val stateOfflineSkipSync: String
+    val stateOfflineNoClient: String
+
+    // --- Server Settings: Extended ---
+    val serverSettingsJvmArgs: String
+    val serverSettingsJvmArgsHint: String
+    val serverSettingsResolution: String
+    val serverSettingsWidth: String
+    val serverSettingsHeight: String
+    val serverSettingsFullscreen: String
+    val serverSettingsAutoConnect: String
+
+    // --- Server Settings: Icon Upload ---
+    val serverSettingsPickIcon: String
 }

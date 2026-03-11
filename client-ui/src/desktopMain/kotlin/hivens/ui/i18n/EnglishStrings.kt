@@ -162,4 +162,25 @@ object EnglishStrings : AppStrings {
     override val fileNoUpdates      = "Files verified, no updates found."
     override fun fileDownloading(n: Int) = "Downloading updates ($n files)..."
     override val fileClientSetup    = "Setting up client..."
+
+    // --- Settings: Offline Mode ---
+    override val settingsOfflineMode       = "Offline mode"
+    override val settingsOfflineModeDesc   = "Launch without authentication. Files won't be synced."
+
+    // --- Launcher States: Offline ---
+    override val stateOfflineSkipAuth      = "Offline mode — authentication skipped"
+    override val stateOfflineSkipSync      = "Offline mode — file sync skipped, using local files"
+    override val stateOfflineNoClient      = "Client files not found. Download them online first."
+
+    // --- Server Settings: Extended ---
+    override val serverSettingsJvmArgs     = "JVM arguments"
+    override val serverSettingsJvmArgsHint = "-XX:+UseZGC -Dfoo=bar"
+    override val serverSettingsResolution  = "Window size"
+    override val serverSettingsWidth       = "Width"
+    override val serverSettingsHeight      = "Height"
+    override val serverSettingsFullscreen  = "Fullscreen"
+    override val serverSettingsAutoConnect = "Auto-connect to server"
+
+    // --- Server Settings: Icon Upload ---
+    override val serverSettingsPickIcon    = "Select server icon"
 }
