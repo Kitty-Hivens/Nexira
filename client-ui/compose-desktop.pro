@@ -34,6 +34,11 @@
     public <methods>;
 }
 
+# --- Okio  ---
+-keep class okio.** { *; }
+-dontwarn okio.**
+-keepnames class okhttp3.internal.publicsuffix.PublicSuffixDatabase
+
 # OkHttp
 -keep class okhttp3.** { *; }
 -keep interface okhttp3.** { *; }
