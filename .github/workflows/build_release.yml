@@ -285,12 +285,13 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
+          pattern: '*-artifacts'
           merge-multiple: true
           path: dist/
 
       - name: Generate SHA256 checksums
         working-directory: dist
-        run: sha256sum * > SHA256SUMS.txt
+        run: find . -maxdepth 1 -type f -exec sha256sum {} + > SHA256SUMS.txt
 
       - name: Compose release body
         id: body
