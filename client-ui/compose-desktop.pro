@@ -9,6 +9,11 @@
 -repackageclasses ''
 -optimizationpasses 3
 
+# --- JNA ---
+-keep class com.sun.jna.** { *; }
+-keepclassmembers class com.sun.jna.** { *; }
+-dontwarn com.sun.jna.**
+
 # --- Kotlin & Coroutines ---
 -keep class kotlinx.coroutines.** { *; }
 -keep class kotlinx.coroutines.swing.** { *; }
