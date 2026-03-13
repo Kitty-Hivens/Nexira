@@ -16,20 +16,31 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil3.ImageLoader
+import coil3.compose.AsyncImage
+import coil3.compose.LocalPlatformContext
+import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import hivens.config.AppConfig
 import hivens.core.data.LauncherUpdate
 import hivens.launcher.update.UpdateService
+import hivens.ui.BuildConfig
 import hivens.ui.components.GlassCard
 import hivens.ui.components.UpdateDialog
+import hivens.ui.generated.resources.Res
+import hivens.ui.generated.resources.favicon
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
 import kotlinx.coroutines.launch
+import okhttp3.OkHttpClient
+import org.jetbrains.compose.resources.painterResource
 import org.koin.compose.koinInject
 import java.awt.Desktop
 import java.net.URI
@@ -43,8 +54,33 @@ fun AboutScreen(onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
 
     var updateState by remember { mutableStateOf<UpdateCheckState>(UpdateCheckState.Idle) }
+    val httpClient: OkHttpClient = koinInject()
+    val context = LocalPlatformContext.current
+    val imageLoader = remember {
+        ImageLoader.Builder(context)
+            .components { add(OkHttpNetworkFetcherFactory(callFactory = { httpClient })) }
+            .build()
+    }
+
     // When true, the full UpdateDialog is shown — same dialog used by UpdateManager
     var showUpdateDialog by remember { mutableStateOf(false) }
+
+    // ── System Info pre-computation ──────────────────────────────────────────
+    val systemRam = remember {
+        try {
+            val osBean = java.lang.management.ManagementFactory.getOperatingSystemMXBean()
+            val method = osBean.javaClass.getMethod("getTotalPhysicalMemorySize")
+            method.isAccessible = true
+            ((method.invoke(osBean) as Long) / (1024 * 1024)).toInt()
+        } catch (_: Exception) { 0 }
+    }
+
+    val displayRes = remember {
+        try {
+            val size = java.awt.Toolkit.getDefaultToolkit().screenSize
+            "${size.width}x${size.height}"
+        } catch (_: Exception) { "Unknown" }
+    }
 
     // ── Update dialog (reuses the existing UpdateDialog composable) ────────
     val availableUpdate = (updateState as? UpdateCheckState.Available)?.update
@@ -86,25 +122,11 @@ fun AboutScreen(onBack: () -> Unit) {
                         Modifier.fillMaxWidth().padding(28.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        val inf = rememberInfiniteTransition(label = "logo")
-                        val rotation by inf.animateFloat(
-                            0f, 360f,
-                            infiniteRepeatable(tween(20000, easing = LinearEasing), RepeatMode.Restart),
-                            label = "rot"
+                        Image(
+                            painter = painterResource(Res.drawable.favicon),
+                            contentDescription = "App Logo",
+                            modifier = Modifier.size(86.dp)
                         )
-                        Box(
-                            Modifier.size(72.dp).clip(CircleShape)
-                                .background(Brush.linearGradient(listOf(
-                                    CelestiaTheme.colors.primary,
-                                    CelestiaTheme.colors.primary.copy(alpha = 0.5f)
-                                ))),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                "A", fontSize = 32.sp, fontWeight = FontWeight.Black,
-                                color = Color.White, modifier = Modifier.rotate(rotation * 0.01f)
-                            )
-                        }
                         Spacer(Modifier.height(16.dp))
                         Text(
                             AppConfig.APP_TITLE,
@@ -112,13 +134,19 @@ fun AboutScreen(onBack: () -> Unit) {
                             fontWeight = FontWeight.Black,
                             color = CelestiaTheme.colors.textPrimary
                         )
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            "v${AppConfig.CLIENT_VERSION.removePrefix("v")}",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = CelestiaTheme.colors.primary,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Spacer(Modifier.height(8.dp))
+                        Box(
+                            Modifier.clip(RoundedCornerShape(6.dp))
+                                .background(CelestiaTheme.colors.primary.copy(alpha = 0.15f))
+                                .padding(horizontal = 10.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                "v${AppConfig.CLIENT_VERSION.removePrefix("v")}",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = CelestiaTheme.colors.primary,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                         val buildDate = remember {
                             try {
                                 SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault())
@@ -146,17 +174,18 @@ fun AboutScreen(onBack: () -> Unit) {
                         SectionLabel(s.aboutSectionCreator)
                         Spacer(Modifier.height(12.dp))
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                Modifier.size(44.dp).clip(CircleShape)
-                                    .background(CelestiaTheme.colors.primary.copy(alpha = 0.2f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text("H", fontWeight = FontWeight.Bold, color = CelestiaTheme.colors.primary, fontSize = 20.sp)
-                            }
+                            AsyncImage(
+                                model = "https://github.com/Kitty-Hivens.png?size=256",
+                                imageLoader = imageLoader,
+                                contentDescription = "Haru",
+                                modifier = Modifier.size(46.dp).clip(CircleShape),
+                                contentScale = ContentScale.Crop,
+                                filterQuality = FilterQuality.High
+                            )
                             Spacer(Modifier.width(12.dp))
                             Column {
                                 Text("Haru (Hivens)", fontWeight = FontWeight.Bold, color = CelestiaTheme.colors.textPrimary)
-                                Text("Kotlin • Compose Multiplatform", style = MaterialTheme.typography.bodySmall, color = CelestiaTheme.colors.textSecondary)
+                                Text("Architect & Developer", style = MaterialTheme.typography.bodySmall, color = CelestiaTheme.colors.primary)
                             }
                         }
 
@@ -164,12 +193,12 @@ fun AboutScreen(onBack: () -> Unit) {
                         SectionLabel(s.aboutSectionTechnologies)
                         Spacer(Modifier.height(8.dp))
                         val techs = listOf(
-                            "Kotlin 2.3" to s.techKotlinDesc,
-                            "Compose Multiplatform" to s.techComposeDesc,
-                            "Ktor" to s.techKtorDesc,
-                            "Koin" to s.techKoinDesc,
-                            "Skia" to s.techSkiaDesc,
-                            "Coil" to s.techCoilDesc
+                            "Kotlin ${KotlinVersion.CURRENT}" to s.techKotlinDesc,
+                            "Compose ${BuildConfig.COMPOSE_VERSION}" to s.techComposeDesc,
+                            "Ktor ${BuildConfig.KTOR_VERSION}" to s.techKtorDesc,
+                            "Koin ${BuildConfig.KOIN_VERSION}" to s.techKoinDesc,
+                            "Coil ${BuildConfig.COIL_VERSION}" to s.techCoilDesc,
+                            "Skia (Skiko)" to s.techSkiaDesc
                         )
                         techs.forEach { (name, desc) ->
                             Row(Modifier.padding(vertical = 3.dp)) {
@@ -352,9 +381,20 @@ fun AboutScreen(onBack: () -> Unit) {
                     Column(Modifier.padding(20.dp)) {
                         SectionLabel(s.aboutSectionSystem)
                         Spacer(Modifier.height(12.dp))
-                        InfoRow(Icons.Default.Computer, s.aboutOs, "${System.getProperty("os.name")} ${System.getProperty("os.arch")}")
-                        InfoRow(Icons.Default.Memory, "Java", "${System.getProperty("java.version")} (${System.getProperty("java.vendor")})")
-                        InfoRow(Icons.Default.Storage, s.aboutJvmHeap, "${Runtime.getRuntime().maxMemory() / (1024 * 1024)} MB")
+
+                        val osName = System.getProperty("os.name")
+                        val osArch = System.getProperty("os.arch")
+                        val osVer = System.getProperty("os.version")
+                        val javaVer = System.getProperty("java.version")
+                        val javaVendor = System.getProperty("java.vendor")
+                        val cores = Runtime.getRuntime().availableProcessors()
+                        val maxHeap = Runtime.getRuntime().maxMemory() / (1024 * 1024)
+
+                        InfoRow(Icons.Default.Computer, s.aboutOs, "$osName $osVer ($osArch)")
+                        InfoRow(Icons.Default.Memory, "CPU", "$cores threads")
+                        InfoRow(Icons.Default.Storage, "RAM", "${if (systemRam > 0) "$systemRam MB" else "Unknown"} (Heap: $maxHeap MB)")
+                        InfoRow(Icons.Default.Code, "Java", "$javaVer ($javaVendor)")
+                        InfoRow(Icons.Default.Tv, "Display", displayRes)
                     }
                 }
 
@@ -407,8 +447,16 @@ private fun InfoRow(icon: ImageVector, label: String, value: String) {
         Icon(icon, null, tint = CelestiaTheme.colors.textSecondary.copy(alpha = 0.4f), modifier = Modifier.size(16.dp))
         Spacer(Modifier.width(8.dp))
         Text(label, color = CelestiaTheme.colors.textSecondary, fontSize = 13.sp)
-        Spacer(Modifier.weight(1f))
-        Text(value, color = CelestiaTheme.colors.textPrimary, fontSize = 13.sp, fontWeight = FontWeight.Medium, fontFamily = FontFamily.Monospace)
+        Spacer(Modifier.width(12.dp))
+        Text(
+            value,
+            color = CelestiaTheme.colors.textPrimary,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium,
+            fontFamily = FontFamily.Monospace,
+            textAlign = TextAlign.End,
+            modifier = Modifier.weight(1f)
+        )
     }
 }
 
