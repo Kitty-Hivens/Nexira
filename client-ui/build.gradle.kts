@@ -70,6 +70,10 @@ buildConfig {
     buildConfigField("String", "FORK_VERSION", "\"${project.version}\"")
     buildConfigField("long", "BUILD_TIME", "${System.currentTimeMillis()}L")
     buildConfigField("String", "APP_NAME", "\"Aura Launcher\"")
+    buildConfigField("String", "COMPOSE_VERSION", "\"$composeVersion\"")
+    buildConfigField("String", "KTOR_VERSION", "\"$ktorVersion\"")
+    buildConfigField("String", "KOIN_VERSION", "\"$koinVersion\"")
+    buildConfigField("String", "COIL_VERSION", "\"$coilVersion\"")
 }
 
 compose.desktop {

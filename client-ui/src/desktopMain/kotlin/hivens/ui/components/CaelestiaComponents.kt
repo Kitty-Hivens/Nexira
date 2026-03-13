@@ -40,7 +40,7 @@ fun GlassCard(
         border    = BorderStroke(1.dp, resolvedBorder),
         elevation = CardDefaults.outlinedCardElevation(defaultElevation = 0.dp)
     ) {
-        Box(modifier = Modifier.fillMaxSize(), content = content)
+        Box(content = content)
     }
 }
 

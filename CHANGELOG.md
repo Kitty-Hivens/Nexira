@@ -73,6 +73,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - i18n: ~60 new string keys across `AppStrings`, `RussianStrings`,
   `EnglishStrings`, `GermanStrings` covering RAM selector, mod cards,
   server grid, background settings, and About screen
+- Build script now exports dependency versions (`COMPOSE_VERSION`, `KTOR_VERSION`, `KOIN_VERSION`, `COIL_VERSION`)
+  to `BuildConfig` for runtime usage
 
 ### Fixed
 - `exitApplication` now correctly wired through `AppRoot` → `AppLayout` → `DashboardScreen`;
@@ -108,6 +110,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Mod descriptions were hidden behind a tooltip that required hover — easy to
   miss; `ModItemCard` now always shows first line of description, with expand
   for full text
+- `exitApplication` now correctly wired through `AppRoot` → `AppLayout` → `DashboardScreen`;
 
 ### Changed
 - `client-ui`: migrated from Compose Material 2 to Material 3 (`material` → `material3`);
@@ -184,6 +187,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `Main.kt` / `AppRoot`: `AppLayout` wrapped in `Box { CustomBackground(); AppLayout() }`;
   `BackgroundManager` initialized alongside `ThemeManager`; background settings state
   hoisted and persisted
+- `AboutScreen` visual and technical refinements: replaced placeholder logo with actual
+  app icon, implemented GitHub avatar fetching via Coil with high-quality downscaling
+  (`FilterQuality.High`), wired dynamic library versions from `BuildConfig`, and expanded
+  the System Info section to include CPU threads, physical RAM, and display resolution
 
 ### Removed
 - `SplashScreen` and `AppState.Splash`
