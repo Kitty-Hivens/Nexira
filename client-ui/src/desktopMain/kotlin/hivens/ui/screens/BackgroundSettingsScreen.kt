@@ -11,8 +11,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import hivens.ui.background.BackgroundSettings
@@ -146,8 +152,27 @@ fun BackgroundSettingsScreen(
 
             // Preview
             GlassCard(Modifier.weight(1f).fillMaxHeight()) {
-                Box(Modifier.fillMaxSize()) {
-                    CustomBackground(settings = settings)
+                val previewMousePos = remember { mutableStateOf(Offset(0.5f, 0.5f)) }
+                var previewSize by remember { mutableStateOf(IntSize.Zero) }
+
+                Box(
+                    Modifier.fillMaxSize()
+                        .onSizeChanged { previewSize = it }
+                        .pointerInput(Unit) {
+                            awaitPointerEventScope {
+                                while (true) {
+                                    val event = awaitPointerEvent(PointerEventPass.Initial)
+                                    if (event.type == PointerEventType.Move) {
+                                        val pos = event.changes.firstOrNull()?.position
+                                        if (pos != null && previewSize.width > 0 && previewSize.height > 0) {
+                                            previewMousePos.value = Offset(pos.x / previewSize.width, pos.y / previewSize.height)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                ) {
+                    CustomBackground(settings = settings, mousePosProvider = { previewMousePos.value })
                     Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.SpaceBetween) {
                         Text(s.backgroundPreview, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.5f), fontWeight = FontWeight.Bold)
                         Column {

@@ -313,15 +313,7 @@ fun AccountPanel(session: SessionData, onLogout: () -> Unit) {
 @Composable
 fun CompactNewsFeed(modifier: Modifier = Modifier) {
     val serverListService: IServerListService = koinInject()
-    val httpClient: OkHttpClient              = koinInject()
     val s       = LocalStrings.current
-    val context = LocalPlatformContext.current
-
-    val imageLoader = remember {
-        ImageLoader.Builder(context)
-            .components { add(OkHttpNetworkFetcherFactory(callFactory = { httpClient })) }
-            .build()
-    }
 
     var news    by remember { mutableStateOf<List<NewsItem>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
@@ -362,7 +354,7 @@ fun CompactNewsFeed(modifier: Modifier = Modifier) {
 
             else -> LazyColumn(contentPadding = PaddingValues(vertical = 4.dp)) {
                 items(news) { item ->
-                    CompactNewsItem(item = item, imageLoader = imageLoader)
+                    CompactNewsItem(item = item)
                     HorizontalDivider(
                         color    = CelestiaTheme.colors.surface.copy(alpha = 0.4f),
                         modifier = Modifier.padding(horizontal = 16.dp)
@@ -463,7 +455,7 @@ private fun SkeletonNewsItem(brush: Brush) {
 // ─── News item ────────────────────────────────────────────────────────────────
 
 @Composable
-private fun CompactNewsItem(item: NewsItem, imageLoader: ImageLoader) {
+private fun CompactNewsItem(item: NewsItem) {
     // Try to open a URL if the NewsItem has one (currently description holds "Views: N",
     // but we keep the click hook ready for when the backend sends real URLs)
     val canOpenUrl = item.imageUrl != null  // reuse as proxy; swap for item.url when available
@@ -500,7 +492,6 @@ private fun CompactNewsItem(item: NewsItem, imageLoader: ImageLoader) {
                         .data(item.imageUrl)
                         .crossfade(true)
                         .build(),
-                    imageLoader        = imageLoader,
                     contentDescription = null,
                     contentScale       = ContentScale.Crop,
                     modifier           = Modifier.fillMaxSize()
