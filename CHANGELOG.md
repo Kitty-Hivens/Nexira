@@ -191,6 +191,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   app icon, implemented GitHub avatar fetching via Coil with high-quality downscaling
   (`FilterQuality.High`), wired dynamic library versions from `BuildConfig`, and expanded
   the System Info section to include CPU threads, physical RAM, and display resolution
+- **Crash on Windows when opening file picker**: added ProGuard keep rules for JNA
+  to prevent the optimizer from stripping methods required for native system dialogs.
+  `exitApplication` now correctly wired through `AppRoot` → `AppLayout` → `DashboardScreen`;
 
 ### Removed
 - `SplashScreen` and `AppState.Splash`
