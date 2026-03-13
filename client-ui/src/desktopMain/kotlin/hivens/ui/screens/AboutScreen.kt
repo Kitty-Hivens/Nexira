@@ -176,7 +176,6 @@ fun AboutScreen(onBack: () -> Unit) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             AsyncImage(
                                 model = "https://github.com/Kitty-Hivens.png?size=256",
-                                imageLoader = imageLoader,
                                 contentDescription = "Haru",
                                 modifier = Modifier.size(46.dp).clip(CircleShape),
                                 contentScale = ContentScale.Crop,

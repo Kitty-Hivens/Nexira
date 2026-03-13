@@ -4,7 +4,16 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.window.*
+import coil3.ImageLoader
+import coil3.compose.setSingletonImageLoaderFactory
+import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import hivens.config.AppConfig
 import hivens.core.api.interfaces.IAuthService
 import hivens.core.api.interfaces.ISettingsService
@@ -15,7 +24,6 @@ import hivens.launcher.ProfileManager
 import hivens.launcher.di.appModule
 import hivens.launcher.di.networkModule
 import hivens.ui.background.BackgroundManager
-import hivens.ui.background.BackgroundSettings
 import hivens.ui.background.CustomBackground
 import hivens.ui.components.UpdateManager
 import hivens.ui.generated.resources.Res
@@ -32,6 +40,7 @@ import hivens.ui.utils.GameConsoleService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import okhttp3.OkHttpClient
 import org.jetbrains.compose.resources.painterResource
 import org.koin.compose.KoinContext
 import org.koin.compose.koinInject
@@ -174,6 +183,15 @@ fun AppRoot(
     val settingsService: ISettingsService      = koinInject()
     val dataDirectory: java.nio.file.Path      = koinInject()
     val json: Json                             = koinInject()
+    val httpClient: OkHttpClient               = koinInject()
+
+    setSingletonImageLoaderFactory { context ->
+        ImageLoader.Builder(context)
+            .components {
+                add(OkHttpNetworkFetcherFactory(callFactory = { httpClient }))
+            }
+            .build()
+    }
 
     var appState      by remember { mutableStateOf<AppState>(AppState.Loading) }
     var currentScreen by remember { mutableStateOf<Screen>(Screen.Home) }
@@ -217,8 +235,28 @@ fun AppRoot(
     }
 
     // ── Render: background behind layout ──────────────────────────────────
-    Box(Modifier.fillMaxSize()) {
-        CustomBackground(settings = backgroundSettings)
+    val mousePos = remember { mutableStateOf(Offset(0.5f, 0.5f)) }
+    var windowSize by remember { mutableStateOf(IntSize.Zero) }
+
+    Box(
+        Modifier
+            .fillMaxSize()
+            .onSizeChanged { windowSize = it }
+            .pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                        if (event.type == PointerEventType.Move) {
+                            val pos = event.changes.firstOrNull()?.position
+                            if (pos != null && windowSize.width > 0 && windowSize.height > 0) {
+                                mousePos.value = Offset(pos.x / windowSize.width, pos.y / windowSize.height)
+                            }
+                        }
+                    }
+                }
+            }
+    ) {
+        CustomBackground(settings = backgroundSettings, mousePosProvider = { mousePos.value })
 
         AppLayout(
             appState             = appState,

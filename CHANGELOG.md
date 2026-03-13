@@ -75,6 +75,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   server grid, background settings, and About screen
 - Build script now exports dependency versions (`COMPOSE_VERSION`, `KTOR_VERSION`, `KOIN_VERSION`, `COIL_VERSION`)
   to `BuildConfig` for runtime usage
+- **Animated Custom Backgrounds**: Hardware-accelerated GIF and WebP support for the launcher backdrop using a native Skiko decoder without third-party libraries.
 
 ### Fixed
 - `exitApplication` now correctly wired through `AppRoot` → `AppLayout` → `DashboardScreen`;
@@ -194,6 +195,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Crash on Windows when opening file picker**: added ProGuard keep rules for JNA
   to prevent the optimizer from stripping methods required for native system dialogs.
   `exitApplication` now correctly wired through `AppRoot` → `AppLayout` → `DashboardScreen`;
+- Migrated static custom background rendering from `ImageIO` to native Skia.
+- Parallax mouse position tracking lifted to root containers (`Main.kt` and `BackgroundSettingsScreen.kt`) to ensure consistent global tracking across the entire window.
+- Configured Coil `ImageLoader` as a global singleton in `Main.kt`, replacing localized instances in `RightPanel` and `AboutScreen`.
 
 ### Removed
 - `SplashScreen` and `AppState.Splash`
