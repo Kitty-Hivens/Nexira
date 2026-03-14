@@ -192,9 +192,7 @@ private fun Bitmap.toImageBitmapSafe(): ImageBitmap {
     } finally {
         canvas.close()
     }
-    val result = dst.asComposeImageBitmap()
-    dst.close()
-    return result
+    return dst.asComposeImageBitmap()
 }
 
 @Composable
