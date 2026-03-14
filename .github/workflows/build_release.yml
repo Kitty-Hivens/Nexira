@@ -193,7 +193,7 @@ jobs:
           # 1. Build the minimal JRE first — jlink refuses to write into an existing dir
           jlink \
             --output "$APPDIR/usr" \
-            --add-modules java.base,java.desktop,java.logging,java.naming,java.net.http,java.prefs,java.sql,jdk.crypto.ec,jdk.unsupported,jdk.zipfs \
+            --add-modules java.base,java.desktop,java.logging,java.management,java.naming,java.net.http,java.prefs,java.sql,jdk.crypto.ec,jdk.unsupported,jdk.zipfs \
             --no-header-files \
             --no-man-pages \
             --strip-debug \
