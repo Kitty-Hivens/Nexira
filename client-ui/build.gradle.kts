@@ -256,7 +256,7 @@ tasks.withType<Jar>().configureEach {
 tasks.configureEach {
     if (name.contains("checkRuntime")) {
         dependsOn(
-            ":client-config:generateBuildConfig",
+            ":client-config:generateBuildConfigClasses",
             ":client-config:processResources",
             ":client-core:processResources",
             ":client-launcher:processResources"
