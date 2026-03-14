@@ -131,6 +131,7 @@ compose.desktop {
                 "java.base",
                 "java.desktop",
                 "java.logging",
+                "java.management",
                 "java.naming",
                 "java.net.http",
                 "java.prefs",
