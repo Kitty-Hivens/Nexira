@@ -1,7 +1,8 @@
 plugins {
-    kotlin("jvm") version "2.3.0" apply false
+    kotlin("jvm") version "2.3.20-RC3" apply false
     id("java")
-    id("com.github.gmazzo.buildconfig") version "5.3.5" apply false
+    id("com.github.gmazzo.buildconfig") version "6.0.9" apply false
+    id("com.github.ben-manes.versions") version "0.53.0"
 }
 
 fun getGitVersion(providerFactory: ProviderFactory): String {
