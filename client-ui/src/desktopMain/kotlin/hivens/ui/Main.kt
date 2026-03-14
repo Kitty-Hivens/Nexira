@@ -97,68 +97,65 @@ fun main() {
         DisposableEffect(Unit) { onDispose { stopKoin() } }
 
         val windowState = rememberWindowState(placement = WindowPlacement.Maximized)
+        val settingsService: ISettingsService = koinInject()
 
-        KoinContext {
-            val settingsService: ISettingsService = koinInject()
+        var isDarkTheme   by remember { mutableStateOf(settingsService.getSettings().isDarkTheme) }
+        var currentLocale by remember {
+            mutableStateOf(AppLocale.fromTag(settingsService.getSettings().locale))
+        }
 
-            var isDarkTheme   by remember { mutableStateOf(settingsService.getSettings().isDarkTheme) }
-            var currentLocale by remember {
-                mutableStateOf(AppLocale.fromTag(settingsService.getSettings().locale))
+        LocaleProvider(locale = currentLocale) {
+            val s = LocalStrings.current
+
+            val dataDirectory: java.nio.file.Path = koinInject()
+            val themeManager  = remember { ThemeManager(dataDirectory) }
+            var customTheme   by remember { mutableStateOf(themeManager.loadTheme()) }
+
+            val trayIcon = painterResource(Res.drawable.favicon)
+
+            Tray(
+                icon    = trayIcon,
+                tooltip = "${AppConfig.APP_TITLE} v${AppConfig.CLIENT_VERSION.removePrefix("v")}",
+                menu    = {
+                    Item(s.trayConsole, onClick = { GameConsoleService.show() })
+                    Separator()
+                    Item(s.trayExit, onClick = ::exitApplication)
+                }
+            )
+
+            if (GameConsoleService.shouldShowConsole) {
+                ConsoleWindow(isDarkTheme = isDarkTheme, onClose = { GameConsoleService.hide() })
             }
 
-            LocaleProvider(locale = currentLocale) {
-                val s = LocalStrings.current
-
-                val dataDirectory: java.nio.file.Path = koinInject()
-                val themeManager  = remember { ThemeManager(dataDirectory) }
-                var customTheme   by remember { mutableStateOf(themeManager.loadTheme()) }
-
-                val trayIcon = painterResource(Res.drawable.favicon)
-
-                Tray(
-                    icon    = trayIcon,
-                    tooltip = "${AppConfig.APP_TITLE} v${AppConfig.CLIENT_VERSION.removePrefix("v")}",
-                    menu    = {
-                        Item(s.trayConsole, onClick = { GameConsoleService.show() })
-                        Separator()
-                        Item(s.trayExit, onClick = ::exitApplication)
-                    }
-                )
-
-                if (GameConsoleService.shouldShowConsole) {
-                    ConsoleWindow(isDarkTheme = isDarkTheme, onClose = { GameConsoleService.hide() })
-                }
-
-                Window(
-                    onCloseRequest = ::exitApplication,
-                    state     = windowState,
-                    title     = AppConfig.APP_TITLE,
-                    resizable = true,
-                    icon      = trayIcon
-                ) {
-                    CelestiaTheme(useDarkTheme = isDarkTheme, customTheme = customTheme) {
-                        AppRoot(
-                            onCloseApp           = ::exitApplication,
-                            isDarkTheme          = isDarkTheme,
-                            onToggleDarkTheme = {
-                                isDarkTheme = !isDarkTheme
-                                val current = settingsService.getSettings()
-                                settingsService.saveSettings(current.copy(isDarkTheme = isDarkTheme))
-                            },
-                            customTheme          = customTheme,
-                            onCustomThemeChanged = { newTheme ->
-                                customTheme = newTheme
-                                themeManager.saveTheme(newTheme)
-                            },
-                            currentLocale   = currentLocale,
-                            onLocaleChanged = { newLocale ->
-                                currentLocale = newLocale
-                                val current = settingsService.getSettings()
-                                settingsService.saveSettings(current.copy(locale = newLocale.tag))
-                            }
-                        )
-                        UpdateManager()
-                    }
+            Window(
+                onCloseRequest = ::exitApplication,
+                state     = windowState,
+                title     = AppConfig.APP_TITLE,
+                resizable = true,
+                icon      = trayIcon
+            ) {
+                CelestiaTheme(useDarkTheme = isDarkTheme, customTheme = customTheme) {
+                    AppRoot(
+                        onCloseApp           = ::exitApplication,
+                        isDarkTheme          = isDarkTheme,
+                        onToggleDarkTheme = {
+                            isDarkTheme = !isDarkTheme
+                            val current = settingsService.getSettings()
+                            settingsService.saveSettings(current.copy(isDarkTheme = isDarkTheme))
+                        },
+                        customTheme          = customTheme,
+                        onCustomThemeChanged = { newTheme ->
+                            customTheme = newTheme
+                            themeManager.saveTheme(newTheme)
+                        },
+                        currentLocale   = currentLocale,
+                        onLocaleChanged = { newLocale ->
+                            currentLocale = newLocale
+                            val current = settingsService.getSettings()
+                            settingsService.saveSettings(current.copy(locale = newLocale.tag))
+                        }
+                    )
+                    UpdateManager()
                 }
             }
         }

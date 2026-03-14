@@ -28,6 +28,7 @@ import hivens.ui.components.GlassCard
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
 import io.github.vinceglb.filekit.FileKit
+import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
 import io.github.vinceglb.filekit.dialogs.FileKitMode
 import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.dialogs.openFilePicker
@@ -82,7 +83,10 @@ fun BackgroundSettingsScreen(
                     SectionTitle(s.backgroundSectionImage)
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(onClick = { scope.launch {
-                            FileKit.openFilePicker(type = FileKitType.File(extensions = listOf("png", "jpg", "jpeg", "gif", "webp", "bmp")), mode = FileKitMode.Single, title = s.backgroundPickFile)?.path?.let { path -> update { copy(imagePath = path, enabled = true) } }
+                            FileKit.openFilePicker(type = FileKitType.File(extensions = listOf("png", "jpg", "jpeg", "gif", "webp", "bmp")), dialogSettings = FileKitDialogSettings(
+                                title = s.backgroundPickFile
+                            )
+                            )?.path?.let { path -> update { copy(imagePath = path, enabled = true) } }
                         } }, shape = RoundedCornerShape(8.dp), modifier = Modifier.weight(1f)) {
                             Icon(Icons.Default.Image, null, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text(s.backgroundPickButton)
                         }
