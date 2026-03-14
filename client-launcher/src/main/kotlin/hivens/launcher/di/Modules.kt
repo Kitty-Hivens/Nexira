@@ -2,6 +2,7 @@ package hivens.launcher.di
 
 import hivens.config.AppConfig
 import hivens.core.api.AuthService
+import hivens.core.api.PlayerRepository
 import hivens.core.api.ServerRepository
 import hivens.core.api.SkinRepository
 import hivens.core.api.interfaces.*
@@ -93,6 +94,7 @@ val networkModule = module {
     // Repositories
     singleOf(::ServerRepository)
     singleOf(::SkinRepository)
+    singleOf(::PlayerRepository)
 }
 
 /**

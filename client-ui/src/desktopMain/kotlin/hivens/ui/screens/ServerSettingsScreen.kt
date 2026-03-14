@@ -24,10 +24,12 @@ import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import hivens.core.api.PlayerRepository
 import hivens.core.api.interfaces.IManifestProcessorService
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.InstanceProfile
 import hivens.core.data.OptionalMod
+import hivens.launcher.CredentialsManager
 import hivens.launcher.ProfileManager
 import hivens.ui.components.CelestiaButton
 import hivens.ui.components.GlassCard
@@ -37,11 +39,11 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
 import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
-import io.github.vinceglb.filekit.dialogs.FileKitMode
 import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.dialogs.openFilePicker
 import io.github.vinceglb.filekit.path
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
@@ -52,12 +54,21 @@ import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import javax.imageio.ImageIO
 
+private sealed class SpawnResetState {
+    object Idle    : SpawnResetState()
+    object Loading : SpawnResetState()
+    object Success : SpawnResetState()
+    object Error   : SpawnResetState()
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
     val profileManager: ProfileManager               = koinInject()
     val manifestProcessorService: IManifestProcessorService = koinInject()
     val dataDirectory: Path                          = koinInject()
+    val playerRepository: PlayerRepository           = koinInject()
+    val credentialsManager: CredentialsManager       = koinInject()
     val s = LocalStrings.current
 
     var mods       by remember { mutableStateOf<List<OptionalMod>>(emptyList()) }
@@ -70,6 +81,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
     var fullScreen by remember { mutableStateOf(false) }
     var autoConnect by remember { mutableStateOf(true) }
     var serverIcon by remember { mutableStateOf<ImageBitmap?>(null) }
+    var spawnResetState by remember { mutableStateOf<SpawnResetState>(SpawnResetState.Idle) }
 
     val modStates  = remember { mutableStateMapOf<String, Boolean>() }
     var modsLoaded by remember { mutableStateOf(false) }
@@ -347,6 +359,44 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                         saveProfile()
                         onBack()
                     }, modifier = Modifier.fillMaxWidth(), primary = false)
+
+                    // ── Return to spawn (only 1.12.2) ───────────────────────
+                    if (server.version.startsWith("1.12")) {
+                        Spacer(Modifier.height(12.dp))
+                        CelestiaButton(
+                            text = when (spawnResetState) {
+                                SpawnResetState.Loading -> s.spawnResetLoading
+                                SpawnResetState.Success -> s.spawnResetSuccess
+                                SpawnResetState.Error   -> s.spawnResetError
+                                SpawnResetState.Idle    -> s.spawnResetButton
+                            },
+                            enabled  = spawnResetState != SpawnResetState.Loading,
+                            onClick  = {
+                                if (spawnResetState != SpawnResetState.Loading) {
+                                    spawnResetState = SpawnResetState.Loading
+                                    scope.launch {
+                                        val credentials = withContext(Dispatchers.IO) {
+                                            credentialsManager.load()
+                                        }
+                                        if (credentials == null) {
+                                            spawnResetState = SpawnResetState.Error
+                                            delay(3000)
+                                            spawnResetState = SpawnResetState.Idle
+                                            return@launch
+                                        }
+                                        val ok = withContext(Dispatchers.IO) {
+                                            playerRepository.resetSpawn(credentials, server.name)
+                                        }
+                                        spawnResetState = if (ok) SpawnResetState.Success else SpawnResetState.Error
+                                        delay(3000)
+                                        spawnResetState = SpawnResetState.Idle
+                                    }
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            primary  = false
+                        )
+                    }
                 }
             }
 

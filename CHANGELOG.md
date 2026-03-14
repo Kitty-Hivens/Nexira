@@ -81,6 +81,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Animated Custom Backgrounds**: Hardware-accelerated GIF and WebP support for the launcher backdrop using a native Skiko decoder without third-party libraries.
 - **Dashboard Empty State**: When the server list fails to load or is empty, the Dashboard now displays an explicit empty state with a manual "Retry" button.
 - `com.github.ben-manes.versions` Gradle plugin to easily track dependency updates.
+- **Spawn Reset**: "Return to spawn" button in server settings,
+  visible only for 1.12.2 servers; sends `action=spawn` to the backend
+  with HMAC signature; button cycles through Idle → Loading → Success/Error
+  states with auto-reset after 3 seconds
+- `PlayerRepository`: new repository for player-specific server actions
 
 ### Fixed
 - `exitApplication` now correctly wired through `AppRoot` → `AppLayout` → `DashboardScreen`;
