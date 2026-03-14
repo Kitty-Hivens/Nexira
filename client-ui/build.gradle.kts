@@ -178,12 +178,10 @@ compose.desktop {
             "-XX:+UseStringDeduplication",
             "-XX:+OptimizeStringConcat",
             "-XX:+UseCompressedOops",
-            "-XX:+UseCompressedClassPointers",
 
             // Startup optimization
             "-XX:TieredStopAtLevel=1",
             "-XX:+TieredCompilation",
-            "-Xverify:none",
 
             // Memory optimization
             "-Xms128m",
