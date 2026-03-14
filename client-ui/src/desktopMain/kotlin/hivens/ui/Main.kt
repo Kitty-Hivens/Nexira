@@ -81,6 +81,7 @@ sealed class Screen {
 // ─── Entry Point ─────────────────────────────────────────────────────────────
 
 fun main() {
+    System.setProperty("skiko.fps.limit", "60")
     Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
         val logger = LoggerFactory.getLogger("CrashHandler")
         logger.error("Uncaught exception on thread '${thread.name}'", throwable)
