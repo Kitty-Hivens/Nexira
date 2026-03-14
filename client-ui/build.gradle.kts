@@ -45,8 +45,8 @@ kotlin {
                 implementation("org.jetbrains.compose.material:material-icons-extended:$iconsVersion")
                 implementation("com.mikepenz:multiplatform-markdown-renderer-m3:${markdownRendererVersion}")
 
-                implementation("io.coil-kt.coil3:coil-compose:$coilVersion")
-                implementation("io.coil-kt.coil3:coil-network-okhttp:$coilNetworkVersion")
+                implementation("io.coil-kt.coil3:coil-compose:$coilVersion") { exclude(group = "org.jetbrains.skiko") }
+                implementation("io.coil-kt.coil3:coil-network-okhttp:$coilNetworkVersion") { exclude(group = "org.jetbrains.skiko") }
                 implementation("io.ktor:ktor-serialization-kotlinx-json:${ktorVersion}")
             }
         }
