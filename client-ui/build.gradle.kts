@@ -13,6 +13,7 @@ val ktorVersion: String by project
 val coroutinesVersion: String by project
 val logbackVersion: String by project
 val proguardVersion: String by project
+val markdownRendererVersion: String by project
 
 plugins {
     kotlin("multiplatform")
@@ -42,6 +43,7 @@ kotlin {
                 implementation("org.jetbrains.compose.ui:ui:$composeVersion")
                 implementation("org.jetbrains.compose.components:components-resources:$composeVersion")
                 implementation("org.jetbrains.compose.material:material-icons-extended:$iconsVersion")
+                implementation("com.mikepenz:multiplatform-markdown-renderer-m3:${markdownRendererVersion}")
 
                 implementation("io.coil-kt.coil3:coil-compose:$coilVersion")
                 implementation("io.coil-kt.coil3:coil-network-okhttp:$coilNetworkVersion")
