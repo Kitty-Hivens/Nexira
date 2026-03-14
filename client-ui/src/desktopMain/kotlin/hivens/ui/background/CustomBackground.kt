@@ -155,15 +155,20 @@ private fun rememberSkiaImage(file: File): ImageBitmap? {
         if (!file.exists()) return@LaunchedEffect
 
         withContext(Dispatchers.IO) {
+            var currentSkiaImage: org.jetbrains.skia.Image? = null
+            var data: Data? = null
+            var codec: Codec? = null
+            var bmp: Bitmap? = null
+
             try {
-                val data = Data.makeFromFileName(file.absolutePath)
-                val codec = Codec.makeFromData(data)
+                data = Data.makeFromFileName(file.absolutePath)
+                codec = Codec.makeFromData(data)
 
                 if (codec.frameCount <= 1) {
-                    val img = org.jetbrains.skia.Image.makeFromEncoded(file.readBytes())
-                    bitmap = img.toComposeImageBitmap()
+                    currentSkiaImage = org.jetbrains.skia.Image.makeFromEncoded(file.readBytes())
+                    bitmap = currentSkiaImage.toComposeImageBitmap()
                 } else {
-                    val bmp = Bitmap().apply { allocPixels(codec.imageInfo) }
+                    bmp = Bitmap().apply { allocPixels(codec.imageInfo) }
                     var frame = 0
                     var priorFrame = -1
 
@@ -173,9 +178,13 @@ private fun rememberSkiaImage(file: File): ImageBitmap? {
                             priorFrame = -1
                         }
                         codec.readPixels(bmp, frame, priorFrame)
-                        bitmap = org.jetbrains.skia.Image.makeFromBitmap(bmp).toComposeImageBitmap()
+                        currentSkiaImage?.close()
+                        currentSkiaImage = org.jetbrains.skia.Image.makeFromBitmap(bmp)
+                        bitmap = currentSkiaImage.toComposeImageBitmap()
+
                         var duration = codec.framesInfo[frame].duration
-                        if (duration < 20) duration = 100
+                        if (duration < 30) duration = 100
+
                         delay(duration.toLong())
 
                         priorFrame = frame
@@ -184,6 +193,11 @@ private fun rememberSkiaImage(file: File): ImageBitmap? {
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
+            } finally {
+                currentSkiaImage?.close()
+                bmp?.close()
+                codec?.close()
+                data?.close()
             }
         }
     }
