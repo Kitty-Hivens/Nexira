@@ -12,9 +12,13 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.*
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.painter.BitmapPainter
+import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -77,7 +81,10 @@ fun CustomBackground(
                         val radius = maxOf(size.width, size.height) * 0.7f
                         drawCircle(
                             brush = Brush.radialGradient(
-                                colors = listOf(Color.Transparent, Color.Black.copy(alpha = settings.vignetteIntensity * 0.6f)),
+                                colors = listOf(
+                                    Color.Transparent,
+                                    Color.Black.copy(alpha = settings.vignetteIntensity * 0.6f)
+                                ),
                                 center = Offset(centerX, centerY),
                                 radius = radius
                             ),
@@ -97,18 +104,12 @@ private fun AnimatedParallaxImage(
     settings: BackgroundSettings,
     mousePosProvider: () -> Offset
 ) {
-    val mousePos = mousePosProvider()
-    val targetX = (0.5f - mousePos.x) * settings.parallaxIntensity * 80f
-    val targetY = (0.5f - mousePos.y) * settings.parallaxIntensity * 80f
-    val parallaxX by animateFloatAsState(targetValue = targetX, animationSpec = spring(stiffness = 50f, dampingRatio = 0.8f))
-    val parallaxY by animateFloatAsState(targetValue = targetY, animationSpec = spring(stiffness = 50f, dampingRatio = 0.8f))
-
     val contentScale = when (settings.scaleMode) {
-        ScaleMode.COVER -> ContentScale.Crop
-        ScaleMode.CONTAIN -> ContentScale.Fit
-        ScaleMode.STRETCH -> ContentScale.FillBounds
+        ScaleMode.COVER    -> ContentScale.Crop
+        ScaleMode.CONTAIN  -> ContentScale.Fit
+        ScaleMode.STRETCH  -> ContentScale.FillBounds
         ScaleMode.ORIGINAL -> ContentScale.None
-        ScaleMode.TILE -> ContentScale.None
+        ScaleMode.TILE     -> ContentScale.None
     }
 
     val alignment = Alignment { size, space, _ ->
@@ -120,25 +121,50 @@ private fun AnimatedParallaxImage(
     val imageBitmap = rememberSkiaImage(file)
 
     if (imageBitmap != null) {
-        Image(
-            painter = BitmapPainter(imageBitmap),
-            contentDescription = null,
-            contentScale = contentScale,
-            alignment = alignment,
-            modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer {
-                    if (settings.parallaxIntensity > 0f) {
-                        val extraScale = 1f + settings.parallaxIntensity * 0.15f
-                        scaleX = extraScale
-                        scaleY = extraScale
-                        translationX = parallaxX
-                        translationY = parallaxY
-                    }
+        val useParallax = settings.parallaxIntensity > 0f
+        val baseModifier = Modifier
+            .fillMaxSize()
+            .let {
+                if (settings.blurRadius > 0f)
+                    it.blur(settings.blurRadius.dp, BlurredEdgeTreatment.Unbounded)
+                else it
+            }
+            .alpha(settings.opacity)
+
+        if (useParallax) {
+            val mousePos = mousePosProvider()
+            val targetX = (0.5f - mousePos.x) * settings.parallaxIntensity * 80f
+            val targetY = (0.5f - mousePos.y) * settings.parallaxIntensity * 80f
+            val parallaxX by animateFloatAsState(
+                targetValue = targetX,
+                animationSpec = spring(stiffness = 50f, dampingRatio = 0.8f)
+            )
+            val parallaxY by animateFloatAsState(
+                targetValue = targetY,
+                animationSpec = spring(stiffness = 50f, dampingRatio = 0.8f)
+            )
+            Image(
+                painter = BitmapPainter(imageBitmap),
+                contentDescription = null,
+                contentScale = contentScale,
+                alignment = alignment,
+                modifier = baseModifier.graphicsLayer {
+                    val extraScale = 1f + settings.parallaxIntensity * 0.15f
+                    scaleX = extraScale
+                    scaleY = extraScale
+                    translationX = parallaxX
+                    translationY = parallaxY
                 }
-                .let { if (settings.blurRadius > 0f) it.blur(settings.blurRadius.dp, BlurredEdgeTreatment.Unbounded) else it }
-                .alpha(settings.opacity)
-        )
+            )
+        } else {
+            Image(
+                painter = BitmapPainter(imageBitmap),
+                contentDescription = null,
+                contentScale = contentScale,
+                alignment = alignment,
+                modifier = baseModifier
+            )
+        }
     }
 }
 
@@ -155,32 +181,31 @@ private fun rememberSkiaImage(file: File): ImageBitmap? {
         if (!file.exists()) return@LaunchedEffect
 
         withContext(Dispatchers.IO) {
-            var currentSkiaImage: org.jetbrains.skia.Image? = null
-            var data: Data? = null
-            var codec: Codec? = null
-            var bmp: Bitmap? = null
+            var data:  Data?   = null
+            var codec: Codec?  = null
+            var bmp:   Bitmap? = null
 
             try {
-                data = Data.makeFromFileName(file.absolutePath)
+                data  = Data.makeFromFileName(file.absolutePath)
                 codec = Codec.makeFromData(data)
+                bmp   = Bitmap().apply { allocPixels(codec.imageInfo) }
 
                 if (codec.frameCount <= 1) {
-                    currentSkiaImage = org.jetbrains.skia.Image.makeFromEncoded(file.readBytes())
-                    bitmap = currentSkiaImage.toComposeImageBitmap()
+                    codec.readPixels(bmp, 0)
+                    val img = org.jetbrains.skia.Image.makeFromBitmap(bmp)
+                    bitmap = img.toComposeImageBitmap()
+                    img.close()
                 } else {
-                    bmp = Bitmap().apply { allocPixels(codec.imageInfo) }
-                    var frame = 0
+                    var frame      = 0
                     var priorFrame = -1
 
                     while (isActive) {
-                        if (frame == 0 && codec.frameCount > 1) {
-                            bmp.erase(0)
-                            priorFrame = -1
-                        }
+                        if (frame == 0) { bmp.erase(0); priorFrame = -1 }
+
                         codec.readPixels(bmp, frame, priorFrame)
-                        currentSkiaImage?.close()
-                        currentSkiaImage = org.jetbrains.skia.Image.makeFromBitmap(bmp)
-                        bitmap = currentSkiaImage.toComposeImageBitmap()
+                        val img = org.jetbrains.skia.Image.makeFromBitmap(bmp)
+                        bitmap = img.toComposeImageBitmap()
+                        img.close()
 
                         var duration = codec.framesInfo[frame].duration
                         if (duration < 30) duration = 100
@@ -194,7 +219,6 @@ private fun rememberSkiaImage(file: File): ImageBitmap? {
             } catch (e: Exception) {
                 e.printStackTrace()
             } finally {
-                currentSkiaImage?.close()
                 bmp?.close()
                 codec?.close()
                 data?.close()

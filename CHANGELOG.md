@@ -114,8 +114,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   miss; `ModItemCard` now always shows first line of description, with expand
   for full text
 - `exitApplication` now correctly wired through `AppRoot` → `AppLayout` → `DashboardScreen`;
-- **Skia Memory Leak**: Fixed severe native memory leaks in `CustomBackground` for animated WebP/GIF files by ensuring `Data`, `Codec`, `Bitmap`, and `Image` are explicitly closed and replaced correctly between frame draws.
-- **Tray Localization**: Application `Tray` and `Window` are now properly scoped inside `LocaleProvider` to ensure tray context menus display in the correct language.
+- **Skia Memory Leak**: Fixed severe native memory leaks in `CustomBackground` for animated
+  WebP/GIF files: `SkiaImage` is now closed immediately after `toComposeImageBitmap()` on
+  every frame instead of being held until the next iteration; `graphicsLayer` is only
+  applied when `parallaxIntensity > 0` to avoid unnecessary offscreen GPU buffers;
+  `System.gc()` hints removed (were causing GC-pause frame drops)
+- **Tray Localization**: Application `Tray` and `Window` are now properly scoped inside
+  `LocaleProvider` to ensure tray context menus display in the correct language.
+- **Render FPS cap**: Added `skiko.fps.limit=60` system property in `main()` to prevent
+  the Skiko renderer from targeting the display refresh rate (200 Hz on high-refresh
+  monitors), which caused sustained ~40% GPU load on integrated graphics (Intel 1235U)
+  even when the UI was idle. Launcher UI does not benefit from >60 fps.
+- **`GlowModifiers` recomposition leak**: `pulsatingGlow` and `shimmerOverlay` were reading
+  animated `State` values via `by` delegate at composition time, causing full recomposition
+  of the Compose tree on every animation frame (~60–200×/sec). Fixed by holding the raw
+  `State` object and reading `.value` exclusively inside `drawBehind` / `drawWithContent`
+  draw-phase lambdas — Compose now invalidates only the draw layer, not the composition tree.
+  `neonBorder` converted to a static non-animated border, eliminating its
+  `rememberInfiniteTransition` entirely.
 
 ### Changed
 - `client-ui`: migrated from Compose Material 2 to Material 3 (`material` → `material3`);
