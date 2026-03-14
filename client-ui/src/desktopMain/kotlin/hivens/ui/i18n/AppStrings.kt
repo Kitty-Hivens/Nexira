@@ -288,4 +288,15 @@ interface AppStrings {
     val spawnResetLoading: String
     val spawnResetSuccess: String
     val spawnResetError: String
+
+    // --- Tray ---
+    val trayStatusIdle: String
+    val trayStatusRunning: String
+    val trayShow: String
+    val trayServers: String
+    val trayNoServers: String
+
+    // --- Settings: Start in tray ---
+    val settingsStartInTray: String
+    val settingsStartInTrayDesc: String
 }

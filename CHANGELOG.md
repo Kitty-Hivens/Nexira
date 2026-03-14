@@ -86,6 +86,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   with HMAC signature; button cycles through Idle → Loading → Success/Error
   states with auto-reset after 3 seconds
 - `PlayerRepository`: new repository for player-specific server actions
+- **System Tray** (#??): replaced Compose `Tray` with `dorkbox/SystemTray` (full
+  Linux SNI/AppIndicator support); tray menu includes show/hide window, open console,
+  server quick-launch list, and exit; game status indicator updates to server name
+  while game is running; crash detection automatically brings window to foreground
+- **Start in tray** (#??): new toggle in Settings → Behavior; launcher starts
+  minimized with window hidden; closing the window hides to tray instead of exiting;
+  falls back to showing the window if tray is unavailable on the current platform
+- `TrayManager`: new singleton object wrapping dorkbox API; init runs on a background
+  thread to avoid blocking UI startup; exposes `onShowWindow`, `onExit`,
+  `onShowConsole`, `onLaunchServer` callbacks and `setGameStatus()` / `updateServers()`
 
 ### Fixed
 - `exitApplication` now correctly wired through `AppRoot` → `AppLayout` → `DashboardScreen`;
@@ -142,7 +152,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   `rememberInfiniteTransition` entirely.
 
 ### Changed
-- `UpdateDialog`: changelog section replaced plain `Text(update.changelog)` with `Markdown(update.changelog)` from `multiplatform-markdown-renderer-m3`; release notes now render headers, bold, bullet lists and code blocks correctly
+- `UpdateDialog`: changelog section replaced plain `Text(update.changelog)` 
+  with `Markdown(update.changelog)`from `multiplatform-markdown-renderer-m3`; 
+  release notes now render headers, bold, bullet lists and code blocks correctly
 - `client-ui`: migrated from Compose Material 2 to Material 3 (`material` → `material3`);
   `material-icons-extended` dependency retained from M2 artifact pending icon migration
 - `CelestiaTheme`: `darkColors()`/`lightColors()` → `darkColorScheme()`/`lightColorScheme()`;
@@ -231,6 +243,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bumped app version to `1.4.0-dev`.
 - Bumped Kotlin to `2.3.20-RC3`, Gradle to `9.4.0`, Ktor to `3.4.1`, Koin to `4.2.0-RC2`, and Compose Multiplatform to `1.11.0-alpha04`.
 - Updated `FileKit` integration to use the new `FileKitDialogSettings` API for native file dialogs in settings screens.
+- `Main.kt`: tray init moved to `Dispatchers.IO`; `onCloseRequest` now hides to tray
+  when `TrayManager.isSupported` instead of calling `exitApplication()`
 
 ### Removed
 - `SplashScreen` and `AppState.Splash`
@@ -261,6 +275,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   content is fully covered by `CompactNewsFeed` in the right panel
 - `ModItemRow` composable and its `TooltipBox` wrapper from `ServerSettingsScreen` —
   replaced by `ModItemCard` component
+- Compose `Tray {}` block — superseded by `TrayManager` / dorkbox
 
 ## [1.3.0] - 2026-03-06
 

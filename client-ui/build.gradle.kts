@@ -14,6 +14,7 @@ val coroutinesVersion: String by project
 val logbackVersion: String by project
 val proguardVersion: String by project
 val markdownRendererVersion: String by project
+val systemTray: String by project
 
 plugins {
     kotlin("multiplatform")
@@ -65,6 +66,7 @@ kotlin {
                 implementation("io.insert-koin:koin-compose:$koinComposeVersion")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:$coroutinesVersion")
                 implementation("ch.qos.logback:logback-classic:$logbackVersion")
+                implementation("com.dorkbox:SystemTray:$systemTray")
             }
         }
     }
