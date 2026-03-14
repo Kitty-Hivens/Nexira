@@ -15,10 +15,10 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asComposeImageBitmap
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.painter.BitmapPainter
-import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -27,8 +27,11 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import org.jetbrains.skia.Bitmap
+import org.jetbrains.skia.Canvas
 import org.jetbrains.skia.Codec
+import org.jetbrains.skia.ColorAlphaType
 import org.jetbrains.skia.Data
+import org.jetbrains.skia.ImageInfo
 import org.jetbrains.skia.makeFromFileName
 import java.io.File
 
@@ -169,10 +172,31 @@ private fun AnimatedParallaxImage(
 }
 
 /**
- * Tiny but powerful native GIF/WebP decoder based on the Skia (Skiko) engine.
- * It accelerates decoding in hardware, automatically handles frame blending (priorFrame)
- * and runs on Desktop without any third-party libraries like Kamel or Coil.
+ * Converts a Skia Bitmap to ImageBitmap without leaking a Canvas.
+ *
+ * The standard toComposeImageBitmap() creates a Canvas internally and never
+ * closes it, causing native memory to accumulate over time. This function
+ * explicitly closes the Canvas after use.
  */
+private fun Bitmap.toImageBitmapSafe(): ImageBitmap {
+    val dst = Bitmap()
+    dst.allocPixels(ImageInfo.makeS32(width, height, ColorAlphaType.PREMUL))
+    val canvas = Canvas(dst)
+    try {
+        val image = org.jetbrains.skia.Image.makeFromBitmap(this)
+        try {
+            canvas.drawImage(image, 0f, 0f)
+        } finally {
+            image.close()
+        }
+    } finally {
+        canvas.close()
+    }
+    val result = dst.asComposeImageBitmap()
+    dst.close()
+    return result
+}
+
 @Composable
 private fun rememberSkiaImage(file: File): ImageBitmap? {
     var bitmap by remember(file) { mutableStateOf<ImageBitmap?>(null) }
@@ -191,11 +215,11 @@ private fun rememberSkiaImage(file: File): ImageBitmap? {
                 bmp   = Bitmap().apply { allocPixels(codec.imageInfo) }
 
                 if (codec.frameCount <= 1) {
+                    // Static image — decode once, convert safely, done
                     codec.readPixels(bmp, 0)
-                    val img = org.jetbrains.skia.Image.makeFromBitmap(bmp)
-                    bitmap = img.toComposeImageBitmap()
-                    img.close()
+                    bitmap = bmp.toImageBitmapSafe()
                 } else {
+                    // Animated GIF/WebP — decode frame by frame
                     var frame      = 0
                     var priorFrame = -1
 
@@ -203,9 +227,8 @@ private fun rememberSkiaImage(file: File): ImageBitmap? {
                         if (frame == 0) { bmp.erase(0); priorFrame = -1 }
 
                         codec.readPixels(bmp, frame, priorFrame)
-                        val img = org.jetbrains.skia.Image.makeFromBitmap(bmp)
-                        bitmap = img.toComposeImageBitmap()
-                        img.close()
+                        // Use safe conversion to avoid Canvas leak on every frame
+                        bitmap = bmp.toImageBitmapSafe()
 
                         var duration = codec.framesInfo[frame].duration
                         if (duration < 30) duration = 100
