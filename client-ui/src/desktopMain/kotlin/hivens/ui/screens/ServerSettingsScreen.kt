@@ -36,6 +36,7 @@ import hivens.ui.components.RamSelector
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
 import io.github.vinceglb.filekit.FileKit
+import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
 import io.github.vinceglb.filekit.dialogs.FileKitMode
 import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.dialogs.openFilePicker
@@ -147,8 +148,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                         scope.launch {
                             val file = FileKit.openFilePicker(
                                 type = FileKitType.File(extensions = listOf("png", "jpg", "jpeg")),
-                                mode = FileKitMode.Single,
-                                title = s.serverSettingsPickIcon
+                                dialogSettings = FileKitDialogSettings(title = s.serverSettingsPickIcon)
                             )
                             file?.path?.let { selectedPath ->
                                 withContext(Dispatchers.IO) {
@@ -239,8 +239,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                                 scope.launch {
                                     val file = FileKit.openFilePicker(
                                         type  = FileKitType.File(extensions = listOf("exe", "bin")),
-                                        mode  = FileKitMode.Single,
-                                        title = s.serverSettingsPickJava
+                                        dialogSettings = FileKitDialogSettings(title = s.serverSettingsPickJava)
                                     )
                                     file?.path?.let { javaPath = it }
                                 }
