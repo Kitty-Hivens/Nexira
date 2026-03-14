@@ -281,4 +281,15 @@ object EnglishStrings : AppStrings {
     override val spawnResetLoading = "Resetting..."
     override val spawnResetSuccess = "Done! Rejoin to apply"
     override val spawnResetError   = "Server error"
+
+    // --- Tray ---
+    override val trayStatusIdle    = "● Ready"
+    override val trayStatusRunning = "▶ Game running"
+    override val trayShow          = "Show launcher"
+    override val trayServers       = "Servers"
+    override val trayNoServers     = "No servers loaded"
+
+    // --- Settings: Start in tray ---
+    override val settingsStartInTray     = "Start in tray"
+    override val settingsStartInTrayDesc = "Launch minimized; closing the window hides it to tray"
 }

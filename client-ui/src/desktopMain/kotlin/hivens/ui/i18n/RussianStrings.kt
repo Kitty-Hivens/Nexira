@@ -281,4 +281,15 @@ object RussianStrings : AppStrings {
     override val spawnResetLoading = "Сбрасываем..."
     override val spawnResetSuccess = "Готово! Перезайди"
     override val spawnResetError   = "Ошибка сервера"
+
+    // --- Tray ---
+    override val trayStatusIdle    = "● Готов к запуску"
+    override val trayStatusRunning = "▶ Игра запущена"
+    override val trayShow          = "Открыть лаунчер"
+    override val trayServers       = "Серверы"
+    override val trayNoServers     = "Серверы не загружены"
+
+    // --- Settings: Start in tray ---
+    override val settingsStartInTray     = "Запускать в трее"
+    override val settingsStartInTrayDesc = "Лаунчер стартует свёрнутым; закрытие окна прячет его в трей"
 }

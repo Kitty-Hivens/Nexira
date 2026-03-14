@@ -13,7 +13,9 @@ data class SettingsData(
     /** BCP-47 language tag: "ru", "en", "de" */
     var locale: String = "en",
     /** Offline Mode: skip authentication, use cached session */
-    var isOfflineMode: Boolean = false
+    var isOfflineMode: Boolean = false,
+    /** Start minimized to tray; hide window on close instead of exiting */
+    var startInTray: Boolean = false
 ) {
     companion object {
         fun defaults(): SettingsData {
@@ -24,6 +26,7 @@ data class SettingsData(
             data.saveCredentials = true
             data.locale = "en"
             data.isOfflineMode = false
+            data.startInTray = false
             return data
         }
     }

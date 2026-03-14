@@ -281,4 +281,15 @@ object GermanStrings : AppStrings {
     override val spawnResetLoading = "Zurücksetzen..."
     override val spawnResetSuccess = "Fertig! Neu einloggen"
     override val spawnResetError   = "Serverfehler"
+
+    // --- Tray ---
+    override val trayStatusIdle    = "● Bereit"
+    override val trayStatusRunning = "▶ Spiel läuft"
+    override val trayShow          = "Launcher anzeigen"
+    override val trayServers       = "Server"
+    override val trayNoServers     = "Keine Server geladen"
+
+    // --- Settings: Start in tray ---
+    override val settingsStartInTray     = "Im Tray starten"
+    override val settingsStartInTrayDesc = "Minimiert starten; Fenster schließen versteckt es im Tray"
 }

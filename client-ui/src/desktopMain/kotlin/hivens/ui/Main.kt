@@ -16,6 +16,7 @@ import coil3.compose.setSingletonImageLoaderFactory
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import hivens.config.AppConfig
 import hivens.core.api.interfaces.IAuthService
+import hivens.core.api.interfaces.IServerListService
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.data.SessionData
 import hivens.launcher.CrashReporter
@@ -31,18 +32,23 @@ import hivens.ui.generated.resources.favicon
 import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.i18n.LocaleProvider
+import hivens.ui.logic.LaunchState
 import hivens.ui.logic.LauncherController
 import hivens.ui.screens.ConsoleWindow
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.CustomTheme
 import hivens.ui.theme.ThemeManager
+import hivens.ui.tray.TrayManager
 import hivens.ui.utils.GameConsoleService
+import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
+import org.jetbrains.compose.resources.ExperimentalResourceApi
 import org.jetbrains.compose.resources.painterResource
-import org.koin.compose.KoinContext
 import org.koin.compose.koinInject
 import org.koin.core.context.startKoin
 import org.koin.core.context.stopKoin
@@ -80,6 +86,7 @@ sealed class Screen {
 
 // ─── Entry Point ─────────────────────────────────────────────────────────────
 
+@OptIn(ExperimentalResourceApi::class, DelicateCoroutinesApi::class)
 fun main() {
     System.setProperty("skiko.fps.limit", "60")
     Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
@@ -95,14 +102,45 @@ fun main() {
     startKoin { modules(networkModule, appModule, uiModule) }
 
     application {
-        DisposableEffect(Unit) { onDispose { stopKoin() } }
+        DisposableEffect(Unit) {
+            onDispose {
+                TrayManager.shutdown()
+                stopKoin()
+            }
+        }
 
-        val windowState = rememberWindowState(placement = WindowPlacement.Maximized)
-        val settingsService: ISettingsService = koinInject()
+        val windowState      = rememberWindowState(placement = WindowPlacement.Maximized)
+        val settingsService: ISettingsService      = koinInject()
+        val serverListService: IServerListService  = koinInject()
+        val controller: LauncherController         = koinInject()
+        val credentialsManager: CredentialsManager = koinInject()
+        val authService: IAuthService              = koinInject()
+        val profileManager: ProfileManager         = koinInject()
 
-        var isDarkTheme   by remember { mutableStateOf(settingsService.getSettings().isDarkTheme) }
+        val settings = remember { settingsService.getSettings() }
+
+        // If startInTray — keep hidden until tray is confirmed ready
+        var isWindowVisible by remember { mutableStateOf(!settings.startInTray) }
+
+        var isDarkTheme   by remember { mutableStateOf(settings.isDarkTheme) }
         var currentLocale by remember {
-            mutableStateOf(AppLocale.fromTag(settingsService.getSettings().locale))
+            mutableStateOf(AppLocale.fromTag(settings.locale))
+        }
+
+        val launchState by controller.state.collectAsState()
+
+        LaunchedEffect(launchState) {
+            val serverName = profileManager.lastServerId
+            when (launchState) {
+                is LaunchState.GameRunning -> TrayManager.setGameStatus(true, serverName)
+                is LaunchState.Error -> {
+                    TrayManager.setGameStatus(false)
+                    if (!isWindowVisible) {
+                        SwingUtilities.invokeLater { isWindowVisible = true }
+                    }
+                }
+                else -> TrayManager.setGameStatus(false)
+            }
         }
 
         LocaleProvider(locale = currentLocale) {
@@ -114,32 +152,124 @@ fun main() {
 
             val trayIcon = painterResource(Res.drawable.favicon)
 
-            Tray(
-                icon    = trayIcon,
-                tooltip = "${AppConfig.APP_TITLE} v${AppConfig.CLIENT_VERSION.removePrefix("v")}",
-                menu    = {
-                    Item(s.trayConsole, onClick = { GameConsoleService.show() })
-                    Separator()
-                    Item(s.trayExit, onClick = ::exitApplication)
+            // ── Tray init on background thread ────────────────────────────
+            LaunchedEffect(Unit) {
+                withContext(Dispatchers.IO) {
+                    try {
+                        val iconBytes = Res.readBytes("drawable/favicon.png")
+                        TrayManager.init(
+                            iconStream = iconBytes.inputStream(),
+                            strings    = TrayManager.Strings(
+                                tooltip       = "${AppConfig.APP_TITLE} v${AppConfig.CLIENT_VERSION.removePrefix("v")}",
+                                statusIdle    = s.trayStatusIdle,
+                                statusRunning = s.trayStatusRunning,
+                                show          = s.trayShow,
+                                console       = s.trayConsole,
+                                servers       = s.trayServers,
+                                noServers     = s.trayNoServers,
+                                exit          = s.trayExit
+                            )
+                        )
+                    } catch (_: Exception) {
+                        runCatching {
+                            val iconBytes = Res.readBytes("drawable/icon.ico")
+                            TrayManager.init(
+                                iconStream = iconBytes.inputStream(),
+                                strings    = TrayManager.Strings(
+                                    tooltip       = AppConfig.APP_TITLE,
+                                    statusIdle    = s.trayStatusIdle,
+                                    statusRunning = s.trayStatusRunning,
+                                    show          = s.trayShow,
+                                    console       = s.trayConsole,
+                                    servers       = s.trayServers,
+                                    noServers     = s.trayNoServers,
+                                    exit          = s.trayExit
+                                )
+                            )
+                        }
+                    }
                 }
-            )
 
+                // Tray failed to init — show window anyway so user isn't stuck
+                if (settings.startInTray && !TrayManager.isSupported) {
+                    isWindowVisible = true
+                }
+
+                // ── Callbacks ─────────────────────────────────────────────
+                TrayManager.onShowWindow = {
+                    SwingUtilities.invokeLater { isWindowVisible = true }
+                }
+
+                TrayManager.onExit = {
+                    SwingUtilities.invokeLater { exitApplication() }
+                }
+
+                TrayManager.onShowConsole = {
+                    SwingUtilities.invokeLater { GameConsoleService.show() }
+                }
+
+                TrayManager.onLaunchServer = { server ->
+                    GlobalScope.launch(Dispatchers.IO) {
+                        val credentials = credentialsManager.load()
+                        if (credentials?.cachedPassword != null) {
+                            try {
+                                val session = authService.login(
+                                    credentials.playerName,
+                                    credentials.cachedPassword!!,
+                                    server.assetDir
+                                )
+                                controller.launch(session, server)
+                                SwingUtilities.invokeLater { GameConsoleService.show() }
+                            } catch (_: Exception) {
+                                SwingUtilities.invokeLater { isWindowVisible = true }
+                            }
+                        } else {
+                            SwingUtilities.invokeLater { isWindowVisible = true }
+                        }
+                    }
+                }
+
+                // ── Populate server list ───────────────────────────────────
+                try {
+                    val data = withContext(Dispatchers.IO) {
+                        serverListService.fetchDashboardData().get()
+                    }
+                    TrayManager.updateServers(data.servers)
+                } catch (_: Exception) { /* tray shows empty list */ }
+            }
+
+            // ── Console window ─────────────────────────────────────────────
             if (GameConsoleService.shouldShowConsole) {
                 ConsoleWindow(isDarkTheme = isDarkTheme, onClose = { GameConsoleService.hide() })
             }
 
+            // ── Main window ────────────────────────────────────────────────
             Window(
-                onCloseRequest = ::exitApplication,
+                onCloseRequest = {
+                    if (TrayManager.isSupported) {
+                        isWindowVisible = false
+                    } else {
+                        exitApplication()
+                    }
+                },
                 state     = windowState,
+                visible   = isWindowVisible,
                 title     = AppConfig.APP_TITLE,
                 resizable = true,
                 icon      = trayIcon
             ) {
                 CelestiaTheme(useDarkTheme = isDarkTheme, customTheme = customTheme) {
                     AppRoot(
-                        onCloseApp           = ::exitApplication,
+                        onCloseApp = {
+                            val gameRunning = launchState is LaunchState.GameRunning
+                            if (gameRunning && TrayManager.isSupported) {
+                                isWindowVisible = false
+                            } else {
+                                exitApplication()
+                            }
+                        },
                         isDarkTheme          = isDarkTheme,
-                        onToggleDarkTheme = {
+                        onToggleDarkTheme    = {
                             isDarkTheme = !isDarkTheme
                             val current = settingsService.getSettings()
                             settingsService.saveSettings(current.copy(isDarkTheme = isDarkTheme))
@@ -202,25 +332,25 @@ fun AppRoot(
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
             val settings = settingsService.getSettings()
-            val saved = credentialsManager.load()
+            val saved    = credentialsManager.load()
 
             appState = when {
                 settings.isOfflineMode && saved != null -> {
                     val offlineSession = SessionData(
-                        playerName = saved.playerName,
-                        uuid = saved.uuid.ifBlank { "offline-${saved.playerName}" },
-                        uid = saved.uid,
-                        accessToken = "offline",
+                        playerName     = saved.playerName,
+                        uuid           = saved.uuid.ifBlank { "offline-${saved.playerName}" },
+                        uid            = saved.uid,
+                        accessToken    = "offline",
                         cachedPassword = saved.cachedPassword,
-                        status = null,
-                        serverId = profileManager.lastServerId
+                        status         = null,
+                        serverId       = profileManager.lastServerId
                     )
                     AppState.Authenticated(offlineSession)
                 }
                 settings.isOfflineMode -> AppState.Unauthenticated
                 saved?.cachedPassword != null -> {
                     try {
-                        val server = profileManager.lastServerId ?: AppConfig.DEFAULT_SERVER_ID
+                        val server  = profileManager.lastServerId ?: AppConfig.DEFAULT_SERVER_ID
                         val session = authService.login(saved.playerName, saved.cachedPassword!!, server)
                         AppState.Authenticated(session)
                     } catch (_: Exception) {
