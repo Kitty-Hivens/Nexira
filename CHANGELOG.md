@@ -76,6 +76,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Build script now exports dependency versions (`COMPOSE_VERSION`, `KTOR_VERSION`, `KOIN_VERSION`, `COIL_VERSION`)
   to `BuildConfig` for runtime usage
 - **Animated Custom Backgrounds**: Hardware-accelerated GIF and WebP support for the launcher backdrop using a native Skiko decoder without third-party libraries.
+- **Dashboard Empty State**: When the server list fails to load or is empty, the Dashboard now displays an explicit empty state with a manual "Retry" button.
+- `com.github.ben-manes.versions` Gradle plugin to easily track dependency updates.
 
 ### Fixed
 - `exitApplication` now correctly wired through `AppRoot` → `AppLayout` → `DashboardScreen`;
@@ -112,6 +114,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   miss; `ModItemCard` now always shows first line of description, with expand
   for full text
 - `exitApplication` now correctly wired through `AppRoot` → `AppLayout` → `DashboardScreen`;
+- **Skia Memory Leak**: Fixed severe native memory leaks in `CustomBackground` for animated WebP/GIF files by ensuring `Data`, `Codec`, `Bitmap`, and `Image` are explicitly closed and replaced correctly between frame draws.
+- **Tray Localization**: Application `Tray` and `Window` are now properly scoped inside `LocaleProvider` to ensure tray context menus display in the correct language.
 
 ### Changed
 - `client-ui`: migrated from Compose Material 2 to Material 3 (`material` → `material3`);
@@ -198,6 +202,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Migrated static custom background rendering from `ImageIO` to native Skia.
 - Parallax mouse position tracking lifted to root containers (`Main.kt` and `BackgroundSettingsScreen.kt`) to ensure consistent global tracking across the entire window.
 - Configured Coil `ImageLoader` as a global singleton in `Main.kt`, replacing localized instances in `RightPanel` and `AboutScreen`.
+- **Dependencies Centralization**: All library versions (Ktor, Koin, Compose, Coroutines, etc.) are now centrally managed in the root `gradle.properties`.
+- Bumped app version to `1.4.0-dev`.
+- Bumped Kotlin to `2.3.20-RC3`, Gradle to `9.4.0`, Ktor to `3.4.1`, Koin to `4.2.0-RC2`, and Compose Multiplatform to `1.11.0-alpha04`.
+- Updated `FileKit` integration to use the new `FileKitDialogSettings` API for native file dialogs in settings screens.
 
 ### Removed
 - `SplashScreen` and `AppState.Splash`
