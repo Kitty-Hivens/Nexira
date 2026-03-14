@@ -6,9 +6,6 @@ object RussianStrings : AppStrings {
     override val appName = "Aura Launcher"
     override val appVersion get() = appName
 
-    // Splash
-    override val splashLoading = "Загрузка..."
-
     // Login
     override val loginTitle        = "Aura Client"
     override val loginUsername     = "Логин"
@@ -155,15 +152,6 @@ object RussianStrings : AppStrings {
     override val trayConsole  = "Открыть консоль"
     override val trayExit     = "Выход"
 
-    // Seasons
-    override val seasonAuto    = "Автоматически"
-    override val seasonNone    = "Отключено"
-    override val seasonWinter  = "Зима (Снег)"
-    override val seasonNewYear = "Новый год"
-    override val seasonSpring  = "Весна (Сакура)"
-    override val seasonSummer  = "Лето (Светлячки)"
-    override val seasonAutumn  = "Осень (Листопад)"
-
     // Settings: Diagnostics
     override val settingsSectionDiagnostics = "Диагностика"
     override val settingsOpenLogs           = "Открыть логи"
@@ -174,4 +162,134 @@ object RussianStrings : AppStrings {
     override val fileNoUpdates      = "Файлы проверены, обновлений нет."
     override fun fileDownloading(n: Int) = "Загрузка обновлений ($n файлов)..."
     override val fileClientSetup    = "Настройка клиента..."
+
+    // --- Settings: Offline Mode ---
+    override val settingsOfflineMode       = "Оффлайн-режим"
+    override val settingsOfflineModeDesc   = "Запуск без авторизации. Файлы не будут синхронизированы."
+
+    // --- Launcher States: Offline ---
+    override val stateOfflineSkipAuth      = "Оффлайн-режим — авторизация пропущена"
+    override val stateOfflineSkipSync      = "Оффлайн-режим — синхронизация пропущена, используем локальные файлы"
+    override val stateOfflineNoClient      = "Файлы клиента не найдены. Сначала скачайте их онлайн."
+
+    // --- Server Settings: Extended ---
+    override val serverSettingsJvmArgs     = "Аргументы JVM"
+    override val serverSettingsJvmArgsHint = "-XX:+UseZGC -Dfoo=bar"
+    override val serverSettingsResolution  = "Размер окна"
+    override val serverSettingsWidth       = "Ширина"
+    override val serverSettingsHeight      = "Высота"
+    override val serverSettingsFullscreen  = "Полный экран"
+    override val serverSettingsAutoConnect = "Автоподключение к серверу"
+
+    // --- Server Settings: Icon Upload ---
+    override val serverSettingsPickIcon    = "Выбрать иконку сервера"
+
+    // =========================================================================
+    // RAM Selector
+    // =========================================================================
+    override val ramCustomInputLabel = "Своё значение:"
+    override fun ramSystemHint(systemRam: String, recommended: String) =
+        "Система: $systemRam • Рекомендуется не более $recommended"
+
+    // =========================================================================
+    // Mod cards
+    // =========================================================================
+    override fun modConflictWarning(ids: String) = "Конфликтует с: $ids"
+    override fun modIncompatibleHint(ids: String) = "Несовместим с: $ids"
+
+    // =========================================================================
+    // Server grid
+    // =========================================================================
+    override val serversFavorites = "★ ИЗБРАННЫЕ"
+
+    // =========================================================================
+    // Custom Background
+    // =========================================================================
+    override val backgroundTitle          = "ПОЛЬЗОВАТЕЛЬСКИЙ ФОН"
+    override val backgroundSubtitle       = "Настройте обои лаунчера"
+    override val backgroundEnable         = "Включить"
+    override val backgroundSectionImage   = "ИЗОБРАЖЕНИЕ"
+    override val backgroundPickFile       = "Выберите изображение для фона"
+    override val backgroundPickButton     = "Выбрать файл"
+    override val backgroundSectionScale   = "МАСШТАБИРОВАНИЕ"
+    override val backgroundScaleCover     = "Заполнить"
+    override val backgroundScaleContain   = "Вписать"
+    override val backgroundScaleStretch   = "Растянуть"
+    override val backgroundScaleOriginal  = "Оригинал"
+    override val backgroundScaleTile      = "Плитка"
+    override val backgroundSectionPosition = "ПОЗИЦИЯ"
+    override val backgroundAlignX         = "Горизонтально"
+    override val backgroundAlignY         = "Вертикально"
+    override val backgroundSectionEffects = "ЭФФЕКТЫ"
+    override val backgroundBlur           = "Размытие"
+    override val backgroundDarken         = "Затемнение"
+    override val backgroundOpacity        = "Прозрачность"
+    override val backgroundSaturation     = "Насыщенность"
+    override val backgroundParallax       = "Параллакс"
+    override val backgroundVignette       = "Виньетка"
+    override val backgroundSectionTint    = "ЦВЕТОВОЙ ОТТЕНОК"
+    override val backgroundTintNone       = "Нет"
+    override val backgroundTintNavy       = "Тёмно-синий"
+    override val backgroundTintViolet     = "Фиолет"
+    override val backgroundTintEmerald    = "Изумруд"
+    override val backgroundTintBordeaux   = "Бордо"
+    override val backgroundTintSteel      = "Сталь"
+    override val backgroundTintIntensity  = "Интенсивность"
+    override val backgroundReset          = "Сбросить к значениям по умолчанию"
+    override val backgroundPreview        = "ПРЕДПРОСМОТР"
+    override val backgroundPreviewServer  = "Пример сервера"
+    override val settingsBackground       = "Пользовательский фон"
+    override val settingsBackgroundSub    = "Фото или GIF на фон лаунчера"
+
+    // =========================================================================
+    // About Screen
+    // =========================================================================
+    override val aboutTitle                = "О ЛАУНЧЕРЕ"
+    override fun aboutDescription(branding: String) = "Неофициальный лаунчер для $branding"
+    override fun aboutBuildDate(date: String) = "Собрано: $date"
+    override val aboutSectionCreator       = "СОЗДАТЕЛЬ"
+    override val aboutSectionTechnologies  = "ТЕХНОЛОГИИ"
+    override val aboutSectionLicense       = "ЛИЦЕНЗИЯ"
+    override val aboutLicenseText          = "GPLv3 — Свободное программное обеспечение"
+    override val aboutSectionUpdates       = "ОБНОВЛЕНИЯ"
+    override val aboutCurrentVersion       = "Текущая версия"
+    override val aboutCheckUpdates         = "Проверить обновления"
+    override val aboutChecking             = "Проверяем..."
+    override val aboutUpToDate             = "У вас последняя версия!"
+    override val aboutCheckAgain           = "Проверить ещё раз"
+    override fun aboutUpdateAvailable(version: String) = "Доступна версия $version"
+    override val aboutCriticalUpdate       = "Критическое обновление"
+    override val aboutSectionSystem        = "СИСТЕМА"
+    override val aboutOs                   = "ОС"
+    override val aboutJvmHeap             = "JVM Heap"
+    override val aboutSectionLinks         = "ССЫЛКИ"
+    override val aboutLinkGithub           = "GitHub"
+    override val aboutLinkBugReport        = "Сообщить о баге"
+    override val aboutLinkReleases         = "Релизы"
+    override val settingsSectionAbout      = "О ПРОГРАММЕ"
+
+    // Tech stack descriptions
+    override val techKotlinDesc  = "Основной язык"
+    override val techComposeDesc = "UI фреймворк"
+    override val techKtorDesc    = "HTTP клиент"
+    override val techKoinDesc    = "Dependency Injection"
+    override val techSkiaDesc    = "Рендеринг скинов"
+    override val techCoilDesc    = "Загрузка изображений"
+
+    // --- Spawn Reset ---
+    override val spawnResetButton  = "Вернуться на спавн"
+    override val spawnResetLoading = "Сбрасываем..."
+    override val spawnResetSuccess = "Готово! Перезайди"
+    override val spawnResetError   = "Ошибка сервера"
+
+    // --- Tray ---
+    override val trayStatusIdle    = "● Готов к запуску"
+    override val trayStatusRunning = "▶ Игра запущена"
+    override val trayShow          = "Открыть лаунчер"
+    override val trayServers       = "Серверы"
+    override val trayNoServers     = "Серверы не загружены"
+
+    // --- Settings: Start in tray ---
+    override val settingsStartInTray     = "Запускать в трее"
+    override val settingsStartInTrayDesc = "Лаунчер стартует свёрнутым; закрытие окна прячет его в трей"
 }

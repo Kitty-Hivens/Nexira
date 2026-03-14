@@ -10,12 +10,18 @@ val filekitVersion: String by project
 val koinVersion: String by project
 val koinComposeVersion: String by project
 val ktorVersion: String by project
+val coroutinesVersion: String by project
+val logbackVersion: String by project
+val proguardVersion: String by project
+val markdownRendererVersion: String by project
+val systemTray: String by project
 
 plugins {
     kotlin("multiplatform")
-    id("org.jetbrains.compose") version "1.11.0-alpha02"
-    id("org.jetbrains.kotlin.plugin.compose") version "2.3.0"
+    id("org.jetbrains.compose") version "1.11.0-alpha04"
+    id("org.jetbrains.kotlin.plugin.compose") version "2.3.20-RC3"
     id("com.github.gmazzo.buildconfig")
+    kotlin("plugin.serialization") version "2.3.20-RC3"
 }
 
 group = "hivens"
@@ -34,13 +40,15 @@ kotlin {
             dependencies {
                 implementation("org.jetbrains.compose.runtime:runtime:$composeVersion")
                 implementation("org.jetbrains.compose.foundation:foundation:$composeVersion")
-                implementation("org.jetbrains.compose.material:material:$composeVersion")
+                implementation("org.jetbrains.compose.material3:material3:${composeVersion}")
                 implementation("org.jetbrains.compose.ui:ui:$composeVersion")
                 implementation("org.jetbrains.compose.components:components-resources:$composeVersion")
                 implementation("org.jetbrains.compose.material:material-icons-extended:$iconsVersion")
+                implementation("com.mikepenz:multiplatform-markdown-renderer-m3:${markdownRendererVersion}")
 
-                implementation("io.coil-kt.coil3:coil-compose:$coilVersion")
-                implementation("io.coil-kt.coil3:coil-network-okhttp:$coilNetworkVersion")
+                implementation("io.coil-kt.coil3:coil-compose:$coilVersion") { exclude(group = "org.jetbrains.skiko") }
+                implementation("io.coil-kt.coil3:coil-network-okhttp:$coilNetworkVersion") { exclude(group = "org.jetbrains.skiko") }
+                implementation("io.ktor:ktor-serialization-kotlinx-json:${ktorVersion}")
             }
         }
 
@@ -56,8 +64,9 @@ kotlin {
                 implementation("io.github.vinceglb:filekit-dialogs-compose:$filekitVersion")
                 implementation("io.insert-koin:koin-core:$koinVersion")
                 implementation("io.insert-koin:koin-compose:$koinComposeVersion")
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.9.0")
-                implementation("ch.qos.logback:logback-classic:1.4.14")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:$coroutinesVersion")
+                implementation("ch.qos.logback:logback-classic:$logbackVersion")
+                implementation("com.dorkbox:SystemTray:$systemTray")
             }
         }
     }
@@ -68,6 +77,10 @@ buildConfig {
     buildConfigField("String", "FORK_VERSION", "\"${project.version}\"")
     buildConfigField("long", "BUILD_TIME", "${System.currentTimeMillis()}L")
     buildConfigField("String", "APP_NAME", "\"Aura Launcher\"")
+    buildConfigField("String", "COMPOSE_VERSION", "\"$composeVersion\"")
+    buildConfigField("String", "KTOR_VERSION", "\"$ktorVersion\"")
+    buildConfigField("String", "KOIN_VERSION", "\"$koinVersion\"")
+    buildConfigField("String", "COIL_VERSION", "\"$coilVersion\"")
 }
 
 compose.desktop {
@@ -159,9 +172,7 @@ compose.desktop {
             "-Dawt.useSystemAAFontSettings=on",
             "-Djdk.gtk.version=3",
             "-Dwayland.debug.children=true",
-            "-Dsun.java2d.uiScale=1",
             "-D_JAVA_AWT_WM_NONREPARENTING=1",
-            "-Dskiko.render.backend=SOFTWARE",
             "-Drobot.need_x11=false",
 
             // Performance flags
@@ -169,12 +180,10 @@ compose.desktop {
             "-XX:+UseStringDeduplication",
             "-XX:+OptimizeStringConcat",
             "-XX:+UseCompressedOops",
-            "-XX:+UseCompressedClassPointers",
 
             // Startup optimization
             "-XX:TieredStopAtLevel=1",
             "-XX:+TieredCompilation",
-            "-Xverify:none",
 
             // Memory optimization
             "-Xms128m",

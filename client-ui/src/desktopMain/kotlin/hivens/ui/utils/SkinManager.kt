@@ -2,66 +2,120 @@ package hivens.ui.utils
 
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asComposeImageBitmap
+import hivens.config.AppConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.jetbrains.skia.ColorAlphaType
 import org.jetbrains.skia.ImageInfo
+import org.slf4j.LoggerFactory
 import java.io.ByteArrayOutputStream
+import java.io.File
 import java.net.HttpURLConnection
 import java.net.URI
-import java.net.URL
 
 /**
- * Менеджер скинов для SmartyCraft.
- * Логика рендеринга адаптирована под h.java из исходников лаунчера.
+ * Skin manager with persistent disk cache (#61).
+ *
+ * Cache layout (mirrors original h.java):
+ *   ~/.aura/skin-cache/front_<nick>.png
+ *   ~/.aura/skin-cache/back_<nick>.png
+ *   ~/.aura/skin-cache/raw_<nick>.png   (original texture)
+ *
+ * Cache is invalidated on explicit call or after [CACHE_TTL_MS].
  */
 object SkinManager {
     private const val BASE_SKIN_URL = "https://www.smartycraft.ru/skins/"
     private const val BASE_CLOAK_URL = "https://www.smartycraft.ru/cloaks/"
+    private const val CACHE_TTL_MS = 30 * 60 * 1000L // 30 minutes
 
+    private val logger = LoggerFactory.getLogger("SkinManager")
+
+    // In-memory LRU (small, just for the current session)
     private val frontCache = mutableMapOf<String, ImageBitmap>()
     private val backCache = mutableMapOf<String, ImageBitmap>()
 
-    // Режим для обычных скинов (64x32/64x64) - Пиксельная четкость (как в Minecraft)
+    // Disk cache directory — lazy-initialized
+    private val cacheDir: File by lazy {
+        val userHome = System.getProperty("user.home")
+        File(userHome, "${AppConfig.APP_DIR}/skin-cache").also { it.mkdirs() }
+    }
+
+    // ── Skia rendering settings ────────────────────────────────────────────
+
     private val samplingNearest = org.jetbrains.skia.FilterMipmap(
         org.jetbrains.skia.FilterMode.NEAREST,
         org.jetbrains.skia.MipmapMode.NONE
     )
-
-    // Режим для HD скинов (>64px) - Линейное сглаживание (убирает "шум" и рябь)
     private val samplingLinear = org.jetbrains.skia.FilterMipmap(
         org.jetbrains.skia.FilterMode.LINEAR,
         org.jetbrains.skia.MipmapMode.NONE
     )
+    private val paint = org.jetbrains.skia.Paint().apply { isAntiAlias = false }
 
-    // Paint без антиалиасинга для четких границ деталей
-    private val paint = org.jetbrains.skia.Paint().apply {
-        isAntiAlias = false
-    }
+    // ── Public API ─────────────────────────────────────────────────────────
 
     fun invalidate(nickname: String) {
         frontCache.remove(nickname)
         backCache.remove(nickname)
+        // Delete disk cache
+        listOf("front", "back", "raw").forEach { prefix ->
+            File(cacheDir, "${prefix}_${nickname}.png").delete()
+        }
+        logger.info("Cache invalidated for {}", nickname)
     }
 
     suspend fun getSkinFront(nickname: String): ImageBitmap? = withContext(Dispatchers.IO) {
-        if (frontCache.containsKey(nickname)) return@withContext frontCache[nickname]
+        // 1. Memory cache
+        frontCache[nickname]?.let { return@withContext it }
 
-        val rawSkin = downloadTexture("$BASE_SKIN_URL$nickname.png") ?: return@withContext null
+        // 2. Disk cache
+        val diskFile = File(cacheDir, "front_${nickname}.png")
+        if (diskFile.exists() && !isExpired(diskFile)) {
+            try {
+                val skiaImage = org.jetbrains.skia.Image.makeFromEncoded(diskFile.readBytes())
+                val bitmap = skiaImageToBitmap(skiaImage)
+                val result = bitmap.asComposeImageBitmap()
+                frontCache[nickname] = result
+                logger.debug("Front skin loaded from disk cache: {}", nickname)
+                return@withContext result
+            } catch (e: Exception) {
+                logger.warn("Failed to read front cache, re-downloading: {}", e.message)
+                diskFile.delete()
+            }
+        }
+
+        // 3. Download and render
+        val rawSkin = getOrDownloadRawSkin(nickname) ?: return@withContext null
         val processed = assembleSkin(rawSkin, isFront = true, cloak = null)
-
         val result = processed.asComposeImageBitmap()
+
+        // Save to caches
         frontCache[nickname] = result
+        saveBitmapToDisk(processed, diskFile)
+
         return@withContext result
     }
 
     suspend fun getSkinBack(nickname: String, cloakHash: String? = null): ImageBitmap? = withContext(Dispatchers.IO) {
-        // Ключ кеша должен учитывать плащ, но для UI профиля пока хватит ника
-        if (backCache.containsKey(nickname)) return@withContext backCache[nickname]
+        backCache[nickname]?.let { return@withContext it }
 
-        val rawSkin = downloadTexture("$BASE_SKIN_URL$nickname.png") ?: return@withContext null
+        val diskFile = File(cacheDir, "back_${nickname}.png")
+        if (diskFile.exists() && !isExpired(diskFile)) {
+            try {
+                val skiaImage = org.jetbrains.skia.Image.makeFromEncoded(diskFile.readBytes())
+                val bitmap = skiaImageToBitmap(skiaImage)
+                val result = bitmap.asComposeImageBitmap()
+                backCache[nickname] = result
+                logger.debug("Back skin loaded from disk cache: {}", nickname)
+                return@withContext result
+            } catch (e: Exception) {
+                logger.warn("Failed to read back cache, re-downloading: {}", e.message)
+                diskFile.delete()
+            }
+        }
 
-        // Логика плащей SmartyCraft: приоритет хешу, иначе пробуем по нику
+        val rawSkin = getOrDownloadRawSkin(nickname) ?: return@withContext null
+
         val cloakUrl = if (!cloakHash.isNullOrEmpty()) {
             "$BASE_CLOAK_URL$cloakHash.png"
         } else {
@@ -70,18 +124,79 @@ object SkinManager {
         val rawCloak = downloadTexture(cloakUrl)
 
         val processed = assembleSkin(rawSkin, isFront = false, cloak = rawCloak)
-
         val result = processed.asComposeImageBitmap()
+
         backCache[nickname] = result
+        saveBitmapToDisk(processed, diskFile)
+
         return@withContext result
     }
+
+    // ── Disk cache helpers ─────────────────────────────────────────────────
+
+    private fun isExpired(file: File): Boolean {
+        return System.currentTimeMillis() - file.lastModified() > CACHE_TTL_MS
+    }
+
+    private fun getOrDownloadRawSkin(nickname: String): org.jetbrains.skia.Image? {
+        val rawFile = File(cacheDir, "raw_${nickname}.png")
+
+        // Try disk cache for raw texture
+        if (rawFile.exists() && !isExpired(rawFile)) {
+            try {
+                return org.jetbrains.skia.Image.makeFromEncoded(rawFile.readBytes())
+            } catch (_: Exception) {
+                rawFile.delete()
+            }
+        }
+
+        // Download
+        val image = downloadTexture("$BASE_SKIN_URL$nickname.png") ?: return null
+
+        // Save raw to disk
+        try {
+            rawFile.parentFile?.mkdirs()
+            // Re-encode as PNG for caching
+            val data = image.encodeToData(org.jetbrains.skia.EncodedImageFormat.PNG)
+            if (data != null) {
+                rawFile.writeBytes(data.bytes)
+            }
+        } catch (e: Exception) {
+            logger.warn("Failed to save raw skin to disk: {}", e.message)
+        }
+
+        return image
+    }
+
+    private fun saveBitmapToDisk(bitmap: org.jetbrains.skia.Bitmap, file: File) {
+        try {
+            val image = org.jetbrains.skia.Image.makeFromBitmap(bitmap)
+            val data = image.encodeToData(org.jetbrains.skia.EncodedImageFormat.PNG)
+            if (data != null) {
+                file.parentFile?.mkdirs()
+                file.writeBytes(data.bytes)
+            }
+        } catch (e: Exception) {
+            logger.warn("Failed to save rendered skin to disk: {}", e.message)
+        }
+    }
+
+    private fun skiaImageToBitmap(image: org.jetbrains.skia.Image): org.jetbrains.skia.Bitmap {
+        val bitmap = org.jetbrains.skia.Bitmap()
+        bitmap.allocPixels(ImageInfo.makeS32(image.width, image.height, ColorAlphaType.PREMUL))
+        val canvas = org.jetbrains.skia.Canvas(bitmap)
+        canvas.drawImage(image, 0f, 0f)
+        return bitmap
+    }
+
+    // ── Network ────────────────────────────────────────────────────────────
 
     private fun downloadTexture(url: String): org.jetbrains.skia.Image? {
         return try {
             val conn = URI.create(url).toURL().openConnection() as HttpURLConnection
             conn.connectTimeout = 3000
             conn.readTimeout = 3000
-            conn.setRequestProperty("User-Agent", "Mozilla/5.0") // Притворяемся браузером
+            conn.setRequestProperty("User-Agent", "Mozilla/5.0")
             if (conn.responseCode != 200) return null
 
             val bytes = conn.inputStream.use { input ->
@@ -90,15 +205,14 @@ object SkinManager {
                 out.toByteArray()
             }
             org.jetbrains.skia.Image.makeFromEncoded(bytes)
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            logger.debug("Failed to download texture from {}: {}", url, e.message)
             null
         }
     }
 
-    /**
-     * Сборка скина из кусочков.
-     * Координаты и зеркалирование соответствуют h.java.
-     */
+    // ── Skin assembly (ported from original h.java) ────────────────────────
+
     private fun assembleSkin(
         skin: org.jetbrains.skia.Image,
         isFront: Boolean,
@@ -113,21 +227,13 @@ object SkinManager {
 
         val w = skin.width.toFloat()
         val h = skin.height.toFloat()
-
-        // Определение формата (HD / Legacy)
         val isHD = w > 64
         val k = w / 64f
-        val isLegacy = h == 32f * k // Старый формат 64x32
-
-        // Ширина руки (4px Steve, 3px Alex). h.java считает все Modern скины тонкими,
-        // но для универсальности оставим 4px как дефолт.
+        val isLegacy = h == 32f * k
         val armW = 4f
         val scale = 10f
-
-        // Выбор режима сглаживания
         val samplingMode = if (isHD) samplingLinear else samplingNearest
 
-        // Функция отрисовки части текстуры
         fun drawPart(
             srcX: Float, srcY: Float, srcW: Float, srcH: Float,
             dstX: Float, dstY: Float, dstW: Float, dstH: Float,
@@ -138,7 +244,6 @@ object SkinManager {
 
             if (mirror) {
                 canvas.save()
-                // Зеркалирование относительно центра целевого прямоугольника
                 val centerX = dstRect.left + dstRect.width / 2
                 canvas.translate(centerX, 0f)
                 canvas.scale(-1f, 1f)
@@ -150,72 +255,55 @@ object SkinManager {
             }
         }
 
-        // --- 1. ГОЛОВА (Head) ---
+        // Head
         val headSrcX = if (isFront) 8f else 24f
         drawPart(headSrcX, 8f, 8f, 8f, 4f, 0f, 8f, 8f)
-
-        // Шлем / Аксессуар (Helm)
         val helmSrcX = if (isFront) 40f else 56f
         drawPart(helmSrcX, 8f, 8f, 8f, 4f, 0f, 8f, 8f)
 
-        // --- 2. ТЕЛО (Body) ---
+        // Body
         val bodySrcX = if (isFront) 20f else 32f
         drawPart(bodySrcX, 20f, 8f, 12f, 4f, 8f, 8f, 12f)
-
         if (!isLegacy) {
             val body2SrcX = if (isFront) 20f else 32f
             drawPart(body2SrcX, 36f, 8f, 12f, 4f, 8f, 8f, 12f)
         }
 
-        // --- 3. РУКИ (Arms) ---
+        // Arms
         if (isFront) {
-            // Вид спереди: Правая рука (слева на экране), Левая (справа)
-            drawPart(44f, 20f, armW, 12f, 4f - armW, 8f, armW, 12f) // Right Arm Front
-
+            drawPart(44f, 20f, armW, 12f, 4f - armW, 8f, armW, 12f)
             val dstXLeft = 12f
             if (isLegacy) {
-                // Левая рука = Зеркальная правая
                 drawPart(44f, 20f, armW, 12f, dstXLeft, 8f, armW, 12f, mirror = true)
             } else {
-                drawPart(36f, 52f, armW, 12f, dstXLeft, 8f, armW, 12f) // Left Arm Front
-                drawPart(52f, 52f, armW, 12f, dstXLeft, 8f, armW, 12f) // Overlay
-                drawPart(44f, 36f, armW, 12f, 4f - armW, 8f, armW, 12f) // Right Overlay
+                drawPart(36f, 52f, armW, 12f, dstXLeft, 8f, armW, 12f)
+                drawPart(52f, 52f, armW, 12f, dstXLeft, 8f, armW, 12f)
+                drawPart(44f, 36f, armW, 12f, 4f - armW, 8f, armW, 12f)
             }
         } else {
-            // Вид сзади: Левая рука (слева на экране), Правая (справа)
-            val dstXRight = 12f // Screen Right -> Character Right Arm Back
-            val dstXLeft = 4f - armW // Screen Left -> Character Left Arm Back
-
-            // Right Arm Back (Texture 52,20)
+            val dstXRight = 12f
+            val dstXLeft = 4f - armW
             drawPart(52f, 20f, armW, 12f, dstXRight, 8f, armW, 12f)
             if (!isLegacy) drawPart(52f, 36f, armW, 12f, dstXRight, 8f, armW, 12f)
-
-            // Left Arm Back
             if (isLegacy) {
-                // Зеркалим Right Arm Back для левой руки
                 drawPart(52f, 20f, armW, 12f, dstXLeft, 8f, armW, 12f, mirror = true)
             } else {
-                drawPart(44f, 52f, armW, 12f, dstXLeft, 8f, armW, 12f) // Left Arm Back
-                drawPart(60f, 52f, armW, 12f, dstXLeft, 8f, armW, 12f) // Overlay
+                drawPart(44f, 52f, armW, 12f, dstXLeft, 8f, armW, 12f)
+                drawPart(60f, 52f, armW, 12f, dstXLeft, 8f, armW, 12f)
             }
         }
 
-        // --- 4. НОГИ (Legs) ---
-        // Right Leg (Texture 0,20 / 12,20)
+        // Legs
         if (isFront) {
-            drawPart(4f, 20f, 4f, 12f, 4f, 20f, 4f, 12f) // Front
+            drawPart(4f, 20f, 4f, 12f, 4f, 20f, 4f, 12f)
             if (!isLegacy) drawPart(4f, 36f, 4f, 12f, 4f, 20f, 4f, 12f)
         } else {
-            // Back View: Рисуем Right Leg (12,20) справа на экране
             drawPart(12f, 20f, 4f, 12f, 8f, 20f, 4f, 12f)
             if (!isLegacy) drawPart(12f, 36f, 4f, 12f, 8f, 20f, 4f, 12f)
         }
-
-        // Left Leg
         if (isLegacy) {
-            // Зеркалим правую ногу
             if (isFront) drawPart(4f, 20f, 4f, 12f, 8f, 20f, 4f, 12f, mirror = true)
-            else drawPart(12f, 20f, 4f, 12f, 4f, 20f, 4f, 12f, mirror = true) // Back View Mirror
+            else drawPart(12f, 20f, 4f, 12f, 4f, 20f, 4f, 12f, mirror = true)
         } else {
             if (isFront) {
                 drawPart(20f, 52f, 4f, 12f, 8f, 20f, 4f, 12f)
@@ -226,19 +314,13 @@ object SkinManager {
             }
         }
 
-        // --- 5. ПЛАЩ (Cloak) ---
-        // Рисуем в самом конце, чтобы он перекрывал тело и руки (как рюкзак)
+        // Cloak (back view only)
         if (!isFront && cloak != null) {
             val kCloak = cloak.width.toFloat() / 64f
             val isCloakHD = cloak.width > 64
-            // Плащ может быть HD, даже если скин обычный
             val cloakSampling = if (isCloakHD) samplingLinear else samplingNearest
-
-            // ВАЖНО: h.java использует координаты (1,1) (Front) для спины плаща.
-            // Стандартный (12,1) там не используется.
             val cloakSrc = org.jetbrains.skia.Rect.makeXYWH(1f * kCloak, 1f * kCloak, 10f * kCloak, 16f * kCloak)
             val cloakDst = org.jetbrains.skia.Rect.makeXYWH(3f * scale, 8f * scale, 10f * scale, 16f * scale)
-
             canvas.drawImageRect(cloak, cloakSrc, cloakDst, cloakSampling, paint, true)
         }
 

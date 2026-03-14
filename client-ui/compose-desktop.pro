@@ -9,6 +9,11 @@
 -repackageclasses ''
 -optimizationpasses 3
 
+# --- JNA ---
+-keep class com.sun.jna.** { *; }
+-keepclassmembers class com.sun.jna.** { *; }
+-dontwarn com.sun.jna.**
+
 # --- Kotlin & Coroutines ---
 -keep class kotlinx.coroutines.** { *; }
 -keep class kotlinx.coroutines.swing.** { *; }
@@ -33,6 +38,11 @@
 -keepclassmembers class io.ktor.util.AttributesJvmBase {
     public <methods>;
 }
+
+# --- Okio  ---
+-keep class okio.** { *; }
+-dontwarn okio.**
+-keepnames class okhttp3.internal.publicsuffix.PublicSuffixDatabase
 
 # OkHttp
 -keep class okhttp3.** { *; }
@@ -81,6 +91,9 @@
     native <methods>;
 }
 
+# --- System tray ---
+-keep class dorkbox.** { *; }
+
 # --- Suppress Warnings ---
 -dontwarn ch.qos.logback.**
 -dontwarn org.slf4j.**
@@ -101,6 +114,7 @@
 -dontwarn org.objectweb.asm.**
 -dontwarn androidx.compose.**
 -dontwarn org.jetbrains.**
+-dontwarn dorkbox.**
 
 # --- Ignored Notes ---
 -dontnote module-info

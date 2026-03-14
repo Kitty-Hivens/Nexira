@@ -7,62 +7,97 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.*
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.painter.BitmapPainter
+import androidx.compose.ui.graphics.toComposeImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import hivens.core.api.PlayerRepository
 import hivens.core.api.interfaces.IManifestProcessorService
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.InstanceProfile
 import hivens.core.data.OptionalMod
+import hivens.launcher.CredentialsManager
 import hivens.launcher.ProfileManager
 import hivens.ui.components.CelestiaButton
 import hivens.ui.components.GlassCard
+import hivens.ui.components.ModItemCard
+import hivens.ui.components.RamSelector
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
 import io.github.vinceglb.filekit.FileKit
-import io.github.vinceglb.filekit.dialogs.FileKitMode
+import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
 import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.dialogs.openFilePicker
 import io.github.vinceglb.filekit.path
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 import java.awt.Desktop
+import java.io.File
+import java.nio.file.Files
 import java.nio.file.Path
-import kotlin.math.roundToInt
+import java.nio.file.StandardCopyOption
+import javax.imageio.ImageIO
+
+private sealed class SpawnResetState {
+    object Idle    : SpawnResetState()
+    object Loading : SpawnResetState()
+    object Success : SpawnResetState()
+    object Error   : SpawnResetState()
+}
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
-    val profileManager: ProfileManager = koinInject()
+    val profileManager: ProfileManager               = koinInject()
     val manifestProcessorService: IManifestProcessorService = koinInject()
-    val dataDirectory: Path = koinInject()
+    val dataDirectory: Path                          = koinInject()
+    val playerRepository: PlayerRepository           = koinInject()
+    val credentialsManager: CredentialsManager       = koinInject()
     val s = LocalStrings.current
 
-    var mods by remember { mutableStateOf<List<OptionalMod>>(emptyList()) }
-    var profile by remember { mutableStateOf<InstanceProfile?>(null) }
+    var mods       by remember { mutableStateOf<List<OptionalMod>>(emptyList()) }
+    var profile    by remember { mutableStateOf<InstanceProfile?>(null) }
+    var javaPath   by remember { mutableStateOf("") }
+    var memory     by remember { mutableStateOf(4096) }
+    var jvmArgs    by remember { mutableStateOf("") }
+    var winWidth   by remember { mutableStateOf("925") }
+    var winHeight  by remember { mutableStateOf("530") }
+    var fullScreen by remember { mutableStateOf(false) }
+    var autoConnect by remember { mutableStateOf(true) }
+    var serverIcon by remember { mutableStateOf<ImageBitmap?>(null) }
+    var spawnResetState by remember { mutableStateOf<SpawnResetState>(SpawnResetState.Idle) }
 
-    var javaPath by remember { mutableStateOf("") }
-    var memory by remember { mutableStateOf(4096f) }
-
-    val modStates = remember { mutableStateMapOf<String, Boolean>() }
+    val modStates  = remember { mutableStateMapOf<String, Boolean>() }
     var modsLoaded by remember { mutableStateOf(false) }
+    val scope      = rememberCoroutineScope()
 
-    val scope = rememberCoroutineScope()
-
+    // Load profile and icon
     LaunchedEffect(server) {
         val p = profileManager.getProfile(server.assetDir)
-        profile = p
+        profile  = p
         javaPath = p.javaPath ?: ""
-        if (p.memoryMb > 0) memory = p.memoryMb.toFloat()
+        jvmArgs  = p.jvmArgs ?: ""
+        winWidth = p.windowWidth.toString()
+        winHeight = p.windowHeight.toString()
+        fullScreen = p.fullScreen
+        autoConnect = p.autoConnect
+        if (p.memoryMb > 0) memory = p.memoryMb
 
         val loadedMods = manifestProcessorService.getOptionalModsForClient(server)
         mods = loadedMods
@@ -70,12 +105,27 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
             modStates[mod.id] = p.optionalModsState.getOrDefault(mod.id, mod.isDefault)
         }
         modsLoaded = true
+
+        // Load icon
+        withContext(Dispatchers.IO) {
+            val iconFile = getServerIconFile(dataDirectory, server)
+            if (iconFile.exists()) {
+                runCatching {
+                    serverIcon = ImageIO.read(iconFile)?.toComposeImageBitmap()
+                }
+            }
+        }
     }
 
     fun saveProfile() {
         profile?.let { p ->
             p.javaPath = javaPath.ifBlank { null }
-            p.memoryMb = memory.roundToInt()
+            p.memoryMb = memory
+            p.jvmArgs = jvmArgs.ifBlank { null }
+            p.windowWidth = winWidth.toIntOrNull() ?: 925
+            p.windowHeight = winHeight.toIntOrNull() ?: 530
+            p.fullScreen = fullScreen
+            p.autoConnect = autoConnect
             modStates.forEach { (id, state) -> p.optionalModsState[id] = state }
             profileManager.saveProfile(p)
         }
@@ -93,73 +143,115 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
     val borderColor = CelestiaTheme.colors.textSecondary.copy(alpha = 0.2f)
 
     Column(Modifier.fillMaxSize().padding(24.dp)) {
+        // ── Header ────────────────────────────────────────────────────────────
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = { saveProfile(); onBack() }) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, s.navBack, tint = CelestiaTheme.colors.textPrimary)
             }
             Spacer(Modifier.width(8.dp))
+
+            // Server icon preview + upload
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(CelestiaTheme.colors.surface)
+                    .clickable {
+                        scope.launch {
+                            val file = FileKit.openFilePicker(
+                                type = FileKitType.File(extensions = listOf("png", "jpg", "jpeg")),
+                                dialogSettings = FileKitDialogSettings(title = s.serverSettingsPickIcon)
+                            )
+                            file?.path?.let { selectedPath ->
+                                withContext(Dispatchers.IO) {
+                                    val targetFile = getServerIconFile(dataDirectory, server)
+                                    targetFile.parentFile.mkdirs()
+                                    Files.copy(
+                                        Path.of(selectedPath),
+                                        targetFile.toPath(),
+                                        StandardCopyOption.REPLACE_EXISTING
+                                    )
+                                    runCatching {
+                                        serverIcon = ImageIO.read(targetFile)?.toComposeImageBitmap()
+                                    }
+                                }
+                            }
+                        }
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                if (serverIcon != null) {
+                    Image(
+                        painter = BitmapPainter(serverIcon!!),
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Icon(
+                        Icons.Default.Image,
+                        contentDescription = null,
+                        tint = CelestiaTheme.colors.textSecondary.copy(alpha = 0.4f),
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
+
+            Spacer(Modifier.width(12.dp))
+
             Column {
-                Text(server.title?.uppercase() ?: "SERVER", style = MaterialTheme.typography.h5, color = CelestiaTheme.colors.textPrimary)
-                Text(s.serverSettingsSubtitle, style = MaterialTheme.typography.caption, color = CelestiaTheme.colors.textSecondary)
+                Text(server.title?.uppercase() ?: "SERVER", style = MaterialTheme.typography.headlineSmall, color = CelestiaTheme.colors.textPrimary)
+                Text(s.serverSettingsSubtitle, style = MaterialTheme.typography.bodySmall, color = CelestiaTheme.colors.textSecondary)
             }
         }
 
         Spacer(Modifier.height(24.dp))
 
         Row(Modifier.fillMaxSize()) {
-            // System settings
+            // ══════════════════════════════════════════════════════════════════
+            // LEFT COLUMN — System settings
+            // ══════════════════════════════════════════════════════════════════
             GlassCard(Modifier.weight(1f).fillMaxHeight()) {
                 Column(Modifier.padding(24.dp).verticalScroll(rememberScrollState())) {
-                    Text(s.serverSettingsSectionSystem, style = MaterialTheme.typography.subtitle2, color = CelestiaTheme.colors.primary)
+
+                    // ── SYSTEM ────────────────────────────────────────────────
+                    Text(s.serverSettingsSectionSystem, style = MaterialTheme.typography.titleSmall, color = CelestiaTheme.colors.primary)
                     Spacer(Modifier.height(16.dp))
 
-                    Text(s.serverSettingsRamValue(memory.roundToInt()), color = CelestiaTheme.colors.textSecondary)
-                    Slider(
-                        value = memory,
-                        onValueChange = { memory = it },
-                        valueRange = 1024f..16384f,
-                        steps = 30,
-                        colors = SliderDefaults.colors(
-                            thumbColor = CelestiaTheme.colors.primary,
-                            activeTrackColor = CelestiaTheme.colors.primary,
-                            inactiveTrackColor = borderColor
-                        )
+                    // ── RAM — RamSelector replaces old Slider ─────────────────
+                    RamSelector(
+                        currentMb = memory,
+                        onValueChanged = { memory = it }
                     )
 
-                    Spacer(Modifier.height(24.dp))
-                    Divider(color = borderColor)
-                    Spacer(Modifier.height(24.dp))
+                    Spacer(Modifier.height(16.dp))
+                    HorizontalDivider(color = borderColor)
+                    Spacer(Modifier.height(16.dp))
 
-                    Text(s.serverSettingsJava, color = CelestiaTheme.colors.textPrimary, style = MaterialTheme.typography.body2)
+                    // Java path
+                    Text(s.serverSettingsJava, color = CelestiaTheme.colors.textPrimary, style = MaterialTheme.typography.bodyMedium)
                     Spacer(Modifier.height(8.dp))
 
                     OutlinedTextField(
-                        value = javaPath,
+                        value         = javaPath,
                         onValueChange = { javaPath = it },
-                        modifier = Modifier
+                        modifier      = Modifier
                             .fillMaxWidth()
                             .onFocusChanged { it.isFocused },
-                        placeholder = {
+                        placeholder   = {
                             Text(
                                 s.serverSettingsJavaAuto(recommendedJavaLabel),
                                 color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.5f)
                             )
                         },
-                        singleLine = true,
-                        colors = TextFieldDefaults.outlinedTextFieldColors(
-                            textColor = CelestiaTheme.colors.textPrimary,
-                            cursorColor = CelestiaTheme.colors.primary,
-                            focusedBorderColor = CelestiaTheme.colors.primary,
-                            unfocusedBorderColor = borderColor,
-                            backgroundColor = Color.Transparent
-                        ),
-                        trailingIcon = {
+                        singleLine    = true,
+                        colors        = settingsFieldColors(),
+                        trailingIcon  = {
                             IconButton(onClick = {
                                 scope.launch {
                                     val file = FileKit.openFilePicker(
-                                        type = FileKitType.File(extensions = listOf("exe", "bin")),
-                                        mode = FileKitMode.Single,
-                                        title = s.serverSettingsPickJava
+                                        type  = FileKitType.File(extensions = listOf("exe", "bin")),
+                                        dialogSettings = FileKitDialogSettings(title = s.serverSettingsPickJava)
                                     )
                                     file?.path?.let { javaPath = it }
                                 }
@@ -171,15 +263,88 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
 
                     if (javaPath.isEmpty()) {
                         Spacer(Modifier.height(4.dp))
-                        Text(
-                            s.serverSettingsJavaHint,
-                            style = MaterialTheme.typography.caption,
-                            color = CelestiaTheme.colors.textSecondary
+                        Text(s.serverSettingsJavaHint, style = MaterialTheme.typography.bodySmall, color = CelestiaTheme.colors.textSecondary)
+                    }
+
+                    Spacer(Modifier.height(16.dp))
+                    HorizontalDivider(color = borderColor)
+                    Spacer(Modifier.height(16.dp))
+
+                    // ── JVM ARGUMENTS ──────────────────────────────────────────
+                    Text(s.serverSettingsJvmArgs, color = CelestiaTheme.colors.textPrimary, style = MaterialTheme.typography.bodyMedium)
+                    Spacer(Modifier.height(8.dp))
+
+                    OutlinedTextField(
+                        value = jvmArgs,
+                        onValueChange = { jvmArgs = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = {
+                            Text(
+                                s.serverSettingsJvmArgsHint,
+                                color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.5f)
+                            )
+                        },
+                        singleLine = false,
+                        minLines = 2,
+                        maxLines = 4,
+                        colors = settingsFieldColors()
+                    )
+
+                    Spacer(Modifier.height(16.dp))
+                    HorizontalDivider(color = borderColor)
+                    Spacer(Modifier.height(16.dp))
+
+                    // ── WINDOW RESOLUTION ─────────────────────────────────────
+                    Text(s.serverSettingsResolution, color = CelestiaTheme.colors.textPrimary, style = MaterialTheme.typography.bodyMedium)
+                    Spacer(Modifier.height(8.dp))
+
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = winWidth,
+                            onValueChange = { winWidth = it.filter { c -> c.isDigit() } },
+                            modifier = Modifier.weight(1f),
+                            label = { Text(s.serverSettingsWidth) },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            colors = settingsFieldColors()
+                        )
+                        Text("×", color = CelestiaTheme.colors.textSecondary, style = MaterialTheme.typography.titleMedium)
+                        OutlinedTextField(
+                            value           = winHeight,
+                            onValueChange   = { winHeight = it.filter { c -> c.isDigit() } },
+                            modifier        = Modifier.weight(1f),
+                            label           = { Text(s.serverSettingsHeight) },
+                            singleLine      = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            colors = settingsFieldColors()
                         )
                     }
 
+                    Spacer(Modifier.height(16.dp))
+
+                    // ── FULLSCREEN ─────────────────────────────────────────────
+                    SettingsToggleRow(
+                        title = s.serverSettingsFullscreen,
+                        checked = fullScreen,
+                        onCheckedChange = { fullScreen = it }
+                    )
+
+                    Spacer(Modifier.height(8.dp))
+
+                    // ── AUTO CONNECT ───────────────────────────────────────────
+                    SettingsToggleRow(
+                        title = s.serverSettingsAutoConnect,
+                        checked = autoConnect,
+                        onCheckedChange = { autoConnect = it }
+                    )
+
                     Spacer(Modifier.weight(1f))
 
+                    // ── Actions ───────────────────────────────────────────────
                     CelestiaButton(s.serverSettingsOpenFolder, onClick = {
                         val path = dataDirectory.resolve("clients").resolve(server.assetDir)
                         if (!path.toFile().exists()) path.toFile().mkdirs()
@@ -194,15 +359,55 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                         saveProfile()
                         onBack()
                     }, modifier = Modifier.fillMaxWidth(), primary = false)
+
+                    // ── Return to spawn (only 1.12.2) ───────────────────────
+                    if (server.version.startsWith("1.12")) {
+                        Spacer(Modifier.height(12.dp))
+                        CelestiaButton(
+                            text = when (spawnResetState) {
+                                SpawnResetState.Loading -> s.spawnResetLoading
+                                SpawnResetState.Success -> s.spawnResetSuccess
+                                SpawnResetState.Error   -> s.spawnResetError
+                                SpawnResetState.Idle    -> s.spawnResetButton
+                            },
+                            enabled  = spawnResetState != SpawnResetState.Loading,
+                            onClick  = {
+                                if (spawnResetState != SpawnResetState.Loading) {
+                                    spawnResetState = SpawnResetState.Loading
+                                    scope.launch {
+                                        val credentials = withContext(Dispatchers.IO) {
+                                            credentialsManager.load()
+                                        }
+                                        if (credentials == null) {
+                                            spawnResetState = SpawnResetState.Error
+                                            delay(3000)
+                                            spawnResetState = SpawnResetState.Idle
+                                            return@launch
+                                        }
+                                        val ok = withContext(Dispatchers.IO) {
+                                            playerRepository.resetSpawn(credentials, server.name)
+                                        }
+                                        spawnResetState = if (ok) SpawnResetState.Success else SpawnResetState.Error
+                                        delay(3000)
+                                        spawnResetState = SpawnResetState.Idle
+                                    }
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            primary  = false
+                        )
+                    }
                 }
             }
 
             Spacer(Modifier.width(24.dp))
 
-            // Mods
+            // ══════════════════════════════════════════════════════════════════
+            // RIGHT COLUMN — Mods
+            // ══════════════════════════════════════════════════════════════════
             GlassCard(Modifier.weight(1f).fillMaxHeight()) {
                 Column(Modifier.padding(24.dp)) {
-                    Text(s.serverSettingsSectionMods, style = MaterialTheme.typography.subtitle2, color = CelestiaTheme.colors.primary)
+                    Text(s.serverSettingsSectionMods, style = MaterialTheme.typography.titleSmall, color = CelestiaTheme.colors.primary)
                     Spacer(Modifier.height(16.dp))
 
                     if (mods.isEmpty() && modsLoaded) {
@@ -212,22 +417,23 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                     } else {
                         AnimatedVisibility(
                             visible = modsLoaded,
-                            enter = slideInVertically(initialOffsetY = { 50 }, animationSpec = tween(500)) + fadeIn(tween(500))
+                            enter   = slideInVertically(initialOffsetY = { 50 }, animationSpec = tween(500)) + fadeIn(tween(500))
                         ) {
                             LazyColumn(Modifier.fillMaxSize()) {
                                 items(mods) { mod ->
                                     val currentState = modStates[mod.id] ?: mod.isDefault
 
-                                    ModItemRow(
-                                        mod = mod,
+                                    ModItemCard(
+                                        mod       = mod,
                                         isChecked = currentState,
-                                        onToggle = { isChecked ->
+                                        onToggle  = { isChecked ->
                                             modStates[mod.id] = isChecked
                                             if (isChecked) {
                                                 mod.excludings.forEach { conflict -> modStates[conflict] = false }
                                             }
                                             saveProfile()
-                                        }
+                                        },
+                                        enabledModIds = modStates.filter { it.value }.keys
                                     )
                                     Spacer(Modifier.height(8.dp))
                                 }
@@ -240,87 +446,38 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+private fun getServerIconFile(dataDirectory: Path, server: ServerProfile): File {
+    return dataDirectory.resolve("clients/${server.assetDir}/icon.png").toFile()
+}
+
 @Composable
-fun ModItemRow(mod: OptionalMod, isChecked: Boolean, onToggle: (Boolean) -> Unit) {
-    var expanded by remember { mutableStateOf(false) }
+private fun settingsFieldColors() = OutlinedTextFieldDefaults.colors(
+    focusedTextColor = CelestiaTheme.colors.textPrimary,
+    unfocusedTextColor = CelestiaTheme.colors.textPrimary,
+    cursorColor = CelestiaTheme.colors.primary,
+    focusedBorderColor = CelestiaTheme.colors.primary,
+    unfocusedBorderColor = CelestiaTheme.colors.textSecondary.copy(alpha = 0.2f),
+    focusedContainerColor = Color.Transparent,
+    unfocusedContainerColor = Color.Transparent
+)
 
-    val backgroundColor by animateColorAsState(
-        targetValue = if (isChecked) CelestiaTheme.colors.primary.copy(alpha = 0.15f) else CelestiaTheme.colors.background.copy(alpha = 0.3f),
-        animationSpec = tween(300)
-    )
-
-    val borderColor = if (isChecked) CelestiaTheme.colors.primary.copy(alpha = 0.5f) else Color.Transparent
-
-    TooltipArea(
-        tooltip = {
-            if (!mod.description.isNullOrEmpty()) {
-                Surface(
-                    color = Color.Black.copy(alpha = 0.9f),
-                    shape = RoundedCornerShape(8.dp),
-                    elevation = 4.dp,
-                    modifier = Modifier.padding(10.dp).widthIn(max = 300.dp)
-                ) {
-                    Text(
-                        text = mod.description!!,
-                        color = Color.White,
-                        modifier = Modifier.padding(12.dp),
-                        style = MaterialTheme.typography.caption
-                    )
-                }
-            }
-        },
-        delayMillis = 600
+@Composable
+private fun SettingsToggleRow(title: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(8.dp))
-                .background(backgroundColor)
-                .border(1.dp, borderColor, RoundedCornerShape(8.dp))
-                .clickable { onToggle(!isChecked) }
-                .padding(12.dp)
-                .animateContentSize()
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(
-                    checked = isChecked,
-                    onCheckedChange = null,
-                    colors = CheckboxDefaults.colors(
-                        checkedColor = CelestiaTheme.colors.primary,
-                        uncheckedColor = CelestiaTheme.colors.textSecondary.copy(alpha = 0.5f)
-                    )
-                )
-                Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(mod.name, style = MaterialTheme.typography.body2, color = CelestiaTheme.colors.textPrimary)
-                }
-
-                if (!mod.description.isNullOrEmpty()) {
-                    IconButton(
-                        onClick = { expanded = !expanded },
-                        modifier = Modifier.size(24.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Info,
-                            contentDescription = null,
-                            tint = if (expanded) CelestiaTheme.colors.primary else CelestiaTheme.colors.textSecondary.copy(alpha = 0.5f)
-                        )
-                    }
-                }
-            }
-
-            if (expanded && !mod.description.isNullOrEmpty()) {
-                Spacer(Modifier.height(8.dp))
-                Divider(color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.2f))
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    text = mod.description!!,
-                    style = MaterialTheme.typography.caption,
-                    color = CelestiaTheme.colors.textSecondary,
-                    modifier = Modifier.padding(start = 32.dp)
-                )
-            }
-        }
+        Text(title, style = MaterialTheme.typography.bodyMedium, color = CelestiaTheme.colors.textPrimary)
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = CelestiaTheme.colors.primary,
+                checkedTrackColor = CelestiaTheme.colors.primary.copy(alpha = 0.5f)
+            )
+        )
     }
 }

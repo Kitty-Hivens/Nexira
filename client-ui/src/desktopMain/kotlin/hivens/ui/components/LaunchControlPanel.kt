@@ -2,9 +2,7 @@ package hivens.ui.components
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.LinearProgressIndicator
-import androidx.compose.material.MaterialTheme
-import androidx.compose.material.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -26,6 +24,7 @@ fun LaunchControlPanel(
     val s = LocalStrings.current
 
     Column(Modifier.fillMaxWidth()) {
+
         // ── Status row ────────────────────────────────────────────────────────
         Row(
             Modifier.fillMaxWidth().height(20.dp),
@@ -33,20 +32,18 @@ fun LaunchControlPanel(
             verticalAlignment     = Alignment.CenterVertically
         ) {
             when (state) {
-                is LaunchState.Idle -> {
-                    Text(
-                        s.launchReady,
-                        style = MaterialTheme.typography.caption,
-                        color = CelestiaTheme.colors.textSecondary
-                    )
-                }
-                is LaunchState.Prepare -> {
-                    Text(
-                        state.stepName,
-                        style = MaterialTheme.typography.caption,
-                        color = CelestiaTheme.colors.textSecondary
-                    )
-                }
+                is LaunchState.Idle -> Text(
+                    s.launchReady,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = CelestiaTheme.colors.textSecondary
+                )
+
+                is LaunchState.Prepare -> Text(
+                    state.stepName,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = CelestiaTheme.colors.textSecondary
+                )
+
                 is LaunchState.Downloading -> {
                     val fmt   = DecimalFormat("#0.0")
                     val dlMb  = state.downloadedBytes / 1024.0 / 1024.0
@@ -54,31 +51,29 @@ fun LaunchControlPanel(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             "${s.launchDownloading} ",
-                            style = MaterialTheme.typography.caption,
+                            style = MaterialTheme.typography.bodySmall,
                             color = CelestiaTheme.colors.textSecondary
                         )
                         Text(
                             "${fmt.format(dlMb)} / ${fmt.format(totMb)} MB (${state.speedStr})",
-                            style      = MaterialTheme.typography.caption,
+                            style      = MaterialTheme.typography.bodySmall,
                             color      = CelestiaTheme.colors.primary,
                             fontWeight = FontWeight.Bold
                         )
                     }
                 }
-                is LaunchState.Error -> {
-                    Text(
-                        state.message,
-                        style = MaterialTheme.typography.caption,
-                        color = CelestiaTheme.colors.error
-                    )
-                }
-                is LaunchState.GameRunning -> {
-                    Text(
-                        s.launchRunning,
-                        style = MaterialTheme.typography.caption,
-                        color = CelestiaTheme.colors.success
-                    )
-                }
+
+                is LaunchState.Error -> Text(
+                    state.message,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = CelestiaTheme.colors.error
+                )
+
+                is LaunchState.GameRunning -> Text(
+                    s.launchRunning,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = CelestiaTheme.colors.success
+                )
             }
         }
 
@@ -91,12 +86,18 @@ fun LaunchControlPanel(
             is LaunchState.GameRunning -> 1.0f
             else                       -> 0f
         }
+
         if (state !is LaunchState.Idle && state !is LaunchState.Error) {
             LinearProgressIndicator(
-                progress        = progress,
-                modifier        = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
-                backgroundColor = CelestiaTheme.colors.surface,
-                color           = CelestiaTheme.colors.primary
+                progress        = { progress },
+                modifier        = Modifier
+                    .fillMaxWidth()
+                    .height(6.dp)
+                    .clip(RoundedCornerShape(3.dp)),
+                color           = CelestiaTheme.colors.primary,
+                trackColor      = CelestiaTheme.colors.surface,
+                gapSize         = 0.dp,
+                drawStopIndicator = {}
             )
         } else {
             Spacer(Modifier.height(6.dp))
