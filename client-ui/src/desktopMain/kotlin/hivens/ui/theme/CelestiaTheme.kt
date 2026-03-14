@@ -3,13 +3,32 @@ package hivens.ui.theme
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.TweenSpec
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.material.MaterialTheme
-import androidx.compose.material.darkColors
-import androidx.compose.material.lightColors
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.Color
 
 // --- COLOR PALETTES ---
+data class CelestiaColors(
+    val primary: Color,
+    val primaryVariant: Color,
+    val secondary: Color,
+    val background: Color,
+    val surface: Color,
+    val surfaceVariant: Color,
+    val error: Color,
+    val onPrimary: Color,
+    val onSecondary: Color,
+    val onBackground: Color,
+    val onSurface: Color,
+    val textPrimary: Color,
+    val textSecondary: Color,
+    val glassBackground: Color,
+    val glassAlpha: Float,
+    val success: Color,
+    val outline: Color
+)
 
 private val DarkColorPalette = CelestiaColors(
     primary = Color(0xFFBB86FC), // Soft purple
@@ -17,6 +36,7 @@ private val DarkColorPalette = CelestiaColors(
     secondary = Color(0xFF03DAC6),
     background = Color(0xFF121212), // Almost black, but not #000
     surface = Color(0xFF1E1E1E), // A little lighter for cards
+    surfaceVariant = Color(0xFF2C2C2C),
     error = Color(0xFFCF6679),
     onPrimary = Color.Black,
     onSecondary = Color.Black,
@@ -26,55 +46,35 @@ private val DarkColorPalette = CelestiaColors(
     textSecondary = Color(0xFFB0B0B0),
     glassBackground = Color(0xFF000000), // Base for glass
     glassAlpha = 0.60f, // Glass transparency (dark)
-    success = Color(0xFF4CAF50)
+    success = Color(0xFF4CAF50),
+    outline = Color(0xFF444444)
 )
 
 private val LightColorPalette = CelestiaColors(
-    primary = Color(0xFF5E68C0),       // Мягкий индиго (вместо резкого фиолетового)
+    primary = Color(0xFF5E68C0),       // Soft indigo (instead of harsh purple)
     primaryVariant = Color(0xFF3F51B5),
-    secondary = Color(0xFF26A69A),     // Спокойный тил
-    background = Color(0xFFF5F7FA),    // Очень светло-серый (не белый!)
-    surface = Color(0xFFFFFFFF),       // Карточки белые
+    secondary = Color(0xFF26A69A),     // Calm teal
+    background = Color(0xFFF5F7FA),    // Very light gray (not white!)
+    surface = Color(0xFFFFFFFF),       // White cards
+    surfaceVariant = Color(0xFFE8EAF0),
     error = Color(0xFFD32F2F),
     onPrimary = Color.White,
     onSecondary = Color.Black,
     onBackground = Color(0xFF212121),
     onSurface = Color(0xFF212121),
-    textPrimary = Color(0xFF263238),   // Темно-синий-серый (мягче черного)
-    textSecondary = Color(0xFF78909C), // Серо-голубой текст
+    textPrimary = Color(0xFF263238),   // Dark blue-gray (softer than black)
+    textSecondary = Color(0xFF78909C), // Gray-blue text
     glassBackground = Color(0xFFFFFFFF),
-    glassAlpha = 0.65f,                // Чуть больше непрозрачности для читаемости
-    success = Color(0xFF66BB6A)
+    glassAlpha = 0.65f,                // Slightly more opacity for readability
+    success = Color(0xFF66BB6A),
+    outline = Color(0xFFCCCCCC)
 )
 
-// --- КЛАСС ЦВЕТОВ ---
-// Добавляем свои поля, которых нет в стандартном MaterialTheme
-data class CelestiaColors(
-    val primary: Color,
-    val primaryVariant: Color,
-    val secondary: Color,
-    val background: Color,
-    val surface: Color,
-    val error: Color,
-    val onPrimary: Color,
-    val onSecondary: Color,
-    val onBackground: Color,
-    val onSurface: Color,
-
-    // Кастомные цвета
-    val textPrimary: Color,
-    val textSecondary: Color,
-    val glassBackground: Color,
-    val glassAlpha: Float,
-    val success: Color
-)
-
-// Глобальный CompositionLocal для доступа к цветам
 val LocalCelestiaColors = staticCompositionLocalOf<CelestiaColors> {
     error("No CelestiaColors provided")
 }
 
-// --- ТЕМА С АНИМАЦИЕЙ И ПОДДЕРЖКОЙ КАСТОМНЫХ ТЕМ ---
+// --- THEME WITH ANIMATION AND SUPPORT FOR CUSTOM THEMES ---
 
 @Composable
 fun CelestiaTheme(
@@ -82,68 +82,81 @@ fun CelestiaTheme(
     customTheme: CustomTheme? = null,
     content: @Composable () -> Unit
 ) {
-    // Если есть кастомная тема - используем её, иначе дефолтную
-    val targetColors = customTheme?.toCelestiaColors(useDarkTheme)
-        ?: if (useDarkTheme) DarkColorPalette else LightColorPalette
+    // If there is a custom theme, use it, otherwise use the default one
+    val baseColors = if (useDarkTheme) DarkColorPalette else LightColorPalette
 
-    // Анимация смены цветов (500мс)
+    val targetColors = if (customTheme != null) {
+        baseColors.copy(
+            primary        = CustomTheme.parseHexColor(customTheme.primary),
+            primaryVariant = CustomTheme.parseHexColor(customTheme.primary).copy(alpha = 0.8f),
+            secondary      = CustomTheme.parseHexColor(customTheme.secondary),
+            success        = CustomTheme.parseHexColor(customTheme.success),
+            error          = CustomTheme.parseHexColor(customTheme.error),
+        )
+    } else {
+        baseColors
+    }
+
+    // Color change animation (500ms)
     val animSpec = remember { TweenSpec<Color>(durationMillis = 500) }
 
     val animatedPrimary by animateColorAsState(targetColors.primary, animSpec)
-    val animatedPrimaryVariant by animateColorAsState(targetColors.primaryVariant, animSpec)
     val animatedSecondary by animateColorAsState(targetColors.secondary, animSpec)
     val animatedBackground by animateColorAsState(targetColors.background, animSpec)
     val animatedSurface by animateColorAsState(targetColors.surface, animSpec)
+    val animatedSurfaceVariant by animateColorAsState(targetColors.surfaceVariant, animSpec)
     val animatedError by animateColorAsState(targetColors.error, animSpec)
     val animatedSuccess by animateColorAsState(targetColors.success, animSpec)
     val animatedTextPrimary by animateColorAsState(targetColors.textPrimary, animSpec)
     val animatedTextSecondary by animateColorAsState(targetColors.textSecondary, animSpec)
+    val animatedOutline by animateColorAsState(targetColors.outline, animSpec)
     val animatedGlassBg by animateColorAsState(targetColors.glassBackground, animSpec)
-
-    // Alpha анимируем отдельно, так как это Float
     val animatedGlassAlpha by animateFloatAsState(targetColors.glassAlpha, TweenSpec(500))
 
-    // Собираем анимированную палитру
+    // Assembling an animated palette
     val animatedPalette = targetColors.copy(
         primary = animatedPrimary,
-        primaryVariant = animatedPrimaryVariant,
         secondary = animatedSecondary,
         background = animatedBackground,
         surface = animatedSurface,
+        surfaceVariant = animatedSurfaceVariant,
         error = animatedError,
         success = animatedSuccess,
         textPrimary = animatedTextPrimary,
         textSecondary = animatedTextSecondary,
+        outline = animatedOutline,
         glassBackground = animatedGlassBg,
         glassAlpha = animatedGlassAlpha
     )
 
-    // Конвертируем в Material Colors для совместимости со стандартными компонентами
-    val materialColors = if (useDarkTheme) {
-        darkColors(
+    // M3 ColorScheme
+    val colorScheme = if (useDarkTheme) {
+        darkColorScheme(
             primary = animatedPalette.primary,
-            primaryVariant = animatedPalette.primaryVariant,
             secondary = animatedPalette.secondary,
             background = animatedPalette.background,
             surface = animatedPalette.surface,
+            surfaceVariant = animatedPalette.surfaceVariant,
             error = animatedPalette.error,
             onPrimary = animatedPalette.onPrimary,
             onSecondary = animatedPalette.onSecondary,
             onBackground = animatedPalette.onBackground,
-            onSurface = animatedPalette.onSurface
+            onSurface = animatedPalette.onSurface,
+            outline = animatedPalette.outline
         )
     } else {
-        lightColors(
+        lightColorScheme(
             primary = animatedPalette.primary,
-            primaryVariant = animatedPalette.primaryVariant,
             secondary = animatedPalette.secondary,
             background = animatedPalette.background,
             surface = animatedPalette.surface,
+            surfaceVariant = animatedPalette.surfaceVariant,
             error = animatedPalette.error,
             onPrimary = animatedPalette.onPrimary,
             onSecondary = animatedPalette.onSecondary,
             onBackground = animatedPalette.onBackground,
-            onSurface = animatedPalette.onSurface
+            onSurface = animatedPalette.onSurface,
+            outline = animatedPalette.outline
         )
     }
 
@@ -151,13 +164,13 @@ fun CelestiaTheme(
         LocalCelestiaColors provides animatedPalette
     ) {
         MaterialTheme(
-            colors = materialColors,
+            colorScheme = colorScheme,
             content = content
         )
     }
 }
 
-// Удобный доступ через CelestiaTheme.colors
+// Easy access via CelestiaTheme.colors
 object CelestiaTheme {
     val colors: CelestiaColors
         @Composable

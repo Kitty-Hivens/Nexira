@@ -5,7 +5,8 @@ import hivens.core.api.model.ServerProfile
 import hivens.core.data.FileData
 import hivens.core.data.FileManifest
 import hivens.core.data.OptionalMod
-import kotlinx.serialization.json.* import org.slf4j.LoggerFactory
+import kotlinx.serialization.json.*
+import org.slf4j.LoggerFactory
 
 class ManifestProcessorService(
     private val json: Json

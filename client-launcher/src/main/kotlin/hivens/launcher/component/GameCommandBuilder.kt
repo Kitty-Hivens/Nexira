@@ -201,53 +201,6 @@ internal class GameCommandBuilder {
         return args
     }
 
-    @Deprecated("Legacy explicit module list. Modules are now resolved dynamically from the classpath.", level = DeprecationLevel.WARNING)
-    private fun getNeoForgeModules(): List<String> = listOf(
-        // Core Launch Infrastructure
-        "cpw/mods/securejarhandler/3.0.8/securejarhandler-3.0.8.jar",
-        "cpw/mods/modlauncher/11.0.5/modlauncher-11.0.5.jar",
-        "cpw/mods/bootstraplauncher/2.0.2/bootstraplauncher-2.0.2.jar",
-        "net/neoforged/JarJarFileSystems/0.4.1/JarJarFileSystems-0.4.1.jar",
-        "net/sf/jopt-simple/jopt-simple/5.0.4/jopt-simple-5.0.4.jar",
-
-        // NeoForge System Modules
-        "net/neoforged/fancymodloader/loader/4.0.42/loader-4.0.42.jar",
-        "net/neoforged/fancymodloader/earlydisplay/4.0.42/earlydisplay-4.0.42.jar",
-        "net/neoforged/bus/8.0.5/bus-8.0.5.jar",
-        "net/neoforged/coremods/7.0.3/coremods-7.0.3.jar",
-        "net/neoforged/srgutils/1.0.0/srgutils-1.0.0.jar",
-
-        // Transformers & Parsers
-        "net/neoforged/accesstransformers/10.0.1/accesstransformers-10.0.1.jar",
-        "net/neoforged/accesstransformers/at-modlauncher/10.0.1/at-modlauncher-10.0.1.jar",
-        "org/antlr/antlr4-runtime/4.13.1/antlr4-runtime-4.13.1.jar",
-
-        // Essential Dependencies
-        "net/jodah/typetools/0.6.3/typetools-0.6.3.jar",
-        "com/electronwill/night-config/core/3.8.3/core-3.8.3.jar",
-        "com/electronwill/night-config/toml/3.8.3/toml-3.8.3.jar",
-        "com/google/guava/guava/32.1.2-jre/guava-32.1.2-jre.jar",
-        "it/unimi/dsi/fastutil/8.5.12/fastutil-8.5.12.jar",
-        "net/fabricmc/sponge-mixin/0.15.2+mixin.0.8.7/sponge-mixin-0.15.2+mixin.0.8.7.jar",
-
-        // Utils, Logging & Console
-        "org/apache/logging/log4j/log4j-api/2.22.1/log4j-api-2.22.1.jar",
-        "org/apache/logging/log4j/log4j-core/2.22.1/log4j-core-2.22.1.jar",
-        "org/apache/logging/log4j/log4j-slf4j2-impl/2.22.1/log4j-slf4j2-impl-2.22.1.jar",
-        "org/slf4j/slf4j-api/2.0.9/slf4j-api-2.0.9.jar",
-        "com/google/code/gson/gson/2.10.1/gson-2.10.1.jar",
-        "net/minecrell/terminalconsoleappender/1.3.0/terminalconsoleappender-1.3.0.jar",
-        "org/jline/jline-reader/3.20.0/jline-reader-3.20.0.jar",
-        "org/jline/jline-terminal/3.20.0/jline-terminal-3.20.0.jar",
-
-        // ASM
-        "org/ow2/asm/asm/9.8/asm-9.8.jar",
-        "org/ow2/asm/asm-commons/9.8/asm-commons-9.8.jar",
-        "org/ow2/asm/asm-tree/9.8/asm-tree-9.8.jar",
-        "org/ow2/asm/asm-util/9.8/asm-util-9.8.jar",
-        "org/ow2/asm/asm-analysis/9.8/asm-analysis-9.8.jar"
-    )
-
     private fun getConfig(version: String): VersionConfig {
         return configs[version]
             ?: configs.entries.find { version.startsWith(it.key) }?.value

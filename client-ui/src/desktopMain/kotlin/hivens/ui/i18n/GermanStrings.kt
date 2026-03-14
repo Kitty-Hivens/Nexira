@@ -6,9 +6,6 @@ object GermanStrings : AppStrings {
     override val appName = "Aura Launcher"
     override val appVersion get() = appName
 
-    // Splash
-    override val splashLoading = "Wird geladen..."
-
     // Login
     override val loginTitle        = "Aura Client"
     override val loginUsername     = "Benutzername"
@@ -155,15 +152,6 @@ object GermanStrings : AppStrings {
     override val trayConsole  = "Konsole öffnen"
     override val trayExit     = "Beenden"
 
-    // Seasons
-    override val seasonAuto    = "Automatisch"
-    override val seasonNone    = "Deaktiviert"
-    override val seasonWinter  = "Winter (Schnee)"
-    override val seasonNewYear = "Neujahr"
-    override val seasonSpring  = "Frühling (Kirschblüte)"
-    override val seasonSummer  = "Sommer (Glühwürmchen)"
-    override val seasonAutumn  = "Herbst (Blätterfall)"
-
     // Settings: Diagnostics
     override val settingsSectionDiagnostics = "Diagnose"
     override val settingsOpenLogs           = "Log-Ordner öffnen"
@@ -174,4 +162,134 @@ object GermanStrings : AppStrings {
     override val fileNoUpdates      = "Dateien überprüft, keine Updates gefunden."
     override fun fileDownloading(n: Int) = "Updates werden heruntergeladen ($n Dateien)..."
     override val fileClientSetup    = "Client wird eingerichtet..."
+
+    // --- Settings: Offline Mode ---
+    override val settingsOfflineMode       = "Offlinemodus"
+    override val settingsOfflineModeDesc   = "Starten ohne Authentifizierung. Dateien werden nicht synchronisiert."
+
+    // --- Launcher States: Offline ---
+    override val stateOfflineSkipAuth      = "Offlinemodus — Authentifizierung übersprungen"
+    override val stateOfflineSkipSync      = "Offlinemodus — Dateisynchronisierung übersprungen, lokale Dateien werden verwendet"
+    override val stateOfflineNoClient      = "Client-Dateien nicht gefunden. Zuerst online herunterladen."
+
+    // --- Server Settings: Extended ---
+    override val serverSettingsJvmArgs     = "JVM-Argumente"
+    override val serverSettingsJvmArgsHint = "-XX:+UseZGC -Dfoo=bar"
+    override val serverSettingsResolution  = "Fenstergröße"
+    override val serverSettingsWidth       = "Breite"
+    override val serverSettingsHeight      = "Höhe"
+    override val serverSettingsFullscreen  = "Vollbild"
+    override val serverSettingsAutoConnect = "Automatisch mit Server verbinden"
+
+    // --- Server Settings: Icon Upload ---
+    override val serverSettingsPickIcon    = "Server-Icon auswählen"
+
+    // =========================================================================
+    // RAM Selector
+    // =========================================================================
+    override val ramCustomInputLabel = "Eigener Wert:"
+    override fun ramSystemHint(systemRam: String, recommended: String) =
+        "System: $systemRam • Empfohlen max: $recommended"
+
+    // =========================================================================
+    // Mod cards
+    // =========================================================================
+    override fun modConflictWarning(ids: String) = "Konflikt mit: $ids"
+    override fun modIncompatibleHint(ids: String) = "Inkompatibel mit: $ids"
+
+    // =========================================================================
+    // Server grid
+    // =========================================================================
+    override val serversFavorites = "★ FAVORITEN"
+
+    // =========================================================================
+    // Custom Background
+    // =========================================================================
+    override val backgroundTitle          = "BENUTZERDEFINIERTER HINTERGRUND"
+    override val backgroundSubtitle       = "Launcher-Hintergrund anpassen"
+    override val backgroundEnable         = "Aktivieren"
+    override val backgroundSectionImage   = "BILD"
+    override val backgroundPickFile       = "Hintergrundbild auswählen"
+    override val backgroundPickButton     = "Datei auswählen"
+    override val backgroundSectionScale   = "SKALIERUNG"
+    override val backgroundScaleCover     = "Füllen"
+    override val backgroundScaleContain   = "Einpassen"
+    override val backgroundScaleStretch   = "Strecken"
+    override val backgroundScaleOriginal  = "Original"
+    override val backgroundScaleTile      = "Kacheln"
+    override val backgroundSectionPosition = "POSITION"
+    override val backgroundAlignX         = "Horizontal"
+    override val backgroundAlignY         = "Vertikal"
+    override val backgroundSectionEffects = "EFFEKTE"
+    override val backgroundBlur           = "Unschärfe"
+    override val backgroundDarken         = "Abdunkeln"
+    override val backgroundOpacity        = "Deckkraft"
+    override val backgroundSaturation     = "Sättigung"
+    override val backgroundParallax       = "Parallaxe"
+    override val backgroundVignette       = "Vignette"
+    override val backgroundSectionTint    = "FARBTÖNUNG"
+    override val backgroundTintNone       = "Keine"
+    override val backgroundTintNavy       = "Dunkelblau"
+    override val backgroundTintViolet     = "Violett"
+    override val backgroundTintEmerald    = "Smaragd"
+    override val backgroundTintBordeaux   = "Bordeaux"
+    override val backgroundTintSteel      = "Stahl"
+    override val backgroundTintIntensity  = "Intensität"
+    override val backgroundReset          = "Auf Standardwerte zurücksetzen"
+    override val backgroundPreview        = "VORSCHAU"
+    override val backgroundPreviewServer  = "Beispielserver"
+    override val settingsBackground       = "Benutzerdefinierter Hintergrund"
+    override val settingsBackgroundSub    = "Foto oder GIF als Launcher-Hintergrund"
+
+    // =========================================================================
+    // About Screen
+    // =========================================================================
+    override val aboutTitle                = "ÜBER DEN LAUNCHER"
+    override fun aboutDescription(branding: String) = "Inoffizieller Launcher für $branding"
+    override fun aboutBuildDate(date: String) = "Erstellt: $date"
+    override val aboutSectionCreator       = "ERSTELLER"
+    override val aboutSectionTechnologies  = "TECHNOLOGIEN"
+    override val aboutSectionLicense       = "LIZENZ"
+    override val aboutLicenseText          = "GPLv3 — Freie und quelloffene Software"
+    override val aboutSectionUpdates       = "UPDATES"
+    override val aboutCurrentVersion       = "Aktuelle Version"
+    override val aboutCheckUpdates         = "Auf Updates prüfen"
+    override val aboutChecking             = "Prüfe..."
+    override val aboutUpToDate             = "Sie sind auf dem neuesten Stand!"
+    override val aboutCheckAgain           = "Erneut prüfen"
+    override fun aboutUpdateAvailable(version: String) = "Version $version verfügbar"
+    override val aboutCriticalUpdate       = "Kritisches Update"
+    override val aboutSectionSystem        = "SYSTEM"
+    override val aboutOs                   = "Betriebssystem"
+    override val aboutJvmHeap             = "JVM Heap"
+    override val aboutSectionLinks         = "LINKS"
+    override val aboutLinkGithub           = "GitHub"
+    override val aboutLinkBugReport        = "Fehler melden"
+    override val aboutLinkReleases         = "Veröffentlichungen"
+    override val settingsSectionAbout      = "ÜBER"
+
+    // Tech stack descriptions
+    override val techKotlinDesc  = "Hauptsprache"
+    override val techComposeDesc = "UI-Framework"
+    override val techKtorDesc    = "HTTP-Client"
+    override val techKoinDesc    = "Dependency Injection"
+    override val techSkiaDesc    = "Skin-Rendering"
+    override val techCoilDesc    = "Bildladen"
+
+    // --- Spawn Reset ---
+    override val spawnResetButton  = "Zum Spawn zurückkehren"
+    override val spawnResetLoading = "Zurücksetzen..."
+    override val spawnResetSuccess = "Fertig! Neu einloggen"
+    override val spawnResetError   = "Serverfehler"
+
+    // --- Tray ---
+    override val trayStatusIdle    = "● Bereit"
+    override val trayStatusRunning = "▶ Spiel läuft"
+    override val trayShow          = "Launcher anzeigen"
+    override val trayServers       = "Server"
+    override val trayNoServers     = "Keine Server geladen"
+
+    // --- Settings: Start in tray ---
+    override val settingsStartInTray     = "Im Tray starten"
+    override val settingsStartInTrayDesc = "Minimiert starten; Fenster schließen versteckt es im Tray"
 }

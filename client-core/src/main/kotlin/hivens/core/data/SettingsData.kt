@@ -7,15 +7,15 @@ data class SettingsData(
     var javaPath: String? = null,
     var memoryMB: Int = 4096,
     var isDarkTheme: Boolean = true,
-    var seasonalTheme: SeasonTheme = SeasonTheme.AUTO,
     var closeAfterStart: Boolean = true,
     var saveCredentials: Boolean = true,
-    var savedUsername: String? = null,
-    var savedUuid: String? = null,
-    var savedAccessToken: String? = null,
     var savedFileManifest: FileManifest? = null,
     /** BCP-47 language tag: "ru", "en", "de" */
-    var locale: String = "en"
+    var locale: String = "en",
+    /** Offline Mode: skip authentication, use cached session */
+    var isOfflineMode: Boolean = false,
+    /** Start minimized to tray; hide window on close instead of exiting */
+    var startInTray: Boolean = false
 ) {
     companion object {
         fun defaults(): SettingsData {
@@ -25,6 +25,8 @@ data class SettingsData(
             data.isDarkTheme = true
             data.saveCredentials = true
             data.locale = "en"
+            data.isOfflineMode = false
+            data.startInTray = false
             return data
         }
     }

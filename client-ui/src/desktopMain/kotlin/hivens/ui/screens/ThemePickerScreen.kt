@@ -8,10 +8,10 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -43,9 +43,9 @@ fun ThemePickerScreen(
             .padding(24.dp)
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
+            modifier              = Modifier.fillMaxWidth().padding(bottom = 24.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment     = Alignment.CenterVertically
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) {
@@ -58,7 +58,7 @@ fun ThemePickerScreen(
                 Spacer(Modifier.width(8.dp))
                 Text(
                     s.themePickerTitle,
-                    style = MaterialTheme.typography.h5,
+                    style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Black,
                     color = CelestiaTheme.colors.textPrimary
                 )
@@ -66,8 +66,8 @@ fun ThemePickerScreen(
 
             Button(
                 onClick = { onThemeSelected(selectedTheme) },
-                colors = ButtonDefaults.buttonColors(backgroundColor = CelestiaTheme.colors.primary),
-                shape = RoundedCornerShape(12.dp)
+                colors  = ButtonDefaults.buttonColors(containerColor = CelestiaTheme.colors.primary),
+                shape   = RoundedCornerShape(12.dp)
             ) {
                 Icon(Icons.Default.Check, contentDescription = null, tint = Color.White)
                 Spacer(Modifier.width(8.dp))
@@ -82,17 +82,17 @@ fun ThemePickerScreen(
             Box(modifier = Modifier.weight(2f).fillMaxHeight()) {
                 GlassCard(modifier = Modifier.fillMaxSize(), shape = RoundedCornerShape(16.dp)) {
                     LazyVerticalGrid(
-                        columns = GridCells.Fixed(2),
-                        contentPadding = PaddingValues(16.dp),
+                        columns               = GridCells.Fixed(2),
+                        contentPadding        = PaddingValues(16.dp),
                         horizontalArrangement = Arrangement.spacedBy(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                        verticalArrangement   = Arrangement.spacedBy(16.dp)
                     ) {
                         items(themes) { theme ->
                             ThemeCard(
-                                theme = theme,
-                                isSelected = theme == selectedTheme,
+                                theme         = theme,
+                                isSelected    = theme == selectedTheme,
                                 selectedLabel = s.themePickerSelected,
-                                onClick = { selectedTheme = theme }
+                                onClick       = { selectedTheme = theme }
                             )
                         }
                     }
@@ -114,7 +114,7 @@ fun ThemeCard(
     onClick: () -> Unit
 ) {
     val scale by animateFloatAsState(
-        targetValue = if (isSelected) 1.05f else 1f,
+        targetValue   = if (isSelected) 1.05f else 1f,
         animationSpec = spring(dampingRatio = 0.7f, stiffness = 300f)
     )
 
@@ -124,26 +124,26 @@ fun ThemeCard(
                 .fillMaxSize()
                 .clickable(onClick = onClick)
                 .border(
-                    width = if (isSelected) 3.dp else 0.dp,
-                    brush = if (isSelected) Brush.linearGradient(
+                    width  = if (isSelected) 3.dp else 0.dp,
+                    brush  = if (isSelected) Brush.linearGradient(
                         listOf(
                             CustomTheme.parseHexColor(theme.primary),
                             CustomTheme.parseHexColor(theme.secondary)
                         )
                     ) else Brush.linearGradient(listOf(Color.Transparent, Color.Transparent)),
-                    shape = RoundedCornerShape(16.dp)
+                    shape  = RoundedCornerShape(16.dp)
                 ),
-            shape = RoundedCornerShape(16.dp),
+            shape           = RoundedCornerShape(16.dp),
             backgroundColor = CustomTheme.parseHexColor(theme.background).copy(alpha = 0.8f)
         ) {
             Column(
-                modifier = Modifier.fillMaxSize().padding(16.dp),
+                modifier            = Modifier.fillMaxSize().padding(16.dp),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
                 Column {
                     Text(
                         theme.name,
-                        style = MaterialTheme.typography.subtitle1,
+                        style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = CustomTheme.parseHexColor(theme.primary),
                         maxLines = 1,
@@ -169,7 +169,7 @@ fun ThemeCard(
                             Spacer(Modifier.width(4.dp))
                             Text(
                                 selectedLabel,
-                                style = MaterialTheme.typography.caption,
+                                style = MaterialTheme.typography.bodySmall,
                                 color = CustomTheme.parseHexColor(theme.primary),
                                 fontWeight = FontWeight.Bold
                             )
@@ -202,14 +202,14 @@ fun ColorCircle(color: Color) {
 @Composable
 fun ThemePreviewPanel(theme: CustomTheme, s: hivens.ui.i18n.AppStrings) {
     GlassCard(
-        modifier = Modifier.fillMaxSize(),
-        shape = RoundedCornerShape(16.dp),
+        modifier        = Modifier.fillMaxSize(),
+        shape           = RoundedCornerShape(16.dp),
         backgroundColor = CustomTheme.parseHexColor(theme.background).copy(alpha = 0.8f)
     ) {
         Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
             Text(
                 s.themePickerPreview,
-                style = MaterialTheme.typography.caption,
+                style = MaterialTheme.typography.bodySmall,
                 color = CustomTheme.parseHexColor(theme.primary),
                 fontWeight = FontWeight.Bold
             )
@@ -229,10 +229,10 @@ fun ThemePreviewPanel(theme: CustomTheme, s: hivens.ui.i18n.AppStrings) {
             Spacer(Modifier.height(24.dp))
 
             Button(
-                onClick = { },
+                onClick = {},
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(backgroundColor = CustomTheme.parseHexColor(theme.primary)),
-                shape = RoundedCornerShape(12.dp)
+                colors   = ButtonDefaults.buttonColors(containerColor = CustomTheme.parseHexColor(theme.primary)),
+                shape    = RoundedCornerShape(12.dp)
             ) {
                 Text(s.themePickerBtnSample, color = Color.White, fontWeight = FontWeight.Bold)
             }
@@ -240,10 +240,10 @@ fun ThemePreviewPanel(theme: CustomTheme, s: hivens.ui.i18n.AppStrings) {
             Spacer(Modifier.height(12.dp))
 
             OutlinedButton(
-                onClick = { },
+                onClick  = {},
                 modifier = Modifier.fillMaxWidth(),
-                border = BorderStroke(2.dp, CustomTheme.parseHexColor(theme.primary)),
-                shape = RoundedCornerShape(12.dp)
+                border   = BorderStroke(2.dp, CustomTheme.parseHexColor(theme.primary)),
+                shape    = RoundedCornerShape(12.dp)
             ) {
                 Text(s.themePickerBtnOutlined, color = CustomTheme.parseHexColor(theme.primary), fontWeight = FontWeight.Bold)
             }
@@ -254,12 +254,11 @@ fun ThemePreviewPanel(theme: CustomTheme, s: hivens.ui.i18n.AppStrings) {
 @Composable
 fun ColorRow(label: String, hexColor: String) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier              = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment     = Alignment.CenterVertically
     ) {
-        Text(label, style = MaterialTheme.typography.body2, color = CelestiaTheme.colors.textSecondary)
-
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = CelestiaTheme.colors.textSecondary)
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -273,7 +272,7 @@ fun ColorRow(label: String, hexColor: String) {
             )
             Text(
                 hexColor,
-                style = MaterialTheme.typography.caption,
+                style = MaterialTheme.typography.bodySmall,
                 color = CelestiaTheme.colors.textPrimary,
                 fontFamily = FontFamily.Monospace
             )

@@ -5,12 +5,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.Icon
-import androidx.compose.material.IconButton
-import androidx.compose.material.MaterialTheme
-import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -19,21 +16,21 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import coil3.ImageLoader
 import coil3.compose.AsyncImage
-import coil3.request.ImageRequest
-import coil3.request.crossfade
 import coil3.compose.LocalPlatformContext
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
-import okhttp3.OkHttpClient
-import org.koin.compose.koinInject
-
-import hivens.core.data.NewsItem
+import coil3.request.ImageRequest
+import coil3.request.crossfade
 import hivens.core.api.interfaces.IServerListService
+import hivens.core.data.NewsItem
 import hivens.ui.components.GlassCard
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import org.koin.compose.koinInject
 
+@Deprecated("May be removed in the future")
 @Composable
 fun NewsScreen(
     onBack: () -> Unit
@@ -42,10 +39,10 @@ fun NewsScreen(
     val serverListService: IServerListService = koinInject()
     val s = LocalStrings.current
 
-    var newsList by remember { mutableStateOf<List<NewsItem>>(emptyList()) }
+    var newsList  by remember { mutableStateOf<List<NewsItem>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
 
-    val context = LocalPlatformContext.current
+    val context     = LocalPlatformContext.current
     val imageLoader = remember {
         ImageLoader.Builder(context)
             .components {
@@ -72,13 +69,13 @@ fun NewsScreen(
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(bottom = 24.dp)
+            modifier          = Modifier.padding(bottom = 24.dp)
         ) {
             IconButton(onClick = onBack) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, s.navBack, tint = CelestiaTheme.colors.textPrimary)
             }
             Spacer(modifier = Modifier.width(16.dp))
-            Text(s.newsTitle, style = MaterialTheme.typography.h4, color = CelestiaTheme.colors.textPrimary)
+            Text(s.newsTitle, style = MaterialTheme.typography.headlineMedium, color = CelestiaTheme.colors.textPrimary)
         }
 
         GlassCard(modifier = Modifier.fillMaxSize()) {
@@ -90,7 +87,7 @@ fun NewsScreen(
                     Text(s.newsEmpty, color = CelestiaTheme.colors.textSecondary)
                 }
                 else -> LazyColumn(
-                    contentPadding = PaddingValues(24.dp),
+                    contentPadding      = PaddingValues(24.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     items(newsList) { item ->
@@ -105,9 +102,9 @@ fun NewsScreen(
 @Composable
 fun NewsCard(item: NewsItem, imageLoader: ImageLoader, noImageLabel: String) {
     GlassCard(
-        modifier = Modifier.fillMaxWidth().height(140.dp),
+        modifier        = Modifier.fillMaxWidth().height(140.dp),
         backgroundColor = CelestiaTheme.colors.surface.copy(alpha = 0.3f),
-        shape = RoundedCornerShape(16.dp)
+        shape           = RoundedCornerShape(16.dp)
     ) {
         Row(modifier = Modifier.fillMaxSize()) {
             if (item.imageUrl != null) {
@@ -116,10 +113,10 @@ fun NewsCard(item: NewsItem, imageLoader: ImageLoader, noImageLabel: String) {
                         .data(item.imageUrl)
                         .crossfade(true)
                         .build(),
-                    imageLoader = imageLoader,
+                    imageLoader        = imageLoader,
                     contentDescription = item.title,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
+                    contentScale       = ContentScale.Crop,
+                    modifier           = Modifier
                         .width(200.dp)
                         .fillMaxHeight()
                         .padding(8.dp)
@@ -141,36 +138,36 @@ fun NewsCard(item: NewsItem, imageLoader: ImageLoader, noImageLabel: String) {
             }
 
             Column(
-                modifier = Modifier.fillMaxSize().padding(16.dp),
+                modifier            = Modifier.fillMaxSize().padding(16.dp),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
                 Column {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier              = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.Top
+                        verticalAlignment     = Alignment.Top
                     ) {
                         Text(
-                            text = item.title,
-                            style = MaterialTheme.typography.h6,
-                            color = CelestiaTheme.colors.textPrimary,
+                            text     = item.title,
+                            style    = MaterialTheme.typography.titleLarge,
+                            color    = CelestiaTheme.colors.textPrimary,
                             maxLines = 2,
                             modifier = Modifier.weight(1f)
                         )
                         Text(
-                            text = item.date,
-                            style = MaterialTheme.typography.caption,
-                            color = CelestiaTheme.colors.primary,
+                            text     = item.date,
+                            style    = MaterialTheme.typography.bodySmall,
+                            color    = CelestiaTheme.colors.primary,
                             modifier = Modifier.padding(start = 8.dp)
                         )
                     }
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(Modifier.height(8.dp))
                 }
 
                 Text(
-                    text = item.description,
-                    style = MaterialTheme.typography.body2,
-                    color = CelestiaTheme.colors.textSecondary,
+                    text     = item.description,
+                    style    = MaterialTheme.typography.bodyMedium,
+                    color    = CelestiaTheme.colors.textSecondary,
                     maxLines = 2
                 )
             }

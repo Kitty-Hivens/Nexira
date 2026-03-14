@@ -55,10 +55,6 @@ class ServerListService(private val repository: ServerRepository) : IServerListS
         }
     }
 
-    override fun fetchProfiles(): CompletableFuture<List<ServerProfile>> {
-        return fetchDashboardData().thenApply { it.servers }
-    }
-
     private fun getProfile(srv: SmartyServer): ServerProfile {
         return ServerProfile().apply {
             name = srv.id
