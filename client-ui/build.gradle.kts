@@ -10,13 +10,16 @@ val filekitVersion: String by project
 val koinVersion: String by project
 val koinComposeVersion: String by project
 val ktorVersion: String by project
+val coroutinesVersion: String by project
+val logbackVersion: String by project
+val proguardVersion: String by project
 
 plugins {
     kotlin("multiplatform")
-    id("org.jetbrains.compose") version "1.11.0-alpha02"
-    id("org.jetbrains.kotlin.plugin.compose") version "2.3.0"
+    id("org.jetbrains.compose") version "1.11.0-alpha04"
+    id("org.jetbrains.kotlin.plugin.compose") version "2.3.20-RC3"
     id("com.github.gmazzo.buildconfig")
-    kotlin("plugin.serialization") version "2.1.0"
+    kotlin("plugin.serialization") version "2.3.20-RC3"
 }
 
 group = "hivens"
@@ -58,8 +61,8 @@ kotlin {
                 implementation("io.github.vinceglb:filekit-dialogs-compose:$filekitVersion")
                 implementation("io.insert-koin:koin-core:$koinVersion")
                 implementation("io.insert-koin:koin-compose:$koinComposeVersion")
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.9.0")
-                implementation("ch.qos.logback:logback-classic:1.5.32")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:$coroutinesVersion")
+                implementation("ch.qos.logback:logback-classic:$logbackVersion")
             }
         }
     }
