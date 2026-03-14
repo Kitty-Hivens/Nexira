@@ -91,6 +91,9 @@
     native <methods>;
 }
 
+# --- System tray ---
+-keep class dorkbox.** { *; }
+
 # --- Suppress Warnings ---
 -dontwarn ch.qos.logback.**
 -dontwarn org.slf4j.**
@@ -111,6 +114,7 @@
 -dontwarn org.objectweb.asm.**
 -dontwarn androidx.compose.**
 -dontwarn org.jetbrains.**
+-dontwarn dorkbox.**
 
 # --- Ignored Notes ---
 -dontnote module-info

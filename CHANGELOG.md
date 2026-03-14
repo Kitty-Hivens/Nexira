@@ -3,7 +3,7 @@
 All notable changes to Aura Launcher will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [Unreleased]
+## [2.0.0] - 2026-03-14
 
 ### Added
 - **Markdown rendering in update dialog**: integrated `multiplatform-markdown-renderer-m3` (v0.39.2) 
@@ -240,7 +240,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Parallax mouse position tracking lifted to root containers (`Main.kt` and `BackgroundSettingsScreen.kt`) to ensure consistent global tracking across the entire window.
 - Configured Coil `ImageLoader` as a global singleton in `Main.kt`, replacing localized instances in `RightPanel` and `AboutScreen`.
 - **Dependencies Centralization**: All library versions (Ktor, Koin, Compose, Coroutines, etc.) are now centrally managed in the root `gradle.properties`.
-- Bumped app version to `1.4.0-dev`.
+- Bumped app version to `2.0.0`.
 - Bumped Kotlin to `2.3.20-RC3`, Gradle to `9.4.0`, Ktor to `3.4.1`, Koin to `4.2.0-RC2`, and Compose Multiplatform to `1.11.0-alpha04`.
 - Updated `FileKit` integration to use the new `FileKitDialogSettings` API for native file dialogs in settings screens.
 - `Main.kt`: tray init moved to `Dispatchers.IO`; `onCloseRequest` now hides to tray
@@ -281,5 +281,5 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 _Initial public release._
 
-[Unreleased]: https://github.com/Kitty-Hivens/Aura-Launcher/compare/v1.3.0...HEAD
+[2.0.0]: https://github.com/Kitty-Hivens/Aura-Launcher/compare/v1.3.0...v2.0.0
 [1.3.0]: https://github.com/Kitty-Hivens/Aura-Launcher/releases/tag/v1.3.0
