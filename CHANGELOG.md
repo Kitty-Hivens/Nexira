@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Added
+- **Markdown rendering in update dialog**: integrated `multiplatform-markdown-renderer-m3` (v0.39.2) 
+  to properly render GitHub release notes with headers, bold, lists and code blocks instead 
+  of displaying raw markdown syntax
 - `CompactNewsFeed`: shimmer skeleton loader replaces spinner while news is being fetched;
   each news card is now clickable and opens `BASE_URL/news/{id}` in the system browser;
   subtle `›` arrow hint marks items as interactive
@@ -134,6 +137,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   `rememberInfiniteTransition` entirely.
 
 ### Changed
+- `UpdateDialog`: changelog section replaced plain `Text(update.changelog)` with `Markdown(update.changelog)` from `multiplatform-markdown-renderer-m3`; release notes now render headers, bold, bullet lists and code blocks correctly
 - `client-ui`: migrated from Compose Material 2 to Material 3 (`material` → `material3`);
   `material-icons-extended` dependency retained from M2 artifact pending icon migration
 - `CelestiaTheme`: `darkColors()`/`lightColors()` → `darkColorScheme()`/`lightColorScheme()`;

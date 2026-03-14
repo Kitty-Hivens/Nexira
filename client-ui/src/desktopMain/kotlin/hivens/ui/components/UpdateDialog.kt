@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.mikepenz.markdown.m3.Markdown
 import hivens.core.data.LauncherUpdate
 import hivens.launcher.update.UpdateApplicator
 import hivens.launcher.update.UpdateService
@@ -116,10 +117,8 @@ fun UpdateDialog(
                         .background(CelestiaTheme.colors.background.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
                         .padding(12.dp)
                 ) {
-                    Text(
-                        text     = update.changelog,
-                        style    = MaterialTheme.typography.bodyMedium,
-                        color    = CelestiaTheme.colors.textSecondary,
+                    Markdown(
+                        content  = update.changelog,
                         modifier = Modifier.verticalScroll(rememberScrollState())
                     )
                 }
