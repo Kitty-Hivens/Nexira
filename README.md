@@ -19,7 +19,7 @@ Aura не стал популярным. Никакой драмы в этом �
 Если ты наткнулся на этот репозиторий и тебе нужно что-то позаимствовать —
 бери. Лицензия GPLv3 никуда не делась.
 
-Последний релиз: **v1.3.0**
+Последний релиз: **v2.0.0**
 
 — Ваш Хару, 2026
 
@@ -46,6 +46,6 @@ That stays with me.
 If you stumbled across this repo and need to borrow something —
 go ahead. The GPLv3 license still applies.
 
-Last release: **v1.3.0**
+Last release: **v2.0.0**
 
 — Your Haru, 2026
