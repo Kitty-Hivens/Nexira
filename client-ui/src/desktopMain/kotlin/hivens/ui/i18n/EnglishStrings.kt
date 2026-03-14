@@ -275,4 +275,10 @@ object EnglishStrings : AppStrings {
     override val techKoinDesc    = "Dependency Injection"
     override val techSkiaDesc    = "Skin rendering"
     override val techCoilDesc    = "Image loading"
+
+    // --- Spawn Reset ---
+    override val spawnResetButton  = "Return to spawn"
+    override val spawnResetLoading = "Resetting..."
+    override val spawnResetSuccess = "Done! Rejoin to apply"
+    override val spawnResetError   = "Server error"
 }

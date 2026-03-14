@@ -282,4 +282,10 @@ interface AppStrings {
     val techKoinDesc: String
     val techSkiaDesc: String
     val techCoilDesc: String
+
+    // --- Spawn Reset ---
+    val spawnResetButton: String
+    val spawnResetLoading: String
+    val spawnResetSuccess: String
+    val spawnResetError: String
 }

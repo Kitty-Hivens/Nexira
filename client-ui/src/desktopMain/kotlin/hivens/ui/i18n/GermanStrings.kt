@@ -275,4 +275,10 @@ object GermanStrings : AppStrings {
     override val techKoinDesc    = "Dependency Injection"
     override val techSkiaDesc    = "Skin-Rendering"
     override val techCoilDesc    = "Bildladen"
+
+    // --- Spawn Reset ---
+    override val spawnResetButton  = "Zum Spawn zurückkehren"
+    override val spawnResetLoading = "Zurücksetzen..."
+    override val spawnResetSuccess = "Fertig! Neu einloggen"
+    override val spawnResetError   = "Serverfehler"
 }

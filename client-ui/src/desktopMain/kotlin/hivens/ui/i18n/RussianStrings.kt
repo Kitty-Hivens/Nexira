@@ -275,4 +275,10 @@ object RussianStrings : AppStrings {
     override val techKoinDesc    = "Dependency Injection"
     override val techSkiaDesc    = "Рендеринг скинов"
     override val techCoilDesc    = "Загрузка изображений"
+
+    // --- Spawn Reset ---
+    override val spawnResetButton  = "Вернуться на спавн"
+    override val spawnResetLoading = "Сбрасываем..."
+    override val spawnResetSuccess = "Готово! Перезайди"
+    override val spawnResetError   = "Ошибка сервера"
 }
