@@ -1,7 +1,12 @@
 # Changelog
 
 All notable changes to Aura Launcher will be documented in this file.
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
+## [2.0.2] - 2026-03-14
+
+### Fixed
+- Closed Skia Canvas after each frame to prevent native memory leak
+
 ## [2.0.1] - 2026-03-14
 
 ### Fixed
