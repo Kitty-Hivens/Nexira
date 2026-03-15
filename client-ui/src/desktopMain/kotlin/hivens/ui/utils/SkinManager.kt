@@ -2,6 +2,7 @@ package hivens.ui.utils
 
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asComposeImageBitmap
+import androidx.compose.ui.graphics.toComposeImageBitmap
 import hivens.config.AppConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -73,8 +74,11 @@ object SkinManager {
         if (diskFile.exists() && !isExpired(diskFile)) {
             try {
                 val skiaImage = org.jetbrains.skia.Image.makeFromEncoded(diskFile.readBytes())
-                val bitmap = skiaImageToBitmap(skiaImage)
-                val result = bitmap.asComposeImageBitmap()
+                val result = try {
+                    skiaImage.toComposeImageBitmap()
+                } finally {
+                    skiaImage.close()
+                }
                 frontCache[nickname] = result
                 logger.debug("Front skin loaded from disk cache: {}", nickname)
                 return@withContext result
@@ -87,7 +91,10 @@ object SkinManager {
         // 3. Download and render
         val rawSkin = getOrDownloadRawSkin(nickname) ?: return@withContext null
         val processed = assembleSkin(rawSkin, isFront = true, cloak = null)
-        val result = processed.asComposeImageBitmap()
+        val result = run {
+            val img = org.jetbrains.skia.Image.makeFromBitmap(processed)
+            try { img.toComposeImageBitmap() } finally { img.close() }
+        }
 
         // Save to caches
         frontCache[nickname] = result
@@ -103,8 +110,11 @@ object SkinManager {
         if (diskFile.exists() && !isExpired(diskFile)) {
             try {
                 val skiaImage = org.jetbrains.skia.Image.makeFromEncoded(diskFile.readBytes())
-                val bitmap = skiaImageToBitmap(skiaImage)
-                val result = bitmap.asComposeImageBitmap()
+                val result = try {
+                    skiaImage.toComposeImageBitmap()
+                } finally {
+                    skiaImage.close()
+                }
                 backCache[nickname] = result
                 logger.debug("Back skin loaded from disk cache: {}", nickname)
                 return@withContext result
@@ -124,7 +134,10 @@ object SkinManager {
         val rawCloak = downloadTexture(cloakUrl)
 
         val processed = assembleSkin(rawSkin, isFront = false, cloak = rawCloak)
-        val result = processed.asComposeImageBitmap()
+        val result = run {
+            val img = org.jetbrains.skia.Image.makeFromBitmap(processed)
+            try { img.toComposeImageBitmap() } finally { img.close() }
+        }
 
         backCache[nickname] = result
         saveBitmapToDisk(processed, diskFile)
@@ -185,7 +198,11 @@ object SkinManager {
         val bitmap = org.jetbrains.skia.Bitmap()
         bitmap.allocPixels(ImageInfo.makeS32(image.width, image.height, ColorAlphaType.PREMUL))
         val canvas = org.jetbrains.skia.Canvas(bitmap)
-        canvas.drawImage(image, 0f, 0f)
+        try {
+            canvas.drawImage(image, 0f, 0f)
+        } finally {
+            canvas.close()
+        }
         return bitmap
     }
 
