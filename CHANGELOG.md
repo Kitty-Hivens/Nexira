@@ -2,6 +2,35 @@
 
 All notable changes to Aura Launcher will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
+## [2.0.3] - 2026-03-15
+
+### ⚠️ Known Issue - Custom Background
+> **It is highly recommended not to use the Custom Background feature in this version.**
+> Despite the partial fix for the native memory leak, enabling/disabling the background
+> does not release resources completely, but animated GIFs/WebPs continue to accumulate
+> native Skia objects. The function will be redesigned in the next release.
+> Use at your own risk.
+
+### Fixed
+- **Partial native memory leak fix in `CustomBackground`**: replaced `toImageBitmapSafe()`
+  (shallow `Bitmap.asComposeImageBitmap()` wrapper) with `Image.makeFromBitmap` +
+  `toComposeImageBitmap()` + `img.close()` in both static and animated paths.
+  `toImageBitmapSafe()` extension removed entirely. `ManagedSCleanerThunk` count reduced
+  from 645 to 468 in VisualVM heap dump.
+- **Partial native memory leak fix in `SkinManager`**: `Canvas` in `skiaImageToBitmap`
+  now closed via `try/finally`; all `Image.makeFromEncoded` call sites in
+  `getSkinFront`/`getSkinBack` close the Skia `Image` immediately after
+  `toComposeImageBitmap()`; `saveBitmapToDisk` closes intermediate `Image` after encode.
+
+### Known Remaining Issues
+- Toggle off/on of custom background does not fully release native Skia resources
+- Animated GIF/WebP frames continue to accumulate `SkiaBackedImageBitmap` instances
+  until GC decides to collect them — JVM does not account for native memory pressure
+- Root cause: `Image.toComposeImageBitmap()` on Compose Multiplatform desktop wraps
+  rather than deep-copies pixel data; closing the source `Image` may invalidate the
+  returned `ImageBitmap`. Full fix requires rewrite using a proper image-loading
+  library with desktop GIF support (Coil 3 does not support animated GIF on desktop).
+
 ## [2.0.2] - 2026-03-14
 
 ### Fixed
