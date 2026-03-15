@@ -2,6 +2,32 @@
 
 All notable changes to Aura Launcher will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
+## [2.0.4] - 2026-03-15
+
+### Changed
+- **Animated GIF/WebP background disabled**: animated paths in `CustomBackground`
+  removed until 2.1.0 (Kamel rewrite). GIF/WebP files now show the first frame
+  as a static image. This eliminates the primary source of native Skia memory
+  accumulation (`BG.gif.frame` objects growing to 200+ between GC cycles,
+  causing RSS to reach 6–8 GB). Static image backgrounds are unaffected.
+
+### Fixed
+- **`CustomBackground` GC hint on settings change**: `System.gc()` called when
+  background is disabled or image path changes, prompting JVM to collect
+  orphaned `SkiaBackedImageBitmap` finalizers sooner. Previously RSS would
+  hold at 8+ GB until JVM decided to GC on its own.
+
+### Added
+- `SkiaDebugOverlay` — internal debug composable showing live RSS, JVM heap,
+  and tracked Skia object counts with Force GC buttons. Used to diagnose
+  and confirm memory fixes. Not included in release builds.
+- `SkiaTracker` — lightweight weak-reference tracker for `ImageBitmap` objects.
+
+### Known Issues
+- Animated GIF/WebP backgrounds show first frame only — full animation
+  support returns in 2.1.0 via Kamel
+- Static background `BG.static` count may reach 3–4 between GC cycles
+  when rapidly switching images; clears on next GC cycle
 ## [2.0.3] - 2026-03-15
 
 ### ⚠️ Known Issue - Custom Background

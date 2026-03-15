@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import hivens.ui.debug.SkiaTracker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -49,8 +50,8 @@ fun CustomBackground(
 
     Box(modifier = modifier.fillMaxSize()) {
         AnimatedParallaxImage(
-            file = file,
-            settings = settings,
+            file             = file,
+            settings         = settings,
             mousePosProvider = mousePosProvider
         )
 
@@ -77,7 +78,7 @@ fun CustomBackground(
                     drawIntoCanvas {
                         val centerX = size.width / 2
                         val centerY = size.height / 2
-                        val radius = maxOf(size.width, size.height) * 0.7f
+                        val radius  = maxOf(size.width, size.height) * 0.7f
                         drawCircle(
                             brush = Brush.radialGradient(
                                 colors = listOf(
@@ -132,36 +133,30 @@ private fun AnimatedParallaxImage(
 
         if (useParallax) {
             val mousePos = mousePosProvider()
-            val targetX = (0.5f - mousePos.x) * settings.parallaxIntensity * 80f
-            val targetY = (0.5f - mousePos.y) * settings.parallaxIntensity * 80f
-            val parallaxX by animateFloatAsState(
-                targetValue = targetX,
-                animationSpec = spring(stiffness = 50f, dampingRatio = 0.8f)
-            )
-            val parallaxY by animateFloatAsState(
-                targetValue = targetY,
-                animationSpec = spring(stiffness = 50f, dampingRatio = 0.8f)
-            )
+            val targetX  = (0.5f - mousePos.x) * settings.parallaxIntensity * 80f
+            val targetY  = (0.5f - mousePos.y) * settings.parallaxIntensity * 80f
+            val parallaxX by animateFloatAsState(targetX, spring(stiffness = 50f, dampingRatio = 0.8f))
+            val parallaxY by animateFloatAsState(targetY, spring(stiffness = 50f, dampingRatio = 0.8f))
             Image(
-                painter = BitmapPainter(imageBitmap),
+                painter            = BitmapPainter(imageBitmap),
                 contentDescription = null,
-                contentScale = contentScale,
-                alignment = alignment,
-                modifier = baseModifier.graphicsLayer {
+                contentScale       = contentScale,
+                alignment          = alignment,
+                modifier           = baseModifier.graphicsLayer {
                     val extraScale = 1f + settings.parallaxIntensity * 0.15f
-                    scaleX = extraScale
-                    scaleY = extraScale
+                    scaleX       = extraScale
+                    scaleY       = extraScale
                     translationX = parallaxX
                     translationY = parallaxY
                 }
             )
         } else {
             Image(
-                painter = BitmapPainter(imageBitmap),
+                painter            = BitmapPainter(imageBitmap),
                 contentDescription = null,
-                contentScale = contentScale,
-                alignment = alignment,
-                modifier = baseModifier
+                contentScale       = contentScale,
+                alignment          = alignment,
+                modifier           = baseModifier
             )
         }
     }
@@ -184,43 +179,17 @@ private fun rememberSkiaImage(file: File): ImageBitmap? {
                 codec = Codec.makeFromData(data)
                 bmp   = org.jetbrains.skia.Bitmap().apply { allocPixels(codec.imageInfo) }
 
-                if (codec.frameCount <= 1) {
-                    // Static image — decode once, convert via full pixel copy, done
-                    codec.readPixels(bmp, 0)
-                    val img = org.jetbrains.skia.Image.makeFromBitmap(bmp)
-                    try {
-                        bitmap = img.toComposeImageBitmap()
-                    } finally {
-                        img.close()
+                // Decode first frame only — animated GIF/WebP disabled until 2.1.0 (Kamel)
+                codec.readPixels(bmp, 0)
+                val img = org.jetbrains.skia.Image.makeFromBitmap(bmp)
+                try {
+                    bitmap = img.toComposeImageBitmap().also {
+                        SkiaTracker.track("BG.static", it)
                     }
-                } else {
-                    // Animated GIF/WebP — decode frame by frame
-                    var frame      = 0
-                    var priorFrame = -1
-
-                    while (isActive) {
-                        if (frame == 0) { bmp.erase(0); priorFrame = -1 }
-
-                        codec.readPixels(bmp, frame, priorFrame)
-
-                        // Full pixel copy into JVM heap — Skia Image is closed immediately,
-                        // no native memory accumulation between frames.
-                        val img = org.jetbrains.skia.Image.makeFromBitmap(bmp)
-                        try {
-                            bitmap = img.toComposeImageBitmap()
-                        } finally {
-                            img.close()
-                        }
-
-                        var duration = codec.framesInfo[frame].duration
-                        if (duration < 30) duration = 100
-
-                        delay(duration.toLong())
-
-                        priorFrame = frame
-                        frame = (frame + 1) % codec.frameCount
-                    }
+                } finally {
+                    img.close()
                 }
+
             } catch (e: Exception) {
                 e.printStackTrace()
             } finally {
