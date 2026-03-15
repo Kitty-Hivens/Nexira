@@ -35,6 +35,7 @@ import hivens.ui.components.CelestiaButton
 import hivens.ui.components.GlassCard
 import hivens.ui.components.ModItemCard
 import hivens.ui.components.RamSelector
+import hivens.ui.debug.SkiaTracker
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
 import io.github.vinceglb.filekit.FileKit
@@ -172,7 +173,9 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                                         StandardCopyOption.REPLACE_EXISTING
                                     )
                                     runCatching {
-                                        serverIcon = ImageIO.read(targetFile)?.toComposeImageBitmap()
+                                        serverIcon = ImageIO.read(targetFile)?.toComposeImageBitmap()?.also {
+                                            SkiaTracker.track("Settings.icon[${server.assetDir}]", it)
+                                        }
                                     }
                                 }
                             }
