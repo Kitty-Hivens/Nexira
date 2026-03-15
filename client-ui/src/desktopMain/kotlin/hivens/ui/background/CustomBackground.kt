@@ -15,10 +15,10 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asComposeImageBitmap
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.painter.BitmapPainter
+import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -26,12 +26,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
-import org.jetbrains.skia.Bitmap
-import org.jetbrains.skia.Canvas
 import org.jetbrains.skia.Codec
-import org.jetbrains.skia.ColorAlphaType
 import org.jetbrains.skia.Data
-import org.jetbrains.skia.ImageInfo
 import org.jetbrains.skia.makeFromFileName
 import java.io.File
 
@@ -171,30 +167,6 @@ private fun AnimatedParallaxImage(
     }
 }
 
-/**
- * Converts a Skia Bitmap to ImageBitmap without leaking a Canvas.
- *
- * The standard toComposeImageBitmap() creates a Canvas internally and never
- * closes it, causing native memory to accumulate over time. This function
- * explicitly closes the Canvas after use.
- */
-private fun Bitmap.toImageBitmapSafe(): ImageBitmap {
-    val dst = Bitmap()
-    dst.allocPixels(ImageInfo.makeS32(width, height, ColorAlphaType.PREMUL))
-    val canvas = Canvas(dst)
-    try {
-        val image = org.jetbrains.skia.Image.makeFromBitmap(this)
-        try {
-            canvas.drawImage(image, 0f, 0f)
-        } finally {
-            image.close()
-        }
-    } finally {
-        canvas.close()
-    }
-    return dst.asComposeImageBitmap()
-}
-
 @Composable
 private fun rememberSkiaImage(file: File): ImageBitmap? {
     var bitmap by remember(file) { mutableStateOf<ImageBitmap?>(null) }
@@ -203,19 +175,24 @@ private fun rememberSkiaImage(file: File): ImageBitmap? {
         if (!file.exists()) return@LaunchedEffect
 
         withContext(Dispatchers.IO) {
-            var data:  Data?   = null
-            var codec: Codec?  = null
-            var bmp:   Bitmap? = null
+            var data:  Data?                      = null
+            var codec: Codec?                     = null
+            var bmp:   org.jetbrains.skia.Bitmap? = null
 
             try {
                 data  = Data.makeFromFileName(file.absolutePath)
                 codec = Codec.makeFromData(data)
-                bmp   = Bitmap().apply { allocPixels(codec.imageInfo) }
+                bmp   = org.jetbrains.skia.Bitmap().apply { allocPixels(codec.imageInfo) }
 
                 if (codec.frameCount <= 1) {
-                    // Static image — decode once, convert safely, done
+                    // Static image — decode once, convert via full pixel copy, done
                     codec.readPixels(bmp, 0)
-                    bitmap = bmp.toImageBitmapSafe()
+                    val img = org.jetbrains.skia.Image.makeFromBitmap(bmp)
+                    try {
+                        bitmap = img.toComposeImageBitmap()
+                    } finally {
+                        img.close()
+                    }
                 } else {
                     // Animated GIF/WebP — decode frame by frame
                     var frame      = 0
@@ -225,8 +202,15 @@ private fun rememberSkiaImage(file: File): ImageBitmap? {
                         if (frame == 0) { bmp.erase(0); priorFrame = -1 }
 
                         codec.readPixels(bmp, frame, priorFrame)
-                        // Use safe conversion to avoid Canvas leak on every frame
-                        bitmap = bmp.toImageBitmapSafe()
+
+                        // Full pixel copy into JVM heap — Skia Image is closed immediately,
+                        // no native memory accumulation between frames.
+                        val img = org.jetbrains.skia.Image.makeFromBitmap(bmp)
+                        try {
+                            bitmap = img.toComposeImageBitmap()
+                        } finally {
+                            img.close()
+                        }
 
                         var duration = codec.framesInfo[frame].duration
                         if (duration < 30) duration = 100
