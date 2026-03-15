@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import hivens.config.AppConfig
 import hivens.core.api.model.ServerProfile
 import hivens.ui.components.GlassCard
+import hivens.ui.debug.SkiaTracker
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
 import kotlinx.coroutines.Dispatchers
@@ -60,7 +61,11 @@ fun ServerDetailScreen(
 
             val imgFile = File(assetsPath, "banner.png")
             if (imgFile.exists()) {
-                runCatching { bannerImage = ImageIO.read(imgFile)?.toComposeImageBitmap() }
+                runCatching {
+                    bannerImage = ImageIO.read(imgFile)?.toComposeImageBitmap()?.also {
+                        SkiaTracker.track("Detail.banner[${server.assetDir}]", it)
+                    }
+                }
             }
             isLoading = false
         }
