@@ -2,7 +2,9 @@ package hivens.ui
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -10,6 +12,7 @@ import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.*
 import coil3.ImageLoader
 import coil3.compose.setSingletonImageLoaderFactory
@@ -27,6 +30,7 @@ import hivens.launcher.di.networkModule
 import hivens.ui.background.BackgroundManager
 import hivens.ui.background.CustomBackground
 import hivens.ui.components.UpdateManager
+import hivens.ui.debug.SkiaDebugOverlay
 import hivens.ui.generated.resources.Res
 import hivens.ui.generated.resources.favicon
 import hivens.ui.i18n.AppLocale
@@ -385,6 +389,11 @@ fun AppRoot(
             }
     ) {
         CustomBackground(settings = backgroundSettings, mousePosProvider = { mousePos.value })
+        /*
+        SkiaDebugOverlay(
+            modifier = Modifier.align(Alignment.TopCenter).padding(top = 8.dp)
+        )
+         */
 
         AppLayout(
             appState             = appState,
@@ -403,6 +412,9 @@ fun AppRoot(
             onBackgroundSettingsChanged = { newSettings ->
                 backgroundSettings = newSettings
                 backgroundManager.save(newSettings)
+                if (!newSettings.enabled || newSettings.imagePath != backgroundSettings.imagePath) {
+                    System.gc()
+                }
             }
         )
     }
