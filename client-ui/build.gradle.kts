@@ -118,7 +118,7 @@ compose.desktop {
             packageName = "AuraLauncher"
             val cleanVersion = project.version.toString().removePrefix("v").substringBefore("-")
 
-            val safeVersion = if (cleanVersion.matches(Regex("\\d+\\.\\d+.*"))) cleanVersion else "1.0.0" else cleanVersion
+            val safeVersion = if (cleanVersion.matches(Regex("\\d+\\.\\d+.*"))) cleanVersion else "1.0.0"
 
             packageVersion = safeVersion
             description = "Aura Launcher v${project.version} (unofficial)"
