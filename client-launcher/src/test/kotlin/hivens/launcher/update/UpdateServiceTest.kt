@@ -32,7 +32,10 @@ class UpdateServiceTest {
         val tempDir = Files.createTempDirectory("update-test")
         tempDir.toFile().deleteOnExit()
         return UpdateService(
-            httpClient = buildMockClient(body = body, status = status),
+            httpClient = buildMockClient(
+                MockResponse(urlContains = "releases/latest", body = body,    status = status),
+                MockResponse(urlContains = "releases",        body = "[$body]", status = status)
+            ),
             json = json,
             dataDirectory = tempDir
         )
