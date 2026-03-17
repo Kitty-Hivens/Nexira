@@ -16,6 +16,7 @@ object EnglishStrings : AppStrings {
     override val loginLoading      = "LOADING"
     override val loginErrorEmpty   = "Enter your username and password"
     override val loginErrorGeneric = "Login error"
+    override val loginRegister     = "Create an account"
 
     // Navigation
     override val navHome     = "Home"

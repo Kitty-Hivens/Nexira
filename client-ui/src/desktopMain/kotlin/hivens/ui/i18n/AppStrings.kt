@@ -16,6 +16,7 @@ interface AppStrings {
     val loginLoading: String
     val loginErrorEmpty: String
     val loginErrorGeneric: String
+    val loginRegister: String
 
     // --- Navigation ---
     val navHome: String
