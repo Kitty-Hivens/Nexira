@@ -1,6 +1,7 @@
 package hivens.ui
 
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -232,6 +233,34 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
             } else {
                 Text(s.loginButton, color = Color.White, fontWeight = FontWeight.Bold)
             }
+        }
+
+        // ── Button "Register" — issue #105 ─────────────────────────────────
+        OutlinedButton(
+            onClick  = {
+                runCatching {
+                    val url = "${AppConfig.BASE_URL}/register"
+                    if (Desktop.isDesktopSupported() &&
+                        Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)
+                    ) {
+                        Desktop.getDesktop().browse(URI(url))
+                    }
+                }
+            },
+            modifier  = Modifier.fillMaxWidth().height(42.dp),
+            shape     = RoundedCornerShape(8.dp),
+            border    = BorderStroke(
+                width = 1.dp,
+                color = CelestiaTheme.colors.primary.copy(alpha = 0.45f)
+            ),
+            colors    = ButtonDefaults.outlinedButtonColors(
+                contentColor = CelestiaTheme.colors.primary
+            )
+        ) {
+            Text(
+                text       = s.loginRegister,
+                fontWeight = FontWeight.Medium
+            )
         }
     }
 }
