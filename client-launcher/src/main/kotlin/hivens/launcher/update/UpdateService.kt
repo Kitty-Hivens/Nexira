@@ -302,11 +302,12 @@ class UpdateService(
                         compareVersions(v, latestVersion)  <= 0
             }
             .sortedByDescending { it.tagName }
-            .joinToString("\n\n---\n\n") { release ->
-                val version = release.tagName
+            .mapNotNull { release ->
                 val section = extractWhatsChanged(release.body)
-                "## $version\n\n$section"
+                if (section.isBlank()) null  // skip releases with no parseable changelog
+                else "## ${release.tagName}\n\n$section"
             }
+            .joinToString("\n\n---\n\n")
             .ifBlank { "No changelog available" }
     }
 
