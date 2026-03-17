@@ -194,7 +194,10 @@ compose.desktop {
             "-XX:ReservedCodeCacheSize=128m",
 
             // Security
-            "--enable-native-access=ALL-UNNAMED"
+            "--enable-native-access=ALL-UNNAMED",
+
+            // prevent JNA native lib version conflict
+            "-Djna.nosys=true"
         )
     }
 }
