@@ -2,6 +2,15 @@
 
 All notable changes to Aura Launcher will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
+## [2.0.5] - 2026-03-17
+
+### Added
+- **Register button in login panel** (#105): added "Create an account" `OutlinedButton`
+  below the login button; opens `BASE_URL/register` in the system browser so users
+  can immediately tell which account type they need.
+- `loginRegister` i18n key added to `AppStrings`, `RussianStrings`, `EnglishStrings`,
+  `GermanStrings`.
+
 ## [2.0.4] - 2026-03-15
 
 ### Changed

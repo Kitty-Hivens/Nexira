@@ -16,6 +16,7 @@ object RussianStrings : AppStrings {
     override val loginLoading      = "ЗАГРУЗКА"
     override val loginErrorEmpty   = "Введите логин и пароль"
     override val loginErrorGeneric = "Ошибка входа"
+    override val loginRegister     = "Зарегистрироваться"
 
     // Navigation
     override val navHome     = "Главная"
