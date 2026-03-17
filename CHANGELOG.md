@@ -2,6 +2,18 @@
 
 All notable changes to Aura Launcher will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
+## [2.0.6] - 2026-03-17
+
+### Fixed
+- **Launcher crash on Windows when JNA version conflict is present**: dorkbox
+  SystemTray throws `java.lang.Error` (not `Exception`) when it detects an
+  incompatible JNA native library cached in `%TEMP%`. Added `jna.nosys=true`
+  system property in `main()` and jvmArgs so JNA always uses its bundled native.
+  Widened `TrayManager.init` catch to `Throwable` as a second line of defence.
+  With `startInTray=true` on affected Windows machines the launcher would silently
+  die before the window ever appeared — now it gracefully falls back to showing
+  the window when tray init fails.
+
 ## [2.0.5] - 2026-03-17
 
 ### Added
