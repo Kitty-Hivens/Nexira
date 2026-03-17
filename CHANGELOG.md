@@ -2,6 +2,14 @@
 
 All notable changes to Aura Launcher will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
+
+## [2.0.7] - 2026-03-17
+
+### Changed
+- **Update dialog changelog**: instead of showing raw release body (including
+  Downloads table and SHA256 checksums), now aggregates "What's Changed"
+  sections across all versions between the installed and latest release.
+
 ## [2.0.6] - 2026-03-17
 
 ### Fixed

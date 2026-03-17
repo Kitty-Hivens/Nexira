@@ -30,7 +30,8 @@ class UpdateService(
     private val lastCheckFile = updateDir.resolve(".last_check")
 
     companion object {
-        private const val GITHUB_API = "https://api.github.com/repos/Kitty-Hivens/Aura-Launcher/releases/latest"
+        private const val GITHUB_API_LATEST   = "https://api.github.com/repos/Kitty-Hivens/Aura-Launcher/releases/latest"
+        private const val GITHUB_API_RELEASES = "https://api.github.com/repos/Kitty-Hivens/Aura-Launcher/releases"
         private const val CHECK_INTERVAL_HOURS = 12L
     }
 
@@ -52,7 +53,7 @@ class UpdateService(
 
             logger.info("Checking for launcher updates...")
 
-            val response = httpClient.get(GITHUB_API) {
+            val response = httpClient.get(GITHUB_API_LATEST) {
                 header("Accept", "application/vnd.github.v3+json")
             }
 
@@ -87,7 +88,7 @@ class UpdateService(
                 version = release.tagName,
                 downloadUrl = asset.browserDownloadUrl,
                 checksum = checksum,
-                changelog = release.body ?: "No changelog available",
+                changelog = fetchChangelogBetween(currentVersion, latestVersion),
                 isCritical = isCritical
             )
 
@@ -281,6 +282,47 @@ class UpdateService(
         }
 
         return 0
+    }
+
+    private suspend fun fetchChangelogBetween(
+        currentVersion: String,
+        latestVersion: String
+    ): String {
+        val response = httpClient.get(GITHUB_API_RELEASES) {
+            header("Accept", "application/vnd.github.v3+json")
+        }
+        if (response.status.value != 200) return ""
+
+        val releases = json.decodeFromString<List<GitHubRelease>>(response.bodyAsText())
+
+        return releases
+            .filter { release ->
+                val v = release.tagName.removePrefix("v")
+                compareVersions(v, currentVersion) > 0 &&
+                        compareVersions(v, latestVersion)  <= 0
+            }
+            .sortedByDescending { it.tagName }
+            .joinToString("\n\n---\n\n") { release ->
+                val version = release.tagName
+                val section = extractWhatsChanged(release.body)
+                "## $version\n\n$section"
+            }
+            .ifBlank { "No changelog available" }
+    }
+
+    private fun extractWhatsChanged(body: String?): String {
+        if (body == null) return ""
+
+        // Slice between "## What's Changed" and the next "---" or "##"
+        val start = body.indexOf("## What's Changed")
+        if (start == -1) return body.substringBefore("---").trim()
+
+        val afterHeader = body.substring(start + "## What's Changed".length)
+        return afterHeader
+            .substringBefore("\n---")
+            .substringBefore("\n## ")
+            .trim()
+            .ifBlank { "" }
     }
 }
 
