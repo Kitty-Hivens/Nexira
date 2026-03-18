@@ -18,7 +18,6 @@ interface IFileDownloadService {
      * @param messageUI Lambda for UI messages (optional).
      * @param progressUI Lambda for progress (current, total) (optional).
      */
-    @Throws(IOException::class)
     suspend fun processSession(
         session: SessionData,
         serverId: String,

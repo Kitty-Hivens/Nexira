@@ -328,8 +328,7 @@ class UpdateServiceTest {
 
     @Test
     fun `checkForUpdate returns null when current version is up to date`() = runTest {
-        // Use v0.0.1 which is older than any real version
-        val svc = createService(githubReleaseJson(tagName = "v0.0.1"))
+        val svc = createService(githubReleaseJson(tagName = "v0.0.0"))
         val update = svc.checkForUpdate(force = true)
 
         assertNull(update, "Should not offer downgrade")

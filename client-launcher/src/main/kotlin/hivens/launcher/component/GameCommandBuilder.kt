@@ -114,7 +114,7 @@ internal class GameCommandBuilder {
         val isModernEnvironment = config.mainClass.contains("BootstrapLauncher")
 
         // 5. NeoForge / Modern Environment
-        if (isModernEnvironment || config.assetIndex == "1.21.1") {
+        if (isModernEnvironment) {
             val libDirStandard = clientRoot.resolve("libraries")
             // Dynamically resolve library directory based on asset index
             val libDirCustom = clientRoot.resolve("libraries-${config.assetIndex}")
@@ -136,7 +136,7 @@ internal class GameCommandBuilder {
         args.addAll(systemArgs)
 
         // Java 21+ Vector API optimization for faster data structures in mods (e.g., JEI, Ars Nouveau)
-        if (isModernEnvironment || config.assetIndex == "1.21.1") {
+        if (isModernEnvironment) {
             args.add("--add-modules=jdk.incubator.vector")
         }
 
@@ -151,7 +151,7 @@ internal class GameCommandBuilder {
 
         // 7. Java 9+ Module Path (NeoForge / Modern Forge) dynamically resolved
         var validModules = emptyList<String>()
-        if (isModernEnvironment || config.assetIndex == "1.21.1") {
+        if (isModernEnvironment) {
             // Strictly ONLY Bootstraplauncher, SecureJarHandler, ASM, and JarJar belong in the Module Path (-p).
             val jvmModuleKeywords = listOf(
                 "securejarhandler",
@@ -176,7 +176,7 @@ internal class GameCommandBuilder {
 
         // 8. Classpath & Entry Point
         args.add("-cp")
-        if (isModernEnvironment || config.assetIndex == "1.21.1") {
+        if (isModernEnvironment) {
             // Remove ONLY the strict boot modules from Classpath. All other libraries stay.
             val cleanClasspath = classpath.split(File.pathSeparator)
                 .filter { path -> !validModules.contains(path) }

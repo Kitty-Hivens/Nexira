@@ -2,6 +2,43 @@
 
 All notable changes to Aura Launcher will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
+## [2.0.8] - 2026-03-18
+### Added
+- **Abyssal** theme to `ThemePresets` — deep ocean palette with cold blue accents.
+
+### Fixed
+- **SkinManager cache invalidation bug**: `getSkinBack` was using `encodeNickname()` for
+  the disk cache filename (`back_Player%20Name.png`) while `invalidate()` deleted by raw
+  nickname (`back_Player Name.png`), leaving stale cache files on disk permanently.
+  File paths now always use raw nickname; URL encoding applies only to network requests.
+- **SkinManager native memory leak**: `saveBitmapToDisk` was not closing the temporary
+  Skia `Image` after `encodeToData()`, leaking native memory on every cache write.
+- **URL encoding in file downloads**: `FileDownloadService` was only replacing spaces
+  with `%20`; all path segments are now properly percent-encoded via `URLEncoder`.
+- **`smarty_hash.cache` relative path**: `ServerRepository` now stores the hash cache
+  inside `dataDirectory` instead of a process-relative path.
+- **`TrayManager.setGameStatus`**: "Running" and "Ready" labels were hardcoded in English;
+  now use the localized strings passed to `init()`.
+- **`ProfileScreen` file picker**: replaced AWT `FileDialog` with `FileKit` for
+  consistency with the rest of the codebase.
+
+### Changed
+- `getMD5` extracted from `AuthService`, `PlayerRepository`, `SkinRepository` into
+  shared `HashUtils.md5()` in `client-core`.
+- `CustomTheme` migrated to `@Serializable`; manual `toJson()`/`fromJson()` removed.
+- `toCelestiaColors()` removed from `CustomTheme` — was never called; `background` and
+  `surface` fields are kept for `ThemePickerScreen` preview only.
+- `SimpleDateFormat` replaced with `DateTimeFormatter` in `ServerListService`.
+
+### Removed
+- `NewsScreen.kt` — was `@Deprecated`; UI fully covered by `CompactNewsFeed`.
+- `IManifestProcessorService.processManifest()` and its stub implementation — zero call sites.
+- `SettingsData.defaults()` — identical to the default constructor `SettingsData()`.
+- `@Throws` annotations on `IAuthService` and `IFileDownloadService` — no effect in
+  Kotlin-only codebase, meaningless on `suspend fun`.
+- Redundant `|| config.assetIndex == "1.21.1"` conditions in `GameCommandBuilder` —
+  `1.21.1` config always uses `BootstrapLauncher`, making the extra check unreachable.
+- Dead `skiaImageToBitmap()` from `SkinManager`.
 
 ## [2.0.7] - 2026-03-17
 
