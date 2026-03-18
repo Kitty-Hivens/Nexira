@@ -83,7 +83,7 @@ fun BackgroundSettingsScreen(
                     SectionTitle(s.backgroundSectionImage)
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(onClick = { scope.launch {
-                            FileKit.openFilePicker(type = FileKitType.File(extensions = listOf("png", "jpg", "jpeg", "gif", "webp", "bmp")), dialogSettings = FileKitDialogSettings(
+                            FileKit.openFilePicker(type = FileKitType.File(extensions = listOf("png", "jpg", "jpeg", "webp", "bmp")), dialogSettings = FileKitDialogSettings(
                                 title = s.backgroundPickFile
                             )
                             )?.path?.let { path -> update { copy(imagePath = path, enabled = true) } }

@@ -16,6 +16,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
   race condition between the `workflow_run` trigger and asset upload completion.
   Asset naming is already guaranteed by `build_release.yml`; `scripts/verify-release.sh`
   is kept for manual use.
+- Animated GIF/WebP background support dropped permanently.
+  All attempts (native Skiko frame scheduler, Kamel, Coil 3) produced either
+  native memory leaks or severe UI stutter due to Compose Multiplatform desktop
+  architecture constraints. Static images are unaffected.
 
 ### Notes
 - OkHttp → CIO engine migration is blocked by
