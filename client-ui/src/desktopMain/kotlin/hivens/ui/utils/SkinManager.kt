@@ -3,15 +3,16 @@ package hivens.ui.utils
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import hivens.config.AppConfig
+import io.ktor.client.*
+import io.ktor.client.request.*
+import io.ktor.client.statement.*
+import io.ktor.http.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.jetbrains.skia.ColorAlphaType
 import org.jetbrains.skia.ImageInfo
 import org.slf4j.LoggerFactory
-import java.io.ByteArrayOutputStream
 import java.io.File
-import java.net.HttpURLConnection
-import java.net.URI
 import java.net.URLEncoder
 
 /**
@@ -26,16 +27,19 @@ import java.net.URLEncoder
  *
  * Note: encodeNickname() is used ONLY for URL construction, never for file paths.
  */
-object SkinManager {
-    private const val BASE_SKIN_URL = "https://www.smartycraft.ru/skins/"
-    private const val BASE_CLOAK_URL = "https://www.smartycraft.ru/cloaks/"
-    private const val CACHE_TTL_MS = 30 * 60 * 1000L // 30 minutes
+class SkinManager(private val httpClient: HttpClient) {
+
+    private companion object {
+        private const val BASE_SKIN_URL  = "https://www.smartycraft.ru/skins/"
+        private const val BASE_CLOAK_URL = "https://www.smartycraft.ru/cloaks/"
+        private const val CACHE_TTL_MS   = 30 * 60 * 1000L // 30 minutes
+    }
 
     private val logger = LoggerFactory.getLogger("SkinManager")
 
     // In-memory LRU (small, just for the current session)
     private val frontCache = mutableMapOf<String, ImageBitmap>()
-    private val backCache = mutableMapOf<String, ImageBitmap>()
+    private val backCache  = mutableMapOf<String, ImageBitmap>()
 
     // Disk cache directory — lazy-initialized
     private val cacheDir: File by lazy {
@@ -155,7 +159,7 @@ object SkinManager {
         return System.currentTimeMillis() - file.lastModified() > CACHE_TTL_MS
     }
 
-    private fun getOrDownloadRawSkin(nickname: String): org.jetbrains.skia.Image? {
+    private suspend fun getOrDownloadRawSkin(nickname: String): org.jetbrains.skia.Image? {
         // raw nickname for file path, encodeNickname only for URL
         val rawFile = File(cacheDir, "raw_${nickname}.png")
 
@@ -205,19 +209,13 @@ object SkinManager {
 
     // ── Network ────────────────────────────────────────────────────────────
 
-    private fun downloadTexture(url: String): org.jetbrains.skia.Image? {
+    private suspend fun downloadTexture(url: String): org.jetbrains.skia.Image? {
         return try {
-            val conn = URI.create(url).toURL().openConnection() as HttpURLConnection
-            conn.connectTimeout = 3000
-            conn.readTimeout = 3000
-            conn.setRequestProperty("User-Agent", "Mozilla/5.0")
-            if (conn.responseCode != 200) return null
-
-            val bytes = conn.inputStream.use { input ->
-                val out = ByteArrayOutputStream()
-                input.copyTo(out)
-                out.toByteArray()
+            val response = httpClient.get(url) {
+                header(HttpHeaders.UserAgent, "Mozilla/5.0")
             }
+            if (!response.status.isSuccess()) return null
+            val bytes = response.bodyAsBytes()
             org.jetbrains.skia.Image.makeFromEncoded(bytes)
         } catch (e: Exception) {
             logger.debug("Failed to download texture from {}: {}", url, e.message)

@@ -1,6 +1,5 @@
 package hivens.ui.screens
 
-import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -13,8 +12,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -24,10 +21,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.ImageLoader
 import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
-import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import hivens.config.AppConfig
 import hivens.core.data.LauncherUpdate
 import hivens.launcher.update.UpdateService
@@ -39,7 +34,6 @@ import hivens.ui.generated.resources.favicon
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
 import kotlinx.coroutines.launch
-import okhttp3.OkHttpClient
 import org.jetbrains.compose.resources.painterResource
 import org.koin.compose.koinInject
 import java.awt.Desktop
@@ -54,13 +48,6 @@ fun AboutScreen(onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
 
     var updateState by remember { mutableStateOf<UpdateCheckState>(UpdateCheckState.Idle) }
-    val httpClient: OkHttpClient = koinInject()
-    val context = LocalPlatformContext.current
-    val imageLoader = remember {
-        ImageLoader.Builder(context)
-            .components { add(OkHttpNetworkFetcherFactory(callFactory = { httpClient })) }
-            .build()
-    }
 
     // When true, the full UpdateDialog is shown — same dialog used by UpdateManager
     var showUpdateDialog by remember { mutableStateOf(false) }
