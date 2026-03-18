@@ -2,9 +2,7 @@ package hivens.ui
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -12,7 +10,6 @@ import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.*
 import coil3.ImageLoader
 import coil3.compose.setSingletonImageLoaderFactory
@@ -21,6 +18,7 @@ import hivens.config.AppConfig
 import hivens.core.api.interfaces.IAuthService
 import hivens.core.api.interfaces.IServerListService
 import hivens.core.api.interfaces.ISettingsService
+import hivens.core.api.model.ServerProfile
 import hivens.core.data.SessionData
 import hivens.launcher.CrashReporter
 import hivens.launcher.CredentialsManager
@@ -30,7 +28,6 @@ import hivens.launcher.di.networkModule
 import hivens.ui.background.BackgroundManager
 import hivens.ui.background.CustomBackground
 import hivens.ui.components.UpdateManager
-import hivens.ui.debug.SkiaDebugOverlay
 import hivens.ui.generated.resources.Res
 import hivens.ui.generated.resources.favicon
 import hivens.ui.i18n.AppLocale
@@ -44,6 +41,7 @@ import hivens.ui.theme.CustomTheme
 import hivens.ui.theme.ThemeManager
 import hivens.ui.tray.TrayManager
 import hivens.ui.utils.GameConsoleService
+import hivens.ui.utils.SkinManager
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
@@ -65,6 +63,7 @@ import javax.swing.SwingUtilities
 
 val uiModule = module {
     singleOf(::LauncherController)
+    single { SkinManager(get()) }
 }
 
 // ─── State ───────────────────────────────────────────────────────────────────
@@ -84,8 +83,8 @@ sealed class Screen {
     object ThemePicker        : Screen()
     object About              : Screen()
     object BackgroundSettings : Screen()
-    data class ServerSettings(val server: hivens.core.api.model.ServerProfile) : Screen()
-    data class ServerDetails (val server: hivens.core.api.model.ServerProfile) : Screen()
+    data class ServerSettings(val server: ServerProfile) : Screen()
+    data class ServerDetails (val server: ServerProfile) : Screen()
 }
 
 // ─── Entry Point ─────────────────────────────────────────────────────────────

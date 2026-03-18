@@ -30,11 +30,10 @@ import io.github.vinceglb.filekit.path
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.koin.compose.koinInject
 import java.awt.Desktop
-import java.awt.FileDialog
 import java.io.File
 import java.net.URI
-import javax.swing.JFrame
 
 /** Tri-state for the skin upload status so colour is not determined by string content. */
 private sealed class UploadStatus {
@@ -46,6 +45,7 @@ private sealed class UploadStatus {
 
 @Composable
 fun ProfileScreen(session: SessionData, skinRepository: SkinRepository) {
+    val skinManager: SkinManager = koinInject()
     val s            = LocalStrings.current
     var frontSkin    by remember { mutableStateOf<ImageBitmap?>(null) }
     var backSkin     by remember { mutableStateOf<ImageBitmap?>(null) }
@@ -55,8 +55,8 @@ fun ProfileScreen(session: SessionData, skinRepository: SkinRepository) {
 
     fun loadSkins() {
         scope.launch {
-            frontSkin = SkinManager.getSkinFront(session.playerName)
-            backSkin  = SkinManager.getSkinBack(session.playerName)
+            frontSkin = skinManager.getSkinFront(session.playerName)
+            backSkin  = skinManager.getSkinBack(session.playerName)
         }
     }
 
@@ -95,7 +95,7 @@ fun ProfileScreen(session: SessionData, skinRepository: SkinRepository) {
                         }
                     }
                     IconButton(
-                        onClick  = { SkinManager.invalidate(session.playerName); loadSkins() },
+                        onClick  = { skinManager.invalidate(session.playerName); loadSkins() },
                         modifier = Modifier.align(Alignment.TopEnd).padding(16.dp)
                     ) {
                         Icon(Icons.Default.Refresh, s.profileRefresh, tint = CelestiaTheme.colors.textPrimary)
@@ -209,7 +209,7 @@ fun ProfileScreen(session: SessionData, skinRepository: SkinRepository) {
                                             // SkinRepository returns "OK" on success, error string otherwise.
                                             if (uploadResult == "OK") {
                                                 uploadStatus = UploadStatus.Success(s.profileUploadSuccess)
-                                                SkinManager.invalidate(session.playerName)
+                                                skinManager.invalidate(session.playerName)
                                                 loadSkins()
                                             } else {
                                                 uploadStatus = UploadStatus.Error(s.profileUploadError(uploadResult))
