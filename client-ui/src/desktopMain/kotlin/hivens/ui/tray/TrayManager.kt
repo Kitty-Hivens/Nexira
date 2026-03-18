@@ -23,6 +23,7 @@ object TrayManager {
     private var serversSubmenu: Menu? = null
     private val serverItems = mutableListOf<MenuItem>()
     private var noServersItem: MenuItem? = null
+    private var strings: Strings? = null
 
     data class Strings(
         val tooltip: String,
@@ -45,6 +46,7 @@ object TrayManager {
     // ── Lifecycle ─────────────────────────────────────────────────────────
 
     fun init(iconStream: InputStream, strings: Strings) {
+        this.strings = strings
         if (tray != null) return
 
         try {
@@ -125,8 +127,8 @@ object TrayManager {
     fun setGameStatus(running: Boolean, serverName: String? = null) {
         statusItem?.setText(when {
             running && serverName != null -> "▶  $serverName"
-            running -> "▶  Running"
-            else    -> "●  Ready"
+            running -> strings?.statusRunning ?: "▶  Running"
+            else    -> strings?.statusIdle ?: "●  Ready"
         })
     }
 

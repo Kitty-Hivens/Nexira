@@ -1,49 +1,28 @@
 package hivens.ui.theme
 
 import androidx.compose.ui.graphics.Color
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
 
 /**
- * Кастомная тема
+ * Custom theme
  */
+@Serializable
 data class CustomTheme(
     val name: String,
     val primary: String,
     val secondary: String,
+    // Used only in ThemePickerScreen preview, not applied to the actual theme.
+    // Dark/Light toggle controls background and text colors at runtime.
     val background: String,
     val surface: String,
     val accent: String,
     val success: String,
     val error: String
 ) {
-    fun toCelestiaColors(isDark: Boolean): CelestiaColors {
-        return CelestiaColors(
-            primary = parseHexColor(primary),
-            primaryVariant = parseHexColor(primary).copy(alpha = 0.8f),
-            secondary = parseHexColor(secondary),
-            background = parseHexColor(background),
-            surface = parseHexColor(surface),
-            surfaceVariant = parseHexColor(surface).copy(alpha = 0.7f),
-            error = parseHexColor(error),
-            onPrimary = if (isDark) Color.Black else Color.White,
-            onSecondary = Color.Black,
-            onBackground = if (isDark) Color.White else Color.Black,
-            onSurface = if (isDark) Color.White else Color.Black,
-            textPrimary = if (isDark) Color(0xFFEEEEEE) else Color(0xFF263238),
-            textSecondary = if (isDark) Color(0xFFB0B0B0) else Color(0xFF78909C),
-            glassBackground = parseHexColor(background),
-            glassAlpha = if (isDark) 0.6f else 0.65f,
-            success = parseHexColor(success),
-            outline = if (isDark) Color(0xFF444444) else Color(0xFFCCCCCC)
-        )
-    }
-    
-    fun toJson(): String {
-        return """{"name":"$name","primary":"$primary","secondary":"$secondary","background":"$background","surface":"$surface","accent":"$accent","success":"$success","error":"$error"}"""
-    }
-    
     companion object {
         fun parseHexColor(hex: String): Color {
             val cleanHex = hex.removePrefix("#")
@@ -54,25 +33,8 @@ data class CustomTheme(
                     8 -> Color(colorInt)
                     else -> Color.White
                 }
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 Color.White
-            }
-        }
-        
-        fun fromJson(json: String): CustomTheme? {
-            return try {
-                val name = json.substringAfter("\"name\":\"").substringBefore("\"")
-                val primary = json.substringAfter("\"primary\":\"").substringBefore("\"")
-                val secondary = json.substringAfter("\"secondary\":\"").substringBefore("\"")
-                val background = json.substringAfter("\"background\":\"").substringBefore("\"")
-                val surface = json.substringAfter("\"surface\":\"").substringBefore("\"")
-                val accent = json.substringAfter("\"accent\":\"").substringBefore("\"")
-                val success = json.substringAfter("\"success\":\"").substringBefore("\"")
-                val error = json.substringAfter("\"error\":\"").substringBefore("\"")
-                
-                CustomTheme(name, primary, secondary, background, surface, accent, success, error)
-            } catch (e: Exception) {
-                null
             }
         }
     }
@@ -145,25 +107,37 @@ object ThemePresets {
         error = "#FF073A"
     )
 
+    val ABYSSAL = CustomTheme(
+        name = "Abyssal",
+        primary = "#4FC3F7",
+        secondary = "#0D47A1",
+        background = "#050A14",
+        surface = "#0A1628",
+        accent = "#00BCD4",
+        success = "#26C6DA",
+        error = "#EF5350"
+    )
+
     fun getAll() = listOf(
         CELESTIA_DARK,
         CYBERPUNK,
         VAPORWAVE,
         MATRIX,
         SYNTHWAVE,
-        NEON_PINK
+        NEON_PINK,
+        ABYSSAL
     )
 }
 
 class ThemeManager(configPath: Path) {
     private val logger = LoggerFactory.getLogger(ThemeManager::class.java)
     private val themesFile = configPath.resolve("themes.json")
+    private val json = Json { ignoreUnknownKeys = true }
 
     fun loadTheme(): CustomTheme {
         return try {
             if (Files.exists(themesFile)) {
-                val content = Files.readString(themesFile)
-                CustomTheme.fromJson(content) ?: ThemePresets.CELESTIA_DARK
+                json.decodeFromString<CustomTheme>(Files.readString(themesFile))
             } else {
                 ThemePresets.CELESTIA_DARK
             }
@@ -176,7 +150,7 @@ class ThemeManager(configPath: Path) {
     fun saveTheme(theme: CustomTheme) {
         try {
             Files.createDirectories(themesFile.parent)
-            Files.writeString(themesFile, theme.toJson())
+            Files.writeString(themesFile, json.encodeToString(theme))
             logger.info("Theme saved: ${theme.name}")
         } catch (e: Exception) {
             logger.error("Failed to save theme", e)

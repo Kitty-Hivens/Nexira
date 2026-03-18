@@ -14,12 +14,6 @@ class ManifestProcessorService(
 
     private val log = LoggerFactory.getLogger(ManifestProcessorService::class.java)
 
-    override fun processManifest(version: String): FileManifest {
-        // In the current architecture, the manifest comes already prepared in SessionData,
-        // This method was originally a stub; we leave it as a stub.
-        return FileManifest()
-    }
-
     override fun flattenManifest(manifest: FileManifest): Map<String, FileData> {
         val result = HashMap<String, FileData>()
         flattenRecursive(manifest, "", result)

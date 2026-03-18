@@ -22,7 +22,7 @@ class SettingsService(
 
     override fun getSettings(): SettingsData {
         if (cachedSettings == null) reload()
-        return cachedSettings ?: SettingsData.defaults()
+        return cachedSettings ?: SettingsData()
     }
 
     override fun saveSettings(settings: SettingsData) {
@@ -38,7 +38,7 @@ class SettingsService(
 
     private fun reload() {
         if (!Files.exists(settingsFile)) {
-            cachedSettings = SettingsData.defaults()
+            cachedSettings = SettingsData()
             return
         }
         try {
@@ -46,7 +46,7 @@ class SettingsService(
             cachedSettings = json.decodeFromString<SettingsData>(text)
         } catch (e: Exception) {
             log.error("Failed to load settings, using defaults", e)
-            cachedSettings = SettingsData.defaults()
+            cachedSettings = SettingsData()
         }
     }
 }

@@ -3,6 +3,7 @@ package hivens.core.api
 import hivens.config.AppConfig
 import hivens.core.api.dto.SmartyResponse
 import hivens.core.data.SessionData
+import hivens.core.util.HashUtils
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -30,7 +31,7 @@ class SkinRepository(
         // Logic from SmartyNetworkService: MD5( (time/10) + "|" + uid + "|" + login )
         val timestamp = System.currentTimeMillis() / 1000L / 10L
         val signString = "$timestamp|${session.uid}|${session.playerName}"
-        val checkHash = getMD5(signString)
+        val checkHash = HashUtils.md5(signString)
 
         return try {
             val response = client.post(AppConfig.AUTH_URL) {
@@ -76,13 +77,5 @@ class SkinRepository(
             "HD" -> "Error: HD skins are not available on your account"
             else -> "Server error: $status"
         }
-    }
-
-    private fun getMD5(input: String): String {
-        return try {
-            val md = MessageDigest.getInstance("MD5")
-            val hash = md.digest(input.toByteArray(Charsets.UTF_8))
-            hash.joinToString("") { "%02x".format(it) }
-        } catch (_: Exception) { "" }
     }
 }

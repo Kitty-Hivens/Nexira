@@ -20,6 +20,5 @@ interface IAuthService {
      * @throws AuthException in case of authentication errors (incorrect password, ban, etc.).
      * @throws IOException in case of network errors (I/O, timeouts, DNS).
      */
-    @Throws(AuthException::class, IOException::class)
     suspend fun login(username: String, password: String, serverId: String): SessionData
 }

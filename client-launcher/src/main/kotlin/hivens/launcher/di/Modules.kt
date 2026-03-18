@@ -92,7 +92,7 @@ val networkModule = module {
     }
 
     // Repositories
-    singleOf(::ServerRepository)
+    single { ServerRepository(get(), get(), get<java.nio.file.Path>().toFile()) }
     singleOf(::SkinRepository)
     singleOf(::PlayerRepository)
 }
