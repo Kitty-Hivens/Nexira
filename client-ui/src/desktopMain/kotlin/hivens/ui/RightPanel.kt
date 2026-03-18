@@ -269,11 +269,12 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
 
 @Composable
 fun AccountPanel(session: SessionData, onLogout: () -> Unit) {
+    val skinManager: SkinManager = koinInject()
     val s = LocalStrings.current
     var faceBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
 
     LaunchedEffect(session.playerName) {
-        faceBitmap = SkinManager.getSkinFront(session.playerName)
+        faceBitmap = skinManager.getSkinFront(session.playerName)
     }
 
     Row(

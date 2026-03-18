@@ -179,7 +179,6 @@ private fun rememberSkiaImage(file: File): ImageBitmap? {
                 codec = Codec.makeFromData(data)
                 bmp   = org.jetbrains.skia.Bitmap().apply { allocPixels(codec.imageInfo) }
 
-                // Decode first frame only — animated GIF/WebP disabled until 2.1.0 (Kamel)
                 codec.readPixels(bmp, 0)
                 val img = org.jetbrains.skia.Image.makeFromBitmap(bmp)
                 try {

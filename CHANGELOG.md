@@ -2,6 +2,31 @@
 
 All notable changes to Aura Launcher will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
+## [2.1.0] - 2026-03-18
+
+### Changed
+- **`SkinManager`** refactored from `object` to `class`; now receives `HttpClient`
+  via Koin injection instead of using `HttpURLConnection` directly. Proxy, timeouts
+  and User-Agent from the global network configuration now apply to skin downloads.
+- `AboutScreen`: removed local `OkHttp` `ImageLoader` instance; uses the global
+  singleton set up in `AppRoot` instead.
+
+### Removed
+- `.github/workflows/verify_release.yml`: was failing on every release due to a
+  race condition between the `workflow_run` trigger and asset upload completion.
+  Asset naming is already guaranteed by `build_release.yml`; `scripts/verify-release.sh`
+  is kept for manual use.
+- Animated GIF/WebP background support dropped permanently.
+  All attempts (native Skiko frame scheduler, Kamel, Coil 3) produced either
+  native memory leaks or severe UI stutter due to Compose Multiplatform desktop
+  architecture constraints. Static images are unaffected.
+
+### Notes
+- OkHttp → CIO engine migration is blocked by
+  [KTOR-5961](https://youtrack.jetbrains.com/issue/KTOR-5961) —
+  SOCKS5 authentication is not implemented in the CIO engine.
+  Will revisit when the proxy requirement is lifted.
+
 ## [2.0.8] - 2026-03-18
 ### Added
 - **Abyssal** theme to `ThemePresets` — deep ocean palette with cold blue accents.
