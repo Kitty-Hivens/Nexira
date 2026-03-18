@@ -67,6 +67,7 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:$coroutinesVersion")
                 implementation("ch.qos.logback:logback-classic:$logbackVersion")
                 implementation("com.dorkbox:SystemTray:$systemTray")
+                implementation("io.ktor:ktor-client-core:${ktorVersion}")
             }
         }
     }
