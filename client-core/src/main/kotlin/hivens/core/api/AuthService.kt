@@ -5,6 +5,7 @@ import hivens.core.api.interfaces.IAuthService
 import hivens.core.data.AuthStatus
 import hivens.core.data.FileManifest
 import hivens.core.data.SessionData
+import hivens.core.util.HashUtils
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.forms.*
@@ -56,7 +57,7 @@ class AuthService(
     override suspend fun login(username: String, password: String, serverId: String): SessionData {
         logger.info("Login via API V3 (server: {})...", serverId)
 
-        val passwordEncoded = getMD5(password)
+        val passwordEncoded = HashUtils.md5(password)
         val clientSessionId = UUID.randomUUID().toString().replace("-", "")
         val is64 = System.getProperty("os.arch").contains("64")
 
@@ -140,12 +141,12 @@ class AuthService(
         if (sessionV3 == null || uid == null) return sessionV3
         return try {
             val salt = AppConfig.AUTH_SALT
-            val keyHash = getMD5(uid + salt)
+            val keyHash = HashUtils.md5(uid + salt)
             val key = keyHash.take(16)
             val decrypted = decryptAES(sessionV3, key)
-            val hash1 = getMD5(decrypted)
+            val hash1 = HashUtils.md5(decrypted)
             val suffix = if (hash1.length >= 3) hash1.substring(hash1.length - 3) else ""
-            getMD5(hash1 + suffix)
+            HashUtils.md5(hash1 + suffix)
         } catch (_: Exception) { sessionV3 }
     }
 
@@ -156,14 +157,6 @@ class AuthService(
         val decodedBytes = Base64.getDecoder().decode(base64Cipher)
         val decryptedBytes = cipher.doFinal(decodedBytes)
         return String(decryptedBytes, StandardCharsets.UTF_8)
-    }
-
-    private fun getMD5(input: String): String {
-        return try {
-            val md = MessageDigest.getInstance("MD5")
-            val hash = md.digest(input.toByteArray(StandardCharsets.UTF_8))
-            hash.joinToString("") { "%02x".format(it) }
-        } catch (_: Exception) { "" }
     }
 
     private fun generateRandomMac(): String {

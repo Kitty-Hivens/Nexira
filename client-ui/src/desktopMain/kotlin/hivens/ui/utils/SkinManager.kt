@@ -1,7 +1,6 @@
 package hivens.ui.utils
 
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asComposeImageBitmap
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import hivens.config.AppConfig
 import kotlinx.coroutines.Dispatchers
@@ -13,6 +12,7 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URI
+import java.net.URLEncoder
 
 /**
  * Skin manager with persistent disk cache (#61).
@@ -23,6 +23,8 @@ import java.net.URI
  *   ~/.aura/skin-cache/raw_<nick>.png   (original texture)
  *
  * Cache is invalidated on explicit call or after [CACHE_TTL_MS].
+ *
+ * Note: encodeNickname() is used ONLY for URL construction, never for file paths.
  */
 object SkinManager {
     private const val BASE_SKIN_URL = "https://www.smartycraft.ru/skins/"
@@ -106,6 +108,7 @@ object SkinManager {
     suspend fun getSkinBack(nickname: String, cloakHash: String? = null): ImageBitmap? = withContext(Dispatchers.IO) {
         backCache[nickname]?.let { return@withContext it }
 
+        // FIX: raw nickname for file path, not encoded — must match invalidate()
         val diskFile = File(cacheDir, "back_${nickname}.png")
         if (diskFile.exists() && !isExpired(diskFile)) {
             try {
@@ -126,10 +129,11 @@ object SkinManager {
 
         val rawSkin = getOrDownloadRawSkin(nickname) ?: return@withContext null
 
+        // encodeNickname used only in URL, not in file path
         val cloakUrl = if (!cloakHash.isNullOrEmpty()) {
             "$BASE_CLOAK_URL$cloakHash.png"
         } else {
-            "$BASE_CLOAK_URL$nickname.png"
+            "$BASE_CLOAK_URL${encodeNickname(nickname)}.png"
         }
         val rawCloak = downloadTexture(cloakUrl)
 
@@ -152,6 +156,7 @@ object SkinManager {
     }
 
     private fun getOrDownloadRawSkin(nickname: String): org.jetbrains.skia.Image? {
+        // raw nickname for file path, encodeNickname only for URL
         val rawFile = File(cacheDir, "raw_${nickname}.png")
 
         // Try disk cache for raw texture
@@ -164,7 +169,7 @@ object SkinManager {
         }
 
         // Download
-        val image = downloadTexture("$BASE_SKIN_URL$nickname.png") ?: return null
+        val image = downloadTexture("$BASE_SKIN_URL${encodeNickname(nickname)}.png") ?: return null
 
         // Save raw to disk
         try {
@@ -184,7 +189,11 @@ object SkinManager {
     private fun saveBitmapToDisk(bitmap: org.jetbrains.skia.Bitmap, file: File) {
         try {
             val image = org.jetbrains.skia.Image.makeFromBitmap(bitmap)
-            val data = image.encodeToData(org.jetbrains.skia.EncodedImageFormat.PNG)
+            val data = try {
+                image.encodeToData(org.jetbrains.skia.EncodedImageFormat.PNG)
+            } finally {
+                image.close()
+            }
             if (data != null) {
                 file.parentFile?.mkdirs()
                 file.writeBytes(data.bytes)
@@ -192,18 +201,6 @@ object SkinManager {
         } catch (e: Exception) {
             logger.warn("Failed to save rendered skin to disk: {}", e.message)
         }
-    }
-
-    private fun skiaImageToBitmap(image: org.jetbrains.skia.Image): org.jetbrains.skia.Bitmap {
-        val bitmap = org.jetbrains.skia.Bitmap()
-        bitmap.allocPixels(ImageInfo.makeS32(image.width, image.height, ColorAlphaType.PREMUL))
-        val canvas = org.jetbrains.skia.Canvas(bitmap)
-        try {
-            canvas.drawImage(image, 0f, 0f)
-        } finally {
-            canvas.close()
-        }
-        return bitmap
     }
 
     // ── Network ────────────────────────────────────────────────────────────
@@ -343,4 +340,8 @@ object SkinManager {
 
         return output
     }
+
+    // ── URL encoding — only for network requests, never for file paths ─────
+    private fun encodeNickname(nickname: String): String =
+        URLEncoder.encode(nickname, Charsets.UTF_8.name()).replace("+", "%20")
 }
