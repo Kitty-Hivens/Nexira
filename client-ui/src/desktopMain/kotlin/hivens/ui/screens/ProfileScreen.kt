@@ -22,6 +22,11 @@ import hivens.ui.components.GlassCard
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.utils.SkinManager
+import io.github.vinceglb.filekit.FileKit
+import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
+import io.github.vinceglb.filekit.dialogs.FileKitType
+import io.github.vinceglb.filekit.dialogs.openFilePicker
+import io.github.vinceglb.filekit.path
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -188,22 +193,26 @@ fun ProfileScreen(session: SessionData, skinRepository: SkinRepository) {
                         CelestiaButton(
                             text     = s.profileUploadSkin,
                             onClick  = {
-                                val file = pickImage(s.profileUploadSkin)
-                                if (file != null) {
-                                    uploadStatus = UploadStatus.Loading
-                                    scope.launch {
+                                scope.launch {
+                                    val result = FileKit.openFilePicker(
+                                        type = FileKitType.File(extensions = listOf("png")),
+                                        dialogSettings = FileKitDialogSettings(title = s.profileUploadSkin)
+                                    )
+                                    val file = result?.path?.let { File(it) }
+                                    if (file != null) {
+                                        uploadStatus = UploadStatus.Loading
                                         try {
-                                            val result = withContext(Dispatchers.IO) {
+                                            val uploadResult = withContext(Dispatchers.IO) {
                                                 skinRepository.uploadSkin(file, false, session)
                                             }
                                             // FIX: Check the result instead of assuming success.
                                             // SkinRepository returns "OK" on success, error string otherwise.
-                                            if (result == "OK") {
+                                            if (uploadResult == "OK") {
                                                 uploadStatus = UploadStatus.Success(s.profileUploadSuccess)
                                                 SkinManager.invalidate(session.playerName)
                                                 loadSkins()
                                             } else {
-                                                uploadStatus = UploadStatus.Error(s.profileUploadError(result))
+                                                uploadStatus = UploadStatus.Error(s.profileUploadError(uploadResult))
                                             }
                                         } catch (e: Exception) {
                                             uploadStatus = UploadStatus.Error(
@@ -221,13 +230,4 @@ fun ProfileScreen(session: SessionData, skinRepository: SkinRepository) {
             }
         }
     }
-}
-
-private fun pickImage(title: String): File? {
-    val dialog = FileDialog(null as JFrame?, title, FileDialog.LOAD)
-    dialog.file      = "*.png"
-    dialog.isVisible = true
-    return if (dialog.directory != null && dialog.file != null)
-        File(dialog.directory, dialog.file)
-    else null
 }

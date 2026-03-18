@@ -13,6 +13,9 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.future.future
 import kotlinx.serialization.json.JsonObject
 import java.text.SimpleDateFormat
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.*
 import java.util.concurrent.CompletableFuture
 
@@ -20,6 +23,9 @@ class ServerListService(private val repository: ServerRepository) : IServerListS
 
     private var cachedData: DashboardData? = null
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val dateFormatter = DateTimeFormatter
+        .ofPattern("dd MMM yyyy", Locale.of("ru"))
+        .withZone(ZoneId.systemDefault())
 
     override fun fetchDashboardData(): CompletableFuture<DashboardData> {
         if (cachedData != null) {
@@ -70,9 +76,7 @@ class ServerListService(private val repository: ServerRepository) : IServerListS
 
     private fun formatTimestamp(ts: Long): String {
         return try {
-            val date = Date(ts * 1000L)
-            val sdf = SimpleDateFormat("dd MMM yyyy", Locale.of("ru"))
-            sdf.format(date)
+            dateFormatter.format(Instant.ofEpochSecond(ts))
         } catch (_: Exception) {
             "Unknown Date"
         }

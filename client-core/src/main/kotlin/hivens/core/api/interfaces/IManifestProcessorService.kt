@@ -6,9 +6,6 @@ import hivens.core.data.FileManifest
 import hivens.core.data.OptionalMod
 
 interface IManifestProcessorService {
-
-    fun processManifest(version: String): FileManifest?
-
     /**
      * Recursively "flattens" the tree file manifest.
      * @return Flat map path -> data.

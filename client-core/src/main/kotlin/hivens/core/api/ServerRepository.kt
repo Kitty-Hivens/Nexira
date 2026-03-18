@@ -15,10 +15,12 @@ import java.security.MessageDigest
 
 class ServerRepository(
     private val client: HttpClient,
-    private val json: Json
+    private val json: Json,
+    dataDir: File? = null
 ) {
     private val logger = LoggerFactory.getLogger("ServerRepository")
-    private val cachedHashFile = File(AppConfig.FILES_HASH_CACHE)
+    private val cachedHashFile = dataDir?.let { File(it, AppConfig.FILES_HASH_CACHE) }
+        ?: File(AppConfig.FILES_HASH_CACHE)
     private var currentHash = AppConfig.DEFAULT_LAUNCHER_HASH
 
     init {

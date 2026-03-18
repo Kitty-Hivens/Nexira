@@ -18,6 +18,7 @@ import kotlinx.coroutines.sync.withPermit
 import org.slf4j.LoggerFactory
 import java.io.FileOutputStream
 import java.io.IOException
+import java.net.URLEncoder
 import java.nio.file.Files
 import java.nio.file.Path
 import java.security.MessageDigest
@@ -191,7 +192,8 @@ class FileDownloadService(
         localPath: Path,
         onBytesRead: ((Int) -> Unit)? = null
     ) {
-        val url = "${AppConfig.BASE_URL}/launcher/clients/" + serverPath.replace(" ", "%20")
+        val url = "${AppConfig.BASE_URL}/launcher/clients/" +
+                serverPath.split("/").joinToString("/") { segment -> URLEncoder.encode(segment, "UTF-8").replace("+", "%20") }
         withContext(Dispatchers.IO) {
             if (localPath.parent != null) Files.createDirectories(localPath.parent)
 

@@ -16,18 +16,4 @@ data class SettingsData(
     var isOfflineMode: Boolean = false,
     /** Start minimized to tray; hide window on close instead of exiting */
     var startInTray: Boolean = false
-) {
-    companion object {
-        fun defaults(): SettingsData {
-            val data = SettingsData()
-            data.javaPath = null
-            data.memoryMB = 4096
-            data.isDarkTheme = true
-            data.saveCredentials = true
-            data.locale = "en"
-            data.isOfflineMode = false
-            data.startInTray = false
-            return data
-        }
-    }
-}
+)
