@@ -1,6 +1,7 @@
 package hivens.launcher
 
 import hivens.config.AppConfig
+import hivens.core.api.HttpClientProvider
 import hivens.core.api.interfaces.IFileDownloadService
 import hivens.core.data.FileData
 import hivens.core.data.FileManifest
@@ -26,9 +27,11 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.roundToInt
 
+
 class FileDownloadService(
-    private val client: HttpClient
+    private val clientProvider: HttpClientProvider
 ) : IFileDownloadService {
+    private val client get() = clientProvider.current
 
     companion object {
         private val logger = LoggerFactory.getLogger(FileDownloadService::class.java)

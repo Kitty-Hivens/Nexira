@@ -41,6 +41,7 @@ import hivens.core.api.interfaces.IServerListService
 import hivens.core.data.NewsItem
 import hivens.core.data.SessionData
 import hivens.launcher.CredentialsManager
+import hivens.launcher.NetworkState
 import hivens.launcher.ProfileManager
 import hivens.ui.easter.AprilFoolsButton
 import hivens.ui.i18n.LocalStrings
@@ -61,6 +62,7 @@ fun RightPanel(
     appState: AppState,
     onLogin: (SessionData) -> Unit,
     onLogout: () -> Unit,
+    sslBypass: Boolean,
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier.background(CelestiaTheme.colors.background)) {
@@ -84,7 +86,10 @@ fun RightPanel(
         HorizontalDivider(color = CelestiaTheme.colors.surface.copy(alpha = 0.7f))
 
         // ── News feed (bottom) ────────────────────────────────────────────────
-        CompactNewsFeed(modifier = Modifier.weight(1f).fillMaxWidth())
+        CompactNewsFeed(
+            sslBypass = sslBypass,
+            modifier  = Modifier.weight(1f).fillMaxWidth()
+        )
     }
 }
 
@@ -203,7 +208,10 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
                         Text(s.sslWarningCancel, color = CelestiaTheme.colors.textSecondary)
                     }
                     Button(
-                        onClick = { doLogin(insecureAuthService) },
+                        onClick = {
+                            NetworkState.sslBypassEnabled = true
+                            doLogin(insecureAuthService)
+                        },
                         modifier = Modifier.weight(1f),
                         shape    = RoundedCornerShape(6.dp),
                         colors   = ButtonDefaults.buttonColors(
@@ -407,7 +415,10 @@ fun AccountPanel(session: SessionData, onLogout: () -> Unit) {
 // ─── Compact News Feed ────────────────────────────────────────────────────────
 
 @Composable
-fun CompactNewsFeed(modifier: Modifier = Modifier) {
+fun CompactNewsFeed(
+    sslBypass: Boolean = false,
+    modifier: Modifier = Modifier
+) {
     val serverListService: IServerListService = koinInject()
     val s       = LocalStrings.current
 
@@ -420,6 +431,16 @@ fun CompactNewsFeed(modifier: Modifier = Modifier) {
             news = data.news
         } catch (_: Exception) {}
         loading = false
+    }
+
+    LaunchedEffect(sslBypass) {
+        if (sslBypass && news.isEmpty()) {
+            try {
+                val data = withContext(Dispatchers.IO) { serverListService.fetchDashboardData().get() }
+                news = data.news
+            } catch (_: Exception) {}
+            loading = false
+        }
     }
 
     Column(modifier = modifier) {

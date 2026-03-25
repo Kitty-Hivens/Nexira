@@ -18,6 +18,7 @@ import hivens.core.api.interfaces.IServerListService
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.SessionData
+import hivens.launcher.NetworkState
 import hivens.launcher.ProfileManager
 import hivens.ui.components.LaunchControlPanel
 import hivens.ui.components.ServerGrid
@@ -26,6 +27,7 @@ import hivens.ui.logic.LaunchState
 import hivens.ui.logic.LauncherController
 import hivens.ui.theme.CelestiaTheme
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
@@ -55,6 +57,13 @@ fun DashboardScreen(
     var favoriteTrigger     by remember { mutableStateOf(0) }
     val favorites = remember(favoriteTrigger) { profileManager.favoriteServers }
     var isLoadingServers    by remember { mutableStateOf(true) }
+    val sslBypass by produceState(initialValue = NetworkState.sslBypassEnabled) {
+        while (true) {
+            value = NetworkState.sslBypassEnabled
+            delay(200)
+        }
+    }
+
 
     fun fetchServers() {
         isLoadingServers = true
@@ -91,6 +100,12 @@ fun DashboardScreen(
     LaunchedEffect(Unit) {
         if (servers.isEmpty()) fetchServers()
         else isLoadingServers = false
+    }
+
+    LaunchedEffect(sslBypass) {
+        if (sslBypass && servers.isEmpty()) {
+            fetchServers()
+        }
     }
 
     LaunchedEffect(initialSelectedServer) {

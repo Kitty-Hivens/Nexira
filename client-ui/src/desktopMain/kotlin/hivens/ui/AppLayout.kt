@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import hivens.core.api.SkinRepository
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.SessionData
+import hivens.launcher.NetworkState
 import hivens.ui.background.BackgroundSettings
 import hivens.ui.easter.AprilFools
 import hivens.ui.i18n.AppLocale
@@ -29,6 +30,7 @@ import hivens.ui.screens.*
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.CustomTheme
 import hivens.ui.utils.GameConsoleService
+import kotlinx.coroutines.delay
 import org.koin.compose.koinInject
 import kotlin.math.sin
 import kotlin.random.Random
@@ -63,6 +65,13 @@ fun AppLayout(
     // When custom background is active, make the row transparent so image shows through
     val rowBackground = if (backgroundSettings.enabled) Color.Transparent
     else CelestiaTheme.colors.background
+
+    val sslBypass by produceState(initialValue = NetworkState.sslBypassEnabled) {
+        while (true) {
+            value = NetworkState.sslBypassEnabled
+            delay(200)
+        }
+    }
 
     Row(Modifier.fillMaxSize().background(rowBackground)) {
 
@@ -166,6 +175,7 @@ fun AppLayout(
             appState = appState,
             onLogin  = onLogin,
             onLogout = onLogout,
+            sslBypass = sslBypass,
             modifier = Modifier.width(264.dp).fillMaxHeight()
         )
     }
