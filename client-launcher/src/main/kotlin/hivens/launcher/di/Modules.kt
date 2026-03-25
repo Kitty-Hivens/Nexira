@@ -2,6 +2,7 @@ package hivens.launcher.di
 
 import hivens.config.AppConfig
 import hivens.core.api.AuthService
+import hivens.core.api.HttpClientProvider
 import hivens.core.api.PlayerRepository
 import hivens.core.api.ServerRepository
 import hivens.core.api.SkinRepository
@@ -41,7 +42,7 @@ val networkModule = module {
     }
 
     /**
-     * HTTP client (OkHttp).
+     * Secure HTTP client (OkHttp).
      * SOCKS proxy is always enabled.
      */
     single<OkHttpClient> {
@@ -55,14 +56,11 @@ val networkModule = module {
             }
         })
 
-        val builder = OkHttpClient.Builder()
+        OkHttpClient.Builder()
             .connectTimeout(AppConfig.TIMEOUT_CONNECT, TimeUnit.MILLISECONDS)
             .readTimeout(AppConfig.TIMEOUT_READ, TimeUnit.MILLISECONDS)
-
-        // Proxy setting
-        builder.proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress(AppConfig.Proxy.HOST, AppConfig.Proxy.PORT)))
-
-        builder.build()
+            .proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress(AppConfig.Proxy.HOST, AppConfig.Proxy.PORT)))
+            .build()
     }
 
     /**
@@ -73,31 +71,39 @@ val networkModule = module {
     single<OkHttpClient>(named("insecure")) {
         val (socketFactory, trustManager) = buildTrustAllSsl()
 
-        val builder = OkHttpClient.Builder()
+        OkHttpClient.Builder()
             .connectTimeout(AppConfig.TIMEOUT_CONNECT, TimeUnit.MILLISECONDS)
             .readTimeout(AppConfig.TIMEOUT_READ, TimeUnit.MILLISECONDS)
             .sslSocketFactory(socketFactory, trustManager)
             .hostnameVerifier { _, _ -> true }
             .proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress(AppConfig.Proxy.HOST, AppConfig.Proxy.PORT)))
-
-        builder.build()
+            .build()
     }
 
     /**
-     * Primary HTTP client.
-     * Automatically switches to the insecure OkHttpClient when the user
-     * has explicitly accepted SSL bypass via [NetworkState.sslBypassEnabled].
+     * [HttpClientProvider] — thin wrapper that resolves the correct [HttpClient]
+     * on every request via [NetworkState.sslBypassEnabled].
+     *
+     * Injected into all repositories instead of [HttpClient] directly,
+     * so that SSL bypass takes effect immediately on the next network call
+     * without requiring Koin singleton recreation.
      */
-    single<HttpClient> {
-        val okHttpInstance = if (NetworkState.sslBypassEnabled)
-            get<OkHttpClient>(named("insecure"))
-        else
-            get<OkHttpClient>()
-        buildHttpClient(okHttpInstance, get())
+    single {
+        val secure   = buildHttpClient(get<OkHttpClient>(),                get())
+        val insecure = buildHttpClient(get<OkHttpClient>(named("insecure")), get())
+        HttpClientProvider {
+            if (NetworkState.sslBypassEnabled) insecure else secure
+        }
     }
 
-    single<HttpClient>(named("insecure")) {
-        buildHttpClient(get(named("insecure")), get())
+    /**
+     * Named insecure [HttpClientProvider] for [AuthService] — always uses
+     * the insecure client regardless of [NetworkState], because it is
+     * injected specifically for the "connect anyway" login retry path.
+     */
+    single<HttpClientProvider>(named("insecure")) {
+        val insecure = buildHttpClient(get<OkHttpClient>(named("insecure")), get())
+        HttpClientProvider { insecure }
     }
 
     // Repositories
@@ -135,7 +141,14 @@ val appModule = module {
     singleOf(::EnvironmentPreparer)
 
     single<IAuthService> { AuthService(get(), get()) }
-    single<IAuthService>(named("insecure")) { AuthService(get(named("insecure")), get()) }
+
+    /**
+     * Insecure [IAuthService] — used exclusively for the SSL bypass login retry.
+     * Always connects without certificate verification.
+     */
+    single<IAuthService>(named("insecure")) {
+        AuthService(get(named("insecure")), get())
+    }
 
     single<IServerListService> { ServerListService(get()) }
 
@@ -155,9 +168,9 @@ val appModule = module {
     // Update Service
     single {
         UpdateService(
-            httpClient    = get(),
-            json          = get(),
-            dataDirectory = get()
+            clientProvider = get(),
+            json           = get(),
+            dataDirectory  = get()
         )
     }
 }
@@ -188,8 +201,8 @@ private fun buildHttpClient(okHttpInstance: OkHttpClient, json: Json): HttpClien
 
 /**
  * Builds a trust-all SSL socket factory for the insecure client.
- * Not perfect (no TPM/Keyring), but allows connecting to servers
- * with expired certificates when the user explicitly accepts the risk.
+ * Allows connecting to servers with expired certificates
+ * when the user explicitly accepts the risk.
  */
 private fun buildTrustAllSsl(): Pair<javax.net.ssl.SSLSocketFactory, javax.net.ssl.X509TrustManager> {
     val trustManager = object : javax.net.ssl.X509TrustManager {

@@ -1,6 +1,7 @@
 package hivens.launcher.update
 
 import hivens.config.AppConfig
+import hivens.core.api.HttpClientProvider
 import hivens.core.data.LauncherUpdate
 import io.ktor.client.*
 import io.ktor.client.request.*
@@ -21,11 +22,12 @@ import java.time.Instant
 import java.time.temporal.ChronoUnit
 
 class UpdateService(
-    private val httpClient: HttpClient,
+    private val clientProvider: HttpClientProvider,
     private val json: Json,
     dataDirectory: Path
 ) {
     private val logger = LoggerFactory.getLogger(UpdateService::class.java)
+    private val httpClient get() = clientProvider.current
     private val updateDir = dataDirectory.resolve("updates")
     private val lastCheckFile = updateDir.resolve(".last_check")
 

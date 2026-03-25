@@ -6,7 +6,6 @@ import hivens.core.data.AuthStatus
 import hivens.core.data.FileManifest
 import hivens.core.data.SessionData
 import hivens.core.util.HashUtils
-import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.forms.*
 import io.ktor.http.*
@@ -15,17 +14,17 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 import java.nio.charset.StandardCharsets
-import java.security.MessageDigest
 import java.util.*
 import javax.crypto.Cipher
 import javax.crypto.spec.SecretKeySpec
 
 class AuthService(
-    private val client: HttpClient,
+    private val clientProvider: HttpClientProvider,
     private val json: Json
 ) : IAuthService {
 
     private val logger = LoggerFactory.getLogger(AuthService::class.java)
+    private val client get() = clientProvider.current
 
     @Serializable
     private data class AuthRequest(

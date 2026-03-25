@@ -15,6 +15,7 @@ import coil3.ImageLoader
 import coil3.compose.setSingletonImageLoaderFactory
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import hivens.config.AppConfig
+import hivens.core.api.AuthException
 import hivens.core.api.interfaces.IAuthService
 import hivens.core.api.interfaces.IServerListService
 import hivens.core.api.interfaces.ISettingsService
@@ -22,6 +23,7 @@ import hivens.core.api.model.ServerProfile
 import hivens.core.data.SessionData
 import hivens.launcher.CrashReporter
 import hivens.launcher.CredentialsManager
+import hivens.launcher.NetworkState
 import hivens.launcher.ProfileManager
 import hivens.launcher.di.appModule
 import hivens.launcher.di.networkModule
@@ -58,6 +60,7 @@ import org.koin.compose.koinInject
 import org.koin.core.context.startKoin
 import org.koin.core.context.stopKoin
 import org.koin.core.module.dsl.singleOf
+import org.koin.core.qualifier.named
 import org.koin.dsl.module
 import org.slf4j.LoggerFactory
 import javax.swing.SwingUtilities
@@ -335,6 +338,7 @@ fun AppRoot(
     val dataDirectory: java.nio.file.Path      = koinInject()
     val json: Json                             = koinInject()
     val httpClient: OkHttpClient               = koinInject()
+    val insecureAuthService: IAuthService      = koinInject(named("insecure"))
 
     setSingletonImageLoaderFactory { context ->
         ImageLoader.Builder(context)
@@ -376,6 +380,19 @@ fun AppRoot(
                         val server  = profileManager.lastServerId ?: AppConfig.DEFAULT_SERVER_ID
                         val session = authService.login(saved.playerName, saved.cachedPassword!!, server)
                         AppState.Authenticated(session)
+                    } catch (e: AuthException) {
+                        if (e.isSslError) {
+                            NetworkState.sslBypassEnabled = true
+                            try {
+                                val server  = profileManager.lastServerId ?: AppConfig.DEFAULT_SERVER_ID
+                                val session = insecureAuthService.login(saved.playerName, saved.cachedPassword!!, server)
+                                AppState.Authenticated(session)
+                            } catch (_: Exception) {
+                                AppState.Unauthenticated
+                            }
+                        } else {
+                            AppState.Unauthenticated
+                        }
                     } catch (_: Exception) {
                         AppState.Unauthenticated
                     }
