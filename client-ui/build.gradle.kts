@@ -69,8 +69,8 @@ kotlin {
                 implementation("com.dorkbox:SystemTray:$systemTray")
                 implementation("io.ktor:ktor-client-core:${ktorVersion}")
 
-                implementation("net.java.dev.jna:jna:6.1.6")           // Not change
-                implementation("net.java.dev.jna:jna-platform:6.1.6")  // Not change
+                implementation("net.java.dev.jna:jna:5.18.1")           // Not change
+                implementation("net.java.dev.jna:jna-platform:5.18.1")  // Not change
             }
         }
         all {
