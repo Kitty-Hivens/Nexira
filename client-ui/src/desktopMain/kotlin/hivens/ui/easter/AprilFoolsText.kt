@@ -23,7 +23,7 @@ object AprilFoolsText {
         "NullPointerException at line 42",
         "Segmentation fault (core dumped)",
         "Error 418: I'm a teapot",
-        "javax.swing.SwingUtilities\$2.run(Unknown Source)",
+        $$"javax.swing.SwingUtilities$2.run(Unknown Source)",
         "at sun.reflect.NativeMethodAccessorImpl.invoke0",
         "FATAL: connection to server lost",
         "Warning: undefined behavior detected",
