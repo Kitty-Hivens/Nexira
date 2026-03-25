@@ -78,3 +78,12 @@ subprojects {
 gradle.startParameter.apply {
     maxWorkerCount = Runtime.getRuntime().availableProcessors()
 }
+
+configurations.all {
+    resolutionStrategy.eachDependency {
+        if (requested.group == "net.java.dev.jna") {
+            useVersion("6.1.6")
+            because("dorkbox/SystemTray requires exactly JNA 6.1.6")
+        }
+    }
+}
