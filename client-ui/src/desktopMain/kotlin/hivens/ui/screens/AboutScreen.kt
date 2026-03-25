@@ -22,13 +22,15 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
-import coil3.compose.LocalPlatformContext
 import hivens.config.AppConfig
 import hivens.core.data.LauncherUpdate
 import hivens.launcher.update.UpdateService
 import hivens.ui.BuildConfig
 import hivens.ui.components.GlassCard
 import hivens.ui.components.UpdateDialog
+import hivens.ui.easter.AprilFoolsButton
+import hivens.ui.easter.AprilFoolsText
+import hivens.ui.easter.AprilFoolsText.GibberishMode
 import hivens.ui.generated.resources.Res
 import hivens.ui.generated.resources.favicon
 import hivens.ui.i18n.LocalStrings
@@ -98,6 +100,8 @@ fun AboutScreen(onBack: () -> Unit) {
 
             // ══════════════════════════════════════════════════════════════════
             // LEFT: Info + Credits
+            // April Fools: strings here may occasionally corrupt themselves.
+            // Right column (system info, links) stays readable intentionally.
             // ══════════════════════════════════════════════════════════════════
             Column(
                 Modifier.weight(1f).fillMaxHeight(),
@@ -115,39 +119,55 @@ fun AboutScreen(onBack: () -> Unit) {
                             modifier = Modifier.size(86.dp)
                         )
                         Spacer(Modifier.height(16.dp))
+
+                        // App title — low probability corruption
                         Text(
-                            AppConfig.APP_TITLE,
+                            AprilFoolsText.maybeGibberish(AppConfig.APP_TITLE, probability = 0.15f),
                             style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.Black,
                             color = CelestiaTheme.colors.textPrimary
                         )
                         Spacer(Modifier.height(8.dp))
+
+                        // Version badge — fake version numbers
                         Box(
                             Modifier.clip(RoundedCornerShape(6.dp))
                                 .background(CelestiaTheme.colors.primary.copy(alpha = 0.15f))
                                 .padding(horizontal = 10.dp, vertical = 4.dp)
                         ) {
                             Text(
-                                "v${AppConfig.CLIENT_VERSION.removePrefix("v")}",
+                                AprilFoolsText.maybeGibberish(
+                                    "v${AppConfig.CLIENT_VERSION.removePrefix("v")}",
+                                    probability = 0.30f,
+                                    mode = GibberishMode.FAKE_VER
+                                ),
                                 style = MaterialTheme.typography.labelLarge,
                                 color = CelestiaTheme.colors.primary,
                                 fontWeight = FontWeight.Bold
                             )
                         }
+
                         val buildDate = remember {
                             try {
                                 SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault())
-                                    .format(Date(hivens.ui.BuildConfig.BUILD_TIME))
+                                    .format(Date(BuildConfig.BUILD_TIME))
                             } catch (_: Exception) { "—" }
                         }
+
+                        // Build date — may corrupt to lorem or reversed
                         Text(
-                            s.aboutBuildDate(buildDate),
+                            AprilFoolsText.maybeGibberish(s.aboutBuildDate(buildDate), probability = 0.25f),
                             style = MaterialTheme.typography.bodySmall,
                             color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.6f)
                         )
                         Spacer(Modifier.height(16.dp))
+
+                        // Description — may become jargon
                         Text(
-                            s.aboutDescription(AppConfig.BRANDING_NAME),
+                            AprilFoolsText.maybeGibberish(
+                                s.aboutDescription(AppConfig.BRANDING_NAME),
+                                probability = 0.20f
+                            ),
                             style = MaterialTheme.typography.bodyMedium,
                             color = CelestiaTheme.colors.textSecondary,
                             textAlign = TextAlign.Center
@@ -170,14 +190,28 @@ fun AboutScreen(onBack: () -> Unit) {
                             )
                             Spacer(Modifier.width(12.dp))
                             Column {
-                                Text("Haru (Hivens)", fontWeight = FontWeight.Bold, color = CelestiaTheme.colors.textPrimary)
-                                Text("Architect & Developer", style = MaterialTheme.typography.bodySmall, color = CelestiaTheme.colors.primary)
+                                Text(
+                                    "Haru (Hivens)",
+                                    fontWeight = FontWeight.Bold,
+                                    color = CelestiaTheme.colors.textPrimary
+                                )
+                                // Role — scrambled on April Fools
+                                Text(
+                                    AprilFoolsText.maybeGibberish(
+                                        "Architect & Developer",
+                                        probability = 0.35f,
+                                        mode = GibberishMode.SCRAMBLED
+                                    ),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = CelestiaTheme.colors.primary
+                                )
                             }
                         }
 
                         Spacer(Modifier.height(20.dp))
                         SectionLabel(s.aboutSectionTechnologies)
                         Spacer(Modifier.height(8.dp))
+
                         val techs = listOf(
                             "Kotlin ${KotlinVersion.CURRENT}" to s.techKotlinDesc,
                             "Compose ${BuildConfig.COMPOSE_VERSION}" to s.techComposeDesc,
@@ -186,26 +220,50 @@ fun AboutScreen(onBack: () -> Unit) {
                             "Coil ${BuildConfig.COIL_VERSION}" to s.techCoilDesc,
                             "Skia (Skiko)" to s.techSkiaDesc
                         )
+
                         techs.forEach { (name, desc) ->
                             Row(Modifier.padding(vertical = 3.dp)) {
                                 Text("•", color = CelestiaTheme.colors.primary, fontWeight = FontWeight.Bold)
                                 Spacer(Modifier.width(8.dp))
-                                Text(name, fontWeight = FontWeight.Medium, color = CelestiaTheme.colors.textPrimary, fontSize = 13.sp)
+                                // Tech name — may zalgo-ify
+                                Text(
+                                    AprilFoolsText.maybeGibberish(name, probability = 0.20f, mode = GibberishMode.ZALGO),
+                                    fontWeight = FontWeight.Medium,
+                                    color = CelestiaTheme.colors.textPrimary,
+                                    fontSize = 13.sp
+                                )
                                 Spacer(Modifier.width(6.dp))
-                                Text("— $desc", color = CelestiaTheme.colors.textSecondary, fontSize = 13.sp)
+                                // Description — may become jargon
+                                Text(
+                                    "— ${AprilFoolsText.maybeGibberish(desc, probability = 0.40f, mode = GibberishMode.JARGON)}",
+                                    color = CelestiaTheme.colors.textSecondary,
+                                    fontSize = 13.sp
+                                )
                             }
                         }
 
                         Spacer(Modifier.height(20.dp))
                         SectionLabel(s.aboutSectionLicense)
                         Spacer(Modifier.height(8.dp))
-                        Text(s.aboutLicenseText, style = MaterialTheme.typography.bodySmall, color = CelestiaTheme.colors.textSecondary)
+
+                        // License text — high probability lorem ipsum
+                        Text(
+                            AprilFoolsText.maybeGibberish(
+                                s.aboutLicenseText,
+                                probability = 0.45f,
+                                mode = GibberishMode.LOREM
+                            ),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = CelestiaTheme.colors.textSecondary
+                        )
                     }
                 }
             }
 
             // ══════════════════════════════════════════════════════════════════
             // RIGHT: Updates + System + Links
+            // No gibberish here — user needs to be able to read system info
+            // and actually click the links when desperate enough.
             // ══════════════════════════════════════════════════════════════════
             Column(
                 Modifier.weight(1f).fillMaxHeight(),
@@ -220,9 +278,11 @@ fun AboutScreen(onBack: () -> Unit) {
                         Spacer(Modifier.height(16.dp))
 
                         when (val state = updateState) {
-                            // ── Idle: check button ────────────────────────────
+                            // ── Idle: check button — chaos target ─────────────
                             UpdateCheckState.Idle -> {
-                                Button(
+                                AprilFoolsButton(
+                                    id      = "about_check_updates_btn",
+                                    text    = s.aboutCheckUpdates,
                                     onClick = {
                                         updateState = UpdateCheckState.Checking
                                         scope.launch {
@@ -236,16 +296,13 @@ fun AboutScreen(onBack: () -> Unit) {
                                         }
                                     },
                                     modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(10.dp),
-                                    colors = ButtonDefaults.buttonColors(containerColor = CelestiaTheme.colors.primary)
-                                ) {
-                                    Icon(Icons.Default.Refresh, null, modifier = Modifier.size(18.dp))
-                                    Spacer(Modifier.width(8.dp))
-                                    Text(s.aboutCheckUpdates, fontWeight = FontWeight.Bold)
-                                }
+                                    colors   = ButtonDefaults.buttonColors(
+                                        containerColor = CelestiaTheme.colors.primary,
+                                    ),
+                                )
                             }
 
-                            // ── Checking: spinner ─────────────────────────────
+                            // ── Checking: spinner — not chaos, user needs feedback
                             UpdateCheckState.Checking -> {
                                 Row(
                                     Modifier.fillMaxWidth().padding(12.dp),
@@ -311,7 +368,7 @@ fun AboutScreen(onBack: () -> Unit) {
 
                                 Spacer(Modifier.height(12.dp))
 
-                                // Download & install button — opens the full UpdateDialog
+                                // Download & install — opens the full UpdateDialog
                                 Button(
                                     onClick = { showUpdateDialog = true },
                                     modifier = Modifier.fillMaxWidth(),
@@ -368,19 +425,19 @@ fun AboutScreen(onBack: () -> Unit) {
                         SectionLabel(s.aboutSectionSystem)
                         Spacer(Modifier.height(12.dp))
 
-                        val osName = System.getProperty("os.name")
-                        val osArch = System.getProperty("os.arch")
-                        val osVer = System.getProperty("os.version")
-                        val javaVer = System.getProperty("java.version")
+                        val osName     = System.getProperty("os.name")
+                        val osArch     = System.getProperty("os.arch")
+                        val osVer      = System.getProperty("os.version")
+                        val javaVer    = System.getProperty("java.version")
                         val javaVendor = System.getProperty("java.vendor")
-                        val cores = Runtime.getRuntime().availableProcessors()
-                        val maxHeap = Runtime.getRuntime().maxMemory() / (1024 * 1024)
+                        val cores      = Runtime.getRuntime().availableProcessors()
+                        val maxHeap    = Runtime.getRuntime().maxMemory() / (1024 * 1024)
 
                         InfoRow(Icons.Default.Computer, s.aboutOs, "$osName $osVer ($osArch)")
-                        InfoRow(Icons.Default.Memory, "CPU", "$cores threads")
-                        InfoRow(Icons.Default.Storage, "RAM", "${if (systemRam > 0) "$systemRam MB" else "Unknown"} (Heap: $maxHeap MB)")
-                        InfoRow(Icons.Default.Code, "Java", "$javaVer ($javaVendor)")
-                        InfoRow(Icons.Default.Tv, "Display", displayRes)
+                        InfoRow(Icons.Default.Memory,   "CPU",     "$cores threads")
+                        InfoRow(Icons.Default.Storage,  "RAM",     "${if (systemRam > 0) "$systemRam MB" else "Unknown"} (Heap: $maxHeap MB)")
+                        InfoRow(Icons.Default.Code,     "Java",    "$javaVer ($javaVendor)")
+                        InfoRow(Icons.Default.Tv,       "Display", displayRes)
                     }
                 }
 
@@ -389,11 +446,11 @@ fun AboutScreen(onBack: () -> Unit) {
                     Column(Modifier.padding(20.dp)) {
                         SectionLabel(s.aboutSectionLinks)
                         Spacer(Modifier.height(12.dp))
-                        LinkButton(s.aboutLinkGithub, "https://github.com/Kitty-Hivens/Aura-Launcher", Icons.Default.Code)
+                        LinkButton(s.aboutLinkGithub,    "https://github.com/Kitty-Hivens/Aura-Launcher",         Icons.Default.Code)
                         Spacer(Modifier.height(8.dp))
-                        LinkButton(s.aboutLinkBugReport, "https://github.com/Kitty-Hivens/Aura-Launcher/issues", Icons.Default.BugReport)
+                        LinkButton(s.aboutLinkBugReport, "https://github.com/Kitty-Hivens/Aura-Launcher/issues",  Icons.Default.BugReport)
                         Spacer(Modifier.height(8.dp))
-                        LinkButton(s.aboutLinkReleases, "https://github.com/Kitty-Hivens/Aura-Launcher/releases", Icons.Default.Download)
+                        LinkButton(s.aboutLinkReleases,  "https://github.com/Kitty-Hivens/Aura-Launcher/releases",Icons.Default.Download)
                     }
                 }
             }
@@ -404,9 +461,9 @@ fun AboutScreen(onBack: () -> Unit) {
 // ── State ─────────────────────────────────────────────────────────────────────
 
 private sealed class UpdateCheckState {
-    object Idle      : UpdateCheckState()
-    object Checking  : UpdateCheckState()
-    object UpToDate  : UpdateCheckState()
+    object Idle     : UpdateCheckState()
+    object Checking : UpdateCheckState()
+    object UpToDate : UpdateCheckState()
     data class Available(val update: LauncherUpdate) : UpdateCheckState()
     data class Error(val message: String)            : UpdateCheckState()
 }
@@ -417,9 +474,9 @@ private sealed class UpdateCheckState {
 private fun SectionLabel(text: String) {
     Text(
         text,
-        style = MaterialTheme.typography.labelSmall,
-        fontWeight = FontWeight.Bold,
-        color = CelestiaTheme.colors.primary,
+        style         = MaterialTheme.typography.labelSmall,
+        fontWeight    = FontWeight.Bold,
+        color         = CelestiaTheme.colors.primary,
         letterSpacing = 1.sp
     )
 }
@@ -436,12 +493,12 @@ private fun InfoRow(icon: ImageVector, label: String, value: String) {
         Spacer(Modifier.width(12.dp))
         Text(
             value,
-            color = CelestiaTheme.colors.textPrimary,
-            fontSize = 13.sp,
+            color      = CelestiaTheme.colors.textPrimary,
+            fontSize   = 13.sp,
             fontWeight = FontWeight.Medium,
             fontFamily = FontFamily.Monospace,
-            textAlign = TextAlign.End,
-            modifier = Modifier.weight(1f)
+            textAlign  = TextAlign.End,
+            modifier   = Modifier.weight(1f)
         )
     }
 }
@@ -456,8 +513,8 @@ private fun LinkButton(label: String, url: String, icon: ImageVector) {
             } catch (_: Exception) {}
         },
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
-        border = BorderStroke(1.dp, CelestiaTheme.colors.outline.copy(alpha = 0.2f))
+        shape    = RoundedCornerShape(8.dp),
+        border   = BorderStroke(1.dp, CelestiaTheme.colors.outline.copy(alpha = 0.2f))
     ) {
         Icon(icon, null, modifier = Modifier.size(16.dp), tint = CelestiaTheme.colors.primary)
         Spacer(Modifier.width(8.dp))

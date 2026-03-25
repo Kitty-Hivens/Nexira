@@ -293,4 +293,28 @@ object RussianStrings : AppStrings {
     // --- Settings: Start in tray ---
     override val settingsStartInTray     = "Запускать в трее"
     override val settingsStartInTrayDesc = "Лаунчер стартует свёрнутым; закрытие окна прячет его в трей"
+
+    // April Fools
+    override fun aprilCloseTitle(escapes: Int) = when {
+        escapes == 0 -> "Подождите секунду..."
+        escapes < 3  -> "Вы уверены?"
+        escapes < 6  -> "Пожалуйста... нам было так хорошо"
+        escapes < 8  -> "Это становится неловким для нас обоих"
+        else         -> "Ладно. Сдаюсь."
+    }
+
+    override fun aprilCloseBody(escapes: Int) = when {
+        escapes == 0 -> "Лаунчер так старался сегодня. Неужели вы его бросите?"
+        escapes < 3  -> "Всё, что вам нужно — здесь. Кнопка просто... стесняется."
+        escapes < 6  -> "Попыток поймать: $escapes. Кнопка не может бегать вечно."
+        escapes < 8  -> "Вы очень настойчивы. Кнопка устаёт. Почти поймали..."
+        else         -> "Вы выиграли. Вы невероятно упорный человек."
+    }
+
+    override val aprilCloseStay      = "Остаться"
+    override val aprilCloseClose     = "Закрыть"
+    override val aprilCloseSurrender = "Закрыть (наконец-то)"
+    override val aprilCloseHideTray  = "Свернуть в трей"
+    override fun aprilCloseEscapeCount(current: Int, max: Int) =
+        "Кнопка сбежала $current / $max раз"
 }

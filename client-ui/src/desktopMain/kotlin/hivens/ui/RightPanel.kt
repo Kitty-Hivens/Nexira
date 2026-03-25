@@ -1,7 +1,6 @@
 package hivens.ui
 
 import androidx.compose.animation.core.*
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -30,10 +29,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil3.ImageLoader
 import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
-import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import hivens.config.AppConfig
@@ -43,13 +40,13 @@ import hivens.core.data.NewsItem
 import hivens.core.data.SessionData
 import hivens.launcher.CredentialsManager
 import hivens.launcher.ProfileManager
+import hivens.ui.easter.AprilFoolsButton
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.utils.SkinManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
 import org.koin.compose.koinInject
 import java.awt.Desktop
 import java.net.URI
@@ -213,31 +210,41 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
             )
         }
 
-        Button(
-            onClick   = { doLogin() },
-            enabled   = !isLoading,
-            modifier  = Modifier.fillMaxWidth().height(42.dp),
-            shape     = RoundedCornerShape(8.dp),
-            colors    = ButtonDefaults.buttonColors(
-                containerColor         = CelestiaTheme.colors.primary,
-                disabledContainerColor = CelestiaTheme.colors.primary.copy(alpha = 0.5f)
-            ),
-            elevation = ButtonDefaults.buttonElevation(0.dp)
-        ) {
-            if (isLoading) {
+        // LOG IN — chaos target (only when not loading, loading state stays reliable)
+        if (isLoading) {
+            Button(
+                onClick   = {},
+                enabled   = false,
+                modifier  = Modifier.fillMaxWidth().height(42.dp),
+                shape     = RoundedCornerShape(8.dp),
+                colors    = ButtonDefaults.buttonColors(
+                    disabledContainerColor = CelestiaTheme.colors.primary.copy(alpha = 0.5f)
+                ),
+                elevation = ButtonDefaults.buttonElevation(0.dp)
+            ) {
                 CircularProgressIndicator(
                     color       = Color.White,
                     modifier    = Modifier.size(18.dp),
                     strokeWidth = 2.dp
                 )
-            } else {
-                Text(s.loginButton, color = Color.White, fontWeight = FontWeight.Bold)
             }
+        } else {
+            AprilFoolsButton(
+                id       = "login_submit_btn",
+                text     = s.loginButton,
+                onClick  = { doLogin() },
+                modifier = Modifier.fillMaxWidth().height(42.dp),
+                colors   = ButtonDefaults.buttonColors(
+                    containerColor = CelestiaTheme.colors.primary,
+                ),
+            )
         }
 
-        // ── Button "Register" — issue #105 ─────────────────────────────────
-        OutlinedButton(
-            onClick  = {
+        // REGISTER — chaos target (#105)
+        AprilFoolsButton(
+            id      = "login_register_btn",
+            text    = s.loginRegister,
+            onClick = {
                 runCatching {
                     val url = "${AppConfig.BASE_URL}/register"
                     if (Desktop.isDesktopSupported() &&
@@ -247,21 +254,12 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
                     }
                 }
             },
-            modifier  = Modifier.fillMaxWidth().height(42.dp),
-            shape     = RoundedCornerShape(8.dp),
-            border    = BorderStroke(
-                width = 1.dp,
-                color = CelestiaTheme.colors.primary.copy(alpha = 0.45f)
+            modifier = Modifier.fillMaxWidth().height(42.dp),
+            colors   = ButtonDefaults.buttonColors(
+                containerColor = Color.Transparent,
+                contentColor   = CelestiaTheme.colors.primary,
             ),
-            colors    = ButtonDefaults.outlinedButtonColors(
-                contentColor = CelestiaTheme.colors.primary
-            )
-        ) {
-            Text(
-                text       = s.loginRegister,
-                fontWeight = FontWeight.Medium
-            )
-        }
+        )
     }
 }
 
@@ -325,6 +323,7 @@ fun AccountPanel(session: SessionData, onLogout: () -> Unit) {
             )
         }
 
+        // Logout is NOT chaos-wrapped — user must always be able to log out
         TextButton(
             onClick  = onLogout,
             modifier = Modifier.height(30.dp)
