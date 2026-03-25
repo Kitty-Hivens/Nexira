@@ -2,6 +2,16 @@
 
 All notable changes to Aura Launcher will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
+## [2.2.2] - 2026-03-25
+
+### Fixed
+- **Launcher crash on Windows — JNA native library version conflict**: JetBrains Runtime 25
+  unpacks its own JNA 7.0.2 native library into `%TEMP%` on startup. dorkbox/SystemTray 4.4
+  performs a hardcoded version check and throws `java.lang.Error` upon finding 7.0.2 instead
+  of the expected 6.1.6, crashing the launcher before the window appears.
+  Resolved by explicitly pinning JNA to 6.1.6 across all dependencies via Gradle resolution
+  strategy, overriding the version bundled by JBR.
+
 ## [2.2.1] - 2026-03-25
 
 ### Fixed
