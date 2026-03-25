@@ -2,6 +2,18 @@
 
 All notable changes to Aura Launcher will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
+## [2.2.4] - 2026-03-25
+
+### Fixed
+- **SSL bypass now applies globally**: after user confirms "Connect anyway",
+  all subsequent network requests (dashboard, file sync, skins) also use the
+  insecure client. Previously only login bypassed SSL verification.
+- **Launcher crash on Linux (GTK detection failure)**: `TrayManager.init`
+  now catches `Throwable` instead of `Exception`, preventing
+  `ExceptionInInitializerError` from dorkbox/SystemTray GtkLoader from
+  crashing the launcher before the window appears. Tray gracefully
+  falls back to unavailable state.
+
 ## [2.2.3] - 2026-03-25
 
 ### Fixed
