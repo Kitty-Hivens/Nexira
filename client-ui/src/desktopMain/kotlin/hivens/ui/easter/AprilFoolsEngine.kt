@@ -10,7 +10,7 @@ import kotlin.math.*
 import kotlin.random.Random
 
 /**
- * The chaos event engine. Call [run] from a [LaunchedEffect] inside [AprilFoolsWrapper].
+ * The chaos event engine. Call [run] from a LaunchedEffect inside [AprilFoolsWrapper].
  *
  * Architecture:
  *  - A tilt-drift coroutine runs continuously, updating [ChaosState.globalTiltDeg].
