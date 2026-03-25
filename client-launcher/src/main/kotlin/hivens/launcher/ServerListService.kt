@@ -52,7 +52,9 @@ class ServerListService(private val repository: ServerRepository) : IServerListS
                 }
 
                 val data = DashboardData(servers, news)
-                cachedData = data
+                if (servers.isNotEmpty()) {
+                    cachedData = data
+                }
                 data
             } catch (e: Exception) {
                 e.printStackTrace()
