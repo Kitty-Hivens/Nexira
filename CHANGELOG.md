@@ -2,6 +2,14 @@
 
 All notable changes to Aura Launcher will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
+## [2.2.3] - 2026-03-25
+
+### Fixed
+- **SSL certificate expired on smartycraft.ru**: raw `CertPathValidatorException` stack
+  trace replaced with a human-readable orange warning banner. Users can now make an
+  informed decision — "Connect anyway" retries the login with SSL verification disabled,
+  while "Cancel" keeps them on the login screen. The bypass is entirely opt-in.
+
 ## [2.2.2] - 2026-03-25
 
 ### Fixed

@@ -3,6 +3,7 @@ package hivens.ui
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -34,6 +35,7 @@ import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import hivens.config.AppConfig
+import hivens.core.api.AuthException
 import hivens.core.api.interfaces.IAuthService
 import hivens.core.api.interfaces.IServerListService
 import hivens.core.data.NewsItem
@@ -48,6 +50,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
+import org.koin.core.qualifier.named
 import java.awt.Desktop
 import java.net.URI
 
@@ -90,6 +93,7 @@ fun RightPanel(
 @Composable
 fun LoginPanel(onLogin: (SessionData) -> Unit) {
     val authService: IAuthService              = koinInject()
+    val insecureAuthService: IAuthService      = koinInject(named("insecure"))
     val credentialsManager: CredentialsManager = koinInject()
     val profileManager: ProfileManager         = koinInject()
     val s            = LocalStrings.current
@@ -101,6 +105,7 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
     var rememberMe   by remember { mutableStateOf(true) }
     var isLoading    by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var sslWarning   by remember { mutableStateOf(false) }
 
     val fieldColors = OutlinedTextFieldDefaults.colors(
         focusedTextColor        = CelestiaTheme.colors.textPrimary,
@@ -114,26 +119,33 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
         unfocusedContainerColor = Color.Transparent
     )
 
-    fun doLogin() {
+    fun doLogin(service: IAuthService = authService) {
         if (login.isBlank() || password.isBlank()) { errorMessage = s.loginErrorEmpty; return }
         focusManager.clearFocus()
-        isLoading = true
+        isLoading    = true
+        sslWarning   = false
         errorMessage = null
         scope.launch {
             try {
                 val session = withContext(Dispatchers.IO) {
                     val lastServer = profileManager.lastServerId ?: AppConfig.DEFAULT_SERVER_ID
-                    val sess = authService.login(login, password, lastServer)
+                    val sess = service.login(login, password, lastServer)
                     if (rememberMe) credentialsManager.save(sess)
                     sess
                 }
                 onLogin(session)
-            } catch (e: Exception) {
+            } catch (e: AuthException) {
                 isLoading = false
-                errorMessage = e.message
-                    ?.replace("java.lang.Exception: ", "")
-                    ?.substringAfter("API: ")
-                    ?: s.loginErrorGeneric
+                when {
+                    e.isSslError -> sslWarning = true
+                    else         -> errorMessage = e.message
+                        ?.replace("java.lang.Exception: ", "")
+                        ?.substringAfter("API: ")
+                        ?: s.loginErrorGeneric
+                }
+            } catch (e: Exception) {
+                isLoading    = false
+                errorMessage = e.message ?: s.loginErrorGeneric
             }
         }
     }
@@ -151,6 +163,60 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
             color      = CelestiaTheme.colors.textPrimary
         )
 
+        // ── SSL warning banner ────────────────────────────────────────────
+        if (sslWarning) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        color = Color(0xFFF59E0B).copy(alpha = 0.12f),
+                        shape = RoundedCornerShape(8.dp)
+                    )
+                    .border(
+                        width = 1.dp,
+                        color = Color(0xFFF59E0B).copy(alpha = 0.5f),
+                        shape = RoundedCornerShape(8.dp)
+                    )
+                    .padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text       = "⚠ ${s.sslWarningTitle}",
+                    style      = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color      = Color(0xFFF59E0B)
+                )
+                Text(
+                    text  = s.sslWarningBody,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = CelestiaTheme.colors.textPrimary.copy(alpha = 0.85f)
+                )
+                Row(
+                    modifier              = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick  = { sslWarning = false },
+                        modifier = Modifier.weight(1f),
+                        shape    = RoundedCornerShape(6.dp)
+                    ) {
+                        Text(s.sslWarningCancel, color = CelestiaTheme.colors.textSecondary)
+                    }
+                    Button(
+                        onClick = { doLogin(insecureAuthService) },
+                        modifier = Modifier.weight(1f),
+                        shape    = RoundedCornerShape(6.dp),
+                        colors   = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFFF59E0B)
+                        )
+                    ) {
+                        Text(s.sslWarningConnectAnyway, color = Color.Black)
+                    }
+                }
+            }
+        }
+
+        // ── Regular error ─────────────────────────────────────────────────
         if (errorMessage != null) {
             Text(
                 text     = errorMessage ?: "",
@@ -166,9 +232,10 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
             )
         }
 
+        // ── Fields ────────────────────────────────────────────────────────
         OutlinedTextField(
             value         = login,
-            onValueChange = { login = it; errorMessage = null },
+            onValueChange = { login = it; errorMessage = null; sslWarning = false },
             label         = { Text(s.loginUsername) },
             modifier      = Modifier.fillMaxWidth(),
             singleLine    = true,
@@ -180,7 +247,7 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
 
         OutlinedTextField(
             value                = password,
-            onValueChange        = { password = it; errorMessage = null },
+            onValueChange        = { password = it; errorMessage = null; sslWarning = false },
             label                = { Text(s.loginPassword) },
             modifier             = Modifier.fillMaxWidth(),
             singleLine           = true,

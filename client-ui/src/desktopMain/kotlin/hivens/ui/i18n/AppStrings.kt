@@ -311,4 +311,10 @@ interface AppStrings {
     val aprilCloseSurrender: String
     val aprilCloseHideTray: String
     fun aprilCloseEscapeCount(current: Int, max: Int): String
+
+    // --- SSL Warning ---
+    val sslWarningTitle: String
+    val sslWarningBody: String
+    val sslWarningConnectAnyway: String
+    val sslWarningCancel: String
 }

@@ -317,4 +317,10 @@ object GermanStrings : AppStrings {
     override val aprilCloseHideTray  = "Im Tray verstecken"
     override fun aprilCloseEscapeCount(current: Int, max: Int) =
         "Der Schließen-Knopf ist $current / $max Mal geflohen"
+
+    // --- SSL Warning ---
+    override val sslWarningTitle        = "Serverzertifikat abgelaufen"
+    override val sslWarningBody         = "Das SSL-Zertifikat des Servers ist abgelaufen. Die Verbindung ist möglicherweise unsicher — die Identität des Servers kann nicht verifiziert werden. Auf eigenes Risiko fortfahren?"
+    override val sslWarningConnectAnyway = "Trotzdem verbinden"
+    override val sslWarningCancel       = "Abbrechen"
 }
