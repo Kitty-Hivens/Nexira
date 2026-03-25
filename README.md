@@ -1,51 +1,29 @@
-# Aura Launcher — Архив
+# Aura Launcher
 
-Этот репозиторий заархивирован. Новых релизов не будет.
-
----
-
-Когда я начинал этот проект, Smartycraft уже угасал. Я это знал.
-Но мне хотелось сделать что-то своё — не потому что была аудитория,
-а потому что было интересно строить.
-
-Aura не стал популярным. Никакой драмы в этом нет.
-Просто так вышло: маленький проект для умирающего сервера, написанный одним человеком.
-
-За время работы над лаунчером я разобрался с Kotlin и Compose Multiplatform,
-написал кросс-платформенный CI с нуля, реализовал свою систему тем,
-покрыл сервисы тестами и сделал AppImage для Linux, который действительно работает.
-Это останется со мной.
-
-Если ты наткнулся на этот репозиторий и тебе нужно что-то позаимствовать —
-бери. Лицензия GPLv3 никуда не делась.
-
-Последний релиз: **v2.0.0**
-
-— Ваш Хару, 2026
+[![Archived](https://img.shields.io/badge/status-archived-red?style=flat-square)](https://github.com/Kitty-Hivens/Aura-Launcher)
+[![Last Release](https://img.shields.io/github/v/release/Kitty-Hivens/Aura-Launcher?style=flat-square&color=BB86FC)](https://github.com/Kitty-Hivens/Aura-Launcher/releases/latest)
+[![License: GPL v3](https://img.shields.io/badge/license-GPLv3-blue?style=flat-square)](LICENSE)
+[![Platform](https://img.shields.io/badge/Windows%20%7C%20Linux%20%7C%20macOS-supported-lightgrey?style=flat-square)](#)
 
 ---
 
-# Aura Launcher — Archived
+[SMARTYcraft](https://www.smartycraft.ru) — российский Minecraft-проект с 2013 года.  
+7 серверов, своя экосистема, свой официальный лаунчер.
 
-This repository is archived. There will be no new releases.
+Aura — неофициальный лаунчер для него, написанный одним человеком.  
+Просто потому что было интересно.
+
+Работает на Windows, Linux, macOS. Есть тесты. Есть CI.  
+Умеет авторизацию, синхронизацию файлов, скины, темы, трей, автообновление.  
+И кое-что ещё — но об этом лучше узнать первого апреля.
+
+> *Buttons have feelings. The window develops opinions.*  
+> *Two weeks. Every year. It's not a bug.*
 
 ---
 
-When I started this project, Smartycraft was already fading. I knew that.
-But I wanted to build something of my own — not because there was an audience,
-but because building it was worth doing.
+Репозиторий архивирован. Если нужно что-то позаимствовать — GPLv3, бери.
 
-Aura never found its users. No drama in that.
-Just a small project for a dying server, written by one person.
+**Last release: v2.2.0** — *"Minor UI improvements and stability fixes."*
 
-Along the way I got a solid grasp of Kotlin and Compose Multiplatform,
-built a cross-platform CI pipeline from scratch, wrote a custom theming engine,
-covered the core services with tests, and shipped a Linux AppImage that actually works.
-That stays with me.
-
-If you stumbled across this repo and need to borrow something —
-go ahead. The GPLv3 license still applies.
-
-Last release: **v2.0.0**
-
-— Your Haru, 2026
+— Haru, 2026

@@ -300,4 +300,15 @@ interface AppStrings {
     // --- Settings: Start in tray ---
     val settingsStartInTray: String
     val settingsStartInTrayDesc: String
+
+    // ─── April Fools close dialog ─────────────────────────────────────────────────
+    /** Dialog title — changes tone as the user fails more attempts */
+    fun aprilCloseTitle(escapes: Int): String
+    /** Dialog body text — changes with escalating despair */
+    fun aprilCloseBody(escapes: Int): String
+    val aprilCloseStay: String
+    val aprilCloseClose: String
+    val aprilCloseSurrender: String
+    val aprilCloseHideTray: String
+    fun aprilCloseEscapeCount(current: Int, max: Int): String
 }

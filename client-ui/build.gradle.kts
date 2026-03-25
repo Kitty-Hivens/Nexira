@@ -70,6 +70,9 @@ kotlin {
                 implementation("io.ktor:ktor-client-core:${ktorVersion}")
             }
         }
+        all {
+            languageSettings.enableLanguageFeature("NestedTypeAliases")
+        }
     }
 }
 

@@ -9,6 +9,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import hivens.ui.easter.AprilFools
+import hivens.ui.easter.AprilFoolsButton
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.logic.LaunchState
 import hivens.ui.theme.CelestiaTheme
@@ -113,19 +115,30 @@ fun LaunchControlPanel(
             else                                               -> s.launchButton
         }
 
-        CelestiaButton(
-            text    = btnText,
-            enabled = state !is LaunchState.GameRunning,
-            // Pulse when ready to play
-            glowing = state is LaunchState.Idle,
-            onClick = {
-                when (state) {
-                    is LaunchState.Downloading, is LaunchState.Prepare -> onAbort()
-                    is LaunchState.Error                               -> onClearError()
-                    else                                               -> onLaunch()
-                }
-            },
-            modifier = Modifier.fillMaxWidth().height(50.dp)
-        )
+        if (state is LaunchState.Idle && AprilFools.isActive()) {
+            // Only the PLAY button in idle state is a chaos target.
+            // Abort / Clear-error buttons stay reliable so the game can always be stopped.
+            AprilFoolsButton(
+                id       = "launch_play_btn",
+                text     = btnText,
+                onClick  = onLaunch,
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+            )
+        } else {
+            CelestiaButton(
+                text    = btnText,
+                enabled = state !is LaunchState.GameRunning,
+                // Pulse when ready to play
+                glowing = state is LaunchState.Idle,
+                onClick = {
+                    when (state) {
+                        is LaunchState.Downloading, is LaunchState.Prepare -> onAbort()
+                        is LaunchState.Error                               -> onClearError()
+                        else                                               -> onLaunch()
+                    }
+                },
+                modifier = Modifier.fillMaxWidth().height(50.dp)
+            )
+        }
     }
 }

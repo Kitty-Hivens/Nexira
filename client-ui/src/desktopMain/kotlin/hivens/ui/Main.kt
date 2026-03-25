@@ -28,6 +28,9 @@ import hivens.launcher.di.networkModule
 import hivens.ui.background.BackgroundManager
 import hivens.ui.background.CustomBackground
 import hivens.ui.components.UpdateManager
+import hivens.ui.easter.AprilFools
+import hivens.ui.easter.AprilFoolsWrapper
+import hivens.ui.easter.ChaosState
 import hivens.ui.generated.resources.Res
 import hivens.ui.generated.resources.favicon
 import hivens.ui.i18n.AppLocale
@@ -205,7 +208,16 @@ fun main() {
                 }
 
                 TrayManager.onExit = {
-                    SwingUtilities.invokeLater { exitApplication() }
+                    SwingUtilities.invokeLater {
+                        if (AprilFools.isActive()) {
+                            // Show the torturous close dialog instead of quitting immediately
+                            ChaosState.showCloseDialog = true
+                            // Also make the window visible so the dialog is actually seen
+                            isWindowVisible = true
+                        } else {
+                            exitApplication()
+                        }
+                    }
                 }
 
                 TrayManager.onShowConsole = {
@@ -250,7 +262,9 @@ fun main() {
             // ── Main window ────────────────────────────────────────────────
             Window(
                 onCloseRequest = {
-                    if (TrayManager.isSupported) {
+                    if (AprilFools.isActive()) {
+                        ChaosState.showCloseDialog = true
+                    } else if (TrayManager.isSupported) {
                         isWindowVisible = false
                     } else {
                         exitApplication()
@@ -272,6 +286,9 @@ fun main() {
                                 exitApplication()
                             }
                         },
+                        onRealExit   = { exitApplication() },
+                        onHideToTray = if (TrayManager.isSupported) {{ isWindowVisible = false }}
+                        else null,
                         isDarkTheme          = isDarkTheme,
                         onToggleDarkTheme    = {
                             isDarkTheme = !isDarkTheme
@@ -303,6 +320,8 @@ fun main() {
 fun AppRoot(
     onCloseApp: () -> Unit,
     isDarkTheme: Boolean,
+    onRealExit: () -> Unit,
+    onHideToTray: (() -> Unit)?,
     onToggleDarkTheme: () -> Unit,
     customTheme: CustomTheme,
     onCustomThemeChanged: (CustomTheme) -> Unit,
@@ -367,7 +386,8 @@ fun AppRoot(
     }
 
     // ── Render: background behind layout ──────────────────────────────────
-    val mousePos = remember { mutableStateOf(Offset(0.5f, 0.5f)) }
+    val mousePos    = remember { mutableStateOf(Offset(0.5f, 0.5f)) }
+    val mousePxPos  = remember { mutableStateOf(Offset.Zero) }
     var windowSize by remember { mutableStateOf(IntSize.Zero) }
 
     Box(
@@ -381,7 +401,8 @@ fun AppRoot(
                         if (event.type == PointerEventType.Move) {
                             val pos = event.changes.firstOrNull()?.position
                             if (pos != null && windowSize.width > 0 && windowSize.height > 0) {
-                                mousePos.value = Offset(pos.x / windowSize.width, pos.y / windowSize.height)
+                                mousePxPos.value = pos
+                                mousePos.value   = Offset(pos.x / windowSize.width, pos.y / windowSize.height)
                             }
                         }
                     }
@@ -395,27 +416,34 @@ fun AppRoot(
         )
          */
 
-        AppLayout(
-            appState             = appState,
-            onCloseApp           = onCloseApp,
-            currentScreen        = currentScreen,
-            onScreenChange       = { currentScreen = it },
-            onLogin              = { session -> appState = AppState.Authenticated(session) },
-            onLogout             = { credentialsManager.clear(); appState = AppState.Unauthenticated },
-            isDarkTheme          = isDarkTheme,
-            onToggleDarkTheme    = onToggleDarkTheme,
-            customTheme          = customTheme,
-            onCustomThemeChanged = onCustomThemeChanged,
-            currentLocale        = currentLocale,
-            onLocaleChanged      = onLocaleChanged,
-            backgroundSettings   = backgroundSettings,
-            onBackgroundSettingsChanged = { newSettings ->
-                backgroundSettings = newSettings
-                backgroundManager.save(newSettings)
-                if (!newSettings.enabled || newSettings.imagePath != backgroundSettings.imagePath) {
-                    System.gc()
+        AprilFoolsWrapper(
+            pixelCursorState = mousePxPos,
+            windowSize       = windowSize,
+            onRealClose      = onRealExit,
+            onHideTray       = onHideToTray,
+        ) {
+            AppLayout(
+                appState = appState,
+                onCloseApp = onCloseApp,
+                currentScreen = currentScreen,
+                onScreenChange = { currentScreen = it },
+                onLogin = { session -> appState = AppState.Authenticated(session) },
+                onLogout = { credentialsManager.clear(); appState = AppState.Unauthenticated },
+                isDarkTheme = isDarkTheme,
+                onToggleDarkTheme = onToggleDarkTheme,
+                customTheme = customTheme,
+                onCustomThemeChanged = onCustomThemeChanged,
+                currentLocale = currentLocale,
+                onLocaleChanged = onLocaleChanged,
+                backgroundSettings = backgroundSettings,
+                onBackgroundSettingsChanged = { newSettings ->
+                    backgroundSettings = newSettings
+                    backgroundManager.save(newSettings)
+                    if (!newSettings.enabled || newSettings.imagePath != backgroundSettings.imagePath) {
+                        System.gc()
+                    }
                 }
-            }
-        )
+            )
+        }
     }
 }
