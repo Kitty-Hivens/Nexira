@@ -17,8 +17,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.core.api.SkinRepository
 import hivens.core.data.SessionData
-import hivens.ui.components.CelestiaButton
 import hivens.ui.components.GlassCard
+import hivens.ui.easter.AprilFoolsButton
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.utils.SkinManager
@@ -175,9 +175,11 @@ fun ProfileScreen(session: SessionData, skinRepository: SkinRepository) {
                             else -> Unit
                         }
 
-                        CelestiaButton(
-                            s.profileTopUp,
-                            onClick  = {
+                        // Top up balance — chaos target
+                        AprilFoolsButton(
+                            id      = "profile_topup_btn",
+                            text    = s.profileTopUp,
+                            onClick = {
                                 runCatching {
                                     val url = "http://smartycraft.ru/cabinet"
                                     if (Desktop.isDesktopSupported() &&
@@ -185,17 +187,22 @@ fun ProfileScreen(session: SessionData, skinRepository: SkinRepository) {
                                         Desktop.getDesktop().browse(URI(url))
                                 }
                             },
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth(),
+                            colors   = ButtonDefaults.buttonColors(
+                                containerColor = CelestiaTheme.colors.primary,
+                            ),
                         )
 
                         Spacer(Modifier.height(16.dp))
 
-                        CelestiaButton(
-                            text     = s.profileUploadSkin,
-                            onClick  = {
+                        // Upload skin — chaos target
+                        AprilFoolsButton(
+                            id      = "profile_upload_skin_btn",
+                            text    = s.profileUploadSkin,
+                            onClick = {
                                 scope.launch {
                                     val result = FileKit.openFilePicker(
-                                        type = FileKitType.File(extensions = listOf("png")),
+                                        type           = FileKitType.File(extensions = listOf("png")),
                                         dialogSettings = FileKitDialogSettings(title = s.profileUploadSkin)
                                     )
                                     val file = result?.path?.let { File(it) }
@@ -223,7 +230,10 @@ fun ProfileScreen(session: SessionData, skinRepository: SkinRepository) {
                                 }
                             },
                             modifier = Modifier.fillMaxWidth(),
-                            primary  = false
+                            colors   = ButtonDefaults.buttonColors(
+                                containerColor = Color.Transparent,
+                                contentColor   = CelestiaTheme.colors.textPrimary,
+                            ),
                         )
                     }
                 }

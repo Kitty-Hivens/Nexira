@@ -31,7 +31,12 @@ import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.*
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -39,6 +44,9 @@ import androidx.compose.ui.unit.sp
 import hivens.config.AppConfig
 import hivens.core.api.model.ServerProfile
 import hivens.ui.debug.SkiaTracker
+import hivens.ui.easter.AprilFools
+import hivens.ui.easter.ChaosState
+import hivens.ui.easter.FloatingButton
 import hivens.ui.effects.neonBorder
 import hivens.ui.effects.shimmerOverlay
 import hivens.ui.theme.CelestiaTheme
@@ -106,6 +114,29 @@ fun SquareServerCard(
         }
     }
 
+    // ── April Fools: register card as a chaos target ──────────────────────────
+    // The card is a Box, not a Button, so we register it manually as a FloatingButton.
+    // The engine can then yank it out of the grid and send it flying.
+    val chaosId = "server_card_${profile.assetDir}"
+    val chaosBtn = remember(profile.assetDir) {
+        ChaosState.find(chaosId) ?: FloatingButton(
+            id       = chaosId,
+            label    = profile.title ?: profile.name,
+            widthPx  = 200f,
+            heightPx = 200f,
+            onClick  = onSelect,
+        ).also { btn -> if (AprilFools.isActive()) ChaosState.register(btn) }
+    }
+
+    // Keep onClick in sync (server list can refresh)
+    LaunchedEffect(onSelect) {
+        if (AprilFools.isActive()) chaosBtn.onClick = onSelect
+    }
+
+    DisposableEffect(profile.assetDir) {
+        onDispose { if (AprilFools.isActive()) ChaosState.unregister(chaosId) }
+    }
+
     val showActions = isHovered || isFocused
     val scale by animateFloatAsState(if (showActions) 1.02f else 1.0f)
     val (colorA, colorB) = remember(profile.name) { serverPalette(profile.name) }
@@ -119,6 +150,33 @@ fun SquareServerCard(
     val scrimMid        = bgBase.copy(alpha = 0.50f)
     val scrimBottom     = bgBase.copy(alpha = 0.92f)
     val badgeBgFallback = colorB.copy(0.22f)
+
+    // When the chaos engine has taken control, the original card is invisible
+    // and the clone lives in ChaosOverlay — block all pointer events on the ghost.
+    val isChaosEscaped = AprilFools.isActive() && !chaosBtn.originalVisible
+    val chaosBlocker: Modifier = if (isChaosEscaped) {
+        Modifier.pointerInput(Unit) {
+            awaitPointerEventScope {
+                while (true) {
+                    awaitPointerEvent(PointerEventPass.Initial)
+                        .changes.forEach { it.consume() }
+                }
+            }
+        }
+    } else {
+        Modifier
+            .clickable(interactionSource = interactionSource, indication = null) { onSelect() }
+            .hoverable(interactionSource)
+            .focusable(interactionSource = interactionSource)
+            .onKeyEvent { event ->
+                if (event.type == KeyEventType.KeyUp &&
+                    (event.key == Key.Enter || event.key == Key.NumPadEnter)
+                ) {
+                    if (isSelected) onLaunch() else onSelect()
+                    true
+                } else false
+            }
+    }
 
     Box(
         modifier = Modifier
@@ -134,18 +192,16 @@ fun SquareServerCard(
             }
             // Shimmer on hover (not when already glowing with neon)
             .shimmerOverlay(enabled = isHovered && !isSelected)
-            // Interaction
-            .clickable(interactionSource = interactionSource, indication = null) { onSelect() }
-            .hoverable(interactionSource)
-            .focusable(interactionSource = interactionSource)
-            .onKeyEvent { event ->
-                if (event.type == KeyEventType.KeyUp &&
-                    (event.key == Key.Enter || event.key == Key.NumPadEnter)
-                ) {
-                    if (isSelected) onLaunch() else onSelect()
-                    true
-                } else false
+            // Track position for chaos engine
+            .onGloballyPositioned { coords ->
+                if (AprilFools.isActive()) chaosBtn.originPx = coords.positionInWindow()
             }
+            // Hide original when chaos engine has taken control
+            .graphicsLayer {
+                alpha = if (isChaosEscaped) 0f else 1f
+            }
+            // Block clicks on invisible original so the overlay clone handles them
+            .then(chaosBlocker)
     ) {
         // ── LAYER 1: Background ───────────────────────────────────────────────
         if (serverIcon != null) {
@@ -254,7 +310,7 @@ fun SquareServerCard(
 
         // ── LAYER 3: Action buttons ───────────────────────────────────────────
         AnimatedVisibility(
-            visible  = showActions,
+            visible  = showActions && !isChaosEscaped,
             enter    = fadeIn() + slideInVertically { 16 },
             exit     = fadeOut() + slideOutVertically { 16 },
             modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 10.dp)
