@@ -317,4 +317,10 @@ object RussianStrings : AppStrings {
     override val aprilCloseHideTray  = "Свернуть в трей"
     override fun aprilCloseEscapeCount(current: Int, max: Int) =
         "Кнопка сбежала $current / $max раз"
+
+    // --- SSL Warning ---
+    override val sslWarningTitle        = "Сертификат безопасности устарел"
+    override val sslWarningBody         = "Сертификат сервера истёк. Соединение может быть небезопасным — данные передаются без проверки подлинности сервера. Продолжить на свой страх и риск?"
+    override val sslWarningConnectAnyway = "Всё равно подключиться"
+    override val sslWarningCancel       = "Отмена"
 }

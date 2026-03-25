@@ -317,4 +317,10 @@ object EnglishStrings : AppStrings {
     override val aprilCloseHideTray  = "Hide to tray"
     override fun aprilCloseEscapeCount(current: Int, max: Int) =
         "The close button has fled $current / $max times"
+
+    // --- SSL Warning ---
+    override val sslWarningTitle        = "Server certificate expired"
+    override val sslWarningBody         = "The server's SSL certificate has expired. Your connection may be insecure — server identity cannot be verified. Proceed at your own risk?"
+    override val sslWarningConnectAnyway = "Connect anyway"
+    override val sslWarningCancel       = "Cancel"
 }

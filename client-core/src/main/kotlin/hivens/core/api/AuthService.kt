@@ -99,6 +99,13 @@ class AuthService(
         } catch (e: Exception) {
             if (e is AuthException) throw e
             logger.error("Authorization error", e)
+            if (e.isSslCertificateError()) {
+                throw AuthException(
+                    status     = AuthStatus.INTERNAL_ERROR,
+                    message    = "SSL certificate error: ${e.message}",
+                    isSslError = true
+                )
+            }
             throw AuthException(AuthStatus.INTERNAL_ERROR, "Network Error: ${e.message}")
         }
 
@@ -165,5 +172,18 @@ class AuthService(
         rand.nextBytes(mac)
         mac[0] = (mac[0].toInt() and 254).toByte()
         return mac.joinToString("-") { "%02X".format(it) }
+    }
+
+    private fun Throwable.isSslCertificateError(): Boolean {
+        var cause: Throwable? = this
+        while (cause != null) {
+            if (cause is javax.net.ssl.SSLHandshakeException ||
+                cause is java.security.cert.CertPathValidatorException ||
+                cause.message?.contains("certificate_expired") == true ||
+                cause.message?.contains("CertPathValidatorException") == true
+            ) return true
+            cause = cause.cause
+        }
+        return false
     }
 }

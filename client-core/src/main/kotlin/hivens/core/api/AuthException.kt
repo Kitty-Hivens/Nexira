@@ -7,5 +7,7 @@ import hivens.core.data.AuthStatus
  */
 class AuthException(
     val status: AuthStatus,
-    message: String
+    message: String,
+    /** True when failure is caused by an expired/invalid SSL certificate. */
+    val isSslError: Boolean = false
 ) : Exception(message)
