@@ -3,7 +3,6 @@ package hivens.core.api
 import hivens.config.AppConfig
 import hivens.core.api.dto.SmartyResponse
 import hivens.core.data.DashboardRequest
-import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
@@ -14,7 +13,7 @@ import java.io.File
 import java.security.MessageDigest
 
 class ServerRepository(
-    private val client: HttpClient,
+    private val clientProvider: HttpClientProvider,
     private val json: Json,
     dataDir: File? = null
 ) {
@@ -22,6 +21,7 @@ class ServerRepository(
     private val cachedHashFile = dataDir?.let { File(it, AppConfig.FILES_HASH_CACHE) }
         ?: File(AppConfig.FILES_HASH_CACHE)
     private var currentHash = AppConfig.DEFAULT_LAUNCHER_HASH
+    private val client get() = clientProvider.current
 
     init {
         if (cachedHashFile.exists()) {

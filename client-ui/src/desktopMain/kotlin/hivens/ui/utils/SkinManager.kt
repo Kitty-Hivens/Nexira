@@ -3,6 +3,7 @@ package hivens.ui.utils
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import hivens.config.AppConfig
+import hivens.core.api.HttpClientProvider
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -27,7 +28,8 @@ import java.net.URLEncoder
  *
  * Note: encodeNickname() is used ONLY for URL construction, never for file paths.
  */
-class SkinManager(private val httpClient: HttpClient) {
+class SkinManager(private val clientProvider: HttpClientProvider) {
+    private val httpClient get() = clientProvider.current
 
     private companion object {
         private const val BASE_SKIN_URL  = "https://www.smartycraft.ru/skins/"

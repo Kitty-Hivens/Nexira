@@ -41,6 +41,7 @@ import hivens.core.api.interfaces.IServerListService
 import hivens.core.data.NewsItem
 import hivens.core.data.SessionData
 import hivens.launcher.CredentialsManager
+import hivens.launcher.NetworkState
 import hivens.launcher.ProfileManager
 import hivens.ui.easter.AprilFoolsButton
 import hivens.ui.i18n.LocalStrings
@@ -203,7 +204,10 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
                         Text(s.sslWarningCancel, color = CelestiaTheme.colors.textSecondary)
                     }
                     Button(
-                        onClick = { doLogin(insecureAuthService) },
+                        onClick = {
+                            NetworkState.sslBypassEnabled = true
+                            doLogin(insecureAuthService)
+                        },
                         modifier = Modifier.weight(1f),
                         shape    = RoundedCornerShape(6.dp),
                         colors   = ButtonDefaults.buttonColors(

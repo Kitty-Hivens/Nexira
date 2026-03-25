@@ -20,10 +20,11 @@ import java.security.MessageDigest
  * such as resetting spawn position.
  */
 class PlayerRepository(
-    private val client: HttpClient,
+    private val clientProvider: HttpClientProvider,
     private val json: Json
 ) {
     private val logger = LoggerFactory.getLogger("PlayerRepository")
+    private val client get() = clientProvider.current
 
     /**
      * Resets the player's spawn point on the specified server.

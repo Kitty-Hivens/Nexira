@@ -1,6 +1,6 @@
 package hivens.launcher
 
-import io.ktor.client.*
+import hivens.core.api.HttpClientProvider
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
@@ -18,9 +18,10 @@ import java.util.zip.ZipInputStream
 
 class JavaManagerService(
     baseDir: Path,
-    private val httpClient: HttpClient
+    private val clientProvider: HttpClientProvider
 ) {
     private val log = LoggerFactory.getLogger(JavaManagerService::class.java)
+    private val httpClient get() = clientProvider.current
     private val runtimesDir: Path = baseDir.resolve("runtimes")
 
     /**

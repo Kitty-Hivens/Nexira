@@ -4,7 +4,6 @@ import hivens.config.AppConfig
 import hivens.core.api.dto.SmartyResponse
 import hivens.core.data.SessionData
 import hivens.core.util.HashUtils
-import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
@@ -12,13 +11,13 @@ import io.ktor.http.*
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 import java.io.File
-import java.security.MessageDigest
 
 class SkinRepository(
-    private val client: HttpClient,
+    private val clientProvider: HttpClientProvider,
     private val json: Json
 ) {
     private val logger = LoggerFactory.getLogger("SkinRepository")
+    private val client get() = clientProvider.current
 
     suspend fun uploadSkin(file: File, isCloak: Boolean, session: SessionData): String {
         val type = if (isCloak) "cloak" else "skin"

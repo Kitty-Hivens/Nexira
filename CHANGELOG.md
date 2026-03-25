@@ -2,6 +2,16 @@
 
 All notable changes to Aura Launcher will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
+## [2.2.5] - 2026-03-25
+
+### Fixed
+- **SSL bypass now actually works globally**: replaced direct `HttpClient`
+  injection in all repositories with `HttpClientProvider` — a thin wrapper
+  that returns the secure or insecure client on every request based on
+  `NetworkState.sslBypassEnabled`. Previously Koin singleton creation order
+  caused repositories to permanently hold a reference to the secure client
+  even after the user accepted SSL bypass.
+
 ## [2.2.4] - 2026-03-25
 
 ### Fixed
