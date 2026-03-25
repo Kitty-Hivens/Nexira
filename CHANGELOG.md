@@ -2,6 +2,20 @@
 
 All notable changes to Aura Launcher will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
+## [2.2.1] - 2026-03-25
+
+### Fixed
+- **Launcher crash on Windows with JBR 25**: JetBrains Runtime 25 bundles JNA 7.0.2
+  natively and unpacks it to `%TEMP%` on startup. dorkbox/SystemTray 4.4 performs
+  a version check and throws `java.lang.Error` when it finds 7.0.2 instead of the
+  expected 6.1.6, crashing the launcher before the window appears.
+  Downgraded dorkbox/SystemTray from 4.4 to 4.3 as a workaround.
+  Root cause is dorkbox abandonment in 2023 — no JNA 7 support will be added upstream.
+
+### Known Issues
+- dorkbox/SystemTray is unmaintained since 2023. Full replacement planned if JNA
+  compatibility issues resurface on future JBR versions.
+
 ## [2.2.0] - 2026-03-25
 
 ### Changed
