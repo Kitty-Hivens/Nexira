@@ -1,8 +1,8 @@
 package hivens.launcher.component
 
+import hivens.core.api.HttpClientProvider
 import hivens.core.util.ZipUtils
 import hivens.launcher.util.ClientFileHelper
-import io.ktor.client.HttpClient
 import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.http.isSuccess
@@ -18,8 +18,9 @@ import java.nio.file.StandardCopyOption
 import java.util.*
 import java.util.stream.Collectors
 
-class EnvironmentPreparer(private val httpClient: HttpClient) {
+class EnvironmentPreparer(private val clientProvider: HttpClientProvider) {
     private val log = LoggerFactory.getLogger(EnvironmentPreparer::class.java)
+    private val httpClient get() = clientProvider.current
 
     // Modules for Modern versions (1.13+)
     private val lwjgl3Modules = listOf(
