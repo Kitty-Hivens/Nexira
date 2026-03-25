@@ -36,6 +36,7 @@ import hivens.ui.components.GlassCard
 import hivens.ui.components.ModItemCard
 import hivens.ui.components.RamSelector
 import hivens.ui.debug.SkiaTracker
+import hivens.ui.easter.AprilFoolsButton
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
 import io.github.vinceglb.filekit.FileKit
@@ -184,7 +185,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                 contentAlignment = Alignment.Center
             ) {
                 if (serverIcon != null) {
-                    Image(
+                    androidx.compose.foundation.Image(
                         painter = BitmapPainter(serverIcon!!),
                         contentDescription = null,
                         modifier = Modifier.fillMaxSize(),
@@ -347,15 +348,25 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
 
                     Spacer(Modifier.weight(1f))
 
-                    // ── Actions ───────────────────────────────────────────────
-                    CelestiaButton(s.serverSettingsOpenFolder, onClick = {
-                        val path = dataDirectory.resolve("clients").resolve(server.assetDir)
-                        if (!path.toFile().exists()) path.toFile().mkdirs()
-                        Desktop.getDesktop().open(path.toFile())
-                    }, modifier = Modifier.fillMaxWidth(), primary = false)
+                    // ── Open folder — chaos target ────────────────────────────
+                    AprilFoolsButton(
+                        id      = "srv_settings_open_folder_btn",
+                        text    = s.serverSettingsOpenFolder,
+                        onClick = {
+                            val path = dataDirectory.resolve("clients").resolve(server.assetDir)
+                            if (!path.toFile().exists()) path.toFile().mkdirs()
+                            Desktop.getDesktop().open(path.toFile())
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors   = ButtonDefaults.buttonColors(
+                            containerColor = Color.Transparent,
+                            contentColor   = CelestiaTheme.colors.textPrimary,
+                        ),
+                    )
 
                     Spacer(Modifier.height(12.dp))
 
+                    // Reset client — NOT chaos-wrapped (destructive action)
                     CelestiaButton(s.serverSettingsReset, onClick = {
                         val path = dataDirectory.resolve("clients").resolve(server.assetDir)
                         path.toFile().deleteRecursively()
@@ -363,19 +374,16 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                         onBack()
                     }, modifier = Modifier.fillMaxWidth(), primary = false)
 
-                    // ── Return to spawn (only 1.12.2) ───────────────────────
+                    // ── Return to spawn (only 1.12.2) — chaos target in Idle ──
                     if (server.version.startsWith("1.12")) {
                         Spacer(Modifier.height(12.dp))
-                        CelestiaButton(
-                            text = when (spawnResetState) {
-                                SpawnResetState.Loading -> s.spawnResetLoading
-                                SpawnResetState.Success -> s.spawnResetSuccess
-                                SpawnResetState.Error   -> s.spawnResetError
-                                SpawnResetState.Idle    -> s.spawnResetButton
-                            },
-                            enabled  = spawnResetState != SpawnResetState.Loading,
-                            onClick  = {
-                                if (spawnResetState != SpawnResetState.Loading) {
+
+                        if (spawnResetState == SpawnResetState.Idle) {
+                            // Only chaos-wrap when idle — Loading/Success/Error states need reliable feedback
+                            AprilFoolsButton(
+                                id      = "srv_settings_spawn_reset_btn",
+                                text    = s.spawnResetButton,
+                                onClick = {
                                     spawnResetState = SpawnResetState.Loading
                                     scope.launch {
                                         val credentials = withContext(Dispatchers.IO) {
@@ -394,11 +402,28 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                                         delay(3000)
                                         spawnResetState = SpawnResetState.Idle
                                     }
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            primary  = false
-                        )
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors   = ButtonDefaults.buttonColors(
+                                    containerColor = Color.Transparent,
+                                    contentColor   = CelestiaTheme.colors.textPrimary,
+                                ),
+                            )
+                        } else {
+                            // Loading / Success / Error — plain reliable button, no chaos
+                            CelestiaButton(
+                                text    = when (spawnResetState) {
+                                    SpawnResetState.Loading -> s.spawnResetLoading
+                                    SpawnResetState.Success -> s.spawnResetSuccess
+                                    SpawnResetState.Error   -> s.spawnResetError
+                                    SpawnResetState.Idle    -> s.spawnResetButton
+                                },
+                                enabled  = spawnResetState != SpawnResetState.Loading,
+                                onClick  = {},
+                                modifier = Modifier.fillMaxWidth(),
+                                primary  = false
+                            )
+                        }
                     }
                 }
             }

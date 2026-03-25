@@ -14,10 +14,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Color
 import hivens.config.AppConfig
 import hivens.core.api.interfaces.ISettingsService
-import hivens.ui.components.CelestiaButton
 import hivens.ui.components.GlassCard
+import hivens.ui.easter.AprilFoolsButton
+import hivens.ui.easter.AprilFoolsDebugPanel
 import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
@@ -44,6 +46,11 @@ fun SettingsScreen(
     var startInTray            by remember { mutableStateOf(initialSettings.startInTray) }
     var langDropdownExpanded   by remember { mutableStateOf(false) }
     var showSavedMessage       by remember { mutableStateOf(false) }
+
+    // ── April Fools debug panel — secret unlock ────────────────────────────────
+    // Tap the DIAGNOSTICS section title 5 times to reveal the debug panel.
+    var debugTapCount  by remember { mutableStateOf(0) }
+    var showAprilDebug by remember { mutableStateOf(false) }
 
     fun save() {
         val current = settingsService.getSettings()
@@ -295,21 +302,50 @@ fun SettingsScreen(
 
                 // ── Diagnostics ───────────────────────────────────────────────
                 item {
-                    SettingsSectionTitle(s.settingsSectionDiagnostics)
-
                     val userHome = System.getProperty("user.home")
+
+                    // Secret: tap the diagnostics title 5 times to toggle the April Fools debug panel
+                    Box(
+                        Modifier.clickable {
+                            debugTapCount++
+                            if (debugTapCount >= 5) {
+                                debugTapCount  = 0
+                                showAprilDebug = !showAprilDebug
+                            }
+                        }
+                    ) {
+                        SettingsSectionTitle(s.settingsSectionDiagnostics)
+                    }
+
+                    // April Fools debug panel (hidden by default)
+                    if (showAprilDebug) {
+                        Spacer(Modifier.height(8.dp))
+                        AprilFoolsDebugPanel()
+                        Spacer(Modifier.height(8.dp))
+                    }
+
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        CelestiaButton(
-                            s.settingsOpenLogs,
+                        // Open logs — chaos target
+                        AprilFoolsButton(
+                            id       = "settings_open_logs_btn",
+                            text     = s.settingsOpenLogs,
                             onClick  = { openFolder("logs") },
                             modifier = Modifier.weight(1f),
-                            primary  = false
+                            colors   = ButtonDefaults.buttonColors(
+                                containerColor = Color.Transparent,
+                                contentColor   = CelestiaTheme.colors.textPrimary,
+                            ),
                         )
-                        CelestiaButton(
-                            s.settingsOpenCrashReports,
+                        // Open crash reports — chaos target
+                        AprilFoolsButton(
+                            id       = "settings_crash_reports_btn",
+                            text     = s.settingsOpenCrashReports,
                             onClick  = { openFolder("$userHome/.aura/crash-reports") },
                             modifier = Modifier.weight(1f),
-                            primary  = false
+                            colors   = ButtonDefaults.buttonColors(
+                                containerColor = Color.Transparent,
+                                contentColor   = CelestiaTheme.colors.textPrimary,
+                            ),
                         )
                     }
                 }

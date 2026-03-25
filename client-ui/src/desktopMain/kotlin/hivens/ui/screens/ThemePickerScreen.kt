@@ -24,6 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import hivens.ui.components.GlassCard
+import hivens.ui.easter.AprilFoolsButton
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.*
 
@@ -64,15 +65,15 @@ fun ThemePickerScreen(
                 )
             }
 
-            Button(
+            // Apply button — chaos target
+            AprilFoolsButton(
+                id      = "theme_picker_apply_btn",
+                text    = s.themePickerApply,
                 onClick = { onThemeSelected(selectedTheme) },
-                colors  = ButtonDefaults.buttonColors(containerColor = CelestiaTheme.colors.primary),
-                shape   = RoundedCornerShape(12.dp)
-            ) {
-                Icon(Icons.Default.Check, contentDescription = null, tint = Color.White)
-                Spacer(Modifier.width(8.dp))
-                Text(s.themePickerApply, color = Color.White, fontWeight = FontWeight.Bold)
-            }
+                colors  = ButtonDefaults.buttonColors(
+                    containerColor = CelestiaTheme.colors.primary,
+                ),
+            )
         }
 
         Row(

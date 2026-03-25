@@ -293,4 +293,28 @@ object GermanStrings : AppStrings {
     // --- Settings: Start in tray ---
     override val settingsStartInTray     = "Im Tray starten"
     override val settingsStartInTrayDesc = "Minimiert starten; Fenster schließen versteckt es im Tray"
+
+    // April Fools
+    override fun aprilCloseTitle(escapes: Int) = when {
+        escapes == 0 -> "Warte mal kurz..."
+        escapes < 3  -> "Bist du sicher?"
+        escapes < 6  -> "Bitte... wir hatten so eine tolle Zeit"
+        escapes < 8  -> "Das wird jetzt peinlich für uns beide"
+        else         -> "Na gut. Ich gebe auf."
+    }
+
+    override fun aprilCloseBody(escapes: Int) = when {
+        escapes == 0 -> "Launcher hat heute so hart gearbeitet. Verlässt du es wirklich?"
+        escapes < 3  -> "Alles was du brauchst ist hier. Der Knopf ist nur... schüchtern."
+        escapes < 6  -> "Fluchtversuche: $escapes. Der Knopf kann nicht ewig fliehen."
+        escapes < 8  -> "Du bist sehr beharrlich. Der Knopf wird müde. Fast geschafft..."
+        else         -> "Du gewinnst. Du bist ein unglaublich ausdauernder Mensch."
+    }
+
+    override val aprilCloseStay      = "Bleiben"
+    override val aprilCloseClose     = "Schließen"
+    override val aprilCloseSurrender = "Schließen (endlich)"
+    override val aprilCloseHideTray  = "Im Tray verstecken"
+    override fun aprilCloseEscapeCount(current: Int, max: Int) =
+        "Der Schließen-Knopf ist $current / $max Mal geflohen"
 }

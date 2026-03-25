@@ -8,6 +8,7 @@ import hivens.launcher.CrashReporter
 import hivens.launcher.CredentialsManager
 import hivens.launcher.JavaManagerService
 import hivens.launcher.ProfileManager
+import hivens.ui.easter.AprilFoolsProgress
 import hivens.ui.i18n.I18n
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.utils.LogType
@@ -116,18 +117,20 @@ class LauncherController : KoinComponent {
                         messageUI = { /* log */ },
                         progressUI = { current, total, bytesRead, totalBytes, speed ->
                             if (!isActive) return@processSession
-                            val progressValue = if (totalBytes > 0) bytesRead.toFloat() / totalBytes.toFloat() else 0f
+                            // April Fools: display progress may regress, actual download is unaffected
+                            val displayProgress = AprilFoolsProgress.wrap(bytesRead, totalBytes)
                             _state.value = LaunchState.Downloading(
-                                fileName = "${s.fileDownloading(total).substringBefore("(")}$current/$total",
-                                currentFileIdx = current,
-                                totalFiles = total,
+                                fileName        = "${s.fileDownloading(total).substringBefore("(")}$current/$total",
+                                currentFileIdx  = current,
+                                totalFiles      = total,
                                 downloadedBytes = bytesRead,
-                                totalBytes = totalBytes,
-                                speedStr = speed,
-                                progress = progressValue
+                                totalBytes      = totalBytes,
+                                speedStr        = speed,
+                                progress        = displayProgress
                             )
-                        }
+                        },
                     )
+                    AprilFoolsProgress.reset()
                 }
 
                 // 4. Java

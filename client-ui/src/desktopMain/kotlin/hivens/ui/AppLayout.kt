@@ -1,7 +1,7 @@
 package hivens.ui
 
 import androidx.compose.animation.Crossfade
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -16,18 +16,22 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import hivens.core.api.SkinRepository
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.SessionData
 import hivens.ui.background.BackgroundSettings
+import hivens.ui.easter.AprilFools
 import hivens.ui.i18n.AppLocale
 import hivens.ui.screens.*
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.CustomTheme
 import hivens.ui.utils.GameConsoleService
 import org.koin.compose.koinInject
+import kotlin.math.sin
+import kotlin.random.Random
 
 // ─── Layout ──────────────────────────────────────────────────────────────────
 
@@ -79,7 +83,8 @@ fun AppLayout(
         Box(Modifier.weight(1f).fillMaxHeight()) {
             Crossfade(
                 targetState   = currentScreen,
-                animationSpec = tween(180)) { screen ->
+                animationSpec = tween(180)
+            ) { screen ->
                 when (screen) {
                     Screen.Home -> {
                         val session = currentSession
@@ -105,11 +110,11 @@ fun AppLayout(
 
                     Screen.Settings ->
                         SettingsScreen(
-                            isDarkTheme       = isDarkTheme,
-                            onToggleTheme     = onToggleDarkTheme,
-                            onOpenThemePicker = { onScreenChange(Screen.ThemePicker) },
-                            currentLocale     = currentLocale,
-                            onLocaleChanged   = onLocaleChanged,
+                            isDarkTheme              = isDarkTheme,
+                            onToggleTheme            = onToggleDarkTheme,
+                            onOpenThemePicker        = { onScreenChange(Screen.ThemePicker) },
+                            currentLocale            = currentLocale,
+                            onLocaleChanged          = onLocaleChanged,
                             onOpenBackgroundSettings = { onScreenChange(Screen.BackgroundSettings) },
                             onOpenAbout              = { onScreenChange(Screen.About) }
                         )
@@ -131,9 +136,9 @@ fun AppLayout(
 
                     Screen.BackgroundSettings ->
                         BackgroundSettingsScreen(
-                            currentSettings     = backgroundSettings,
-                            onSettingsChanged   = onBackgroundSettingsChanged,
-                            onBack              = { onScreenChange(Screen.Settings) }
+                            currentSettings   = backgroundSettings,
+                            onSettingsChanged = onBackgroundSettingsChanged,
+                            onBack            = { onScreenChange(Screen.Settings) }
                         )
 
                     is Screen.ServerSettings ->
@@ -184,6 +189,47 @@ fun AppSidebar(
             || currentScreen is Screen.BackgroundSettings
     val aboutActive    = currentScreen is Screen.About
 
+    // ── April Fools: nav clicks have a 30% chance of being silently swallowed ──
+    // The button doesn't move or react — it just feels like the UI froze.
+    // Logout is intentionally excluded so the user can always escape.
+    fun chaosNavClick(originalClick: () -> Unit): () -> Unit {
+        if (!AprilFools.isActive()) return originalClick
+        return {
+            if (Random.nextFloat() > 0.30f) {
+                originalClick()
+            }
+            // else: click silently consumed — simulates UI "lag"
+        }
+    }
+
+    // ── April Fools: bouncing nav buttons ────────────────────────────────────
+    // Each item has a unique sine phase so they bounce out of sync.
+    // Amplitude grows from 0px on day 1 to 18px on day 14.
+    val bounceAmplitude = if (AprilFools.isActive()) AprilFools.intensity() * 18f else 0f
+
+    val bounceTransition = rememberInfiniteTransition(label = "navBounce")
+    val bounceCycle by bounceTransition.animateFloat(
+        initialValue  = 0f,
+        targetValue   = (2f * Math.PI).toFloat(),
+        animationSpec = infiniteRepeatable(
+            animation = tween(
+                durationMillis = if (AprilFools.isActive())
+                    (2200 - AprilFools.intensity() * 1400).toInt().coerceAtLeast(600)
+                else
+                    2200,
+                easing = LinearEasing
+            ),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "bounceCycle"
+    )
+
+    // Different phase offset per button — they never all peak at the same time
+    val homeOffset    = sin(bounceCycle + 0.0f) * bounceAmplitude
+    val profileOffset = sin(bounceCycle + 1.1f) * bounceAmplitude
+    val settingsOffset= sin(bounceCycle + 2.2f) * bounceAmplitude
+    val aboutOffset   = sin(bounceCycle + 3.3f) * bounceAmplitude
+
     NavigationRail(
         modifier       = Modifier.width(64.dp).fillMaxHeight(),
         containerColor = CelestiaTheme.colors.surface.copy(alpha = 0.35f),
@@ -192,31 +238,44 @@ fun AppSidebar(
         // ── Nav items ─────────────────────────────────────────────────────
         Spacer(Modifier.height(8.dp))
 
-        SidebarNavItem(
-            icon     = Icons.Default.Home,
-            selected = homeActive,
-            onClick  = { onScreenChange(Screen.Home) }
-        )
-        SidebarNavItem(
-            icon     = Icons.Default.Person,
-            selected = profileActive,
-            enabled  = isAuthenticated,
-            onClick  = { onScreenChange(Screen.Profile) }
-        )
-        SidebarNavItem(
-            icon     = Icons.Default.Settings,
-            selected = settingsActive,
-            onClick  = { onScreenChange(Screen.Settings) }
-        )
-        SidebarNavItem(
-            icon     = Icons.Default.Info,
-            selected = aboutActive,
-            onClick  = { onScreenChange(Screen.About) }
-        )
+        // Each item wrapped in a Box that applies the vertical bounce offset
+        Box(Modifier.graphicsLayer { translationY = homeOffset }) {
+            SidebarNavItem(
+                icon     = Icons.Default.Home,
+                selected = homeActive,
+                onClick  = chaosNavClick { onScreenChange(Screen.Home) }
+            )
+        }
+
+        Box(Modifier.graphicsLayer { translationY = profileOffset }) {
+            SidebarNavItem(
+                icon     = Icons.Default.Person,
+                selected = profileActive,
+                enabled  = isAuthenticated,
+                onClick  = chaosNavClick { onScreenChange(Screen.Profile) }
+            )
+        }
+
+        Box(Modifier.graphicsLayer { translationY = settingsOffset }) {
+            SidebarNavItem(
+                icon     = Icons.Default.Settings,
+                selected = settingsActive,
+                onClick  = chaosNavClick { onScreenChange(Screen.Settings) }
+            )
+        }
+
+        Box(Modifier.graphicsLayer { translationY = aboutOffset }) {
+            SidebarNavItem(
+                icon     = Icons.Default.Info,
+                selected = aboutActive,
+                onClick  = chaosNavClick { onScreenChange(Screen.About) }
+            )
+        }
 
         // ── Bottom actions ────────────────────────────────────────────────
         Spacer(Modifier.weight(1f))
 
+        // Console toggle — not bouncing, user needs to be able to open it
         IconButton(
             onClick  = {
                 if (GameConsoleService.shouldShowConsole) GameConsoleService.hide()
@@ -235,6 +294,7 @@ fun AppSidebar(
             )
         }
 
+        // Logout — NOT chaos-wrapped, NOT bouncing — user must always be able to log out
         if (isAuthenticated) {
             IconButton(onClick = onLogout, modifier = Modifier.size(48.dp)) {
                 Icon(
@@ -288,9 +348,9 @@ private fun SidebarNavItem(
 private fun ContentLoadingPlaceholder() {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         CircularProgressIndicator(
-            color        = CelestiaTheme.colors.primary.copy(alpha = 0.35f),
-            modifier     = Modifier.size(28.dp),
-            strokeWidth  = 2.dp
+            color       = CelestiaTheme.colors.primary.copy(alpha = 0.35f),
+            modifier    = Modifier.size(28.dp),
+            strokeWidth = 2.dp
         )
     }
 }
