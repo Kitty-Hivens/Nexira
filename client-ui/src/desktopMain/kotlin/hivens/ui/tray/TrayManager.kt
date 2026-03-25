@@ -60,7 +60,7 @@ object TrayManager {
             t.setImage(iconStream)
             buildMenu(t.menu, strings)
             logger.info("TrayManager initialized ({})", t.javaClass.simpleName)
-        } catch (t: Exception) {
+        } catch (t: Throwable) {
             logger.error("Failed to initialize TrayManager", t)
         }
     }

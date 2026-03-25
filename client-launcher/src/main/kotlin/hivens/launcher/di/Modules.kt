@@ -65,19 +65,12 @@ val networkModule = module {
         builder.build()
     }
 
-    single<HttpClient> { buildHttpClient(get(), get()) }
-
-    // Repositories
-    single { ServerRepository(get(), get(), get<java.nio.file.Path>().toFile()) }
-    singleOf(::SkinRepository)
-    singleOf(::PlayerRepository)
-
-
-    // ── Insecure client (SSL verification disabled) ───────────────────────
-    // Registered only for the explicit "connect anyway" user flow.
-    // Never injected by default — must be requested by named("insecure").
-
-    single(named("insecure")) {
+    /**
+     * Insecure HTTP client (SSL verification disabled).
+     * Registered only for the explicit "connect anyway" user flow.
+     * Never injected by default — must be requested by named("insecure").
+     */
+    single<OkHttpClient>(named("insecure")) {
         val (socketFactory, trustManager) = buildTrustAllSsl()
 
         val builder = OkHttpClient.Builder()
@@ -90,7 +83,27 @@ val networkModule = module {
         builder.build()
     }
 
-    single<HttpClient>(named("insecure")) { buildHttpClient(get(named("insecure")), get()) }
+    /**
+     * Primary HTTP client.
+     * Automatically switches to the insecure OkHttpClient when the user
+     * has explicitly accepted SSL bypass via [NetworkState.sslBypassEnabled].
+     */
+    single<HttpClient> {
+        val okHttpInstance = if (NetworkState.sslBypassEnabled)
+            get<OkHttpClient>(named("insecure"))
+        else
+            get<OkHttpClient>()
+        buildHttpClient(okHttpInstance, get())
+    }
+
+    single<HttpClient>(named("insecure")) {
+        buildHttpClient(get(named("insecure")), get())
+    }
+
+    // Repositories
+    single { ServerRepository(get(), get(), get<java.nio.file.Path>().toFile()) }
+    singleOf(::SkinRepository)
+    singleOf(::PlayerRepository)
 }
 
 /**
@@ -122,35 +135,62 @@ val appModule = module {
     singleOf(::EnvironmentPreparer)
 
     single<IAuthService> { AuthService(get(), get()) }
+    single<IAuthService>(named("insecure")) { AuthService(get(named("insecure")), get()) }
+
     single<IServerListService> { ServerListService(get()) }
 
     /**
      * Basic launch service.
-     * Now accepts EnvironmentPreparer via DI.
+     * Accepts EnvironmentPreparer via DI.
      */
     single<ILauncherService> {
         LauncherService(
             manifestProcessor = get(),
-            profileManager = get(),
-            javaManager = get(),
-            envPreparer = get()
+            profileManager    = get(),
+            javaManager       = get(),
+            envPreparer       = get()
         )
     }
 
     // Update Service
     single {
         UpdateService(
-            httpClient = get(),
-            json = get(),
+            httpClient    = get(),
+            json          = get(),
             dataDirectory = get()
         )
     }
-
-    single<IAuthService>(named("insecure")) {
-        AuthService(get(named("insecure")), get())
-    }
 }
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/**
+ * Builds an [HttpClient] backed by the given [OkHttpClient].
+ * Extracted to eliminate duplication between secure and insecure variants.
+ */
+private fun buildHttpClient(okHttpInstance: OkHttpClient, json: Json): HttpClient =
+    HttpClient(OkHttp) {
+        engine { preconfigured = okHttpInstance }
+
+        install(ContentNegotiation) { json(json) }
+
+        install(HttpTimeout) {
+            requestTimeoutMillis = 600_000
+            connectTimeoutMillis = 30_000
+            socketTimeoutMillis  = 600_000
+        }
+
+        defaultRequest {
+            header("User-Agent", "SMARTYlauncher/${AppConfig.LAUNCHER_VERSION}")
+            contentType(ContentType.Application.Json)
+        }
+    }
+
+/**
+ * Builds a trust-all SSL socket factory for the insecure client.
+ * Not perfect (no TPM/Keyring), but allows connecting to servers
+ * with expired certificates when the user explicitly accepts the risk.
+ */
 private fun buildTrustAllSsl(): Pair<javax.net.ssl.SSLSocketFactory, javax.net.ssl.X509TrustManager> {
     val trustManager = object : javax.net.ssl.X509TrustManager {
         override fun checkClientTrusted(
@@ -165,25 +205,3 @@ private fun buildTrustAllSsl(): Pair<javax.net.ssl.SSLSocketFactory, javax.net.s
     ctx.init(null, arrayOf(trustManager), java.security.SecureRandom())
     return ctx.socketFactory to trustManager
 }
-
-private fun buildHttpClient(okHttpInstance: OkHttpClient, json: Json): HttpClient =
-    HttpClient(OkHttp) {
-        engine {
-            preconfigured = okHttpInstance
-        }
-
-        // Ktor plugins
-        install(ContentNegotiation) { json(json) }
-
-        install(HttpTimeout) {
-            requestTimeoutMillis = 600_000 // 10 minutes
-            connectTimeoutMillis = 30_000 // 30 seconds to connect
-            socketTimeoutMillis = 600_000 // 10 minutes to wait for packets
-        }
-
-        defaultRequest {
-            // User-Agent strictly according to the config
-            header("User-Agent", "SMARTYlauncher/${AppConfig.LAUNCHER_VERSION}")
-            contentType(ContentType.Application.Json)
-        }
-    }
