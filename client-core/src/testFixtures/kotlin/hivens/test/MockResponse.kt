@@ -1,5 +1,6 @@
 package hivens.test
 
+import hivens.core.api.HttpClientProvider
 import io.ktor.client.*
 import io.ktor.client.engine.mock.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -24,7 +25,7 @@ data class MockResponse(
 )
 
 /**
- * Builds a test [HttpClient] backed by [MockEngine].
+ * Builds a test [HttpClientProvider] backed by [MockEngine].
  *
  * Responses are matched against [responses] in order by [MockResponse.urlContains].
  * The first matching entry is returned; if nothing matches, the last entry is used as fallback.
@@ -38,10 +39,10 @@ data class MockResponse(
  * )
  * ```
  */
-fun buildMockClient(vararg responses: MockResponse): HttpClient {
+fun buildMockClient(vararg responses: MockResponse): HttpClientProvider {
     val queue = responses.toMutableList()
 
-    return HttpClient(MockEngine) {
+    val client = HttpClient(MockEngine) {
         engine {
             addHandler { request ->
                 val url = request.url.toString()
@@ -66,13 +67,15 @@ fun buildMockClient(vararg responses: MockResponse): HttpClient {
             })
         }
     }
+
+    return HttpClientProvider { client }
 }
 
 fun buildMockClient(
     body: String,
     status: HttpStatusCode = HttpStatusCode.OK,
     contentType: ContentType = ContentType.Application.Json
-): HttpClient = buildMockClient(MockResponse(body = body, status = status, contentType = contentType))
+): HttpClientProvider = buildMockClient(MockResponse(body = body, status = status, contentType = contentType))
 
-fun buildErrorClient(status: HttpStatusCode = HttpStatusCode.InternalServerError): HttpClient =
+fun buildErrorClient(status: HttpStatusCode = HttpStatusCode.InternalServerError): HttpClientProvider =
     buildMockClient(body = """{"error":"server error"}""", status = status)
