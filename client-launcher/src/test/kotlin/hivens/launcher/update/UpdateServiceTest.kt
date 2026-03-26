@@ -22,7 +22,7 @@ class UpdateServiceTest {
         val tempDir = Files.createTempDirectory("update-test")
         tempDir.toFile().deleteOnExit()
         return UpdateService(
-            httpClient = buildMockClient(*responses),
+            clientProvider = buildMockClient(*responses),
             json = json,
             dataDirectory = tempDir
         )
@@ -32,8 +32,8 @@ class UpdateServiceTest {
         val tempDir = Files.createTempDirectory("update-test")
         tempDir.toFile().deleteOnExit()
         return UpdateService(
-            httpClient = buildMockClient(
-                MockResponse(urlContains = "releases/latest", body = body,    status = status),
+            clientProvider = buildMockClient(
+                MockResponse(urlContains = "releases/latest", body = body,      status = status),
                 MockResponse(urlContains = "releases",        body = "[$body]", status = status)
             ),
             json = json,
@@ -438,7 +438,7 @@ class UpdateServiceTest {
         Files.writeString(updatesDir.resolve("notes.txt"), "keep me")   // should survive
 
         val svc = UpdateService(
-            httpClient = buildMockClient(body = "{}"),
+            clientProvider = buildMockClient(body = "{}"),
             json = json,
             dataDirectory = tempDir
         )
