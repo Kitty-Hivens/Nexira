@@ -50,6 +50,7 @@ import hivens.ui.utils.SkinManager
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -63,7 +64,10 @@ import org.koin.core.module.dsl.singleOf
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
 import org.slf4j.LoggerFactory
+import java.io.File
+import java.io.FileOutputStream
 import javax.swing.SwingUtilities
+import kotlin.system.exitProcess
 
 // ─── DI ──────────────────────────────────────────────────────────────────────
 
@@ -97,6 +101,9 @@ sealed class Screen {
 
 @OptIn(ExperimentalResourceApi::class, DelicateCoroutinesApi::class)
 fun main() {
+    val lockFile = File(System.getProperty("user.home"), ".aura/.lock")
+    val lockChannel = FileOutputStream(lockFile).channel
+    val lock = lockChannel.tryLock()
     System.setProperty("jna.nosys", "true")
     System.setProperty("skiko.fps.limit", "60")
     Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
@@ -107,6 +114,11 @@ fun main() {
             val reportFile = CrashReporter.saveToDisk(report)
             SwingUtilities.invokeLater { CrashReporter.showCrashDialog(report, reportFile) }
         }
+    }
+
+    if (lock == null) {
+        File(System.getProperty("user.home"), ".aura/.show").createNewFile()
+        exitProcess(0)
     }
 
     startKoin { modules(networkModule, appModule, uiModule) }
@@ -138,6 +150,18 @@ fun main() {
         }
 
         val launchState by controller.state.collectAsState()
+
+
+        LaunchedEffect(Unit) {
+            while (true) {
+                delay(500)
+                val showFile = File(System.getProperty("user.home"), ".aura/.show")
+                if (showFile.exists()) {
+                    showFile.delete()
+                    isWindowVisible = true
+                }
+            }
+        }
 
         LaunchedEffect(launchState) {
             val serverName = profileManager.lastServerId
