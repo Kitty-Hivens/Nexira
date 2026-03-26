@@ -2,6 +2,21 @@
 
 All notable changes to Aura Launcher will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
+## [2.2.6] - 2026-03-26
+
+### Fixed
+- **Launcher collapses repeatedly when reopened during active game session**:
+  added per-session flag so the launcher hides only once after game starts,
+  not on every subsequent open while the game is running.
+- **Single instance support**: launching a second instance now brings the
+  existing window to foreground instead of opening a duplicate process.
+
+### Changed
+- **Update dialog**: increased width and changelog area height for better
+  readability.
+- **Idle status label**: renamed "Готов к игре" to "Ожидание" / "Idle" /
+  "Wartend" across all locales for clarity.
+
 ## [2.2.5] - 2026-03-25
 
 ### Fixed
