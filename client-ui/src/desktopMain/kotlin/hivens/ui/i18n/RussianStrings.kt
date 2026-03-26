@@ -284,7 +284,7 @@ object RussianStrings : AppStrings {
     override val spawnResetError   = "Ошибка сервера"
 
     // --- Tray ---
-    override val trayStatusIdle    = "● Готов к запуску"
+    override val trayStatusIdle    = "● Ожидание"
     override val trayStatusRunning = "▶ Игра запущена"
     override val trayShow          = "Открыть лаунчер"
     override val trayServers       = "Серверы"

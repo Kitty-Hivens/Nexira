@@ -51,6 +51,7 @@ fun DashboardScreen(
     val scope = rememberCoroutineScope()
 
     val launchState by controller.state.collectAsState()
+    var hiddenForCurrentSession by remember { mutableStateOf(false) }
 
     var servers             by remember { mutableStateOf<List<ServerProfile>>(emptyList()) }
     var selectedServerState by remember { mutableStateOf(initialSelectedServer) }
@@ -92,8 +93,17 @@ fun DashboardScreen(
     }
 
     LaunchedEffect(launchState) {
-        if (launchState is LaunchState.GameRunning) {
-            if (settingsService.getSettings().closeAfterStart) onCloseApp()
+        when (launchState) {
+            is LaunchState.GameRunning -> {
+                if (settingsService.getSettings().closeAfterStart && !hiddenForCurrentSession) {
+                    hiddenForCurrentSession = true
+                    onCloseApp()
+                }
+            }
+            is LaunchState.Idle, is LaunchState.Error -> {
+                hiddenForCurrentSession = false
+            }
+            else -> {}
         }
     }
 
