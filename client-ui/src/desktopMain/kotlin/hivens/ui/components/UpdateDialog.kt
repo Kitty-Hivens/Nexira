@@ -45,7 +45,7 @@ fun UpdateDialog(
         onDismissRequest = { if (!update.isCritical) onDismiss() }
     ) {
         Surface(
-            modifier  = Modifier.width(550.dp).wrapContentHeight(),
+            modifier  = Modifier.width(700.dp).wrapContentHeight(),
             shape     = RoundedCornerShape(16.dp),
             color     = CelestiaTheme.colors.surface,
             tonalElevation = 8.dp
@@ -113,7 +113,7 @@ fun UpdateDialog(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(max = 200.dp)
+                        .heightIn(max = 350.dp)
                         .background(CelestiaTheme.colors.background.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
                         .padding(12.dp)
                 ) {
