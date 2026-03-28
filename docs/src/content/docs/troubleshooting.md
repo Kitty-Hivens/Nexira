@@ -5,10 +5,10 @@ description: Common issues and how to fix them.
 
 ## Where are the logs?
 
-|                | Path                                                                                |
-|----------------|-------------------------------------------------------------------------------------|
-| Crash reports  | `~/.aura/crash-reports/` (Linux/macOS) or `%AppData%\.aura\crash-reports` (Windows) |
-| Console output | Wrench icon in sidebar → **Copy All**                                               |
+| | Path |
+|---|---|
+| Crash reports | `~/.aura/crash-reports/` (Linux/macOS) or `%AppData%\.aura\crash-reports` (Windows) |
+| Console output | Wrench icon in sidebar → **Copy All** |
 
 :::tip[Reporting a bug?]
 Always attach the crash report or console output. [Open a bug report →](https://github.com/Kitty-Hivens/Aura-Launcher/issues/new?template=bug_report.md)
