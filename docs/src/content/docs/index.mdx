@@ -1,0 +1,34 @@
+---
+title: Aura Launcher
+description: An unofficial launcher for SMARTYcraft. Works on Windows, Linux and macOS.
+template: splash
+hero:
+  tagline: An unofficial launcher for SMARTYcraft. Works on Windows, Linux and macOS — no manual Java setup required.
+  actions:
+    - text: Installation
+      link: /Aura-Launcher/installation/
+      icon: right-arrow
+      variant: primary
+    - text: GitHub
+      link: https://github.com/Kitty-Hivens/Aura-Launcher/releases/latest
+      icon: external
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## Features
+
+<CardGrid stagger>
+  <Card title="All platforms" icon="laptop">
+    Windows, Linux and macOS. No manual Java setup — the launcher manages it automatically.
+  </Card>
+  <Card title="All servers" icon="puzzle">
+    1.7.10, 1.12.2, 1.21.1 (NeoForge). Automatic file sync before every session.
+  </Card>
+  <Card title="Auto-updates" icon="rocket">
+    The launcher updates itself. SHA256 verified, scheduled on exit.
+  </Card>
+  <Card title="Open source" icon="open-book">
+    GPL-3.0. Fork it, extend it, do whatever.
+  </Card>
+</CardGrid>
