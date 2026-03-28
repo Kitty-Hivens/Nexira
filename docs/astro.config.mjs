@@ -13,19 +13,26 @@ export default defineConfig({
         baseUrl: 'https://github.com/Kitty-Hivens/Aura-Launcher/edit/stable/docs/',
       },
       customCss: ['./src/styles/custom.css'],
+      defaultLocale: 'root',
+      locales: {
+        root: { label: 'English', lang: 'en' },
+        ru: { label: 'Русский', lang: 'ru' },
+      },
       sidebar: [
         {
           label: 'Getting Started',
+          translations: { ru: 'Начало работы' },
           items: [
-            { label: 'Installation', slug: 'installation' },
-            { label: 'Troubleshooting', slug: 'troubleshooting' },
+            { label: 'Installation', slug: 'installation', translations: { ru: 'Установка' } },
+            { label: 'Troubleshooting', slug: 'troubleshooting', translations: { ru: 'Устранение неполадок' } },
           ],
         },
         {
           label: 'For Developers',
+          translations: { ru: 'Для разработчиков' },
           items: [
-            { label: 'Building from Source', slug: 'dev/building' },
-            { label: 'Architecture', slug: 'dev/architecture' },
+            { label: 'Building from Source', slug: 'dev/building', translations: { ru: 'Сборка из исходников' } },
+            { label: 'Architecture', slug: 'dev/architecture', translations: { ru: 'Архитектура' } },
           ],
         },
       ],

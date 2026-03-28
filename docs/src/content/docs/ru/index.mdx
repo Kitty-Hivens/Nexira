@@ -1,0 +1,34 @@
+---
+title: Aura Launcher
+description: Неофициальный лаунчер для SMARTYcraft. Работает на Windows, Linux и macOS.
+template: splash
+hero:
+  tagline: Неофициальный лаунчер для SMARTYcraft. Работает на Windows, Linux и macOS — без ручной настройки Java.
+  actions:
+    - text: Установка
+      link: /Aura-Launcher/ru/installation/
+      icon: right-arrow
+      variant: primary
+    - text: GitHub
+      link: https://github.com/Kitty-Hivens/Aura-Launcher/releases/latest
+      icon: external
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## Возможности
+
+<CardGrid stagger>
+  <Card title="Все платформы" icon="laptop">
+    Windows, Linux и macOS. Без ручной настройки Java — лаунчер управляет этим автоматически.
+  </Card>
+  <Card title="Все серверы" icon="puzzle">
+    1.7.10, 1.12.2, 1.21.1 (NeoForge). Автоматическая синхронизация файлов перед каждой сессией.
+  </Card>
+  <Card title="Автообновление" icon="rocket">
+    Лаунчер обновляется сам. SHA256 верификация, установка при выходе.
+  </Card>
+  <Card title="Открытый код" icon="open-book">
+    GPL-3.0. Форкай, расширяй, делай что хочешь.
+  </Card>
+</CardGrid>
