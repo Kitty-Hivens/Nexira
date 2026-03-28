@@ -6,10 +6,6 @@ export default defineConfig({
     starlight({
       title: 'Aura Launcher',
       description: 'An unofficial launcher for SMARTYcraft',
-      logo: {
-        src: './src/assets/icon.png',
-        replacesTitle: false,
-      },
       social: {
         github: 'https://github.com/Kitty-Hivens/Aura-Launcher',
       },
