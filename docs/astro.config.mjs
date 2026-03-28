@@ -17,7 +17,6 @@ export default defineConfig({
         {
           label: 'Getting Started',
           items: [
-            { label: 'Introduction', slug: '' },
             { label: 'Installation', slug: 'installation' },
             { label: 'Troubleshooting', slug: 'troubleshooting' },
           ],
