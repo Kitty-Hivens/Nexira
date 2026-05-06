@@ -1,0 +1,97 @@
+# Single source of truth for dependency and plugin versions.
+# Referenced from each subproject's build.gradle.kts via the `libs` accessor.
+# Use ./gradlew dependencyUpdates to surface candidates.
+
+[versions]
+# ── Toolchain & language plugins ─────────────────────────────────────────────
+kotlin            = "2.3.20-RC3"
+compose           = "1.11.0-alpha04"
+buildconfigPlugin = "6.0.9"
+versionsPlugin    = "0.53.0"
+
+# ── Core libraries ───────────────────────────────────────────────────────────
+ktor              = "3.4.1"
+koin              = "4.2.0-RC2"
+serialization     = "1.10.0"
+coroutines        = "1.10.2"
+
+# ── UI / Compose ecosystem ───────────────────────────────────────────────────
+composeIcons      = "1.7.3"
+markdownRenderer  = "0.39.2"
+coil              = "3.4.0"
+filekit           = "0.13.0"
+
+# ── Logging ──────────────────────────────────────────────────────────────────
+slf4j             = "2.1.0-alpha1"
+logback           = "1.5.32"
+
+# ── Misc runtime ─────────────────────────────────────────────────────────────
+commonsCompress   = "1.28.0"
+systemTray        = "4.4"
+proguard          = "7.8.2"
+
+# ── JNA — must stay 6.1.6 globally for dorkbox/SystemTray's hardcoded
+# version check; client-ui additionally declares 5.18.1 explicitly to keep
+# Windows happy. See root build.gradle.kts resolutionStrategy. ───────────────
+jna               = "6.1.6"
+jnaWindows        = "5.18.1"
+
+# ── Test ─────────────────────────────────────────────────────────────────────
+mockk             = "1.13.12"
+
+[libraries]
+# Logging
+slf4j-api                       = { group = "org.slf4j",       name = "slf4j-api",                version.ref = "slf4j" }
+slf4j-simple                    = { group = "org.slf4j",       name = "slf4j-simple",             version.ref = "slf4j" }
+logback-classic                 = { group = "ch.qos.logback",  name = "logback-classic",          version.ref = "logback" }
+
+# Ktor
+ktor-client-core                = { group = "io.ktor", name = "ktor-client-core",                 version.ref = "ktor" }
+ktor-client-okhttp              = { group = "io.ktor", name = "ktor-client-okhttp",               version.ref = "ktor" }
+ktor-client-content-negotiation = { group = "io.ktor", name = "ktor-client-content-negotiation",  version.ref = "ktor" }
+ktor-serialization-json         = { group = "io.ktor", name = "ktor-serialization-kotlinx-json",  version.ref = "ktor" }
+ktor-client-mock                = { group = "io.ktor", name = "ktor-client-mock",                 version.ref = "ktor" }
+
+# Kotlinx
+kotlinx-serialization-json      = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "serialization" }
+kotlinx-coroutines-test         = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test",    version.ref = "coroutines" }
+kotlinx-coroutines-swing        = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-swing",   version.ref = "coroutines" }
+
+# DI
+koin-core                       = { group = "io.insert-koin", name = "koin-core",    version.ref = "koin" }
+koin-compose                    = { group = "io.insert-koin", name = "koin-compose", version.ref = "koin" }
+
+# Compose (explicit refs in addition to plugin DSL accessors)
+compose-runtime                 = { group = "org.jetbrains.compose.runtime",    name = "runtime",             version.ref = "compose" }
+compose-foundation              = { group = "org.jetbrains.compose.foundation", name = "foundation",          version.ref = "compose" }
+compose-material3               = { group = "org.jetbrains.compose.material3",  name = "material3",           version.ref = "compose" }
+compose-ui                      = { group = "org.jetbrains.compose.ui",         name = "ui",                  version.ref = "compose" }
+compose-components-resources    = { group = "org.jetbrains.compose.components", name = "components-resources", version.ref = "compose" }
+compose-material-icons-extended = { group = "org.jetbrains.compose.material",   name = "material-icons-extended", version.ref = "composeIcons" }
+
+# UI add-ons
+multiplatform-markdown-m3       = { group = "com.mikepenz",        name = "multiplatform-markdown-renderer-m3", version.ref = "markdownRenderer" }
+coil-compose                    = { group = "io.coil-kt.coil3",    name = "coil-compose",        version.ref = "coil" }
+coil-network-okhttp             = { group = "io.coil-kt.coil3",    name = "coil-network-okhttp", version.ref = "coil" }
+filekit-core                    = { group = "io.github.vinceglb", name = "filekit-core",         version.ref = "filekit" }
+filekit-dialogs-compose         = { group = "io.github.vinceglb", name = "filekit-dialogs-compose", version.ref = "filekit" }
+
+# Misc
+commons-compress                = { group = "org.apache.commons", name = "commons-compress", version.ref = "commonsCompress" }
+dorkbox-systemtray               = { group = "com.dorkbox",        name = "SystemTray",        version.ref = "systemTray" }
+
+# JNA (Windows-only explicit pin in client-ui)
+jna                              = { group = "net.java.dev.jna", name = "jna",          version.ref = "jnaWindows" }
+jna-platform                     = { group = "net.java.dev.jna", name = "jna-platform", version.ref = "jnaWindows" }
+
+# Test
+mockk                            = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
+
+[plugins]
+kotlin-jvm              = { id = "org.jetbrains.kotlin.jvm",                  version.ref = "kotlin" }
+kotlin-multiplatform    = { id = "org.jetbrains.kotlin.multiplatform",        version.ref = "kotlin" }
+kotlin-serialization    = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+kotlin-compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose",       version.ref = "kotlin" }
+compose                 = { id = "org.jetbrains.compose",                     version.ref = "compose" }
+buildconfig             = { id = "com.github.gmazzo.buildconfig",             version.ref = "buildconfigPlugin" }
+versions                = { id = "com.github.ben-manes.versions",             version.ref = "versionsPlugin" }
