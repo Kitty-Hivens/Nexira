@@ -7,7 +7,7 @@ object GermanStrings : AppStrings {
     override val appVersion get() = appName
 
     // Login
-    override val loginTitle        = "Aura Client"
+    override val loginTitle        = "Aura Launcher"
     override val loginUsername     = "Benutzername"
     override val loginPassword     = "Passwort"
     override val loginRemember     = "Passwort speichern"
