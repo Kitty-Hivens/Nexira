@@ -68,3 +68,7 @@ Compose Multiplatform's built-in Linux packaging produces DEB/RPM. AppImage is a
 ### GameCommandBuilder version configs
 
 Each supported Minecraft version has an immutable `VersionConfig` — main class, tweak class, JVM flags, natives dir. NeoForge (1.21.1) requires module path separation (`-p`) and additional `--add-opens` flags for Java 21+.
+
+### Protocol constants (`AppConfig.LEGACY_*`)
+
+The auth salt, default launcher hash, default server id and protocol JAR descriptor in `AppConfig` were recovered from the decompiled official SMARTYcraft launcher: [`Kitty-Hivens/smrt-deco`](https://github.com/Kitty-Hivens/smrt-deco). The upstream is Proguard-obfuscated (`a.java`, `b.java`, …) and archived since April 2026, so any future protocol change will need to be re-derived from a fresh dump.

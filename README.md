@@ -54,4 +54,5 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
 ---
 
-> Not affiliated with or endorsed by SMARTYcraft.
+> Not affiliated with or endorsed by SMARTYcraft.  
+> Protocol constants reverse-engineered from [`Kitty-Hivens/smrt-deco`](https://github.com/Kitty-Hivens/smrt-deco).
