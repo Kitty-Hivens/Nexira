@@ -2,26 +2,12 @@ import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
 
-val composeVersion: String by project
-val iconsVersion: String by project
-val coilVersion: String by project
-val coilNetworkVersion: String by project
-val filekitVersion: String by project
-val koinVersion: String by project
-val koinComposeVersion: String by project
-val ktorVersion: String by project
-val coroutinesVersion: String by project
-val logbackVersion: String by project
-val proguardVersion: String by project
-val markdownRendererVersion: String by project
-val systemTray: String by project
-
 plugins {
-    kotlin("multiplatform")
-    id("org.jetbrains.compose") version "1.11.0-alpha04"
-    id("org.jetbrains.kotlin.plugin.compose") version "2.3.20-RC3"
-    id("com.github.gmazzo.buildconfig")
-    kotlin("plugin.serialization") version "2.3.20-RC3"
+    alias(libs.plugins.kotlin.multiplatform)
+    alias(libs.plugins.compose)
+    alias(libs.plugins.kotlin.compose.compiler)
+    alias(libs.plugins.buildconfig)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 group = "hivens"
@@ -38,17 +24,22 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                implementation("org.jetbrains.compose.runtime:runtime:$composeVersion")
-                implementation("org.jetbrains.compose.foundation:foundation:$composeVersion")
-                implementation("org.jetbrains.compose.material3:material3:${composeVersion}")
-                implementation("org.jetbrains.compose.ui:ui:$composeVersion")
-                implementation("org.jetbrains.compose.components:components-resources:$composeVersion")
-                implementation("org.jetbrains.compose.material:material-icons-extended:$iconsVersion")
-                implementation("com.mikepenz:multiplatform-markdown-renderer-m3:${markdownRendererVersion}")
+                implementation(libs.compose.runtime)
+                implementation(libs.compose.foundation)
+                implementation(libs.compose.material3)
+                implementation(libs.compose.ui)
+                implementation(libs.compose.components.resources)
+                implementation(libs.compose.material.icons.extended)
+                implementation(libs.multiplatform.markdown.m3)
 
-                implementation("io.coil-kt.coil3:coil-compose:$coilVersion") { exclude(group = "org.jetbrains.skiko") }
-                implementation("io.coil-kt.coil3:coil-network-okhttp:$coilNetworkVersion") { exclude(group = "org.jetbrains.skiko") }
-                implementation("io.ktor:ktor-serialization-kotlinx-json:${ktorVersion}")
+                // String coordinates here (instead of the catalog accessor) because
+                // KotlinDependencyHandler.implementation(provider) lacks a configuration-action
+                // overload — the exclude requires the String form.
+                val coilCoord = "io.coil-kt.coil3"
+                val coilV     = libs.versions.coil.get()
+                implementation("$coilCoord:coil-compose:$coilV")        { exclude(group = "org.jetbrains.skiko") }
+                implementation("$coilCoord:coil-network-okhttp:$coilV") { exclude(group = "org.jetbrains.skiko") }
+                implementation(libs.ktor.serialization.json)
             }
         }
 
@@ -60,34 +51,32 @@ kotlin {
                 implementation(project(":client-core"))
                 implementation(project(":client-launcher"))
 
-                implementation("io.github.vinceglb:filekit-core:$filekitVersion")
-                implementation("io.github.vinceglb:filekit-dialogs-compose:$filekitVersion")
-                implementation("io.insert-koin:koin-core:$koinVersion")
-                implementation("io.insert-koin:koin-compose:$koinComposeVersion")
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:$coroutinesVersion")
-                implementation("ch.qos.logback:logback-classic:$logbackVersion")
-                implementation("com.dorkbox:SystemTray:$systemTray")
-                implementation("io.ktor:ktor-client-core:${ktorVersion}")
+                implementation(libs.filekit.core)
+                implementation(libs.filekit.dialogs.compose)
+                implementation(libs.koin.core)
+                implementation(libs.koin.compose)
+                implementation(libs.kotlinx.coroutines.swing)
+                implementation(libs.logback.classic)
+                implementation(libs.dorkbox.systemtray)
+                implementation(libs.ktor.client.core)
 
-                implementation("net.java.dev.jna:jna:5.18.1")           // Not change
-                implementation("net.java.dev.jna:jna-platform:5.18.1")  // Not change
+                // Windows-only explicit pin: see libs.versions.toml comment on jnaWindows.
+                implementation(libs.jna)
+                implementation(libs.jna.platform)
             }
-        }
-        all {
-            languageSettings.enableLanguageFeature("NestedTypeAliases")
         }
     }
 }
 
 buildConfig {
     packageName("hivens.ui")
-    buildConfigField("String", "FORK_VERSION", "\"${project.version}\"")
-    buildConfigField("long", "BUILD_TIME", "${System.currentTimeMillis()}L")
-    buildConfigField("String", "APP_NAME", "\"Aura Launcher\"")
-    buildConfigField("String", "COMPOSE_VERSION", "\"$composeVersion\"")
-    buildConfigField("String", "KTOR_VERSION", "\"$ktorVersion\"")
-    buildConfigField("String", "KOIN_VERSION", "\"$koinVersion\"")
-    buildConfigField("String", "COIL_VERSION", "\"$coilVersion\"")
+    buildConfigField("String", "FORK_VERSION",   "\"${project.version}\"")
+    buildConfigField("long",   "BUILD_TIME",     "${System.currentTimeMillis()}L")
+    buildConfigField("String", "APP_NAME",       "\"Aura Launcher\"")
+    buildConfigField("String", "COMPOSE_VERSION", "\"${libs.versions.compose.get()}\"")
+    buildConfigField("String", "KTOR_VERSION",    "\"${libs.versions.ktor.get()}\"")
+    buildConfigField("String", "KOIN_VERSION",    "\"${libs.versions.koin.get()}\"")
+    buildConfigField("String", "COIL_VERSION",    "\"${libs.versions.coil.get()}\"")
 }
 
 compose.desktop {
@@ -119,7 +108,7 @@ compose.desktop {
                 configurationFiles.from(project.file("compose-desktop.pro"))
 
                 // Additional runtime optimizations
-                version.set("7.8.2")
+                version.set(libs.versions.proguard.get())
             }
 
             packageName = "AuraLauncher"
@@ -223,6 +212,9 @@ tasks.withType<KotlinJvmCompile>().configureEach {
         jvmTarget.set(JvmTarget.JVM_25)
 
         freeCompilerArgs.addAll(
+            // Language features
+            "-XXLanguage:+NestedTypeAliases",
+
             // Backend optimizations
             "-jvm-default=no-compatibility",
             "-Xlambdas=indy",
