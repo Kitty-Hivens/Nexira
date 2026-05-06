@@ -44,11 +44,48 @@ bin/
 .idea/vcs.xml
 .idea/misc.xml
 .idea/gradle.xml
-.idea/gradle.xml
-.idea/misc.xml
-.idea/vcs.xml
 /.kotlin/
 client-ui/smarty_hash.cache
 /client-ui/logs/
 client-launcher/smarty_hash.cache
 /docs/node_modules/
+
+### AI agents ###
+# Important:
+# This project allows the use of neural networks, but it is preferable that the files for them not be included in the project.
+
+# Claude Code
+CLAUDE.md
+CLAUDE.local.md
+.claude/
+# OpenAI Codex / generic agents convention
+AGENTS.md
+.codex/
+# Gemini CLI
+GEMINI.md
+.gemini/
+# Cursor
+.cursor/
+.cursorrules
+.cursorignore
+# Aider
+.aider*
+# Continue
+.continue/
+# Windsurf
+.windsurf/
+.windsurfrules
+# Codeium
+.codeium/
+# Zed AI
+.zed/
+# Roo Code
+.roo/
+.roomodes
+# Cline
+.cline/
+# GitHub Copilot (instruction files)
+.github/copilot-instructions.md
+# SpecStory / Qodo / misc agent caches
+.specstory/
+.qodo/
