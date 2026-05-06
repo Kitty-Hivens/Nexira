@@ -41,8 +41,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import hivens.config.AppConfig
 import hivens.core.api.model.ServerProfile
+import hivens.launcher.platform.PlatformPaths
 import hivens.ui.debug.SkiaTracker
 import hivens.ui.easter.AprilFools
 import hivens.ui.easter.ChaosState
@@ -52,7 +52,7 @@ import hivens.ui.effects.shimmerOverlay
 import hivens.ui.theme.CelestiaTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.File
+import org.koin.compose.koinInject
 import javax.imageio.ImageIO
 import kotlin.math.abs
 
@@ -91,19 +91,12 @@ fun SquareServerCard(
     val isFocused by interactionSource.collectIsFocusedAsState()
 
     var serverIcon by remember { mutableStateOf<ImageBitmap?>(null) }
+    val paths: PlatformPaths = koinInject()
 
     // Load icon from disk
     LaunchedEffect(profile) {
         withContext(Dispatchers.IO) {
-            val userHome = System.getProperty("user.home")
-            val os       = System.getProperty("os.name").lowercase()
-            val baseDir  = when {
-                os.contains("win") -> "$userHome/AppData/Roaming/${AppConfig.APP_DIR}"
-                os.contains("mac") -> "$userHome/Library/Application Support/${AppConfig.APP_DIR}"
-                else               -> "$userHome/${AppConfig.APP_DIR}"
-            }
-            // Looking for icon.png file
-            val iconFile = File(baseDir, "clients/${profile.assetDir}/icon.png")
+            val iconFile = paths.clientDir(profile.assetDir).resolve("icon.png").toFile()
             if (iconFile.exists()) {
                 runCatching {
                     serverIcon = ImageIO.read(iconFile)?.toComposeImageBitmap()?.also {

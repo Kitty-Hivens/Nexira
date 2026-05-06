@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import hivens.launcher.platform.PlatformPaths
 import java.io.File
 import java.io.FileWriter
 import java.io.BufferedWriter
@@ -29,6 +30,9 @@ object GameConsoleService {
     private var sessionWriter: BufferedWriter? = null
     private val fileDateFmt = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss")
 
+    private fun logsDir(): File =
+        PlatformPaths.system().logsDir.toFile().also { it.mkdirs() }
+
     fun startSession() {
         // Close previous session writer
         sessionWriter?.close()
@@ -40,9 +44,8 @@ object GameConsoleService {
 
         // Open new auto-save file
         try {
-            val logsDir = File("logs").also { it.mkdirs() }
             val fileName = "game-output-${fileDateFmt.format(Date())}.log"
-            sessionWriter = BufferedWriter(FileWriter(File(logsDir, fileName), true))
+            sessionWriter = BufferedWriter(FileWriter(File(logsDir(), fileName), true))
         } catch (_: Exception) {}
     }
 
@@ -65,9 +68,8 @@ object GameConsoleService {
 
     fun saveToFile(): File? {
         return try {
-            val logsDir = File("logs").also { it.mkdirs() }
             val fileName = "console-export-${fileDateFmt.format(Date())}.log"
-            val file = File(logsDir, fileName)
+            val file = File(logsDir(), fileName)
             file.bufferedWriter().use { writer ->
                 logs.forEach { entry ->
                     if (entry.type == LogType.DIVIDER) {
