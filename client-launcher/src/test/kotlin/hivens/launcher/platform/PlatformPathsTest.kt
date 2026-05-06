@@ -69,6 +69,42 @@ class PlatformPathsTest {
     }
 
     @Test
+    fun `AURA_DATA_DIR overrides the platform default on every os`() {
+        val override = "/mnt/d/aura"
+        val onWindows = PlatformPaths("Windows 11", home) { name ->
+            when (name) {
+                "AURA_DATA_DIR" -> override
+                "LOCALAPPDATA" -> "C:\\Users\\test\\AppData\\Local"
+                else -> null
+            }
+        }
+        val onMac = PlatformPaths("Mac OS X", home) {
+            if (it == "AURA_DATA_DIR") override else null
+        }
+        val onLinux = PlatformPaths("Linux", home) {
+            when (it) {
+                "AURA_DATA_DIR" -> override
+                "XDG_DATA_HOME" -> "/should/not/be/used"
+                else -> null
+            }
+        }
+        assertEquals(Paths.get(override), onWindows.dataDir)
+        assertEquals(Paths.get(override), onMac.dataDir)
+        assertEquals(Paths.get(override), onLinux.dataDir)
+    }
+
+    @Test
+    fun `blank AURA_DATA_DIR falls through to the platform default`() {
+        val paths = PlatformPaths("Linux", home) {
+            when (it) {
+                "AURA_DATA_DIR" -> "   "
+                else -> null
+            }
+        }
+        assertEquals(home.resolve(".local").resolve("share").resolve("aura-launcher"), paths.dataDir)
+    }
+
+    @Test
     fun `subdirectories are derived from data dir`() {
         val paths = PlatformPaths("Linux", home, env = { null })
         val data = paths.dataDir
