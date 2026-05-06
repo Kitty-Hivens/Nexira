@@ -272,40 +272,48 @@ object UpdateApplicator {
 
     // ========== HELPERS ==========
 
-    private fun getCurrentExecutable(): Path {
-        return when {
-            OS.isWindows -> {
-                val classPath = System.getProperty("java.class.path")
-                val jarPath = Paths.get(classPath.split(";").first())
-                jarPath.parent?.parent?.resolve("AuraLauncher.exe")
-                    ?: Paths.get("AuraLauncher.exe")
-            }
-            OS.isMacOS -> {
-                val userDir = System.getProperty("user.dir")
-                Paths.get(userDir).resolve("../MacOS/AuraLauncher")
-            }
-            OS.isLinux -> {
-                // When running as AppImage, the runtime automatically sets $APPIMAGE
-                // to the real path of the .AppImage file on disk.
-                //
-                // DO NOT use /proc/self/exe here — it resolves to the temporary FUSE
-                // mount point (e.g. /tmp/.mount_AuraLaXXXXX/usr/bin/AuraLauncher)
-                // which is gone the moment the process exits. Writing the update
-                // there would silently succeed but have zero effect.
-                val appImageEnv = System.getenv("APPIMAGE")
-                if (!appImageEnv.isNullOrBlank()) {
-                    Paths.get(appImageEnv)
-                } else {
-                    // Fallback for dev/non-AppImage environments
-                    try {
-                        Paths.get("/proc/self/exe").toRealPath()
-                    } catch (_: Exception) {
-                        val classPath = System.getProperty("java.class.path")
-                        Paths.get(classPath.split(":").first())
-                    }
-                }
-            }
-            else -> Paths.get("AuraLauncher")
+    private fun getCurrentExecutable(): Path = when {
+        OS.isWindows -> resolveWindowsExecutable()
+        OS.isMacOS   -> resolveMacOsExecutable()
+        OS.isLinux   -> resolveLinuxExecutable()
+        else -> error("Unsupported platform: ${OS.getName()}; cannot locate launcher binary")
+    }
+
+    private fun resolveWindowsExecutable(): Path {
+        val classPath = System.getProperty("java.class.path")
+            ?: error("java.class.path is unset; cannot locate Windows launcher binary")
+        val jarPath = Paths.get(classPath.split(";").first()).toAbsolutePath()
+        val installRoot = jarPath.parent?.parent
+            ?: error("Cannot resolve Windows install root from $jarPath; expected lib/<jar>.jar inside install dir")
+        return installRoot.resolve("AuraLauncher.exe")
+    }
+
+    private fun resolveMacOsExecutable(): Path {
+        // .app/Contents/app/<jar>.jar  ->  .app/Contents/MacOS/AuraLauncher
+        val classPath = System.getProperty("java.class.path")
+        if (!classPath.isNullOrBlank()) {
+            val jarPath = Paths.get(classPath.split(":").first()).toAbsolutePath()
+            val contents = jarPath.parent?.parent
+            if (contents != null) return contents.resolve("MacOS").resolve("AuraLauncher")
+        }
+        error("Cannot resolve macOS launcher binary: java.class.path missing or not in expected .app/Contents/app/ layout")
+    }
+
+    private fun resolveLinuxExecutable(): Path {
+        // When running as AppImage, the runtime automatically sets $APPIMAGE
+        // to the real path of the .AppImage file on disk.
+        //
+        // DO NOT use /proc/self/exe naively — under AppImage it resolves to the
+        // temporary FUSE mount point (/tmp/.mount_AuraLaXXXXX/usr/bin/AuraLauncher)
+        // which is gone the moment the process exits.
+        val appImageEnv = System.getenv("APPIMAGE")
+        if (!appImageEnv.isNullOrBlank()) return Paths.get(appImageEnv)
+        return try {
+            Paths.get("/proc/self/exe").toRealPath()
+        } catch (e: Exception) {
+            val classPath = System.getProperty("java.class.path")
+                ?: error("Cannot resolve Linux launcher binary: APPIMAGE unset, /proc/self/exe failed (${e.message}), java.class.path is null")
+            Paths.get(classPath.split(":").first()).toAbsolutePath()
         }
     }
 }

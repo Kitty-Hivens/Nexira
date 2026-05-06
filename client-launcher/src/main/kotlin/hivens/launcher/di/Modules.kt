@@ -9,6 +9,7 @@ import hivens.core.api.SkinRepository
 import hivens.core.api.interfaces.*
 import hivens.launcher.*
 import hivens.launcher.component.EnvironmentPreparer
+import hivens.launcher.platform.PlatformPaths
 import hivens.launcher.update.UpdateService
 import io.ktor.client.*
 import io.ktor.client.engine.okhttp.*
@@ -24,7 +25,6 @@ import org.koin.core.qualifier.named
 import org.koin.dsl.module
 import java.net.InetSocketAddress
 import java.net.Proxy
-import java.nio.file.Paths
 import java.util.concurrent.TimeUnit
 
 /**
@@ -117,11 +117,16 @@ val networkModule = module {
  */
 val appModule = module {
     /**
-     * Application working directory (.aura).
+     * Per-OS application paths. See [PlatformPaths] for layout.
      */
-    single(createdAtStart = true) {
-        Paths.get(System.getProperty("user.home"), AppConfig.APP_DIR)
-    }
+    single(createdAtStart = true) { PlatformPaths.system() }
+
+    /**
+     * Application data directory. Resolved via [PlatformPaths] so that all
+     * subsystems (settings, profiles, credentials, downloaded clients,
+     * skin cache, logs, crash reports) share one platform-correct root.
+     */
+    single<java.nio.file.Path>(createdAtStart = true) { get<PlatformPaths>().dataDir }
 
     // Managers and services
     single { CredentialsManager(get(), get()) }

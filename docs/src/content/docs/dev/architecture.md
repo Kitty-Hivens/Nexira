@@ -69,6 +69,18 @@ Compose Multiplatform's built-in Linux packaging produces DEB/RPM. AppImage is a
 
 Each supported Minecraft version has an immutable `VersionConfig` — main class, tweak class, JVM flags, natives dir. NeoForge (1.21.1) requires module path separation (`-p`) and additional `--add-opens` flags for Java 21+.
 
+### Platform data directories
+
+User data (settings, credentials, downloaded clients, skin cache, logs, crash reports) lives under a single per-OS directory, resolved by `PlatformPaths` in `client-launcher`:
+
+| OS      | Path                                              |
+|---------|---------------------------------------------------|
+| Windows | `%LOCALAPPDATA%\AuraLauncher\`                    |
+| macOS   | `~/Library/Application Support/AuraLauncher/`     |
+| Linux   | `$XDG_DATA_HOME/aura-launcher/` (default `~/.local/share/aura-launcher/`) |
+
+On first launch the legacy `~/.aura/` directory (used by versions ≤ 2.2.x) is copied into the new location and a `.migrated` marker is written into the legacy directory. The legacy data is **not** deleted — users can remove it manually after verifying the migration.
+
 ### Protocol constants (`AppConfig.LEGACY_*`)
 
 The auth salt, default launcher hash, default server id and protocol JAR descriptor in `AppConfig` were recovered from the decompiled official SMARTYcraft launcher: [`Kitty-Hivens/smrt-deco`](https://github.com/Kitty-Hivens/smrt-deco). The upstream is Proguard-obfuscated (`a.java`, `b.java`, …) and archived since April 2026, so any future protocol change will need to be re-derived from a fresh dump.

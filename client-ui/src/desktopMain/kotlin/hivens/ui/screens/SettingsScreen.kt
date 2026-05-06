@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
 import hivens.config.AppConfig
 import hivens.core.api.interfaces.ISettingsService
+import hivens.launcher.platform.PlatformPaths
 import hivens.ui.components.GlassCard
 import hivens.ui.easter.AprilFoolsButton
 import hivens.ui.easter.AprilFoolsDebugPanel
@@ -38,6 +39,7 @@ fun SettingsScreen(
     onOpenAbout: () -> Unit = {}
 ) {
     val settingsService: ISettingsService = koinInject()
+    val paths: PlatformPaths              = koinInject()
     val s = LocalStrings.current
 
     val initialSettings        = remember { settingsService.getSettings() }
@@ -302,8 +304,6 @@ fun SettingsScreen(
 
                 // ── Diagnostics ───────────────────────────────────────────────
                 item {
-                    val userHome = System.getProperty("user.home")
-
                     // Secret: tap the diagnostics title 5 times to toggle the April Fools debug panel
                     Box(
                         Modifier.clickable {
@@ -329,7 +329,7 @@ fun SettingsScreen(
                         AprilFoolsButton(
                             id       = "settings_open_logs_btn",
                             text     = s.settingsOpenLogs,
-                            onClick  = { openFolder("logs") },
+                            onClick  = { openFolder(paths.logsDir.toString()) },
                             modifier = Modifier.weight(1f),
                             colors   = ButtonDefaults.buttonColors(
                                 containerColor = Color.Transparent,
@@ -340,7 +340,7 @@ fun SettingsScreen(
                         AprilFoolsButton(
                             id       = "settings_crash_reports_btn",
                             text     = s.settingsOpenCrashReports,
-                            onClick  = { openFolder("$userHome/.aura/crash-reports") },
+                            onClick  = { openFolder(paths.crashDir.toString()) },
                             modifier = Modifier.weight(1f),
                             colors   = ButtonDefaults.buttonColors(
                                 containerColor = Color.Transparent,

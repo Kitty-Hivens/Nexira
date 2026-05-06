@@ -27,6 +27,8 @@ import hivens.launcher.NetworkState
 import hivens.launcher.ProfileManager
 import hivens.launcher.di.appModule
 import hivens.launcher.di.networkModule
+import hivens.launcher.platform.DataDirMigration
+import hivens.launcher.platform.PlatformPaths
 import hivens.ui.background.BackgroundManager
 import hivens.ui.background.CustomBackground
 import hivens.ui.components.UpdateManager
@@ -73,7 +75,7 @@ import kotlin.system.exitProcess
 
 val uiModule = module {
     singleOf(::LauncherController)
-    single { SkinManager(get()) }
+    single { SkinManager(get(), get()) }
 }
 
 // ─── State ───────────────────────────────────────────────────────────────────
@@ -101,11 +103,14 @@ sealed class Screen {
 
 @OptIn(ExperimentalResourceApi::class, DelicateCoroutinesApi::class)
 fun main() {
-    val lockFile = File(System.getProperty("user.home"), ".aura/.lock")
-    val lockChannel = FileOutputStream(lockFile).channel
-    val lock = lockChannel.tryLock()
     System.setProperty("jna.nosys", "true")
     System.setProperty("skiko.fps.limit", "60")
+
+    val paths = PlatformPaths.system()
+    DataDirMigration.run(paths)
+    java.nio.file.Files.createDirectories(paths.dataDir)
+    CrashReporter.paths = paths
+
     Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
         val logger = LoggerFactory.getLogger("CrashHandler")
         logger.error("Uncaught exception on thread '${thread.name}'", throwable)
@@ -116,8 +121,12 @@ fun main() {
         }
     }
 
+    val lockFile = paths.dataDir.resolve(".lock").toFile()
+    val lockChannel = FileOutputStream(lockFile).channel
+    val lock = lockChannel.tryLock()
+
     if (lock == null) {
-        File(System.getProperty("user.home"), ".aura/.show").createNewFile()
+        paths.dataDir.resolve(".show").toFile().createNewFile()
         exitProcess(0)
     }
 
@@ -153,9 +162,9 @@ fun main() {
 
 
         LaunchedEffect(Unit) {
+            val showFile = paths.dataDir.resolve(".show").toFile()
             while (true) {
                 delay(500)
-                val showFile = File(System.getProperty("user.home"), ".aura/.show")
                 if (showFile.exists()) {
                     showFile.delete()
                     isWindowVisible = true

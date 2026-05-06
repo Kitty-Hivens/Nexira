@@ -1,6 +1,7 @@
 package hivens.launcher
 
 import hivens.config.AppConfig
+import hivens.launcher.platform.PlatformPaths
 import java.awt.Desktop
 import java.awt.Toolkit
 import java.awt.datatransfer.StringSelection
@@ -14,6 +15,13 @@ object CrashReporter {
 
     private val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH-mm-ss")
         .withZone(ZoneId.systemDefault())
+
+    /**
+     * Resolved at process start by [hivens.ui.MainKt]. Default to the system-derived
+     * paths so a crash before init still lands in a sensible location.
+     */
+    @Volatile
+    var paths: PlatformPaths = PlatformPaths.system()
 
     @Volatile
     var lastAction: String? = null
@@ -50,7 +58,7 @@ object CrashReporter {
     }
 
     fun saveToDisk(report: CrashReport): File {
-        val crashDir = File(System.getProperty("user.home"), ".aura/crash-reports")
+        val crashDir = paths.crashDir.toFile()
         crashDir.mkdirs()
 
         val ts = formatter.format(Instant.parse(report.timestamp))

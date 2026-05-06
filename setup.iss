@@ -28,7 +28,8 @@ AppSupportURL={#MyAppURL}/issues
 AppUpdatesURL={#MyAppURL}/releases
 
 ; ── Privileges ──────────────────────────────────────────────────────────────
-; No UAC prompt — installs into %AppData% without admin rights.
+; No UAC prompt — installs into %AppData% (Roaming) without admin rights.
+; User-generated data (clients, profiles, logs) lives separately in %LocalAppData%\AuraLauncher.
 ; The dialog option lets a power user elevate if they WANT a machine-wide install.
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
@@ -59,8 +60,8 @@ DisableReadyPage=no
 ; ── Uninstaller ─────────────────────────────────────────────────────────────
 UninstallDisplayName={#MyAppName}
 UninstallDisplayIcon={app}\{#MyAppExeName}
-; Do NOT auto-delete the user's game data in %AppData%\.aura
-; The user can remove it manually if needed.
+; Do NOT auto-delete the user's game data in %LocalAppData%\AuraLauncher
+; (or the legacy %UserProfile%\.aura directory). The user can remove it manually.
 CloseApplications=force
 CloseApplicationsFilter=*{#MyAppExeName}*
 
@@ -105,7 +106,7 @@ Filename: "{app}\{#MyAppExeName}"; \
 
 [UninstallDelete]
 ; Remove the install directory if empty after uninstall
-; (user data lives in %AppData%\.aura, NOT touched here)
+; (user data lives in %LocalAppData%\AuraLauncher, NOT touched here)
 Type: dirifempty; Name: "{app}"
 
 [Code]
