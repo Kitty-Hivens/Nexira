@@ -35,6 +35,11 @@ object AppConfig {
 
     // ==========================================
     // 4. LEGACY PARAMETERS (for compatibility with backend)
+    // ----------------------------------------------------------------------
+    // Values below mirror the wire protocol of the official SMARTYcraft
+    // launcher. They were recovered from the decompiled (Proguard-obfuscated)
+    // sources at https://github.com/Kitty-Hivens/smrt-deco — keep that
+    // repository as the source of truth when this protocol changes.
     // ==========================================
     const val DEFAULT_SERVER_ID = "Industrial"
     const val DEFAULT_LAUNCHER_HASH = "0714d6ea824454d0af31a02373eef703"
