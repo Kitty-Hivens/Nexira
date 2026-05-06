@@ -8,7 +8,10 @@ import hivens.core.api.ServerRepository
 import hivens.core.api.SkinRepository
 import hivens.core.api.interfaces.*
 import hivens.launcher.*
+import hivens.launcher.component.ClasspathProvider
 import hivens.launcher.component.EnvironmentPreparer
+import hivens.launcher.component.GameCommandBuilder
+import hivens.launcher.component.ProcessLogHandler
 import hivens.launcher.platform.PlatformPaths
 import hivens.launcher.update.UpdateService
 import io.ktor.client.*
@@ -142,8 +145,11 @@ val appModule = module {
     single { ProfileManager(get(), get()) }
     single { JavaManagerService(get(), get()) }
 
-    // EnvironmentPreparer
+    // Launch pipeline collaborators
     singleOf(::EnvironmentPreparer)
+    single { ClasspathProvider(get()) }
+    single { GameCommandBuilder() }
+    single { ProcessLogHandler() }
 
     single<IAuthService> { AuthService(get(), get()) }
 
@@ -158,15 +164,17 @@ val appModule = module {
     single<IServerListService> { ServerListService(get()) }
 
     /**
-     * Basic launch service.
-     * Accepts EnvironmentPreparer via DI.
+     * Basic launch service. All collaborators are constructor-injected so the
+     * facade is fully replaceable / mockable in tests.
      */
     single<ILauncherService> {
         LauncherService(
-            manifestProcessor = get(),
             profileManager    = get(),
             javaManager       = get(),
-            envPreparer       = get()
+            envPreparer       = get(),
+            classpathProvider = get(),
+            commandBuilder    = get(),
+            logHandler        = get()
         )
     }
 
