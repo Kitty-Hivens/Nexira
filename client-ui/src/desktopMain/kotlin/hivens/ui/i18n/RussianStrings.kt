@@ -7,7 +7,7 @@ object RussianStrings : AppStrings {
     override val appVersion get() = appName
 
     // Login
-    override val loginTitle        = "Aura Client"
+    override val loginTitle        = "Aura Launcher"
     override val loginUsername     = "Логин"
     override val loginPassword     = "Пароль"
     override val loginRemember     = "Запомнить пароль"

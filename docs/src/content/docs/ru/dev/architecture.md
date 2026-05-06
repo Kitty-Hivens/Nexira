@@ -6,7 +6,7 @@ description: Структура модулей и ключевые архите�
 ## Структура модулей
 
 ```
-smartycraft-open-launcher/
+aura-launcher/
 ├── client-config      # Константы, AppConfig, BuildConfig
 ├── client-core        # Доменные модели, API-сервисы, интерфейсы
 ├── client-launcher    # DI, загрузка файлов, обновления, запуск

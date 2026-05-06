@@ -6,7 +6,7 @@ description: Module structure and key design decisions in Aura Launcher.
 ## Module structure
 
 ```
-smartycraft-open-launcher/
+aura-launcher/
 ├── client-config      # Constants, AppConfig, BuildConfig
 ├── client-core        # Domain models, API services, interfaces
 ├── client-launcher    # DI wiring, file download, update, launch logic
