@@ -1,6 +1,8 @@
 package hivens.core.api
 
-import hivens.config.AppConfig
+import hivens.config.Network
+import hivens.config.Protocol
+import hivens.config.Storage
 import hivens.core.api.dto.SmartyResponse
 import hivens.core.data.DashboardRequest
 import io.ktor.client.call.*
@@ -18,9 +20,9 @@ class ServerRepository(
     dataDir: File? = null
 ) {
     private val logger = LoggerFactory.getLogger("ServerRepository")
-    private val cachedHashFile = dataDir?.let { File(it, AppConfig.FILES_HASH_CACHE) }
-        ?: File(AppConfig.FILES_HASH_CACHE)
-    private var currentHash = AppConfig.DEFAULT_LAUNCHER_HASH
+    private val cachedHashFile = dataDir?.let { File(it, Storage.HASH_CACHE_FILE) }
+        ?: File(Storage.HASH_CACHE_FILE)
+    private var currentHash = Protocol.DEFAULT_LAUNCHER_HASH
     private val client get() = clientProvider.current
 
     init {
@@ -57,14 +59,14 @@ class ServerRepository(
         // We generate JSON manually, since the server expects a JSON string inside the "json" form field
         // This is a specificity of the old SmartyCraft PHP backend
         val requestPayload = DashboardRequest(
-            version = AppConfig.LAUNCHER_VERSION,
+            version = Protocol.MIMIC_LAUNCHER_VERSION,
             cheksum = hash
         )
 
         val payload = json.encodeToString(requestPayload)
 
         return try {
-            val response = client.post(AppConfig.AUTH_URL) {
+            val response = client.post(Network.AUTH_URL) {
                 setBody(FormDataContent(Parameters.build {
                     append("action", "loader")
                     append("json", payload)
@@ -83,7 +85,7 @@ class ServerRepository(
 
     private suspend fun updateLauncherHash(): String? {
         return try {
-            val bytes = client.get(AppConfig.OFFICIAL_JAR_URL).body<ByteArray>()
+            val bytes = client.get(Network.OFFICIAL_JAR_URL).body<ByteArray>()
             val md = MessageDigest.getInstance("MD5")
             val digest = md.digest(bytes)
             digest.joinToString("") { "%02x".format(it) }

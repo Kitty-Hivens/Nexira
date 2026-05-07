@@ -22,7 +22,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
-import hivens.config.AppConfig
+import hivens.config.Branding
 import hivens.core.data.LauncherUpdate
 import hivens.launcher.update.UpdateService
 import hivens.ui.BuildConfig
@@ -122,7 +122,7 @@ fun AboutScreen(onBack: () -> Unit) {
 
                         // App title — low probability corruption
                         Text(
-                            AprilFoolsText.maybeGibberish(AppConfig.APP_TITLE, probability = 0.15f),
+                            AprilFoolsText.maybeGibberish(Branding.TITLE, probability = 0.15f),
                             style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.Black,
                             color = CelestiaTheme.colors.textPrimary
@@ -137,7 +137,7 @@ fun AboutScreen(onBack: () -> Unit) {
                         ) {
                             Text(
                                 AprilFoolsText.maybeGibberish(
-                                    "v${AppConfig.CLIENT_VERSION.removePrefix("v")}",
+                                    "v${Branding.VERSION.removePrefix("v")}",
                                     probability = 0.30f,
                                     mode = GibberishMode.FAKE_VER
                                 ),
@@ -165,7 +165,7 @@ fun AboutScreen(onBack: () -> Unit) {
                         // Description — may become jargon
                         Text(
                             AprilFoolsText.maybeGibberish(
-                                s.aboutDescription(AppConfig.BRANDING_NAME),
+                                s.aboutDescription(Branding.UPSTREAM_NAME),
                                 probability = 0.20f
                             ),
                             style = MaterialTheme.typography.bodyMedium,
@@ -274,7 +274,7 @@ fun AboutScreen(onBack: () -> Unit) {
                     Column(Modifier.padding(20.dp)) {
                         SectionLabel(s.aboutSectionUpdates)
                         Spacer(Modifier.height(16.dp))
-                        InfoRow(Icons.Default.Info, s.aboutCurrentVersion, "v${AppConfig.CLIENT_VERSION.removePrefix("v")}")
+                        InfoRow(Icons.Default.Info, s.aboutCurrentVersion, "v${Branding.VERSION.removePrefix("v")}")
                         Spacer(Modifier.height(16.dp))
 
                         when (val state = updateState) {

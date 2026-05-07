@@ -14,7 +14,8 @@ import androidx.compose.ui.window.*
 import coil3.ImageLoader
 import coil3.compose.setSingletonImageLoaderFactory
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
-import hivens.config.AppConfig
+import hivens.config.Branding
+import hivens.config.Protocol
 import hivens.core.api.AuthException
 import hivens.core.api.interfaces.IAuthService
 import hivens.core.api.interfaces.IServerListService
@@ -203,7 +204,7 @@ fun main() {
                         TrayManager.init(
                             iconStream = iconBytes.inputStream(),
                             strings    = TrayManager.Strings(
-                                tooltip       = "${AppConfig.APP_TITLE} v${AppConfig.CLIENT_VERSION.removePrefix("v")}",
+                                tooltip       = "${Branding.TITLE} v${Branding.VERSION.removePrefix("v")}",
                                 statusIdle    = s.trayStatusIdle,
                                 statusRunning = s.trayStatusRunning,
                                 show          = s.trayShow,
@@ -219,7 +220,7 @@ fun main() {
                             TrayManager.init(
                                 iconStream = iconBytes.inputStream(),
                                 strings    = TrayManager.Strings(
-                                    tooltip       = AppConfig.APP_TITLE,
+                                    tooltip       = Branding.TITLE,
                                     statusIdle    = s.trayStatusIdle,
                                     statusRunning = s.trayStatusRunning,
                                     show          = s.trayShow,
@@ -308,7 +309,7 @@ fun main() {
                 },
                 state     = windowState,
                 visible   = isWindowVisible,
-                title     = AppConfig.APP_TITLE,
+                title     = Branding.TITLE,
                 resizable = true,
                 icon      = trayIcon
             ) {
@@ -410,14 +411,14 @@ fun AppRoot(
                 settings.isOfflineMode -> AppState.Unauthenticated
                 saved?.cachedPassword != null -> {
                     try {
-                        val server  = profileManager.lastServerId ?: AppConfig.DEFAULT_SERVER_ID
+                        val server  = profileManager.lastServerId ?: Protocol.DEFAULT_SERVER_ID
                         val session = authService.login(saved.playerName, saved.cachedPassword!!, server)
                         AppState.Authenticated(session)
                     } catch (e: AuthException) {
                         if (e.isSslError) {
                             NetworkState.sslBypassEnabled = true
                             try {
-                                val server  = profileManager.lastServerId ?: AppConfig.DEFAULT_SERVER_ID
+                                val server  = profileManager.lastServerId ?: Protocol.DEFAULT_SERVER_ID
                                 val session = insecureAuthService.login(saved.playerName, saved.cachedPassword!!, server)
                                 AppState.Authenticated(session)
                             } catch (_: Exception) {
