@@ -196,7 +196,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
   when rapidly switching images; clears on next GC cycle
 ## [2.0.3] - 2026-03-15
 
-### ⚠️ Known Issue - Custom Background
+### Known Issue - Custom Background
 > **It is highly recommended not to use the Custom Background feature in this version.**
 > Despite the partial fix for the native memory leak, enabling/disabling the background
 > does not release resources completely, but animated GIFs/WebPs continue to accumulate
