@@ -7,6 +7,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
@@ -101,24 +102,31 @@ fun UpdateDialog(
                 HorizontalDivider(color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.2f))
                 Spacer(Modifier.height(16.dp))
 
-                // ── Changelog ─────────────────────────────────────────────────
+                // ── Highlights or full changelog ──────────────────────────────
+                val hasHighlights = !update.highlights.isNullOrBlank()
+                val bodyContent = update.highlights?.takeIf { it.isNotBlank() } ?: update.changelog
+
                 Text(
-                    s.updateChangelog,
+                    if (hasHighlights) s.updateHighlights else s.updateChangelog,
                     style      = MaterialTheme.typography.titleSmall,
                     color      = CelestiaTheme.colors.textPrimary,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(Modifier.height(8.dp))
 
+                // Highlights are short prose, full changelog can be paragraphs of
+                // commit-flavoured text. Cap height in both cases — the dialog is
+                // 700dp wide and would dominate the screen otherwise.
+                val bodyMaxHeight = if (hasHighlights) 200.dp else 350.dp
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(max = 350.dp)
+                        .heightIn(max = bodyMaxHeight)
                         .background(CelestiaTheme.colors.background.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
                         .padding(12.dp)
                 ) {
                     Markdown(
-                        content  = update.changelog,
+                        content  = bodyContent,
                         modifier = Modifier.verticalScroll(rememberScrollState())
                     )
                 }
@@ -159,10 +167,33 @@ fun UpdateDialog(
 
                 // ── Actions ───────────────────────────────────────────────────
                 Row(
-                    modifier              = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment     = Alignment.CenterVertically
+                    modifier          = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
+                    // "View on GitHub" sits left, doesn't compete for attention with the
+                    // primary install button on the right. Hidden during download so the
+                    // user can't accidentally yank focus mid-progress.
+                    if (downloadState !is DownloadState.Downloading) {
+                        TextButton(onClick = {
+                            runCatching {
+                                val desktop = java.awt.Desktop.getDesktop()
+                                if (desktop.isSupported(java.awt.Desktop.Action.BROWSE)) {
+                                    desktop.browse(java.net.URI(update.releasePageUrl))
+                                }
+                            }
+                        }) {
+                            Icon(
+                                imageVector        = Icons.AutoMirrored.Filled.OpenInNew,
+                                contentDescription = null,
+                                tint               = CelestiaTheme.colors.textSecondary,
+                                modifier           = Modifier.size(16.dp)
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Text(s.updateViewOnGitHub, color = CelestiaTheme.colors.textSecondary)
+                        }
+                    }
+
+                    Spacer(Modifier.weight(1f))
 
                     if (!update.isCritical && downloadState !is DownloadState.Downloading) {
                         TextButton(onClick = onDismiss) {

@@ -3,6 +3,7 @@ package hivens.launcher.update
 import hivens.config.Branding
 import hivens.core.api.HttpClientProvider
 import hivens.core.data.LauncherUpdate
+import hivens.core.data.ReleaseManifest
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -32,9 +33,12 @@ class UpdateService(
     private val lastCheckFile = updateDir.resolve(".last_check")
 
     companion object {
-        private const val GITHUB_API_LATEST   = "https://api.github.com/repos/Kitty-Hivens/Aura-Launcher/releases/latest"
-        private const val GITHUB_API_RELEASES = "https://api.github.com/repos/Kitty-Hivens/Aura-Launcher/releases"
+        private const val GITHUB_REPO          = "Kitty-Hivens/Aura-Launcher"
+        private const val GITHUB_API_LATEST    = "https://api.github.com/repos/$GITHUB_REPO/releases/latest"
+        private const val GITHUB_API_RELEASES  = "https://api.github.com/repos/$GITHUB_REPO/releases"
+        private const val GITHUB_RELEASE_PAGE  = "https://github.com/$GITHUB_REPO/releases/tag"
         private const val CHECK_INTERVAL_HOURS = 12L
+        private const val MANIFEST_ASSET_NAME  = "release-manifest.json"
     }
 
     init {
@@ -80,17 +84,28 @@ class UpdateService(
                 return@withContext null
             }
 
-            val checksum = extractChecksum(release.body, asset.name)
+            // Prefer the machine-readable manifest. Older releases without one
+            // fall back to scraping the markdown table from the release body.
+            val manifest = tryFetchManifest(release)
+            val checksum = manifest?.assets?.find { it.name == asset.name }?.sha256
+                ?: extractChecksum(release.body, asset.name)
+            val highlights = manifest?.highlights?.takeIf { it.isNotBlank() }
+
             val isCritical = release.name.contains("[CRITICAL]", ignoreCase = true) ||
                              release.body?.contains("CRITICAL", ignoreCase = true) == true
 
-            logger.info("Update available: $currentVersion -> $latestVersion")
+            logger.info(
+                "Update available: $currentVersion -> $latestVersion (manifest: {})",
+                if (manifest != null) "yes" else "no"
+            )
 
             return@withContext LauncherUpdate(
                 version = release.tagName,
                 downloadUrl = asset.browserDownloadUrl,
                 checksum = checksum,
                 changelog = fetchChangelogBetween(currentVersion, latestVersion),
+                highlights = highlights,
+                releasePageUrl = "$GITHUB_RELEASE_PAGE/${release.tagName}",
                 isCritical = isCritical
             )
 
@@ -228,7 +243,30 @@ class UpdateService(
     }
 
     /**
+     * Looks for `release-manifest.json` among the release assets and parses it.
+     * Returns null if the asset is absent (legacy release) or the body is not
+     * a valid manifest document — callers must handle null and fall back.
+     */
+    internal suspend fun tryFetchManifest(release: GitHubRelease): ReleaseManifest? {
+        val asset = release.assets.find { it.name == MANIFEST_ASSET_NAME } ?: return null
+        return try {
+            val response = httpClient.get(asset.browserDownloadUrl) {
+                header("Accept", "application/json")
+            }
+            if (response.status.value != 200) {
+                logger.warn("release-manifest.json fetch returned {}", response.status)
+                return null
+            }
+            json.decodeFromString<ReleaseManifest>(response.bodyAsText())
+        } catch (e: Exception) {
+            logger.warn("Failed to fetch or parse release-manifest.json", e)
+            null
+        }
+    }
+
+    /**
      * Extracts SHA256 checksum for [fileName] from the GitHub release body.
+     * Used as a fallback for legacy releases without a `release-manifest.json` asset.
      *
      * Supports two formats commonly found in release notes:
      *   1. Markdown table:  `| \`filename\` | \`hash\` |`
