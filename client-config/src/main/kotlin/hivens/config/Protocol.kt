@@ -17,7 +17,7 @@ object Protocol {
      * The version we *claim to be* in the dashboard request and User-Agent.
      * This is the official launcher's version we impersonate, not [Branding.VERSION].
      */
-    const val MIMIC_LAUNCHER_VERSION = "3.6.3"
+    const val MIMIC_LAUNCHER_VERSION = "3.6.4"
 
     /** Default server id for cold-start logins (when no profile.lastServerId is set). */
     const val DEFAULT_SERVER_ID = "Industrial"
