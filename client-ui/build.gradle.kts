@@ -143,18 +143,16 @@ compose.desktop {
                 menuGroup = "Aura Launcher"
                 shortcut = true
                 dirChooser = true
-                iconFile.set(project.file("src/commonMain/composeResources/drawable/icon.ico"))
+                iconFile.set(rootProject.file("resources/icons/icon.ico"))
 
                 // perUserInstall removed — Inno Setup handles privilege escalation
                 // via PrivilegesRequired=lowest in setup.iss
                 console = false
             }
 
-            linux {
-                // packageName / debMaintainer / appCategory removed —
-                // DEB and RPM are no longer shipped; AppImage is assembled in CI.
-                iconFile.set(project.file("src/commonMain/composeResources/drawable/icon.png"))
-            }
+            // No `linux { ... }` block: DEB/RPM are not shipped, and AppImage is
+            // assembled in CI from `resources/icons/`. The Compose Linux package
+            // task is not invoked, so its iconFile is dead weight.
 
             macOS {
                 bundleID = "com.hivens.auralauncher"
