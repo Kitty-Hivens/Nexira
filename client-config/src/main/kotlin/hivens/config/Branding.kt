@@ -9,6 +9,15 @@ object Branding {
     const val TITLE = "Aura Launcher"
 
     /**
+     * X11 WM_CLASS / Wayland app_id the launcher window advertises. Must match
+     * `StartupWMClass=` in resources/aura-launcher.desktop and the AppStream
+     * metainfo `<id>` slug, otherwise compositors (KDE, Hyprland, GNOME) cannot
+     * associate the live window with the .desktop entry and fall back to the
+     * generic "broken file" icon in workspace overviews.
+     */
+    const val WM_CLASS = "AuraLauncher"
+
+    /**
      * This launcher's own semantic version — generated at build time from
      * `git describe --tags --dirty`, so it tracks the released artifact.
      */
