@@ -185,64 +185,10 @@ jobs:
             "s|    <releases>|    <releases>\n    <release version=\"$APP_VERSION\" date=\"$DATE\">\n      <url type=\"details\">https://github.com/Kitty-Hivens/Aura-Launcher/releases/tag/v$APP_VERSION</url>\n    </release>|" \
             resources/io.github.kitty_hivens.auralauncher.metainfo.xml
 
-      - name: Assemble AppDir
-        run: |
-          APPDIR="AppDir"
-          JAR=$(ls client-ui/build/compose/jars/*-release*.jar | head -1)
-          
-          # 1. Build the minimal JRE first — jlink refuses to write into an existing dir
-          jlink \
-            --output "$APPDIR/usr" \
-            --add-modules java.base,java.desktop,java.logging,java.management,java.naming,java.net.http,java.prefs,java.sql,jdk.crypto.ec,jdk.unsupported,jdk.zipfs \
-            --no-header-files \
-            --no-man-pages \
-            --strip-debug \
-            --compress=2
-
-          # 2. Create remaining subdirs (usr/bin already exists from jlink)
-          mkdir -p \
-            "$APPDIR/usr/lib" \
-            "$APPDIR/usr/share/applications" \
-            "$APPDIR/usr/share/icons/hicolor/256x256/apps" \
-            "$APPDIR/usr/share/icons/hicolor/512x512/apps" \
-            "$APPDIR/usr/share/metainfo"
-
-          # 3. AppRun entry-point
-          # WM_CLASS hygiene: -Dawt.appClassName works on JBR; on stock OpenJDK
-          # (which is what jlink builds the AppImage's runtime from) Main.kt
-          # reflects into sun.awt.X11.XToolkit.awtAppClassName, which JPMS guards
-          # behind --add-opens. Both must be present for Hyprland/KDE/GNOME to
-          # match the live window against StartupWMClass=AuraLauncher and pick up
-          # the hicolor icon at the correct size. Mirrors client-ui/build.gradle.kts
-          # — the fat jar bypasses the Compose-generated launcher script, so its
-          # jvmArgs do not flow through here.
-          cat > "$APPDIR/AppRun" << 'EOF'
-          #!/bin/sh
-          HERE="$(dirname "$(readlink -f "$0")")"
-          exec "$HERE/usr/bin/java" \
-               -Dawt.appClassName=AuraLauncher \
-               --add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED \
-               -jar "$HERE/usr/lib/aura-launcher.jar" \
-               "$@"
-          EOF
-          chmod +x "$APPDIR/AppRun"
-
-          # 4. Copy assets
-          cp "$JAR" "$APPDIR/usr/lib/aura-launcher.jar"
-          cp resources/aura-launcher.desktop "$APPDIR/usr/share/applications/"
-          cp resources/aura-launcher.desktop "$APPDIR/"
-          cp resources/icons/256x256.png "$APPDIR/usr/share/icons/hicolor/256x256/apps/aura-launcher.png"
-          cp resources/icons/512x512.png "$APPDIR/usr/share/icons/hicolor/512x512/apps/aura-launcher.png"
-          cp resources/icons/256x256.png "$APPDIR/aura-launcher.png"
-          # Provide both names so appimagetool finds AppStream metadata
-          cp resources/io.github.kitty_hivens.auralauncher.metainfo.xml "$APPDIR/usr/share/metainfo/io.github.kitty_hivens.auralauncher.metainfo.xml"
-          cp resources/io.github.kitty_hivens.auralauncher.metainfo.xml "$APPDIR/usr/share/metainfo/io.github.kitty_hivens.auralauncher.appdata.xml"
-
       - name: Build AppImage
         run: |
-          ARCH=x86_64 appimagetool \
-            AppDir \
-            "AuraLauncher-$APP_VERSION-x86_64.AppImage"
+          JAR=$(ls client-ui/build/compose/jars/*-release*.jar | head -1)
+          ./scripts/build-appimage.sh "$APP_VERSION" "$JAR"
 
       - uses: actions/upload-artifact@v4
         with:
