@@ -164,6 +164,20 @@ compose.desktop {
         // JVM ARGUMENTS OPTIMIZATION
         // ====================================================================
         jvmArgs(
+            // Linux window-manager identity. Two-pronged because the canonical
+            // "set X11 WM_CLASS from a JVM" knob is JDK-vendor-specific:
+            //   - JBR honours -Dawt.appClassName=...  natively at toolkit init.
+            //   - Stock OpenJDK (Liberica, Temurin, etc.) ignores that property
+            //     and derives WM_CLASS from the launcher's argv[0]. Main.kt
+            //     reflects into sun.awt.X11.XToolkit.awtAppClassName before the
+            //     first window is created, which needs the --add-opens below.
+            // Result: matches StartupWMClass=AuraLauncher in
+            // resources/aura-launcher.desktop on every JDK, so KDE/Hyprland/GNOME
+            // associate the live window with the .desktop entry and pick up the
+            // hicolor icon at the size the compositor actually wants.
+            "-Dawt.appClassName=AuraLauncher",
+            "--add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED",
+
             // Graphics optimization
             "-Dawt.useSystemAAFontSettings=on",
             "-Djdk.gtk.version=3",

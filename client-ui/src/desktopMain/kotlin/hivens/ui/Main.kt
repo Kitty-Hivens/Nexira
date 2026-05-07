@@ -103,16 +103,46 @@ sealed class Screen {
 
 // ─── Entry Point ─────────────────────────────────────────────────────────────
 
+/**
+ * Force the X11 toolkit's app class name so the WM_CLASS hint on every window
+ * we create matches `StartupWMClass=` in the .desktop entry.
+ *
+ * Stock OpenJDK derives WM_CLASS from the launcher binary's argv[0] and exposes
+ * no public knob to override it; JBR exposes `-Dawt.appClassName` but only that
+ * one vendor honours it. Reflection into the package-private static field works
+ * across both — provided we run before any window is shown (XWindow.setWMClass
+ * snapshots the value at construction time) and the JVM was launched with
+ * `--add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED`.
+ *
+ * No-op on macOS/Windows. Failures are logged but never fatal — a wrong icon
+ * is annoying, not crash-worthy.
+ */
+private fun setLinuxXToolkitAppClassName(name: String) {
+    if (!System.getProperty("os.name").lowercase().contains("linux")) return
+    runCatching {
+        // Triggers XToolkit class load + initial awtAppClassName assignment.
+        java.awt.Toolkit.getDefaultToolkit()
+        val cls = Class.forName("sun.awt.X11.XToolkit")
+        val field = cls.getDeclaredField("awtAppClassName")
+        field.isAccessible = true
+        field.set(null, name)
+    }.onFailure {
+        LoggerFactory.getLogger("Main").warn(
+            "Could not override XToolkit.awtAppClassName ({}); " +
+            "compositors may show a generic icon. Cause: {}",
+            name, it.toString()
+        )
+    }
+}
+
 @OptIn(ExperimentalResourceApi::class, DelicateCoroutinesApi::class)
 fun main() {
     System.setProperty("jna.nosys", "true")
     System.setProperty("skiko.fps.limit", "60")
-    // Match StartupWMClass in resources/aura-launcher.desktop so KDE/Hyprland/GNOME
-    // can associate the running window with the .desktop entry (and thus pick up
-    // the hicolor icon at the size the compositor actually wants — without this,
-    // WM_CLASS is `java-MainKt` and the desktop falls back to the small embedded
-    // window icon, blurring it in workspace overviews).
-    System.setProperty("awt.appClassName", "AuraLauncher")
+    // X11 WM_CLASS = "AuraLauncher". -Dawt.appClassName covers JBR; for stock
+    // OpenJDK we reflect into sun.awt.X11.XToolkit.awtAppClassName before the
+    // first window is created. See jvmArgs in client-ui/build.gradle.kts.
+    setLinuxXToolkitAppClassName(Branding.WM_CLASS)
 
     val paths = PlatformPaths.system()
     DataDirMigration.run(paths)

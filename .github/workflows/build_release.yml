@@ -208,10 +208,20 @@ jobs:
             "$APPDIR/usr/share/metainfo"
 
           # 3. AppRun entry-point
+          # WM_CLASS hygiene: -Dawt.appClassName works on JBR; on stock OpenJDK
+          # (which is what jlink builds the AppImage's runtime from) Main.kt
+          # reflects into sun.awt.X11.XToolkit.awtAppClassName, which JPMS guards
+          # behind --add-opens. Both must be present for Hyprland/KDE/GNOME to
+          # match the live window against StartupWMClass=AuraLauncher and pick up
+          # the hicolor icon at the correct size. Mirrors client-ui/build.gradle.kts
+          # — the fat jar bypasses the Compose-generated launcher script, so its
+          # jvmArgs do not flow through here.
           cat > "$APPDIR/AppRun" << 'EOF'
           #!/bin/sh
           HERE="$(dirname "$(readlink -f "$0")")"
           exec "$HERE/usr/bin/java" \
+               -Dawt.appClassName=AuraLauncher \
+               --add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED \
                -jar "$HERE/usr/lib/aura-launcher.jar" \
                "$@"
           EOF
