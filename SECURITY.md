@@ -4,8 +4,8 @@
 
 | Version        | Supported |
 |----------------|-----------|
-| Latest release | ✅         |
-| Older versions | ✗         |
+| Latest release | ✓          |
+| Older versions | ✗          |
 
 ## Reporting a vulnerability
 
@@ -24,4 +24,4 @@ A few things that look like vulnerabilities but are intentional:
 
 **AES-256-GCM credential encryption** — Credentials are encrypted with a key derived from machine-specific properties (username, home dir, OS name) via PBKDF2. This is not OS Keyring/TPM-backed and does not protect against local-privilege-escalation attacks on the same machine. It prevents casual file-copy credential theft.
 
-**SOCKS proxy hardcoded** — The proxy credentials in `AppConfig` are the game server's public SOCKS proxy, not private secrets.
+**SOCKS proxy hardcoded** — The proxy credentials in `Network.Proxy` are the game server's public SOCKS proxy, not private secrets.

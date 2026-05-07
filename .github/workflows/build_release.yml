@@ -315,10 +315,10 @@ jobs:
             printf '\n---\n\n'
             printf '## Downloads\n\n'
             printf '| Platform | File |\n|---|---|\n'
-            printf '| 🪟 Windows Installer | `AuraLauncher-%s-Setup.exe` |\n' "$APP_VERSION"
-            printf '| 🪟 Windows Portable  | `AuraLauncher-%s-Windows-Portable.zip` |\n' "$APP_VERSION"
-            printf '| 🐧 Linux AppImage    | `AuraLauncher-%s-x86_64.AppImage` |\n' "$APP_VERSION"
-            printf '| 🍎 macOS             | `AuraLauncher-%s.dmg` |\n\n' "$APP_VERSION"
+            printf '| Windows Installer | `AuraLauncher-%s-Setup.exe` |\n' "$APP_VERSION"
+            printf '| Windows Portable  | `AuraLauncher-%s-Windows-Portable.zip` |\n' "$APP_VERSION"
+            printf '| Linux AppImage    | `AuraLauncher-%s-x86_64.AppImage` |\n' "$APP_VERSION"
+            printf '| macOS             | `AuraLauncher-%s.dmg` |\n\n' "$APP_VERSION"
             printf '## SHA256 Checksums\n\n'
             printf '| File | SHA256 |\n|---|---|\n'
             echo -e "$CHECKSUMS"
