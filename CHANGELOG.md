@@ -11,14 +11,70 @@ below are for the GitHub release page and CHANGELOG readers.
 
 ## [Unreleased]
 
+## [2.2.7] - 2026-05-07
+
 ### Highlights
-- Project Void groundwork: per-OS data directory with migration from `~/.aura`,
-  configurable via `AURA_DATA_DIR`.
-- Cleaner internals — `LauncherService` is now fully constructor-injected,
-  configuration is split by concern (Branding/Network/Protocol/Storage),
-  and dependency versions live in a single `gradle/libs.versions.toml`.
-- Updates now publish a `release-manifest.json` so the in-app dialog can
-  show a tidy "What's new" summary instead of the raw changelog.
+- **Required upgrade**: SMARTYcraft 3.6.4 protocol sync — proxy credentials
+  rotated upstream, so anything older than this build cannot authenticate.
+- Auto-updater and JDK/natives downloads now bypass the SMARTYcraft proxy,
+  so the launcher can still update itself when the upstream is unreachable.
+- Window icon and WM_CLASS render correctly on KDE Plasma, Hyprland and
+  GNOME — workspace overviews show the proper hi-res launcher icon instead
+  of a generic "broken file" glyph, on every JDK vendor.
+- Per-OS data directory with automatic migration from `~/.aura`; relocate
+  via the `AURA_DATA_DIR` env var.
+- Update dialog reads a tidy "What's new" summary from a published
+  `release-manifest.json` instead of scraping the raw changelog body.
+
+### Added
+- Direct HTTP channel (`HttpClientProvider` qualified `named("direct")`) for
+  third-party CDNs that don't tunnel through the SMARTYcraft proxy. Used
+  by `UpdateService`, `JavaManagerService` and `EnvironmentPreparer` so
+  GitHub releases, BellSoft JDKs and Maven Central LWJGL natives stay
+  reachable across SMARTYcraft outages.
+- `Branding.WM_CLASS` constant — single source of truth for the X11/Wayland
+  app identity that must match `StartupWMClass=` in the .desktop entry and
+  the AppStream metainfo `<id>` slug.
+- Per-OS data directory: `%APPDATA%\AuraLauncher` on Windows,
+  `~/Library/Application Support/AuraLauncher` on macOS,
+  `~/.local/share/aura-launcher` on Linux. Override via `AURA_DATA_DIR`.
+- `release-manifest.json` published alongside binaries; in-app dialog
+  renders a Highlights-only "What's new" view instead of the raw body.
+- Documentation site (Astro Starlight) deployed to GitHub Pages with
+  Russian localization; CONTRIBUTING, SECURITY and issue templates.
+
+### Changed
+- **Protocol sync (smrt-deco 3.6.3 → 3.6.4)**: `MIMIC_LAUNCHER_VERSION`
+  3.6.3 → 3.6.4; SOCKS proxy port 1080 → 58613, user
+  `proxyuser` → `smartycraftproxyuser`, password rotated.
+- `AppConfig` split into `Branding` / `Network` / `Protocol` / `Storage`
+  for clearer ownership; `LauncherService` collaborators are now
+  constructor-injected (DI-friendly, mockable).
+- Single-source icon pipeline: edit `resources/branding/app-icon.png` and
+  `tray-icon.png`, run `scripts/regenerate-icons.sh` to produce every
+  derived variant. Multi-size Windows ICO (16/32/48/64/128/256) replaces
+  the single 64-px frame Explorer used to downscale to blurry placeholders.
+- Dependency versions consolidated into `gradle/libs.versions.toml`.
+
+### Fixed
+- **WM_CLASS mismatch on Linux**: KDE / Hyprland / GNOME workspace overviews
+  now match the live window to `aura-launcher.desktop` and pick up the
+  hicolor icon. The previous fix relied on `-Dawt.appClassName`, which only
+  JBR honours; the launcher now reflects into
+  `sun.awt.X11.XToolkit.awtAppClassName` so stock OpenJDK distributions
+  (Liberica, Temurin, …) work too.
+- **Auto-updater survives SMARTYcraft proxy outages**: GitHub release fetch
+  and binary download now route through the direct HTTP channel and no
+  longer require the upstream SOCKS proxy to be reachable.
+- **`Res.drawable.icon` startup crash**: moved `icon.ico` out of
+  `composeResources/drawable/` to `resources/icons/` so Compose Resources
+  no longer indexes two files under the same stem and `painterResource`
+  resolves cleanly.
+
+### Removed
+- Compose `linux { iconFile.set(...) }` block — the Linux package
+  distributable task is not invoked; releases ship via AppImage assembled
+  in CI from `resources/icons/`.
 
 ## [2.2.6] - 2026-03-26
 
