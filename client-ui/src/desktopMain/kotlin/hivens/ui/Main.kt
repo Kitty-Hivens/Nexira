@@ -38,6 +38,7 @@ import hivens.ui.easter.AprilFoolsWrapper
 import hivens.ui.easter.ChaosState
 import hivens.ui.generated.resources.Res
 import hivens.ui.generated.resources.favicon
+import hivens.ui.generated.resources.icon
 import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.i18n.LocaleProvider
@@ -106,6 +107,12 @@ sealed class Screen {
 fun main() {
     System.setProperty("jna.nosys", "true")
     System.setProperty("skiko.fps.limit", "60")
+    // Match StartupWMClass in resources/aura-launcher.desktop so KDE/Hyprland/GNOME
+    // can associate the running window with the .desktop entry (and thus pick up
+    // the hicolor icon at the size the compositor actually wants — without this,
+    // WM_CLASS is `java-MainKt` and the desktop falls back to the small embedded
+    // window icon, blurring it in workspace overviews).
+    System.setProperty("awt.appClassName", "AuraLauncher")
 
     val paths = PlatformPaths.system()
     DataDirMigration.run(paths)
@@ -194,7 +201,11 @@ fun main() {
             val themeManager  = remember { ThemeManager(dataDirectory) }
             var customTheme   by remember { mutableStateOf(themeManager.loadTheme()) }
 
-            val trayIcon = painterResource(Res.drawable.favicon)
+            // Tray needs a 64-px glyph; the window chrome and KDE overview want the
+            // detailed hi-res icon so they can downscale cleanly to whatever the
+            // compositor demands.
+            val trayIcon   = painterResource(Res.drawable.favicon)
+            val windowIcon = painterResource(Res.drawable.icon)
 
             // ── Tray init on background thread ────────────────────────────
             LaunchedEffect(Unit) {
@@ -311,7 +322,7 @@ fun main() {
                 visible   = isWindowVisible,
                 title     = Branding.TITLE,
                 resizable = true,
-                icon      = trayIcon
+                icon      = windowIcon
             ) {
                 CelestiaTheme(useDarkTheme = isDarkTheme, customTheme = customTheme) {
                     AppRoot(
