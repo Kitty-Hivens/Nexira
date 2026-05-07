@@ -134,6 +134,8 @@ interface AppStrings {
     val updateTitleCritical: String
     val updateCriticalBanner: String
     val updateChangelog: String
+    val updateHighlights: String
+    val updateViewOnGitHub: String
     val updateLater: String
     val updateDownload: String
     val updateDownloadNow: String

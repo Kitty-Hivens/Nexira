@@ -1,7 +1,25 @@
 # Changelog
 
 All notable changes to Aura Launcher will be documented in this file.
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+
+Each released entry should open with a short `### Highlights` block —
+2-5 plain-English bullets summarizing what the user actually notices.
+The launcher's in-app update dialog renders just the Highlights; the
+detailed `### Added`/`### Changed`/`### Fixed`/`### Removed` sections
+below are for the GitHub release page and CHANGELOG readers.
+
+## [Unreleased]
+
+### Highlights
+- Project Void groundwork: per-OS data directory with migration from `~/.aura`,
+  configurable via `AURA_DATA_DIR`.
+- Cleaner internals — `LauncherService` is now fully constructor-injected,
+  configuration is split by concern (Branding/Network/Protocol/Storage),
+  and dependency versions live in a single `gradle/libs.versions.toml`.
+- Updates now publish a `release-manifest.json` so the in-app dialog can
+  show a tidy "What's new" summary instead of the raw changelog.
+
 ## [2.2.6] - 2026-03-26
 
 ### Fixed

@@ -293,35 +293,101 @@ jobs:
         working-directory: dist
         run: find . -maxdepth 1 -type f -exec sha256sum {} + > SHA256SUMS.txt
 
+      - name: Generate release-manifest.json
+        working-directory: dist
+        env:
+          CHANGELOG_NOTES: ${{ needs.changelog.outputs.notes }}
+        run: |
+          # Highlights = lines under "### Highlights" up to the next "### "
+          HIGHLIGHTS=$(printf '%s' "$CHANGELOG_NOTES" \
+            | awk '/^### Highlights/ {flag=1; next} /^### / {flag=0} flag' \
+            | sed '/^[[:space:]]*$/d')
+
+          ASSETS_JSON='[]'
+          while IFS= read -r line; do
+            hash=$(echo "$line" | awk '{print $1}')
+            file=$(echo "$line" | awk '{print $2}' | sed 's|^\./||')
+            [ -z "$file" ] && continue
+            case "$file" in
+              SHA256SUMS.txt|release-manifest.json) continue ;;
+            esac
+
+            case "$file" in
+              *Setup.exe)             plat=windows; kind=installer ;;
+              *Windows-Portable.zip)  plat=windows; kind=portable  ;;
+              *.AppImage)             plat=linux;   kind=appimage  ;;
+              *.dmg)                  plat=macos;   kind=dmg       ;;
+              *)                      plat=unknown; kind=unknown   ;;
+            esac
+
+            size=$(stat -c%s "$file")
+            ASSETS_JSON=$(echo "$ASSETS_JSON" \
+              | jq --arg n "$file" --arg p "$plat" --arg k "$kind" \
+                   --arg s "$hash" --argjson sz "$size" \
+                   '. + [{"name": $n, "platform": $p, "kind": $k, "sha256": $s, "size": $sz}]')
+          done < SHA256SUMS.txt
+
+          PUBLISHED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          jq -n \
+            --arg ver "$APP_VERSION" \
+            --arg pub "$PUBLISHED_AT" \
+            --arg hl "$HIGHLIGHTS" \
+            --argjson assets "$ASSETS_JSON" \
+            '{
+              schemaVersion: 1,
+              version: $ver,
+              publishedAt: $pub,
+              highlights: (if $hl == "" then null else $hl end),
+              assets: $assets
+            }' > release-manifest.json
+
       - name: Compose release body
         id: body
         env:
           CHANGELOG_NOTES: ${{ needs.changelog.outputs.notes }}
         run: |
+          REPO_BASE="https://github.com/Kitty-Hivens/Aura-Launcher/releases/download/v${APP_VERSION}"
+
+          # Highlights extracted the same way as for the manifest
+          HIGHLIGHTS=$(printf '%s' "$CHANGELOG_NOTES" \
+            | awk '/^### Highlights/ {flag=1; next} /^### / {flag=0} flag' \
+            | sed '/^[[:space:]]*$/d')
+
           CHECKSUMS=""
           while IFS= read -r line; do
             hash=$(echo "$line" | awk '{print $1}')
             file=$(echo "$line" | awk '{print $2}' | sed 's|^\./||')
+            [ -z "$file" ] && continue
             CHECKSUMS="${CHECKSUMS}| \`${file}\` | \`${hash}\` |\n"
           done < dist/SHA256SUMS.txt
 
           EOF_DELIM=$(openssl rand -hex 8)
           {
             echo "body<<$EOF_DELIM"
+
             printf '> [!NOTE]\n'
             printf '> **Aura Launcher** is an unofficial third-party launcher and is not affiliated with or endorsed by the original game developers.\n\n'
-            printf '## What'\''s Changed\n\n'
-            echo "$CHANGELOG_NOTES"
-            printf '\n---\n\n'
+
+            if [ -n "$HIGHLIGHTS" ]; then
+              printf "## What's New\n\n"
+              printf '%s\n\n' "$HIGHLIGHTS"
+            fi
+
             printf '## Downloads\n\n'
             printf '| Platform | File |\n|---|---|\n'
-            printf '| Windows Installer | `AuraLauncher-%s-Setup.exe` |\n' "$APP_VERSION"
-            printf '| Windows Portable  | `AuraLauncher-%s-Windows-Portable.zip` |\n' "$APP_VERSION"
-            printf '| Linux AppImage    | `AuraLauncher-%s-x86_64.AppImage` |\n' "$APP_VERSION"
-            printf '| macOS             | `AuraLauncher-%s.dmg` |\n\n' "$APP_VERSION"
-            printf '## SHA256 Checksums\n\n'
+            printf '| Windows Installer | [`AuraLauncher-%s-Setup.exe`](%s/AuraLauncher-%s-Setup.exe) |\n' "$APP_VERSION" "$REPO_BASE" "$APP_VERSION"
+            printf '| Windows Portable  | [`AuraLauncher-%s-Windows-Portable.zip`](%s/AuraLauncher-%s-Windows-Portable.zip) |\n' "$APP_VERSION" "$REPO_BASE" "$APP_VERSION"
+            printf '| Linux AppImage    | [`AuraLauncher-%s-x86_64.AppImage`](%s/AuraLauncher-%s-x86_64.AppImage) |\n' "$APP_VERSION" "$REPO_BASE" "$APP_VERSION"
+            printf '| macOS             | [`AuraLauncher-%s.dmg`](%s/AuraLauncher-%s.dmg) |\n\n' "$APP_VERSION" "$REPO_BASE" "$APP_VERSION"
+
+            printf '<details>\n<summary>SHA256 Checksums</summary>\n\n'
             printf '| File | SHA256 |\n|---|---|\n'
             echo -e "$CHECKSUMS"
+            printf '\n</details>\n\n'
+
+            printf "## What's Changed\n\n"
+            printf '%s\n' "$CHANGELOG_NOTES"
+
             echo "$EOF_DELIM"
           } >> "$GITHUB_OUTPUT"
 
