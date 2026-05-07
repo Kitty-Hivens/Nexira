@@ -10,6 +10,16 @@
   #define AppVersion "0.0.0-dev"
 #endif
 
+; VersionInfoVersion writes into the PE header (VS_FIXEDFILEINFO), which
+; Windows requires to be MAJOR.MINOR[.BUILD[.REVISION]] — digits only. Strip
+; any pre-release suffix (e.g. "2.2.7-rc1" -> "2.2.7"). Mirrors the same
+; normalization done in client-ui/build.gradle.kts for Compose's packageVersion.
+#if Pos("-", AppVersion) > 0
+  #define VersionInfo Copy(AppVersion, 1, Pos("-", AppVersion) - 1)
+#else
+  #define VersionInfo AppVersion
+#endif
+
 #define MyAppName      "Aura Launcher"
 #define MyAppPublisher "Hivens"
 #define MyAppURL       "https://github.com/Kitty-Hivens/Aura-Launcher"
@@ -66,7 +76,7 @@ CloseApplications=force
 CloseApplicationsFilter=*{#MyAppExeName}*
 
 ; ── Version info embedded in installer EXE ──────────────────────────────────
-VersionInfoVersion={#AppVersion}
+VersionInfoVersion={#VersionInfo}
 VersionInfoCompany={#MyAppPublisher}
 VersionInfoDescription={#MyAppName} Installer
 VersionInfoProductName={#MyAppName}

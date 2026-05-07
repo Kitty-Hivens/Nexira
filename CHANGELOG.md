@@ -11,10 +11,13 @@ below are for the GitHub release page and CHANGELOG readers.
 
 ## [Unreleased]
 
-## [2.2.7-rc1] - 2026-05-07
+## [2.2.7-rc2] - 2026-05-07
 
 Release candidate for [2.2.7]. Same code; canary tag for catching install
-regressions on Windows / macOS / Linux before the public bump.
+regressions on Windows / macOS / Linux before the public bump. (rc1 failed
+on Inno Setup `VersionInfoVersion` strict-version validation; fixed by
+stripping the pre-release suffix in setup.iss the same way build.gradle.kts
+already does for Compose's `packageVersion`.)
 
 ### Highlights
 - **Required upgrade** once promoted: SMARTYcraft 3.6.4 protocol sync, plus a
