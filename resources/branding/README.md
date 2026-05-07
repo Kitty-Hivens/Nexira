@@ -31,13 +31,19 @@ still build the project.
 
 ## Generated files (do not edit by hand)
 
-| Path                                                                 | Format       | Purpose                          |
-|----------------------------------------------------------------------|--------------|----------------------------------|
-| `client-ui/src/commonMain/composeResources/drawable/icon.png`        | PNG 1024×1024| Compose Linux app icon            |
-| `client-ui/src/commonMain/composeResources/drawable/icon.ico`        | Multi-size ICO (16/32/48/64/128/256) | Compose Windows + Inno Setup    |
-| `client-ui/src/commonMain/composeResources/drawable/favicon.png`     | PNG 64×64    | Tray + window chrome at runtime  |
-| `resources/icons/256x256.png`                                        | PNG 256×256  | AppImage hicolor 256             |
-| `resources/icons/512x512.png`                                        | PNG 512×512  | AppImage hicolor 512             |
+| Path                                                             | Format                               | Purpose                                              |
+|------------------------------------------------------------------|--------------------------------------|------------------------------------------------------|
+| `client-ui/src/commonMain/composeResources/drawable/icon.png`    | PNG 1024×1024                        | `Res.drawable.icon` — hi-res window chrome (Main.kt) |
+| `client-ui/src/commonMain/composeResources/drawable/favicon.png` | PNG 64×64                            | `Res.drawable.favicon` — tray + AboutScreen          |
+| `resources/icons/icon.ico`                                       | Multi-size ICO (16/32/48/64/128/256) | Compose Windows iconFile + Inno Setup                |
+| `resources/icons/256x256.png`                                    | PNG 256×256                          | AppImage hicolor 256                                 |
+| `resources/icons/512x512.png`                                    | PNG 512×512                          | AppImage hicolor 512                                 |
+
+**Why is `icon.ico` not under `composeResources/drawable/`?** Compose Resources
+groups files by stem-without-extension. Putting `icon.ico` next to `icon.png`
+makes `Res.drawable.icon` resolve to *both* files and crashes
+`painterResource` at runtime. Installer assets live under `resources/icons/`
+where Compose doesn't index them.
 
 ## Source preference
 

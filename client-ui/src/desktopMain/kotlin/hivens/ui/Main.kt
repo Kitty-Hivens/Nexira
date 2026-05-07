@@ -227,7 +227,7 @@ fun main() {
                         )
                     } catch (_: Exception) {
                         runCatching {
-                            val iconBytes = Res.readBytes("drawable/icon.ico")
+                            val iconBytes = Res.readBytes("drawable/icon.png")
                             TrayManager.init(
                                 iconStream = iconBytes.inputStream(),
                                 strings    = TrayManager.Strings(

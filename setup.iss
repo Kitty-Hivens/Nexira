@@ -42,7 +42,7 @@ DisableProgramGroupPage=yes
 ; ── Output ──────────────────────────────────────────────────────────────────
 OutputDir=.
 OutputBaseFilename=AuraLauncher-Setup
-SetupIconFile=client-ui\src\commonMain\composeResources\drawable\icon.ico
+SetupIconFile=resources\icons\icon.ico
 
 ; ── Compression ─────────────────────────────────────────────────────────────
 Compression=lzma2/ultra64

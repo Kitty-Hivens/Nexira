@@ -10,10 +10,14 @@
 #
 # Outputs:
 #   client-ui/src/commonMain/composeResources/drawable/icon.png      (1024×1024)
-#   client-ui/src/commonMain/composeResources/drawable/icon.ico      (multi-size)
 #   client-ui/src/commonMain/composeResources/drawable/favicon.png   (64×64)
+#   resources/icons/icon.ico                                         (Inno Setup + Windows Compose iconFile)
 #   resources/icons/256x256.png                                      (AppImage)
 #   resources/icons/512x512.png                                      (AppImage)
+#
+# Note: icon.ico is intentionally NOT under composeResources/drawable/.
+# Compose Resources groups by stem, so colocating icon.ico with icon.png
+# makes Res.drawable.icon ambiguous and crashes painterResource at runtime.
 # ─────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
@@ -51,7 +55,8 @@ echo "── app-icon.png  →  variants ─────────────
 
 # Multi-size .ico for Windows. Single-size ICO (the prior state) renders
 # blurry at 16/32/48px in Explorer; pack the standard ladder so Windows
-# can pick the closest match.
+# can pick the closest match. Lives under resources/icons/, NOT drawable/
+# — see header note about Compose Resources stem-grouping.
 "${IM[@]}" "$APP_SRC" \
     \( -clone 0 -resize 256x256 \) \
     \( -clone 0 -resize 128x128 \) \
@@ -60,7 +65,7 @@ echo "── app-icon.png  →  variants ─────────────
     \( -clone 0 -resize 32x32   \) \
     \( -clone 0 -resize 16x16   \) \
     -delete 0 \
-    "$DRAWABLE/icon.ico"
+    "$HICOLOR/icon.ico"
 
 # ── Tray icon ───────────────────────────────────────────────────────────────
 echo "── tray-icon.png  →  favicon.png ──────────────────────────────────────"
@@ -75,7 +80,7 @@ echo "  $TRAY_SRC"
 echo "regenerated:"
 ls -la \
     "$DRAWABLE/icon.png" \
-    "$DRAWABLE/icon.ico" \
     "$DRAWABLE/favicon.png" \
+    "$HICOLOR/icon.ico" \
     "$HICOLOR/256x256.png" \
     "$HICOLOR/512x512.png"
