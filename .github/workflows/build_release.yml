@@ -269,14 +269,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build DMG
-        # macOS Info.plist enforces CFBundleShortVersionString = MAJOR.MINOR.PATCH
-        # (digits only). Pre-release tags like v2.2.7-rc1 fail Compose Desktop's
-        # packageVersion validation, so strip any `-suffix` for the package
-        # internals only. The artifact filename keeps the full tag so users can
-        # still tell rc builds apart.
-        run: |
-          MAC_VERSION="${APP_VERSION%%-*}"
-          ./gradlew :client-ui:packageReleaseDmg -Pversion="$MAC_VERSION"
+        run: ./gradlew :client-ui:packageReleaseDmg -Pversion="$APP_VERSION"
 
       - name: Rename DMG
         run: |
