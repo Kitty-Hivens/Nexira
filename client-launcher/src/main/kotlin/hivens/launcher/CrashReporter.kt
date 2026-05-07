@@ -1,6 +1,6 @@
 package hivens.launcher
 
-import hivens.config.AppConfig
+import hivens.config.Branding
 import hivens.launcher.platform.PlatformPaths
 import java.awt.Desktop
 import java.awt.Toolkit
@@ -44,7 +44,7 @@ object CrashReporter {
         val rt = Runtime.getRuntime()
         return CrashReport(
             timestamp = Instant.now().toString(),
-            version = AppConfig.CLIENT_VERSION,
+            version = Branding.VERSION,
             osName = System.getProperty("os.name"),
             osVersion = System.getProperty("os.version"),
             osArch = System.getProperty("os.arch"),
@@ -98,7 +98,7 @@ object CrashReporter {
         val choice = JOptionPane.showOptionDialog(
             null,
             message,
-            "Crash Report — ${AppConfig.APP_TITLE}",
+            "Crash Report — ${Branding.TITLE}",
             JOptionPane.DEFAULT_OPTION,
             JOptionPane.ERROR_MESSAGE,
             null,

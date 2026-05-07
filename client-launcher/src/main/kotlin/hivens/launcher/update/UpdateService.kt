@@ -1,6 +1,6 @@
 package hivens.launcher.update
 
-import hivens.config.AppConfig
+import hivens.config.Branding
 import hivens.core.api.HttpClientProvider
 import hivens.core.data.LauncherUpdate
 import io.ktor.client.*
@@ -67,7 +67,7 @@ class UpdateService(
             val release = json.decodeFromString<GitHubRelease>(response.bodyAsText())
             updateLastCheck()
 
-            val currentVersion = AppConfig.CLIENT_VERSION.removePrefix("v")
+            val currentVersion = Branding.VERSION.removePrefix("v")
             val latestVersion = release.tagName.removePrefix("v")
 
             if (compareVersions(latestVersion, currentVersion) <= 0) {

@@ -1,6 +1,8 @@
 package hivens.launcher.di
 
-import hivens.config.AppConfig
+import hivens.config.Network
+import hivens.config.Protocol
+import hivens.config.Storage
 import hivens.core.api.AuthService
 import hivens.core.api.HttpClientProvider
 import hivens.core.api.PlayerRepository
@@ -53,16 +55,16 @@ val networkModule = module {
         java.net.Authenticator.setDefault(object : java.net.Authenticator() {
             override fun getPasswordAuthentication(): java.net.PasswordAuthentication {
                 return java.net.PasswordAuthentication(
-                    AppConfig.Proxy.USER,
-                    AppConfig.Proxy.PASS.toCharArray()
+                    Network.Proxy.USER,
+                    Network.Proxy.PASS.toCharArray()
                 )
             }
         })
 
         OkHttpClient.Builder()
-            .connectTimeout(AppConfig.TIMEOUT_CONNECT, TimeUnit.MILLISECONDS)
-            .readTimeout(AppConfig.TIMEOUT_READ, TimeUnit.MILLISECONDS)
-            .proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress(AppConfig.Proxy.HOST, AppConfig.Proxy.PORT)))
+            .connectTimeout(Network.TIMEOUT_CONNECT, TimeUnit.MILLISECONDS)
+            .readTimeout(Network.TIMEOUT_READ, TimeUnit.MILLISECONDS)
+            .proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress(Network.Proxy.HOST, Network.Proxy.PORT)))
             .build()
     }
 
@@ -75,11 +77,11 @@ val networkModule = module {
         val (socketFactory, trustManager) = buildTrustAllSsl()
 
         OkHttpClient.Builder()
-            .connectTimeout(AppConfig.TIMEOUT_CONNECT, TimeUnit.MILLISECONDS)
-            .readTimeout(AppConfig.TIMEOUT_READ, TimeUnit.MILLISECONDS)
+            .connectTimeout(Network.TIMEOUT_CONNECT, TimeUnit.MILLISECONDS)
+            .readTimeout(Network.TIMEOUT_READ, TimeUnit.MILLISECONDS)
             .sslSocketFactory(socketFactory, trustManager)
             .hostnameVerifier { _, _ -> true }
-            .proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress(AppConfig.Proxy.HOST, AppConfig.Proxy.PORT)))
+            .proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress(Network.Proxy.HOST, Network.Proxy.PORT)))
             .build()
     }
 
@@ -136,7 +138,7 @@ val appModule = module {
 
     single<ISettingsService> {
         val dataDir: java.nio.file.Path = get()
-        SettingsService(get(), dataDir.resolve(AppConfig.FILES_SETTINGS))
+        SettingsService(get(), dataDir.resolve(Storage.SETTINGS_FILE))
     }
 
     single<IFileDownloadService> { FileDownloadService(get()) }
@@ -207,7 +209,7 @@ private fun buildHttpClient(okHttpInstance: OkHttpClient, json: Json): HttpClien
         }
 
         defaultRequest {
-            header("User-Agent", "SMARTYlauncher/${AppConfig.LAUNCHER_VERSION}")
+            header("User-Agent", "SMARTYlauncher/${Protocol.MIMIC_LAUNCHER_VERSION}")
             contentType(ContentType.Application.Json)
         }
     }

@@ -1,6 +1,7 @@
 package hivens.core.api
 
-import hivens.config.AppConfig
+import hivens.config.Network
+import hivens.config.Protocol
 import hivens.core.api.interfaces.IAuthService
 import hivens.core.data.AuthStatus
 import hivens.core.data.FileManifest
@@ -38,8 +39,8 @@ class AuthService(
         val javaVersion: String,
         val javaBitness: Int,
         val javaHome: String,
-        val classPath: String = AppConfig.PROTOCOL_DEFAULT_JAR,
-        val rtCheckSum: String = AppConfig.PROTOCOL_DEFAULT_CSUM
+        val classPath: String = Protocol.DEFAULT_JAR,
+        val rtCheckSum: String = Protocol.DEFAULT_CSUM
     )
 
     @Serializable
@@ -79,7 +80,7 @@ class AuthService(
 
         val response: AuthResponse = try {
             val call = client.submitForm(
-                url = AppConfig.AUTH_URL,
+                url = Network.AUTH_URL,
                 formParameters = Parameters.build {
                     append("action", "login")
                     append("json", jsonString)
@@ -146,7 +147,7 @@ class AuthService(
     private fun generateGameToken(uid: String?, sessionV3: String?): String? {
         if (sessionV3 == null || uid == null) return sessionV3
         return try {
-            val salt = AppConfig.AUTH_SALT
+            val salt = Protocol.AUTH_SALT
             val keyHash = HashUtils.md5(uid + salt)
             val key = keyHash.take(16)
             val decrypted = decryptAES(sessionV3, key)

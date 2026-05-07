@@ -337,7 +337,7 @@ class UpdateServiceTest {
     @Test
     fun `checkForUpdate returns null when versions are equal`() = runTest {
         // Use the actual client version from config
-        val currentVersion = hivens.config.AppConfig.CLIENT_VERSION.removePrefix("v")
+        val currentVersion = hivens.config.Branding.VERSION.removePrefix("v")
         val svc = createService(githubReleaseJson(tagName = "v$currentVersion"))
         val update = svc.checkForUpdate(force = true)
 

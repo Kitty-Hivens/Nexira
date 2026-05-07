@@ -15,7 +15,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
-import hivens.config.AppConfig
+import hivens.config.Branding
 import hivens.core.api.interfaces.ISettingsService
 import hivens.launcher.platform.PlatformPaths
 import hivens.ui.components.GlassCard
@@ -368,9 +368,9 @@ fun SettingsScreen(
                             Icon(Icons.Default.Info, null, tint = CelestiaTheme.colors.primary, modifier = Modifier.size(24.dp))
                             Spacer(Modifier.width(16.dp))
                             Column {
-                                Text(AppConfig.APP_TITLE, color = CelestiaTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
+                                Text(Branding.TITLE, color = CelestiaTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
                                 Text(
-                                    "v${AppConfig.CLIENT_VERSION.removePrefix("v")} — GPLv3",
+                                    "v${Branding.VERSION.removePrefix("v")} — GPLv3",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = CelestiaTheme.colors.textSecondary
                                 )
