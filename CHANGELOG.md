@@ -11,6 +11,16 @@ below are for the GitHub release page and CHANGELOG readers.
 
 ## [Unreleased]
 
+## [2.2.7-rc1] - 2026-05-07
+
+Release candidate for [2.2.7]. Same code; canary tag for catching install
+regressions on Windows / macOS / Linux before the public bump.
+
+### Highlights
+- **Required upgrade** once promoted: SMARTYcraft 3.6.4 protocol sync, plus a
+  new direct HTTP channel that keeps auto-update alive when the upstream
+  proxy is unreachable. See [2.2.7] below for the full notes.
+
 ## [2.2.7] - 2026-05-07
 
 ### Highlights
