@@ -32,13 +32,14 @@ class SingleInstanceTest {
     fun `acquire on a clean dir returns true and writes pid`() {
         assertTrue(SingleInstance.acquire(dataDir), "first acquire on a fresh dir must succeed")
 
-        val lockFile = dataDir.resolve(".lock")
-        assertTrue(Files.exists(lockFile))
-        val pidLine = Files.readString(lockFile).trim()
+        // Lock file itself is held exclusively (mandatory on Windows) — read
+        // the diagnostic PID from the side-car .lock.pid file instead.
+        assertTrue(Files.exists(dataDir.resolve(".lock")))
+        val pidLine = Files.readString(dataDir.resolve(".lock.pid")).trim()
         assertContains(
             pidLine,
             ProcessHandle.current().pid().toString(),
-            message = "lock file should contain our pid for diagnostics"
+            message = ".lock.pid must contain our pid for diagnostics"
         )
     }
 

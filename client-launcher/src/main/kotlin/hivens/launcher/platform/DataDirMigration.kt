@@ -22,6 +22,19 @@ object DataDirMigration {
     private val log = LoggerFactory.getLogger(DataDirMigration::class.java)
     private const val MARKER = ".migrated"
 
+    /**
+     * Files the launcher writes to its dataDir BEFORE migration runs (because
+     * SingleInstance.acquire grabs the lock before DataDirMigration.run, by
+     * design — see Main.kt). Their presence MUST NOT make the target look
+     * "already populated" or first-run migration silently skips and the
+     * legacy `.aura/` payload is lost.
+     *
+     * Add new entries here whenever startup gains another pre-migration
+     * housekeeping file. Codex caught the .lock.pid regression on PR #129
+     * exactly this way.
+     */
+    private val HOUSEKEEPING = setOf(".lock", ".lock.pid", ".show", MARKER)
+
     fun run(paths: PlatformPaths) {
         val legacy = paths.legacyDataDir
         val target = paths.dataDir
@@ -72,21 +85,19 @@ object DataDirMigration {
     }
 
     /**
-     * True when the directory contains anything beyond housekeeping markers.
+     * True when the directory contains anything beyond [HOUSEKEEPING].
      *
-     * The launcher writes `.lock` (single-instance file lock) and `.show`
-     * (cross-process "raise the existing instance" signal) into the data
-     * directory before migration runs — see Main.kt's startup sequence.
-     * `.migrated` lands in the legacy directory, but is filtered here too
-     * for symmetry. Treating those as "user data" would cause us to skip
-     * a legitimate first-run migration on the second launch (the .lock
-     * from the first run would already be in place).
+     * The launcher writes housekeeping markers (.lock / .lock.pid / .show /
+     * .migrated) before migration runs — see Main.kt's startup sequence.
+     * Treating those as "user data" would cause us to skip a legitimate
+     * first-run migration (the lock files from this very startup would
+     * already be in place).
      */
     private fun Path.hasUserData(): Boolean =
         Files.list(this).use { stream ->
             stream.anyMatch { entry ->
                 val name = entry.fileName?.toString() ?: return@anyMatch false
-                name != ".lock" && name != ".show" && name != MARKER
+                name !in HOUSEKEEPING
             }
         }
 }
