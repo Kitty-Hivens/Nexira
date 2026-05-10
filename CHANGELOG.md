@@ -11,6 +11,24 @@ below are for the GitHub release page and CHANGELOG readers.
 
 ## [Unreleased]
 
+## [2.2.7-rc3] - 2026-05-10
+
+Release candidate for [2.2.7], superseding rc2 with the freshly-rotated
+upstream version pin (smrt-deco 3.6.5, pushed 2026-05-10) and a runtime
+knob to ride out the *next* upstream rotation without waiting for a
+launcher release. CI internals also got a couple of paper-cut fixes —
+metainfo injection now uses `xmlstarlet` instead of regex-on-XML, and
+the AppImage assembly bash moved from inline yaml into a shell script.
+
+### Highlights
+- Mimicked launcher version bumped to **SMARTYcraft 3.6.5** (rc2 was 3.6.4).
+  No protocol bytes changed beyond the version string; proxy creds, AES
+  params and salt are all unchanged.
+- New **experimental override** for the mimicked version: pass
+  `-Dsmrt.mimic.version=X.Y.Z` on the JVM command line to claim a different
+  launcher version without rebuilding. Useful when upstream rotates the
+  pin and a launcher update has not shipped yet.
+
 ## [2.2.7-rc2] - 2026-05-07
 
 Release candidate for [2.2.7]. Same code; canary tag for catching install
@@ -27,7 +45,7 @@ already does for Compose's `packageVersion`.)
 ## [2.2.7] - 2026-05-07
 
 ### Highlights
-- **Required upgrade**: SMARTYcraft 3.6.4 protocol sync — proxy credentials
+- **Required upgrade**: SMARTYcraft 3.6.5 protocol sync — proxy credentials
   rotated upstream, so anything older than this build cannot authenticate.
 - Auto-updater and JDK/natives downloads now bypass the SMARTYcraft proxy,
   so the launcher can still update itself when the upstream is unreachable.
@@ -57,9 +75,13 @@ already does for Compose's `packageVersion`.)
   Russian localization; CONTRIBUTING, SECURITY and issue templates.
 
 ### Changed
-- **Protocol sync (smrt-deco 3.6.3 → 3.6.4)**: `MIMIC_LAUNCHER_VERSION`
-  3.6.3 → 3.6.4; SOCKS proxy port 1080 → 58613, user
+- **Protocol sync (smrt-deco 3.6.3 → 3.6.5)**: `MIMIC_LAUNCHER_VERSION`
+  3.6.3 → 3.6.5; SOCKS proxy port 1080 → 58613, user
   `proxyuser` → `smartycraftproxyuser`, password rotated.
+  `MIMIC_LAUNCHER_VERSION` is now runtime-resolvable via
+  `-Dsmrt.mimic.version=X.Y.Z` (gated behind a new
+  `@ExperimentalProtocolOverride` opt-in marker) so users can react to
+  the next upstream rotation without waiting for a launcher build.
 - `AppConfig` split into `Branding` / `Network` / `Protocol` / `Storage`
   for clearer ownership; `LauncherService` collaborators are now
   constructor-injected (DI-friendly, mockable).
