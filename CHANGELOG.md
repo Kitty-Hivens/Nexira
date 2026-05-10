@@ -3,7 +3,7 @@
 All notable changes to Aura Launcher will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-Each released entry should open with a short `### Highlights` block —
+※ Each released entry opens with a short `### Highlights` block —
 2-5 plain-English bullets summarizing what the user actually notices.
 The launcher's in-app update dialog renders just the Highlights; the
 detailed `### Added`/`### Changed`/`### Fixed`/`### Removed` sections
