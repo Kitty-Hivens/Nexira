@@ -43,6 +43,9 @@ class FileDownloadService(
             "mods", "config", "bin", "assets", "libraries", "resources",
             "saves", "resourcepacks", "shaderpacks", "natives"
         )
+
+        private const val INDEX_FILENAME = ".extra_unpacked_index.json"
+        private val indexJson = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
     }
 
     override suspend fun processSession(
@@ -312,6 +315,21 @@ class FileDownloadService(
         }
     }
 
+    /**
+     * Snapshot of the last successful extra.zip extraction. Persisted as
+     * [INDEX_FILENAME] in `baseDir` so the next sync can diff old paths
+     * against new and prune files the upstream modpack removed.
+     *
+     * Default-constructed (empty hash + empty paths) when no previous
+     * snapshot exists — first unpack writes the index, second-and-later
+     * unpacks get the prune behaviour.
+     */
+    @kotlinx.serialization.Serializable
+    private data class ExtraZipIndex(
+        val hash: String = "",
+        val paths: List<String> = emptyList(),
+    )
+
     private fun processExtraZip(
         baseDir: Path,
         files: Map<String, FileData>,
@@ -320,38 +338,79 @@ class FileDownloadService(
     ) {
         val extraKey = files.keys.firstOrNull { normalizePath(it).endsWith("extra.zip") } ?: return
         val localZip = baseDir.resolve(normalizePath(extraKey))
+        if (!Files.exists(localZip)) return
 
-        if (Files.exists(localZip)) {
-            var needUnzip = true
-            val localHash = try { calculateMD5(localZip) } catch(_: Exception) { "" }
-            val markerFile = baseDir.resolve(".extra_unpacked_hash")
+        val localHash = try { calculateMD5(localZip) } catch (_: Exception) { "" }
+        val indexFile = baseDir.resolve(INDEX_FILENAME)
+        val previousIndex = readIndex(indexFile)
 
-            // If the server sent a hash to check configs (extraCheckSum)
-            if (!serverCheckSum.isNullOrEmpty()) {
-                if (localHash.equals(serverCheckSum, ignoreCase = true)) {
-                    needUnzip = false
-                }
-            } else {
-                val lastUnpackedHash = try {
-                    if (Files.exists(markerFile)) Files.readString(markerFile) else ""
-                } catch(_: Exception) { "" }
+        // Skip-unzip decision: server hash takes precedence; fallback to
+        // index hash from last successful extract.
+        val skipReason = when {
+            !serverCheckSum.isNullOrEmpty() && localHash.equals(serverCheckSum, true) -> "server hash matches"
+            localHash.isNotEmpty() && localHash == previousIndex.hash               -> "index hash matches last unpack"
+            else                                                                    -> null
+        }
+        if (skipReason != null) {
+            logger.debug("extra.zip unpack skipped — {}", skipReason)
+            return
+        }
 
-                if (localHash == lastUnpackedHash && localHash.isNotEmpty()) {
-                    needUnzip = false
-                }
-            }
-
-            if (needUnzip) {
-                try {
-                    messageUI?.invoke("Setting up the client...")
-                    ZipUtils.unzip(localZip.toFile(), baseDir.toFile())
-                    try { Files.writeString(markerFile, localHash) } catch(_: Exception) {}
-                } catch (e: Exception) {
-                    logger.error("Error unpacking extra.zip", e)
-                }
-            }
+        try {
+            messageUI?.invoke("Setting up the client...")
+            val newPaths = ZipUtils.unzip(localZip.toFile(), baseDir.toFile())
+            pruneOrphans(baseDir, previousIndex.paths, newPaths)
+            writeIndex(indexFile, ExtraZipIndex(hash = localHash, paths = newPaths))
+        } catch (e: Exception) {
+            logger.error("Error unpacking extra.zip", e)
         }
     }
+
+    /**
+     * Files in [previousPaths] that no longer appear in [currentPaths] are
+     * orphans — the upstream modpack removed them, so the local install
+     * should drop them too. Protected paths (per [protectedPaths]) are
+     * never touched even if the index says they were last there: the
+     * user may have edited an `options.txt` that originally arrived in
+     * extra.zip, and we promised never to overwrite their config.
+     */
+    private fun pruneOrphans(baseDir: Path, previousPaths: List<String>, currentPaths: List<String>) {
+        val current = currentPaths.toSet()
+        val orphans = previousPaths.filter { it !in current }
+        if (orphans.isEmpty()) return
+
+        var pruned = 0
+        for (rel in orphans) {
+            if (protectedPaths.isProtected(rel)) {
+                logger.debug("orphan {} kept — protected path", rel)
+                continue
+            }
+            val target = baseDir.resolve(rel)
+            try {
+                if (Files.deleteIfExists(target)) pruned++
+            } catch (e: Exception) {
+                logger.warn("Failed to prune orphan {}", rel, e)
+            }
+        }
+        if (pruned > 0) logger.info("Pruned {} orphan files removed by upstream extra.zip", pruned)
+    }
+
+    private fun readIndex(indexFile: Path): ExtraZipIndex {
+        if (!Files.exists(indexFile)) return ExtraZipIndex()
+        return runCatching {
+            indexJson.decodeFromString<ExtraZipIndex>(Files.readString(indexFile))
+        }.getOrElse {
+            logger.warn("extra.zip index unreadable; treating as empty (one missed prune cycle)", it)
+            ExtraZipIndex()
+        }
+    }
+
+    private fun writeIndex(indexFile: Path, index: ExtraZipIndex) {
+        runCatching {
+            Files.writeString(indexFile, indexJson.encodeToString(index))
+        }.onFailure { logger.warn("Failed to persist extra.zip index", it) }
+    }
+
 
     /**
      * Removes prefixes like "Industrial/mods/..." -> "mods/..."
