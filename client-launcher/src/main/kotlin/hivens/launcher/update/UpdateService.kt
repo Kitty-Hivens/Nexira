@@ -34,6 +34,7 @@ class UpdateService(
     private val httpClient get() = clientProvider.current
     private val updateDir = dataDirectory.resolve("updates")
     private val lastCheckFile = updateDir.resolve(".last_check")
+    private val lastMetaCheckFile = updateDir.resolve(".last_meta_check")
 
     companion object {
         private const val GITHUB_REPO          = "Kitty-Hivens/Aura-Launcher"
@@ -41,6 +42,17 @@ class UpdateService(
         private const val GITHUB_API_RELEASES  = "https://api.github.com/repos/$GITHUB_REPO/releases"
         private const val GITHUB_RELEASE_PAGE  = "https://github.com/$GITHUB_REPO/releases/tag"
         private const val CHECK_INTERVAL_HOURS = 12L
+
+        /**
+         * Meta-only poll cadence. Far tighter than [CHECK_INTERVAL_HOURS]
+         * because the meta endpoint is `update-channel.json` on raw GitHub —
+         * a few hundred bytes, no API rate limit (raw.githubusercontent.com
+         * is throttled per-IP but not per-hour like the v3 API). At 5 min
+         * the launcher hits 12 reqs/hour against raw, well below any
+         * realistic ceiling, while still surfacing mandatory rollouts
+         * to long-running launcher sessions in near-real-time.
+         */
+        private const val META_CHECK_INTERVAL_MINUTES = 5L
         private const val MANIFEST_ASSET_NAME  = "release-manifest.json"
 
         // ── Out-of-band channel metadata ──────────────────────────────────────
@@ -300,7 +312,7 @@ class UpdateService(
 
     internal fun shouldCheck(): Boolean {
         if (!Files.exists(lastCheckFile)) return true
-        
+
         return runCatching {
             val lastCheck = Files.readString(lastCheckFile).toLongOrNull() ?: return true
             val hoursSince = ChronoUnit.HOURS.between(
@@ -314,6 +326,79 @@ class UpdateService(
     private fun updateLastCheck() {
         runCatching {
             Files.writeString(lastCheckFile, System.currentTimeMillis().toString())
+        }
+    }
+
+    internal fun shouldCheckMeta(): Boolean {
+        if (!Files.exists(lastMetaCheckFile)) return true
+
+        return runCatching {
+            val last = Files.readString(lastMetaCheckFile).toLongOrNull() ?: return true
+            val minsSince = ChronoUnit.MINUTES.between(
+                Instant.ofEpochMilli(last),
+                Instant.now()
+            )
+            minsSince >= META_CHECK_INTERVAL_MINUTES
+        }.getOrDefault(true)
+    }
+
+    private fun updateLastMetaCheck() {
+        runCatching {
+            Files.writeString(lastMetaCheckFile, System.currentTimeMillis().toString())
+        }
+    }
+
+    /**
+     * Lightweight near-real-time mandatory probe.
+     *
+     * Polls only `meta/update-channel.json` (a few hundred bytes on raw
+     * GitHub, no v3 API rate limit) at the [META_CHECK_INTERVAL_MINUTES]
+     * cadence. When the published `mandatory_min_version` rises above the
+     * installed version it bypasses [shouldCheck]'s 12 h cooldown to fetch
+     * the actual release immediately — by definition, a mandatory rollout
+     * needs to reach the user *now*, not on the next routine check.
+     *
+     * Returns null when:
+     *   - the meta cooldown hasn't elapsed yet,
+     *   - mandatory updates are disabled in settings (master OFF or child OFF),
+     *   - the channel meta file is missing / unreadable / has no floor,
+     *   - the floor is at-or-below the installed version,
+     *   - the subsequent release fetch fails for any reason.
+     *
+     * Designed to be called in a polling loop from the UI layer; failures
+     * are logged at warn level and the caller should simply retry on the
+     * next tick.
+     */
+    suspend fun checkForMandatoryUpdate(): LauncherUpdate? = withContext(Dispatchers.IO) {
+        try {
+            if (!shouldCheckMeta()) return@withContext null
+
+            val settings = settingsService.getSettings()
+            val mandatoryEnabled = settings.experimentalFeaturesEnabled &&
+                                   settings.mandatoryUpdatesEnabled
+            if (!mandatoryEnabled) {
+                updateLastMetaCheck()
+                return@withContext null
+            }
+
+            updateLastMetaCheck()
+            val meta = tryFetchChannelMeta() ?: return@withContext null
+            val floor = meta.mandatoryMinVersion?.removePrefix("v")
+                ?.takeIf { it.isNotBlank() }
+                ?: return@withContext null
+
+            val current = Branding.VERSION.removePrefix("v")
+            if (compareVersions(current, floor) >= 0) return@withContext null
+
+            logger.warn(
+                "Mandatory floor {} > installed {}; forcing release check (reason: {})",
+                floor, current, meta.reason ?: "<none>"
+            )
+            // force=true skips the 12h release-check cooldown
+            checkForUpdate(force = true)?.takeIf { it.isMandatory }
+        } catch (e: Exception) {
+            logger.warn("Mandatory poll failed", e)
+            null
         }
     }
 
