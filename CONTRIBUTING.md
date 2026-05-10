@@ -53,6 +53,17 @@ Tests live in:
 
 Shared test fixtures are in `client-core/src/testFixtures/` via `java-test-fixtures`.
 
+After cloning, install the pre-push hook so failing tests block your push
+before they hit CI:
+
+```bash
+./scripts/install-hooks.sh
+```
+
+Symlinks `hooks/pre-push` into `.git/hooks/pre-push`; future updates to the
+hook script reach you automatically. Bypass with `git push --no-verify` if
+you really need to push WIP, but please don't make a habit of it.
+
 ## ── Module structure ──
 
 | Module            | Purpose                                        |
