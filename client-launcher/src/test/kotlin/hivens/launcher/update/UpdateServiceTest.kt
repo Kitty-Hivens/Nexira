@@ -618,6 +618,70 @@ class UpdateServiceTest {
         assertFalse(update.isMandatory)
     }
 
+    // ═══════════════════════════════════════════════════════════════════════════
+    // checkForMandatoryUpdate (5-minute meta poll)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `mandatory poll returns update when floor exceeds installed`() = runTest {
+        val channelMeta = """{"mandatory_min_version":"999.0.0","reason":"upstream broke"}"""
+        val svc = createService(
+            MockResponse(urlContains = "releases/latest",     body = githubReleaseJson(tagName = "v999.0.0")),
+            MockResponse(urlContains = "releases",            body = "[${githubReleaseJson(tagName = "v999.0.0")}]"),
+            MockResponse(urlContains = "update-channel.json", body = channelMeta),
+            settings = fakeSettings()
+        )
+        val result = svc.checkForMandatoryUpdate()
+        assertNotNull(result)
+        assertTrue(result.isMandatory)
+        assertEquals("upstream broke", result.mandatoryReason)
+    }
+
+    @Test
+    fun `mandatory poll returns null when floor at or below installed`() = runTest {
+        val channelMeta = """{"mandatory_min_version":"0.0.0","reason":null}"""
+        val svc = createService(
+            MockResponse(urlContains = "releases/latest",     body = githubReleaseJson(tagName = "v999.0.0")),
+            MockResponse(urlContains = "releases",            body = "[${githubReleaseJson(tagName = "v999.0.0")}]"),
+            MockResponse(urlContains = "update-channel.json", body = channelMeta),
+            settings = fakeSettings()
+        )
+        assertNull(svc.checkForMandatoryUpdate())
+    }
+
+    @Test
+    fun `mandatory poll skips when mandatory updates disabled`() = runTest {
+        val channelMeta = """{"mandatory_min_version":"999.0.0","reason":"upstream broke"}"""
+        val svc = createService(
+            MockResponse(urlContains = "releases/latest",     body = githubReleaseJson(tagName = "v999.0.0")),
+            MockResponse(urlContains = "releases",            body = "[${githubReleaseJson(tagName = "v999.0.0")}]"),
+            MockResponse(urlContains = "update-channel.json", body = channelMeta),
+            settings = fakeSettings(mandatoryUpdatesEnabled = false)
+        )
+        assertNull(svc.checkForMandatoryUpdate())
+    }
+
+    @Test
+    fun `mandatory poll respects meta cooldown on second immediate call`() = runTest {
+        val channelMeta = """{"mandatory_min_version":"999.0.0","reason":"upstream broke"}"""
+        val svc = createService(
+            MockResponse(urlContains = "releases/latest",     body = githubReleaseJson(tagName = "v999.0.0")),
+            MockResponse(urlContains = "releases",            body = "[${githubReleaseJson(tagName = "v999.0.0")}]"),
+            MockResponse(urlContains = "update-channel.json", body = channelMeta),
+            settings = fakeSettings()
+        )
+        val first = svc.checkForMandatoryUpdate()
+        assertNotNull(first, "first call should fire")
+        val second = svc.checkForMandatoryUpdate()
+        assertNull(second, "second immediate call should be skipped by cooldown (.last_meta_check)")
+    }
+
+    @Test
+    fun `shouldCheckMeta returns true on fresh install`() {
+        val svc = createService("{}")
+        assertTrue(svc.shouldCheckMeta())
+    }
+
     @Test
     fun `mandatory floor with v-prefix is normalised`() = runTest {
         // Real-world authors will write "v2.2.8" out of habit — strip the v.

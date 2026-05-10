@@ -31,6 +31,11 @@ launchers ignore prereleases by GitHub API contract.
   moving target; expected to flip to OFF once cadence stabilises.
 - **Experimental features master toggle** in Settings — gates both knobs
   above with a single switch for users who want a calm upgrade story.
+- **Near-real-time mandatory rollouts**: a long-running launcher session
+  polls `update-channel.json` every 5 minutes (cheap, no GitHub API quota),
+  so when an emergency upgrade is published the user sees the blocking
+  dialog within ~5 minutes — no need to restart the launcher to pick it up.
+  Routine release checks stay on the existing 12 h cadence.
 - Strict version comparison in the update flow: `1.3.0 > 1.3.0-rc3`,
   `rc1 < rc2 < rc3`, `alpha < beta < rc`. Without this the prerelease channel
   would consider RC bumps within the same base "the same version".
