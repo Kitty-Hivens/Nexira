@@ -1,0 +1,40 @@
+# EditorConfig — see https://editorconfig.org/ for spec.
+# Pinned defaults so contributors don't have to discover ours by accident.
+
+root = true
+
+[*]
+charset                  = utf-8
+end_of_line              = lf
+insert_final_newline     = true
+trim_trailing_whitespace = true
+indent_style             = space
+indent_size              = 4
+
+# Kotlin / Java / Gradle
+[*.{kt,kts,java}]
+indent_size                              = 4
+max_line_length                          = 120
+ij_kotlin_continuation_indent_size       = 4
+ij_kotlin_allow_trailing_comma           = true
+ij_kotlin_allow_trailing_comma_on_call_site = true
+ij_kotlin_imports_layout                 = *
+# We use ※ ◆ ❖ ── ━━ in code comments; don't normalise these.
+ij_visual_guides                         = 120
+
+# YAML / JSON / TOML — 2 spaces is the community default
+[*.{yml,yaml,json,toml}]
+indent_size = 2
+
+# Markdown — trailing whitespace is a linebreak in MD; don't trim.
+[*.md]
+trim_trailing_whitespace = false
+indent_size              = 2
+
+# Shell — POSIX recommends 4-space indent
+[*.sh]
+indent_size = 4
+
+# Makefiles MUST use tabs
+[Makefile]
+indent_style = tab

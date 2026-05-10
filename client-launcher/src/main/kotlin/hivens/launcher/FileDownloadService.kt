@@ -7,6 +7,7 @@ import hivens.core.data.FileData
 import hivens.core.data.FileManifest
 import hivens.core.data.SessionData
 import hivens.core.util.ZipUtils
+import hivens.core.util.retryWithBackoff
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -29,7 +30,9 @@ import kotlin.math.roundToInt
 
 
 class FileDownloadService(
-    private val clientProvider: HttpClientProvider
+    private val clientProvider: HttpClientProvider,
+    private val protectedPaths: ProtectedPaths,
+    private val manifestCache: ManifestCache,
 ) : IFileDownloadService {
     private val client get() = clientProvider.current
 
@@ -41,6 +44,9 @@ class FileDownloadService(
             "mods", "config", "bin", "assets", "libraries", "resources",
             "saves", "resourcepacks", "shaderpacks", "natives"
         )
+
+        private const val INDEX_FILENAME = ".extra_unpacked_index.json"
+        private val indexJson = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
     }
 
     override suspend fun processSession(
@@ -54,6 +60,26 @@ class FileDownloadService(
     ) = withContext(Dispatchers.IO) {
         val manifest = session.fileManifest ?: throw IOException("File manifest is empty!")
         Files.createDirectories(targetDir)
+
+        // ── Manifest cache short-circuit ─────────────────────────────────
+        // If this same manifest *with the same ignoredFiles set* was
+        // successfully synced recently (≤TTL), skip the full per-file
+        // MD5 walk and the extra.zip processing. Both downstream steps
+        // are themselves hash-gated and would no-op, but the integrity
+        // walk alone dominates cold-start on 1000-file modpacks. The
+        // TTL inside ManifestCache is the safety valve for "what if a
+        // file got corrupted on disk?" scenarios.
+        //
+        // ignoredFiles is part of the cache input because cleanupIgnoredFiles
+        // (which physically deletes disabled mod jars) lives below this
+        // gate — caching only on manifest hash would let a freshly-disabled
+        // mod stay loaded until the cache expires or the manifest changes
+        // upstream. (Codex P2 on PR #128.)
+        val manifestHash = manifestCache.hashOf(cacheKeyInputFor(manifest, ignoredFiles))
+        if (manifestCache.isClean(serverId, manifestHash)) {
+            messageUI?.invoke("Files verified (cached)")
+            return@withContext
+        }
 
         // 1. Flatten manifest
         val filesMap = flattenManifest(manifest)
@@ -72,6 +98,21 @@ class FileDownloadService(
 
         // 4. Processing Extra.zip
         processExtraZip(targetDir, filesMap, extraCheckSum, messageUI)
+
+        // 5. Mark this manifest as cleanly synced — next session with the
+        // same manifest hash short-circuits the integrity walk above.
+        manifestCache.markClean(serverId, manifestHash)
+    }
+
+    /**
+     * Composes the cache-key input as `<canonical-manifest-json>|ignored:<sorted-csv>`.
+     * Sorting the ignored set is mandatory — `Set` iteration order isn't
+     * stable, and the cache must be insensitive to insertion order while
+     * sensitive to membership changes.
+     */
+    private fun cacheKeyInputFor(manifest: FileManifest, ignoredFiles: Set<String>?): String {
+        val ignored = ignoredFiles?.toSortedSet()?.joinToString(",") ?: ""
+        return indexJson.encodeToString(manifest) + "|ignored:" + ignored
     }
 
     /**
@@ -200,21 +241,99 @@ class FileDownloadService(
         withContext(Dispatchers.IO) {
             if (localPath.parent != null) Files.createDirectories(localPath.parent)
 
-            client.prepareGet(url).execute { response ->
-                if (!response.status.isSuccess()) throw IOException("HTTP ${response.status} for $url")
+            // Retry the whole transfer on transient network errors. The
+            // SMARTYcraft channel periodically drops mid-stream over SOCKS;
+            // without retry-with-resume a flaky network turns 100MB asset sync
+            // into a Sisyphean restart-from-zero loop.
+            retryWithBackoff(
+                operation = "download $serverPath",
+                shouldRetry = ::isTransientDownloadError,
+            ) {
+                val existing = if (Files.exists(localPath)) Files.size(localPath) else 0L
 
-                val channel = response.bodyAsChannel()
-                FileOutputStream(localPath.toFile()).use { output ->
-                    val buffer = ByteArray(8192)
-                    while (!channel.isClosedForRead) {
-                        val read = channel.readAvailable(buffer, 0, buffer.size)
-                        if (read <= 0) break
-                        output.write(buffer, 0, read)
-                        onBytesRead?.invoke(read)
+                client.prepareGet(url) {
+                    if (existing > 0) header(HttpHeaders.Range, "bytes=$existing-")
+                }.execute { response ->
+                    when (response.status) {
+                        HttpStatusCode.PartialContent -> {
+                            // 206: server is honouring the Range — append the remainder.
+                            // Report the already-on-disk bytes upfront so the UI's
+                            // total-bytes progress hits 100% on completion. (Long-to-Int
+                            // narrowing is fine here — modpack assets are well under 2GB.)
+                            if (existing > 0) onBytesRead?.invoke(existing.toInt())
+                            writeBody(response, localPath, append = true, onBytesRead)
+                        }
+                        HttpStatusCode.OK -> {
+                            // 200: server ignored Range (or we sent none) — overwrite.
+                            // Don't report existing bytes; we're throwing them away.
+                            writeBody(response, localPath, append = false, onBytesRead)
+                        }
+                        HttpStatusCode.RequestedRangeNotSatisfiable -> {
+                            // 416: partial on disk is bigger than the upstream file
+                            // (corrupt write or upstream shrank). Clear and let retry
+                            // fetch from byte 0. Throw the dedicated subclass so
+                            // isTransientDownloadError recognises it as retryable
+                            // — a plain IOException with this message would NOT
+                            // match the predicate's substring checks and would
+                            // hard-fail instead of recovering.
+                            Files.deleteIfExists(localPath)
+                            throw RetryableHttpException("HTTP 416 for $url; cleared bad partial, will refetch")
+                        }
+                        else -> throw IOException("HTTP ${response.status} for $url")
                     }
                 }
             }
         }
+    }
+
+    private suspend fun writeBody(
+        response: HttpResponse,
+        localPath: Path,
+        append: Boolean,
+        onBytesRead: ((Int) -> Unit)?,
+    ) {
+        val channel = response.bodyAsChannel()
+        FileOutputStream(localPath.toFile(), append).use { output ->
+            val buffer = ByteArray(8192)
+            while (!channel.isClosedForRead) {
+                val read = channel.readAvailable(buffer, 0, buffer.size)
+                if (read <= 0) break
+                output.write(buffer, 0, read)
+                onBytesRead?.invoke(read)
+            }
+        }
+    }
+
+    /**
+     * Sentinel for "we deliberately threw to trigger a retry after fixing
+     * local state". Currently the only thrower is the 416 branch in
+     * [downloadFileInternal], which deletes the bad partial before
+     * raising this so the next retry fetches from byte 0. Adding a
+     * subclass instead of pattern-matching the message keeps the contract
+     * explicit — string matching on `cause.message` was the bug Codex
+     * caught on PR #128.
+     */
+    private class RetryableHttpException(message: String) : IOException(message)
+
+    private fun isTransientDownloadError(t: Throwable): Boolean {
+        // CancellationException must NEVER be retried — it's how the parent
+        // coroutine signals "stop"; swallowing and retrying would deadlock
+        // the launch flow.
+        if (t is CancellationException) return false
+        var cause: Throwable? = t
+        while (cause != null) {
+            if (cause is RetryableHttpException) return true
+            if (cause is java.net.ConnectException ||
+                cause is java.net.SocketException ||
+                cause is io.ktor.utils.io.ClosedByteChannelException ||
+                cause is java.net.SocketTimeoutException
+            ) return true
+            if (cause is IOException &&
+                cause.message?.contains("Connection reset", ignoreCase = true) == true
+            ) return true
+            cause = cause.cause
+        }
+        return false
     }
 
     private fun formatSpeed(bytesPerSec: Double): String {
@@ -232,20 +351,14 @@ class FileDownloadService(
         if (!Files.exists(file)) return true
         if (Files.isDirectory(file)) return false
         if (expectedMd5 == "any") return false // "any" hash means "do not check"
-        val lowerPath = relativePath.lowercase().replace("\\", "/")
-        val isProtectedClientConfig = lowerPath.endsWith("options.txt") ||
-                lowerPath.endsWith("servers.dat") ||
-                lowerPath.contains("xaerominimap") ||
-                lowerPath.contains("xaeroworldmap") ||
-                lowerPath.contains("voxelmap") ||
-                lowerPath.contains("journeymap") ||
-                lowerPath.contains("jei")
 
         return try {
             if (Files.size(file) == 0L) return true
 
-            // Если файл защищен и он уже существует (size > 0), мы запрещаем его перезапись!
-            if (isProtectedClientConfig) return false
+            // Protected user-config: present + non-empty means hands-off.
+            // The default list is in ProtectedPaths.kt; users extend it via
+            // dataDir/protected-paths.json without recompiling.
+            if (protectedPaths.isProtected(relativePath)) return false
 
             val localMd5 = calculateMD5(file)
             !localMd5.equals(expectedMd5, ignoreCase = true)
@@ -253,6 +366,21 @@ class FileDownloadService(
             true // In case of any reading error, it is better to re-download
         }
     }
+
+    /**
+     * Snapshot of the last successful extra.zip extraction. Persisted as
+     * [INDEX_FILENAME] in `baseDir` so the next sync can diff old paths
+     * against new and prune files the upstream modpack removed.
+     *
+     * Default-constructed (empty hash + empty paths) when no previous
+     * snapshot exists — first unpack writes the index, second-and-later
+     * unpacks get the prune behaviour.
+     */
+    @kotlinx.serialization.Serializable
+    private data class ExtraZipIndex(
+        val hash: String = "",
+        val paths: List<String> = emptyList(),
+    )
 
     private fun processExtraZip(
         baseDir: Path,
@@ -262,38 +390,79 @@ class FileDownloadService(
     ) {
         val extraKey = files.keys.firstOrNull { normalizePath(it).endsWith("extra.zip") } ?: return
         val localZip = baseDir.resolve(normalizePath(extraKey))
+        if (!Files.exists(localZip)) return
 
-        if (Files.exists(localZip)) {
-            var needUnzip = true
-            val localHash = try { calculateMD5(localZip) } catch(_: Exception) { "" }
-            val markerFile = baseDir.resolve(".extra_unpacked_hash")
+        val localHash = try { calculateMD5(localZip) } catch (_: Exception) { "" }
+        val indexFile = baseDir.resolve(INDEX_FILENAME)
+        val previousIndex = readIndex(indexFile)
 
-            // If the server sent a hash to check configs (extraCheckSum)
-            if (!serverCheckSum.isNullOrEmpty()) {
-                if (localHash.equals(serverCheckSum, ignoreCase = true)) {
-                    needUnzip = false
-                }
-            } else {
-                val lastUnpackedHash = try {
-                    if (Files.exists(markerFile)) Files.readString(markerFile) else ""
-                } catch(_: Exception) { "" }
+        // Skip-unzip decision: server hash takes precedence; fallback to
+        // index hash from last successful extract.
+        val skipReason = when {
+            !serverCheckSum.isNullOrEmpty() && localHash.equals(serverCheckSum, true) -> "server hash matches"
+            localHash.isNotEmpty() && localHash == previousIndex.hash               -> "index hash matches last unpack"
+            else                                                                    -> null
+        }
+        if (skipReason != null) {
+            logger.debug("extra.zip unpack skipped — {}", skipReason)
+            return
+        }
 
-                if (localHash == lastUnpackedHash && localHash.isNotEmpty()) {
-                    needUnzip = false
-                }
-            }
-
-            if (needUnzip) {
-                try {
-                    messageUI?.invoke("Setting up the client...")
-                    ZipUtils.unzip(localZip.toFile(), baseDir.toFile())
-                    try { Files.writeString(markerFile, localHash) } catch(_: Exception) {}
-                } catch (e: Exception) {
-                    logger.error("Error unpacking extra.zip", e)
-                }
-            }
+        try {
+            messageUI?.invoke("Setting up the client...")
+            val newPaths = ZipUtils.unzip(localZip.toFile(), baseDir.toFile())
+            pruneOrphans(baseDir, previousIndex.paths, newPaths)
+            writeIndex(indexFile, ExtraZipIndex(hash = localHash, paths = newPaths))
+        } catch (e: Exception) {
+            logger.error("Error unpacking extra.zip", e)
         }
     }
+
+    /**
+     * Files in [previousPaths] that no longer appear in [currentPaths] are
+     * orphans — the upstream modpack removed them, so the local install
+     * should drop them too. Protected paths (per [protectedPaths]) are
+     * never touched even if the index says they were last there: the
+     * user may have edited an `options.txt` that originally arrived in
+     * extra.zip, and we promised never to overwrite their config.
+     */
+    private fun pruneOrphans(baseDir: Path, previousPaths: List<String>, currentPaths: List<String>) {
+        val current = currentPaths.toSet()
+        val orphans = previousPaths.filter { it !in current }
+        if (orphans.isEmpty()) return
+
+        var pruned = 0
+        for (rel in orphans) {
+            if (protectedPaths.isProtected(rel)) {
+                logger.debug("orphan {} kept — protected path", rel)
+                continue
+            }
+            val target = baseDir.resolve(rel)
+            try {
+                if (Files.deleteIfExists(target)) pruned++
+            } catch (e: Exception) {
+                logger.warn("Failed to prune orphan {}", rel, e)
+            }
+        }
+        if (pruned > 0) logger.info("Pruned {} orphan files removed by upstream extra.zip", pruned)
+    }
+
+    private fun readIndex(indexFile: Path): ExtraZipIndex {
+        if (!Files.exists(indexFile)) return ExtraZipIndex()
+        return runCatching {
+            indexJson.decodeFromString<ExtraZipIndex>(Files.readString(indexFile))
+        }.getOrElse {
+            logger.warn("extra.zip index unreadable; treating as empty (one missed prune cycle)", it)
+            ExtraZipIndex()
+        }
+    }
+
+    private fun writeIndex(indexFile: Path, index: ExtraZipIndex) {
+        runCatching {
+            Files.writeString(indexFile, indexJson.encodeToString(index))
+        }.onFailure { logger.warn("Failed to persist extra.zip index", it) }
+    }
+
 
     /**
      * Removes prefixes like "Industrial/mods/..." -> "mods/..."

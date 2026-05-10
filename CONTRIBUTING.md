@@ -4,7 +4,7 @@ PRs and forks are welcome. Code is GPL-3.0 — take it and do whatever.
 
 ---
 
-## Branch model
+## ── Branch model ──
 
 ```
 dev  →  (PR + Qodana CI)  →  stable
@@ -13,7 +13,7 @@ dev  →  (PR + Qodana CI)  →  stable
 All changes go through PRs against `dev`. Direct pushes to `stable` are not allowed.  
 Releases are tagged from `stable` via `build_release.yml`.
 
-## Changelog
+## ── Changelog ──
 
 Each released version's entry in `CHANGELOG.md` should open with a short
 `### Highlights` section — 2-5 user-facing bullets explaining what the user
@@ -26,7 +26,7 @@ alongside the binaries, and `UpdateService` shows it in the in-app update
 dialog. Releases without a Highlights block fall back to rendering the full
 changelog there.
 
-## Commit style
+## ── Commit style ──
 
 Scoped, minimal commits. No squash-merging noise.
 
@@ -36,12 +36,12 @@ feat(update): add isCritical flag detection from release title
 chore(deps): pin JNA to 5.18.1 on Windows
 ```
 
-## Code quality
+## ── Code quality ──
 
 Every PR is scanned by [Qodana](https://www.jetbrains.com/qodana/) (`qodana_code_quality.yml`).  
 The scan runs in full mode (`pr-mode: false`) — all files, not just changed ones.
 
-## Testing
+## ── Testing ──
 
 ```bash
 ./gradlew :client-core:test :client-launcher:test
@@ -53,7 +53,18 @@ Tests live in:
 
 Shared test fixtures are in `client-core/src/testFixtures/` via `java-test-fixtures`.
 
-## Module structure
+After cloning, install the pre-push hook so failing tests block your push
+before they hit CI:
+
+```bash
+./scripts/install-hooks.sh
+```
+
+Symlinks `hooks/pre-push` into `.git/hooks/pre-push`; future updates to the
+hook script reach you automatically. Bypass with `git push --no-verify` if
+you really need to push WIP, but please don't make a habit of it.
+
+## ── Module structure ──
 
 | Module            | Purpose                                        |
 |-------------------|------------------------------------------------|
@@ -62,11 +73,11 @@ Shared test fixtures are in `client-core/src/testFixtures/` via `java-test-fixtu
 | `client-launcher` | DI wiring, file download, update, launch logic |
 | `client-ui`       | Compose Multiplatform desktop UI               |
 
-## Stack
+## ── Stack ──
 
 Kotlin · Compose Multiplatform · Ktor · Koin · Skiko · dorkbox/SystemTray · Logback
 
-## Platform notes
+## ── Platform notes ──
 
 - **Windows**: JNA must stay pinned to `5.18.1` in `client-ui` and forced to `6.1.6` globally via `resolutionStrategy` — dorkbox/SystemTray 4.4 has a hardcoded version check.
 - **Linux**: AppImage is assembled manually in CI (`build_release.yml`), not via Compose packaging.
@@ -74,6 +85,6 @@ Kotlin · Compose Multiplatform · Ktor · Koin · Skiko · dorkbox/SystemTray �
 
 ---
 
-## License
+## ── License ──
 
 By contributing, you agree that your work will be licensed under [GPL-3.0](LICENSE).
