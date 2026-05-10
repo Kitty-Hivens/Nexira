@@ -253,9 +253,13 @@ class FileDownloadService(
                         HttpStatusCode.RequestedRangeNotSatisfiable -> {
                             // 416: partial on disk is bigger than the upstream file
                             // (corrupt write or upstream shrank). Clear and let retry
-                            // fetch from byte 0.
+                            // fetch from byte 0. Throw the dedicated subclass so
+                            // isTransientDownloadError recognises it as retryable
+                            // — a plain IOException with this message would NOT
+                            // match the predicate's substring checks and would
+                            // hard-fail instead of recovering.
                             Files.deleteIfExists(localPath)
-                            throw IOException("HTTP 416 for $url; cleared bad partial, will refetch")
+                            throw RetryableHttpException("HTTP 416 for $url; cleared bad partial, will refetch")
                         }
                         else -> throw IOException("HTTP ${response.status} for $url")
                     }
@@ -282,6 +286,17 @@ class FileDownloadService(
         }
     }
 
+    /**
+     * Sentinel for "we deliberately threw to trigger a retry after fixing
+     * local state". Currently the only thrower is the 416 branch in
+     * [downloadFileInternal], which deletes the bad partial before
+     * raising this so the next retry fetches from byte 0. Adding a
+     * subclass instead of pattern-matching the message keeps the contract
+     * explicit — string matching on `cause.message` was the bug Codex
+     * caught on PR #128.
+     */
+    private class RetryableHttpException(message: String) : IOException(message)
+
     private fun isTransientDownloadError(t: Throwable): Boolean {
         // CancellationException must NEVER be retried — it's how the parent
         // coroutine signals "stop"; swallowing and retrying would deadlock
@@ -289,6 +304,7 @@ class FileDownloadService(
         if (t is CancellationException) return false
         var cause: Throwable? = t
         while (cause != null) {
+            if (cause is RetryableHttpException) return true
             if (cause is java.net.ConnectException ||
                 cause is java.net.SocketException ||
                 cause is io.ktor.utils.io.ClosedByteChannelException ||
