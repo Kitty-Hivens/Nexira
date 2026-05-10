@@ -254,7 +254,14 @@ val appModule = module {
  * is true. h2 multiplexing over the SOCKS hop drops mid-stream on long bodies;
  * 1.1 with parallel connections trades multiplexing for resilience. Skipped on
  * the direct channel — its third-party CDN endpoints have rock-solid h2 stacks.
+ *
+ * Qodana correctly notices the flag is currently always-true ([Network.FORCE_HTTP1_FOR_SMARTYCRAFT]
+ * is `const val true`), making the `else this` branch dead at compile time. The
+ * branch stays on purpose — it's a kill-switch for the day h2-over-SOCKS
+ * starts behaving (or for someone debugging whether the pin is what's
+ * causing a new symptom). Suppression below is the explicit "yes, on purpose".
  */
+@Suppress("KotlinConstantConditions")
 private fun OkHttpClient.Builder.applySmartycraftProtocols(): OkHttpClient.Builder =
     if (Network.FORCE_HTTP1_FOR_SMARTYCRAFT) protocols(listOf(OkProtocol.HTTP_1_1)) else this
 
