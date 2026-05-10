@@ -62,13 +62,20 @@ class FileDownloadService(
         Files.createDirectories(targetDir)
 
         // ── Manifest cache short-circuit ─────────────────────────────────
-        // If this same manifest was successfully synced recently (≤TTL),
-        // skip the full per-file MD5 walk and the extra.zip processing.
-        // Both downstream steps are themselves hash-gated and would no-op,
-        // but the integrity walk alone dominates cold-start on 1000-file
-        // modpacks. The TTL inside ManifestCache is the safety valve
-        // for "but what if a file got corrupted on disk?" scenarios.
-        val manifestHash = manifestCache.hashOf(indexJson.encodeToString(manifest))
+        // If this same manifest *with the same ignoredFiles set* was
+        // successfully synced recently (≤TTL), skip the full per-file
+        // MD5 walk and the extra.zip processing. Both downstream steps
+        // are themselves hash-gated and would no-op, but the integrity
+        // walk alone dominates cold-start on 1000-file modpacks. The
+        // TTL inside ManifestCache is the safety valve for "what if a
+        // file got corrupted on disk?" scenarios.
+        //
+        // ignoredFiles is part of the cache input because cleanupIgnoredFiles
+        // (which physically deletes disabled mod jars) lives below this
+        // gate — caching only on manifest hash would let a freshly-disabled
+        // mod stay loaded until the cache expires or the manifest changes
+        // upstream. (Codex P2 on PR #128.)
+        val manifestHash = manifestCache.hashOf(cacheKeyInputFor(manifest, ignoredFiles))
         if (manifestCache.isClean(serverId, manifestHash)) {
             messageUI?.invoke("Files verified (cached)")
             return@withContext
@@ -95,6 +102,17 @@ class FileDownloadService(
         // 5. Mark this manifest as cleanly synced — next session with the
         // same manifest hash short-circuits the integrity walk above.
         manifestCache.markClean(serverId, manifestHash)
+    }
+
+    /**
+     * Composes the cache-key input as `<canonical-manifest-json>|ignored:<sorted-csv>`.
+     * Sorting the ignored set is mandatory — `Set` iteration order isn't
+     * stable, and the cache must be insensitive to insertion order while
+     * sensitive to membership changes.
+     */
+    private fun cacheKeyInputFor(manifest: FileManifest, ignoredFiles: Set<String>?): String {
+        val ignored = ignoredFiles?.toSortedSet()?.joinToString(",") ?: ""
+        return indexJson.encodeToString(manifest) + "|ignored:" + ignored
     }
 
     /**

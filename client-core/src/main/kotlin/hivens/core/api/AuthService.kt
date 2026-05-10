@@ -37,17 +37,19 @@ class AuthService(
      * one network request as long as the user clicks Play within the
      * TTL window.
      *
-     * Username is part of the cache key because in principle the user
-     * could re-auth as a different account between the two calls (rare,
-     * but not impossible). Password is not part of the key — when the
-     * user is the same the password is the same; if they differ we don't
-     * hit the cache anyway because of the username mismatch.
+     * Cache key is `(username, passwordHash, serverId)`. Password hash
+     * is mandatory in the key because otherwise a second login attempt
+     * with the *wrong* password within the 30 s TTL would silently
+     * succeed via cache, masking real credential rotation (Codex P2 on
+     * PR #128). We use the MD5 already computed for the auth request,
+     * not the plaintext password — same secret-handling profile as the
+     * rest of the call.
      *
      * 30 s TTL: long enough for "open launcher → pick server → click Play",
      * short enough that the upstream server still considers the session
      * fresh. Cache is in-memory only — process restart re-auths.
      */
-    private data class CacheKey(val username: String, val serverId: String)
+    private data class CacheKey(val username: String, val passwordHash: String, val serverId: String)
     private data class CachedSession(val session: SessionData, val expiresAt: Long)
 
     private val sessionCache = java.util.concurrent.ConcurrentHashMap<CacheKey, CachedSession>()
@@ -81,13 +83,16 @@ class AuthService(
     )
 
     override suspend fun login(username: String, password: String, serverId: String): SessionData {
-        cachedFor(username, serverId)?.let {
+        // Hash first so the cache key includes the password — otherwise a
+        // wrong/rotated password within the TTL would silently succeed
+        // via cache. (Codex P2 on PR #128.)
+        val passwordEncoded = HashUtils.md5(password)
+        cachedFor(username, passwordEncoded, serverId)?.let {
             logger.info("Login via API V3 (server: {}) — cache hit, skipping network", serverId)
             return it
         }
         logger.info("Login via API V3 (server: {})...", serverId)
 
-        val passwordEncoded = HashUtils.md5(password)
         val clientSessionId = UUID.randomUUID().toString().replace("-", "")
         val is64 = System.getProperty("os.arch").contains("64")
 
@@ -175,11 +180,11 @@ class AuthService(
             serverId = serverId,
             cachedPassword = password,
             balance = response.money
-        ).also { cacheSession(username, serverId, it) }
+        ).also { cacheSession(username, passwordEncoded, serverId, it) }
     }
 
-    private fun cachedFor(username: String, serverId: String): SessionData? {
-        val key = CacheKey(username, serverId)
+    private fun cachedFor(username: String, passwordHash: String, serverId: String): SessionData? {
+        val key = CacheKey(username, passwordHash, serverId)
         val cached = sessionCache[key] ?: return null
         if (System.currentTimeMillis() >= cached.expiresAt) {
             sessionCache.remove(key, cached)
@@ -188,8 +193,8 @@ class AuthService(
         return cached.session
     }
 
-    private fun cacheSession(username: String, serverId: String, session: SessionData) {
-        sessionCache[CacheKey(username, serverId)] =
+    private fun cacheSession(username: String, passwordHash: String, serverId: String, session: SessionData) {
+        sessionCache[CacheKey(username, passwordHash, serverId)] =
             CachedSession(session, System.currentTimeMillis() + sessionTtlMs)
     }
 
