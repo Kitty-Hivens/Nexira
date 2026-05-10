@@ -97,6 +97,29 @@ class DataDirMigrationTest {
     }
 
     @Test
+    fun `target containing only housekeeping files still triggers migration`() {
+        // Main.kt now acquires the single-instance lock BEFORE running
+        // migration, which means .lock and .show may already exist in the
+        // (otherwise empty) target on a true first launch. Migration must
+        // still see the directory as "no user data here, proceed".
+        Files.createDirectories(paths.legacyDataDir)
+        Files.writeString(paths.legacyDataDir.resolve("legacy.json"), "legacy")
+
+        Files.createDirectories(paths.dataDir)
+        Files.writeString(paths.dataDir.resolve(".lock"), "")
+        Files.writeString(paths.dataDir.resolve(".show"), "")
+
+        DataDirMigration.run(paths)
+
+        assertEquals(
+            "legacy",
+            Files.readString(paths.dataDir.resolve("legacy.json")),
+            "Migration must run when target contains only .lock / .show housekeeping"
+        )
+        assertTrue(Files.exists(paths.legacyDataDir.resolve(".migrated")))
+    }
+
+    @Test
     fun `preserves directory tree depth`() {
         val deep = paths.legacyDataDir.resolve("clients/Industrial/assets/textures/blocks")
         Files.createDirectories(deep)
