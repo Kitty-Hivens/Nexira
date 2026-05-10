@@ -32,6 +32,7 @@ import kotlin.math.roundToInt
 class FileDownloadService(
     private val clientProvider: HttpClientProvider,
     private val protectedPaths: ProtectedPaths,
+    private val manifestCache: ManifestCache,
 ) : IFileDownloadService {
     private val client get() = clientProvider.current
 
@@ -60,6 +61,19 @@ class FileDownloadService(
         val manifest = session.fileManifest ?: throw IOException("File manifest is empty!")
         Files.createDirectories(targetDir)
 
+        // ── Manifest cache short-circuit ─────────────────────────────────
+        // If this same manifest was successfully synced recently (≤TTL),
+        // skip the full per-file MD5 walk and the extra.zip processing.
+        // Both downstream steps are themselves hash-gated and would no-op,
+        // but the integrity walk alone dominates cold-start on 1000-file
+        // modpacks. The TTL inside ManifestCache is the safety valve
+        // for "but what if a file got corrupted on disk?" scenarios.
+        val manifestHash = manifestCache.hashOf(indexJson.encodeToString(manifest))
+        if (manifestCache.isClean(serverId, manifestHash)) {
+            messageUI?.invoke("Files verified (cached)")
+            return@withContext
+        }
+
         // 1. Flatten manifest
         val filesMap = flattenManifest(manifest)
 
@@ -77,6 +91,10 @@ class FileDownloadService(
 
         // 4. Processing Extra.zip
         processExtraZip(targetDir, filesMap, extraCheckSum, messageUI)
+
+        // 5. Mark this manifest as cleanly synced — next session with the
+        // same manifest hash short-circuits the integrity walk above.
+        manifestCache.markClean(serverId, manifestHash)
     }
 
     /**

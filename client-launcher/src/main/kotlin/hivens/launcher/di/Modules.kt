@@ -185,7 +185,11 @@ val appModule = module {
         val dataDir: java.nio.file.Path = get()
         ProtectedPaths(dataDir.resolve(Storage.PROTECTED_PATHS_FILE), get())
     }
-    single<IFileDownloadService> { FileDownloadService(get(), get()) }
+    single {
+        val dataDir: java.nio.file.Path = get()
+        ManifestCache(dataDir.resolve("manifest-cache"), get())
+    }
+    single<IFileDownloadService> { FileDownloadService(get(), get(), get()) }
 
     single<IManifestProcessorService> { ManifestProcessorService(get()) }
     single { ProfileManager(get(), get()) }
