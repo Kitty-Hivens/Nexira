@@ -271,6 +271,13 @@ jobs:
     env:
       APP_VERSION: ${{ needs.changelog.outputs.version }}
     steps:
+      # Need the repo source for scripts/compose-release-body.sh that the
+      # "Compose release body" step calls below. Without checkout it errors
+      # with `./scripts/compose-release-body.sh: No such file or directory`
+      # (regression introduced by CI-modernize #6 on PR #128 when the
+      # release-body composition was extracted out of inline yaml).
+      - uses: actions/checkout@v4
+
       - uses: actions/download-artifact@v4
         with:
           pattern: '*-artifacts'
