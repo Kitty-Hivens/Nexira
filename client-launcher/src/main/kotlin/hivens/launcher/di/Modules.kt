@@ -15,6 +15,7 @@ import hivens.launcher.component.EnvironmentPreparer
 import hivens.launcher.component.GameCommandBuilder
 import hivens.launcher.component.ProcessLogHandler
 import hivens.launcher.platform.PlatformPaths
+import hivens.launcher.update.UpdateApplicators
 import hivens.launcher.update.UpdateService
 import io.ktor.client.*
 import io.ktor.client.engine.okhttp.*
@@ -236,6 +237,10 @@ val appModule = module {
             settingsService = get()
         )
     }
+
+    // Per-platform update applicator selected at startup. Kept as a singleton
+    // so the shutdown hook each implementation registers fires exactly once.
+    single<IUpdateApplicator> { UpdateApplicators.forCurrentPlatform() }
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
