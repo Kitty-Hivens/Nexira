@@ -11,6 +11,61 @@ below are for the GitHub release page and CHANGELOG readers.
 
 ## [Unreleased]
 
+## [2.2.8] - 2026-05-10
+
+Update Channels chunk — gives the launcher two new tools for surviving the
+upstream cadence: a server-controlled mandatory-update floor (so the launcher
+refuses to start when the protocol breaks compat with installed builds), and
+an opt-in pre-release channel (so RC builds reach users before the next
+stable cut). Both gated by a master "Experimental features" toggle. Shipped
+as a non-prerelease so existing 2.2.7-rc3 users actually receive it — older
+launchers ignore prereleases by GitHub API contract.
+
+### Highlights
+- **Mandatory updates**: launcher refuses to start when the installed version
+  drops below `mandatory_min_version` published in `meta/update-channel.json`.
+  No new server infra — the file lives on the `stable` branch and is updated
+  via PR. Triggers a non-dismissable dialog with "Install" or "Quit".
+- **Pre-release update channel**: opt in to receive RC and beta builds before
+  the next stable. Currently ON by default while the upstream protocol is a
+  moving target; expected to flip to OFF once cadence stabilises.
+- **Experimental features master toggle** in Settings — gates both knobs
+  above with a single switch for users who want a calm upgrade story.
+- Strict version comparison in the update flow: `1.3.0 > 1.3.0-rc3`,
+  `rc1 < rc2 < rc3`, `alpha < beta < rc`. Without this the prerelease channel
+  would consider RC bumps within the same base "the same version".
+
+### Added
+- `meta/update-channel.json` — out-of-band channel metadata fetched via the
+  direct HTTP channel (no SMARTYcraft proxy dependency). Carries
+  `mandatory_min_version` and an optional human `reason` shown in the
+  blocking dialog. Initial value is `null` (no floor); flipping it activates
+  enforcement on the next update check (within the 12 h cooldown).
+- `UpdateChannelMeta` data class wrapping the JSON above.
+- `LauncherUpdate.isMandatory` / `mandatoryReason` fields propagating the
+  decision to the UI layer.
+- Three booleans on `SettingsData`: `experimentalFeaturesEnabled` (master),
+  `mandatoryUpdatesEnabled`, `prereleaseChannelEnabled`. All default to ON.
+- "Experimental features" section in `SettingsScreen` with Material icons,
+  master + two children, sub-rows greyed out when the master is off.
+- `UpdateDialog` mandatory mode: red banner with reason, no "Later" button,
+  hard "Quit" button (clean `exitProcess(0)`), backdrop dismiss disabled.
+- `UpdateService` tests: 6 new cases for channel selection (prerelease ON
+  vs OFF, master OFF forces both children OFF) and mandatory floor (above
+  current, at-or-below, missing meta, mandatory toggle OFF, v-prefix
+  normalisation), plus 4 new SemVer-suffix cases for `compareVersions`.
+
+### Changed
+- `UpdateService.compareVersions` is now strict on prerelease suffixes
+  (was: strip suffix and compare numeric base only). Final beats any RC at
+  the same base; lex compare on the suffix orders `alpha < beta < rc1 < rc2`
+  for the launcher's release cadence.
+- `UpdateService` reads `ISettingsService` and dispatches between
+  `/releases/latest` (stable channel) and `/releases?per_page=20` filtered
+  for non-draft entries (prerelease channel).
+- `UpdateManager` routes mandatory updates straight to the modal dialog
+  (skipping the corner notification), same as critical updates.
+
 ## [2.2.7-rc3] - 2026-05-10
 
 Release candidate for [2.2.7], superseding rc2 with the freshly-rotated
