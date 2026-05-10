@@ -30,7 +30,8 @@ import kotlin.math.roundToInt
 
 
 class FileDownloadService(
-    private val clientProvider: HttpClientProvider
+    private val clientProvider: HttpClientProvider,
+    private val protectedPaths: ProtectedPaths,
 ) : IFileDownloadService {
     private val client get() = clientProvider.current
 
@@ -295,20 +296,14 @@ class FileDownloadService(
         if (!Files.exists(file)) return true
         if (Files.isDirectory(file)) return false
         if (expectedMd5 == "any") return false // "any" hash means "do not check"
-        val lowerPath = relativePath.lowercase().replace("\\", "/")
-        val isProtectedClientConfig = lowerPath.endsWith("options.txt") ||
-                lowerPath.endsWith("servers.dat") ||
-                lowerPath.contains("xaerominimap") ||
-                lowerPath.contains("xaeroworldmap") ||
-                lowerPath.contains("voxelmap") ||
-                lowerPath.contains("journeymap") ||
-                lowerPath.contains("jei")
 
         return try {
             if (Files.size(file) == 0L) return true
 
-            // Если файл защищен и он уже существует (size > 0), мы запрещаем его перезапись!
-            if (isProtectedClientConfig) return false
+            // Protected user-config: present + non-empty means hands-off.
+            // The default list is in ProtectedPaths.kt; users extend it via
+            // dataDir/protected-paths.json without recompiling.
+            if (protectedPaths.isProtected(relativePath)) return false
 
             val localMd5 = calculateMD5(file)
             !localMd5.equals(expectedMd5, ignoreCase = true)

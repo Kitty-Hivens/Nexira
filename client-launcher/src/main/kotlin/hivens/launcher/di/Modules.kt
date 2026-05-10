@@ -180,7 +180,11 @@ val appModule = module {
         SettingsService(get(), dataDir.resolve(Storage.SETTINGS_FILE))
     }
 
-    single<IFileDownloadService> { FileDownloadService(get()) }
+    single {
+        val dataDir: java.nio.file.Path = get()
+        ProtectedPaths(dataDir.resolve(Storage.PROTECTED_PATHS_FILE), get())
+    }
+    single<IFileDownloadService> { FileDownloadService(get(), get()) }
 
     single<IManifestProcessorService> { ManifestProcessorService(get()) }
     single { ProfileManager(get(), get()) }
