@@ -46,6 +46,9 @@ fun SettingsScreen(
     var closeAfterStart        by remember { mutableStateOf(initialSettings.closeAfterStart) }
     var isOfflineMode          by remember { mutableStateOf(initialSettings.isOfflineMode) }
     var startInTray            by remember { mutableStateOf(initialSettings.startInTray) }
+    var experimentalEnabled    by remember { mutableStateOf(initialSettings.experimentalFeaturesEnabled) }
+    var mandatoryUpdates       by remember { mutableStateOf(initialSettings.mandatoryUpdatesEnabled) }
+    var prereleaseChannel      by remember { mutableStateOf(initialSettings.prereleaseChannelEnabled) }
     var langDropdownExpanded   by remember { mutableStateOf(false) }
     var showSavedMessage       by remember { mutableStateOf(false) }
 
@@ -58,9 +61,12 @@ fun SettingsScreen(
         val current = settingsService.getSettings()
         settingsService.saveSettings(
             current.copy(
-                closeAfterStart = closeAfterStart,
-                isOfflineMode   = isOfflineMode,
-                startInTray     = startInTray
+                closeAfterStart             = closeAfterStart,
+                isOfflineMode               = isOfflineMode,
+                startInTray                 = startInTray,
+                experimentalFeaturesEnabled = experimentalEnabled,
+                mandatoryUpdatesEnabled     = mandatoryUpdates,
+                prereleaseChannelEnabled    = prereleaseChannel
             )
         )
         showSavedMessage = true
@@ -302,6 +308,46 @@ fun SettingsScreen(
                     }
                 }
 
+                // ── Experimental features ─────────────────────────────────────
+                item {
+                    SettingsSectionTitle(s.settingsSectionExperimental)
+
+                    // Master toggle
+                    SettingsRowWithDescription(
+                        title          = s.settingsExperimentalMaster,
+                        description    = s.settingsExperimentalMasterDesc,
+                        icon           = Icons.Default.Science,
+                        iconTint       = CelestiaTheme.colors.primary,
+                        checked        = experimentalEnabled,
+                        enabled        = true,
+                        onCheckedChange = { experimentalEnabled = it; save() }
+                    )
+
+                    Spacer(Modifier.height(16.dp))
+
+                    SettingsRowWithDescription(
+                        title          = s.settingsMandatoryUpdates,
+                        description    = s.settingsMandatoryUpdatesDesc,
+                        icon           = Icons.Default.Update,
+                        iconTint       = CelestiaTheme.colors.primary,
+                        checked        = experimentalEnabled && mandatoryUpdates,
+                        enabled        = experimentalEnabled,
+                        onCheckedChange = { mandatoryUpdates = it; save() }
+                    )
+
+                    Spacer(Modifier.height(16.dp))
+
+                    SettingsRowWithDescription(
+                        title          = s.settingsPrereleaseChannel,
+                        description    = s.settingsPrereleaseChannelDesc,
+                        icon           = Icons.Default.NewReleases,
+                        iconTint       = CelestiaTheme.colors.primary,
+                        checked        = experimentalEnabled && prereleaseChannel,
+                        enabled        = experimentalEnabled,
+                        onCheckedChange = { prereleaseChannel = it; save() }
+                    )
+                }
+
                 // ── Diagnostics ───────────────────────────────────────────────
                 item {
                     // Secret: tap the diagnostics title 5 times to toggle the April Fools debug panel
@@ -405,6 +451,63 @@ private fun SettingsSectionTitle(text: String) {
     Spacer(Modifier.height(8.dp))
     HorizontalDivider(color = CelestiaTheme.colors.primary.copy(alpha = 0.3f))
     Spacer(Modifier.height(16.dp))
+}
+
+/**
+ * Settings row with icon + title + description + switch. Mirrors the layout
+ * used by the Offline Mode and Start-in-Tray rows above. [enabled] greys out
+ * the whole row (used by experimental sub-toggles when the master is off).
+ */
+@Composable
+private fun SettingsRowWithDescription(
+    title: String,
+    description: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    iconTint: Color,
+    checked: Boolean,
+    enabled: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    val alpha = if (enabled) 1f else 0.4f
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(CelestiaTheme.colors.background.copy(alpha = 0.4f))
+            .padding(16.dp),
+        verticalAlignment     = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+            Icon(
+                icon, null,
+                tint     = iconTint.copy(alpha = alpha),
+                modifier = Modifier.size(24.dp)
+            )
+            Spacer(Modifier.width(16.dp))
+            Column {
+                Text(
+                    title,
+                    color      = CelestiaTheme.colors.textPrimary.copy(alpha = alpha),
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = CelestiaTheme.colors.textSecondary.copy(alpha = alpha)
+                )
+            }
+        }
+        Switch(
+            checked         = checked,
+            enabled         = enabled,
+            onCheckedChange = onCheckedChange,
+            colors          = SwitchDefaults.colors(
+                checkedThumbColor = CelestiaTheme.colors.primary,
+                checkedTrackColor = CelestiaTheme.colors.primary.copy(alpha = 0.5f)
+            )
+        )
+    }
 }
 
 @Composable

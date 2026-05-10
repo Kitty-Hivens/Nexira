@@ -24,7 +24,10 @@ fun UpdateManager() {
             val update = updateService.checkForUpdate(force = false)
             if (update != null) {
                 availableUpdate = update
-                if (update.isCritical) {
+                // Critical AND mandatory both skip the corner-notification step
+                // and open the modal directly — neither is something the user
+                // should be able to ignore by clicking past a small badge.
+                if (update.isCritical || update.isMandatory) {
                     showDialog = true
                 } else {
                     showNotification = true
