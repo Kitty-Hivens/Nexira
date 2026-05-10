@@ -11,6 +11,69 @@ below are for the GitHub release page and CHANGELOG readers.
 
 ## [Unreleased]
 
+## [2.2.9] - 2026-05-10
+
+Stability sweep — four user-visible reliability fixes that ride on the
+infrastructure shipped in 2.2.8. Targeted at the failure classes observed
+in production logs: mid-stream HTTP/2 resets on the SOCKS-proxied
+SMARTYcraft channel, downloads restarting from byte 0 on every flake,
+duplicate auth requests on the dashboard → Play flow, and the
+single-instance gate failing to actually raise the existing window on
+KDE / Hyprland / GNOME.
+
+### Highlights
+- **SMARTYcraft channel pinned to HTTP/1.1**: h2 multiplexing over the
+  upstream SOCKS proxy was dropping mid-stream on long bodies. 1.1 with
+  parallel connections trades multiplexing for resilience. Direct channel
+  (GitHub releases, BellSoft JDKs, Maven Central) is unaffected.
+- **Auth and downloads now retry on transient resets** (3 attempts, 1 s /
+  3 s / 9 s backoff). Auth-rejection responses and SSL cert errors are
+  explicitly *not* retried — those need user attention, not a silent loop.
+- **Downloads resume via `Range:`** instead of restarting from byte 0.
+  A 100 MB asset that drops at 70 % now costs seconds to recover instead
+  of restarting the whole transfer.
+- **Per-server session cache** in `AuthService`: dashboard list refresh
+  and the actual server-launch auth used to fire two back-to-back logins
+  for the same server. The second one now returns the 30-second-cached
+  session without hitting the network — fewer requests, fewer chances to
+  trip the upstream's "sessions don't dedup" race.
+- **Single-instance gate raises the existing window**: second-launch
+  attempts previously only flipped `visible = true`, leaving the window
+  minimised or buried under other windows on KDE / Hyprland / GNOME.
+  Now un-minimises and pulses `isAlwaysOnTop` to force a true raise.
+  Lock file also stores the holder PID for diagnostics
+  (`cat ~/.local/share/aura-launcher/.lock`).
+
+### Added
+- `RetryWithBackoff` utility in `client-core/util/`. Generic suspend
+  wrapper with caller-supplied retry predicate; deliberately narrow.
+  5 unit tests cover the predicate contract.
+- `Network.FORCE_HTTP1_FOR_SMARTYCRAFT` knob (default true). Wired via
+  an `OkHttpClient.Builder` extension in `Modules.kt` so secure and
+  insecure smartycraft clients pick it up identically.
+- `SingleInstance` helper in `client-launcher/.../platform/`. Holds the
+  channel + lock on a static field, registers a shutdown hook with audit
+  log line, writes the holder PID into the lock file. 4 unit tests.
+- `.show` watcher in `Main.kt` raises the window via `windowState.isMinimized = false`,
+  `toFront()`, and the `isAlwaysOnTop` pulse trick (the only cross-WM way
+  to force a focus-steal-like raise on X11/Wayland).
+- Per-server session cache in `AuthService` with 30 s TTL. Dashboard load
+  and Play within the same server are deduplicated to one network request.
+
+### Changed
+- `AuthService.login` and `FileDownloadService.downloadFileInternal`
+  wrapped in `retryWithBackoff` with predicates that walk the full
+  cause chain looking for `ConnectException` / `SocketException` /
+  `ClosedByteChannelException` / `SocketTimeoutException` and "Connection
+  reset" `IOException`s. `CancellationException` is explicitly excluded.
+- `FileDownloadService` sends `Range: bytes=N-` when a partial file is on
+  disk; handles 206 (append), 200 (server ignored Range, overwrite),
+  416 (clear bad partial and refetch) explicitly.
+- `DataDirMigration.run` defers to a new `Path.hasUserData()` probe that
+  ignores housekeeping files (`.lock`, `.show`, `.migrated`) — a
+  follow-up to the lock-before-migration order so first-run still triggers
+  when the lock file already exists in the target dir.
+
 ## [2.2.8] - 2026-05-10
 
 Update Channels chunk — gives the launcher two new tools for surviving the
@@ -36,15 +99,6 @@ launchers ignore prereleases by GitHub API contract.
   so when an emergency upgrade is published the user sees the blocking
   dialog within ~5 minutes — no need to restart the launcher to pick it up.
   Routine release checks stay on the existing 12 h cadence.
-- **Network resilience on the SMARTYcraft channel**: pinned to HTTP/1.1
-  (h2 over SOCKS was dropping mid-stream); auth and asset downloads now
-  retry up to 3 times with 1 s / 3 s / 9 s backoff on transient resets.
-  File downloads resume from where they left off via `Range:` instead of
-  restarting from byte 0.
-- **Single-instance gate hardened**: lock file now stores the holder PID
-  for diagnostics; second-launch attempts also actually raise the existing
-  window (was previously just `visible = true`, leaving it minimised /
-  buried under other windows on KDE / Hyprland / GNOME).
 - Strict version comparison in the update flow: `1.3.0 > 1.3.0-rc3`,
   `rc1 < rc2 < rc3`, `alpha < beta < rc`. Without this the prerelease channel
   would consider RC bumps within the same base "the same version".

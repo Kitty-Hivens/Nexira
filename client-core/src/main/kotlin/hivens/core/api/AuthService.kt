@@ -29,16 +29,29 @@ class AuthService(
     private val client get() = clientProvider.current
 
     /**
-     * Diagnostic-only state for the "double login" issue observed in
-     * production: see CHANGELOG note next to the fix that consumes this.
-     * Per-server timestamp of the most recent login attempt; if a second
-     * call lands within 5s on the same server, we log a warn-level stack
-     * trace so the offending caller surfaces in the next user log paste.
-     * This does NOT block the second call — diagnose first, fix in a
-     * follow-up once the offender is known.
+     * Per-server session cache. The dashboard renders server cards by
+     * doing a "list servers" auth, then the Play button does a "launch
+     * server" auth — historically two consecutive logins for the same
+     * serverId within ~3 seconds. Both call sites are legitimate; they
+     * just don't share state. Caching here deduplicates them down to
+     * one network request as long as the user clicks Play within the
+     * TTL window.
+     *
+     * Username is part of the cache key because in principle the user
+     * could re-auth as a different account between the two calls (rare,
+     * but not impossible). Password is not part of the key — when the
+     * user is the same the password is the same; if they differ we don't
+     * hit the cache anyway because of the username mismatch.
+     *
+     * 30 s TTL: long enough for "open launcher → pick server → click Play",
+     * short enough that the upstream server still considers the session
+     * fresh. Cache is in-memory only — process restart re-auths.
      */
-    private val lastLoginNanos = java.util.concurrent.ConcurrentHashMap<String, Long>()
-    private val duplicateLoginWindowNs = 5_000_000_000L  // 5 seconds
+    private data class CacheKey(val username: String, val serverId: String)
+    private data class CachedSession(val session: SessionData, val expiresAt: Long)
+
+    private val sessionCache = java.util.concurrent.ConcurrentHashMap<CacheKey, CachedSession>()
+    private val sessionTtlMs = 30_000L
 
     @Serializable
     private data class AuthRequest(
@@ -68,7 +81,10 @@ class AuthService(
     )
 
     override suspend fun login(username: String, password: String, serverId: String): SessionData {
-        warnIfDuplicate(serverId)
+        cachedFor(username, serverId)?.let {
+            logger.info("Login via API V3 (server: {}) — cache hit, skipping network", serverId)
+            return it
+        }
         logger.info("Login via API V3 (server: {})...", serverId)
 
         val passwordEncoded = HashUtils.md5(password)
@@ -159,23 +175,22 @@ class AuthService(
             serverId = serverId,
             cachedPassword = password,
             balance = response.money
-        )
+        ).also { cacheSession(username, serverId, it) }
     }
 
-    private fun warnIfDuplicate(serverId: String) {
-        val now = System.nanoTime()
-        val previous = lastLoginNanos.put(serverId, now) ?: return
-        val deltaNs = now - previous
-        if (deltaNs < duplicateLoginWindowNs) {
-            val deltaMs = deltaNs / 1_000_000
-            // Synthetic exception captures the stack so the duplicate caller
-            // is visible in logs. Throwable construction is cheap relative
-            // to a network call and only fires inside the 5s window.
-            logger.warn(
-                "Duplicate login attempt for server '{}' within {}ms — possible UI re-fire or unintended re-auth before launch",
-                serverId, deltaMs, Throwable("duplicate-login stack").also { it.stackTrace = it.stackTrace.drop(1).toTypedArray() },
-            )
+    private fun cachedFor(username: String, serverId: String): SessionData? {
+        val key = CacheKey(username, serverId)
+        val cached = sessionCache[key] ?: return null
+        if (System.currentTimeMillis() >= cached.expiresAt) {
+            sessionCache.remove(key, cached)
+            return null
         }
+        return cached.session
+    }
+
+    private fun cacheSession(username: String, serverId: String, session: SessionData) {
+        sessionCache[CacheKey(username, serverId)] =
+            CachedSession(session, System.currentTimeMillis() + sessionTtlMs)
     }
 
     private fun generateGameToken(uid: String?, sessionV3: String?): String? {
