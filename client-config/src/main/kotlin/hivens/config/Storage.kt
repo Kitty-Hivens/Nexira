@@ -8,7 +8,8 @@ package hivens.config
  * leaf names so callers don't sprinkle "settings.json" string literals.
  */
 object Storage {
-    const val SETTINGS_FILE   = "settings.json"
-    const val PROFILES_FILE   = "profiles.json"
-    const val HASH_CACHE_FILE = "smarty_hash.cache"
+    const val SETTINGS_FILE         = "settings.json"
+    const val PROFILES_FILE         = "profiles.json"
+    const val HASH_CACHE_FILE       = "smarty_hash.cache"
+    const val PROTECTED_PATHS_FILE  = "protected-paths.json"
 }

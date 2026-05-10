@@ -30,6 +30,7 @@ import hivens.launcher.di.appModule
 import hivens.launcher.di.networkModule
 import hivens.launcher.platform.DataDirMigration
 import hivens.launcher.platform.PlatformPaths
+import hivens.launcher.platform.SingleInstance
 import hivens.ui.background.BackgroundManager
 import hivens.ui.background.CustomBackground
 import hivens.ui.components.UpdateManager
@@ -69,7 +70,6 @@ import org.koin.core.qualifier.named
 import org.koin.dsl.module
 import org.slf4j.LoggerFactory
 import java.io.File
-import java.io.FileOutputStream
 import javax.swing.SwingUtilities
 import kotlin.system.exitProcess
 
@@ -160,18 +160,10 @@ fun main() {
 
     // Single-instance lock acquired BEFORE migration. Two launchers started
     // close together would otherwise both reach DataDirMigration.run() and
-    // race on REPLACE_EXISTING file copies — the loser exiting on .lock
-    // wouldn't undo half-written files. (Codex flagged the original order
-    // as P2 on PR #127.) DataDirMigration's emptiness check is taught to
-    // ignore .lock / .show / .migrated so its first-run trigger still fires.
-    val lockFile = paths.dataDir.resolve(".lock").toFile()
-    val lockChannel = FileOutputStream(lockFile).channel
-    val lock = lockChannel.tryLock()
-
-    if (lock == null) {
-        paths.dataDir.resolve(".show").toFile().createNewFile()
-        exitProcess(0)
-    }
+    // race on REPLACE_EXISTING file copies. DataDirMigration's emptiness
+    // check is taught to ignore .lock / .show / .migrated so its first-run
+    // trigger still fires.
+    if (!SingleInstance.acquire(paths.dataDir)) exitProcess(0)
 
     DataDirMigration.run(paths)
 
@@ -206,13 +198,23 @@ fun main() {
         val launchState by controller.state.collectAsState()
 
 
+        // Bumped each time the .show signal fires; the Window content uses it
+        // to invoke window.toFront() / requestFocus() so a duplicate-launch
+        // attempt actually raises the existing instance, not just makes it
+        // visible-but-buried-under-other-windows.
+        var raiseTick by remember { mutableStateOf(0) }
+
         LaunchedEffect(Unit) {
             val showFile = paths.dataDir.resolve(".show").toFile()
             while (true) {
                 delay(500)
                 if (showFile.exists()) {
                     showFile.delete()
+                    // Un-minimize: setting visible=true alone leaves a taskbar-
+                    // minimized window minimized.
+                    if (windowState.isMinimized) windowState.isMinimized = false
                     isWindowVisible = true
+                    raiseTick++
                 }
             }
         }
@@ -361,6 +363,24 @@ fun main() {
                 resizable = true,
                 icon      = windowIcon
             ) {
+                // Pulled-forward: triggered by the .show watcher above when a
+                // second instance fires its signal. Skip on raiseTick == 0 so
+                // the first composition doesn't steal focus from whatever the
+                // user was doing when the launcher started.
+                LaunchedEffect(raiseTick) {
+                    if (raiseTick == 0) return@LaunchedEffect
+                    SwingUtilities.invokeLater {
+                        // The isAlwaysOnTop trick is the only cross-WM way to
+                        // force a raise on X11 (KDE / Hyprland / GNOME all
+                        // ignore plain toFront() to discourage focus-stealing).
+                        // Pulse it: enable → toFront → requestFocus → disable.
+                        window.isAlwaysOnTop = true
+                        window.toFront()
+                        window.requestFocus()
+                        window.isAlwaysOnTop = false
+                    }
+                }
+
                 CelestiaTheme(useDarkTheme = isDarkTheme, customTheme = customTheme) {
                     AppRoot(
                         onCloseApp = {

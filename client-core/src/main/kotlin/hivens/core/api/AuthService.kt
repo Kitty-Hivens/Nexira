@@ -7,6 +7,7 @@ import hivens.core.data.AuthStatus
 import hivens.core.data.FileManifest
 import hivens.core.data.SessionData
 import hivens.core.util.HashUtils
+import hivens.core.util.retryWithBackoff
 import io.ktor.client.call.*
 import io.ktor.client.request.forms.*
 import io.ktor.http.*
@@ -26,6 +27,33 @@ class AuthService(
 
     private val logger = LoggerFactory.getLogger(AuthService::class.java)
     private val client get() = clientProvider.current
+
+    /**
+     * Per-server session cache. The dashboard renders server cards by
+     * doing a "list servers" auth, then the Play button does a "launch
+     * server" auth — historically two consecutive logins for the same
+     * serverId within ~3 seconds. Both call sites are legitimate; they
+     * just don't share state. Caching here deduplicates them down to
+     * one network request as long as the user clicks Play within the
+     * TTL window.
+     *
+     * Cache key is `(username, passwordHash, serverId)`. Password hash
+     * is mandatory in the key because otherwise a second login attempt
+     * with the *wrong* password within the 30 s TTL would silently
+     * succeed via cache, masking real credential rotation (Codex P2 on
+     * PR #128). We use the MD5 already computed for the auth request,
+     * not the plaintext password — same secret-handling profile as the
+     * rest of the call.
+     *
+     * 30 s TTL: long enough for "open launcher → pick server → click Play",
+     * short enough that the upstream server still considers the session
+     * fresh. Cache is in-memory only — process restart re-auths.
+     */
+    private data class CacheKey(val username: String, val passwordHash: String, val serverId: String)
+    private data class CachedSession(val session: SessionData, val expiresAt: Long)
+
+    private val sessionCache = java.util.concurrent.ConcurrentHashMap<CacheKey, CachedSession>()
+    private val sessionTtlMs = 30_000L
 
     @Serializable
     private data class AuthRequest(
@@ -55,9 +83,16 @@ class AuthService(
     )
 
     override suspend fun login(username: String, password: String, serverId: String): SessionData {
+        // Hash first so the cache key includes the password — otherwise a
+        // wrong/rotated password within the TTL would silently succeed
+        // via cache. (Codex P2 on PR #128.)
+        val passwordEncoded = HashUtils.md5(password)
+        cachedFor(username, passwordEncoded, serverId)?.let {
+            logger.info("Login via API V3 (server: {}) — cache hit, skipping network", serverId)
+            return it
+        }
         logger.info("Login via API V3 (server: {})...", serverId)
 
-        val passwordEncoded = HashUtils.md5(password)
         val clientSessionId = UUID.randomUUID().toString().replace("-", "")
         val is64 = System.getProperty("os.arch").contains("64")
 
@@ -79,23 +114,27 @@ class AuthService(
         val jsonString = json.encodeToString(requestPayload)
 
         val response: AuthResponse = try {
-            val call = client.submitForm(
-                url = Network.AUTH_URL,
-                formParameters = Parameters.build {
-                    append("action", "login")
-                    append("json", jsonString)
-                }
-            )
-            // Reading the response body as a string for manual error handling
-            val rawBody = call.body<String>().trim()
+            retryWithBackoff(operation = "auth login", shouldRetry = ::isTransientNetworkError) {
+                val call = client.submitForm(
+                    url = Network.AUTH_URL,
+                    formParameters = Parameters.build {
+                        append("action", "login")
+                        append("json", jsonString)
+                    }
+                )
+                // Reading the response body as a string for manual error handling
+                val rawBody = call.body<String>().trim()
 
-            // Handling text server errors
-            if (rawBody.contains("Bad login", ignoreCase = true)) throw AuthException(AuthStatus.BAD_LOGIN, "Invalid login or password")
-            if (rawBody.contains("User not found", ignoreCase = true)) throw AuthException(AuthStatus.BAD_LOGIN, "User not found")
+                // Handling text server errors. These are deliberate auth
+                // rejections from the server, never retryable; isTransientNetworkError
+                // returns false for AuthException so retryWithBackoff bubbles them
+                // out on the first attempt.
+                if (rawBody.contains("Bad login", ignoreCase = true)) throw AuthException(AuthStatus.BAD_LOGIN, "Invalid login or password")
+                if (rawBody.contains("User not found", ignoreCase = true)) throw AuthException(AuthStatus.BAD_LOGIN, "User not found")
 
-            // Parse JSON
-            json.decodeFromString(rawBody)
-
+                // Parse JSON
+                json.decodeFromString<AuthResponse>(rawBody)
+            }
         } catch (e: Exception) {
             if (e is AuthException) throw e
             logger.error("Authorization error", e)
@@ -141,7 +180,22 @@ class AuthService(
             serverId = serverId,
             cachedPassword = password,
             balance = response.money
-        )
+        ).also { cacheSession(username, passwordEncoded, serverId, it) }
+    }
+
+    private fun cachedFor(username: String, passwordHash: String, serverId: String): SessionData? {
+        val key = CacheKey(username, passwordHash, serverId)
+        val cached = sessionCache[key] ?: return null
+        if (System.currentTimeMillis() >= cached.expiresAt) {
+            sessionCache.remove(key, cached)
+            return null
+        }
+        return cached.session
+    }
+
+    private fun cacheSession(username: String, passwordHash: String, serverId: String, session: SessionData) {
+        sessionCache[CacheKey(username, passwordHash, serverId)] =
+            CachedSession(session, System.currentTimeMillis() + sessionTtlMs)
     }
 
     private fun generateGameToken(uid: String?, sessionV3: String?): String? {
@@ -172,6 +226,32 @@ class AuthService(
         rand.nextBytes(mac)
         mac[0] = (mac[0].toInt() and 254).toByte()
         return mac.joinToString("-") { "%02X".format(it) }
+    }
+
+    /**
+     * True for the narrow set of transient network failures we've seen on
+     * the SMARTYcraft channel — h2 frame resets over SOCKS, raw socket
+     * resets during TLS, ktor's wrapped channel-closed exception. NOT true
+     * for [AuthException] (those are server-side rejections, retrying just
+     * locks the user out faster) or SSL cert errors (those need user opt-in,
+     * not a silent retry).
+     */
+    private fun isTransientNetworkError(t: Throwable): Boolean {
+        if (t is AuthException) return false
+        if (t.isSslCertificateError()) return false
+        var cause: Throwable? = t
+        while (cause != null) {
+            if (cause is java.net.ConnectException ||
+                cause is java.net.SocketException ||
+                cause is io.ktor.utils.io.ClosedByteChannelException ||
+                cause is java.net.SocketTimeoutException
+            ) return true
+            if (cause is java.io.IOException &&
+                cause.message?.contains("Connection reset", ignoreCase = true) == true
+            ) return true
+            cause = cause.cause
+        }
+        return false
     }
 
     private fun Throwable.isSslCertificateError(): Boolean {

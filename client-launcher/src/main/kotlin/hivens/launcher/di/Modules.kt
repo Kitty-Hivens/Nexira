@@ -15,6 +15,7 @@ import hivens.launcher.component.EnvironmentPreparer
 import hivens.launcher.component.GameCommandBuilder
 import hivens.launcher.component.ProcessLogHandler
 import hivens.launcher.platform.PlatformPaths
+import hivens.launcher.update.UpdateApplicators
 import hivens.launcher.update.UpdateService
 import io.ktor.client.*
 import io.ktor.client.engine.okhttp.*
@@ -25,6 +26,7 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
+import okhttp3.Protocol as OkProtocol
 import org.koin.core.module.dsl.singleOf
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
@@ -69,6 +71,7 @@ val networkModule = module {
             .connectTimeout(Network.TIMEOUT_CONNECT, TimeUnit.MILLISECONDS)
             .readTimeout(Network.TIMEOUT_READ, TimeUnit.MILLISECONDS)
             .proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress(Network.Proxy.HOST, Network.Proxy.PORT)))
+            .applySmartycraftProtocols()
             .build()
     }
 
@@ -86,6 +89,7 @@ val networkModule = module {
             .sslSocketFactory(socketFactory, trustManager)
             .hostnameVerifier { _, _ -> true }
             .proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress(Network.Proxy.HOST, Network.Proxy.PORT)))
+            .applySmartycraftProtocols()
             .build()
     }
 
@@ -177,7 +181,15 @@ val appModule = module {
         SettingsService(get(), dataDir.resolve(Storage.SETTINGS_FILE))
     }
 
-    single<IFileDownloadService> { FileDownloadService(get()) }
+    single {
+        val dataDir: java.nio.file.Path = get()
+        ProtectedPaths(dataDir.resolve(Storage.PROTECTED_PATHS_FILE), get())
+    }
+    single {
+        val dataDir: java.nio.file.Path = get()
+        ManifestCache(dataDir.resolve("manifest-cache"), get())
+    }
+    single<IFileDownloadService> { FileDownloadService(get(), get(), get()) }
 
     single<IManifestProcessorService> { ManifestProcessorService(get()) }
     single { ProfileManager(get(), get()) }
@@ -229,9 +241,29 @@ val appModule = module {
             settingsService = get()
         )
     }
+
+    // Per-platform update applicator selected at startup. Kept as a singleton
+    // so the shutdown hook each implementation registers fires exactly once.
+    single<IUpdateApplicator> { UpdateApplicators.forCurrentPlatform() }
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+/**
+ * Pins the smartycraft channel to HTTP/1.1 when [Network.FORCE_HTTP1_FOR_SMARTYCRAFT]
+ * is true. h2 multiplexing over the SOCKS hop drops mid-stream on long bodies;
+ * 1.1 with parallel connections trades multiplexing for resilience. Skipped on
+ * the direct channel — its third-party CDN endpoints have rock-solid h2 stacks.
+ *
+ * Qodana correctly notices the flag is currently always-true ([Network.FORCE_HTTP1_FOR_SMARTYCRAFT]
+ * is `const val true`), making the `else this` branch dead at compile time. The
+ * branch stays on purpose — it's a kill-switch for the day h2-over-SOCKS
+ * starts behaving (or for someone debugging whether the pin is what's
+ * causing a new symptom). Suppression below is the explicit "yes, on purpose".
+ */
+@Suppress("KotlinConstantConditions")
+private fun OkHttpClient.Builder.applySmartycraftProtocols(): OkHttpClient.Builder =
+    if (Network.FORCE_HTTP1_FOR_SMARTYCRAFT) protocols(listOf(OkProtocol.HTTP_1_1)) else this
 
 /**
  * Builds an [HttpClient] backed by the given [OkHttpClient].
