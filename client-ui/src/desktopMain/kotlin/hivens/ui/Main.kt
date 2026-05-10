@@ -145,7 +145,6 @@ fun main() {
     setLinuxXToolkitAppClassName(Branding.WM_CLASS)
 
     val paths = PlatformPaths.system()
-    DataDirMigration.run(paths)
     java.nio.file.Files.createDirectories(paths.dataDir)
     CrashReporter.paths = paths
 
@@ -159,6 +158,12 @@ fun main() {
         }
     }
 
+    // Single-instance lock acquired BEFORE migration. Two launchers started
+    // close together would otherwise both reach DataDirMigration.run() and
+    // race on REPLACE_EXISTING file copies — the loser exiting on .lock
+    // wouldn't undo half-written files. (Codex flagged the original order
+    // as P2 on PR #127.) DataDirMigration's emptiness check is taught to
+    // ignore .lock / .show / .migrated so its first-run trigger still fires.
     val lockFile = paths.dataDir.resolve(".lock").toFile()
     val lockChannel = FileOutputStream(lockFile).channel
     val lock = lockChannel.tryLock()
@@ -167,6 +172,8 @@ fun main() {
         paths.dataDir.resolve(".show").toFile().createNewFile()
         exitProcess(0)
     }
+
+    DataDirMigration.run(paths)
 
     startKoin { modules(networkModule, appModule, uiModule) }
 

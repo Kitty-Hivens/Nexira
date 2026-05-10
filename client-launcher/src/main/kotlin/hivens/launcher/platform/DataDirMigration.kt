@@ -29,7 +29,7 @@ object DataDirMigration {
 
         if (!Files.isDirectory(legacy)) return
         if (Files.exists(marker)) return
-        if (Files.isDirectory(target) && !target.isEmpty()) {
+        if (Files.isDirectory(target) && target.hasUserData()) {
             log.info("Target data directory {} already populated; skipping legacy import", target)
             writeMarker(marker, target)
             return
@@ -71,6 +71,22 @@ object DataDirMigration {
         }
     }
 
-    private fun Path.isEmpty(): Boolean =
-        Files.list(this).use { !it.findAny().isPresent }
+    /**
+     * True when the directory contains anything beyond housekeeping markers.
+     *
+     * The launcher writes `.lock` (single-instance file lock) and `.show`
+     * (cross-process "raise the existing instance" signal) into the data
+     * directory before migration runs — see Main.kt's startup sequence.
+     * `.migrated` lands in the legacy directory, but is filtered here too
+     * for symmetry. Treating those as "user data" would cause us to skip
+     * a legitimate first-run migration on the second launch (the .lock
+     * from the first run would already be in place).
+     */
+    private fun Path.hasUserData(): Boolean =
+        Files.list(this).use { stream ->
+            stream.anyMatch { entry ->
+                val name = entry.fileName?.toString() ?: return@anyMatch false
+                name != ".lock" && name != ".show" && name != MARKER
+            }
+        }
 }
