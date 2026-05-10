@@ -22,6 +22,17 @@ single-instance gate failing to actually raise the existing window on
 KDE / Hyprland / GNOME.
 
 ### Highlights
+- **Cold-start much faster after a clean session**: when the server
+  manifest hasn't changed since the last successful sync (TTL 7 days),
+  the launcher skips the per-file MD5 integrity walk. On a 1000-file
+  modpack this collapses multi-second checks into a single hash compare.
+- **Orphan files now actually leave**: when the upstream modpack
+  removes a mod, the corresponding local file is pruned on next sync
+  (was: lingered forever, often causing mismatch crashes on join).
+- **User-extendable protected-paths list**: drop a mod into
+  `dataDir/protected-paths.json` and the launcher will never overwrite
+  configs under that directory, even when the manifest says they're
+  stale. Defaults shipped with the file on first run.
 - **SMARTYcraft channel pinned to HTTP/1.1**: h2 multiplexing over the
   upstream SOCKS proxy was dropping mid-stream on long bodies. 1.1 with
   parallel connections trades multiplexing for resilience. Direct channel
@@ -73,6 +84,21 @@ KDE / Hyprland / GNOME.
   ignores housekeeping files (`.lock`, `.show`, `.migrated`) — a
   follow-up to the lock-before-migration order so first-run still triggers
   when the lock file already exists in the target dir.
+- `UpdateApplicator` (320-line `object`) split into `IUpdateApplicator`
+  interface + `Windows`/`Mac`/`Linux`/`NoOp` implementations selected by
+  `OS` at startup. Per-platform shutdown hooks register exactly once via
+  Koin singleton. `UpdateDialog` switched from static call to injected
+  interface.
+- `extra.zip` unpacking now snapshots the extracted file list into
+  `.extra_unpacked_index.json`. On the next sync, files in the old
+  snapshot but not in the new one are pruned (orphans removed by the
+  upstream modpack). Protected paths are never touched even if they
+  appeared in the previous index.
+- `FileDownloadService.processSession` short-circuits the per-file MD5
+  walk when the manifest hash matches the last successful sync (TTL
+  7 days). Cache lives at `dataDir/manifest-cache/<server>.json`. On
+  a 1000-file modpack this turns multi-second cold-start integrity
+  checks into a single hash comparison.
 
 ## [2.2.8] - 2026-05-10
 
