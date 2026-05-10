@@ -18,12 +18,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.mikepenz.markdown.m3.Markdown
+import hivens.core.api.interfaces.IUpdateApplicator
 import hivens.core.data.LauncherUpdate
-import hivens.launcher.update.UpdateApplicator
 import hivens.launcher.update.UpdateService
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
 import kotlinx.coroutines.launch
+import org.koin.compose.koinInject
 import org.slf4j.LoggerFactory
 import kotlin.math.roundToInt
 import kotlin.system.exitProcess
@@ -35,9 +36,10 @@ fun UpdateDialog(
     updateService: UpdateService,
     onDismiss: () -> Unit
 ) {
-    val s      = LocalStrings.current
-    val logger = LoggerFactory.getLogger("UpdateDialog")
-    val scope  = rememberCoroutineScope()
+    val s              = LocalStrings.current
+    val logger         = LoggerFactory.getLogger("UpdateDialog")
+    val scope          = rememberCoroutineScope()
+    val updateApplicator: IUpdateApplicator = koinInject()
 
     var downloadState by remember { mutableStateOf<DownloadState>(DownloadState.Idle) }
     var errorMessage  by remember { mutableStateOf<String?>(null) }
@@ -289,7 +291,7 @@ fun UpdateDialog(
                             Button(
                                 onClick = {
                                     try {
-                                        UpdateApplicator.scheduleUpdate(java.nio.file.Paths.get(path))
+                                        updateApplicator.scheduleUpdate(java.nio.file.Paths.get(path))
                                         logger.info("Update scheduled, exiting...")
                                         exitProcess(0)
                                     } catch (e: Exception) {
