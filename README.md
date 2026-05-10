@@ -35,10 +35,10 @@
 
 | Platform | File |
   |---|---|
-| 🪟 Windows | `AuraLauncher-*-Setup.exe` |
-| 🪟 Windows (portable) | `AuraLauncher-*-Windows-Portable.zip` |
-| 🐧 Linux | `AuraLauncher-*-x86_64.AppImage` |
-| 🍎 macOS | `AuraLauncher-*.dmg` |
+| Windows | `AuraLauncher-*-Setup.exe` |
+| Windows (portable) | `AuraLauncher-*-Windows-Portable.zip` |
+| Linux | `AuraLauncher-*-x86_64.AppImage` |
+| macOS | `AuraLauncher-*.dmg` |
 
 → [**Latest Release**](https://github.com/Kitty-Hivens/Aura-Launcher/releases/latest)
 
@@ -54,4 +54,5 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
 ---
 
-> Not affiliated with or endorsed by SMARTYcraft.
+> Not affiliated with or endorsed by SMARTYcraft.  
+> Protocol constants reverse-engineered from [`Kitty-Hivens/smrt-deco`](https://github.com/Kitty-Hivens/smrt-deco).

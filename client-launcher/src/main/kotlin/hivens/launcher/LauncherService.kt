@@ -1,7 +1,6 @@
 package hivens.launcher
 
 import hivens.core.api.interfaces.ILauncherService
-import hivens.core.api.interfaces.IManifestProcessorService
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.FileManifest
 import hivens.core.data.InstanceProfile
@@ -19,20 +18,21 @@ import java.nio.file.Path
 /**
  * Implementation of the Minecraft client launch service.
  *
- * <p>Acts as a facade, coordinating the work of environment preparation components ([EnvironmentPreparer]),
- * classpath build ([ClasspathProvider]) and command line build ([GameCommandBuilder]).</p>
+ * Acts as a facade, coordinating the work of [EnvironmentPreparer] (natives + assets),
+ * [ClasspathProvider] (manifest → classpath), [GameCommandBuilder] (version-specific JVM
+ * command) and [ProcessLogHandler] (stdout/stderr interception). All collaborators are
+ * supplied via constructor injection so that this service can be unit-tested in isolation.
  */
-class LauncherService(
-    manifestProcessor: IManifestProcessorService,
+internal class LauncherService(
     private val profileManager: ProfileManager,
     private val javaManager: JavaManagerService,
-    private val envPreparer: EnvironmentPreparer
+    private val envPreparer: EnvironmentPreparer,
+    private val classpathProvider: ClasspathProvider,
+    private val commandBuilder: GameCommandBuilder,
+    private val logHandler: ProcessLogHandler
 ) : ILauncherService {
 
     private val log = LoggerFactory.getLogger(LauncherService::class.java)
-    private val classpathProvider = ClasspathProvider(manifestProcessor)
-    private val commandBuilder = GameCommandBuilder()
-    private val logHandler = ProcessLogHandler()
 
     /**
      * Launches a client with log interception.
@@ -52,8 +52,7 @@ class LauncherService(
         val version = serverProfile.version
 
         // 1. Memory allocation strategy
-        var memory = if (profile.memoryMb > 0) profile.memoryMb else allocatedMemoryMB
-        if (memory < 768) memory = 1024
+        val memory = normalizeMemory(profile.memoryMb, allocatedMemoryMB)
 
         // 2. Determining the path to Java
         val javaExec: String = resolveJavaPath(profile, javaExecutablePath, version)
@@ -108,7 +107,7 @@ class LauncherService(
      * Selects the appropriate Java Runtime.
      * Priority: Profile Setup -> Managed Java (JavaManager) -> System Java.
      */
-    private suspend fun resolveJavaPath(profile: InstanceProfile, defaultPath: Path, version: String): String {
+    internal suspend fun resolveJavaPath(profile: InstanceProfile, defaultPath: Path, version: String): String {
         if (!profile.javaPath.isNullOrEmpty()) return profile.javaPath!!
         runCatching {
             val managedPath = javaManager.getJavaPath(version)
@@ -116,5 +115,17 @@ class LauncherService(
         }
         if (Files.exists(defaultPath)) return defaultPath.toString()
         return "java"
+    }
+
+    internal companion object {
+        /**
+         * Memory allocation rule: profile's per-instance value wins when positive,
+         * otherwise the launcher's globally allocated value is used. Anything below
+         * 768 MB is bumped to 1024 MB to keep modded clients viable.
+         */
+        internal fun normalizeMemory(profileMb: Int, allocatedMb: Int): Int {
+            val raw = if (profileMb > 0) profileMb else allocatedMb
+            return if (raw < 768) 1024 else raw
+        }
     }
 }

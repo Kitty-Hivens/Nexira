@@ -1,7 +1,176 @@
 # Changelog
 
 All notable changes to Aura Launcher will be documented in this file.
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+
+Each released entry should open with a short `### Highlights` block —
+2-5 plain-English bullets summarizing what the user actually notices.
+The launcher's in-app update dialog renders just the Highlights; the
+detailed `### Added`/`### Changed`/`### Fixed`/`### Removed` sections
+below are for the GitHub release page and CHANGELOG readers.
+
+## [Unreleased]
+
+## [2.2.8] - 2026-05-10
+
+Update Channels chunk — gives the launcher two new tools for surviving the
+upstream cadence: a server-controlled mandatory-update floor (so the launcher
+refuses to start when the protocol breaks compat with installed builds), and
+an opt-in pre-release channel (so RC builds reach users before the next
+stable cut). Both gated by a master "Experimental features" toggle. Shipped
+as a non-prerelease so existing 2.2.7-rc3 users actually receive it — older
+launchers ignore prereleases by GitHub API contract.
+
+### Highlights
+- **Mandatory updates**: launcher refuses to start when the installed version
+  drops below `mandatory_min_version` published in `meta/update-channel.json`.
+  No new server infra — the file lives on the `stable` branch and is updated
+  via PR. Triggers a non-dismissable dialog with "Install" or "Quit".
+- **Pre-release update channel**: opt in to receive RC and beta builds before
+  the next stable. Currently ON by default while the upstream protocol is a
+  moving target; expected to flip to OFF once cadence stabilises.
+- **Experimental features master toggle** in Settings — gates both knobs
+  above with a single switch for users who want a calm upgrade story.
+- **Near-real-time mandatory rollouts**: a long-running launcher session
+  polls `update-channel.json` every 5 minutes (cheap, no GitHub API quota),
+  so when an emergency upgrade is published the user sees the blocking
+  dialog within ~5 minutes — no need to restart the launcher to pick it up.
+  Routine release checks stay on the existing 12 h cadence.
+- Strict version comparison in the update flow: `1.3.0 > 1.3.0-rc3`,
+  `rc1 < rc2 < rc3`, `alpha < beta < rc`. Without this the prerelease channel
+  would consider RC bumps within the same base "the same version".
+
+### Added
+- `meta/update-channel.json` — out-of-band channel metadata fetched via the
+  direct HTTP channel (no SMARTYcraft proxy dependency). Carries
+  `mandatory_min_version` and an optional human `reason` shown in the
+  blocking dialog. Initial value is `null` (no floor); flipping it activates
+  enforcement on the next update check (within the 12 h cooldown).
+- `UpdateChannelMeta` data class wrapping the JSON above.
+- `LauncherUpdate.isMandatory` / `mandatoryReason` fields propagating the
+  decision to the UI layer.
+- Three booleans on `SettingsData`: `experimentalFeaturesEnabled` (master),
+  `mandatoryUpdatesEnabled`, `prereleaseChannelEnabled`. All default to ON.
+- "Experimental features" section in `SettingsScreen` with Material icons,
+  master + two children, sub-rows greyed out when the master is off.
+- `UpdateDialog` mandatory mode: red banner with reason, no "Later" button,
+  hard "Quit" button (clean `exitProcess(0)`), backdrop dismiss disabled.
+- `UpdateService` tests: 6 new cases for channel selection (prerelease ON
+  vs OFF, master OFF forces both children OFF) and mandatory floor (above
+  current, at-or-below, missing meta, mandatory toggle OFF, v-prefix
+  normalisation), plus 4 new SemVer-suffix cases for `compareVersions`.
+
+### Changed
+- `UpdateService.compareVersions` is now strict on prerelease suffixes
+  (was: strip suffix and compare numeric base only). Final beats any RC at
+  the same base; lex compare on the suffix orders `alpha < beta < rc1 < rc2`
+  for the launcher's release cadence.
+- `UpdateService` reads `ISettingsService` and dispatches between
+  `/releases/latest` (stable channel) and `/releases?per_page=20` filtered
+  for non-draft entries (prerelease channel).
+- `UpdateManager` routes mandatory updates straight to the modal dialog
+  (skipping the corner notification), same as critical updates.
+
+## [2.2.7-rc3] - 2026-05-10
+
+Release candidate for [2.2.7], superseding rc2 with the freshly-rotated
+upstream version pin (smrt-deco 3.6.5, pushed 2026-05-10) and a runtime
+knob to ride out the *next* upstream rotation without waiting for a
+launcher release. CI internals also got a couple of paper-cut fixes —
+metainfo injection now uses `xmlstarlet` instead of regex-on-XML, and
+the AppImage assembly bash moved from inline yaml into a shell script.
+
+### Highlights
+- Mimicked launcher version bumped to **SMARTYcraft 3.6.5** (rc2 was 3.6.4).
+  No protocol bytes changed beyond the version string; proxy creds, AES
+  params and salt are all unchanged.
+- New **experimental override** for the mimicked version: pass
+  `-Dsmrt.mimic.version=X.Y.Z` on the JVM command line to claim a different
+  launcher version without rebuilding. Useful when upstream rotates the
+  pin and a launcher update has not shipped yet.
+
+## [2.2.7-rc2] - 2026-05-07
+
+Release candidate for [2.2.7]. Same code; canary tag for catching install
+regressions on Windows / macOS / Linux before the public bump. (rc1 failed
+on Inno Setup `VersionInfoVersion` strict-version validation; fixed by
+stripping the pre-release suffix in setup.iss the same way build.gradle.kts
+already does for Compose's `packageVersion`.)
+
+### Highlights
+- **Required upgrade** once promoted: SMARTYcraft 3.6.4 protocol sync, plus a
+  new direct HTTP channel that keeps auto-update alive when the upstream
+  proxy is unreachable. See [2.2.7] below for the full notes.
+
+## [2.2.7] - 2026-05-07
+
+### Highlights
+- **Required upgrade**: SMARTYcraft 3.6.5 protocol sync — proxy credentials
+  rotated upstream, so anything older than this build cannot authenticate.
+- Auto-updater and JDK/natives downloads now bypass the SMARTYcraft proxy,
+  so the launcher can still update itself when the upstream is unreachable.
+- Window icon and WM_CLASS render correctly on KDE Plasma, Hyprland and
+  GNOME — workspace overviews show the proper hi-res launcher icon instead
+  of a generic "broken file" glyph, on every JDK vendor.
+- Per-OS data directory with automatic migration from `~/.aura`; relocate
+  via the `AURA_DATA_DIR` env var.
+- Update dialog reads a tidy "What's new" summary from a published
+  `release-manifest.json` instead of scraping the raw changelog body.
+
+### Added
+- Direct HTTP channel (`HttpClientProvider` qualified `named("direct")`) for
+  third-party CDNs that don't tunnel through the SMARTYcraft proxy. Used
+  by `UpdateService`, `JavaManagerService` and `EnvironmentPreparer` so
+  GitHub releases, BellSoft JDKs and Maven Central LWJGL natives stay
+  reachable across SMARTYcraft outages.
+- `Branding.WM_CLASS` constant — single source of truth for the X11/Wayland
+  app identity that must match `StartupWMClass=` in the .desktop entry and
+  the AppStream metainfo `<id>` slug.
+- Per-OS data directory: `%APPDATA%\AuraLauncher` on Windows,
+  `~/Library/Application Support/AuraLauncher` on macOS,
+  `~/.local/share/aura-launcher` on Linux. Override via `AURA_DATA_DIR`.
+- `release-manifest.json` published alongside binaries; in-app dialog
+  renders a Highlights-only "What's new" view instead of the raw body.
+- Documentation site (Astro Starlight) deployed to GitHub Pages with
+  Russian localization; CONTRIBUTING, SECURITY and issue templates.
+
+### Changed
+- **Protocol sync (smrt-deco 3.6.3 → 3.6.5)**: `MIMIC_LAUNCHER_VERSION`
+  3.6.3 → 3.6.5; SOCKS proxy port 1080 → 58613, user
+  `proxyuser` → `smartycraftproxyuser`, password rotated.
+  `MIMIC_LAUNCHER_VERSION` is now runtime-resolvable via
+  `-Dsmrt.mimic.version=X.Y.Z` (gated behind a new
+  `@ExperimentalProtocolOverride` opt-in marker) so users can react to
+  the next upstream rotation without waiting for a launcher build.
+- `AppConfig` split into `Branding` / `Network` / `Protocol` / `Storage`
+  for clearer ownership; `LauncherService` collaborators are now
+  constructor-injected (DI-friendly, mockable).
+- Single-source icon pipeline: edit `resources/branding/app-icon.png` and
+  `tray-icon.png`, run `scripts/regenerate-icons.sh` to produce every
+  derived variant. Multi-size Windows ICO (16/32/48/64/128/256) replaces
+  the single 64-px frame Explorer used to downscale to blurry placeholders.
+- Dependency versions consolidated into `gradle/libs.versions.toml`.
+
+### Fixed
+- **WM_CLASS mismatch on Linux**: KDE / Hyprland / GNOME workspace overviews
+  now match the live window to `aura-launcher.desktop` and pick up the
+  hicolor icon. The previous fix relied on `-Dawt.appClassName`, which only
+  JBR honours; the launcher now reflects into
+  `sun.awt.X11.XToolkit.awtAppClassName` so stock OpenJDK distributions
+  (Liberica, Temurin, …) work too.
+- **Auto-updater survives SMARTYcraft proxy outages**: GitHub release fetch
+  and binary download now route through the direct HTTP channel and no
+  longer require the upstream SOCKS proxy to be reachable.
+- **`Res.drawable.icon` startup crash**: moved `icon.ico` out of
+  `composeResources/drawable/` to `resources/icons/` so Compose Resources
+  no longer indexes two files under the same stem and `painterResource`
+  resolves cleanly.
+
+### Removed
+- Compose `linux { iconFile.set(...) }` block — the Linux package
+  distributable task is not invoked; releases ship via AppImage assembled
+  in CI from `resources/icons/`.
+
 ## [2.2.6] - 2026-03-26
 
 ### Fixed
@@ -196,7 +365,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
   when rapidly switching images; clears on next GC cycle
 ## [2.0.3] - 2026-03-15
 
-### ⚠️ Known Issue - Custom Background
+### Known Issue - Custom Background
 > **It is highly recommended not to use the Custom Background feature in this version.**
 > Despite the partial fix for the native memory leak, enabling/disabling the background
 > does not release resources completely, but animated GIFs/WebPs continue to accumulate

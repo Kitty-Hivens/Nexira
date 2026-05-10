@@ -34,7 +34,8 @@ import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
 import coil3.request.crossfade
-import hivens.config.AppConfig
+import hivens.config.Network
+import hivens.config.Protocol
 import hivens.core.api.AuthException
 import hivens.core.api.interfaces.IAuthService
 import hivens.core.api.interfaces.IServerListService
@@ -133,7 +134,7 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
         scope.launch {
             try {
                 val session = withContext(Dispatchers.IO) {
-                    val lastServer = profileManager.lastServerId ?: AppConfig.DEFAULT_SERVER_ID
+                    val lastServer = profileManager.lastServerId ?: Protocol.DEFAULT_SERVER_ID
                     val sess = service.login(login, password, lastServer)
                     if (rememberMe) credentialsManager.save(sess)
                     sess
@@ -321,7 +322,7 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
             text    = s.loginRegister,
             onClick = {
                 runCatching {
-                    val url = "${AppConfig.BASE_URL}/register"
+                    val url = "${Network.BASE_URL}/register"
                     if (Desktop.isDesktopSupported() &&
                         Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)
                     ) {
@@ -584,7 +585,7 @@ private fun CompactNewsItem(item: NewsItem) {
                 // Build a best-effort URL from the image URL pattern:
                 // https://smartycraft.ru/images/news/mini/news1.jpg  →  https://smartycraft.ru/news{id}
                 try {
-                    val url = "${AppConfig.BASE_URL}/news${item.id}"
+                    val url = "${Network.BASE_URL}/news${item.id}"
                     if (Desktop.isDesktopSupported() &&
                         Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)
                     ) {

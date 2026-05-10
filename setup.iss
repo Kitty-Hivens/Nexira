@@ -10,6 +10,16 @@
   #define AppVersion "0.0.0-dev"
 #endif
 
+; VersionInfoVersion writes into the PE header (VS_FIXEDFILEINFO), which
+; Windows requires to be MAJOR.MINOR[.BUILD[.REVISION]] — digits only. Strip
+; any pre-release suffix (e.g. "2.2.7-rc1" -> "2.2.7"). Mirrors the same
+; normalization done in client-ui/build.gradle.kts for Compose's packageVersion.
+#if Pos("-", AppVersion) > 0
+  #define VersionInfo Copy(AppVersion, 1, Pos("-", AppVersion) - 1)
+#else
+  #define VersionInfo AppVersion
+#endif
+
 #define MyAppName      "Aura Launcher"
 #define MyAppPublisher "Hivens"
 #define MyAppURL       "https://github.com/Kitty-Hivens/Aura-Launcher"
@@ -28,7 +38,8 @@ AppSupportURL={#MyAppURL}/issues
 AppUpdatesURL={#MyAppURL}/releases
 
 ; ── Privileges ──────────────────────────────────────────────────────────────
-; No UAC prompt — installs into %AppData% without admin rights.
+; No UAC prompt — installs into %AppData% (Roaming) without admin rights.
+; User-generated data (clients, profiles, logs) lives separately in %LocalAppData%\AuraLauncher.
 ; The dialog option lets a power user elevate if they WANT a machine-wide install.
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
@@ -41,7 +52,7 @@ DisableProgramGroupPage=yes
 ; ── Output ──────────────────────────────────────────────────────────────────
 OutputDir=.
 OutputBaseFilename=AuraLauncher-Setup
-SetupIconFile=client-ui\src\commonMain\composeResources\drawable\icon.ico
+SetupIconFile=resources\icons\icon.ico
 
 ; ── Compression ─────────────────────────────────────────────────────────────
 Compression=lzma2/ultra64
@@ -59,13 +70,13 @@ DisableReadyPage=no
 ; ── Uninstaller ─────────────────────────────────────────────────────────────
 UninstallDisplayName={#MyAppName}
 UninstallDisplayIcon={app}\{#MyAppExeName}
-; Do NOT auto-delete the user's game data in %AppData%\.aura
-; The user can remove it manually if needed.
+; Do NOT auto-delete the user's game data in %LocalAppData%\AuraLauncher
+; (or the legacy %UserProfile%\.aura directory). The user can remove it manually.
 CloseApplications=force
 CloseApplicationsFilter=*{#MyAppExeName}*
 
 ; ── Version info embedded in installer EXE ──────────────────────────────────
-VersionInfoVersion={#AppVersion}
+VersionInfoVersion={#VersionInfo}
 VersionInfoCompany={#MyAppPublisher}
 VersionInfoDescription={#MyAppName} Installer
 VersionInfoProductName={#MyAppName}
@@ -105,7 +116,7 @@ Filename: "{app}\{#MyAppExeName}"; \
 
 [UninstallDelete]
 ; Remove the install directory if empty after uninstall
-; (user data lives in %AppData%\.aura, NOT touched here)
+; (user data lives in %LocalAppData%\AuraLauncher, NOT touched here)
 Type: dirifempty; Name: "{app}"
 
 [Code]

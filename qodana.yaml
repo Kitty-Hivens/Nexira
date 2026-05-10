@@ -18,6 +18,12 @@ exclude:
   - name: UnusedSymbol
   - name: AssignedValueIsNeverRead
   - name: HasPlatformType
+  # KDoc cross-module references are unresolvable by design — the strict
+  # one-way module layering (config ← core ← launcher ← ui) means lower
+  # modules legitimately reference upper-module symbols in human-readable
+  # docs without being able to import them. We've decided that's a feature,
+  # not a typo source worth catching.
+  - name: KDocUnresolvedReference
 
 projectJDK: "21" #(Applied in CI/CD pipeline)
 

@@ -1,6 +1,6 @@
 plugins {
-    kotlin("jvm")
-    id("com.github.gmazzo.buildconfig")
+    alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.buildconfig)
 }
 
 // Set up class generation

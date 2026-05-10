@@ -7,7 +7,7 @@ object EnglishStrings : AppStrings {
     override val appVersion get() = appName
 
     // Login
-    override val loginTitle        = "Aura Client"
+    override val loginTitle        = "Aura Launcher"
     override val loginUsername     = "Username"
     override val loginPassword     = "Password"
     override val loginRemember     = "Remember password"
@@ -128,9 +128,17 @@ object EnglishStrings : AppStrings {
     // Update
     override val updateTitle           = "Update available"
     override val updateTitleCritical   = "CRITICAL UPDATE"
+    override val updateTitleMandatory  = "MANDATORY UPDATE"
     override val updateCriticalBanner  = "This update contains critical security fixes."
-    override val updateChangelog       = "What's new:"
+    override val updateMandatoryBanner =
+        "Server-side compatibility broke for older versions. The launcher cannot continue without this update."
+    override fun updateMandatoryBannerWithReason(reason: String) =
+        "Required by the upstream protocol: $reason"
+    override val updateChangelog       = "Full changelog"
+    override val updateHighlights      = "What's new"
+    override val updateViewOnGitHub    = "View on GitHub"
     override val updateLater           = "Later"
+    override val updateExit            = "Quit"
     override val updateDownload        = "Download and install"
     override val updateDownloadNow     = "DOWNLOAD NOW"
     override val updateDownloading     = "Downloading..."
@@ -293,6 +301,15 @@ object EnglishStrings : AppStrings {
     // --- Settings: Start in tray ---
     override val settingsStartInTray     = "Start in tray"
     override val settingsStartInTrayDesc = "Launch minimized; closing the window hides it to tray"
+
+    // --- Settings: Experimental features ---
+    override val settingsSectionExperimental    = "Experimental features"
+    override val settingsExperimentalMaster     = "Experimental features"
+    override val settingsExperimentalMasterDesc = "Master toggle. Disabling this forces both knobs below to off, regardless of their stored values."
+    override val settingsMandatoryUpdates       = "Mandatory updates"
+    override val settingsMandatoryUpdatesDesc   = "Block startup until critical updates are installed when the upstream protocol breaks. Currently ON by default."
+    override val settingsPrereleaseChannel      = "Pre-release update channel"
+    override val settingsPrereleaseChannelDesc  = "Receive RC and beta builds. Lets you get protocol fixes before the next stable release. Currently ON by default."
 
     // April Fools
     override fun aprilCloseTitle(escapes: Int) = when {

@@ -1,4 +1,4 @@
-rootProject.name = "smartycraft-open-launcher"
+rootProject.name = "aura-launcher"
 
 include(":client-config")
 include(":client-core")

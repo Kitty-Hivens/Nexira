@@ -1,5 +1,7 @@
 package hivens.launcher.update
 
+import hivens.core.api.interfaces.ISettingsService
+import hivens.core.data.SettingsData
 import hivens.test.MockResponse
 import hivens.test.buildMockClient
 import io.ktor.http.*
@@ -16,19 +18,48 @@ class UpdateServiceTest {
         encodeDefaults = true
     }
 
+    /**
+     * Stub settings service backed by a mutable [SettingsData] reference.
+     * Tests pre-load whatever toggles they want via [fakeSettings] and pass
+     * the result to [createService].
+     */
+    private class FakeSettingsService(initial: SettingsData) : ISettingsService {
+        private var current: SettingsData = initial
+        override fun getSettings(): SettingsData = current
+        override fun saveSettings(settings: SettingsData) { current = settings }
+    }
+
+    private fun fakeSettings(
+        experimentalFeaturesEnabled: Boolean = true,
+        mandatoryUpdatesEnabled: Boolean = true,
+        prereleaseChannelEnabled: Boolean = false  // default OFF in tests so existing /releases/latest mocks work
+    ): ISettingsService = FakeSettingsService(
+        SettingsData(
+            experimentalFeaturesEnabled = experimentalFeaturesEnabled,
+            mandatoryUpdatesEnabled = mandatoryUpdatesEnabled,
+            prereleaseChannelEnabled = prereleaseChannelEnabled
+        )
+    )
+
     private fun createService(
-        vararg responses: MockResponse
+        vararg responses: MockResponse,
+        settings: ISettingsService = fakeSettings()
     ): UpdateService {
         val tempDir = Files.createTempDirectory("update-test")
         tempDir.toFile().deleteOnExit()
         return UpdateService(
             clientProvider = buildMockClient(*responses),
             json = json,
-            dataDirectory = tempDir
+            dataDirectory = tempDir,
+            settingsService = settings
         )
     }
 
-    private fun createService(body: String, status: HttpStatusCode = HttpStatusCode.OK): UpdateService {
+    private fun createService(
+        body: String,
+        status: HttpStatusCode = HttpStatusCode.OK,
+        settings: ISettingsService = fakeSettings()
+    ): UpdateService {
         val tempDir = Files.createTempDirectory("update-test")
         tempDir.toFile().deleteOnExit()
         return UpdateService(
@@ -37,7 +68,8 @@ class UpdateServiceTest {
                 MockResponse(urlContains = "releases",        body = "[$body]", status = status)
             ),
             json = json,
-            dataDirectory = tempDir
+            dataDirectory = tempDir,
+            settingsService = settings
         )
     }
 
@@ -106,17 +138,35 @@ class UpdateServiceTest {
     }
 
     @Test
-    fun `compareVersions strips prerelease suffix before comparing`() {
+    fun `compareVersions still compares numeric base across suffixes`() {
         val svc = createService("{}")
-        // "2.0.0-beta" should compare as 2.0.0 which is greater than 1.3.0
+        // "2.0.0-beta" base = 2.0.0, greater than 1.3.0 regardless of suffix
         assertTrue(svc.compareVersions("2.0.0-beta", "1.3.0") > 0)
     }
 
     @Test
-    fun `compareVersions treats prerelease versions with same base as equal`() {
+    fun `compareVersions ranks final above any prerelease at same base`() {
         val svc = createService("{}")
-        // Both strip to 1.3.0
-        assertEquals(0, svc.compareVersions("1.3.0-rc1", "1.3.0-beta2"))
+        // Final 1.3.0 > 1.3.0-rc3 — without this the prerelease channel would
+        // accidentally consider users on a final build "behind" the latest RC.
+        assertTrue(svc.compareVersions("1.3.0", "1.3.0-rc3") > 0)
+        assertTrue(svc.compareVersions("1.3.0-rc3", "1.3.0") < 0)
+    }
+
+    @Test
+    fun `compareVersions orders prerelease suffixes lexicographically`() {
+        val svc = createService("{}")
+        // SemVer-ish: alpha < beta < rc, and rc1 < rc2. Lex compare on the
+        // suffix string is sufficient for the launcher's release cadence.
+        assertTrue(svc.compareVersions("1.3.0-rc2", "1.3.0-rc1") > 0)
+        assertTrue(svc.compareVersions("1.3.0-beta", "1.3.0-alpha") > 0)
+        assertTrue(svc.compareVersions("1.3.0-rc1", "1.3.0-beta3") > 0)
+    }
+
+    @Test
+    fun `compareVersions returns zero for identical prerelease tags`() {
+        val svc = createService("{}")
+        assertEquals(0, svc.compareVersions("1.3.0-rc3", "1.3.0-rc3"))
     }
 
     @Test
@@ -337,7 +387,7 @@ class UpdateServiceTest {
     @Test
     fun `checkForUpdate returns null when versions are equal`() = runTest {
         // Use the actual client version from config
-        val currentVersion = hivens.config.AppConfig.CLIENT_VERSION.removePrefix("v")
+        val currentVersion = hivens.config.Branding.VERSION.removePrefix("v")
         val svc = createService(githubReleaseJson(tagName = "v$currentVersion"))
         val update = svc.checkForUpdate(force = true)
 
@@ -440,7 +490,8 @@ class UpdateServiceTest {
         val svc = UpdateService(
             clientProvider = buildMockClient(body = "{}"),
             json = json,
-            dataDirectory = tempDir
+            dataDirectory = tempDir,
+            settingsService = fakeSettings()
         )
         svc.cleanupOldUpdates()
 
@@ -449,5 +500,200 @@ class UpdateServiceTest {
         assertFalse(Files.exists(updatesDir.resolve("AuraLauncher-1.0.0-x86_64.AppImage")))
         assertTrue(Files.exists(updatesDir.resolve(".last_check")), ".last_check should survive")
         assertTrue(Files.exists(updatesDir.resolve("notes.txt")), "notes.txt should survive")
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Update channel selection (prerelease toggle)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `prerelease channel ON picks first non-draft from releases list`() = runTest {
+        // Two releases in the list: a draft (must be skipped) and a published
+        // RC (must be picked). The /releases/latest endpoint isn't even hit
+        // when prereleases are on — wire it to fail to prove that.
+        val draft = githubReleaseJson(tagName = "v99.9.9", body = "draft")
+            .replace("\"prerelease\": false", "\"prerelease\": false,\n            \"draft\": true")
+        val rc = githubReleaseJson(tagName = "v99.0.0-rc1", body = "rc body")
+        val svc = createService(
+            MockResponse(urlContains = "releases/latest", body = "BOOM", status = HttpStatusCode.InternalServerError),
+            MockResponse(urlContains = "releases",        body = "[$draft,$rc]"),
+            settings = fakeSettings(prereleaseChannelEnabled = true)
+        )
+        val update = svc.checkForUpdate(force = true)
+        assertNotNull(update)
+        assertEquals("v99.0.0-rc1", update.version)
+    }
+
+    @Test
+    fun `prerelease channel OFF still uses releases-latest endpoint`() = runTest {
+        // /releases (the list endpoint) is broken — if the code accidentally
+        // hits it when prereleases are off, the test will fail.
+        val svc = createService(
+            MockResponse(urlContains = "releases/latest", body = githubReleaseJson(tagName = "v99.0.0")),
+            MockResponse(urlContains = "releases",        body = "BOOM",            status = HttpStatusCode.InternalServerError),
+            settings = fakeSettings(prereleaseChannelEnabled = false)
+        )
+        val update = svc.checkForUpdate(force = true)
+        assertNotNull(update)
+        assertEquals("v99.0.0", update.version)
+    }
+
+    @Test
+    fun `experimental master OFF forces both children OFF`() = runTest {
+        // Master off → prereleases off (so /releases/latest is the path, not
+        // /releases) AND mandatory off (so even a high floor doesn't block).
+        val release = githubReleaseJson(tagName = "v99.0.0")
+        val channelMeta = """{"mandatory_min_version":"999.0.0","reason":"upstream broke"}"""
+        val svc = createService(
+            MockResponse(urlContains = "releases/latest",     body = release),
+            MockResponse(urlContains = "releases",            body = "BOOM", status = HttpStatusCode.InternalServerError),
+            MockResponse(urlContains = "update-channel.json", body = channelMeta),
+            settings = fakeSettings(experimentalFeaturesEnabled = false)
+        )
+        val update = svc.checkForUpdate(force = true)
+        assertNotNull(update)
+        assertFalse(update.isMandatory, "Master off must force mandatory off even when floor > current")
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Mandatory floor (out-of-band update-channel.json)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `mandatory floor above current marks update as mandatory`() = runTest {
+        val channelMeta = """{"mandatory_min_version":"999.0.0","reason":"upstream protocol broke"}"""
+        val svc = createService(
+            MockResponse(urlContains = "releases/latest",     body = githubReleaseJson(tagName = "v999.0.0")),
+            MockResponse(urlContains = "releases",            body = "[${githubReleaseJson(tagName = "v999.0.0")}]"),
+            MockResponse(urlContains = "update-channel.json", body = channelMeta),
+            settings = fakeSettings()  // mandatory ON, prereleases OFF (default)
+        )
+        val update = svc.checkForUpdate(force = true)
+        assertNotNull(update)
+        assertTrue(update.isMandatory, "Floor 999.0.0 > installed should mandate the update")
+        assertEquals("upstream protocol broke", update.mandatoryReason)
+    }
+
+    @Test
+    fun `mandatory floor at-or-below current does not mandate`() = runTest {
+        // Floor "0.0.0" — strictly below any real installed version.
+        val channelMeta = """{"mandatory_min_version":"0.0.0","reason":null}"""
+        val svc = createService(
+            MockResponse(urlContains = "releases/latest",     body = githubReleaseJson(tagName = "v999.0.0")),
+            MockResponse(urlContains = "releases",            body = "[${githubReleaseJson(tagName = "v999.0.0")}]"),
+            MockResponse(urlContains = "update-channel.json", body = channelMeta),
+            settings = fakeSettings()
+        )
+        val update = svc.checkForUpdate(force = true)
+        assertNotNull(update)
+        assertFalse(update.isMandatory)
+        assertNull(update.mandatoryReason)
+    }
+
+    @Test
+    fun `missing channel meta degrades to non-mandatory`() = runTest {
+        // 404 on the meta endpoint must not break the update flow.
+        val svc = createService(
+            MockResponse(urlContains = "releases/latest",     body = githubReleaseJson(tagName = "v999.0.0")),
+            MockResponse(urlContains = "releases",            body = "[${githubReleaseJson(tagName = "v999.0.0")}]"),
+            MockResponse(urlContains = "update-channel.json", body = "Not Found", status = HttpStatusCode.NotFound),
+            settings = fakeSettings()
+        )
+        val update = svc.checkForUpdate(force = true)
+        assertNotNull(update)
+        assertFalse(update.isMandatory, "Missing channel meta must not block startup")
+    }
+
+    @Test
+    fun `mandatoryUpdatesEnabled OFF disables enforcement even with high floor`() = runTest {
+        val channelMeta = """{"mandatory_min_version":"999.0.0","reason":"upstream broke"}"""
+        val svc = createService(
+            MockResponse(urlContains = "releases/latest",     body = githubReleaseJson(tagName = "v999.0.0")),
+            MockResponse(urlContains = "releases",            body = "[${githubReleaseJson(tagName = "v999.0.0")}]"),
+            MockResponse(urlContains = "update-channel.json", body = channelMeta),
+            settings = fakeSettings(mandatoryUpdatesEnabled = false)
+        )
+        val update = svc.checkForUpdate(force = true)
+        assertNotNull(update)
+        assertFalse(update.isMandatory)
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // checkForMandatoryUpdate (5-minute meta poll)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `mandatory poll returns update when floor exceeds installed`() = runTest {
+        val channelMeta = """{"mandatory_min_version":"999.0.0","reason":"upstream broke"}"""
+        val svc = createService(
+            MockResponse(urlContains = "releases/latest",     body = githubReleaseJson(tagName = "v999.0.0")),
+            MockResponse(urlContains = "releases",            body = "[${githubReleaseJson(tagName = "v999.0.0")}]"),
+            MockResponse(urlContains = "update-channel.json", body = channelMeta),
+            settings = fakeSettings()
+        )
+        val result = svc.checkForMandatoryUpdate()
+        assertNotNull(result)
+        assertTrue(result.isMandatory)
+        assertEquals("upstream broke", result.mandatoryReason)
+    }
+
+    @Test
+    fun `mandatory poll returns null when floor at or below installed`() = runTest {
+        val channelMeta = """{"mandatory_min_version":"0.0.0","reason":null}"""
+        val svc = createService(
+            MockResponse(urlContains = "releases/latest",     body = githubReleaseJson(tagName = "v999.0.0")),
+            MockResponse(urlContains = "releases",            body = "[${githubReleaseJson(tagName = "v999.0.0")}]"),
+            MockResponse(urlContains = "update-channel.json", body = channelMeta),
+            settings = fakeSettings()
+        )
+        assertNull(svc.checkForMandatoryUpdate())
+    }
+
+    @Test
+    fun `mandatory poll skips when mandatory updates disabled`() = runTest {
+        val channelMeta = """{"mandatory_min_version":"999.0.0","reason":"upstream broke"}"""
+        val svc = createService(
+            MockResponse(urlContains = "releases/latest",     body = githubReleaseJson(tagName = "v999.0.0")),
+            MockResponse(urlContains = "releases",            body = "[${githubReleaseJson(tagName = "v999.0.0")}]"),
+            MockResponse(urlContains = "update-channel.json", body = channelMeta),
+            settings = fakeSettings(mandatoryUpdatesEnabled = false)
+        )
+        assertNull(svc.checkForMandatoryUpdate())
+    }
+
+    @Test
+    fun `mandatory poll respects meta cooldown on second immediate call`() = runTest {
+        val channelMeta = """{"mandatory_min_version":"999.0.0","reason":"upstream broke"}"""
+        val svc = createService(
+            MockResponse(urlContains = "releases/latest",     body = githubReleaseJson(tagName = "v999.0.0")),
+            MockResponse(urlContains = "releases",            body = "[${githubReleaseJson(tagName = "v999.0.0")}]"),
+            MockResponse(urlContains = "update-channel.json", body = channelMeta),
+            settings = fakeSettings()
+        )
+        val first = svc.checkForMandatoryUpdate()
+        assertNotNull(first, "first call should fire")
+        val second = svc.checkForMandatoryUpdate()
+        assertNull(second, "second immediate call should be skipped by cooldown (.last_meta_check)")
+    }
+
+    @Test
+    fun `shouldCheckMeta returns true on fresh install`() {
+        val svc = createService("{}")
+        assertTrue(svc.shouldCheckMeta())
+    }
+
+    @Test
+    fun `mandatory floor with v-prefix is normalised`() = runTest {
+        // Real-world authors will write "v2.2.8" out of habit — strip the v.
+        val channelMeta = """{"mandatory_min_version":"v999.0.0","reason":"normalised"}"""
+        val svc = createService(
+            MockResponse(urlContains = "releases/latest",     body = githubReleaseJson(tagName = "v999.0.0")),
+            MockResponse(urlContains = "releases",            body = "[${githubReleaseJson(tagName = "v999.0.0")}]"),
+            MockResponse(urlContains = "update-channel.json", body = channelMeta),
+            settings = fakeSettings()
+        )
+        val update = svc.checkForUpdate(force = true)
+        assertNotNull(update)
+        assertTrue(update.isMandatory)
     }
 }

@@ -2,8 +2,8 @@ package hivens.ui.utils
 
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toComposeImageBitmap
-import hivens.config.AppConfig
 import hivens.core.api.HttpClientProvider
+import hivens.launcher.platform.PlatformPaths
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -20,15 +20,18 @@ import java.net.URLEncoder
  * Skin manager with persistent disk cache (#61).
  *
  * Cache layout (mirrors original h.java):
- *   ~/.aura/skin-cache/front_<nick>.png
- *   ~/.aura/skin-cache/back_<nick>.png
- *   ~/.aura/skin-cache/raw_<nick>.png   (original texture)
+ *   <dataDir>/skin-cache/front_<nick>.png
+ *   <dataDir>/skin-cache/back_<nick>.png
+ *   <dataDir>/skin-cache/raw_<nick>.png   (original texture)
  *
  * Cache is invalidated on explicit call or after [CACHE_TTL_MS].
  *
  * Note: encodeNickname() is used ONLY for URL construction, never for file paths.
  */
-class SkinManager(private val clientProvider: HttpClientProvider) {
+class SkinManager(
+    private val clientProvider: HttpClientProvider,
+    private val paths: PlatformPaths
+) {
     private val httpClient get() = clientProvider.current
 
     private companion object {
@@ -45,8 +48,7 @@ class SkinManager(private val clientProvider: HttpClientProvider) {
 
     // Disk cache directory — lazy-initialized
     private val cacheDir: File by lazy {
-        val userHome = System.getProperty("user.home")
-        File(userHome, "${AppConfig.APP_DIR}/skin-cache").also { it.mkdirs() }
+        paths.skinCacheDir.toFile().also { it.mkdirs() }
     }
 
     // ── Skia rendering settings ────────────────────────────────────────────
