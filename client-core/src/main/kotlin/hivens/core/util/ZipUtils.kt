@@ -9,9 +9,21 @@ import java.util.zip.ZipInputStream
 object ZipUtils {
     private val logger = LoggerFactory.getLogger(ZipUtils::class.java)
 
-    fun unzip(zipFile: File, destDir: File) {
+    /**
+     * Unzips [zipFile] into [destDir]. Returns the relative paths of every
+     * file (NOT directory) extracted, normalised to forward slashes, in
+     * the order they appeared in the archive. Existing callers that
+     * ignore the return value are unaffected.
+     *
+     * The path list is what powers `FileDownloadService`'s extra.zip
+     * orphan-pruning — by snapshotting the contents of the previous
+     * unpack we can diff against the new contents and remove files that
+     * the upstream modpack dropped.
+     */
+    fun unzip(zipFile: File, destDir: File): List<String> {
         if (!destDir.exists()) destDir.mkdirs()
         val buffer = ByteArray(8192)
+        val extracted = mutableListOf<String>()
 
         ZipInputStream(FileInputStream(zipFile)).use { zis ->
             var zipEntry = zis.nextEntry
@@ -38,10 +50,12 @@ object ZipUtils {
                             fos.write(buffer, 0, len)
                         }
                     }
+                    extracted += zipEntry.name.replace('\\', '/')
                 }
                 zipEntry = zis.nextEntry
             }
             zis.closeEntry()
         }
+        return extracted
     }
 }
