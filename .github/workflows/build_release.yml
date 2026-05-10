@@ -164,7 +164,7 @@ jobs:
       - name: Install AppImage tools
         run: |
           sudo apt-get update -q
-          sudo apt-get install -y fuse libfuse2 desktop-file-utils appstream
+          sudo apt-get install -y fuse libfuse2 desktop-file-utils appstream xmlstarlet
           wget -qO /usr/local/bin/appimagetool \
             "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage"
           chmod +x /usr/local/bin/appimagetool
@@ -179,11 +179,7 @@ jobs:
         run: appstreamcli validate --pedantic resources/io.github.kitty_hivens.auralauncher.metainfo.xml
 
       - name: Inject release entry into metainfo
-        run: |
-          DATE=$(date -u +%Y-%m-%d)
-          sed -i \
-            "s|    <releases>|    <releases>\n    <release version=\"$APP_VERSION\" date=\"$DATE\">\n      <url type=\"details\">https://github.com/Kitty-Hivens/Aura-Launcher/releases/tag/v$APP_VERSION</url>\n    </release>|" \
-            resources/io.github.kitty_hivens.auralauncher.metainfo.xml
+        run: ./scripts/inject-metainfo-release.sh "$APP_VERSION"
 
       - name: Build AppImage
         run: |
