@@ -60,7 +60,6 @@ subprojects {
             }
 
             compilerArgs.addAll(listOf(
-                "-Xlint:none",
                 "-parameters"
             ))
         }

@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# ─────────────────────────────────────────────────────────────────────────────
+# pre-push hook — runs the same test set CI does before a push lands.
+#
+# Symlinked from .git/hooks/pre-push by scripts/install-hooks.sh.
+#
+# Skip on temporary "WIP push" if you really need to:
+#     git push --no-verify
+# But please don't make a habit of it.
+# ─────────────────────────────────────────────────────────────────────────────
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+cd "$REPO_ROOT"
+
+echo "── pre-push: running :client-core:test :client-launcher:test"
+if ! ./gradlew --quiet :client-core:test :client-launcher:test; then
+    echo
+    echo "── pre-push: FAILED. Push aborted."
+    echo "   Fix the failing tests, or push with --no-verify if you truly mean to."
+    exit 1
+fi
+echo "── pre-push: ✓ tests green"
