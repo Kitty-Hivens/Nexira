@@ -25,6 +25,7 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
+import okhttp3.Protocol as OkProtocol
 import org.koin.core.module.dsl.singleOf
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
@@ -69,6 +70,7 @@ val networkModule = module {
             .connectTimeout(Network.TIMEOUT_CONNECT, TimeUnit.MILLISECONDS)
             .readTimeout(Network.TIMEOUT_READ, TimeUnit.MILLISECONDS)
             .proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress(Network.Proxy.HOST, Network.Proxy.PORT)))
+            .applySmartycraftProtocols()
             .build()
     }
 
@@ -86,6 +88,7 @@ val networkModule = module {
             .sslSocketFactory(socketFactory, trustManager)
             .hostnameVerifier { _, _ -> true }
             .proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress(Network.Proxy.HOST, Network.Proxy.PORT)))
+            .applySmartycraftProtocols()
             .build()
     }
 
@@ -232,6 +235,15 @@ val appModule = module {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+/**
+ * Pins the smartycraft channel to HTTP/1.1 when [Network.FORCE_HTTP1_FOR_SMARTYCRAFT]
+ * is true. h2 multiplexing over the SOCKS hop drops mid-stream on long bodies;
+ * 1.1 with parallel connections trades multiplexing for resilience. Skipped on
+ * the direct channel — its third-party CDN endpoints have rock-solid h2 stacks.
+ */
+private fun OkHttpClient.Builder.applySmartycraftProtocols(): OkHttpClient.Builder =
+    if (Network.FORCE_HTTP1_FOR_SMARTYCRAFT) protocols(listOf(OkProtocol.HTTP_1_1)) else this
 
 /**
  * Builds an [HttpClient] backed by the given [OkHttpClient].
