@@ -21,14 +21,15 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import hivens.config.AppConfig
 import hivens.core.api.model.ServerProfile
+import hivens.launcher.platform.PlatformPaths
 import hivens.ui.components.GlassCard
 import hivens.ui.debug.SkiaTracker
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.koin.compose.koinInject
 import java.io.File
 import javax.imageio.ImageIO
 
@@ -38,16 +39,10 @@ fun ServerDetailScreen(
     onBack: () -> Unit
 ) {
     val s = LocalStrings.current
+    val paths: PlatformPaths = koinInject()
 
     val assetsPath = remember(server) {
-        val userHome = System.getProperty("user.home")
-        val os       = System.getProperty("os.name").lowercase()
-        val baseDir  = when {
-            os.contains("win") -> "$userHome/AppData/Roaming/${AppConfig.APP_DIR}"
-            os.contains("mac") -> "$userHome/Library/Application Support/${AppConfig.APP_DIR}"
-            else               -> "$userHome/${AppConfig.APP_DIR}"
-        }
-        File(baseDir, "clients/${server.assetDir}")
+        paths.clientDir(server.assetDir).toFile()
     }
 
     var description by remember { mutableStateOf<String?>(null) }

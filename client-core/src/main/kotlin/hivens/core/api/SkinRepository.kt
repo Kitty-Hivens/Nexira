@@ -1,6 +1,6 @@
 package hivens.core.api
 
-import hivens.config.AppConfig
+import hivens.config.Network
 import hivens.core.api.dto.SmartyResponse
 import hivens.core.data.SessionData
 import hivens.core.util.HashUtils
@@ -33,7 +33,7 @@ class SkinRepository(
         val checkHash = HashUtils.md5(signString)
 
         return try {
-            val response = client.post(AppConfig.AUTH_URL) {
+            val response = client.post(Network.AUTH_URL) {
                 setBody(MultiPartFormDataContent(
                     formData {
                         append("action", action)

@@ -13,6 +13,19 @@ dev  →  (PR + Qodana CI)  →  stable
 All changes go through PRs against `dev`. Direct pushes to `stable` are not allowed.  
 Releases are tagged from `stable` via `build_release.yml`.
 
+## Changelog
+
+Each released version's entry in `CHANGELOG.md` should open with a short
+`### Highlights` section — 2-5 user-facing bullets explaining what the user
+actually notices. The detailed `### Added` / `### Changed` / `### Fixed` /
+`### Removed` blocks below stay for the GitHub release page and changelog
+readers.
+
+The CI build extracts the Highlights block, embeds it in `release-manifest.json`
+alongside the binaries, and `UpdateService` shows it in the in-app update
+dialog. Releases without a Highlights block fall back to rendering the full
+changelog there.
+
 ## Commit style
 
 Scoped, minimal commits. No squash-merging noise.

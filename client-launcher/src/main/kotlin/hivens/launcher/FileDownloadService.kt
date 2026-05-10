@@ -1,6 +1,6 @@
 package hivens.launcher
 
-import hivens.config.AppConfig
+import hivens.config.Network
 import hivens.core.api.HttpClientProvider
 import hivens.core.api.interfaces.IFileDownloadService
 import hivens.core.data.FileData
@@ -195,7 +195,7 @@ class FileDownloadService(
         localPath: Path,
         onBytesRead: ((Int) -> Unit)? = null
     ) {
-        val url = "${AppConfig.BASE_URL}/launcher/clients/" +
+        val url = "${Network.BASE_URL}/launcher/clients/" +
                 serverPath.split("/").joinToString("/") { segment -> URLEncoder.encode(segment, "UTF-8").replace("+", "%20") }
         withContext(Dispatchers.IO) {
             if (localPath.parent != null) Files.createDirectories(localPath.parent)

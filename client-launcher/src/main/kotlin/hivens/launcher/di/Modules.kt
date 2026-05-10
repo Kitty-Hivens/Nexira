@@ -1,6 +1,8 @@
 package hivens.launcher.di
 
-import hivens.config.AppConfig
+import hivens.config.Network
+import hivens.config.Protocol
+import hivens.config.Storage
 import hivens.core.api.AuthService
 import hivens.core.api.HttpClientProvider
 import hivens.core.api.PlayerRepository
@@ -8,7 +10,11 @@ import hivens.core.api.ServerRepository
 import hivens.core.api.SkinRepository
 import hivens.core.api.interfaces.*
 import hivens.launcher.*
+import hivens.launcher.component.ClasspathProvider
 import hivens.launcher.component.EnvironmentPreparer
+import hivens.launcher.component.GameCommandBuilder
+import hivens.launcher.component.ProcessLogHandler
+import hivens.launcher.platform.PlatformPaths
 import hivens.launcher.update.UpdateService
 import io.ktor.client.*
 import io.ktor.client.engine.okhttp.*
@@ -24,7 +30,6 @@ import org.koin.core.qualifier.named
 import org.koin.dsl.module
 import java.net.InetSocketAddress
 import java.net.Proxy
-import java.nio.file.Paths
 import java.util.concurrent.TimeUnit
 
 /**
@@ -41,30 +46,34 @@ val networkModule = module {
         }
     }
 
+    // ── Smartycraft channel ───────────────────────────────────────────────────
+    // SOCKS-proxied. Required for everything on `*.smartycraft.ru`. See the
+    // routing taxonomy in `hivens.config.Network`.
+
     /**
-     * Secure HTTP client (OkHttp).
-     * SOCKS proxy is always enabled.
+     * Smartycraft secure client. SSL verification on, SOCKS proxy always on.
+     * Backs the default (smartycraft) [HttpClientProvider].
      */
     single<OkHttpClient> {
         // Global authorization for SOCKS (Java API)
         java.net.Authenticator.setDefault(object : java.net.Authenticator() {
             override fun getPasswordAuthentication(): java.net.PasswordAuthentication {
                 return java.net.PasswordAuthentication(
-                    AppConfig.Proxy.USER,
-                    AppConfig.Proxy.PASS.toCharArray()
+                    Network.Proxy.USER,
+                    Network.Proxy.PASS.toCharArray()
                 )
             }
         })
 
         OkHttpClient.Builder()
-            .connectTimeout(AppConfig.TIMEOUT_CONNECT, TimeUnit.MILLISECONDS)
-            .readTimeout(AppConfig.TIMEOUT_READ, TimeUnit.MILLISECONDS)
-            .proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress(AppConfig.Proxy.HOST, AppConfig.Proxy.PORT)))
+            .connectTimeout(Network.TIMEOUT_CONNECT, TimeUnit.MILLISECONDS)
+            .readTimeout(Network.TIMEOUT_READ, TimeUnit.MILLISECONDS)
+            .proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress(Network.Proxy.HOST, Network.Proxy.PORT)))
             .build()
     }
 
     /**
-     * Insecure HTTP client (SSL verification disabled).
+     * Smartycraft insecure client (SSL verification disabled).
      * Registered only for the explicit "connect anyway" user flow.
      * Never injected by default — must be requested by named("insecure").
      */
@@ -72,21 +81,43 @@ val networkModule = module {
         val (socketFactory, trustManager) = buildTrustAllSsl()
 
         OkHttpClient.Builder()
-            .connectTimeout(AppConfig.TIMEOUT_CONNECT, TimeUnit.MILLISECONDS)
-            .readTimeout(AppConfig.TIMEOUT_READ, TimeUnit.MILLISECONDS)
+            .connectTimeout(Network.TIMEOUT_CONNECT, TimeUnit.MILLISECONDS)
+            .readTimeout(Network.TIMEOUT_READ, TimeUnit.MILLISECONDS)
             .sslSocketFactory(socketFactory, trustManager)
             .hostnameVerifier { _, _ -> true }
-            .proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress(AppConfig.Proxy.HOST, AppConfig.Proxy.PORT)))
+            .proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress(Network.Proxy.HOST, Network.Proxy.PORT)))
+            .build()
+    }
+
+    // ── Direct channel ────────────────────────────────────────────────────────
+    // No proxy, strict TLS. For third-party CDNs (GitHub releases, BellSoft
+    // JDKs, Maven Central). Survives any SMARTYcraft proxy outage by design —
+    // the auto-updater must keep working when the upstream proxy doesn't.
+
+    /**
+     * Direct-channel client. No proxy, no SSL bypass. Backs the
+     * [HttpClientProvider] qualified `named("direct")`.
+     *
+     * SSL bypass is intentionally not honoured here: the third-party CDNs
+     * we hit on this channel have rock-solid TLS, and silently widening the
+     * bypass to them just because the user accepted it for smartycraft.ru
+     * would be a needless trust expansion.
+     */
+    single<OkHttpClient>(named("direct")) {
+        OkHttpClient.Builder()
+            .connectTimeout(Network.TIMEOUT_CONNECT, TimeUnit.MILLISECONDS)
+            .readTimeout(Network.TIMEOUT_READ, TimeUnit.MILLISECONDS)
             .build()
     }
 
     /**
-     * [HttpClientProvider] — thin wrapper that resolves the correct [HttpClient]
-     * on every request via [NetworkState.sslBypassEnabled].
+     * Default (smartycraft) [HttpClientProvider] — thin wrapper that resolves
+     * the correct proxied [HttpClient] on every request via
+     * [NetworkState.sslBypassEnabled].
      *
-     * Injected into all repositories instead of [HttpClient] directly,
-     * so that SSL bypass takes effect immediately on the next network call
-     * without requiring Koin singleton recreation.
+     * Injected into all smartycraft.ru-bound repositories instead of [HttpClient]
+     * directly, so that SSL bypass takes effect immediately on the next network
+     * call without requiring Koin singleton recreation.
      */
     single {
         val secure   = buildHttpClient(get<OkHttpClient>(),                get())
@@ -98,12 +129,22 @@ val networkModule = module {
 
     /**
      * Named insecure [HttpClientProvider] for [AuthService] — always uses
-     * the insecure client regardless of [NetworkState], because it is
-     * injected specifically for the "connect anyway" login retry path.
+     * the insecure smartycraft client regardless of [NetworkState], because it
+     * is injected specifically for the "connect anyway" login retry path.
      */
     single<HttpClientProvider>(named("insecure")) {
         val insecure = buildHttpClient(get<OkHttpClient>(named("insecure")), get())
         HttpClientProvider { insecure }
+    }
+
+    /**
+     * Direct-channel [HttpClientProvider]. Inject this (`named("direct")`)
+     * for any outbound call that does NOT need to tunnel through the
+     * SMARTYcraft proxy — see routing notes in `hivens.config.Network`.
+     */
+    single<HttpClientProvider>(named("direct")) {
+        val direct = buildHttpClient(get<OkHttpClient>(named("direct")), get())
+        HttpClientProvider { direct }
     }
 
     // Repositories
@@ -117,28 +158,38 @@ val networkModule = module {
  */
 val appModule = module {
     /**
-     * Application working directory (.aura).
+     * Per-OS application paths. See [PlatformPaths] for layout.
      */
-    single(createdAtStart = true) {
-        Paths.get(System.getProperty("user.home"), AppConfig.APP_DIR)
-    }
+    single(createdAtStart = true) { PlatformPaths.system() }
+
+    /**
+     * Application data directory. Resolved via [PlatformPaths] so that all
+     * subsystems (settings, profiles, credentials, downloaded clients,
+     * skin cache, logs, crash reports) share one platform-correct root.
+     */
+    single<java.nio.file.Path>(createdAtStart = true) { get<PlatformPaths>().dataDir }
 
     // Managers and services
     single { CredentialsManager(get(), get()) }
 
     single<ISettingsService> {
         val dataDir: java.nio.file.Path = get()
-        SettingsService(get(), dataDir.resolve(AppConfig.FILES_SETTINGS))
+        SettingsService(get(), dataDir.resolve(Storage.SETTINGS_FILE))
     }
 
     single<IFileDownloadService> { FileDownloadService(get()) }
 
     single<IManifestProcessorService> { ManifestProcessorService(get()) }
     single { ProfileManager(get(), get()) }
-    single { JavaManagerService(get(), get()) }
+    // Direct channel — BellSoft JDK CDN does not require the SMARTYcraft proxy.
+    single { JavaManagerService(get(), get(named("direct"))) }
 
-    // EnvironmentPreparer
-    singleOf(::EnvironmentPreparer)
+    // Launch pipeline collaborators
+    // Direct channel — Maven Central LWJGL/JInput natives don't need the proxy.
+    single { EnvironmentPreparer(get(named("direct"))) }
+    single { ClasspathProvider(get()) }
+    single { GameCommandBuilder() }
+    single { ProcessLogHandler() }
 
     single<IAuthService> { AuthService(get(), get()) }
 
@@ -153,24 +204,29 @@ val appModule = module {
     single<IServerListService> { ServerListService(get()) }
 
     /**
-     * Basic launch service.
-     * Accepts EnvironmentPreparer via DI.
+     * Basic launch service. All collaborators are constructor-injected so the
+     * facade is fully replaceable / mockable in tests.
      */
     single<ILauncherService> {
         LauncherService(
-            manifestProcessor = get(),
             profileManager    = get(),
             javaManager       = get(),
-            envPreparer       = get()
+            envPreparer       = get(),
+            classpathProvider = get(),
+            commandBuilder    = get(),
+            logHandler        = get()
         )
     }
 
-    // Update Service
+    // Update Service — direct channel. GitHub releases must remain reachable
+    // even when the SMARTYcraft proxy is down, otherwise the auto-updater
+    // cannot ship the very fix that restores proxy connectivity.
     single {
         UpdateService(
-            clientProvider = get(),
-            json           = get(),
-            dataDirectory  = get()
+            clientProvider  = get(named("direct")),
+            json            = get(),
+            dataDirectory   = get(),
+            settingsService = get()
         )
     }
 }
@@ -194,7 +250,7 @@ private fun buildHttpClient(okHttpInstance: OkHttpClient, json: Json): HttpClien
         }
 
         defaultRequest {
-            header("User-Agent", "SMARTYlauncher/${AppConfig.LAUNCHER_VERSION}")
+            header("User-Agent", "SMARTYlauncher/${Protocol.MIMIC_LAUNCHER_VERSION}")
             contentType(ContentType.Application.Json)
         }
     }

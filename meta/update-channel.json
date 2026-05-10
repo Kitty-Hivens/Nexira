@@ -1,0 +1,5 @@
+{
+  "_comment": "Out-of-band update-channel metadata. Read by UpdateService over the direct channel from raw.githubusercontent.com (stable branch). Edit via PR; takes effect on the next launcher update check (within 12h cooldown). Setting `mandatory_min_version` to a value strictly greater than what's installed will block startup until the user runs the update flow — only do this when the upstream protocol genuinely broke older versions.",
+  "mandatory_min_version": null,
+  "reason": null
+}

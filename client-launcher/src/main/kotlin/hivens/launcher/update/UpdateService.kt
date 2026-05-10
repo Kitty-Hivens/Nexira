@@ -1,8 +1,11 @@
 package hivens.launcher.update
 
-import hivens.config.AppConfig
+import hivens.config.Branding
 import hivens.core.api.HttpClientProvider
+import hivens.core.api.interfaces.ISettingsService
 import hivens.core.data.LauncherUpdate
+import hivens.core.data.ReleaseManifest
+import hivens.core.data.UpdateChannelMeta
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -24,17 +27,46 @@ import java.time.temporal.ChronoUnit
 class UpdateService(
     private val clientProvider: HttpClientProvider,
     private val json: Json,
-    dataDirectory: Path
+    dataDirectory: Path,
+    private val settingsService: ISettingsService
 ) {
     private val logger = LoggerFactory.getLogger(UpdateService::class.java)
     private val httpClient get() = clientProvider.current
     private val updateDir = dataDirectory.resolve("updates")
     private val lastCheckFile = updateDir.resolve(".last_check")
+    private val lastMetaCheckFile = updateDir.resolve(".last_meta_check")
 
     companion object {
-        private const val GITHUB_API_LATEST   = "https://api.github.com/repos/Kitty-Hivens/Aura-Launcher/releases/latest"
-        private const val GITHUB_API_RELEASES = "https://api.github.com/repos/Kitty-Hivens/Aura-Launcher/releases"
+        private const val GITHUB_REPO          = "Kitty-Hivens/Aura-Launcher"
+        private const val GITHUB_API_LATEST    = "https://api.github.com/repos/$GITHUB_REPO/releases/latest"
+        private const val GITHUB_API_RELEASES  = "https://api.github.com/repos/$GITHUB_REPO/releases"
+        private const val GITHUB_RELEASE_PAGE  = "https://github.com/$GITHUB_REPO/releases/tag"
         private const val CHECK_INTERVAL_HOURS = 12L
+
+        /**
+         * Meta-only poll cadence. Far tighter than [CHECK_INTERVAL_HOURS]
+         * because the meta endpoint is `update-channel.json` on raw GitHub —
+         * a few hundred bytes, no API rate limit (raw.githubusercontent.com
+         * is throttled per-IP but not per-hour like the v3 API). At 5 min
+         * the launcher hits 12 reqs/hour against raw, well below any
+         * realistic ceiling, while still surfacing mandatory rollouts
+         * to long-running launcher sessions in near-real-time.
+         */
+        private const val META_CHECK_INTERVAL_MINUTES = 5L
+        private const val MANIFEST_ASSET_NAME  = "release-manifest.json"
+
+        // ── Out-of-band channel metadata ──────────────────────────────────────
+        // Lives on the `stable` branch so it can be edited via a single PR
+        // without cutting a new release. Any launcher hitting this URL bypasses
+        // the SMARTYcraft proxy (direct channel) so the update flow remains
+        // operational even when the upstream proxy is dead.
+        private const val UPDATE_CHANNEL_META_URL =
+            "https://raw.githubusercontent.com/$GITHUB_REPO/stable/meta/update-channel.json"
+
+        // How many releases to fetch when the user opts into prereleases —
+        // GitHub returns 30 per page by default; we never need that many to
+        // find the most recently published non-draft entry.
+        private const val PRERELEASE_PAGE_SIZE = 20
     }
 
     init {
@@ -45,6 +77,12 @@ class UpdateService(
 
     /**
      * Checks availability of updates with caching.
+     *
+     * The selected channel (stable vs prerelease) and whether mandatory updates
+     * are honoured both come from [ISettingsService] — see the experimental
+     * fields on `SettingsData`. The master `experimentalFeaturesEnabled` toggle
+     * gates both children: if it's off, both sub-toggles are forced to false
+     * regardless of their stored values.
      */
     suspend fun checkForUpdate(force: Boolean = false): LauncherUpdate? = withContext(Dispatchers.IO) {
         try {
@@ -53,22 +91,34 @@ class UpdateService(
                 return@withContext null
             }
 
-            logger.info("Checking for launcher updates...")
+            val settings = settingsService.getSettings()
+            val experimentalOn = settings.experimentalFeaturesEnabled
+            val prereleaseChannel = experimentalOn && settings.prereleaseChannelEnabled
+            val mandatoryEnabled  = experimentalOn && settings.mandatoryUpdatesEnabled
 
-            val response = httpClient.get(GITHUB_API_LATEST) {
-                header("Accept", "application/vnd.github.v3+json")
-            }
+            logger.info(
+                "Checking for launcher updates (channel: {}, mandatory: {})",
+                if (prereleaseChannel) "prerelease" else "stable",
+                if (mandatoryEnabled) "enforced" else "advisory"
+            )
 
-            if (response.status.value != 200) {
-                logger.warn("GitHub API returned ${response.status}")
-                return@withContext null
-            }
-
-            val release = json.decodeFromString<GitHubRelease>(response.bodyAsText())
+            val release = fetchLatestRelease(includePrereleases = prereleaseChannel)
+                ?: return@withContext null
             updateLastCheck()
 
-            val currentVersion = AppConfig.CLIENT_VERSION.removePrefix("v")
+            val currentVersion = Branding.VERSION.removePrefix("v")
             val latestVersion = release.tagName.removePrefix("v")
+
+            // Out-of-band channel meta — fetched even when "up to date" so a
+            // mandatory floor can still trigger on the same version (e.g. user
+            // is on 2.2.7, latest is 2.2.7, but mandatory_min got bumped to
+            // 2.2.7 — no-op; mandatory_min = 2.2.8 — needs latest, which IS
+            // newer, so the path below catches it).
+            val channelMeta = tryFetchChannelMeta()
+            val belowMandatoryFloor = mandatoryEnabled &&
+                    channelMeta?.mandatoryMinVersion?.let { floor ->
+                        compareVersions(currentVersion, floor.removePrefix("v")) < 0
+                    } == true
 
             if (compareVersions(latestVersion, currentVersion) <= 0) {
                 logger.info("Launcher is up to date ($currentVersion)")
@@ -80,24 +130,97 @@ class UpdateService(
                 return@withContext null
             }
 
-            val checksum = extractChecksum(release.body, asset.name)
+            // Prefer the machine-readable manifest. Older releases without one
+            // fall back to scraping the markdown table from the release body.
+            val manifest = tryFetchManifest(release)
+            val checksum = manifest?.assets?.find { it.name == asset.name }?.sha256
+                ?: extractChecksum(release.body, asset.name)
+            val highlights = manifest?.highlights?.takeIf { it.isNotBlank() }
+
             val isCritical = release.name.contains("[CRITICAL]", ignoreCase = true) ||
                              release.body?.contains("CRITICAL", ignoreCase = true) == true
 
-            logger.info("Update available: $currentVersion -> $latestVersion")
+            logger.info(
+                "Update available: {} -> {} (manifest: {}, mandatory: {})",
+                currentVersion, latestVersion,
+                if (manifest != null) "yes" else "no",
+                belowMandatoryFloor
+            )
 
             return@withContext LauncherUpdate(
                 version = release.tagName,
                 downloadUrl = asset.browserDownloadUrl,
                 checksum = checksum,
                 changelog = fetchChangelogBetween(currentVersion, latestVersion),
-                isCritical = isCritical
+                highlights = highlights,
+                releasePageUrl = "$GITHUB_RELEASE_PAGE/${release.tagName}",
+                isCritical = isCritical,
+                isMandatory = belowMandatoryFloor,
+                mandatoryReason = if (belowMandatoryFloor) channelMeta.reason else null
             )
 
         } catch (e: Exception) {
             logger.error("Failed to check for updates", e)
             null
         }
+    }
+
+    /**
+     * Picks the update target.
+     *
+     * - [includePrereleases] = false → hits `/releases/latest`, which by
+     *   GitHub's contract excludes drafts and prereleases.
+     * - [includePrereleases] = true → lists the most recent
+     *   [PRERELEASE_PAGE_SIZE] releases and returns the first non-draft one.
+     *   GitHub returns them by `published_at` descending, so this matches
+     *   "newest published thing of either kind".
+     */
+    internal suspend fun fetchLatestRelease(includePrereleases: Boolean): GitHubRelease? {
+        return if (includePrereleases) {
+            val response = httpClient.get(GITHUB_API_RELEASES) {
+                header("Accept", "application/vnd.github.v3+json")
+                parameter("per_page", PRERELEASE_PAGE_SIZE)
+            }
+            if (response.status.value != 200) {
+                logger.warn("GitHub /releases returned {}", response.status)
+                return null
+            }
+            json.decodeFromString<List<GitHubRelease>>(response.bodyAsText())
+                .firstOrNull { !it.draft }
+                ?: run {
+                    logger.warn("No non-draft releases found in /releases response")
+                    null
+                }
+        } else {
+            val response = httpClient.get(GITHUB_API_LATEST) {
+                header("Accept", "application/vnd.github.v3+json")
+            }
+            if (response.status.value != 200) {
+                logger.warn("GitHub /releases/latest returned {}", response.status)
+                return null
+            }
+            json.decodeFromString<GitHubRelease>(response.bodyAsText())
+        }
+    }
+
+    /**
+     * Fetches the out-of-band update-channel metadata. Returns null on any
+     * error (missing file, parse failure, network issue) — callers must
+     * treat null as "no mandatory floor".
+     */
+    internal suspend fun tryFetchChannelMeta(): UpdateChannelMeta? = try {
+        val response = httpClient.get(UPDATE_CHANNEL_META_URL) {
+            header("Accept", "application/json")
+        }
+        if (response.status.value != 200) {
+            logger.debug("update-channel.json fetch returned {}", response.status)
+            null
+        } else {
+            json.decodeFromString<UpdateChannelMeta>(response.bodyAsText())
+        }
+    } catch (e: Exception) {
+        logger.debug("Failed to fetch update-channel.json", e)
+        null
     }
 
     /**
@@ -189,7 +312,7 @@ class UpdateService(
 
     internal fun shouldCheck(): Boolean {
         if (!Files.exists(lastCheckFile)) return true
-        
+
         return runCatching {
             val lastCheck = Files.readString(lastCheckFile).toLongOrNull() ?: return true
             val hoursSince = ChronoUnit.HOURS.between(
@@ -203,6 +326,79 @@ class UpdateService(
     private fun updateLastCheck() {
         runCatching {
             Files.writeString(lastCheckFile, System.currentTimeMillis().toString())
+        }
+    }
+
+    internal fun shouldCheckMeta(): Boolean {
+        if (!Files.exists(lastMetaCheckFile)) return true
+
+        return runCatching {
+            val last = Files.readString(lastMetaCheckFile).toLongOrNull() ?: return true
+            val minsSince = ChronoUnit.MINUTES.between(
+                Instant.ofEpochMilli(last),
+                Instant.now()
+            )
+            minsSince >= META_CHECK_INTERVAL_MINUTES
+        }.getOrDefault(true)
+    }
+
+    private fun updateLastMetaCheck() {
+        runCatching {
+            Files.writeString(lastMetaCheckFile, System.currentTimeMillis().toString())
+        }
+    }
+
+    /**
+     * Lightweight near-real-time mandatory probe.
+     *
+     * Polls only `meta/update-channel.json` (a few hundred bytes on raw
+     * GitHub, no v3 API rate limit) at the [META_CHECK_INTERVAL_MINUTES]
+     * cadence. When the published `mandatory_min_version` rises above the
+     * installed version it bypasses [shouldCheck]'s 12 h cooldown to fetch
+     * the actual release immediately — by definition, a mandatory rollout
+     * needs to reach the user *now*, not on the next routine check.
+     *
+     * Returns null when:
+     *   - the meta cooldown hasn't elapsed yet,
+     *   - mandatory updates are disabled in settings (master OFF or child OFF),
+     *   - the channel meta file is missing / unreadable / has no floor,
+     *   - the floor is at-or-below the installed version,
+     *   - the subsequent release fetch fails for any reason.
+     *
+     * Designed to be called in a polling loop from the UI layer; failures
+     * are logged at warn level and the caller should simply retry on the
+     * next tick.
+     */
+    suspend fun checkForMandatoryUpdate(): LauncherUpdate? = withContext(Dispatchers.IO) {
+        try {
+            if (!shouldCheckMeta()) return@withContext null
+
+            val settings = settingsService.getSettings()
+            val mandatoryEnabled = settings.experimentalFeaturesEnabled &&
+                                   settings.mandatoryUpdatesEnabled
+            if (!mandatoryEnabled) {
+                updateLastMetaCheck()
+                return@withContext null
+            }
+
+            updateLastMetaCheck()
+            val meta = tryFetchChannelMeta() ?: return@withContext null
+            val floor = meta.mandatoryMinVersion?.removePrefix("v")
+                ?.takeIf { it.isNotBlank() }
+                ?: return@withContext null
+
+            val current = Branding.VERSION.removePrefix("v")
+            if (compareVersions(current, floor) >= 0) return@withContext null
+
+            logger.warn(
+                "Mandatory floor {} > installed {}; forcing release check (reason: {})",
+                floor, current, meta.reason ?: "<none>"
+            )
+            // force=true skips the 12h release-check cooldown
+            checkForUpdate(force = true)?.takeIf { it.isMandatory }
+        } catch (e: Exception) {
+            logger.warn("Mandatory poll failed", e)
+            null
         }
     }
 
@@ -228,7 +424,30 @@ class UpdateService(
     }
 
     /**
+     * Looks for `release-manifest.json` among the release assets and parses it.
+     * Returns null if the asset is absent (legacy release) or the body is not
+     * a valid manifest document — callers must handle null and fall back.
+     */
+    internal suspend fun tryFetchManifest(release: GitHubRelease): ReleaseManifest? {
+        val asset = release.assets.find { it.name == MANIFEST_ASSET_NAME } ?: return null
+        return try {
+            val response = httpClient.get(asset.browserDownloadUrl) {
+                header("Accept", "application/json")
+            }
+            if (response.status.value != 200) {
+                logger.warn("release-manifest.json fetch returned {}", response.status)
+                return null
+            }
+            json.decodeFromString<ReleaseManifest>(response.bodyAsText())
+        } catch (e: Exception) {
+            logger.warn("Failed to fetch or parse release-manifest.json", e)
+            null
+        }
+    }
+
+    /**
      * Extracts SHA256 checksum for [fileName] from the GitHub release body.
+     * Used as a fallback for legacy releases without a `release-manifest.json` asset.
      *
      * Supports two formats commonly found in release notes:
      *   1. Markdown table:  `| \`filename\` | \`hash\` |`
@@ -272,18 +491,40 @@ class UpdateService(
         }.getOrDefault(false)
     }
 
+    /**
+     * SemVer-ish comparison.
+     *
+     * 1. Numeric base (`X.Y.Z`) compared element-wise — missing segments = 0.
+     * 2. If bases tie, the prerelease suffix decides:
+     *    - no suffix on either side → equal
+     *    - one side has no suffix → it wins (final > rc/beta/alpha)
+     *    - both have suffixes → lexicographic compare on the suffix string,
+     *      which gives the desired `alpha < beta < rc1 < rc2 < rc10` *almost*
+     *      (note: lex says `rc10 < rc2` — the launcher's release cadence
+     *      doesn't reach double-digit RCs, so this is acceptable; if it ever
+     *      does, switch to natural-order comparison)
+     */
     internal fun compareVersions(v1: String, v2: String): Int {
-        val parts1 = v1.substringBefore('-').split('.').map { it.toIntOrNull() ?: 0 }
-        val parts2 = v2.substringBefore('-').split('.').map { it.toIntOrNull() ?: 0 }
+        val base1 = v1.substringBefore('-')
+        val base2 = v2.substringBefore('-')
+        val parts1 = base1.split('.').map { it.toIntOrNull() ?: 0 }
+        val parts2 = base2.split('.').map { it.toIntOrNull() ?: 0 }
 
         for (i in 0 until maxOf(parts1.size, parts2.size)) {
             val p1 = parts1.getOrNull(i) ?: 0
             val p2 = parts2.getOrNull(i) ?: 0
-
             if (p1 != p2) return p1.compareTo(p2)
         }
 
-        return 0
+        // Bases equal — break the tie on prerelease suffix.
+        val suffix1 = v1.substringAfter('-', missingDelimiterValue = "")
+        val suffix2 = v2.substringAfter('-', missingDelimiterValue = "")
+        return when {
+            suffix1.isEmpty() && suffix2.isEmpty() -> 0
+            suffix1.isEmpty() -> 1   // v1 = final, v2 = prerelease → v1 wins
+            suffix2.isEmpty() -> -1  // v1 = prerelease, v2 = final → v2 wins
+            else -> suffix1.compareTo(suffix2)
+        }
     }
 
     private suspend fun fetchChangelogBetween(
@@ -338,6 +579,7 @@ data class GitHubRelease(
     @SerialName("body") val body: String? = null,
     @SerialName("assets") val assets: List<GitHubAsset>,
     @SerialName("prerelease") val prerelease: Boolean = false,
+    @SerialName("draft") val draft: Boolean = false,
     @SerialName("published_at") val publishedAt: String
 )
 

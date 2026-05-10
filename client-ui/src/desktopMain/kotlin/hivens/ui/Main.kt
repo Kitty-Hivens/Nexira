@@ -14,7 +14,8 @@ import androidx.compose.ui.window.*
 import coil3.ImageLoader
 import coil3.compose.setSingletonImageLoaderFactory
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
-import hivens.config.AppConfig
+import hivens.config.Branding
+import hivens.config.Protocol
 import hivens.core.api.AuthException
 import hivens.core.api.interfaces.IAuthService
 import hivens.core.api.interfaces.IServerListService
@@ -27,6 +28,8 @@ import hivens.launcher.NetworkState
 import hivens.launcher.ProfileManager
 import hivens.launcher.di.appModule
 import hivens.launcher.di.networkModule
+import hivens.launcher.platform.DataDirMigration
+import hivens.launcher.platform.PlatformPaths
 import hivens.ui.background.BackgroundManager
 import hivens.ui.background.CustomBackground
 import hivens.ui.components.UpdateManager
@@ -35,6 +38,7 @@ import hivens.ui.easter.AprilFoolsWrapper
 import hivens.ui.easter.ChaosState
 import hivens.ui.generated.resources.Res
 import hivens.ui.generated.resources.favicon
+import hivens.ui.generated.resources.icon
 import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.i18n.LocaleProvider
@@ -73,7 +77,7 @@ import kotlin.system.exitProcess
 
 val uiModule = module {
     singleOf(::LauncherController)
-    single { SkinManager(get()) }
+    single { SkinManager(get(), get()) }
 }
 
 // ─── State ───────────────────────────────────────────────────────────────────
@@ -99,13 +103,51 @@ sealed class Screen {
 
 // ─── Entry Point ─────────────────────────────────────────────────────────────
 
+/**
+ * Force the X11 toolkit's app class name so the WM_CLASS hint on every window
+ * we create matches `StartupWMClass=` in the .desktop entry.
+ *
+ * Stock OpenJDK derives WM_CLASS from the launcher binary's argv[0] and exposes
+ * no public knob to override it; JBR exposes `-Dawt.appClassName` but only that
+ * one vendor honours it. Reflection into the package-private static field works
+ * across both — provided we run before any window is shown (XWindow.setWMClass
+ * snapshots the value at construction time) and the JVM was launched with
+ * `--add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED`.
+ *
+ * No-op on macOS/Windows. Failures are logged but never fatal — a wrong icon
+ * is annoying, not crash-worthy.
+ */
+private fun setLinuxXToolkitAppClassName(name: String) {
+    if (!System.getProperty("os.name").lowercase().contains("linux")) return
+    runCatching {
+        // Triggers XToolkit class load + initial awtAppClassName assignment.
+        java.awt.Toolkit.getDefaultToolkit()
+        val cls = Class.forName("sun.awt.X11.XToolkit")
+        val field = cls.getDeclaredField("awtAppClassName")
+        field.isAccessible = true
+        field.set(null, name)
+    }.onFailure {
+        LoggerFactory.getLogger("Main").warn(
+            "Could not override XToolkit.awtAppClassName ({}); " +
+            "compositors may show a generic icon. Cause: {}",
+            name, it.toString()
+        )
+    }
+}
+
 @OptIn(ExperimentalResourceApi::class, DelicateCoroutinesApi::class)
 fun main() {
-    val lockFile = File(System.getProperty("user.home"), ".aura/.lock")
-    val lockChannel = FileOutputStream(lockFile).channel
-    val lock = lockChannel.tryLock()
     System.setProperty("jna.nosys", "true")
     System.setProperty("skiko.fps.limit", "60")
+    // X11 WM_CLASS = "AuraLauncher". -Dawt.appClassName covers JBR; for stock
+    // OpenJDK we reflect into sun.awt.X11.XToolkit.awtAppClassName before the
+    // first window is created. See jvmArgs in client-ui/build.gradle.kts.
+    setLinuxXToolkitAppClassName(Branding.WM_CLASS)
+
+    val paths = PlatformPaths.system()
+    java.nio.file.Files.createDirectories(paths.dataDir)
+    CrashReporter.paths = paths
+
     Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
         val logger = LoggerFactory.getLogger("CrashHandler")
         logger.error("Uncaught exception on thread '${thread.name}'", throwable)
@@ -116,10 +158,22 @@ fun main() {
         }
     }
 
+    // Single-instance lock acquired BEFORE migration. Two launchers started
+    // close together would otherwise both reach DataDirMigration.run() and
+    // race on REPLACE_EXISTING file copies — the loser exiting on .lock
+    // wouldn't undo half-written files. (Codex flagged the original order
+    // as P2 on PR #127.) DataDirMigration's emptiness check is taught to
+    // ignore .lock / .show / .migrated so its first-run trigger still fires.
+    val lockFile = paths.dataDir.resolve(".lock").toFile()
+    val lockChannel = FileOutputStream(lockFile).channel
+    val lock = lockChannel.tryLock()
+
     if (lock == null) {
-        File(System.getProperty("user.home"), ".aura/.show").createNewFile()
+        paths.dataDir.resolve(".show").toFile().createNewFile()
         exitProcess(0)
     }
+
+    DataDirMigration.run(paths)
 
     startKoin { modules(networkModule, appModule, uiModule) }
 
@@ -153,9 +207,9 @@ fun main() {
 
 
         LaunchedEffect(Unit) {
+            val showFile = paths.dataDir.resolve(".show").toFile()
             while (true) {
                 delay(500)
-                val showFile = File(System.getProperty("user.home"), ".aura/.show")
                 if (showFile.exists()) {
                     showFile.delete()
                     isWindowVisible = true
@@ -184,7 +238,11 @@ fun main() {
             val themeManager  = remember { ThemeManager(dataDirectory) }
             var customTheme   by remember { mutableStateOf(themeManager.loadTheme()) }
 
-            val trayIcon = painterResource(Res.drawable.favicon)
+            // Tray needs a 64-px glyph; the window chrome and KDE overview want the
+            // detailed hi-res icon so they can downscale cleanly to whatever the
+            // compositor demands.
+            val trayIcon   = painterResource(Res.drawable.favicon)
+            val windowIcon = painterResource(Res.drawable.icon)
 
             // ── Tray init on background thread ────────────────────────────
             LaunchedEffect(Unit) {
@@ -194,7 +252,7 @@ fun main() {
                         TrayManager.init(
                             iconStream = iconBytes.inputStream(),
                             strings    = TrayManager.Strings(
-                                tooltip       = "${AppConfig.APP_TITLE} v${AppConfig.CLIENT_VERSION.removePrefix("v")}",
+                                tooltip       = "${Branding.TITLE} v${Branding.VERSION.removePrefix("v")}",
                                 statusIdle    = s.trayStatusIdle,
                                 statusRunning = s.trayStatusRunning,
                                 show          = s.trayShow,
@@ -206,11 +264,11 @@ fun main() {
                         )
                     } catch (_: Exception) {
                         runCatching {
-                            val iconBytes = Res.readBytes("drawable/icon.ico")
+                            val iconBytes = Res.readBytes("drawable/icon.png")
                             TrayManager.init(
                                 iconStream = iconBytes.inputStream(),
                                 strings    = TrayManager.Strings(
-                                    tooltip       = AppConfig.APP_TITLE,
+                                    tooltip       = Branding.TITLE,
                                     statusIdle    = s.trayStatusIdle,
                                     statusRunning = s.trayStatusRunning,
                                     show          = s.trayShow,
@@ -299,9 +357,9 @@ fun main() {
                 },
                 state     = windowState,
                 visible   = isWindowVisible,
-                title     = AppConfig.APP_TITLE,
+                title     = Branding.TITLE,
                 resizable = true,
-                icon      = trayIcon
+                icon      = windowIcon
             ) {
                 CelestiaTheme(useDarkTheme = isDarkTheme, customTheme = customTheme) {
                     AppRoot(
@@ -401,14 +459,14 @@ fun AppRoot(
                 settings.isOfflineMode -> AppState.Unauthenticated
                 saved?.cachedPassword != null -> {
                     try {
-                        val server  = profileManager.lastServerId ?: AppConfig.DEFAULT_SERVER_ID
+                        val server  = profileManager.lastServerId ?: Protocol.DEFAULT_SERVER_ID
                         val session = authService.login(saved.playerName, saved.cachedPassword!!, server)
                         AppState.Authenticated(session)
                     } catch (e: AuthException) {
                         if (e.isSslError) {
                             NetworkState.sslBypassEnabled = true
                             try {
-                                val server  = profileManager.lastServerId ?: AppConfig.DEFAULT_SERVER_ID
+                                val server  = profileManager.lastServerId ?: Protocol.DEFAULT_SERVER_ID
                                 val session = insecureAuthService.login(saved.playerName, saved.cachedPassword!!, server)
                                 AppState.Authenticated(session)
                             } catch (_: Exception) {

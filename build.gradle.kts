@@ -1,8 +1,12 @@
 plugins {
-    kotlin("jvm") version "2.3.20-RC3" apply false
+    alias(libs.plugins.kotlin.jvm) apply false
+    alias(libs.plugins.kotlin.multiplatform) apply false
+    alias(libs.plugins.kotlin.serialization) apply false
+    alias(libs.plugins.kotlin.compose.compiler) apply false
+    alias(libs.plugins.compose) apply false
+    alias(libs.plugins.buildconfig) apply false
+    alias(libs.plugins.versions)
     id("java")
-    id("com.github.gmazzo.buildconfig") version "6.0.9" apply false
-    id("com.github.ben-manes.versions") version "0.53.0"
 }
 
 fun getGitVersion(providerFactory: ProviderFactory): String {
@@ -79,11 +83,14 @@ gradle.startParameter.apply {
     maxWorkerCount = Runtime.getRuntime().availableProcessors()
 }
 
+// dorkbox/SystemTray 4.4 has a hardcoded JNA version check; JBR 25 ships
+// JNA 7.x natively. Pin the global resolution to whatever the catalog says.
+val pinnedJnaVersion = libs.versions.jna.get()
 configurations.all {
     resolutionStrategy.eachDependency {
         if (requested.group == "net.java.dev.jna") {
-            useVersion("6.1.6")
-            because("dorkbox/SystemTray requires exactly JNA 6.1.6")
+            useVersion(pinnedJnaVersion)
+            because("dorkbox/SystemTray requires exactly JNA $pinnedJnaVersion")
         }
     }
 }
