@@ -7,6 +7,7 @@ import hivens.core.data.FileData
 import hivens.core.data.FileManifest
 import hivens.core.data.SessionData
 import hivens.core.util.ZipUtils
+import hivens.core.util.retryWithBackoff
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -200,21 +201,83 @@ class FileDownloadService(
         withContext(Dispatchers.IO) {
             if (localPath.parent != null) Files.createDirectories(localPath.parent)
 
-            client.prepareGet(url).execute { response ->
-                if (!response.status.isSuccess()) throw IOException("HTTP ${response.status} for $url")
+            // Retry the whole transfer on transient network errors. The
+            // SMARTYcraft channel periodically drops mid-stream over SOCKS;
+            // without retry-with-resume a flaky network turns 100MB asset sync
+            // into a Sisyphean restart-from-zero loop.
+            retryWithBackoff(
+                operation = "download $serverPath",
+                shouldRetry = ::isTransientDownloadError,
+            ) {
+                val existing = if (Files.exists(localPath)) Files.size(localPath) else 0L
 
-                val channel = response.bodyAsChannel()
-                FileOutputStream(localPath.toFile()).use { output ->
-                    val buffer = ByteArray(8192)
-                    while (!channel.isClosedForRead) {
-                        val read = channel.readAvailable(buffer, 0, buffer.size)
-                        if (read <= 0) break
-                        output.write(buffer, 0, read)
-                        onBytesRead?.invoke(read)
+                client.prepareGet(url) {
+                    if (existing > 0) header(HttpHeaders.Range, "bytes=$existing-")
+                }.execute { response ->
+                    when (response.status) {
+                        HttpStatusCode.PartialContent -> {
+                            // 206: server is honouring the Range — append the remainder.
+                            // Report the already-on-disk bytes upfront so the UI's
+                            // total-bytes progress hits 100% on completion. (Long-to-Int
+                            // narrowing is fine here — modpack assets are well under 2GB.)
+                            if (existing > 0) onBytesRead?.invoke(existing.toInt())
+                            writeBody(response, localPath, append = true, onBytesRead)
+                        }
+                        HttpStatusCode.OK -> {
+                            // 200: server ignored Range (or we sent none) — overwrite.
+                            // Don't report existing bytes; we're throwing them away.
+                            writeBody(response, localPath, append = false, onBytesRead)
+                        }
+                        HttpStatusCode.RequestedRangeNotSatisfiable -> {
+                            // 416: partial on disk is bigger than the upstream file
+                            // (corrupt write or upstream shrank). Clear and let retry
+                            // fetch from byte 0.
+                            Files.deleteIfExists(localPath)
+                            throw IOException("HTTP 416 for $url; cleared bad partial, will refetch")
+                        }
+                        else -> throw IOException("HTTP ${response.status} for $url")
                     }
                 }
             }
         }
+    }
+
+    private suspend fun writeBody(
+        response: HttpResponse,
+        localPath: Path,
+        append: Boolean,
+        onBytesRead: ((Int) -> Unit)?,
+    ) {
+        val channel = response.bodyAsChannel()
+        FileOutputStream(localPath.toFile(), append).use { output ->
+            val buffer = ByteArray(8192)
+            while (!channel.isClosedForRead) {
+                val read = channel.readAvailable(buffer, 0, buffer.size)
+                if (read <= 0) break
+                output.write(buffer, 0, read)
+                onBytesRead?.invoke(read)
+            }
+        }
+    }
+
+    private fun isTransientDownloadError(t: Throwable): Boolean {
+        // CancellationException must NEVER be retried — it's how the parent
+        // coroutine signals "stop"; swallowing and retrying would deadlock
+        // the launch flow.
+        if (t is CancellationException) return false
+        var cause: Throwable? = t
+        while (cause != null) {
+            if (cause is java.net.ConnectException ||
+                cause is java.net.SocketException ||
+                cause is io.ktor.utils.io.ClosedByteChannelException ||
+                cause is java.net.SocketTimeoutException
+            ) return true
+            if (cause is IOException &&
+                cause.message?.contains("Connection reset", ignoreCase = true) == true
+            ) return true
+            cause = cause.cause
+        }
+        return false
     }
 
     private fun formatSpeed(bytesPerSec: Double): String {

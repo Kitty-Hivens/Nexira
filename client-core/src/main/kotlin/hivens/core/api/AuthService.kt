@@ -7,6 +7,7 @@ import hivens.core.data.AuthStatus
 import hivens.core.data.FileManifest
 import hivens.core.data.SessionData
 import hivens.core.util.HashUtils
+import hivens.core.util.retryWithBackoff
 import io.ktor.client.call.*
 import io.ktor.client.request.forms.*
 import io.ktor.http.*
@@ -26,6 +27,18 @@ class AuthService(
 
     private val logger = LoggerFactory.getLogger(AuthService::class.java)
     private val client get() = clientProvider.current
+
+    /**
+     * Diagnostic-only state for the "double login" issue observed in
+     * production: see CHANGELOG note next to the fix that consumes this.
+     * Per-server timestamp of the most recent login attempt; if a second
+     * call lands within 5s on the same server, we log a warn-level stack
+     * trace so the offending caller surfaces in the next user log paste.
+     * This does NOT block the second call — diagnose first, fix in a
+     * follow-up once the offender is known.
+     */
+    private val lastLoginNanos = java.util.concurrent.ConcurrentHashMap<String, Long>()
+    private val duplicateLoginWindowNs = 5_000_000_000L  // 5 seconds
 
     @Serializable
     private data class AuthRequest(
@@ -55,6 +68,7 @@ class AuthService(
     )
 
     override suspend fun login(username: String, password: String, serverId: String): SessionData {
+        warnIfDuplicate(serverId)
         logger.info("Login via API V3 (server: {})...", serverId)
 
         val passwordEncoded = HashUtils.md5(password)
@@ -79,23 +93,27 @@ class AuthService(
         val jsonString = json.encodeToString(requestPayload)
 
         val response: AuthResponse = try {
-            val call = client.submitForm(
-                url = Network.AUTH_URL,
-                formParameters = Parameters.build {
-                    append("action", "login")
-                    append("json", jsonString)
-                }
-            )
-            // Reading the response body as a string for manual error handling
-            val rawBody = call.body<String>().trim()
+            retryWithBackoff(operation = "auth login", shouldRetry = ::isTransientNetworkError) {
+                val call = client.submitForm(
+                    url = Network.AUTH_URL,
+                    formParameters = Parameters.build {
+                        append("action", "login")
+                        append("json", jsonString)
+                    }
+                )
+                // Reading the response body as a string for manual error handling
+                val rawBody = call.body<String>().trim()
 
-            // Handling text server errors
-            if (rawBody.contains("Bad login", ignoreCase = true)) throw AuthException(AuthStatus.BAD_LOGIN, "Invalid login or password")
-            if (rawBody.contains("User not found", ignoreCase = true)) throw AuthException(AuthStatus.BAD_LOGIN, "User not found")
+                // Handling text server errors. These are deliberate auth
+                // rejections from the server, never retryable; isTransientNetworkError
+                // returns false for AuthException so retryWithBackoff bubbles them
+                // out on the first attempt.
+                if (rawBody.contains("Bad login", ignoreCase = true)) throw AuthException(AuthStatus.BAD_LOGIN, "Invalid login or password")
+                if (rawBody.contains("User not found", ignoreCase = true)) throw AuthException(AuthStatus.BAD_LOGIN, "User not found")
 
-            // Parse JSON
-            json.decodeFromString(rawBody)
-
+                // Parse JSON
+                json.decodeFromString<AuthResponse>(rawBody)
+            }
         } catch (e: Exception) {
             if (e is AuthException) throw e
             logger.error("Authorization error", e)
@@ -144,6 +162,22 @@ class AuthService(
         )
     }
 
+    private fun warnIfDuplicate(serverId: String) {
+        val now = System.nanoTime()
+        val previous = lastLoginNanos.put(serverId, now) ?: return
+        val deltaNs = now - previous
+        if (deltaNs < duplicateLoginWindowNs) {
+            val deltaMs = deltaNs / 1_000_000
+            // Synthetic exception captures the stack so the duplicate caller
+            // is visible in logs. Throwable construction is cheap relative
+            // to a network call and only fires inside the 5s window.
+            logger.warn(
+                "Duplicate login attempt for server '{}' within {}ms — possible UI re-fire or unintended re-auth before launch",
+                serverId, deltaMs, Throwable("duplicate-login stack").also { it.stackTrace = it.stackTrace.drop(1).toTypedArray() },
+            )
+        }
+    }
+
     private fun generateGameToken(uid: String?, sessionV3: String?): String? {
         if (sessionV3 == null || uid == null) return sessionV3
         return try {
@@ -172,6 +206,32 @@ class AuthService(
         rand.nextBytes(mac)
         mac[0] = (mac[0].toInt() and 254).toByte()
         return mac.joinToString("-") { "%02X".format(it) }
+    }
+
+    /**
+     * True for the narrow set of transient network failures we've seen on
+     * the SMARTYcraft channel — h2 frame resets over SOCKS, raw socket
+     * resets during TLS, ktor's wrapped channel-closed exception. NOT true
+     * for [AuthException] (those are server-side rejections, retrying just
+     * locks the user out faster) or SSL cert errors (those need user opt-in,
+     * not a silent retry).
+     */
+    private fun isTransientNetworkError(t: Throwable): Boolean {
+        if (t is AuthException) return false
+        if (t.isSslCertificateError()) return false
+        var cause: Throwable? = t
+        while (cause != null) {
+            if (cause is java.net.ConnectException ||
+                cause is java.net.SocketException ||
+                cause is io.ktor.utils.io.ClosedByteChannelException ||
+                cause is java.net.SocketTimeoutException
+            ) return true
+            if (cause is java.io.IOException &&
+                cause.message?.contains("Connection reset", ignoreCase = true) == true
+            ) return true
+            cause = cause.cause
+        }
+        return false
     }
 
     private fun Throwable.isSslCertificateError(): Boolean {
