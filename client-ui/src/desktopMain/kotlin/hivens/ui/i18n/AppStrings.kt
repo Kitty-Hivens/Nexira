@@ -132,11 +132,15 @@ interface AppStrings {
     // --- Update ---
     val updateTitle: String
     val updateTitleCritical: String
+    val updateTitleMandatory: String
     val updateCriticalBanner: String
+    val updateMandatoryBanner: String
+    fun updateMandatoryBannerWithReason(reason: String): String
     val updateChangelog: String
     val updateHighlights: String
     val updateViewOnGitHub: String
     val updateLater: String
+    val updateExit: String
     val updateDownload: String
     val updateDownloadNow: String
     val updateDownloading: String
@@ -302,6 +306,15 @@ interface AppStrings {
     // --- Settings: Start in tray ---
     val settingsStartInTray: String
     val settingsStartInTrayDesc: String
+
+    // --- Settings: Experimental features ---
+    val settingsSectionExperimental: String
+    val settingsExperimentalMaster: String
+    val settingsExperimentalMasterDesc: String
+    val settingsMandatoryUpdates: String
+    val settingsMandatoryUpdatesDesc: String
+    val settingsPrereleaseChannel: String
+    val settingsPrereleaseChannelDesc: String
 
     // ─── April Fools close dialog ─────────────────────────────────────────────────
     /** Dialog title — changes tone as the user fails more attempts */

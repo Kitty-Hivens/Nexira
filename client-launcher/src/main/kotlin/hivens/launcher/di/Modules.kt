@@ -223,9 +223,10 @@ val appModule = module {
     // cannot ship the very fix that restores proxy connectivity.
     single {
         UpdateService(
-            clientProvider = get(named("direct")),
-            json           = get(),
-            dataDirectory  = get()
+            clientProvider  = get(named("direct")),
+            json            = get(),
+            dataDirectory   = get(),
+            settingsService = get()
         )
     }
 }

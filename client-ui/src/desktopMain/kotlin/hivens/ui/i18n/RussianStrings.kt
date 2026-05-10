@@ -128,11 +128,17 @@ object RussianStrings : AppStrings {
     // Update
     override val updateTitle           = "Доступно обновление"
     override val updateTitleCritical   = "КРИТИЧЕСКОЕ ОБНОВЛЕНИЕ"
+    override val updateTitleMandatory  = "ОБЯЗАТЕЛЬНОЕ ОБНОВЛЕНИЕ"
     override val updateCriticalBanner  = "Это обновление содержит критические исправления безопасности."
+    override val updateMandatoryBanner =
+        "Совместимость со старыми версиями нарушена на стороне сервера. Запуск без обновления невозможен."
+    override fun updateMandatoryBannerWithReason(reason: String) =
+        "Требуется по протоколу: $reason"
     override val updateChangelog       = "Полный список изменений"
     override val updateHighlights      = "Что нового"
     override val updateViewOnGitHub    = "Открыть на GitHub"
     override val updateLater           = "Позже"
+    override val updateExit            = "Выйти"
     override val updateDownload        = "Скачать и установить"
     override val updateDownloadNow     = "СКАЧАТЬ СЕЙЧАС"
     override val updateDownloading     = "Загрузка..."
@@ -295,6 +301,15 @@ object RussianStrings : AppStrings {
     // --- Settings: Start in tray ---
     override val settingsStartInTray     = "Запускать в трее"
     override val settingsStartInTrayDesc = "Лаунчер стартует свёрнутым; закрытие окна прячет его в трей"
+
+    // --- Settings: Experimental features ---
+    override val settingsSectionExperimental    = "Экспериментальные функции"
+    override val settingsExperimentalMaster     = "Экспериментальные функции"
+    override val settingsExperimentalMasterDesc = "Главный выключатель. Если выключить, оба переключателя ниже принудительно гасятся, независимо от их сохранённых значений."
+    override val settingsMandatoryUpdates       = "Обязательные обновления"
+    override val settingsMandatoryUpdatesDesc   = "Блокировать запуск до установки критических обновлений, когда ломается совместимость с протоколом. Сейчас включено по умолчанию."
+    override val settingsPrereleaseChannel      = "Канал нестабильных обновлений"
+    override val settingsPrereleaseChannelDesc  = "Получать RC и beta-сборки. Позволяет получать фиксы до выхода стабильного релиза. Сейчас временно включено по умолчанию."
 
     // April Fools
     override fun aprilCloseTitle(escapes: Int) = when {

@@ -42,8 +42,16 @@ fun UpdateDialog(
     var downloadState by remember { mutableStateOf<DownloadState>(DownloadState.Idle) }
     var errorMessage  by remember { mutableStateOf<String?>(null) }
 
+    // Critical and mandatory both block the backdrop dismiss, but a mandatory
+    // update goes further: it also replaces the "Later" button with a hard
+    // "Quit" so the user has *some* exit path that isn't "click outside the
+    // dialog and pretend it didn't happen". Treat them together as `isBlocking`
+    // for everything that's about non-dismissability, and keep `isMandatory`
+    // separate for the visual + button changes.
+    val isBlocking = update.isCritical || update.isMandatory
+
     BasicAlertDialog(
-        onDismissRequest = { if (!update.isCritical) onDismiss() }
+        onDismissRequest = { if (!isBlocking) onDismiss() }
     ) {
         Surface(
             modifier  = Modifier.width(700.dp).wrapContentHeight(),
@@ -59,17 +67,21 @@ fun UpdateDialog(
                     modifier          = Modifier.fillMaxWidth()
                 ) {
                     Icon(
-                        imageVector        = if (update.isCritical) Icons.Default.Warning else Icons.Default.CloudDownload,
+                        imageVector        = if (isBlocking) Icons.Default.Warning else Icons.Default.CloudDownload,
                         contentDescription = null,
-                        tint               = if (update.isCritical) CelestiaTheme.colors.error else CelestiaTheme.colors.primary,
+                        tint               = if (isBlocking) CelestiaTheme.colors.error else CelestiaTheme.colors.primary,
                         modifier           = Modifier.size(32.dp)
                     )
                     Spacer(Modifier.width(12.dp))
                     Column {
                         Text(
-                            text       = if (update.isCritical) s.updateTitleCritical else s.updateTitle,
+                            text       = when {
+                                update.isMandatory -> s.updateTitleMandatory
+                                update.isCritical  -> s.updateTitleCritical
+                                else               -> s.updateTitle
+                            },
                             style      = MaterialTheme.typography.titleLarge,
-                            color      = if (update.isCritical) CelestiaTheme.colors.error else CelestiaTheme.colors.textPrimary,
+                            color      = if (isBlocking) CelestiaTheme.colors.error else CelestiaTheme.colors.textPrimary,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
@@ -80,8 +92,8 @@ fun UpdateDialog(
                     }
                 }
 
-                // ── Critical banner ───────────────────────────────────────────
-                if (update.isCritical) {
+                // ── Critical / Mandatory banner ──────────────────────────────
+                if (isBlocking) {
                     Spacer(Modifier.height(16.dp))
                     Box(
                         modifier = Modifier
@@ -89,8 +101,16 @@ fun UpdateDialog(
                             .background(CelestiaTheme.colors.error.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
                             .padding(12.dp)
                     ) {
+                        val bannerText = when {
+                            update.isMandatory -> {
+                                val reason = update.mandatoryReason
+                                if (!reason.isNullOrBlank()) s.updateMandatoryBannerWithReason(reason)
+                                else s.updateMandatoryBanner
+                            }
+                            else -> s.updateCriticalBanner
+                        }
                         Text(
-                            s.updateCriticalBanner,
+                            bannerText,
                             style      = MaterialTheme.typography.bodyMedium,
                             color      = CelestiaTheme.colors.error,
                             fontWeight = FontWeight.Medium
@@ -195,9 +215,20 @@ fun UpdateDialog(
 
                     Spacer(Modifier.weight(1f))
 
-                    if (!update.isCritical && downloadState !is DownloadState.Downloading) {
+                    if (!isBlocking && downloadState !is DownloadState.Downloading) {
                         TextButton(onClick = onDismiss) {
                             Text(s.updateLater, color = CelestiaTheme.colors.textSecondary)
+                        }
+                        Spacer(Modifier.width(8.dp))
+                    }
+
+                    // Mandatory updates need a hard exit path — without it the
+                    // user's only choices are "install now" or "kill the
+                    // process from outside". Hidden mid-download to avoid the
+                    // user yanking themselves out of an install in progress.
+                    if (update.isMandatory && downloadState !is DownloadState.Downloading) {
+                        TextButton(onClick = { exitProcess(0) }) {
+                            Text(s.updateExit, color = CelestiaTheme.colors.textSecondary)
                         }
                         Spacer(Modifier.width(8.dp))
                     }
@@ -222,12 +253,12 @@ fun UpdateDialog(
                                     }
                                 },
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (update.isCritical) CelestiaTheme.colors.error else CelestiaTheme.colors.primary
+                                    containerColor = if (isBlocking) CelestiaTheme.colors.error else CelestiaTheme.colors.primary
                                 ),
                                 shape  = RoundedCornerShape(8.dp)
                             ) {
                                 Text(
-                                    if (update.isCritical) s.updateDownloadNow else s.updateDownload,
+                                    if (isBlocking) s.updateDownloadNow else s.updateDownload,
                                     color      = Color.White,
                                     fontWeight = FontWeight.Bold
                                 )
