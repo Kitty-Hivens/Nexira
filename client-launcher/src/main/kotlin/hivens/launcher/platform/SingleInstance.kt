@@ -1,7 +1,6 @@
 package hivens.launcher.platform
 
 import org.slf4j.LoggerFactory
-import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
 import java.nio.channels.FileLock
 import java.nio.channels.OverlappingFileLockException
@@ -70,7 +69,7 @@ object SingleInstance {
             } else {
                 heldChannel = channel
                 heldLock = lock
-                writePid(channel)
+                writePid(dataDir)
                 Runtime.getRuntime().addShutdownHook(Thread(::release, "single-instance-release"))
                 log.info("Single-instance lock acquired (pid={})", ProcessHandle.current().pid())
                 true
@@ -102,11 +101,19 @@ object SingleInstance {
         }
     }
 
-    private fun writePid(channel: FileChannel) {
+    /**
+     * PID is written to a SEPARATE `.lock.pid` file rather than into `.lock`
+     * itself because Windows treats `FileChannel.tryLock()` as a mandatory
+     * OS-level lock — once acquired, no other handle (even in the same JVM)
+     * can open the file for read, and `Files.readString(.lock)` throws
+     * IOException. Linux and macOS use advisory locks where reads work
+     * fine, but cross-platform consistency wins. `.lock` stays empty and
+     * sole-purpose; `.lock.pid` is informational and freely readable for
+     * `cat ~/.local/share/aura-launcher/.lock.pid` debugging.
+     */
+    private fun writePid(dataDir: Path) {
         runCatching {
-            channel.position(0)
-            channel.truncate(0)
-            channel.write(ByteBuffer.wrap("${ProcessHandle.current().pid()}\n".toByteArray()))
+            Files.writeString(dataDir.resolve(".lock.pid"), "${ProcessHandle.current().pid()}\n")
         }
     }
 }
