@@ -101,7 +101,10 @@ class FileDownloadService(
 
         // 5. Mark this manifest as cleanly synced — next session with the
         // same manifest hash short-circuits the integrity walk above.
-        manifestCache.markClean(serverId, manifestHash)
+        // Pass the manifest content too: the offline-launch path
+        // (LauncherController) recovers it from cache when sync is
+        // skipped, so the classpath builder still has a file list to walk.
+        manifestCache.markClean(serverId, manifestHash, manifest)
     }
 
     /**
