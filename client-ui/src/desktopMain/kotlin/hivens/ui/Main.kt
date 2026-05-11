@@ -351,7 +351,13 @@ fun main() {
                 onCloseRequest = {
                     if (AprilFools.isActive()) {
                         ChaosState.showCloseDialog = true
-                    } else if (TrayManager.isSupported) {
+                    } else if (TrayManager.canBeReady) {
+                        // canBeReady (not isSupported) so we don't kill the
+                        // launcher mid-init when dorkbox's GTK probe is
+                        // taking its time. If it ultimately fails, the user
+                        // can quit via tray (when it appears) or kill the
+                        // process — strictly better than exiting on a close
+                        // request the user clearly meant as "minimise".
                         isWindowVisible = false
                     } else {
                         exitApplication()
@@ -385,14 +391,18 @@ fun main() {
                     AppRoot(
                         onCloseApp = {
                             val gameRunning = launchState is LaunchState.GameRunning
-                            if (gameRunning && TrayManager.isSupported) {
+                            if (gameRunning && TrayManager.canBeReady) {
+                                // Same canBeReady reasoning as the Window
+                                // onCloseRequest: don't pull the rug from
+                                // under a running game just because tray
+                                // init is still mid-flight.
                                 isWindowVisible = false
                             } else {
                                 exitApplication()
                             }
                         },
                         onRealExit   = { exitApplication() },
-                        onHideToTray = if (TrayManager.isSupported) {{ isWindowVisible = false }}
+                        onHideToTray = if (TrayManager.canBeReady) {{ isWindowVisible = false }}
                         else null,
                         isDarkTheme          = isDarkTheme,
                         onToggleDarkTheme    = {
