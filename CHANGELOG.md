@@ -11,6 +11,155 @@ below are for the GitHub release page and CHANGELOG readers.
 
 ## [Unreleased]
 
+## [2.2.10] - 2026-05-12
+
+UX polish chunk anchored on the new visual JVM Args Builder — a Compose
+dialog for picking GC algorithm and tuning flags so users no longer
+have to hand-type Aikar's recipe to get smooth modded MC. Plus the
+usual round of stability fixes, a saner default heap size, full
+Console-window localisation that was previously hardcoded English,
+and a new gothic dark-red theme.
+
+### Highlights
+- **Visual JVM Args Builder** (experimental opt-in): pick GC (G1 / ZGC
+  / Shenandoah / ParallelGC / SerialGC), tune G1 region size and pause
+  targets via sliders, enable AppCDS or JFR profiling — all without
+  memorising `-XX:+UnlockExperimentalVMOptions`. Six curated presets
+  cover Aikar's flags (canonical modded MC), Heavy modded (GTNH-class),
+  Vanilla G1 (stock baseline), ZGC and Shenandoah for huge heaps, plus
+  ParallelGC throughput. Live preview at the bottom shows the composed
+  arg string. Enable under Settings → Experimental features.
+- **Auto-sync installed packs on launch** (experimental opt-in): the
+  launcher quietly refreshes every server pack you've already installed
+  at startup. Useful if you hop between multiple servers and want
+  fresh state without clicking each one. Sequential to avoid bandwidth
+  contention. Cheap when nothing changed — the 2.2.9 manifest cache
+  short-circuits the integrity walk.
+- **NeoForge `--fml.*` args auto-detect**: launcher now reads the
+  required NeoForge / FML / NeoForm version values directly from the
+  populated `libraries-{mc}/` directory and the universal jar's
+  manifest. Removes the recurring "smrt-deco bumped, Aura's hardcoded
+  version doesn't match, NeoForge fails to register the `neoforge`
+  mod and every dependent mod shows `[MISSING]`" failure mode. Baked-
+  in values stay as a safety-net fallback.
+- **Default heap bumped 4 → 6 GB** for new per-server profiles: 4 GB
+  was borderline tight for the SmartyCraft modpack class (50-70 mods).
+  RamSelector still caps choices at 75 % of detected system RAM, so
+  the default scales down gracefully on low-RAM machines.
+- **Blood Rain theme**: first warm-dark gothic option in the theme
+  picker. All accents stay inside the dark-red family (no cool
+  counterpoint) for a "blood rain on a moonless night" mood. Sits
+  opposite the existing cool-electric presets (Cyberpunk / Vaporwave
+  / Synthwave / Neon Dreams).
+- **Console window fully localised** (EN / RU / DE): window title,
+  filter labels, action tooltips, search placeholder, jump-to-bottom
+  button — all previously hardcoded English. Three i18n keys
+  (`consoleTitle`, `consoleCopyAll`, `consoleClear`) had existed in
+  `AppStrings` since an earlier refactor but were never wired to the
+  screen; fixed alongside the new keys.
+- **RAM custom-value field no longer clips its placeholder**: the
+  `OutlinedTextField` had been forced to 48 dp height, below the
+  Material3 default ~56 dp the placeholder layout assumes. The
+  placeholder digit appeared to "fall through" the bottom border.
+- **Server settings bottom buttons unified**: Open Folder, Reset
+  Client, and Return to Spawn now all render in the same outlined
+  Celestia style. Open Folder and Spawn Reset were previously
+  `AprilFoolsButton` with a transparent-container hack that made them
+  read as floating text instead of buttons.
+- **Tray init race fix**: the close-request callback treats a close
+  as "minimise" while the tray subsystem is still initialising.
+  Previously, on systems where dorkbox/SystemTray takes up to a
+  minute to fall back to the GTK status icon, the launcher could
+  exit before the tray ever appeared — silently, with no error.
+- **Offline launches now rebuild the classpath**: per-server
+  `ManifestCache` persists the full manifest content alongside its
+  hash, so `LauncherController`'s offline branch has the data it
+  needs. Previously the cache stored only the hash and offline mode
+  produced an empty classpath that failed with a confusing
+  class-not-found error.
+
+### Added
+- `JvmConfig` model in `client-core/jvm/` composing `G1Tuning` /
+  `ZgcTuning` / `ShenandoahTuning` / `CdsConfig` / `JitConfig` /
+  `PerfFlags` / `JfrConfig` into a single `toArgs()` argument list.
+  Pure data, serialisable. 27 unit tests cover GC dispatch, exact-
+  match against the canonical Aikar's flags recipe (catches accidental
+  drift), CDS / JFR edge cases, composition order, custom passthrough.
+- `JvmArgsPresets` catalog: six well-documented `JvmPreset` entries
+  (Aikar / HeavyModded / VanillaG1 / ZgcLowLatency /
+  ShenandoahLowLatency / Throughput) with `minRecommendedHeapMb` and
+  `minJavaVersion` metadata so the UI can warn when an environment
+  doesn't satisfy a preset.
+- `JvmArgsBuilderDialog` Compose modal (820 × 540 dp): preset chips,
+  seven categorised tabs (GC / per-GC tuning / AppCDS / JIT /
+  Performance / JFR / Custom passthrough), live preview pane.
+  Reachable from the per-server constructor when
+  `jvmBuilderEnabled` is on. Full EN / RU / DE for descriptive copy;
+  technical `-XX:` flag identifiers stay literal.
+- `SettingsData.jvmBuilderEnabled` experimental toggle.
+- `AutoSyncService` walks every installed pack on startup and re-runs
+  the manifest sync. Skips servers with no client directory (never
+  triggers a fresh many-GB pack download without an explicit launch)
+  and servers where the user has no cached credentials.
+- `SettingsData.autoSyncAllPacks` experimental toggle, plus a
+  `Dashboard` progress strip and per-card sync badges so the user can
+  see what's running.
+- `NeoForgeVersionDetector` component reading
+  `libraries-{mc}/net/neoforged/{neoforge,fancymodloader/loader}/`
+  directory names and parsing `Implementation-Version` out of the
+  universal jar's `MANIFEST.MF` to recover all four `--fml.*` args.
+  6 unit tests cover happy path, multi-version selection, missing
+  directories, and manifest-without-neoform-section fallback.
+- `BLOOD_RAIN` theme preset in `ThemePresets`.
+- Console window i18n keys: `consoleHeaderCount(filtered, total)`
+  (replaces the single-int `consoleTitleCount(n)` whose signature
+  never matched the use site), `consoleWrap`, `consoleSaveToFile`,
+  `consoleSearchPlaceholder`, `consoleJumpToBottom`. EN / RU / DE.
+
+### Changed
+- `SettingsData.memoryMB` and `InstanceProfile.memoryMb` defaults
+  bumped 4096 → 6144.
+- `GameCommandBuilder` reads `--fml.*` arg values from
+  `NeoForgeVersionDetector` first, with the previous baked-in values
+  preserved as a fallback. Logs `WARN` when fallback fires so version
+  drift surfaces in the launcher log instead of as an unexplained
+  in-game `[MISSING]`.
+- Three bottom action buttons on `ServerSettingsScreen` (Open Folder,
+  Reset Client, Return to Spawn) unified to `CelestiaButton(primary =
+  false)`. Open Folder and Spawn Reset lose their April Fools chaos
+  integration as a result — the deferred fix needs a proper
+  CelestiaButton-based wrapper for `AprilFoolsButton` that respects
+  the design language, queued under future Atelier-phase work.
+- Dependency versions: ktor 3.4.1 → 3.4.3, koin 4.2.0-RC2 → 4.2.1
+  (RC → stable), kotlinx-serialization 1.10.0 → 1.11.0,
+  kotlinx-coroutines 1.10.2 → 1.11.0, multiplatform-markdown-renderer
+  0.39.2 → 0.40.2, filekit 0.13.0 → 0.14.1, versions plugin
+  0.53.0 → 0.54.0. Held back: Kotlin (next is 2.4.0-Beta2, beta of
+  a new major), Coil (3.5.0-beta01), Compose (1.11.0-rc01 not yet
+  on Maven Central).
+- `--fml.neoForgeVersion` baked-in fallback bumped 21.1.505 → 21.1.506
+  to match smrt-deco 3.6.5 (since superseded by the auto-detect path
+  but kept current as the safety net).
+
+### Fixed
+- Tray initialisation race: the close-request handler treats a close
+  as minimise while `TrayManager.canBeReady` is true (state ∈
+  `INITIALIZING` or `READY`), avoiding the silent-exit failure on
+  systems where dorkbox's GTK probe takes up to a minute.
+- Offline launches now rebuild the classpath: per-server
+  `ManifestCache` persists the full manifest content alongside its
+  hash, so `LauncherController`'s offline branch can pass it to
+  `ClasspathProvider`.
+- RAM custom-value placeholder text no longer clips through the bottom
+  border of its `OutlinedTextField`.
+- ConsoleWindow's eight previously-hardcoded user-facing strings are
+  now read from `LocalStrings`.
+- Material3 deprecated APIs replaced in `JvmArgsBuilderDialog`:
+  `Divider` → `HorizontalDivider`, `ScrollableTabRow` →
+  `PrimaryScrollableTabRow`.
+- `System.runFinalization()` calls in `SkiaTracker` debug panel
+  removed — deprecated in Java 18 and a no-op since Java 9 anyway.
+
 ## [2.2.9] - 2026-05-10
 
 Stability sweep — four user-visible reliability fixes that ride on the
