@@ -185,6 +185,7 @@ object RussianStrings : AppStrings {
     // --- Server Settings: Extended ---
     override val serverSettingsJvmArgs     = "Аргументы JVM"
     override val serverSettingsJvmArgsHint = "-XX:+UseZGC -Dfoo=bar"
+    override val serverSettingsJvmBuildArgs = "Собрать"
     override val serverSettingsResolution  = "Размер окна"
     override val serverSettingsWidth       = "Ширина"
     override val serverSettingsHeight      = "Высота"
