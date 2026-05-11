@@ -5,7 +5,15 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class SettingsData(
     var javaPath: String? = null,
-    var memoryMB: Int = 4096,
+    /**
+     * Default heap size in MB used as a fallback when an InstanceProfile
+     * doesn't specify its own. 6 GB is the saner-for-modded-MC baseline:
+     * SmartyCraft packs (50-70 mods) need 4-6 GB to run smoothly, and
+     * vanilla can always be lowered per-server. RamSelector caps choices
+     * at 75% of detected system RAM, so this default also gracefully
+     * scales down on low-RAM systems.
+     */
+    var memoryMB: Int = 6144,
     var isDarkTheme: Boolean = true,
     var closeAfterStart: Boolean = true,
     var saveCredentials: Boolean = true,
