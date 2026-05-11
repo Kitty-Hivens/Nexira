@@ -137,7 +137,7 @@ jobs:
 
       - name: Build distributable
         shell: bash
-        run: ./gradlew :client-ui:createReleaseDistributable -Pversion="$APP_VERSION"
+        run: ./gradlew :client-ui:createReleaseDistributable -PappVersion="$APP_VERSION"
 
       - name: Compile Inno Setup EXE
         shell: pwsh
@@ -206,7 +206,7 @@ jobs:
           fi
 
       - name: Build JAR
-        run: ./gradlew :client-ui:packageReleaseUberJarForCurrentOS -Pversion="$APP_VERSION"
+        run: ./gradlew :client-ui:packageReleaseUberJarForCurrentOS -PappVersion="$APP_VERSION"
 
       - name: Validate desktop entry
         run: desktop-file-validate resources/aura-launcher.desktop
@@ -247,7 +247,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build DMG
-        run: ./gradlew :client-ui:packageReleaseDmg -Pversion="$APP_VERSION"
+        run: ./gradlew :client-ui:packageReleaseDmg -PappVersion="$APP_VERSION"
 
       - name: Rename DMG
         run: |
