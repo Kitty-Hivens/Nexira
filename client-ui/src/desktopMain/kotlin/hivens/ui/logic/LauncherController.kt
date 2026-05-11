@@ -7,6 +7,7 @@ import hivens.core.data.SessionData
 import hivens.launcher.CrashReporter
 import hivens.launcher.CredentialsManager
 import hivens.launcher.JavaManagerService
+import hivens.launcher.ManifestCache
 import hivens.launcher.ProfileManager
 import hivens.ui.easter.AprilFoolsProgress
 import hivens.ui.i18n.I18n
@@ -30,6 +31,7 @@ class LauncherController : KoinComponent {
     private val javaManagerService: JavaManagerService by inject()
     private val launcherService: ILauncherService by inject()
     private val manifestProcessor: IManifestProcessorService by inject()
+    private val manifestCache: ManifestCache by inject()
     private val profileManager: ProfileManager by inject()
     private val dataDirectory: Path by inject()
 
@@ -105,6 +107,25 @@ class LauncherController : KoinComponent {
                         _state.value = LaunchState.Error(s.stateOfflineNoClient)
                         GameConsoleService.append(s.stateOfflineNoClient, LogType.ERROR)
                         return@launch
+                    }
+                    // Recover the file manifest from the last successful online sync.
+                    // Without it, ClasspathProvider has nothing to walk and builds an
+                    // empty -cp argument — the JVM then dies with "Could not find or
+                    // load main class net.minecraft.launchwrapper.Launch" because the
+                    // class IS on disk but classpath is "". TTL is intentionally
+                    // ignored here: a stale-but-present manifest is strictly better
+                    // than launching with no classpath. If the user has never logged
+                    // in online, the cache is empty and we bail with an actionable
+                    // error rather than a cryptic JVM message.
+                    if (session.fileManifest == null) {
+                        val cached = manifestCache.loadManifest(targetServerId)
+                        if (cached != null) {
+                            session = session.copy(fileManifest = cached)
+                        } else {
+                            _state.value = LaunchState.Error(s.stateOfflineNoManifest)
+                            GameConsoleService.append(s.stateOfflineNoManifest, LogType.ERROR)
+                            return@launch
+                        }
                     }
                     GameConsoleService.append(s.stateOfflineSkipSync, LogType.INFO)
                 } else {
@@ -198,18 +219,7 @@ class LauncherController : KoinComponent {
     }
 
     private fun calculateIgnoredFiles(server: ServerProfile): Set<String> {
-        val availableMods = manifestProcessor.getOptionalModsForClient(server)
-        if (availableMods.isEmpty()) return emptySet()
-        val ignored = HashSet<String>()
-        val userProfile = profileManager.getProfile(server.assetDir)
-        val userState = userProfile.optionalModsState
-        for (mod in availableMods) {
-            val isEnabled = userState[mod.id] ?: mod.isDefault
-            if (!isEnabled) {
-                ignored.addAll(mod.jars)
-                if (mod.infoFile != null) ignored.add(mod.infoFile!!)
-            }
-        }
-        return ignored
+        val userState = profileManager.getProfile(server.assetDir).optionalModsState
+        return manifestProcessor.calculateIgnoredFiles(server, userState)
     }
 }

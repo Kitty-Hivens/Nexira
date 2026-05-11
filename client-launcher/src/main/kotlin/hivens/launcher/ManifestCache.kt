@@ -1,5 +1,6 @@
 package hivens.launcher
 
+import hivens.core.data.FileManifest
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
@@ -31,8 +32,24 @@ class ManifestCache(
 ) {
     private val log = LoggerFactory.getLogger(ManifestCache::class.java)
 
+    /**
+     * The cached entry stores the manifest content alongside the integrity
+     * hash + timestamp. The hash + timestamp drive the [isClean] short-circuit
+     * for online sync; the manifest content is what [loadManifest] returns to
+     * recover the file list when launching offline (when `session.fileManifest`
+     * is null because auth was skipped).
+     *
+     * `manifest` is nullable for backwards-compat with cache files written by
+     * launcher 2.2.9, which stored only the hash. Old cache files still work
+     * for the integrity check; offline fallback just won't have data until the
+     * next online sync re-populates the cache.
+     */
     @Serializable
-    data class Entry(val hash: String, val syncedAt: Long)
+    data class Entry(
+        val hash: String,
+        val syncedAt: Long,
+        val manifest: FileManifest? = null,
+    )
 
     /**
      * Computes a stable hash of [manifestJson] (the canonical JSON form
@@ -57,13 +74,30 @@ class ManifestCache(
         return true
     }
 
-    fun markClean(serverId: String, manifestHash: String) {
+    fun markClean(serverId: String, manifestHash: String, manifest: FileManifest? = null) {
         runCatching {
             Files.createDirectories(cacheDir)
-            val entry = Entry(hash = manifestHash, syncedAt = System.currentTimeMillis())
+            val entry = Entry(
+                hash = manifestHash,
+                syncedAt = System.currentTimeMillis(),
+                manifest = manifest,
+            )
             Files.writeString(cacheFile(serverId), json.encodeToString(entry))
         }.onFailure { log.warn("Failed to persist manifest-cache entry for {}", serverId, it) }
     }
+
+    /**
+     * Loads the cached manifest content for [serverId], regardless of TTL.
+     *
+     * Used by the offline launch path: if the user starts the launcher with
+     * no network, `session.fileManifest` is null (sync was skipped). We
+     * recover it from the last successful online sync so [ClasspathProvider]
+     * has something to walk. Cache age doesn't matter here — a stale manifest
+     * is still better than launching with an empty classpath. The on-disk
+     * files are presumed unchanged; if they aren't, the game itself will
+     * complain on launch.
+     */
+    fun loadManifest(serverId: String): FileManifest? = read(serverId)?.manifest
 
     /**
      * Drops the cache for [serverId] — call when the user explicitly

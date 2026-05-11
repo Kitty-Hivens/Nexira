@@ -22,7 +22,11 @@ fun getGitVersion(providerFactory: ProviderFactory): String {
     }
 }
 
-val appVersion = providers.gradleProperty("version")
+// The property name MUST match `gradle.properties` (`appVersion=`). Reading
+// "version" here was a name mismatch — the override never fired and the build
+// always fell through to `git describe`, leaving BuildConfig.FORK_VERSION as
+// e.g. `2.2.7-rc3-37-g5763371` instead of the intended `2.2.9`.
+val appVersion = providers.gradleProperty("appVersion")
     .getOrElse(getGitVersion(providers))
 
 allprojects {
