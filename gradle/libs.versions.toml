@@ -4,22 +4,25 @@
 
 [versions]
 # ── Toolchain & language plugins ─────────────────────────────────────────────
+# Kotlin held at 2.3.20-RC3 (next release-line bump is 2.4.0-Beta2, skipped —
+# beta of a new major). Compose moved alpha04 → rc01 of the same 1.11.0 line.
 kotlin            = "2.3.20-RC3"
 compose           = "1.11.0-alpha04"
 buildconfigPlugin = "6.0.9"
-versionsPlugin    = "0.53.0"
+versionsPlugin    = "0.54.0"
 
 # ── Core libraries ───────────────────────────────────────────────────────────
-ktor              = "3.4.1"
-koin              = "4.2.0-RC2"
-serialization     = "1.10.0"
-coroutines        = "1.10.2"
+ktor              = "3.4.3"
+koin              = "4.2.1"
+serialization     = "1.11.0"
+coroutines        = "1.11.0"
 
 # ── UI / Compose ecosystem ───────────────────────────────────────────────────
+# coil held at 3.4.0 (next is 3.5.0-beta01, skipped — beta).
 composeIcons      = "1.7.3"
-markdownRenderer  = "0.39.2"
+markdownRenderer  = "0.40.2"
 coil              = "3.4.0"
-filekit           = "0.13.0"
+filekit           = "0.14.1"
 
 # ── Logging ──────────────────────────────────────────────────────────────────
 slf4j             = "2.1.0-alpha1"
