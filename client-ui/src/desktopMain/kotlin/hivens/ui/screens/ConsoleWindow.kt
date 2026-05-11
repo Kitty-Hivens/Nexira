@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.rememberWindowState
+import hivens.ui.i18n.LocalStrings
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.utils.LogEntry
 import hivens.ui.utils.LogType
@@ -65,12 +66,13 @@ private val FONT_SIZES = listOf(11, 12, 14)
 
 @Composable
 fun ConsoleWindow(isDarkTheme: Boolean, onClose: () -> Unit) {
+    val title = LocalStrings.current.consoleTitle
     val windowState = rememberWindowState(width = 960.dp, height = 620.dp)
 
     Window(
         onCloseRequest = onClose,
         state          = windowState,
-        title          = "Debug Console",
+        title          = title,
         alwaysOnTop    = false,
         undecorated    = false
     ) {
@@ -101,6 +103,7 @@ private fun ConsoleContent(
     textColor: Color,
     isDarkTheme: Boolean
 ) {
+    val s = LocalStrings.current
     val clipboard = LocalClipboard.current
     val scope     = rememberCoroutineScope()
 
@@ -164,7 +167,7 @@ private fun ConsoleContent(
             ) {
                 // Title + count
                 Text(
-                    "Game Output (${filtered.size}/${logsCopy.size})",
+                    s.consoleHeaderCount(filtered.size, logsCopy.size),
                     color      = textColor,
                     fontWeight = FontWeight.Bold,
                     modifier   = Modifier.padding(start = 8.dp)
@@ -204,14 +207,14 @@ private fun ConsoleContent(
                     IconButton(onClick = { wrapText = !wrapText }) {
                         Icon(
                             Icons.AutoMirrored.Filled.WrapText,
-                            "Wrap",
+                            s.consoleWrap,
                             tint = if (wrapText) Color(0xFF4CAF50) else textColor.copy(alpha = 0.4f)
                         )
                     }
 
                     // Save to file
                     IconButton(onClick = { GameConsoleService.saveToFile() }) {
-                        Icon(Icons.Default.Save, "Save to file", tint = textColor.copy(alpha = 0.7f))
+                        Icon(Icons.Default.Save, s.consoleSaveToFile, tint = textColor.copy(alpha = 0.7f))
                     }
 
                     // Copy all
@@ -223,12 +226,12 @@ private fun ConsoleContent(
                             clipboard.setClipEntry(ClipEntry(StringSelection(text)))
                         }
                     }) {
-                        Icon(Icons.Default.ContentCopy, "Copy All", tint = textColor.copy(alpha = 0.7f))
+                        Icon(Icons.Default.ContentCopy, s.consoleCopyAll, tint = textColor.copy(alpha = 0.7f))
                     }
 
                     // Clear
                     IconButton(onClick = { GameConsoleService.clear() }) {
-                        Icon(Icons.Default.Delete, "Clear", tint = textColor.copy(alpha = 0.7f))
+                        Icon(Icons.Default.Delete, s.consoleClear, tint = textColor.copy(alpha = 0.7f))
                     }
                 }
             }
@@ -249,7 +252,7 @@ private fun ConsoleContent(
                     modifier      = Modifier.weight(1f),
                     decorationBox = { inner ->
                         if (searchQuery.isEmpty()) {
-                            Text("Search...", color = textColor.copy(alpha = 0.3f), fontSize = 12.sp, fontFamily = FontFamily.Monospace)
+                            Text(s.consoleSearchPlaceholder, color = textColor.copy(alpha = 0.3f), fontSize = 12.sp, fontFamily = FontFamily.Monospace)
                         }
                         inner()
                     }
@@ -309,7 +312,7 @@ private fun ConsoleContent(
                     onClick  = { scope.launch { listState.scrollToItem(filtered.lastIndex) } },
                     modifier = Modifier.align(Alignment.CenterEnd)
                 ) {
-                    Text("↓ Jump to bottom", color = Color.White, fontSize = 11.sp)
+                    Text(s.consoleJumpToBottom, color = Color.White, fontSize = 11.sp)
                 }
             }
         }

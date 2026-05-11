@@ -152,9 +152,13 @@ object RussianStrings : AppStrings {
 
     // Console
     override val consoleTitle = "Консоль отладки"
-    override fun consoleTitleCount(n: Int) = "Вывод игры ($n)"
+    override fun consoleHeaderCount(filtered: Int, total: Int) = "Вывод игры ($filtered/$total)"
     override val consoleCopyAll = "Копировать всё"
     override val consoleClear   = "Очистить"
+    override val consoleWrap    = "Перенос строк"
+    override val consoleSaveToFile = "Сохранить в файл"
+    override val consoleSearchPlaceholder = "Поиск…"
+    override val consoleJumpToBottom = "↓ К концу"
 
     // Tray
     override val trayShowHide = "Показать / Скрыть"

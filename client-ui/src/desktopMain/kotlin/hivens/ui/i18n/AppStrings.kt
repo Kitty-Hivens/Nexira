@@ -154,9 +154,14 @@ interface AppStrings {
 
     // --- Console ---
     val consoleTitle: String
-    fun consoleTitleCount(n: Int): String
+    /** Header showing how many entries pass the active filter, e.g. "Game Output (12/847)". */
+    fun consoleHeaderCount(filtered: Int, total: Int): String
     val consoleCopyAll: String
     val consoleClear: String
+    val consoleWrap: String
+    val consoleSaveToFile: String
+    val consoleSearchPlaceholder: String
+    val consoleJumpToBottom: String
 
     // --- Tray ---
     val trayShowHide: String
