@@ -26,6 +26,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import hivens.core.api.PlayerRepository
 import hivens.core.api.interfaces.IManifestProcessorService
+import hivens.core.api.interfaces.ISettingsService
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.InstanceProfile
 import hivens.core.data.OptionalMod
@@ -33,6 +34,7 @@ import hivens.launcher.CredentialsManager
 import hivens.launcher.ProfileManager
 import hivens.ui.components.CelestiaButton
 import hivens.ui.components.GlassCard
+import hivens.ui.components.JvmArgsBuilderDialog
 import hivens.ui.components.ModItemCard
 import hivens.ui.components.RamSelector
 import hivens.ui.debug.SkiaTracker
@@ -71,7 +73,11 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
     val dataDirectory: Path                          = koinInject()
     val playerRepository: PlayerRepository           = koinInject()
     val credentialsManager: CredentialsManager       = koinInject()
+    val settingsService: ISettingsService            = koinInject()
     val s = LocalStrings.current
+
+    val jvmBuilderEnabled = remember { settingsService.getSettings().jvmBuilderEnabled }
+    var showJvmBuilder by remember { mutableStateOf(false) }
 
     var mods       by remember { mutableStateOf<List<OptionalMod>>(emptyList()) }
     var profile    by remember { mutableStateOf<InstanceProfile?>(null) }
@@ -275,7 +281,20 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                     Spacer(Modifier.height(16.dp))
 
                     // ── JVM ARGUMENTS ──────────────────────────────────────────
-                    Text(s.serverSettingsJvmArgs, color = CelestiaTheme.colors.textPrimary, style = MaterialTheme.typography.bodyMedium)
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text(s.serverSettingsJvmArgs, color = CelestiaTheme.colors.textPrimary, style = MaterialTheme.typography.bodyMedium)
+                        if (jvmBuilderEnabled) {
+                            TextButton(onClick = { showJvmBuilder = true }) {
+                                Icon(Icons.Default.Tune, null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text(s.serverSettingsJvmBuildArgs)
+                            }
+                        }
+                    }
                     Spacer(Modifier.height(8.dp))
 
                     OutlinedTextField(
@@ -471,6 +490,19 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                 }
             }
         }
+    }
+
+    // ── JVM args builder dialog (experimental, opt-in) ─────────────────
+    if (showJvmBuilder) {
+        JvmArgsBuilderDialog(
+            initial = hivens.core.jvm.JvmArgsPresets.default.config,
+            onDismiss = { showJvmBuilder = false },
+            onApply = { newArgs ->
+                jvmArgs = newArgs
+                showJvmBuilder = false
+                saveProfile()
+            },
+        )
     }
 }
 

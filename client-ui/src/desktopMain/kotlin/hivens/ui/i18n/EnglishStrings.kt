@@ -185,6 +185,7 @@ object EnglishStrings : AppStrings {
     // --- Server Settings: Extended ---
     override val serverSettingsJvmArgs     = "JVM arguments"
     override val serverSettingsJvmArgsHint = "-XX:+UseZGC -Dfoo=bar"
+    override val serverSettingsJvmBuildArgs = "Build args"
     override val serverSettingsResolution  = "Window size"
     override val serverSettingsWidth       = "Width"
     override val serverSettingsHeight      = "Height"

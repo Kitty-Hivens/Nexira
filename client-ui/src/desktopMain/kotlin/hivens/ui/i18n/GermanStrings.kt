@@ -185,6 +185,7 @@ object GermanStrings : AppStrings {
     // --- Server Settings: Extended ---
     override val serverSettingsJvmArgs     = "JVM-Argumente"
     override val serverSettingsJvmArgsHint = "-XX:+UseZGC -Dfoo=bar"
+    override val serverSettingsJvmBuildArgs = "Bauen"
     override val serverSettingsResolution  = "Fenstergröße"
     override val serverSettingsWidth       = "Breite"
     override val serverSettingsHeight      = "Höhe"

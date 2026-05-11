@@ -187,6 +187,8 @@ interface AppStrings {
     // --- Server Settings: Extended ---
     val serverSettingsJvmArgs: String
     val serverSettingsJvmArgsHint: String
+    /** Button label that opens the visual JVM args builder when the experimental toggle is on. */
+    val serverSettingsJvmBuildArgs: String
     val serverSettingsResolution: String
     val serverSettingsWidth: String
     val serverSettingsHeight: String
