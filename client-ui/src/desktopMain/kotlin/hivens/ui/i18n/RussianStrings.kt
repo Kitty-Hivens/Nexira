@@ -180,6 +180,7 @@ object RussianStrings : AppStrings {
     override val stateOfflineSkipAuth      = "Оффлайн-режим — авторизация пропущена"
     override val stateOfflineSkipSync      = "Оффлайн-режим — синхронизация пропущена, используем локальные файлы"
     override val stateOfflineNoClient      = "Файлы клиента не найдены. Сначала скачайте их онлайн."
+    override val stateOfflineNoManifest    = "Нет кеша манифеста для этого сервера. Войдите онлайн хотя бы раз перед запуском оффлайн."
 
     // --- Server Settings: Extended ---
     override val serverSettingsJvmArgs     = "Аргументы JVM"

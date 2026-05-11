@@ -1,5 +1,7 @@
 package hivens.launcher
 
+import hivens.core.data.FileData
+import hivens.core.data.FileManifest
 import kotlinx.serialization.json.Json
 import java.nio.file.Files
 import java.nio.file.Path
@@ -8,6 +10,8 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ManifestCacheTest {
@@ -96,5 +100,45 @@ class ManifestCacheTest {
             cache.isClean("Industrial", "abc"),
             "entry older than TTL_MS must be treated as a cache miss"
         )
+    }
+
+    @Test
+    fun `loadManifest returns null on a fresh cache`() {
+        assertNull(cache.loadManifest("Industrial"))
+    }
+
+    @Test
+    fun `loadManifest returns null when entry was written without manifest content`() {
+        // 2.2.9 entries (hash + timestamp only) must remain readable but
+        // surface as "no offline data" rather than crashing the offline path.
+        cache.markClean("Industrial", "abc123")
+        assertNull(cache.loadManifest("Industrial"))
+    }
+
+    @Test
+    fun `markClean with manifest persists content for loadManifest`() {
+        val sample = FileManifest(
+            files = mapOf("a.jar" to FileData(md5 = "deadbeef", size = 100)),
+            directories = mapOf(
+                "libs" to FileManifest(files = mapOf("b.jar" to FileData(md5 = "cafef00d", size = 200))),
+            ),
+        )
+        cache.markClean("Industrial", "abc123", sample)
+        val loaded = cache.loadManifest("Industrial")
+        assertNotNull(loaded)
+        assertEquals(sample, loaded)
+    }
+
+    @Test
+    fun `loadManifest ignores TTL — stale-but-present manifest is still returned`() {
+        // Offline-launch fallback intentionally serves expired entries:
+        // a stale file list is strictly better than launching with empty
+        // classpath (which is what triggered the original bug).
+        Files.createDirectories(cacheDir)
+        val ancient = """{"hash":"abc","syncedAt":1000,"manifest":{"directories":{},"files":{"x.jar":{"md5":"abc","size":1}}}}"""
+        Files.writeString(cacheDir.resolve("Industrial.json"), ancient)
+        val loaded = cache.loadManifest("Industrial")
+        assertNotNull(loaded)
+        assertEquals(1, loaded.files.size)
     }
 }

@@ -182,6 +182,7 @@ interface AppStrings {
     val stateOfflineSkipAuth: String
     val stateOfflineSkipSync: String
     val stateOfflineNoClient: String
+    val stateOfflineNoManifest: String
 
     // --- Server Settings: Extended ---
     val serverSettingsJvmArgs: String

@@ -180,6 +180,7 @@ object EnglishStrings : AppStrings {
     override val stateOfflineSkipAuth      = "Offline mode — authentication skipped"
     override val stateOfflineSkipSync      = "Offline mode — file sync skipped, using local files"
     override val stateOfflineNoClient      = "Client files not found. Download them online first."
+    override val stateOfflineNoManifest    = "No cached manifest for this server. Log in online at least once before launching offline."
 
     // --- Server Settings: Extended ---
     override val serverSettingsJvmArgs     = "JVM arguments"
