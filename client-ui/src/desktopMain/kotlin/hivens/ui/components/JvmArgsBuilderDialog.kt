@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import hivens.core.jvm.*
+import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
 
 /**
@@ -42,19 +43,20 @@ fun JvmArgsBuilderDialog(
     onDismiss: () -> Unit,
     onApply: (String) -> Unit,
 ) {
+    val s = LocalStrings.current
     var config by remember { mutableStateOf(initial) }
     var selectedPresetId by remember { mutableStateOf<String?>(null) }
     var selectedTabIdx by remember { mutableStateOf(0) }
 
-    val tabs = remember {
+    val tabs = remember(s) {
         listOf(
-            "GC" to Icons.Default.Memory,
-            "G1 / Z / Shenandoah" to Icons.Default.Tune,
-            "AppCDS" to Icons.Default.Bolt,
-            "JIT" to Icons.Default.Speed,
-            "Performance" to Icons.Default.Whatshot,
-            "JFR" to Icons.Default.Insights,
-            "Custom" to Icons.Default.Code,
+            s.jvmTabGc to Icons.Default.Memory,
+            s.jvmTabTuning to Icons.Default.Tune,
+            s.jvmTabCds to Icons.Default.Bolt,
+            s.jvmTabJit to Icons.Default.Speed,
+            s.jvmTabPerf to Icons.Default.Whatshot,
+            s.jvmTabJfr to Icons.Default.Insights,
+            s.jvmTabCustom to Icons.Default.Code,
         )
     }
 
@@ -84,13 +86,13 @@ fun JvmArgsBuilderDialog(
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(
-                            "JVM Args Builder",
+                            s.jvmTitle,
                             color = CelestiaTheme.colors.textPrimary,
                             fontWeight = FontWeight.Bold,
                             style = MaterialTheme.typography.titleMedium,
                         )
                         Text(
-                            "Pick a preset or compose flags by hand. Result lands in jvmArgs.",
+                            s.jvmSubtitle,
                             color = CelestiaTheme.colors.textSecondary,
                             style = MaterialTheme.typography.bodySmall,
                         )
@@ -100,7 +102,7 @@ fun JvmArgsBuilderDialog(
                     }
                 }
 
-                Divider(color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.15f))
+                HorizontalDivider(color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.15f))
 
                 // ── Preset picker ──────────────────────────────────────
                 PresetPickerRow(
@@ -111,10 +113,10 @@ fun JvmArgsBuilderDialog(
                     },
                 )
 
-                Divider(color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.15f))
+                HorizontalDivider(color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.15f))
 
                 // ── Tab row ────────────────────────────────────────────
-                ScrollableTabRow(
+                PrimaryScrollableTabRow(
                     selectedTabIndex = selectedTabIdx,
                     edgePadding = 16.dp,
                     containerColor = CelestiaTheme.colors.surface,
@@ -162,7 +164,7 @@ fun JvmArgsBuilderDialog(
                     horizontalArrangement = Arrangement.End,
                 ) {
                     TextButton(onClick = onDismiss) {
-                        Text("Cancel", color = CelestiaTheme.colors.textSecondary)
+                        Text(s.jvmCancel, color = CelestiaTheme.colors.textSecondary)
                     }
                     Spacer(Modifier.width(8.dp))
                     Button(
@@ -173,7 +175,7 @@ fun JvmArgsBuilderDialog(
                     ) {
                         Icon(Icons.Default.Check, null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text("Apply to jvmArgs")
+                        Text(s.jvmApply)
                     }
                 }
             }
@@ -188,13 +190,14 @@ private fun PresetPickerRow(
     selectedId: String?,
     onSelected: (JvmPreset) -> Unit,
 ) {
+    val s = LocalStrings.current
     Column(
         Modifier
             .fillMaxWidth()
             .padding(horizontal = 24.dp, vertical = 12.dp)
     ) {
         Text(
-            "Presets",
+            s.jvmPresetsHeader,
             color = CelestiaTheme.colors.textSecondary,
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.Bold,
@@ -231,26 +234,27 @@ private fun PresetPickerRow(
 
 @Composable
 private fun GcTabContent(config: JvmConfig, onChange: (JvmConfig) -> Unit) {
+    val s = LocalStrings.current
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        SectionHeader("Garbage Collector")
+        SectionHeader(s.jvmGcHeader)
 
-        GcOption("G1GC", "Recommended for modded MC, 4-32 GB heap.",
+        GcOption("G1GC", s.jvmGcG1Hint,
             selected = config.gc == GcChoice.G1) {
             onChange(config.copy(gc = GcChoice.G1))
         }
-        GcOption("ZGC", "Sub-millisecond pauses. Java 17+, 16+ GB heap. Generational on Java 21+.",
+        GcOption("ZGC", s.jvmGcZHint,
             selected = config.gc == GcChoice.Z) {
             onChange(config.copy(gc = GcChoice.Z))
         }
-        GcOption("Shenandoah", "Concurrent low-pause from OpenJDK/Liberica. Java 17+.",
+        GcOption("Shenandoah", s.jvmGcShenandoahHint,
             selected = config.gc == GcChoice.Shenandoah) {
             onChange(config.copy(gc = GcChoice.Shenandoah))
         }
-        GcOption("ParallelGC", "Throughput-first. Long stop-the-world pauses. Almost never the right pick.",
+        GcOption("ParallelGC", s.jvmGcParallelHint,
             selected = config.gc == GcChoice.Parallel) {
             onChange(config.copy(gc = GcChoice.Parallel))
         }
-        GcOption("SerialGC", "Single-threaded. Tiny heaps only (< 1 GB).",
+        GcOption("SerialGC", s.jvmGcSerialHint,
             selected = config.gc == GcChoice.Serial) {
             onChange(config.copy(gc = GcChoice.Serial))
         }
@@ -289,12 +293,13 @@ private fun GcOption(label: String, hint: String, selected: Boolean, onClick: ()
 
 @Composable
 private fun GcTuningTabContent(config: JvmConfig, onChange: (JvmConfig) -> Unit) {
+    val s = LocalStrings.current
     when (config.gc) {
         GcChoice.G1 -> G1TuningPanel(config.g1) { onChange(config.copy(g1 = it)) }
         GcChoice.Z -> ZgcTuningPanel(config.zgc) { onChange(config.copy(zgc = it)) }
         GcChoice.Shenandoah -> ShenandoahTuningPanel(config.shenandoah) { onChange(config.copy(shenandoah = it)) }
         GcChoice.Parallel, GcChoice.Serial -> Text(
-            "No tuning available for ${config.gc.name}GC. Switch to G1, Z, or Shenandoah on the GC tab.",
+            s.jvmTuningNotApplicable("${config.gc.name}GC"),
             color = CelestiaTheme.colors.textSecondary,
             style = MaterialTheme.typography.bodyMedium,
         )
@@ -303,42 +308,43 @@ private fun GcTuningTabContent(config: JvmConfig, onChange: (JvmConfig) -> Unit)
 
 @Composable
 private fun G1TuningPanel(g1: G1Tuning, onChange: (G1Tuning) -> Unit) {
+    val s = LocalStrings.current
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        SectionHeader("G1GC tuning")
+        SectionHeader(s.jvmG1Header)
         SliderField(
-            label = "MaxGCPauseMillis", hint = "Target max pause time. Lower = more frequent collections.",
+            label = "MaxGCPauseMillis", hint = s.jvmG1MaxPauseMillisHint,
             value = g1.maxPauseMs.toFloat(), valueRange = 50f..500f, steps = 8,
             display = "${g1.maxPauseMs} ms",
         ) { onChange(g1.copy(maxPauseMs = it.toInt())) }
         SliderField(
-            label = "G1HeapRegionSize", hint = "Region size in MB. Larger = fewer regions, less metadata.",
+            label = "G1HeapRegionSize", hint = s.jvmG1RegionSizeHint,
             value = g1.regionSizeMb.toFloat(), valueRange = 1f..32f, steps = 4,
             display = "${g1.regionSizeMb} MB",
         ) { onChange(g1.copy(regionSizeMb = it.toInt())) }
         SliderField(
-            label = "G1NewSizePercent", hint = "Min young generation as % of heap. Aikar: 30.",
+            label = "G1NewSizePercent", hint = s.jvmG1NewSizePercentHint,
             value = g1.newSizePercent.toFloat(), valueRange = 5f..80f, steps = 14,
             display = "${g1.newSizePercent}%",
         ) { onChange(g1.copy(newSizePercent = it.toInt())) }
         SliderField(
-            label = "G1MaxNewSizePercent", hint = "Max young generation as % of heap. Aikar: 40.",
+            label = "G1MaxNewSizePercent", hint = s.jvmG1MaxNewSizePercentHint,
             value = g1.maxNewSizePercent.toFloat(), valueRange = 5f..90f, steps = 16,
             display = "${g1.maxNewSizePercent}%",
         ) { onChange(g1.copy(maxNewSizePercent = it.toInt())) }
         SliderField(
             label = "InitiatingHeapOccupancyPercent",
-            hint = "When mixed GC starts. Aikar: 15 (eager). Stock: 45.",
+            hint = s.jvmG1IhopHint,
             value = g1.initiatingHeapOccupancyPercent.toFloat(), valueRange = 5f..90f, steps = 16,
             display = "${g1.initiatingHeapOccupancyPercent}%",
         ) { onChange(g1.copy(initiatingHeapOccupancyPercent = it.toInt())) }
         ToggleField(
             label = "ParallelRefProcEnabled",
-            hint = "Process references in parallel. Pure win on multi-core.",
+            hint = s.jvmG1ParallelRefProcHint,
             checked = g1.parallelRefProcEnabled,
         ) { onChange(g1.copy(parallelRefProcEnabled = it)) }
         ToggleField(
             label = "PerfDisableSharedMem",
-            hint = "Skip /tmp/hsperfdata. Stops VisualVM but improves disk hygiene.",
+            hint = s.jvmG1PerfDisableSharedMemHint,
             checked = g1.perfDisableSharedMem,
         ) { onChange(g1.copy(perfDisableSharedMem = it)) }
     }
@@ -346,29 +352,31 @@ private fun G1TuningPanel(g1: G1Tuning, onChange: (G1Tuning) -> Unit) {
 
 @Composable
 private fun ZgcTuningPanel(z: ZgcTuning, onChange: (ZgcTuning) -> Unit) {
+    val s = LocalStrings.current
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        SectionHeader("ZGC tuning")
+        SectionHeader(s.jvmZHeader)
         ToggleField(
             label = "Generational ZGC",
-            hint = "Java 21+ only. Splits heap into young/old. Significantly better than non-generational.",
+            hint = s.jvmZGenerationalHint,
             checked = z.generational,
         ) { onChange(z.copy(generational = it)) }
     }
 }
 
 @Composable
-private fun ShenandoahTuningPanel(s: ShenandoahTuning, onChange: (ShenandoahTuning) -> Unit) {
+private fun ShenandoahTuningPanel(tuning: ShenandoahTuning, onChange: (ShenandoahTuning) -> Unit) {
+    val s = LocalStrings.current
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        SectionHeader("Shenandoah heuristic")
+        SectionHeader(s.jvmShenandoahHeader)
         ShenandoahTuning.Heuristic.entries.forEach { heuristic ->
             val hint = when (heuristic) {
-                ShenandoahTuning.Heuristic.Adaptive -> "Default. Balances pause vs throughput."
-                ShenandoahTuning.Heuristic.Static -> "Trigger collection at fixed thresholds."
-                ShenandoahTuning.Heuristic.Compact -> "Aggressive compaction. Better at memory reclaim."
-                ShenandoahTuning.Heuristic.Aggressive -> "Continuous collection. High throughput cost."
+                ShenandoahTuning.Heuristic.Adaptive -> s.jvmShenandoahAdaptiveHint
+                ShenandoahTuning.Heuristic.Static -> s.jvmShenandoahStaticHint
+                ShenandoahTuning.Heuristic.Compact -> s.jvmShenandoahCompactHint
+                ShenandoahTuning.Heuristic.Aggressive -> s.jvmShenandoahAggressiveHint
             }
             GcOption(heuristic.name, hint,
-                selected = s.mode == heuristic) { onChange(s.copy(mode = heuristic)) }
+                selected = tuning.mode == heuristic) { onChange(tuning.copy(mode = heuristic)) }
         }
     }
 }
@@ -377,11 +385,11 @@ private fun ShenandoahTuningPanel(s: ShenandoahTuning, onChange: (ShenandoahTuni
 
 @Composable
 private fun CdsTabContent(config: JvmConfig, onChange: (JvmConfig) -> Unit) {
+    val s = LocalStrings.current
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        SectionHeader("Application Class Data Sharing")
+        SectionHeader(s.jvmCdsHeader)
         Text(
-            "Cache the loaded class metadata across launches. For 200+ mod packs, " +
-                "saves 1-3 seconds on every cold start after the first.",
+            s.jvmCdsIntro,
             color = CelestiaTheme.colors.textSecondary,
             style = MaterialTheme.typography.bodySmall,
         )
@@ -389,13 +397,10 @@ private fun CdsTabContent(config: JvmConfig, onChange: (JvmConfig) -> Unit) {
 
         CdsConfig.Mode.entries.forEach { mode ->
             val (label, hint) = when (mode) {
-                CdsConfig.Mode.Disabled -> "Disabled" to "No CDS. Default."
-                CdsConfig.Mode.AutoArchive -> "Auto-archive (Java 19+)" to
-                    "JVM auto-manages the archive at exit. No path needed."
-                CdsConfig.Mode.ArchiveAtExit -> "Archive at exit" to
-                    "Write archive to your specified path on shutdown."
-                CdsConfig.Mode.UseArchive -> "Use existing archive" to
-                    "Read pre-built archive from your specified path."
+                CdsConfig.Mode.Disabled -> s.jvmCdsModeDisabledLabel to s.jvmCdsModeDisabledHint
+                CdsConfig.Mode.AutoArchive -> s.jvmCdsModeAutoLabel to s.jvmCdsModeAutoHint
+                CdsConfig.Mode.ArchiveAtExit -> s.jvmCdsModeArchiveLabel to s.jvmCdsModeArchiveHint
+                CdsConfig.Mode.UseArchive -> s.jvmCdsModeUseLabel to s.jvmCdsModeUseHint
             }
             GcOption(label, hint, selected = config.cds.mode == mode) {
                 onChange(config.copy(cds = config.cds.copy(mode = mode)))
@@ -407,7 +412,7 @@ private fun CdsTabContent(config: JvmConfig, onChange: (JvmConfig) -> Unit) {
             OutlinedTextField(
                 value = config.cds.archivePath ?: "",
                 onValueChange = { onChange(config.copy(cds = config.cds.copy(archivePath = it.ifBlank { null }))) },
-                label = { Text("Archive path") },
+                label = { Text(s.jvmCdsArchivePathLabel) },
                 placeholder = { Text("/path/to/aura.jsa") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
@@ -420,11 +425,12 @@ private fun CdsTabContent(config: JvmConfig, onChange: (JvmConfig) -> Unit) {
 
 @Composable
 private fun JitTabContent(config: JvmConfig, onChange: (JvmConfig) -> Unit) {
+    val s = LocalStrings.current
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        SectionHeader("JIT compiler")
+        SectionHeader(s.jvmJitHeader)
         ToggleField(
             label = "Tiered compilation",
-            hint = "On = warm-up via interpreter then C1 then C2 (default). Off = C2 only, slower start.",
+            hint = s.jvmJitTieredHint,
             checked = config.jit.tieredCompilation,
         ) { onChange(config.copy(jit = config.jit.copy(tieredCompilation = it))) }
 
@@ -432,7 +438,7 @@ private fun JitTabContent(config: JvmConfig, onChange: (JvmConfig) -> Unit) {
 
         IntInput(
             label = "ReservedCodeCacheSize (MB)",
-            hint = "Size of JIT-compiled code cache. JVM default is 240. Modded MC may benefit from 512+.",
+            hint = s.jvmJitCodeCacheHint,
             value = config.jit.codeCacheMb,
             placeholder = "240",
         ) { onChange(config.copy(jit = config.jit.copy(codeCacheMb = it))) }
@@ -443,41 +449,42 @@ private fun JitTabContent(config: JvmConfig, onChange: (JvmConfig) -> Unit) {
 
 @Composable
 private fun PerfTabContent(config: JvmConfig, onChange: (JvmConfig) -> Unit) {
+    val s = LocalStrings.current
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        SectionHeader("Performance & OS-level flags")
+        SectionHeader(s.jvmPerfHeader)
         ToggleField(
             label = "AlwaysPreTouch",
-            hint = "Touch every heap page at startup. Slower start, more consistent runtime.",
+            hint = s.jvmPerfAlwaysPreTouchHint,
             checked = config.perf.alwaysPreTouch,
         ) { onChange(config.copy(perf = config.perf.copy(alwaysPreTouch = it))) }
         ToggleField(
             label = "DisableExplicitGC",
-            hint = "Make System.gc() a no-op. Some legacy mods abuse it. Almost always a win.",
+            hint = s.jvmPerfDisableExplicitGcHint,
             checked = config.perf.disableExplicitGc,
         ) { onChange(config.copy(perf = config.perf.copy(disableExplicitGc = it))) }
         ToggleField(
-            label = "UseLargePages (Linux only)",
-            hint = "Requires hugepages pre-allocated via sysctl. ~2-5% perf gain when set up.",
+            label = "UseLargePages (Linux)",
+            hint = s.jvmPerfUseLargePagesHint,
             checked = config.perf.useLargePages,
         ) { onChange(config.copy(perf = config.perf.copy(useLargePages = it))) }
         ToggleField(
-            label = "UseTransparentHugePages (Linux only)",
-            hint = "Easier than UseLargePages. Adds latency spikes during defrag. Trade-off.",
+            label = "UseTransparentHugePages (Linux)",
+            hint = s.jvmPerfTransparentHugePagesHint,
             checked = config.perf.useTransparentHugePages,
         ) { onChange(config.perf.copy(useTransparentHugePages = it).let { config.copy(perf = it) }) }
         ToggleField(
             label = "UseNUMA",
-            hint = "NUMA-aware allocation. Only useful on multi-socket systems.",
+            hint = s.jvmPerfNumaHint,
             checked = config.perf.numa,
         ) { onChange(config.copy(perf = config.perf.copy(numa = it))) }
         ToggleField(
             label = "HeapDumpOnOutOfMemoryError",
-            hint = "Write a heap dump on OOM. Crucial for diagnostics.",
+            hint = s.jvmPerfHeapDumpHint,
             checked = config.perf.heapDumpOnOom,
         ) { onChange(config.copy(perf = config.perf.copy(heapDumpOnOom = it))) }
         ToggleField(
             label = "ExitOnOutOfMemoryError",
-            hint = "Exit on OOM instead of trying to limp along. Prevents zombie game state.",
+            hint = s.jvmPerfExitOnOomHint,
             checked = config.perf.exitOnOom,
         ) { onChange(config.copy(perf = config.perf.copy(exitOnOom = it))) }
     }
@@ -487,35 +494,35 @@ private fun PerfTabContent(config: JvmConfig, onChange: (JvmConfig) -> Unit) {
 
 @Composable
 private fun JfrTabContent(config: JvmConfig, onChange: (JvmConfig) -> Unit) {
+    val s = LocalStrings.current
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        SectionHeader("Java Flight Recorder")
+        SectionHeader(s.jvmJfrHeader)
         Text(
-            "Records JVM internals (allocations, GC, threads, locks). Open the resulting " +
-                ".jfr in JDK Mission Control or IntelliJ for analysis.",
+            s.jvmJfrIntro,
             color = CelestiaTheme.colors.textSecondary,
             style = MaterialTheme.typography.bodySmall,
         )
         Spacer(Modifier.height(4.dp))
         ToggleField(
-            label = "Enable JFR recording",
-            hint = "Default settings = ~1% overhead. Profile settings = ~5%, captures method-level.",
+            label = s.jvmJfrEnableLabel,
+            hint = s.jvmJfrEnableHint,
             checked = config.jfr.enabled,
         ) { onChange(config.copy(jfr = config.jfr.copy(enabled = it))) }
 
         if (config.jfr.enabled) {
             IntInput(
-                label = "Duration (minutes)",
-                hint = "How long the recording runs.",
+                label = s.jvmJfrDurationLabel,
+                hint = "",
                 value = config.jfr.durationMinutes,
                 placeholder = "60",
             ) {
                 onChange(config.copy(jfr = config.jfr.copy(durationMinutes = it ?: 60)))
             }
-            SectionHeader("Settings preset")
+            SectionHeader(s.jvmJfrSettingsHeader)
             JfrConfig.SettingsPreset.entries.forEach { preset ->
                 val hint = when (preset) {
-                    JfrConfig.SettingsPreset.Default -> "Low overhead, suitable for normal play."
-                    JfrConfig.SettingsPreset.Profile -> "Method-level profiling. ~5% overhead."
+                    JfrConfig.SettingsPreset.Default -> s.jvmJfrSettingsDefaultHint
+                    JfrConfig.SettingsPreset.Profile -> s.jvmJfrSettingsProfileHint
                 }
                 GcOption(preset.name, hint, selected = config.jfr.settings == preset) {
                     onChange(config.copy(jfr = config.jfr.copy(settings = preset)))
@@ -524,7 +531,7 @@ private fun JfrTabContent(config: JvmConfig, onChange: (JvmConfig) -> Unit) {
             OutlinedTextField(
                 value = config.jfr.outputPath ?: "",
                 onValueChange = { onChange(config.copy(jfr = config.jfr.copy(outputPath = it.ifBlank { null }))) },
-                label = { Text("Output .jfr path (optional)") },
+                label = { Text(s.jvmJfrOutputPathLabel) },
                 placeholder = { Text("/path/to/recording.jfr") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
@@ -537,12 +544,12 @@ private fun JfrTabContent(config: JvmConfig, onChange: (JvmConfig) -> Unit) {
 
 @Composable
 private fun CustomTabContent(config: JvmConfig, onChange: (JvmConfig) -> Unit) {
+    val s = LocalStrings.current
     var text by remember(config.custom) { mutableStateOf(config.custom.joinToString(" ")) }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        SectionHeader("Custom passthrough")
+        SectionHeader(s.jvmCustomHeader)
         Text(
-            "Extra flags appended verbatim. Use for one-off experiments or vendor-specific " +
-                "knobs not surfaced in the UI yet. Space-separated.",
+            s.jvmCustomIntro,
             color = CelestiaTheme.colors.textSecondary,
             style = MaterialTheme.typography.bodySmall,
         )
@@ -550,9 +557,9 @@ private fun CustomTabContent(config: JvmConfig, onChange: (JvmConfig) -> Unit) {
             value = text,
             onValueChange = {
                 text = it
-                onChange(config.copy(custom = it.trim().split(Regex("\\s+")).filter { s -> s.isNotBlank() }))
+                onChange(config.copy(custom = it.trim().split(Regex("\\s+")).filter { tok -> tok.isNotBlank() }))
             },
-            label = { Text("Extra args") },
+            label = { Text(s.jvmCustomLabel) },
             placeholder = { Text("-Daura.weird.flag=42 -XX:+SomeNewThing") },
             modifier = Modifier.fillMaxWidth().heightIn(min = 80.dp),
         )
@@ -563,6 +570,7 @@ private fun CustomTabContent(config: JvmConfig, onChange: (JvmConfig) -> Unit) {
 
 @Composable
 private fun ArgsPreviewBox(config: JvmConfig) {
+    val s = LocalStrings.current
     val args = remember(config) { config.toArgs() }
     Column(
         Modifier
@@ -573,7 +581,7 @@ private fun ArgsPreviewBox(config: JvmConfig) {
             Icon(Icons.Default.Code, null, tint = CelestiaTheme.colors.primary,
                 modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(6.dp))
-            Text("Preview (${args.size} flags)",
+            Text(s.jvmPreviewFlagsCount(args.size),
                 color = CelestiaTheme.colors.textSecondary,
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.Bold)
