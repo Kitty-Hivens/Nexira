@@ -18,6 +18,7 @@ import hivens.core.api.interfaces.IServerListService
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.SessionData
+import hivens.launcher.AutoSyncService
 import hivens.launcher.NetworkState
 import hivens.launcher.ProfileManager
 import hivens.ui.components.LaunchControlPanel
@@ -47,10 +48,13 @@ fun DashboardScreen(
     val settingsService: ISettingsService     = koinInject()
     val profileManager: ProfileManager        = koinInject()
     val controller: LauncherController        = koinInject()
+    val autoSyncService: AutoSyncService      = koinInject()
     val s = LocalStrings.current
     val scope = rememberCoroutineScope()
 
     val launchState by controller.state.collectAsState()
+    val syncStates by autoSyncService.serverStates.collectAsState()
+    val syncOverall by autoSyncService.overallState.collectAsState()
     var hiddenForCurrentSession by remember { mutableStateOf(false) }
 
     var servers             by remember { mutableStateOf<List<ServerProfile>>(emptyList()) }
@@ -197,10 +201,27 @@ fun DashboardScreen(
                         onToggleFav = {
                             profileManager.toggleFavorite(it.assetDir)
                             favoriteTrigger++
-                        }
+                        },
+                        syncStates = syncStates
                     )
                 }
             }
+        }
+
+        // ── Auto-sync overall progress strip ──────────────────────────────────
+        // Sticky just above the launch control panel. Visible only while
+        // AutoSyncService is actively walking the queue. Stays out of the way
+        // when auto-sync is disabled or has finished.
+        if (syncOverall is AutoSyncService.OverallState.InProgress) {
+            val progress = syncOverall as AutoSyncService.OverallState.InProgress
+            Spacer(Modifier.height(8.dp))
+            AutoSyncProgressStrip(
+                serverName = progress.currentServer,
+                currentIdx = progress.currentIdx,
+                total      = progress.total,
+                bytesRead  = progress.bytesRead,
+                totalBytes = progress.totalBytes,
+            )
         }
 
         Spacer(Modifier.height(12.dp))
@@ -225,6 +246,70 @@ fun DashboardScreen(
                 onLaunch     = { selectedServerState?.let { controller.launch(session, it, onSessionUpdated) } },
                 onAbort      = { controller.abort() },
                 onClearError = { controller.clearError() }
+            )
+        }
+    }
+}
+
+/**
+ * Compact strip above the launch panel showing AutoSyncService progress.
+ * Renders only while a sync is in-flight; auto-hides when state transitions
+ * to Idle / Done. Kept self-contained (no Koin deps) so it can be tested
+ * with a fake [InProgress] state.
+ */
+@Composable
+private fun AutoSyncProgressStrip(
+    serverName: String,
+    currentIdx: Int,
+    total: Int,
+    bytesRead: Long,
+    totalBytes: Long,
+) {
+    val s = LocalStrings.current
+    val progressFraction = if (totalBytes > 0) {
+        (bytesRead.toFloat() / totalBytes.toFloat()).coerceIn(0f, 1f)
+    } else 0f
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(
+                width = 1.dp,
+                color = CelestiaTheme.colors.outline.copy(alpha = 0.20f),
+                shape = RoundedCornerShape(10.dp)
+            )
+            .background(
+                color = CelestiaTheme.colors.surface.copy(alpha = 0.35f),
+                shape = RoundedCornerShape(10.dp)
+            )
+            .padding(horizontal = 14.dp, vertical = 8.dp)
+    ) {
+        Column(Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = s.dashboardAutoSyncProgress(serverName, currentIdx, total),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = CelestiaTheme.colors.textSecondary,
+                    fontWeight = FontWeight.Medium
+                )
+                if (totalBytes > 0) {
+                    Text(
+                        text = s.dashboardAutoSyncBytes(bytesRead / 1_048_576, totalBytes / 1_048_576),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.7f)
+                    )
+                }
+            }
+            Spacer(Modifier.height(4.dp))
+            LinearProgressIndicator(
+                progress = { progressFraction },
+                modifier = Modifier.fillMaxWidth(),
+                color = CelestiaTheme.colors.primary,
+                trackColor = CelestiaTheme.colors.outline.copy(alpha = 0.15f),
             )
         }
     }

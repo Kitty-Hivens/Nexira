@@ -29,5 +29,20 @@ data class SettingsData(
     /** Block startup when installed < `mandatory_min_version` from `meta/update-channel.json`. */
     var mandatoryUpdatesEnabled: Boolean = true,
     /** Include GitHub prereleases (RC/beta) when picking the update target. */
-    var prereleaseChannelEnabled: Boolean = true
+    var prereleaseChannelEnabled: Boolean = true,
+    /**
+     * Sync all installed server packs in the background on launcher startup.
+     *
+     * "Installed" means there's a non-empty `clients/<server>/` directory —
+     * we never trigger a many-GB first-time pack download out of nowhere.
+     * Sequential sync (one server at a time) to avoid bandwidth contention
+     * and let the per-server status badges read clearly. ManifestCache (2.2.9)
+     * makes the common case cheap: when nothing changed upstream, the integrity
+     * walk short-circuits and the sync completes in milliseconds.
+     *
+     * Off by default because it costs bandwidth and most users only play 1-2
+     * servers; primarily a maintainer-grade convenience for users with many
+     * servers installed who want fresh state without clicking each one.
+     */
+    var autoSyncAllPacks: Boolean = false
 )

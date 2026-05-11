@@ -14,10 +14,14 @@ import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -42,6 +46,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import hivens.core.api.model.ServerProfile
+import hivens.launcher.AutoSyncService
 import hivens.launcher.platform.PlatformPaths
 import hivens.ui.debug.SkiaTracker
 import hivens.ui.easter.AprilFools
@@ -84,7 +89,8 @@ fun SquareServerCard(
     onLaunch: () -> Unit,
     onSettings: () -> Unit,
     onDetails: () -> Unit,
-    onToggleFav: () -> Unit
+    onToggleFav: () -> Unit,
+    syncState: AutoSyncService.ServerState? = null,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
@@ -302,6 +308,17 @@ fun SquareServerCard(
         }
 
         // ── LAYER 3: Action buttons ───────────────────────────────────────────
+        // ── Sync state badge (top-right) ──────────────────────────────────────
+        // Shown only when AutoSyncService has touched this server in the
+        // current session. Hidden after a brief grace period for SYNCED so
+        // the dashboard doesn't get permanently dotted with green checkmarks.
+        if (syncState != null && syncState != AutoSyncService.ServerState.SKIPPED) {
+            SyncBadge(
+                state = syncState,
+                modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
+            )
+        }
+
         AnimatedVisibility(
             visible  = showActions && !isChaosEscaped,
             enter    = fadeIn() + slideInVertically { 16 },
@@ -332,5 +349,48 @@ fun SquareServerCard(
 private fun CardIconButton(icon: ImageVector, color: Color = Color.White.copy(0.8f), onClick: () -> Unit) {
     IconButton(onClick = onClick, modifier = Modifier.size(30.dp)) {
         Icon(icon, null, tint = color, modifier = Modifier.size(16.dp))
+    }
+}
+
+/**
+ * Tiny pill-shaped badge for AutoSyncService state. Lives in the card's top-
+ * right corner. Auto-hides 5 seconds after entering SYNCED so the dashboard
+ * doesn't stay decorated with green checkmarks across sessions.
+ */
+@Composable
+private fun SyncBadge(state: AutoSyncService.ServerState, modifier: Modifier = Modifier) {
+    var visible by remember(state) { mutableStateOf(true) }
+
+    // Fade out SYNCED after a grace window. QUEUED/SYNCING/FAILED stay until
+    // the next sync cycle replaces or clears them.
+    LaunchedEffect(state) {
+        if (state == AutoSyncService.ServerState.SYNCED) {
+            kotlinx.coroutines.delay(5000)
+            visible = false
+        }
+    }
+
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(),
+        exit = fadeOut(),
+        modifier = modifier,
+    ) {
+        val (icon, tint) = when (state) {
+            AutoSyncService.ServerState.QUEUED   -> Icons.Default.HourglassEmpty to Color(0xFFEAB308)  // amber
+            AutoSyncService.ServerState.SYNCING  -> Icons.Default.Sync           to Color(0xFF38BDF8)  // sky
+            AutoSyncService.ServerState.SYNCED   -> Icons.Default.Check          to Color(0xFF22C55E)  // green
+            AutoSyncService.ServerState.FAILED   -> Icons.Default.Close          to Color(0xFFEF4444)  // red
+            AutoSyncService.ServerState.SKIPPED  -> return@AnimatedVisibility
+        }
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(50))
+                .background(tint.copy(alpha = 0.18f))
+                .border(1.dp, tint.copy(alpha = 0.55f), RoundedCornerShape(50))
+                .padding(horizontal = 6.dp, vertical = 4.dp),
+        ) {
+            Icon(icon, null, tint = tint, modifier = Modifier.size(14.dp))
+        }
     }
 }

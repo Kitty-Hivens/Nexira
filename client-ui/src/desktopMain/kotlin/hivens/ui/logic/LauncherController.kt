@@ -219,18 +219,7 @@ class LauncherController : KoinComponent {
     }
 
     private fun calculateIgnoredFiles(server: ServerProfile): Set<String> {
-        val availableMods = manifestProcessor.getOptionalModsForClient(server)
-        if (availableMods.isEmpty()) return emptySet()
-        val ignored = HashSet<String>()
-        val userProfile = profileManager.getProfile(server.assetDir)
-        val userState = userProfile.optionalModsState
-        for (mod in availableMods) {
-            val isEnabled = userState[mod.id] ?: mod.isDefault
-            if (!isEnabled) {
-                ignored.addAll(mod.jars)
-                if (mod.infoFile != null) ignored.add(mod.infoFile!!)
-            }
-        }
-        return ignored
+        val userState = profileManager.getProfile(server.assetDir).optionalModsState
+        return manifestProcessor.calculateIgnoredFiles(server, userState)
     }
 }

@@ -311,6 +311,11 @@ object EnglishStrings : AppStrings {
     override val settingsMandatoryUpdatesDesc   = "Block startup until critical updates are installed when the upstream protocol breaks. Currently ON by default."
     override val settingsPrereleaseChannel      = "Pre-release update channel"
     override val settingsPrereleaseChannelDesc  = "Receive RC and beta builds. Lets you get protocol fixes before the next stable release. Currently ON by default."
+    override val settingsAutoSyncAllPacks       = "Auto-sync installed packs on launch"
+    override val settingsAutoSyncAllPacksDesc   = "Quietly refresh every server pack you've already installed when the launcher starts. Costs background bandwidth — useful if you switch between many servers and want fresh state without clicking each one."
+    override fun dashboardAutoSyncProgress(serverName: String, current: Int, total: Int) =
+        "Syncing $serverName ($current/$total)"
+    override fun dashboardAutoSyncBytes(readMB: Long, totalMB: Long) = "$readMB / $totalMB MB"
 
     // April Fools
     override fun aprilCloseTitle(escapes: Int) = when {

@@ -215,6 +215,22 @@ val appModule = module {
 
     single<IServerListService> { ServerListService(get()) }
 
+    single {
+        val dataDir: java.nio.file.Path = get()
+        val profiles: ProfileManager = get()
+        val credentials: CredentialsManager = get()
+        AutoSyncService(
+            authService = get(),
+            downloadService = get(),
+            manifestProcessor = get(),
+            dataDirectory = dataDir,
+            credentialsProvider = { credentials.load() },
+            optionalModsStateProvider = { serverId ->
+                profiles.getProfile(serverId).optionalModsState
+            },
+        )
+    }
+
     /**
      * Basic launch service. All collaborators are constructor-injected so the
      * facade is fully replaceable / mockable in tests.

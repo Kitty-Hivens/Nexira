@@ -311,6 +311,11 @@ object RussianStrings : AppStrings {
     override val settingsMandatoryUpdatesDesc   = "Блокировать запуск до установки критических обновлений, когда ломается совместимость с протоколом. Сейчас включено по умолчанию."
     override val settingsPrereleaseChannel      = "Канал нестабильных обновлений"
     override val settingsPrereleaseChannelDesc  = "Получать RC и beta-сборки. Позволяет получать фиксы до выхода стабильного релиза. Сейчас временно включено по умолчанию."
+    override val settingsAutoSyncAllPacks       = "Автосинхронизация всех сборок при запуске"
+    override val settingsAutoSyncAllPacksDesc   = "Тихо обновлять все уже установленные сборки в фоне при старте лаунчера. Тратит фоновый трафик — полезно если играешь на нескольких серверах и хочешь свежее состояние без клика по каждому."
+    override fun dashboardAutoSyncProgress(serverName: String, current: Int, total: Int) =
+        "Синхронизация $serverName ($current/$total)"
+    override fun dashboardAutoSyncBytes(readMB: Long, totalMB: Long) = "$readMB / $totalMB МБ"
 
     // April Fools
     override fun aprilCloseTitle(escapes: Int) = when {

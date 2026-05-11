@@ -48,4 +48,18 @@ class ManifestProcessorService(
         }
         return result
     }
+
+    override fun calculateIgnoredFiles(profile: ServerProfile, userState: Map<String, Boolean>): Set<String> {
+        val available = getOptionalModsForClient(profile)
+        if (available.isEmpty()) return emptySet()
+        val ignored = HashSet<String>()
+        for (mod in available) {
+            val isEnabled = userState[mod.id] ?: mod.isDefault
+            if (!isEnabled) {
+                ignored.addAll(mod.jars)
+                if (mod.infoFile != null) ignored.add(mod.infoFile!!)
+            }
+        }
+        return ignored
+    }
 }
