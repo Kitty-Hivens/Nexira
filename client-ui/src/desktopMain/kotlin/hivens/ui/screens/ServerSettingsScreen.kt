@@ -377,8 +377,11 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                             Desktop.getDesktop().open(path.toFile())
                         },
                         modifier = Modifier.fillMaxWidth(),
+                        // Faint primary tint so the button reads as actionable instead of
+                        // floating text. Was Color.Transparent which made it disappear into
+                        // the background when AprilFools is dormant.
                         colors   = ButtonDefaults.buttonColors(
-                            containerColor = Color.Transparent,
+                            containerColor = CelestiaTheme.colors.primary.copy(alpha = 0.12f),
                             contentColor   = CelestiaTheme.colors.textPrimary,
                         ),
                     )
@@ -423,8 +426,9 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                                     }
                                 },
                                 modifier = Modifier.fillMaxWidth(),
+                                // Same faint tint as Open Folder above — see comment there.
                                 colors   = ButtonDefaults.buttonColors(
-                                    containerColor = Color.Transparent,
+                                    containerColor = CelestiaTheme.colors.primary.copy(alpha = 0.12f),
                                     contentColor   = CelestiaTheme.colors.textPrimary,
                                 ),
                             )
