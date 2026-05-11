@@ -152,9 +152,13 @@ object RussianStrings : AppStrings {
 
     // Console
     override val consoleTitle = "Консоль отладки"
-    override fun consoleTitleCount(n: Int) = "Вывод игры ($n)"
+    override fun consoleHeaderCount(filtered: Int, total: Int) = "Вывод игры ($filtered/$total)"
     override val consoleCopyAll = "Копировать всё"
     override val consoleClear   = "Очистить"
+    override val consoleWrap    = "Перенос строк"
+    override val consoleSaveToFile = "Сохранить в файл"
+    override val consoleSearchPlaceholder = "Поиск…"
+    override val consoleJumpToBottom = "↓ К концу"
 
     // Tray
     override val trayShowHide = "Показать / Скрыть"
@@ -180,10 +184,12 @@ object RussianStrings : AppStrings {
     override val stateOfflineSkipAuth      = "Оффлайн-режим — авторизация пропущена"
     override val stateOfflineSkipSync      = "Оффлайн-режим — синхронизация пропущена, используем локальные файлы"
     override val stateOfflineNoClient      = "Файлы клиента не найдены. Сначала скачайте их онлайн."
+    override val stateOfflineNoManifest    = "Нет кеша манифеста для этого сервера. Войдите онлайн хотя бы раз перед запуском оффлайн."
 
     // --- Server Settings: Extended ---
     override val serverSettingsJvmArgs     = "Аргументы JVM"
     override val serverSettingsJvmArgsHint = "-XX:+UseZGC -Dfoo=bar"
+    override val serverSettingsJvmBuildArgs = "Собрать"
     override val serverSettingsResolution  = "Размер окна"
     override val serverSettingsWidth       = "Ширина"
     override val serverSettingsHeight      = "Высота"
@@ -310,6 +316,13 @@ object RussianStrings : AppStrings {
     override val settingsMandatoryUpdatesDesc   = "Блокировать запуск до установки критических обновлений, когда ломается совместимость с протоколом. Сейчас включено по умолчанию."
     override val settingsPrereleaseChannel      = "Канал нестабильных обновлений"
     override val settingsPrereleaseChannelDesc  = "Получать RC и beta-сборки. Позволяет получать фиксы до выхода стабильного релиза. Сейчас временно включено по умолчанию."
+    override val settingsAutoSyncAllPacks       = "Автосинхронизация всех сборок при запуске"
+    override val settingsAutoSyncAllPacksDesc   = "Тихо обновлять все уже установленные сборки в фоне при старте лаунчера. Тратит фоновый трафик — полезно если играешь на нескольких серверах и хочешь свежее состояние без клика по каждому."
+    override val settingsJvmBuilder             = "Визуальный конструктор JVM-аргументов"
+    override val settingsJvmBuilderDesc         = "Показывает кнопку «Собрать аргументы» в настройках сервера. Выбираешь сборщик мусора, настраиваешь регионы хипа, включаешь AppCDS или JFR — без необходимости помнить флаги. Готовые пресеты: Aikar's recipe, GTNH-класс, ZGC для больших хипов и другие."
+    override fun dashboardAutoSyncProgress(serverName: String, current: Int, total: Int) =
+        "Синхронизация $serverName ($current/$total)"
+    override fun dashboardAutoSyncBytes(readMB: Long, totalMB: Long) = "$readMB / $totalMB МБ"
 
     // April Fools
     override fun aprilCloseTitle(escapes: Int) = when {
@@ -340,4 +353,86 @@ object RussianStrings : AppStrings {
     override val sslWarningBody         = "Сертификат сервера истёк. Соединение может быть небезопасным — данные передаются без проверки подлинности сервера. Продолжить на свой страх и риск?"
     override val sslWarningConnectAnyway = "Всё равно подключиться"
     override val sslWarningCancel       = "Отмена"
+
+    // ── JVM Args Builder ────────────────────────────────────────────────
+    override val jvmTitle    = "Конструктор JVM-аргументов"
+    override val jvmSubtitle = "Выбери пресет или собери флаги вручную. Результат запишется в jvmArgs."
+    override val jvmPresetsHeader = "Пресеты"
+    override val jvmTabGc      = "GC"
+    override val jvmTabTuning  = "G1 / Z / Shenandoah"
+    override val jvmTabCds     = "AppCDS"
+    override val jvmTabJit     = "JIT"
+    override val jvmTabPerf    = "Производительность"
+    override val jvmTabJfr     = "JFR"
+    override val jvmTabCustom  = "Свои"
+    override val jvmCancel     = "Отмена"
+    override val jvmApply      = "Записать в jvmArgs"
+    override fun jvmPreviewFlagsCount(n: Int) = "Превью ($n флагов)"
+
+    override val jvmGcHeader            = "Сборщик мусора"
+    override val jvmGcG1Hint            = "Рекомендуемый для модового MC, хип 4-32 ГБ."
+    override val jvmGcZHint             = "Паузы меньше миллисекунды. Java 17+, хип от 16 ГБ. Generational на Java 21+."
+    override val jvmGcShenandoahHint    = "Concurrent low-pause из OpenJDK / Liberica. Java 17+."
+    override val jvmGcParallelHint      = "Throughput-first. Длинные stop-the-world паузы. Почти никогда не правильный выбор."
+    override val jvmGcSerialHint        = "Однопоточный. Только для крошечных хипов (< 1 ГБ)."
+
+    override val jvmG1Header                  = "Тюнинг G1GC"
+    override val jvmG1MaxPauseMillisHint      = "Цель максимальной паузы. Меньше = чаще сборки."
+    override val jvmG1RegionSizeHint          = "Размер региона в МБ. Больше = меньше регионов и метаданных."
+    override val jvmG1NewSizePercentHint      = "Минимум young generation как % от хипа. Aikar: 30."
+    override val jvmG1MaxNewSizePercentHint   = "Максимум young generation как % от хипа. Aikar: 40."
+    override val jvmG1IhopHint                = "Когда стартует mixed GC. Aikar: 15 (рано). Стандарт: 45."
+    override val jvmG1ParallelRefProcHint     = "Параллельная обработка ссылок. Чистый плюс на много-ядре."
+    override val jvmG1PerfDisableSharedMemHint = "Не писать /tmp/hsperfdata. Ломает VisualVM, но чище для диска."
+
+    override val jvmZHeader            = "Тюнинг ZGC"
+    override val jvmZGenerationalHint  = "Только Java 21+. Делит хип на young / old. Сильно лучше чем не-generational."
+
+    override val jvmShenandoahHeader        = "Эвристика Shenandoah"
+    override val jvmShenandoahAdaptiveHint  = "По умолчанию. Балансирует паузу и throughput."
+    override val jvmShenandoahStaticHint    = "Триггерит сборку по фиксированным порогам."
+    override val jvmShenandoahCompactHint   = "Агрессивная компакция. Лучше освобождает память."
+    override val jvmShenandoahAggressiveHint = "Непрерывная сборка. Высокая цена throughput."
+
+    override fun jvmTuningNotApplicable(gcName: String) =
+        "Для $gcName тюнинг не применим. Переключись на G1, Z или Shenandoah на вкладке GC."
+
+    override val jvmCdsHeader            = "Application Class Data Sharing"
+    override val jvmCdsIntro             = "Кэшировать метаданные классов между запусками. Для сборок 200+ модов экономит 1-3 секунды на каждом холодном старте после первого."
+    override val jvmCdsModeDisabledLabel = "Отключено"
+    override val jvmCdsModeDisabledHint  = "CDS выключен. По умолчанию."
+    override val jvmCdsModeAutoLabel     = "Авто-архив (Java 19+)"
+    override val jvmCdsModeAutoHint      = "JVM сама управляет архивом при выходе. Путь не нужен."
+    override val jvmCdsModeArchiveLabel  = "Архивировать при выходе"
+    override val jvmCdsModeArchiveHint   = "Записывать архив по указанному пути при завершении."
+    override val jvmCdsModeUseLabel      = "Использовать готовый архив"
+    override val jvmCdsModeUseHint       = "Читать готовый архив по указанному пути."
+    override val jvmCdsArchivePathLabel  = "Путь к архиву"
+
+    override val jvmJitHeader        = "JIT-компилятор"
+    override val jvmJitTieredHint    = "On = прогрев интерпретатор → C1 → C2 (по умолчанию). Off = только C2, медленнее старт."
+    override val jvmJitCodeCacheHint = "Размер кэша JIT-кода. По умолчанию JVM 240. Модовому MC может пригодиться 512+."
+
+    override val jvmPerfHeader                  = "Производительность и OS-флаги"
+    override val jvmPerfAlwaysPreTouchHint      = "Прикоснуться ко всем страницам хипа при старте. Старт медленнее, runtime стабильнее."
+    override val jvmPerfDisableExplicitGcHint   = "Сделать System.gc() no-op. Некоторые legacy моды злоупотребляют. Почти всегда плюс."
+    override val jvmPerfUseLargePagesHint       = "Требует hugepages, заранее аллоцированные через sysctl. ~2-5% при правильной настройке."
+    override val jvmPerfTransparentHugePagesHint = "Проще чем UseLargePages. Добавляет latency-всплески при дефрагментации. Trade-off."
+    override val jvmPerfNumaHint                = "NUMA-aware аллокация. Полезно только на multi-socket системах."
+    override val jvmPerfHeapDumpHint            = "Сделать heap-dump при OOM. Критично для диагностики."
+    override val jvmPerfExitOnOomHint           = "Выход на OOM вместо попыток продолжить. Предотвращает zombie-стейт игры."
+
+    override val jvmJfrHeader               = "Java Flight Recorder"
+    override val jvmJfrIntro                = "Записывает внутренности JVM (аллокации, GC, потоки, локи). Открой получившийся .jfr в JDK Mission Control или IntelliJ для анализа."
+    override val jvmJfrEnableLabel          = "Включить JFR-запись"
+    override val jvmJfrEnableHint           = "Default settings = ~1% overhead. Profile settings = ~5%, ловит method-level."
+    override val jvmJfrDurationLabel        = "Длительность (минуты)"
+    override val jvmJfrSettingsHeader       = "Пресет настроек"
+    override val jvmJfrSettingsDefaultHint  = "Низкий overhead, подходит для обычной игры."
+    override val jvmJfrSettingsProfileHint  = "Method-level профайлинг. ~5% overhead."
+    override val jvmJfrOutputPathLabel      = "Путь к выходному .jfr (опционально)"
+
+    override val jvmCustomHeader = "Свои флаги"
+    override val jvmCustomIntro  = "Дополнительные флаги добавляются как есть. Для одноразовых экспериментов или vendor-флагов которые мы ещё не вывели в UI. Через пробел."
+    override val jvmCustomLabel  = "Дополнительные аргументы"
 }

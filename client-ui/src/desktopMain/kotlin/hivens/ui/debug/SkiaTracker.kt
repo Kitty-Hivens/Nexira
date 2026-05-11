@@ -156,15 +156,16 @@ fun SkiaDebugOverlay(
 
                     // ── Buttons ───────────────────────────────────────────────
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        // System.runFinalization() removed — deprecated in Java 18 and
+                        // a no-op since Java 9 (finalizers aren't guaranteed to run
+                        // synchronously regardless). Two-shot GC is the modern recipe.
                         DebugButton("Force GC") {
                             System.gc()
-                            System.runFinalization()
                             System.gc()
                             gcCount++
                         }
                         DebugButton("GC + wait") {
                             System.gc()
-                            System.runFinalization()
                             Thread.sleep(500)
                             System.gc()
                             gcCount++

@@ -15,6 +15,7 @@ import java.nio.file.Path
  */
 internal class GameCommandBuilder {
     private val logger = LoggerFactory.getLogger(GameCommandBuilder::class.java)
+    private val neoForgeDetector = NeoForgeVersionDetector()
 
     /**
      * Immutable version configuration.
@@ -193,7 +194,7 @@ internal class GameCommandBuilder {
         args.addAll(config.programArgs)
 
         // 9. Game Arguments
-        args.addAll(buildMinecraftArgs(session, serverProfile, clientRoot, config.assetIndex))
+        args.addAll(buildMinecraftArgs(session, serverProfile, clientRoot, config.assetIndex, isModernEnvironment))
 
         if (config.tweakClass != null) {
             args.add("--tweakClass")
@@ -213,7 +214,8 @@ internal class GameCommandBuilder {
         session: SessionData,
         profile: ServerProfile,
         root: Path,
-        assetIndex: String
+        assetIndex: String,
+        isModernEnvironment: Boolean
     ): List<String> {
         val args = ArrayList<String>()
         args.add("--username"); args.add(session.playerName)
@@ -226,16 +228,27 @@ internal class GameCommandBuilder {
         args.add("--userProperties"); args.add("{}")
         args.add("--userType"); args.add("mojang")
 
-        if (assetIndex == "1.21.1") {
-            // Default required arguments to prevent MissingRequiredOptionsException
-            val defaultFmlArgs = mapOf(
-                "neoForgeVersion" to "21.1.505",
-                "fmlVersion" to "4.0.42",
-                "mcVersion" to "1.21.1",
-                "neoFormVersion" to "20240808.144430"
-            )
+        if (isModernEnvironment) {
+            // NeoForge needs --fml.{neoForgeVersion,fmlVersion,mcVersion,neoFormVersion}.
+            // Auto-detect from libraries-{mcVersion}/ first — the values live in directory
+            // names and the universal jar's MANIFEST.MF, so a manifest sync always brings
+            // matching versions and we never drift. Fall back to baked-in defaults if the
+            // directory layout is unexpected.
+            //
+            // The fallback values mirror smrt-deco 3.6.5 (synced 2026-05-10) and exist
+            // purely as a safety net.
+            val detected = neoForgeDetector.detect(root, assetIndex)?.toMap()
+            val defaultFmlArgs = detected ?: run {
+                logger.warn("NeoForge auto-detect failed; using baked-in defaults")
+                mapOf(
+                    "neoForgeVersion" to "21.1.506",
+                    "fmlVersion" to "4.0.42",
+                    "mcVersion" to assetIndex,
+                    "neoFormVersion" to "20240808.144430"
+                )
+            }
 
-            // Merge defaults with backend arguments. Backend arguments will override defaults if present.
+            // Backend arguments still win — server can override what was detected.
             val backendArgs = profile.neoForgeArgs ?: emptyMap()
             val finalFmlArgs = defaultFmlArgs + backendArgs
 

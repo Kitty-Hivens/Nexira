@@ -9,6 +9,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import hivens.core.api.model.ServerProfile
+import hivens.launcher.AutoSyncService
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
 
@@ -26,6 +27,7 @@ fun ServerGrid(
     onSettings: (ServerProfile) -> Unit,
     onDetails: (ServerProfile) -> Unit,
     onToggleFav: (ServerProfile) -> Unit,
+    syncStates: Map<String, AutoSyncService.ServerState> = emptyMap(),
     modifier: Modifier = Modifier
 ) {
     val s = LocalStrings.current
@@ -76,7 +78,8 @@ fun ServerGrid(
                     onLaunch = { if (isLaunchable) onLaunch(item.profile) },
                     onSettings = { onSettings(item.profile) },
                     onDetails = { onDetails(item.profile) },
-                    onToggleFav = { onToggleFav(item.profile) }
+                    onToggleFav = { onToggleFav(item.profile) },
+                    syncState = syncStates[item.profile.assetDir]
                 )
             }
         }

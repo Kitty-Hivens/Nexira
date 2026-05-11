@@ -49,6 +49,8 @@ fun SettingsScreen(
     var experimentalEnabled    by remember { mutableStateOf(initialSettings.experimentalFeaturesEnabled) }
     var mandatoryUpdates       by remember { mutableStateOf(initialSettings.mandatoryUpdatesEnabled) }
     var prereleaseChannel      by remember { mutableStateOf(initialSettings.prereleaseChannelEnabled) }
+    var autoSyncAllPacks       by remember { mutableStateOf(initialSettings.autoSyncAllPacks) }
+    var jvmBuilderEnabled      by remember { mutableStateOf(initialSettings.jvmBuilderEnabled) }
     var langDropdownExpanded   by remember { mutableStateOf(false) }
     var showSavedMessage       by remember { mutableStateOf(false) }
 
@@ -66,7 +68,9 @@ fun SettingsScreen(
                 startInTray                 = startInTray,
                 experimentalFeaturesEnabled = experimentalEnabled,
                 mandatoryUpdatesEnabled     = mandatoryUpdates,
-                prereleaseChannelEnabled    = prereleaseChannel
+                prereleaseChannelEnabled    = prereleaseChannel,
+                autoSyncAllPacks            = autoSyncAllPacks,
+                jvmBuilderEnabled           = jvmBuilderEnabled
             )
         )
         showSavedMessage = true
@@ -345,6 +349,30 @@ fun SettingsScreen(
                         checked        = experimentalEnabled && prereleaseChannel,
                         enabled        = experimentalEnabled,
                         onCheckedChange = { prereleaseChannel = it; save() }
+                    )
+
+                    Spacer(Modifier.height(16.dp))
+
+                    SettingsRowWithDescription(
+                        title          = s.settingsAutoSyncAllPacks,
+                        description    = s.settingsAutoSyncAllPacksDesc,
+                        icon           = Icons.Default.Sync,
+                        iconTint       = CelestiaTheme.colors.primary,
+                        checked        = experimentalEnabled && autoSyncAllPacks,
+                        enabled        = experimentalEnabled,
+                        onCheckedChange = { autoSyncAllPacks = it; save() }
+                    )
+
+                    Spacer(Modifier.height(16.dp))
+
+                    SettingsRowWithDescription(
+                        title          = s.settingsJvmBuilder,
+                        description    = s.settingsJvmBuilderDesc,
+                        icon           = Icons.Default.Tune,
+                        iconTint       = CelestiaTheme.colors.primary,
+                        checked        = experimentalEnabled && jvmBuilderEnabled,
+                        enabled        = experimentalEnabled,
+                        onCheckedChange = { jvmBuilderEnabled = it; save() }
                     )
                 }
 

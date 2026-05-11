@@ -152,9 +152,13 @@ object EnglishStrings : AppStrings {
 
     // Console
     override val consoleTitle = "Debug Console"
-    override fun consoleTitleCount(n: Int) = "Game Output ($n)"
+    override fun consoleHeaderCount(filtered: Int, total: Int) = "Game Output ($filtered/$total)"
     override val consoleCopyAll = "Copy All"
     override val consoleClear   = "Clear"
+    override val consoleWrap    = "Wrap"
+    override val consoleSaveToFile = "Save to file"
+    override val consoleSearchPlaceholder = "Search…"
+    override val consoleJumpToBottom = "↓ Jump to bottom"
 
     // Tray
     override val trayShowHide = "Show / Hide"
@@ -180,10 +184,12 @@ object EnglishStrings : AppStrings {
     override val stateOfflineSkipAuth      = "Offline mode — authentication skipped"
     override val stateOfflineSkipSync      = "Offline mode — file sync skipped, using local files"
     override val stateOfflineNoClient      = "Client files not found. Download them online first."
+    override val stateOfflineNoManifest    = "No cached manifest for this server. Log in online at least once before launching offline."
 
     // --- Server Settings: Extended ---
     override val serverSettingsJvmArgs     = "JVM arguments"
     override val serverSettingsJvmArgsHint = "-XX:+UseZGC -Dfoo=bar"
+    override val serverSettingsJvmBuildArgs = "Build args"
     override val serverSettingsResolution  = "Window size"
     override val serverSettingsWidth       = "Width"
     override val serverSettingsHeight      = "Height"
@@ -310,6 +316,13 @@ object EnglishStrings : AppStrings {
     override val settingsMandatoryUpdatesDesc   = "Block startup until critical updates are installed when the upstream protocol breaks. Currently ON by default."
     override val settingsPrereleaseChannel      = "Pre-release update channel"
     override val settingsPrereleaseChannelDesc  = "Receive RC and beta builds. Lets you get protocol fixes before the next stable release. Currently ON by default."
+    override val settingsAutoSyncAllPacks       = "Auto-sync installed packs on launch"
+    override val settingsAutoSyncAllPacksDesc   = "Quietly refresh every server pack you've already installed when the launcher starts. Costs background bandwidth — useful if you switch between many servers and want fresh state without clicking each one."
+    override val settingsJvmBuilder             = "Visual JVM args builder"
+    override val settingsJvmBuilderDesc         = "Reveals a 'Build args' button in the per-server constructor. Pick a GC algorithm, tune heap regions, enable AppCDS or JFR profiling — without memorising flags. Curated presets cover Aikar's recipe, GTNH-class heavy modded, ZGC for huge heaps, and more."
+    override fun dashboardAutoSyncProgress(serverName: String, current: Int, total: Int) =
+        "Syncing $serverName ($current/$total)"
+    override fun dashboardAutoSyncBytes(readMB: Long, totalMB: Long) = "$readMB / $totalMB MB"
 
     // April Fools
     override fun aprilCloseTitle(escapes: Int) = when {
@@ -340,4 +353,86 @@ object EnglishStrings : AppStrings {
     override val sslWarningBody         = "The server's SSL certificate has expired. Your connection may be insecure — server identity cannot be verified. Proceed at your own risk?"
     override val sslWarningConnectAnyway = "Connect anyway"
     override val sslWarningCancel       = "Cancel"
+
+    // ── JVM Args Builder ────────────────────────────────────────────────
+    override val jvmTitle    = "JVM Args Builder"
+    override val jvmSubtitle = "Pick a preset or compose flags by hand. The result lands in jvmArgs."
+    override val jvmPresetsHeader = "Presets"
+    override val jvmTabGc      = "GC"
+    override val jvmTabTuning  = "G1 / Z / Shenandoah"
+    override val jvmTabCds     = "AppCDS"
+    override val jvmTabJit     = "JIT"
+    override val jvmTabPerf    = "Performance"
+    override val jvmTabJfr     = "JFR"
+    override val jvmTabCustom  = "Custom"
+    override val jvmCancel     = "Cancel"
+    override val jvmApply      = "Apply to jvmArgs"
+    override fun jvmPreviewFlagsCount(n: Int) = "Preview ($n flags)"
+
+    override val jvmGcHeader            = "Garbage Collector"
+    override val jvmGcG1Hint            = "Recommended for modded MC, 4-32 GB heap."
+    override val jvmGcZHint             = "Sub-millisecond pauses. Java 17+, 16+ GB heap. Generational on Java 21+."
+    override val jvmGcShenandoahHint    = "Concurrent low-pause from OpenJDK / Liberica. Java 17+."
+    override val jvmGcParallelHint      = "Throughput-first. Long stop-the-world pauses. Almost never the right pick."
+    override val jvmGcSerialHint        = "Single-threaded. Tiny heaps only (< 1 GB)."
+
+    override val jvmG1Header                  = "G1GC tuning"
+    override val jvmG1MaxPauseMillisHint      = "Target max pause time. Lower = more frequent collections."
+    override val jvmG1RegionSizeHint          = "Region size in MB. Larger = fewer regions, less metadata."
+    override val jvmG1NewSizePercentHint      = "Min young generation as % of heap. Aikar: 30."
+    override val jvmG1MaxNewSizePercentHint   = "Max young generation as % of heap. Aikar: 40."
+    override val jvmG1IhopHint                = "When mixed GC starts. Aikar: 15 (eager). Stock: 45."
+    override val jvmG1ParallelRefProcHint     = "Process references in parallel. Pure win on multi-core."
+    override val jvmG1PerfDisableSharedMemHint = "Skip /tmp/hsperfdata. Stops VisualVM but improves disk hygiene."
+
+    override val jvmZHeader            = "ZGC tuning"
+    override val jvmZGenerationalHint  = "Java 21+ only. Splits heap into young / old. Significantly better than non-generational."
+
+    override val jvmShenandoahHeader        = "Shenandoah heuristic"
+    override val jvmShenandoahAdaptiveHint  = "Default. Balances pause vs throughput."
+    override val jvmShenandoahStaticHint    = "Trigger collection at fixed thresholds."
+    override val jvmShenandoahCompactHint   = "Aggressive compaction. Better at memory reclaim."
+    override val jvmShenandoahAggressiveHint = "Continuous collection. High throughput cost."
+
+    override fun jvmTuningNotApplicable(gcName: String) =
+        "No tuning available for $gcName. Switch to G1, Z, or Shenandoah on the GC tab."
+
+    override val jvmCdsHeader            = "Application Class Data Sharing"
+    override val jvmCdsIntro             = "Cache the loaded class metadata across launches. For 200+ mod packs, saves 1-3 seconds on every cold start after the first."
+    override val jvmCdsModeDisabledLabel = "Disabled"
+    override val jvmCdsModeDisabledHint  = "No CDS. Default."
+    override val jvmCdsModeAutoLabel     = "Auto-archive (Java 19+)"
+    override val jvmCdsModeAutoHint      = "JVM auto-manages the archive at exit. No path needed."
+    override val jvmCdsModeArchiveLabel  = "Archive at exit"
+    override val jvmCdsModeArchiveHint   = "Write archive to your specified path on shutdown."
+    override val jvmCdsModeUseLabel      = "Use existing archive"
+    override val jvmCdsModeUseHint       = "Read pre-built archive from your specified path."
+    override val jvmCdsArchivePathLabel  = "Archive path"
+
+    override val jvmJitHeader        = "JIT compiler"
+    override val jvmJitTieredHint    = "On = warm-up via interpreter then C1 then C2 (default). Off = C2 only, slower start."
+    override val jvmJitCodeCacheHint = "Size of JIT-compiled code cache. JVM default is 240. Modded MC may benefit from 512+."
+
+    override val jvmPerfHeader                  = "Performance & OS-level flags"
+    override val jvmPerfAlwaysPreTouchHint      = "Touch every heap page at startup. Slower start, more consistent runtime."
+    override val jvmPerfDisableExplicitGcHint   = "Make System.gc() a no-op. Some legacy mods abuse it. Almost always a win."
+    override val jvmPerfUseLargePagesHint       = "Requires hugepages pre-allocated via sysctl. ~2-5% perf gain when set up."
+    override val jvmPerfTransparentHugePagesHint = "Easier than UseLargePages. Adds latency spikes during defrag. Trade-off."
+    override val jvmPerfNumaHint                = "NUMA-aware allocation. Only useful on multi-socket systems."
+    override val jvmPerfHeapDumpHint            = "Write a heap dump on OOM. Crucial for diagnostics."
+    override val jvmPerfExitOnOomHint           = "Exit on OOM instead of trying to limp along. Prevents zombie game state."
+
+    override val jvmJfrHeader               = "Java Flight Recorder"
+    override val jvmJfrIntro                = "Records JVM internals (allocations, GC, threads, locks). Open the resulting .jfr in JDK Mission Control or IntelliJ for analysis."
+    override val jvmJfrEnableLabel          = "Enable JFR recording"
+    override val jvmJfrEnableHint           = "Default settings = ~1% overhead. Profile settings = ~5%, captures method-level."
+    override val jvmJfrDurationLabel        = "Duration (minutes)"
+    override val jvmJfrSettingsHeader       = "Settings preset"
+    override val jvmJfrSettingsDefaultHint  = "Low overhead, suitable for normal play."
+    override val jvmJfrSettingsProfileHint  = "Method-level profiling. ~5% overhead."
+    override val jvmJfrOutputPathLabel      = "Output .jfr path (optional)"
+
+    override val jvmCustomHeader = "Custom passthrough"
+    override val jvmCustomIntro  = "Extra flags appended verbatim. Use for one-off experiments or vendor-specific knobs not surfaced in the UI yet. Space-separated."
+    override val jvmCustomLabel  = "Extra args"
 }

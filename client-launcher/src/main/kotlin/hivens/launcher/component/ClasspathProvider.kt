@@ -43,17 +43,21 @@ class ClasspathProvider(
 
         // 2. Fallback: Local scan (if manifest is empty or old server)
         if (manifest.files.isEmpty() && manifest.directories.isEmpty()) {
+            val before = allJars.size
             runCatching {
-                if (Files.exists(libDir)) {
+                if (!Files.exists(libDir)) {
+                    logger.warn("Empty manifest and no local libraries dir at {} — classpath will be empty", libDir)
+                } else {
                     Files.walk(libDir).use { stream ->
                         stream.filter { path ->
                             val name = path.name.lowercase()
                             path.isRegularFile() && name.endsWith(".jar") && !name.endsWith(".cache")
                         }.forEach { allJars.add(it) }
                     }
+                    logger.info("Empty manifest fallback: walked {} and found {} JARs", libDir, allJars.size - before)
                 }
             }.onFailure { e ->
-                logger.warn("Local library scan error: ${e.message}")
+                logger.warn("Local library scan failed at {}: {}", libDir, e.message, e)
             }
         }
 

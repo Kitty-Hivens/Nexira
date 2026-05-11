@@ -22,6 +22,7 @@ import hivens.core.api.interfaces.IServerListService
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.SessionData
+import hivens.launcher.AutoSyncService
 import hivens.launcher.CrashReporter
 import hivens.launcher.CredentialsManager
 import hivens.launcher.NetworkState
@@ -237,6 +238,7 @@ fun main() {
             val s = LocalStrings.current
 
             val dataDirectory: java.nio.file.Path = koinInject()
+            val autoSyncService: AutoSyncService = koinInject()
             val themeManager  = remember { ThemeManager(dataDirectory) }
             var customTheme   by remember { mutableStateOf(themeManager.loadTheme()) }
 
@@ -284,8 +286,20 @@ fun main() {
                     }
                 }
 
-                // Tray failed to init — show window anyway so user isn't stuck
-                if (settings.startInTray && !TrayManager.isSupported) {
+                // Tray failed to init — restore the window so the user isn't
+                // stuck with no reachable UI. Two scenarios converge here:
+                //   1. startInTray=true: window was hidden by design, but
+                //      there's now no tray to bring it back. Show it.
+                //   2. startInTray=false but the user clicked the close
+                //      button during the INITIALIZING window (the close
+                //      handler at the bottom of this file uses canBeReady,
+                //      not isSupported, to avoid killing the launcher
+                //      mid-init). Same outcome — window hidden, no tray
+                //      either. Without this restore the process keeps
+                //      running with no UI and the user has to kill it.
+                //   (Codex P1 from PR #131 — the canBeReady-during-INIT
+                //   path needs this failure-path unhide.)
+                if (!TrayManager.isSupported && !isWindowVisible) {
                     isWindowVisible = true
                 }
 
@@ -333,12 +347,33 @@ fun main() {
                 }
 
                 // ── Populate server list ───────────────────────────────────
-                try {
+                val dashboardServers = try {
                     val data = withContext(Dispatchers.IO) {
                         serverListService.fetchDashboardData().get()
                     }
                     TrayManager.updateServers(data.servers)
-                } catch (_: Exception) { /* tray shows empty list */ }
+                    data.servers
+                } catch (_: Exception) {
+                    /* tray shows empty list */
+                    emptyList()
+                }
+
+                // ── Auto-sync (experimental, opt-in) ──────────────────────
+                // Fire-and-forget background sync of every installed pack.
+                // Gated by experimentalFeaturesEnabled master + autoSyncAllPacks
+                // child to match the rest of the experimental opt-ins. Runs on
+                // GlobalScope because we want it to survive composition resets;
+                // the service itself is a singleton and idempotent (will just
+                // no-op on subsequent calls if already running — TODO: enforce
+                // via in-flight flag once we add UI re-trigger).
+                if (settings.experimentalFeaturesEnabled
+                    && settings.autoSyncAllPacks
+                    && dashboardServers.isNotEmpty()
+                ) {
+                    GlobalScope.launch(Dispatchers.IO) {
+                        autoSyncService.syncAll(dashboardServers)
+                    }
+                }
             }
 
             // ── Console window ─────────────────────────────────────────────
@@ -351,7 +386,13 @@ fun main() {
                 onCloseRequest = {
                     if (AprilFools.isActive()) {
                         ChaosState.showCloseDialog = true
-                    } else if (TrayManager.isSupported) {
+                    } else if (TrayManager.canBeReady) {
+                        // canBeReady (not isSupported) so we don't kill the
+                        // launcher mid-init when dorkbox's GTK probe is
+                        // taking its time. If it ultimately fails, the user
+                        // can quit via tray (when it appears) or kill the
+                        // process — strictly better than exiting on a close
+                        // request the user clearly meant as "minimise".
                         isWindowVisible = false
                     } else {
                         exitApplication()
@@ -385,14 +426,18 @@ fun main() {
                     AppRoot(
                         onCloseApp = {
                             val gameRunning = launchState is LaunchState.GameRunning
-                            if (gameRunning && TrayManager.isSupported) {
+                            if (gameRunning && TrayManager.canBeReady) {
+                                // Same canBeReady reasoning as the Window
+                                // onCloseRequest: don't pull the rug from
+                                // under a running game just because tray
+                                // init is still mid-flight.
                                 isWindowVisible = false
                             } else {
                                 exitApplication()
                             }
                         },
                         onRealExit   = { exitApplication() },
-                        onHideToTray = if (TrayManager.isSupported) {{ isWindowVisible = false }}
+                        onHideToTray = if (TrayManager.canBeReady) {{ isWindowVisible = false }}
                         else null,
                         isDarkTheme          = isDarkTheme,
                         onToggleDarkTheme    = {

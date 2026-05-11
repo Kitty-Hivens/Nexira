@@ -154,9 +154,14 @@ interface AppStrings {
 
     // --- Console ---
     val consoleTitle: String
-    fun consoleTitleCount(n: Int): String
+    /** Header showing how many entries pass the active filter, e.g. "Game Output (12/847)". */
+    fun consoleHeaderCount(filtered: Int, total: Int): String
     val consoleCopyAll: String
     val consoleClear: String
+    val consoleWrap: String
+    val consoleSaveToFile: String
+    val consoleSearchPlaceholder: String
+    val consoleJumpToBottom: String
 
     // --- Tray ---
     val trayShowHide: String
@@ -182,10 +187,13 @@ interface AppStrings {
     val stateOfflineSkipAuth: String
     val stateOfflineSkipSync: String
     val stateOfflineNoClient: String
+    val stateOfflineNoManifest: String
 
     // --- Server Settings: Extended ---
     val serverSettingsJvmArgs: String
     val serverSettingsJvmArgsHint: String
+    /** Button label that opens the visual JVM args builder when the experimental toggle is on. */
+    val serverSettingsJvmBuildArgs: String
     val serverSettingsResolution: String
     val serverSettingsWidth: String
     val serverSettingsHeight: String
@@ -315,6 +323,15 @@ interface AppStrings {
     val settingsMandatoryUpdatesDesc: String
     val settingsPrereleaseChannel: String
     val settingsPrereleaseChannelDesc: String
+    val settingsAutoSyncAllPacks: String
+    val settingsAutoSyncAllPacksDesc: String
+    val settingsJvmBuilder: String
+    val settingsJvmBuilderDesc: String
+
+    /** Auto-sync progress strip — `Syncing <name> (3/7)` */
+    fun dashboardAutoSyncProgress(serverName: String, current: Int, total: Int): String
+    /** Auto-sync byte progress — `123 / 456 MB` */
+    fun dashboardAutoSyncBytes(readMB: Long, totalMB: Long): String
 
     // ─── April Fools close dialog ─────────────────────────────────────────────────
     /** Dialog title — changes tone as the user fails more attempts */
@@ -332,4 +349,93 @@ interface AppStrings {
     val sslWarningBody: String
     val sslWarningConnectAnyway: String
     val sslWarningCancel: String
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // JVM Args Builder dialog
+    // ═══════════════════════════════════════════════════════════════════════
+    // Technical -XX flag names and JVM-recognised identifiers (G1GC, ZGC,
+    // MaxGCPauseMillis, AlwaysPreTouch, etc.) are kept hardcoded — they
+    // are not labels but actual flag names a user has to recognise. Only
+    // the descriptive helpers, section headers, and button copy are
+    // localised.
+
+    val jvmTitle: String
+    val jvmSubtitle: String
+    val jvmPresetsHeader: String
+    val jvmTabGc: String
+    val jvmTabTuning: String
+    val jvmTabCds: String
+    val jvmTabJit: String
+    val jvmTabPerf: String
+    val jvmTabJfr: String
+    val jvmTabCustom: String
+    val jvmCancel: String
+    val jvmApply: String
+    fun jvmPreviewFlagsCount(n: Int): String
+
+    val jvmGcHeader: String
+    val jvmGcG1Hint: String
+    val jvmGcZHint: String
+    val jvmGcShenandoahHint: String
+    val jvmGcParallelHint: String
+    val jvmGcSerialHint: String
+
+    val jvmG1Header: String
+    val jvmG1MaxPauseMillisHint: String
+    val jvmG1RegionSizeHint: String
+    val jvmG1NewSizePercentHint: String
+    val jvmG1MaxNewSizePercentHint: String
+    val jvmG1IhopHint: String
+    val jvmG1ParallelRefProcHint: String
+    val jvmG1PerfDisableSharedMemHint: String
+
+    val jvmZHeader: String
+    val jvmZGenerationalHint: String
+
+    val jvmShenandoahHeader: String
+    val jvmShenandoahAdaptiveHint: String
+    val jvmShenandoahStaticHint: String
+    val jvmShenandoahCompactHint: String
+    val jvmShenandoahAggressiveHint: String
+
+    fun jvmTuningNotApplicable(gcName: String): String
+
+    val jvmCdsHeader: String
+    val jvmCdsIntro: String
+    val jvmCdsModeDisabledLabel: String
+    val jvmCdsModeDisabledHint: String
+    val jvmCdsModeAutoLabel: String
+    val jvmCdsModeAutoHint: String
+    val jvmCdsModeArchiveLabel: String
+    val jvmCdsModeArchiveHint: String
+    val jvmCdsModeUseLabel: String
+    val jvmCdsModeUseHint: String
+    val jvmCdsArchivePathLabel: String
+
+    val jvmJitHeader: String
+    val jvmJitTieredHint: String
+    val jvmJitCodeCacheHint: String
+
+    val jvmPerfHeader: String
+    val jvmPerfAlwaysPreTouchHint: String
+    val jvmPerfDisableExplicitGcHint: String
+    val jvmPerfUseLargePagesHint: String
+    val jvmPerfTransparentHugePagesHint: String
+    val jvmPerfNumaHint: String
+    val jvmPerfHeapDumpHint: String
+    val jvmPerfExitOnOomHint: String
+
+    val jvmJfrHeader: String
+    val jvmJfrIntro: String
+    val jvmJfrEnableLabel: String
+    val jvmJfrEnableHint: String
+    val jvmJfrDurationLabel: String
+    val jvmJfrSettingsHeader: String
+    val jvmJfrSettingsDefaultHint: String
+    val jvmJfrSettingsProfileHint: String
+    val jvmJfrOutputPathLabel: String
+
+    val jvmCustomHeader: String
+    val jvmCustomIntro: String
+    val jvmCustomLabel: String
 }

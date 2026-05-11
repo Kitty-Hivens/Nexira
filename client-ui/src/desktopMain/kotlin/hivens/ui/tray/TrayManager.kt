@@ -25,6 +25,39 @@ object TrayManager {
     private var noServersItem: MenuItem? = null
     private var strings: Strings? = null
 
+    /**
+     * Lifecycle state of the tray. Distinguishes "init has not even started"
+     * from "init is running but hasn't completed yet" — critical because
+     * dorkbox's `SystemTray.get()` can stall for up to ~60s on Linux setups
+     * with broken/missing GTK libraries before falling back to Swing. During
+     * that window the user might close the launcher window expecting the
+     * standard "minimize-to-tray" behavior; without this state we'd see
+     * `isSupported == false` and call `exitApplication()` instead, killing
+     * the launcher (and any game launch in progress).
+     *
+     * Volatile because [init] runs on Dispatchers.IO and the close-request
+     * callbacks in Main.kt read state from the AWT thread.
+     */
+    enum class State { NOT_STARTED, INITIALIZING, READY, FAILED }
+
+    @Volatile
+    private var state: State = State.NOT_STARTED
+
+    /**
+     * True only when the tray is fully registered. Use this when a code
+     * path needs to *act* on the tray right now (e.g. update menu items).
+     */
+    val isSupported: Boolean get() = state == State.READY
+
+    /**
+     * True when the tray either is ready or is still in the middle of
+     * initialising. Use this for close-request handlers: if the tray
+     * might still come up, prefer "hide to tray" over "exit application",
+     * since the user's intent is "minimise" and we don't want to kill the
+     * launcher because dorkbox's GTK probe is slow.
+     */
+    val canBeReady: Boolean get() = state == State.INITIALIZING || state == State.READY
+
     data class Strings(
         val tooltip: String,
         val statusIdle: String,
@@ -47,20 +80,24 @@ object TrayManager {
 
     fun init(iconStream: InputStream, strings: Strings) {
         this.strings = strings
-        if (tray != null) return
+        if (state != State.NOT_STARTED) return
 
+        state = State.INITIALIZING
         try {
             SystemTray.DEBUG = false
             val t = SystemTray.get() ?: run {
                 logger.warn("SystemTray not supported on this platform")
+                state = State.FAILED
                 return
             }
             tray = t
             t.setTooltip(strings.tooltip)
             t.setImage(iconStream)
             buildMenu(t.menu, strings)
+            state = State.READY
             logger.info("TrayManager initialized ({})", t.javaClass.simpleName)
         } catch (t: Throwable) {
+            state = State.FAILED
             logger.error("Failed to initialize TrayManager", t)
         }
     }
@@ -132,8 +169,6 @@ object TrayManager {
         })
     }
 
-    val isSupported: Boolean get() = tray != null
-
     fun shutdown() {
         runCatching { tray?.shutdown() }
         tray = null
@@ -141,5 +176,6 @@ object TrayManager {
         serversSubmenu = null
         statusItem = null
         noServersItem = null
+        state = State.NOT_STARTED
     }
 }
