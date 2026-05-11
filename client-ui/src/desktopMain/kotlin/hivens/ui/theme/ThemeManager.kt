@@ -118,6 +118,24 @@ object ThemePresets {
         error = "#EF5350"
     )
 
+    /**
+     * Blood Rain — gothic dark-red palette. Sits opposite to the cool-electric
+     * presets (Cyberpunk / Vaporwave / Synthwave / Neon Dreams). All accents
+     * stay inside the warm-dark red family — no cool counterpoint — so the
+     * mood reads as "blood rain on a moonless night" rather than "blood AND
+     * water". Atmospheric darkness substitutes for a literal cold-blue rain.
+     */
+    val BLOOD_RAIN = CustomTheme(
+        name = "Blood Rain",
+        primary    = "#A01818",   // fresh blood
+        secondary  = "#4A0810",   // deeper pooled blood
+        background = "#0A0303",   // night void with red undertone
+        surface    = "#1C0A0C",   // wet stone, crimson-tinted
+        accent     = "#6B1525",   // burgundy — tonal variation in the same family
+        success    = "#4A5A35",   // dark moss — life persisting in the rain
+        error      = "#E53935"    // alarm-bright red, distinct from primary
+    )
+
     fun getAll() = listOf(
         CELESTIA_DARK,
         CYBERPUNK,
@@ -125,7 +143,8 @@ object ThemePresets {
         MATRIX,
         SYNTHWAVE,
         NEON_PINK,
-        ABYSSAL
+        ABYSSAL,
+        BLOOD_RAIN,
     )
 }
 
