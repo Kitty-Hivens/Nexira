@@ -313,6 +313,8 @@ object GermanStrings : AppStrings {
     override val settingsPrereleaseChannelDesc  = "RC- und Beta-Builds erhalten. Ermöglicht Protokoll-Fixes vor dem nächsten stabilen Release. Aktuell standardmäßig EIN."
     override val settingsAutoSyncAllPacks       = "Installierte Modpacks beim Start automatisch aktualisieren"
     override val settingsAutoSyncAllPacksDesc   = "Aktualisiert beim Launcher-Start jedes bereits installierte Server-Pack im Hintergrund. Kostet Bandbreite — nützlich, wenn du zwischen mehreren Servern wechselst und frischen Stand ohne Klick auf jeden willst."
+    override val settingsJvmBuilder             = "Visueller JVM-Argument-Builder"
+    override val settingsJvmBuilderDesc         = "Zeigt einen „Argumente bauen“-Button in den Server-Einstellungen. Wähle Garbage Collector, justiere Heap-Regionen, aktiviere AppCDS oder JFR — ohne Flags auswendig zu lernen. Vorgaben: Aikar's Rezept, GTNH-Klasse, ZGC für große Heaps und mehr."
     override fun dashboardAutoSyncProgress(serverName: String, current: Int, total: Int) =
         "Synchronisiere $serverName ($current/$total)"
     override fun dashboardAutoSyncBytes(readMB: Long, totalMB: Long) = "$readMB / $totalMB MB"

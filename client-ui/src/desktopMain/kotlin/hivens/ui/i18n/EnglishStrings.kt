@@ -313,6 +313,8 @@ object EnglishStrings : AppStrings {
     override val settingsPrereleaseChannelDesc  = "Receive RC and beta builds. Lets you get protocol fixes before the next stable release. Currently ON by default."
     override val settingsAutoSyncAllPacks       = "Auto-sync installed packs on launch"
     override val settingsAutoSyncAllPacksDesc   = "Quietly refresh every server pack you've already installed when the launcher starts. Costs background bandwidth — useful if you switch between many servers and want fresh state without clicking each one."
+    override val settingsJvmBuilder             = "Visual JVM args builder"
+    override val settingsJvmBuilderDesc         = "Reveals a 'Build args' button in the per-server constructor. Pick a GC algorithm, tune heap regions, enable AppCDS or JFR profiling — without memorising flags. Curated presets cover Aikar's recipe, GTNH-class heavy modded, ZGC for huge heaps, and more."
     override fun dashboardAutoSyncProgress(serverName: String, current: Int, total: Int) =
         "Syncing $serverName ($current/$total)"
     override fun dashboardAutoSyncBytes(readMB: Long, totalMB: Long) = "$readMB / $totalMB MB"

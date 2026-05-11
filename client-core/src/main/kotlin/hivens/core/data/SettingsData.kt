@@ -44,5 +44,20 @@ data class SettingsData(
      * servers; primarily a maintainer-grade convenience for users with many
      * servers installed who want fresh state without clicking each one.
      */
-    var autoSyncAllPacks: Boolean = false
+    var autoSyncAllPacks: Boolean = false,
+
+    /**
+     * Reveals the visual JVM-args builder in the per-server constructor.
+     *
+     * The default jvm-args field in [hivens.core.data.InstanceProfile] is
+     * a free-text string — to hand-craft Aikar's flags or pick a GC the
+     * user has to know what `-XX:+UseG1GC -XX:MaxGCPauseMillis=200` means.
+     * The builder dialog (`JvmArgsBuilderDialog`) presents a curated
+     * preset picker, GC tabs, and per-knob explanations; the resulting
+     * args still write to InstanceProfile.jvmArgs unchanged.
+     *
+     * Off by default because the feature is power-user-grade and the free-
+     * text field is enough for users who already know what they want.
+     */
+    var jvmBuilderEnabled: Boolean = false
 )
