@@ -286,8 +286,20 @@ fun main() {
                     }
                 }
 
-                // Tray failed to init — show window anyway so user isn't stuck
-                if (settings.startInTray && !TrayManager.isSupported) {
+                // Tray failed to init — restore the window so the user isn't
+                // stuck with no reachable UI. Two scenarios converge here:
+                //   1. startInTray=true: window was hidden by design, but
+                //      there's now no tray to bring it back. Show it.
+                //   2. startInTray=false but the user clicked the close
+                //      button during the INITIALIZING window (the close
+                //      handler at the bottom of this file uses canBeReady,
+                //      not isSupported, to avoid killing the launcher
+                //      mid-init). Same outcome — window hidden, no tray
+                //      either. Without this restore the process keeps
+                //      running with no UI and the user has to kill it.
+                //   (Codex P1 from PR #131 — the canBeReady-during-INIT
+                //   path needs this failure-path unhide.)
+                if (!TrayManager.isSupported && !isWindowVisible) {
                     isWindowVisible = true
                 }
 
