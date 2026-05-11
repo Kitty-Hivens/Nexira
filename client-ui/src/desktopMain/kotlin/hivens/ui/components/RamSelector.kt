@@ -109,7 +109,10 @@ fun RamSelector(
                     isCustomMode = true
                     customInput.toIntOrNull()?.takeIf { it in 512..32768 }?.let(onValueChanged)
                 },
-                modifier = Modifier.weight(1f).height(48.dp),
+                // No fixed height — Material3 OutlinedTextField needs ~56 dp to lay out
+                // its placeholder; forcing 48 dp clipped it past the bottom border so
+                // the digit visually "fell through" the field.
+                modifier = Modifier.weight(1f),
                 placeholder = { Text(if (isCustomMode) "" else currentMb.toString(), color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.4f), fontSize = 13.sp) },
                 suffix = { Text("MB", color = CelestiaTheme.colors.textSecondary, fontSize = 12.sp) },
                 singleLine = true,
