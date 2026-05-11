@@ -316,6 +316,13 @@ interface AppStrings {
     val settingsMandatoryUpdatesDesc: String
     val settingsPrereleaseChannel: String
     val settingsPrereleaseChannelDesc: String
+    val settingsAutoSyncAllPacks: String
+    val settingsAutoSyncAllPacksDesc: String
+
+    /** Auto-sync progress strip — `Syncing <name> (3/7)` */
+    fun dashboardAutoSyncProgress(serverName: String, current: Int, total: Int): String
+    /** Auto-sync byte progress — `123 / 456 MB` */
+    fun dashboardAutoSyncBytes(readMB: Long, totalMB: Long): String
 
     // ─── April Fools close dialog ─────────────────────────────────────────────────
     /** Dialog title — changes tone as the user fails more attempts */

@@ -22,6 +22,7 @@ import hivens.core.api.interfaces.IServerListService
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.SessionData
+import hivens.launcher.AutoSyncService
 import hivens.launcher.CrashReporter
 import hivens.launcher.CredentialsManager
 import hivens.launcher.NetworkState
@@ -237,6 +238,7 @@ fun main() {
             val s = LocalStrings.current
 
             val dataDirectory: java.nio.file.Path = koinInject()
+            val autoSyncService: AutoSyncService = koinInject()
             val themeManager  = remember { ThemeManager(dataDirectory) }
             var customTheme   by remember { mutableStateOf(themeManager.loadTheme()) }
 
@@ -333,12 +335,33 @@ fun main() {
                 }
 
                 // ── Populate server list ───────────────────────────────────
-                try {
+                val dashboardServers = try {
                     val data = withContext(Dispatchers.IO) {
                         serverListService.fetchDashboardData().get()
                     }
                     TrayManager.updateServers(data.servers)
-                } catch (_: Exception) { /* tray shows empty list */ }
+                    data.servers
+                } catch (_: Exception) {
+                    /* tray shows empty list */
+                    emptyList()
+                }
+
+                // ── Auto-sync (experimental, opt-in) ──────────────────────
+                // Fire-and-forget background sync of every installed pack.
+                // Gated by experimentalFeaturesEnabled master + autoSyncAllPacks
+                // child to match the rest of the experimental opt-ins. Runs on
+                // GlobalScope because we want it to survive composition resets;
+                // the service itself is a singleton and idempotent (will just
+                // no-op on subsequent calls if already running — TODO: enforce
+                // via in-flight flag once we add UI re-trigger).
+                if (settings.experimentalFeaturesEnabled
+                    && settings.autoSyncAllPacks
+                    && dashboardServers.isNotEmpty()
+                ) {
+                    GlobalScope.launch(Dispatchers.IO) {
+                        autoSyncService.syncAll(dashboardServers)
+                    }
+                }
             }
 
             // ── Console window ─────────────────────────────────────────────
