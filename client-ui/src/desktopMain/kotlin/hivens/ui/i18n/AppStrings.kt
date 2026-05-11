@@ -318,6 +318,8 @@ interface AppStrings {
     val settingsPrereleaseChannelDesc: String
     val settingsAutoSyncAllPacks: String
     val settingsAutoSyncAllPacksDesc: String
+    val settingsJvmBuilder: String
+    val settingsJvmBuilderDesc: String
 
     /** Auto-sync progress strip — `Syncing <name> (3/7)` */
     fun dashboardAutoSyncProgress(serverName: String, current: Int, total: Int): String
