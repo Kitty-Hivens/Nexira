@@ -152,9 +152,13 @@ object GermanStrings : AppStrings {
 
     // Console
     override val consoleTitle = "Debug-Konsole"
-    override fun consoleTitleCount(n: Int) = "Spielausgabe ($n)"
+    override fun consoleHeaderCount(filtered: Int, total: Int) = "Spielausgabe ($filtered/$total)"
     override val consoleCopyAll = "Alles kopieren"
     override val consoleClear   = "Leeren"
+    override val consoleWrap    = "Zeilenumbruch"
+    override val consoleSaveToFile = "In Datei speichern"
+    override val consoleSearchPlaceholder = "Suchen…"
+    override val consoleJumpToBottom = "↓ Zum Ende"
 
     // Tray
     override val trayShowHide = "Anzeigen / Ausblenden"
