@@ -38,7 +38,6 @@ import hivens.ui.components.JvmArgsBuilderDialog
 import hivens.ui.components.ModItemCard
 import hivens.ui.components.RamSelector
 import hivens.ui.debug.SkiaTracker
-import hivens.ui.easter.AprilFoolsButton
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
 import io.github.vinceglb.filekit.FileKit
@@ -367,23 +366,22 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
 
                     Spacer(Modifier.weight(1f))
 
-                    // ── Open folder — chaos target ────────────────────────────
-                    AprilFoolsButton(
-                        id      = "srv_settings_open_folder_btn",
-                        text    = s.serverSettingsOpenFolder,
-                        onClick = {
+                    // ── Open folder ───────────────────────────────────────────
+                    // Was AprilFoolsButton with a colors-passthrough hack — produced
+                    // a flat filled chip that visually clashed with CelestiaButton's
+                    // outlined style on Reset Client. Until AprilFools gets a proper
+                    // CelestiaButton-based wrapper that can also host the future
+                    // Atelier style variants, we use plain CelestiaButton here and
+                    // accept losing this button's April Fools chaos integration.
+                    CelestiaButton(
+                        text     = s.serverSettingsOpenFolder,
+                        onClick  = {
                             val path = dataDirectory.resolve("clients").resolve(server.assetDir)
                             if (!path.toFile().exists()) path.toFile().mkdirs()
                             Desktop.getDesktop().open(path.toFile())
                         },
                         modifier = Modifier.fillMaxWidth(),
-                        // Faint primary tint so the button reads as actionable instead of
-                        // floating text. Was Color.Transparent which made it disappear into
-                        // the background when AprilFools is dormant.
-                        colors   = ButtonDefaults.buttonColors(
-                            containerColor = CelestiaTheme.colors.primary.copy(alpha = 0.12f),
-                            contentColor   = CelestiaTheme.colors.textPrimary,
-                        ),
+                        primary  = false,
                     )
 
                     Spacer(Modifier.height(12.dp))
@@ -402,10 +400,12 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
 
                         if (spawnResetState == SpawnResetState.Idle) {
                             // Only chaos-wrap when idle — Loading/Success/Error states need reliable feedback
-                            AprilFoolsButton(
-                                id      = "srv_settings_spawn_reset_btn",
-                                text    = s.spawnResetButton,
-                                onClick = {
+                            // Same rationale as the Open Folder button above — uses
+                            // CelestiaButton until AprilFoolsButton gets a wrapper
+                            // that respects the Celestia / Atelier visual systems.
+                            CelestiaButton(
+                                text     = s.spawnResetButton,
+                                onClick  = {
                                     spawnResetState = SpawnResetState.Loading
                                     scope.launch {
                                         val credentials = withContext(Dispatchers.IO) {
@@ -426,11 +426,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                                     }
                                 },
                                 modifier = Modifier.fillMaxWidth(),
-                                // Same faint tint as Open Folder above — see comment there.
-                                colors   = ButtonDefaults.buttonColors(
-                                    containerColor = CelestiaTheme.colors.primary.copy(alpha = 0.12f),
-                                    contentColor   = CelestiaTheme.colors.textPrimary,
-                                ),
+                                primary  = false,
                             )
                         } else {
                             // Loading / Success / Error — plain reliable button, no chaos
