@@ -4,7 +4,6 @@ interface AppStrings {
 
     // --- App ---
     val appName: String
-    val appVersion: String
 
     // --- Login ---
     val loginTitle: String
@@ -12,23 +11,16 @@ interface AppStrings {
     val loginPassword: String
     val loginRemember: String
     val loginButton: String
-    val loginSuccess: String
-    val loginLoading: String
     val loginErrorEmpty: String
     val loginErrorGeneric: String
     val loginRegister: String
 
     // --- Navigation ---
-    val navHome: String
-    val navProfile: String
-    val navSettings: String
-    val navConsole: String
     val navLogout: String
     val navBack: String
 
     // --- Dashboard ---
     fun dashboardWelcome(name: String): String
-    val dashboardNews: String
     val dashboardServers: String
     val dashboardServersEmpty: String
 
@@ -79,8 +71,6 @@ interface AppStrings {
     val settingsThemePicker: String
     val settingsThemePickerSub: String
     val settingsDarkTheme: String
-    val settingsSeasonEffect: String
-    val settingsSeasonEffectSub: String
     val settingsCloseAfterLaunch: String
     val settingsSaved: String
     val settingsLanguage: String
@@ -102,17 +92,13 @@ interface AppStrings {
 
     // --- News ---
     val newsTitle: String
-    val newsLoading: String
     val newsEmpty: String
-    val newsNoImage: String
 
     // --- Server Detail ---
     val serverDetailTitle: String
-    val serverDetailLoading: String
     val serverDetailNoImage: String
     val serverDetailNoImageHint: String
     val serverDetailMissingTitle: String
-    val serverDetailMissingBody: String
     fun serverDetailMissingPath(path: String, file: String): String
 
     // --- Server Settings ---
@@ -164,7 +150,6 @@ interface AppStrings {
     val consoleJumpToBottom: String
 
     // --- Tray ---
-    val trayShowHide: String
     val trayConsole: String
     val trayExit: String
 
@@ -174,10 +159,7 @@ interface AppStrings {
     val settingsOpenCrashReports: String
 
     // --- File Manager ---
-    val fileCheckIntegrity: String
-    val fileNoUpdates: String
     fun fileDownloading(n: Int): String
-    val fileClientSetup: String
 
     // --- Settings: Offline Mode ---
     val settingsOfflineMode: String
@@ -281,7 +263,6 @@ interface AppStrings {
     val aboutCriticalUpdate: String
     val aboutSectionSystem: String
     val aboutOs: String
-    val aboutJvmHeap: String
     val aboutSectionLinks: String
     val aboutLinkGithub: String
     val aboutLinkBugReport: String
