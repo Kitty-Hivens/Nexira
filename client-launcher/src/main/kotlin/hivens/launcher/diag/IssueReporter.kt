@@ -54,7 +54,14 @@ object IssueReporter {
     // ── Body templates ──────────────────────────────────────────────────────
 
     private fun buildCrashBody(report: CrashReporter.CrashReport): String {
-        val ring = ActionRing.snapshot().takeLast(ACTION_RING_LIMIT)
+        // Use the snapshot frozen at crash time, NOT a fresh ActionRing.snapshot():
+        // if the process keeps running after an uncaught exception (which the
+        // default handler does — it shows the dialog without exiting), the ring
+        // accumulates more entries before the user clicks "Report on GitHub",
+        // and we'd ship a body that doesn't match the crash file the user
+        // can also see on disk. report.actions is the authoritative crash-time
+        // state.
+        val ring = report.actions.takeLast(ACTION_RING_LIMIT)
         val ringBlock = if (ring.isEmpty()) "_(no actions recorded)_"
         else ring.joinToString("\n") { e ->
             "- `[${entryTimeFmt.format(e.timestamp)}]` ${e.text}"

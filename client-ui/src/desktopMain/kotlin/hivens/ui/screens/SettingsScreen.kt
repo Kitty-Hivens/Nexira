@@ -19,6 +19,8 @@ import hivens.config.Branding
 import hivens.core.api.interfaces.ISettingsService
 import hivens.launcher.diag.DiagnosticBundle
 import hivens.launcher.platform.PlatformPaths
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import hivens.ui.components.GlassCard
 import hivens.ui.easter.AprilFoolsButton
 import hivens.ui.easter.AprilFoolsDebugPanel
@@ -430,26 +432,44 @@ fun SettingsScreen(
                     // crash reports, action ring and system info. The companion
                     // GitHub-Issue button below is enabled only after a bundle
                     // exists in this session.
+                    //
+                    // Generation runs off the Compose UI thread: filesystem
+                    // reads + ZIP compression of a 200 MB launcher.log cap is
+                    // enough to freeze Settings for a noticeable beat. While
+                    // generating, the button is disabled so a double-click
+                    // doesn't fire two parallel writes to the same data dir.
                     var lastBundlePath by remember { mutableStateOf<java.nio.file.Path?>(null) }
+                    var bundleBusy     by remember { mutableStateOf(false) }
+                    val bundleScope    = rememberCoroutineScope()
 
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         AprilFoolsButton(
                             id       = "settings_create_diag_bundle_btn",
                             text     = s.settingsCreateDiagnosticBundle,
                             onClick  = {
-                                runCatching {
-                                    val zip = DiagnosticBundle.create(paths)
-                                    lastBundlePath = zip
-                                    if (Desktop.isDesktopSupported()) {
-                                        Desktop.getDesktop().open(zip.parent.toFile())
+                                if (bundleBusy) return@AprilFoolsButton
+                                bundleBusy = true
+                                bundleScope.launch {
+                                    val zip = withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                        runCatching { DiagnosticBundle.create(paths) }.getOrNull()
                                     }
+                                    if (zip != null) {
+                                        lastBundlePath = zip
+                                        if (Desktop.isDesktopSupported()) {
+                                            runCatching { Desktop.getDesktop().open(zip.parent.toFile()) }
+                                        }
+                                    }
+                                    bundleBusy = false
                                 }
                             },
                             modifier = Modifier.weight(1f),
                             colors   = ButtonDefaults.buttonColors(
                                 containerColor = Color.Transparent,
-                                contentColor   = CelestiaTheme.colors.textPrimary,
+                                contentColor   = CelestiaTheme.colors.textPrimary.copy(
+                                    alpha = if (bundleBusy) 0.45f else 1f
+                                ),
                             ),
+                            enabled  = !bundleBusy,
                         )
                         AprilFoolsButton(
                             id       = "settings_report_github_btn",
