@@ -194,7 +194,7 @@ val appModule = module {
     single<IManifestProcessorService> { ManifestProcessorService(get()) }
     single { ProfileManager(get(), get()) }
     // Direct channel — BellSoft JDK CDN does not require the SMARTYcraft proxy.
-    single { JavaManagerService(get(), get(named("direct"))) }
+    single<IJavaManager> { JavaManagerService(get(), get(named("direct"))) }
 
     // Launch pipeline collaborators
     // Direct channel — Maven Central LWJGL/JInput natives don't need the proxy.
