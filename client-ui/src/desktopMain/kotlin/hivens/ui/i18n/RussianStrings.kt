@@ -158,6 +158,7 @@ object RussianStrings : AppStrings {
     override val settingsOpenCrashReports        = "Отчёты о сбоях"
     override val settingsCreateDiagnosticBundle  = "Собрать диагностический пакет"
     override val settingsDiagnosticBundleHint    = "Соберёт в один ZIP redact'нутые логи, отчёты о сбоях, историю действий и сведения о системе — отправлять в поддержку."
+    override val settingsReportOnGithub          = "Сообщить на GitHub с пакетом"
 
     // File Manager
     override fun fileDownloading(n: Int) = "Загрузка обновлений ($n файлов)..."

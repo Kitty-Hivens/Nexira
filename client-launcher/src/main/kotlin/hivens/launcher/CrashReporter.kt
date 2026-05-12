@@ -2,11 +2,13 @@ package hivens.launcher
 
 import hivens.config.Branding
 import hivens.core.diag.ActionRing
+import hivens.launcher.diag.IssueReporter
 import hivens.launcher.platform.PlatformPaths
 import java.awt.Desktop
 import java.awt.Toolkit
 import java.awt.datatransfer.StringSelection
 import java.io.File
+import java.net.URI
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -103,7 +105,7 @@ object CrashReporter {
             Please send this file to the developers.
         """.trimIndent()
 
-        val options = arrayOf("Copy report", "Open folder", "Close")
+        val options = arrayOf("Report on GitHub", "Copy report", "Open folder", "Close")
         val choice = JOptionPane.showOptionDialog(
             null,
             message,
@@ -117,10 +119,20 @@ object CrashReporter {
 
         when (choice) {
             0 -> {
+                // Beacon "Report on GitHub": opens browser at a pre-filled new-Issue
+                // URL. Nothing leaves the user's machine until they click Submit on
+                // github.com — the launcher itself never POSTs anything.
+                runCatching {
+                    if (Desktop.isDesktopSupported()) {
+                        Desktop.getDesktop().browse(URI(IssueReporter.crashIssueUrl(report)))
+                    }
+                }
+            }
+            1 -> {
                 val clipboard = Toolkit.getDefaultToolkit().systemClipboard
                 clipboard.setContents(StringSelection(reportFile.readText()), null)
             }
-            1 -> {
+            2 -> {
                 if (Desktop.isDesktopSupported()) {
                     Desktop.getDesktop().open(reportFile.parentFile)
                 }
