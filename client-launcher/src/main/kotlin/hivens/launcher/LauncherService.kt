@@ -1,5 +1,6 @@
 package hivens.launcher
 
+import hivens.core.api.interfaces.IJavaManager
 import hivens.core.api.interfaces.ILauncherService
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.FileManifest
@@ -25,7 +26,7 @@ import java.nio.file.Path
  */
 internal class LauncherService(
     private val profileManager: ProfileManager,
-    private val javaManager: JavaManagerService,
+    private val javaManager: IJavaManager,
     private val envPreparer: EnvironmentPreparer,
     private val classpathProvider: ClasspathProvider,
     private val commandBuilder: GameCommandBuilder,
@@ -55,7 +56,7 @@ internal class LauncherService(
         val memory = normalizeMemory(profile.memoryMb, allocatedMemoryMB)
 
         // 2. Determining the path to Java
-        val javaExec: String = resolveJavaPath(profile, javaExecutablePath, version)
+        val javaExec: String = resolveJavaPath(javaManager, profile, javaExecutablePath, version)
 
         log.info("Session initialization: {}, Java: {}, Heap: {}MB", serverProfile.name, javaExec, memory)
         onLog("Running ${serverProfile.name}...", LauncherLogType.INFO)
@@ -103,20 +104,6 @@ internal class LauncherService(
         ) { _, _ -> /* Logs are ignored */ }
     }
 
-    /**
-     * Selects the appropriate Java Runtime.
-     * Priority: Profile Setup -> Managed Java (JavaManager) -> System Java.
-     */
-    internal suspend fun resolveJavaPath(profile: InstanceProfile, defaultPath: Path, version: String): String {
-        if (!profile.javaPath.isNullOrEmpty()) return profile.javaPath!!
-        runCatching {
-            val managedPath = javaManager.getJavaPath(version)
-            if (Files.exists(managedPath)) return managedPath.toString()
-        }
-        if (Files.exists(defaultPath)) return defaultPath.toString()
-        return "java"
-    }
-
     internal companion object {
         /**
          * Memory allocation rule: profile's per-instance value wins when positive,
@@ -126,6 +113,29 @@ internal class LauncherService(
         internal fun normalizeMemory(profileMb: Int, allocatedMb: Int): Int {
             val raw = if (profileMb > 0) profileMb else allocatedMb
             return if (raw < 768) 1024 else raw
+        }
+
+        /**
+         * Selects the appropriate Java Runtime.
+         * Priority: Profile Setup -> Managed Java ([IJavaManager]) -> System Java.
+         *
+         * Pulled into the companion (rather than instance method) so tests can
+         * exercise the full priority cascade with a fake [IJavaManager] without
+         * having to construct the rest of [LauncherService]'s collaborators.
+         */
+        internal suspend fun resolveJavaPath(
+            javaManager: IJavaManager,
+            profile: InstanceProfile,
+            defaultPath: Path,
+            version: String
+        ): String {
+            if (!profile.javaPath.isNullOrEmpty()) return profile.javaPath!!
+            runCatching {
+                val managedPath = javaManager.getJavaPath(version)
+                if (Files.exists(managedPath)) return managedPath.toString()
+            }
+            if (Files.exists(defaultPath)) return defaultPath.toString()
+            return "java"
         }
     }
 }
