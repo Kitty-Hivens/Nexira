@@ -97,8 +97,8 @@ fun AppLayout(
                 when (screen) {
                     Screen.Home -> {
                         val session = currentSession
-                        if (session != null) {
-                            DashboardScreen(
+                        when {
+                            session != null -> DashboardScreen(
                                 session               = session,
                                 initialSelectedServer = selectedServer,
                                 onServerSelected      = { selectedServer = it },
@@ -107,8 +107,13 @@ fun AppLayout(
                                 onOpenServerSettings  = { onScreenChange(Screen.ServerSettings(it)) },
                                 onOpenDetails         = { onScreenChange(Screen.ServerDetails(it)) }
                             )
-                        } else {
-                            ContentLoadingPlaceholder()
+                            // `Loading` is the brief window between startup and resolved
+                            // credentials — spinner is appropriate. `Unauthenticated` is
+                            // a stable state waiting on user input; show the explicit
+                            // "sign in" copy so the spinning placeholder doesn't read as
+                            // a stuck network request.
+                            appState is AppState.Loading -> ContentLoadingPlaceholder()
+                            else -> ContentLoginRequiredPlaceholder()
                         }
                     }
 
@@ -362,5 +367,35 @@ private fun ContentLoadingPlaceholder() {
             modifier    = Modifier.size(28.dp),
             strokeWidth = 2.dp
         )
+    }
+}
+
+@Composable
+private fun ContentLoginRequiredPlaceholder() {
+    val s = hivens.ui.i18n.LocalStrings.current
+    Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Person,
+                contentDescription = null,
+                tint = CelestiaTheme.colors.primary.copy(alpha = 0.45f),
+                modifier = Modifier.size(48.dp)
+            )
+            Text(
+                text = s.dashboardLoginRequiredTitle,
+                style = MaterialTheme.typography.titleMedium,
+                color = CelestiaTheme.colors.textPrimary
+            )
+            Text(
+                text = s.dashboardLoginRequiredHint,
+                style = MaterialTheme.typography.bodySmall,
+                color = CelestiaTheme.colors.textSecondary,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                modifier = Modifier.widthIn(max = 360.dp)
+            )
+        }
     }
 }

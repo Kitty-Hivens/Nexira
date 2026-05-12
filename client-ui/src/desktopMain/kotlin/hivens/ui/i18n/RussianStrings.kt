@@ -21,8 +21,10 @@ object RussianStrings : AppStrings {
 
     // Dashboard
     override fun dashboardWelcome(name: String) = "ДОБРО ПОЖАЛОВАТЬ, $name"
-    override val dashboardServers      = "ДОСТУПНЫЕ СЕРВЕРЫ"
-    override val dashboardServersEmpty = "Серверы не найдены"
+    override val dashboardServers              = "ДОСТУПНЫЕ СЕРВЕРЫ"
+    override val dashboardServersEmpty         = "Серверы не найдены"
+    override val dashboardLoginRequiredTitle   = "Войдите, чтобы увидеть серверы"
+    override val dashboardLoginRequiredHint    = "Воспользуйтесь панелью справа. Список серверов на SMARTYcraft скрыт за авторизацией."
 
     // Launch Control
     override val launchReady       = "Готов к игре"
