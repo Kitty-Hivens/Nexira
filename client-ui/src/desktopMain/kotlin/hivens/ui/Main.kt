@@ -138,6 +138,14 @@ private fun setLinuxXToolkitAppClassName(name: String) {
 
 @OptIn(ExperimentalResourceApi::class, DelicateCoroutinesApi::class)
 fun main() {
+    // Resolve logs dir BEFORE any LoggerFactory.getLogger() call so logback.xml
+    // (which reads `${aura.logs.dir}` for its rolling-file appenders) sees the
+    // platform-correct path on its very first init. The first getLogger we
+    // could hit is inside setLinuxXToolkitAppClassName.onFailure below — set
+    // the property before that to keep logback's classpath scan clean.
+    val paths = PlatformPaths.system()
+    System.setProperty("aura.logs.dir", paths.logsDir.toString())
+
     System.setProperty("jna.nosys", "true")
     System.setProperty("skiko.fps.limit", "60")
     // X11 WM_CLASS = "AuraLauncher". -Dawt.appClassName covers JBR; for stock
@@ -145,7 +153,6 @@ fun main() {
     // first window is created. See jvmArgs in client-ui/build.gradle.kts.
     setLinuxXToolkitAppClassName(Branding.WM_CLASS)
 
-    val paths = PlatformPaths.system()
     java.nio.file.Files.createDirectories(paths.dataDir)
     CrashReporter.paths = paths
 

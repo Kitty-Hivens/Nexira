@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    ─── Pulse — central logging configuration ────────────────────────────────
+
+    LOGS_DIR resolves from the system property `aura.logs.dir` set in
+    `hivens.ui.MainKt` BEFORE the first LoggerFactory.getLogger() call.
+    The property value comes from PlatformPaths.logsDir, so AURA_DATA_DIR
+    override and per-OS data-dir layout flow through automatically.
+
+    Falls back to CWD-relative `logs/` if the property is missing —
+    happens only when something logs before Main.main() ran (i.e. inside
+    a unit test that's somehow pulled the UI module's logback.xml; not
+    expected, but the fallback prevents NPEs).
+
+    Channel layout:
+      - launcher.log  — root, everything except routed channels
+      - network.log   — io.ktor.* / okhttp3.* / hivens.core.api.* /
+                        hivens.launcher.update.*
+      - game.log      — child Minecraft JVM stdout/stderr
+                        (ProcessLogHandler logs into hivens.launcher.game)
+      - crash.log     — ERROR-only, ALL channels, slow rotation
+                        (so crash forensics survive 30 days even if
+                        active logs roll faster)
+
+    MDC keys reserved for future Step-2: sessionId / launchId. The pattern
+    already prints them — current code just doesn't put them yet.
+-->
+<configuration scan="false" packagingData="false">
+
+    <property name="LOGS_DIR" value="${aura.logs.dir:-logs}"/>
+
+    <property name="PATTERN_FILE"
+              value="%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%X{sessionId:-}/%X{launchId:-}] %logger{36} - %msg%n%ex"/>
+    <property name="PATTERN_CONSOLE"
+              value="%d{HH:mm:ss.SSS} %-5level %logger{36} - %msg%n%ex"/>
+
+    <!-- ── Console — kept for `gradle run` / IDE dev workflow. -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${PATTERN_CONSOLE}</pattern>
+        </encoder>
+    </appender>
+
+    <!-- ── launcher.log — root catch-all. -->
+    <appender name="LAUNCHER_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOGS_DIR}/launcher.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOGS_DIR}/launcher-%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <maxFileSize>10MB</maxFileSize>
+            <maxHistory>14</maxHistory>
+            <totalSizeCap>200MB</totalSizeCap>
+        </rollingPolicy>
+        <encoder>
+            <pattern>${PATTERN_FILE}</pattern>
+        </encoder>
+    </appender>
+
+    <!-- ── network.log — HTTP / auth / update plumbing. -->
+    <appender name="NETWORK_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOGS_DIR}/network.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOGS_DIR}/network-%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <maxFileSize>10MB</maxFileSize>
+            <maxHistory>7</maxHistory>
+            <totalSizeCap>100MB</totalSizeCap>
+        </rollingPolicy>
+        <encoder>
+            <pattern>${PATTERN_FILE}</pattern>
+        </encoder>
+    </appender>
+
+    <!-- ── game.log — child Minecraft JVM stdout/stderr. -->
+    <appender name="GAME_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOGS_DIR}/game.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOGS_DIR}/game-%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <maxFileSize>20MB</maxFileSize>
+            <maxHistory>7</maxHistory>
+            <totalSizeCap>200MB</totalSizeCap>
+        </rollingPolicy>
+        <encoder>
+            <!-- Game lines already carry their own log4j-style prefix; add only
+                 a thin timestamp so the file stays readable without doubling. -->
+            <pattern>%d{HH:mm:ss.SSS} %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- ── crash.log — ERROR-only across the board, slow rotation. -->
+    <appender name="CRASH_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOGS_DIR}/crash.log</file>
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>ERROR</level>
+        </filter>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOGS_DIR}/crash-%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <maxFileSize>5MB</maxFileSize>
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>50MB</totalSizeCap>
+        </rollingPolicy>
+        <encoder>
+            <pattern>${PATTERN_FILE}</pattern>
+        </encoder>
+    </appender>
+
+    <!-- ── Channel routing ──────────────────────────────────────────────── -->
+
+    <!-- Network noise from third-party libraries: file only (no console flood). -->
+    <logger name="io.ktor"   level="INFO" additivity="false">
+        <appender-ref ref="NETWORK_FILE"/>
+        <appender-ref ref="CRASH_FILE"/>
+    </logger>
+    <logger name="okhttp3"   level="INFO" additivity="false">
+        <appender-ref ref="NETWORK_FILE"/>
+        <appender-ref ref="CRASH_FILE"/>
+    </logger>
+
+    <!-- Our own network-side code: console + network.log + crash.log. -->
+    <logger name="hivens.core.api"        level="INFO" additivity="false">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="NETWORK_FILE"/>
+        <appender-ref ref="CRASH_FILE"/>
+    </logger>
+    <logger name="hivens.launcher.update" level="INFO" additivity="false">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="NETWORK_FILE"/>
+        <appender-ref ref="CRASH_FILE"/>
+    </logger>
+
+    <!-- Game stdout/stderr stream from ProcessLogHandler. -->
+    <logger name="hivens.launcher.game" level="INFO" additivity="false">
+        <appender-ref ref="GAME_FILE"/>
+    </logger>
+
+    <!-- Everything else: console + launcher.log + crash.log. -->
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="LAUNCHER_FILE"/>
+        <appender-ref ref="CRASH_FILE"/>
+    </root>
+</configuration>
