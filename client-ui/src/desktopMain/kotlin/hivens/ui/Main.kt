@@ -105,6 +105,28 @@ sealed class Screen {
 // ─── Entry Point ─────────────────────────────────────────────────────────────
 
 /**
+ * Single startup line summarising which AWT toolkit JBR/JDK picked and what
+ * Linux display-server environment we're in. The Wayland-Native investigation
+ * (docs/dev/wayland-investigation.md) needs every log we get back from a real
+ * user to triangulate the toolkit-vs-session matrix; this line makes it
+ * trivial to grep across `launcher.log` files attached to bundles.
+ *
+ * Always-on (not gated by AURA_WAYLAND_TRIAL) — the diagnostic value applies
+ * to every Linux user, not just trial participants.
+ */
+private fun logToolkitAndSession() {
+    if (!System.getProperty("os.name").lowercase().contains("linux")) return
+    val toolkit = runCatching { java.awt.Toolkit.getDefaultToolkit().javaClass.name }
+        .getOrElse { "<unavailable: ${it.javaClass.simpleName}>" }
+    fun env(k: String) = System.getenv(k) ?: "<unset>"
+    LoggerFactory.getLogger("Main").info(
+        "Display: toolkit={} XDG_SESSION_TYPE={} XDG_CURRENT_DESKTOP={} WAYLAND_DISPLAY={} DISPLAY={}",
+        toolkit, env("XDG_SESSION_TYPE"), env("XDG_CURRENT_DESKTOP"),
+        env("WAYLAND_DISPLAY"), env("DISPLAY"),
+    )
+}
+
+/**
  * Force the X11 toolkit's app class name so the WM_CLASS hint on every window
  * we create matches `StartupWMClass=` in the .desktop entry.
  *
@@ -166,6 +188,12 @@ fun main() {
     // OpenJDK we reflect into sun.awt.X11.XToolkit.awtAppClassName before the
     // first window is created. See jvmArgs in client-ui/build.gradle.kts.
     setLinuxXToolkitAppClassName(Branding.WM_CLASS)
+
+    // Capture toolkit + session-type as soon as the toolkit has been triggered
+    // by setLinuxXToolkitAppClassName above. One INFO line per launch — gives
+    // every user-attached `launcher.log` enough context to slot into the
+    // Wayland-Native investigation matrix.
+    logToolkitAndSession()
 
     java.nio.file.Files.createDirectories(paths.dataDir)
     CrashReporter.paths = paths
