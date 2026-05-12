@@ -161,6 +161,9 @@ interface AppStrings {
     val settingsSectionDiagnostics: String
     val settingsOpenLogs: String
     val settingsOpenCrashReports: String
+    /** Beacon: bundles crash reports + redacted logs + system info into one ZIP. */
+    val settingsCreateDiagnosticBundle: String
+    val settingsDiagnosticBundleHint: String
 
     // --- File Manager ---
     fun fileDownloading(n: Int): String

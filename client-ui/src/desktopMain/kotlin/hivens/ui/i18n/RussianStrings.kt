@@ -153,9 +153,11 @@ object RussianStrings : AppStrings {
     override val trayExit     = "Выход"
 
     // Settings: Diagnostics
-    override val settingsSectionDiagnostics = "Диагностика"
-    override val settingsOpenLogs           = "Открыть логи"
-    override val settingsOpenCrashReports   = "Отчёты о сбоях"
+    override val settingsSectionDiagnostics      = "Диагностика"
+    override val settingsOpenLogs                = "Открыть логи"
+    override val settingsOpenCrashReports        = "Отчёты о сбоях"
+    override val settingsCreateDiagnosticBundle  = "Собрать диагностический пакет"
+    override val settingsDiagnosticBundleHint    = "Соберёт в один ZIP redact'нутые логи, отчёты о сбоях, историю действий и сведения о системе — отправлять в поддержку."
 
     // File Manager
     override fun fileDownloading(n: Int) = "Загрузка обновлений ($n файлов)..."

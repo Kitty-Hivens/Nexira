@@ -1,6 +1,7 @@
 package hivens.launcher
 
 import hivens.config.Branding
+import hivens.core.diag.ActionRing
 import hivens.launcher.platform.PlatformPaths
 import java.awt.Desktop
 import java.awt.Toolkit
@@ -15,6 +16,8 @@ object CrashReporter {
 
     private val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH-mm-ss")
         .withZone(ZoneId.systemDefault())
+    private val entryTimeFmt = DateTimeFormatter.ofPattern("HH:mm:ss.SSS")
+        .withZone(ZoneId.systemDefault())
 
     /**
      * Resolved at process start by [hivens.ui.MainKt]. Default to the system-derived
@@ -22,9 +25,6 @@ object CrashReporter {
      */
     @Volatile
     var paths: PlatformPaths = PlatformPaths.system()
-
-    @Volatile
-    var lastAction: String? = null
 
     data class CrashReport(
         val timestamp: String,
@@ -35,7 +35,8 @@ object CrashReporter {
         val jvmVersion: String,
         val jvmVendor: String,
         val maxMemoryMb: Long,
-        val lastAction: String?,
+        /** Snapshot of [ActionRing] at crash time, oldest-first. */
+        val actions: List<ActionRing.Entry>,
         val thread: String,
         val stackTrace: String
     )
@@ -51,7 +52,7 @@ object CrashReporter {
             jvmVersion = System.getProperty("java.version"),
             jvmVendor = System.getProperty("java.vendor"),
             maxMemoryMb = rt.maxMemory() / 1_000_000,
-            lastAction = lastAction,
+            actions = ActionRing.snapshot(),
             thread = thread.name,
             stackTrace = throwable.stackTraceToString()
         )
@@ -74,7 +75,15 @@ object CrashReporter {
             appendLine(" Java      : ${report.jvmVersion} (${report.jvmVendor})")
             appendLine(" Max RAM   : ${report.maxMemoryMb} MB")
             appendLine(" Thread    : ${report.thread}")
-            appendLine(" Last action: ${report.lastAction ?: "Unknown"}")
+            appendLine()
+            appendLine(" Recent actions (oldest first):")
+            if (report.actions.isEmpty()) {
+                appendLine("   (none recorded)")
+            } else {
+                report.actions.forEach { entry ->
+                    appendLine("   [${entryTimeFmt.format(entry.timestamp)}] ${entry.text}")
+                }
+            }
             appendLine()
             appendLine(" Stack Trace:")
             appendLine(report.stackTrace)
