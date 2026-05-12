@@ -59,7 +59,6 @@ object TrayManager {
     val canBeReady: Boolean get() = state == State.INITIALIZING || state == State.READY
 
     data class Strings(
-        val tooltip: String,
         val statusIdle: String,
         val statusRunning: String,
         val show: String,
@@ -91,7 +90,10 @@ object TrayManager {
                 return
             }
             tray = t
-            t.setTooltip(strings.tooltip)
+            // No setTooltip(): dorkbox itself warns tooltips are inconsistent
+            // across platforms (KDE/AppIndicator ignores the value entirely
+            // and shows the library's own class name "SystemTray"). The
+            // .desktop StartupWMClass + window title carry identity better.
             t.setImage(iconStream)
             buildMenu(t.menu, strings)
             state = State.READY

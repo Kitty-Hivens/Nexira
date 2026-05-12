@@ -256,7 +256,6 @@ fun main() {
                         TrayManager.init(
                             iconStream = iconBytes.inputStream(),
                             strings    = TrayManager.Strings(
-                                tooltip       = "${Branding.TITLE} v${Branding.VERSION.removePrefix("v")}",
                                 statusIdle    = s.trayStatusIdle,
                                 statusRunning = s.trayStatusRunning,
                                 show          = s.trayShow,
@@ -272,7 +271,6 @@ fun main() {
                             TrayManager.init(
                                 iconStream = iconBytes.inputStream(),
                                 strings    = TrayManager.Strings(
-                                    tooltip       = Branding.TITLE,
                                     statusIdle    = s.trayStatusIdle,
                                     statusRunning = s.trayStatusRunning,
                                     show          = s.trayShow,
