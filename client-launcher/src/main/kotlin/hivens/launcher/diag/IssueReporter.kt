@@ -35,7 +35,11 @@ object IssueReporter {
 
     /** URL that opens a new Issue pre-filled with the crash report. */
     fun crashIssueUrl(report: CrashReporter.CrashReport): String {
-        val title = "[crash] ${report.thread}: ${report.stackTrace.lineSequence().firstOrNull().orEmpty().take(120)}"
+        // Title also goes through Redactor: it ends up in the GET URL, which
+        // means browser history / corporate proxy logs / GitHub request logs
+        // would all see it raw. Body redaction alone isn't enough.
+        val rawTitle = "[crash] ${report.thread}: ${report.stackTrace.lineSequence().firstOrNull().orEmpty().take(120)}"
+        val title = Redactor.redact(rawTitle)
         val body = buildCrashBody(report)
         return buildUrl(title = title, body = body, labels = "crash,auto-report")
     }
