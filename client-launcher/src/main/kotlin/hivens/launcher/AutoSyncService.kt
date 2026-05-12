@@ -5,6 +5,7 @@ import hivens.core.api.interfaces.IFileDownloadService
 import hivens.core.api.interfaces.IManifestProcessorService
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.SessionData
+import hivens.core.diag.ActionRing
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -85,6 +86,7 @@ class AutoSyncService(
         val pass = creds?.cachedPassword
         if (creds == null || pass.isNullOrBlank()) {
             log.info("Auto-sync skipped: no cached credentials")
+            ActionRing.record("Auto-sync skipped: no cached credentials")
             _overallState.value = OverallState.Done(succeeded = 0, failed = 0, skipped = allServers.size)
             return
         }
@@ -94,9 +96,12 @@ class AutoSyncService(
 
         if (installed.isEmpty()) {
             log.info("Auto-sync skipped: no installed servers")
+            ActionRing.record("Auto-sync skipped: no installed servers")
             _overallState.value = OverallState.Done(succeeded = 0, failed = 0, skipped = skippedCount)
             return
         }
+
+        ActionRing.record("Auto-sync started: ${installed.size} server(s) queued (${installed.joinToString { it.assetDir }})")
 
         // Mark everyone QUEUED upfront so the dashboard can show the queue ordering.
         _serverStates.value = installed.associate { it.assetDir to ServerState.QUEUED }
@@ -151,6 +156,7 @@ class AutoSyncService(
 
         _overallState.value = OverallState.Done(succeeded = succeeded, failed = failed, skipped = skippedCount)
         log.info("Auto-sync complete: {} succeeded, {} failed, {} skipped", succeeded, failed, skippedCount)
+        ActionRing.record("Auto-sync complete: $succeeded ok / $failed failed / $skippedCount skipped")
     }
 
     /**

@@ -358,7 +358,10 @@ fun main() {
                                 )
                                 controller.launch(session, server)
                                 SwingUtilities.invokeLater { GameConsoleService.show() }
-                            } catch (_: Exception) {
+                            } catch (e: Exception) {
+                                LoggerFactory.getLogger("Main").warn(
+                                    "Tray-launched login failed for ${server.assetDir}", e
+                                )
                                 SwingUtilities.invokeLater { isWindowVisible = true }
                             }
                         } else {
@@ -550,18 +553,28 @@ fun AppRoot(
                         AppState.Authenticated(session)
                     } catch (e: AuthException) {
                         if (e.isSslError) {
+                            hivens.core.diag.ActionRing.record("SSL bypass auto-enabled on cached-credential auto-login (cert error)")
                             NetworkState.sslBypassEnabled = true
                             try {
                                 val server  = profileManager.lastServerId ?: Protocol.DEFAULT_SERVER_ID
                                 val session = insecureAuthService.login(saved.playerName, saved.cachedPassword!!, server)
                                 AppState.Authenticated(session)
-                            } catch (_: Exception) {
+                            } catch (e2: Exception) {
+                                LoggerFactory.getLogger("Main").warn(
+                                    "Auto-login with cached credentials failed after SSL bypass", e2
+                                )
                                 AppState.Unauthenticated
                             }
                         } else {
+                            LoggerFactory.getLogger("Main").warn(
+                                "Cached-credential auto-login failed (non-SSL)", e
+                            )
                             AppState.Unauthenticated
                         }
-                    } catch (_: Exception) {
+                    } catch (e: Exception) {
+                        LoggerFactory.getLogger("Main").warn(
+                            "Cached-credential auto-login failed with non-Auth exception", e
+                        )
                         AppState.Unauthenticated
                     }
                 }
