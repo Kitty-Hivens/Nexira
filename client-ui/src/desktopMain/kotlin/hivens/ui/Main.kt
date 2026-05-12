@@ -270,7 +270,8 @@ fun main() {
                                 servers       = s.trayServers,
                                 noServers     = s.trayNoServers,
                                 exit          = s.trayExit
-                            )
+                            ),
+                            appName    = Branding.TITLE
                         )
                     } catch (_: Exception) {
                         runCatching {
@@ -285,7 +286,8 @@ fun main() {
                                     servers       = s.trayServers,
                                     noServers     = s.trayNoServers,
                                     exit          = s.trayExit
-                                )
+                                ),
+                                appName    = Branding.TITLE
                             )
                         }
                     }
