@@ -75,8 +75,9 @@ class JavaManagerService(
                     throw IOException("Loading error: ${httpResponse.status}")
                 }
                 val channel = httpResponse.bodyAsChannel()
-                val fileStream = FileOutputStream(archive.toFile())
-                channel.copyTo(fileStream)
+                FileOutputStream(archive.toFile()).use { fileStream ->
+                    channel.copyTo(fileStream)
+                }
             }
 
             log.info("Unpacking to $targetDir")
