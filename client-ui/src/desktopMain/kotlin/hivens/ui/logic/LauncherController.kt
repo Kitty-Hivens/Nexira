@@ -6,7 +6,6 @@ import hivens.core.data.LauncherLogType
 import hivens.core.data.SessionData
 import hivens.launcher.CrashReporter
 import hivens.launcher.CredentialsManager
-import hivens.launcher.JavaManagerService
 import hivens.launcher.ManifestCache
 import hivens.launcher.ProfileManager
 import hivens.ui.easter.AprilFoolsProgress
@@ -28,7 +27,7 @@ class LauncherController : KoinComponent {
     private val credentialsManager: CredentialsManager by inject()
     private val settingsService: ISettingsService by inject()
     private val downloadService: IFileDownloadService by inject()
-    private val javaManagerService: JavaManagerService by inject()
+    private val javaManagerService: IJavaManager by inject()
     private val launcherService: ILauncherService by inject()
     private val manifestProcessor: IManifestProcessorService by inject()
     private val manifestCache: ManifestCache by inject()
