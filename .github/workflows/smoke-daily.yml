@@ -1,0 +1,57 @@
+name: Smoke (daily)
+
+# ── Daily live-smoke probe against real smartycraft.ru ──────────────────────
+#
+# Distinct from the release-time smoke (which gates artefact assembly): this
+# one fires on its own schedule so we learn about upstream protocol drift
+# *before* we sit down to cut a release. Failure → workflow shows red on the
+# repo Actions tab and GitHub mobile sends the standard workflow-failure
+# notification. No extra wiring needed.
+#
+# Cron is 06:00 UTC = 09:00 MSK — early enough that we see the result over
+# morning coffee, late enough that any overnight upstream maintenance is
+# usually wrapped up.
+#
+# `workflow_dispatch` exposed so you can also fire it manually from the
+# Actions UI any time you want a sanity check (e.g. "did Серафим silently
+# rotate something this afternoon?").
+
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+# Two daily probes overlapping (manual run while cron is mid-flight, or a
+# rerun-on-failure landing on top of the next scheduled run) would just
+# waste the test account's session — serialize them.
+concurrency:
+  group: smoke-daily
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    name: Live Smoke (smartycraft.ru)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: jetbrains
+          java-version: '25'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run live smoke against real upstream
+        env:
+          SMARTY_TEST_USER: ${{ secrets.SMARTY_TEST_USER }}
+          SMARTY_TEST_PASS: ${{ secrets.SMARTY_TEST_PASS }}
+        run: ./gradlew :client-launcher:smokeTest
+
+      - name: Upload smoke report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-report-${{ github.run_id }}
+          path: client-launcher/build/reports/tests/smokeTest/
