@@ -205,7 +205,25 @@ compose.desktop {
             "--enable-native-access=ALL-UNNAMED",
 
             // prevent JNA native lib version conflict
-            "-Djna.nosys=true"
+            "-Djna.nosys=true",
+
+            // ── Wayland-Native trial flag ─────────────────────────────────
+            //
+            // Force JBR's WLToolkit instead of XToolkit when AURA_WAYLAND_TRIAL=1
+            // is set in the build environment. JBR 25 ships sun.awt.wl.WLToolkit
+            // but defaults to XToolkit even on Wayland sessions; we have to opt in
+            // explicitly. Trial-only because the toolkit-aware fallback paths
+            // (WM_CLASS, raise pulse, jlink jetbrains.api module) are not yet in
+            // place — see docs/dev/wayland-investigation.md for the chunk plan.
+            //
+            // `providers.environmentVariable(...).orNull` is configuration-cache
+            // safe (vs. raw System.getenv); evaluation deferred to the proper
+            // gradle stage.
+            *(if (providers.environmentVariable("AURA_WAYLAND_TRIAL").orNull == "1") {
+                arrayOf("-Dawt.toolkit.name=WLToolkit")
+            } else {
+                emptyArray()
+            })
         )
     }
 }
