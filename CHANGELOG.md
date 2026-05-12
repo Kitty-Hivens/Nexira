@@ -11,6 +11,176 @@ below are for the GitHub release page and CHANGELOG readers.
 
 ## [Unreleased]
 
+## [2.2.11] - 2026-05-12
+
+Infrastructure-heavy release focused on debuggability when something goes
+wrong: a proper logging pipeline (Pulse), a one-click diagnostic bundle
+(Beacon), the actual fix for the KDE/GNOME tray hover-title bug, and a
+better unauthenticated dashboard state. Plus three audit-driven fixes
+that catch regressions before users see them.
+
+### Highlights
+- **Centralised logging pipeline** (Pulse): launcher now writes
+  structured rolling log files to the platform-correct data directory
+  — `launcher.log`, `network.log`, `game.log` and `crash.log`, each
+  with size + age caps. Game stdout/stderr persists automatically (no
+  more "I forgot to save the console before the crash"). Crash forensics
+  survive 30 days in `crash.log` even when active logs roll faster.
+- **Per-launch tagging in logs**: every line carries
+  `[sessionId/launchId]` — shipping a 200 MB log dump for support and
+  needing only the last Play attempt? `grep launchId=abcd1234 *.log`
+  slices to that one launch.
+- **Token / password / UUID redaction** before any log line hits disk
+  or the in-app console — screenshots and copy-pastes from the console
+  for support are safe to share without manually scrubbing the
+  `accessToken=...` lines.
+- **One-click diagnostic bundle** (Beacon): Settings → Diagnostics →
+  "Create diagnostic bundle" → ZIP with system info, the action history
+  ring, all redacted log files, and every crash report — open the
+  containing folder so you can attach the file to a support message
+  in one motion.
+- **"Report on GitHub" buttons** on the crash dialog and next to the
+  diagnostic-bundle button — opens a browser at a pre-filled
+  `github.com/issues/new` URL with the crash report (or a body asking
+  you to drag-attach the bundle ZIP) already in the editor. Nothing
+  leaves your machine until you review and click Submit on github.com;
+  the launcher itself never POSTs anything. Designed as the principled
+  alternative to telemetry — convenient for both sides without a
+  phone-home codepath in the binary.
+- **Action history ring buffer** behind the scenes: the last 64
+  user/lifecycle events with timestamps. Replaces the old
+  `lastAction = "..."` (one global string, only ever the most recent
+  thing). Crash reports now include the full trail leading up to the
+  crash, not just the last entry.
+- **KDE/GNOME tray hover now actually says "Aura Launcher"** instead
+  of "SystemTray". The previous tooltip-removal in 2.2.10 didn't fix
+  the underlying cause — AppIndicator's hover text comes from the
+  constructor argument to `SystemTray.get()`, not from `setTooltip()`.
+- **Sign-in screen no longer shows a vacant spinning indicator**:
+  when the launcher is waiting on user login, the main panel now
+  shows an explicit "Sign in to see servers" message with a hint
+  pointing at the right-side login form. Previously, both the brief
+  startup-loading state AND the stable unauthenticated state rendered
+  the same tiny spinner, making it look like servers were forever
+  trying to load.
+
+### Added
+- `client-ui/src/desktopMain/resources/logback.xml` — central logging
+  config with four rolling-file appenders. Output dir resolves from
+  the `aura.logs.dir` system property set in `Main.main()` before the
+  first `LoggerFactory.getLogger()` call. `AURA_DATA_DIR` override and
+  per-OS data-dir layout flow through automatically.
+- `kotlinx-coroutines-slf4j` dependency for `MDCContext`. Used in
+  `LauncherController.launch()` so the per-launch `launchId` propagates
+  through every coroutine dispatcher hop downstream (FileDownloadService,
+  LauncherService, etc.) without each component having to set MDC itself.
+- `hivens.core.logging.Redactor`: pure-function redactor masking
+  `accessToken` / `password` / `Bearer` / `sessionToken` / `refreshToken` /
+  `authToken` / `apiToken` / 8-4-4-4-12 UUIDs. 10 unit tests cover
+  idempotency, case-insensitivity, multi-value lines, no-op on clean text.
+- `hivens.ui.logging.RedactingMessageConverter` — custom logback `%rmsg`
+  conversion word that replaces every appender's `%msg` so disk never
+  carries raw credentials, even momentarily.
+- `hivens.core.diag.ActionRing`: thread-safe bounded ring buffer of the
+  last 64 user/lifecycle events. 5 unit tests cover ordering, capacity,
+  timestamps, snapshot defensive-copy, mostRecent.
+- `hivens.launcher.diag.DiagnosticBundle` — ZIP packager for support
+  bundles. Routes log file contents through `Redactor` a second time as
+  defence-in-depth.
+- `hivens.launcher.diag.IssueReporter` — pure URL builder for the
+  GitHub-Issue "report" buttons. Body capped at 6000 chars raw (URL-
+  encoded grows ~3x for non-ASCII), keeping total URL under any
+  reasonable browser cap. Stack traces truncated to 3000 chars;
+  ActionRing snapshot truncated to last 20 entries; everything routed
+  through `Redactor` so accessTokens / UUIDs in stack-trace URL params
+  never reach the github.com tab. 9 unit tests cover URL prefix, query
+  param presence, body content inclusion, redaction, length cap,
+  determinism.
+- `Branding.REPO_SLUG` / `REPO_URL` / `ISSUE_NEW_URL` constants —
+  centralised so a fork doesn't grep for hard-coded URLs across the UI.
+- "Create diagnostic bundle" + "Report on GitHub with bundle" buttons
+  under Settings → Diagnostics, plus i18n keys (EN / RU / DE):
+  `settingsCreateDiagnosticBundle`, `settingsDiagnosticBundleHint`,
+  `settingsReportOnGithub`. The Report-on-GitHub button is disabled
+  until a bundle exists in this session, then copies the ZIP path to
+  the clipboard and opens the pre-filled Issue editor.
+- "Report on GitHub" added as the first option on the crash dialog
+  (next to Copy report / Open folder / Close).
+- Regex toggle (`.*`) in the in-app `ConsoleWindow` search bar. Tinted
+  green when the pattern parses, red while invalid, grey when off.
+  Failed compile collapses to "match nothing" rather than crashing.
+- `IJavaManager` interface in `client-core/api/interfaces/` — abstracts
+  the managed-Java runtime contract so tests can substitute a fake
+  without configuring the mockk inline-mock-agent.
+- `LaunchPipelineIntegrationTest`: 5 cases driving auth via MockEngine
+  through the real `ManifestProcessorService` → `ClasspathProvider` →
+  `GameCommandBuilder` chain on a tmpdir client root. Catches
+  orchestration regressions (auth shape changes, manifest format drift,
+  version → mainClass mapping, profile-vs-allocated memory interaction)
+  the per-component unit tests miss.
+- 5 new `LauncherServiceTest` cases covering the `resolveJavaPath`
+  priority cascade with a fake `IJavaManager`.
+- Login-required placeholder + i18n keys
+  (`dashboardLoginRequiredTitle` / `dashboardLoginRequiredHint`) for
+  EN / RU / DE.
+
+### Changed
+- `LauncherService.resolveJavaPath` lifted into the internal companion
+  (was an instance method) taking `IJavaManager` as parameter — same
+  pattern as the existing `normalizeMemory`. Production behaviour
+  unchanged.
+- `LauncherController` now injects `IJavaManager` (interface) instead
+  of `JavaManagerService` (concrete) — matches the DI binding registered
+  in `Modules.kt`. Without this fix, the controller would have failed
+  with `NoBeanDefFoundException` on the first Play click after the
+  IJavaManager extraction.
+- `ProcessLogHandler` writes game stdout/stderr through the
+  `hivens.launcher.game` SLF4J channel (routed to `game.log` by Pulse).
+  Previously called `println` / `System.err.println` which polluted the
+  launcher's own stdout without persisting anywhere durable.
+- `CrashReporter.lastAction` (one global mutable string) replaced by
+  `ActionRing.snapshot()`. Crash reports now print the action history
+  trail instead of a single line.
+- Multiple `catch (_: Exception) {}` silent failures across UI code
+  (news fetch, link Desktop.browse, tray-launched login, cached-
+  credential auto-login, JSON decode fallback, per-session log file
+  open, console mirror write) replaced with explicit `log.warn(...)` /
+  `log.debug(...)`. Means the new log files actually carry signal.
+- `AutoSyncService` records start (with installed server list),
+  skip-no-creds, skip-no-installed, and complete (succeeded/failed/skipped
+  counts) into `ActionRing` so the diagnostic bundle reflects what the
+  launcher was doing.
+- Login attempt + result, SSL bypass acceptance also recorded into
+  `ActionRing` for the same reason.
+
+### Fixed
+- KDE/GNOME tray hover text was permanently "SystemTray" because
+  dorkbox's `SystemTray.get()` no-arg overload defaults the
+  AppIndicator title (set via `app_indicator_set_title()`) to the
+  literal `"SystemTray"`. The previous attempt at fixing this
+  (dropping `setTooltip()` in 2.2.10) was based on the wrong assumption
+  that KDE would fall back to the `.desktop` `StartupWMClass` —
+  AppIndicator does not. Real fix: pass `Branding.TITLE` to
+  `SystemTray.get(name)`.
+- Resource leak in `JavaManagerService.downloadAndUnpack`:
+  `FileOutputStream(archive.toFile())` was never closed, so on Windows
+  the subsequent `Files.deleteIfExists(archive)` in the `finally`
+  block silently failed (returned `false`) and the JDK installer
+  payload accumulated in `%TEMP%` between Java-runtime downloads.
+  Fixed with `.use { }`.
+- Resource leak in `ProcessLogHandler.pipeOutput`:
+  `BufferedReader(InputStreamReader(stream))` stayed referenced until
+  the GC reclaimed the daemon thread. Fixed with `.use { }` plus a
+  switch to `lineSequence().forEach` for the modern idiom.
+- 19 unused i18n keys removed across `AppStrings` + the three locale
+  implementations: `appVersion`, `loginSuccess`, `loginLoading`,
+  `navHome`, `navProfile`, `navSettings`, `navConsole`, `dashboardNews`,
+  `settingsSeasonEffect`, `settingsSeasonEffectSub`, `newsLoading`,
+  `newsNoImage`, `serverDetailLoading`, `serverDetailMissingBody`,
+  `trayShowHide`, `fileCheckIntegrity`, `fileNoUpdates`,
+  `fileClientSetup`, `aboutJvmHeap`. Compile-verified zero references
+  in non-i18n source; cleanup only, no UI change.
+
 ## [2.2.10] - 2026-05-12
 
 UX polish chunk anchored on the new visual JVM Args Builder — a Compose
