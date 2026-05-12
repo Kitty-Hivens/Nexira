@@ -30,31 +30,32 @@ jobs:
   # Resolves the PR that brought HEAD onto stable
   # (`gh pr list --search sha:$GITHUB_SHA`) and asserts at least one of:
   #
-  #   - An APPROVED review (the strict signal — only humans can leave this;
-  #     PR authors cannot self-approve per GitHub policy).
-  #   - A non-author review *of any state* — captures the realistic
-  #     solo-maintainer + Codex case. Codex only ever leaves COMMENTED
-  #     reviews ("If Codex has suggestions, it will comment; otherwise it
-  #     will react with 👍" — Codex docs). The presence of a Codex review
-  #     entry proves the bot processed the diff; absence means Codex hit
-  #     its rate limit and only left a plain comment about the limit, with
-  #     no review entity attached.
+  #   - Strong: APPROVED review by a non-author. Only humans can leave this;
+  #     PR authors cannot self-approve per GitHub policy.
+  #   - Weak (Codex): non-author review *of any state*. Codex only ever
+  #     leaves COMMENTED reviews ("If Codex has suggestions, it will
+  #     comment; otherwise it will react with 👍" — Codex docs). The
+  #     presence of a Codex review entry proves the bot processed the diff.
+  #   - Weak (Qodana): a `github-actions` comment whose body starts with
+  #     `# Qodana`. Qodana posts findings via the comment API, NOT the
+  #     review API, so it never shows in `.reviews[]`. We detect it by
+  #     bot-author + body marker. Qodana is configured `on: pull_request`
+  #     with `post-pr-comment: true`, so this engagement signal is
+  #     independent of Codex availability.
   #
   # Failure modes this catches:
   #   1. Direct/force push to stable bypassing PR (no merging PR for SHA).
-  #   2. PR merged but no reviewer engaged (rate-limited Codex with only a
-  #      "you've hit the limit" comment, or a hurried merge with the bot
-  #      disabled). User's explicit concern in the policy menu — see
-  #      [[no_compromised_release]] memory if it gets written.
-  #   3. Compromised maintainer account opening a PR + immediately self-
-  #      merging without any external eyes — branch protection on stable
-  #      handles the merge attempt; this gate handles any release that
-  #      somehow squeezed through.
+  #   2. PR merged but BOTH Codex AND Qodana failed to engage — both rate-
+  #      limited or both bots disabled. See [[aura-release-protection-model]]
+  #      memory for the why-not-tighter explanation.
+  #   3. Compromised maintainer account opens a PR + self-merges without
+  #      bots wired up. Branch protection on stable handles the merge
+  #      attempt; this gate handles any release that squeezed through.
   #
-  # Trust model honesty: solo-maintainer with bot-only review is NOT
-  # crypto-strong. A subtle malicious diff that Codex doesn't catch will
-  # pass this gate. The gate enforces *engagement happened*, not *engagement
-  # was correct*. Strengthening would require adding a non-bot reviewer.
+  # Trust model honesty: this is two independent bot-signals, neither of
+  # which inspects code semantics rigorously. Two bots saying "ok" still
+  # is not "a competent human reviewed the diff". Strengthening requires
+  # a non-bot APPROVED review.
   #
   # `GH_TOKEN: secrets.GITHUB_TOKEN` has the `pull_requests: read` scope by
   # default. No extra setup needed.
@@ -80,22 +81,33 @@ jobs:
             exit 1
           fi
           echo "Found PR #$PR — checking review engagement..."
-          # Pull author + reviews in one shot so we can correctly exclude self-reviews.
-          PR_JSON=$(gh pr view "$PR" --repo "$GH_REPO" --json author,reviews)
+          # Pull author + reviews + comments in one shot so we can correctly
+          # exclude self-reviews and detect Qodana's comment-API engagement.
+          PR_JSON=$(gh pr view "$PR" --repo "$GH_REPO" --json author,reviews,comments)
           AUTHOR=$(echo "$PR_JSON" | jq -r '.author.login')
           APPROVED=$(echo "$PR_JSON" | jq --arg author "$AUTHOR" \
             '[.reviews[] | select(.state=="APPROVED" and .author.login != $author)] | length')
           ANY_REVIEW=$(echo "$PR_JSON" | jq --arg author "$AUTHOR" \
             '[.reviews[] | select(.author.login != $author)] | length')
+          # Qodana posts as `github-actions[bot]` (login `github-actions`)
+          # via the comment API; body starts with `# Qodana ...`. Anchor on
+          # the markdown header start to avoid matching arbitrary text that
+          # happens to mention Qodana lower in a comment.
+          QODANA=$(echo "$PR_JSON" | jq \
+            '[.comments[] | select(.author.login=="github-actions" and (.body | startswith("# Qodana")))] | length')
           if [ "$APPROVED" -ge 1 ]; then
             echo "::notice title=Review gate::PR #$PR has $APPROVED approving review(s) from non-authors. Gate passes (strong signal)."
             exit 0
           fi
           if [ "$ANY_REVIEW" -ge 1 ]; then
-            echo "::notice title=Review gate::PR #$PR has $ANY_REVIEW non-author review(s) (no APPROVED, but engagement present — typically Codex COMMENTED state). Gate passes (weak signal)."
+            echo "::notice title=Review gate::PR #$PR has $ANY_REVIEW non-author review entry/entries (no APPROVED — typically Codex COMMENTED state). Gate passes (weak signal)."
             exit 0
           fi
-          echo "::error title=Review gate::PR #$PR has zero non-author reviews. Likely cause: Codex hit its rate limit and left only a plain comment without filing a review entity. Either re-trigger Codex (commenting '@codex review' once the limit resets), or get a manual approval before tagging this release."
+          if [ "$QODANA" -ge 1 ]; then
+            echo "::notice title=Review gate::PR #$PR has $QODANA Qodana scan comment(s) from github-actions and no other reviewer engagement. Gate passes (weak signal — Qodana fallback). Codex was likely rate-limited."
+            exit 0
+          fi
+          echo "::error title=Review gate::PR #$PR has zero non-author reviews AND zero Qodana scan comments. Likely cause: BOTH Codex (rate-limited / disabled) AND Qodana (workflow failure / disabled) failed to engage. Investigate before tagging."
           exit 1
 
   # ─────────────────────────────────────────────────────────────────────────
