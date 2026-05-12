@@ -99,16 +99,21 @@ object IssueReporter {
     }
 
     private fun buildBundleBody(bundlePath: Path): String = buildString {
+        // ONLY the file name lands in the URL — never the absolute path. The
+        // absolute path leaks `~/.local/share/...` (Linux) or
+        // `C:\Users\<username>\AppData\...` (Windows) into the GitHub URL,
+        // which becomes part of browser history, proxy logs, GitHub request
+        // logs. The user's clipboard already has the full path (set by the
+        // caller in SettingsScreen.onClick), so they have what they need to
+        // locate the file locally.
+        val bundleName = bundlePath.fileName?.toString() ?: "diagnostic-bundle.zip"
         appendLine("## Описание")
         appendLine("<!-- Опишите проблему. -->")
         appendLine()
         appendLine("## Diagnostic bundle")
         appendLine()
-        appendLine("Diagnostic bundle ZIP сгенерирован и его путь скопирован в буфер обмена:")
-        appendLine()
-        appendLine("```")
-        appendLine(bundlePath.toAbsolutePath().toString())
-        appendLine("```")
+        appendLine("Diagnostic bundle ZIP `$bundleName` создан в data-директории лаунчера, ")
+        appendLine("полный путь скопирован в буфер обмена.")
         appendLine()
         appendLine("**Перетащите этот ZIP в это окно перед отправкой Issue** (GitHub поддерживает drag-and-drop).")
         appendLine("Содержимое: redacted launcher / network / game / crash logs, action ring, system info, crash reports.")

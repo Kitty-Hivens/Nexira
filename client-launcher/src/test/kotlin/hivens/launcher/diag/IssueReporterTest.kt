@@ -88,11 +88,20 @@ class IssueReporterTest {
     }
 
     @Test
-    fun `bundle issue url mentions the bundle path`() {
-        val zip: Path = Paths.get("/tmp/aura-diagnostic-abc12345-2026-05-12.zip")
+    fun `bundle issue url references the bundle FILENAME but not the absolute path`() {
+        // The absolute path leaks home directory / username when the URL is
+        // visited (browser history, proxy logs, GitHub request logs). The
+        // user's clipboard carries the full path locally; the URL only needs
+        // the filename for the "drag the X.zip here" instruction.
+        val zip: Path = Paths.get("/home/haru/.local/share/aura-launcher/aura-diagnostic-abc12345-2026-05-12.zip")
         val body = decodedBody(IssueReporter.bundleIssueUrl(zip))
-        assertTrue(body.contains(zip.toString()),
-            "bundle path must be referenced so the user knows what to drag-attach")
+
+        assertTrue(body.contains("aura-diagnostic-abc12345-2026-05-12.zip"),
+            "bundle filename must appear in body so the user knows what to drag-attach")
+        assertFalse(body.contains("/home/haru"),
+            "absolute path with home dir must NOT appear in URL body — that would leak username/host info")
+        assertFalse(body.contains(".local/share"),
+            "data directory path must NOT appear in URL body")
     }
 
     @Test

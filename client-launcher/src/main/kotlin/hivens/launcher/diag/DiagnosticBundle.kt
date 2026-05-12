@@ -63,13 +63,18 @@ object DiagnosticBundle {
             writeText(zip, "system-info.txt", buildSystemInfo(paths))
             writeText(zip, "action-ring.txt", buildActionRing())
 
-            // Live log files
+            // Live log files. Each file is isolated: a single broken file
+            // (locked, malformed UTF-8, permission denied) MUST NOT abort the
+            // whole bundle — the bundle is the user's last resort for support
+            // and a half-bundle with one missing log is vastly better than
+            // none at all. Failures are recorded as a placeholder entry in
+            // the ZIP so the support reader knows what was missing and why.
             val logsDir = paths.logsDir
             if (Files.exists(logsDir)) {
                 LOG_FILES.forEach { name ->
                     val src = logsDir.resolve(name)
                     if (Files.exists(src)) {
-                        writeText(zip, "logs/$name", Redactor.redact(Files.readString(src)))
+                        copyTextRedacted(zip, "logs/$name", src)
                     }
                 }
             }
@@ -86,7 +91,7 @@ object DiagnosticBundle {
             if (Files.exists(crashDir)) {
                 Files.list(crashDir).use { stream ->
                     stream.filter { Files.isRegularFile(it) }.forEach { f ->
-                        writeText(zip, "crash-reports/${f.fileName}", Redactor.redact(Files.readString(f)))
+                        copyTextRedacted(zip, "crash-reports/${f.fileName}", f)
                     }
                 }
             }
@@ -143,5 +148,22 @@ object DiagnosticBundle {
         zip.putNextEntry(ZipEntry(entryName))
         zip.write(content.toByteArray(Charsets.UTF_8))
         zip.closeEntry()
+    }
+
+    /**
+     * Copy [src] into the ZIP under [entryName], routing the contents through
+     * [Redactor] first. If reading [src] throws (locked file, permission denied,
+     * malformed UTF-8), write a placeholder entry instead of aborting the whole
+     * bundle. The bundle is the user's support last resort — partial is much
+     * better than nothing.
+     */
+    private fun copyTextRedacted(zip: ZipOutputStream, entryName: String, src: Path) {
+        val payload = runCatching { Redactor.redact(Files.readString(src)) }
+            .getOrElse { e ->
+                log.warn("Diagnostic bundle: skipping unreadable {} ({}): {}",
+                    src, e.javaClass.simpleName, e.message)
+                "<unreadable: ${e.javaClass.simpleName}: ${e.message}>"
+            }
+        writeText(zip, entryName, payload)
     }
 }
