@@ -25,11 +25,86 @@ env:
 
 jobs:
   # ─────────────────────────────────────────────────────────────────────────
+  # Review gate — refuses to release HEAD that no reviewer engaged with
+  #
+  # Resolves the PR that brought HEAD onto stable
+  # (`gh pr list --search sha:$GITHUB_SHA`) and asserts at least one of:
+  #
+  #   - An APPROVED review (the strict signal — only humans can leave this;
+  #     PR authors cannot self-approve per GitHub policy).
+  #   - A non-author review *of any state* — captures the realistic
+  #     solo-maintainer + Codex case. Codex only ever leaves COMMENTED
+  #     reviews ("If Codex has suggestions, it will comment; otherwise it
+  #     will react with 👍" — Codex docs). The presence of a Codex review
+  #     entry proves the bot processed the diff; absence means Codex hit
+  #     its rate limit and only left a plain comment about the limit, with
+  #     no review entity attached.
+  #
+  # Failure modes this catches:
+  #   1. Direct/force push to stable bypassing PR (no merging PR for SHA).
+  #   2. PR merged but no reviewer engaged (rate-limited Codex with only a
+  #      "you've hit the limit" comment, or a hurried merge with the bot
+  #      disabled). User's explicit concern in the policy menu — see
+  #      [[no_compromised_release]] memory if it gets written.
+  #   3. Compromised maintainer account opening a PR + immediately self-
+  #      merging without any external eyes — branch protection on stable
+  #      handles the merge attempt; this gate handles any release that
+  #      somehow squeezed through.
+  #
+  # Trust model honesty: solo-maintainer with bot-only review is NOT
+  # crypto-strong. A subtle malicious diff that Codex doesn't catch will
+  # pass this gate. The gate enforces *engagement happened*, not *engagement
+  # was correct*. Strengthening would require adding a non-bot reviewer.
+  #
+  # `GH_TOKEN: secrets.GITHUB_TOKEN` has the `pull_requests: read` scope by
+  # default. No extra setup needed.
+  # ─────────────────────────────────────────────────────────────────────────
+  review-gate:
+    name: Review Gate
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+      contents: read
+    steps:
+      - name: Verify HEAD originates from a reviewed PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_SHA:   ${{ github.sha }}
+          GH_REPO:  ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          echo "Resolving PR for HEAD $GH_SHA on $GH_REPO..."
+          PR=$(gh pr list --repo "$GH_REPO" --state merged --search "sha:$GH_SHA" --json number --jq '.[0].number // empty')
+          if [ -z "$PR" ]; then
+            echo "::error title=Review gate::HEAD ($GH_SHA) is not associated with any merged PR. Refusing to release un-PR-ed commits."
+            exit 1
+          fi
+          echo "Found PR #$PR — checking review engagement..."
+          # Pull author + reviews in one shot so we can correctly exclude self-reviews.
+          PR_JSON=$(gh pr view "$PR" --repo "$GH_REPO" --json author,reviews)
+          AUTHOR=$(echo "$PR_JSON" | jq -r '.author.login')
+          APPROVED=$(echo "$PR_JSON" | jq --arg author "$AUTHOR" \
+            '[.reviews[] | select(.state=="APPROVED" and .author.login != $author)] | length')
+          ANY_REVIEW=$(echo "$PR_JSON" | jq --arg author "$AUTHOR" \
+            '[.reviews[] | select(.author.login != $author)] | length')
+          if [ "$APPROVED" -ge 1 ]; then
+            echo "::notice title=Review gate::PR #$PR has $APPROVED approving review(s) from non-authors. Gate passes (strong signal)."
+            exit 0
+          fi
+          if [ "$ANY_REVIEW" -ge 1 ]; then
+            echo "::notice title=Review gate::PR #$PR has $ANY_REVIEW non-author review(s) (no APPROVED, but engagement present — typically Codex COMMENTED state). Gate passes (weak signal)."
+            exit 0
+          fi
+          echo "::error title=Review gate::PR #$PR has zero non-author reviews. Likely cause: Codex hit its rate limit and left only a plain comment without filing a review entity. Either re-trigger Codex (commenting '@codex review' once the limit resets), or get a manual approval before tagging this release."
+          exit 1
+
+  # ─────────────────────────────────────────────────────────────────────────
   # Tests - must pass BEFORE any build
   # ─────────────────────────────────────────────────────────────────────────
   test:
     name: Run Tests (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    needs: review-gate
     # fail-fast: false — one OS failing shouldn't kill the others; we want
     # to see ALL platform-specific failures in one run, not race-of-the-first.
     # shell: bash so steps work identically on Windows runners (PowerShell's
