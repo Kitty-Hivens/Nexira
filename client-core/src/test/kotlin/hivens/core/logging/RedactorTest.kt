@@ -76,4 +76,30 @@ class RedactorTest {
         assertFalse(redacted.contains("longtoken123"))
         assertTrue(redacted.contains("user=alice"))
     }
+
+    @Test
+    fun `RFC 6750 bearer token covers slashes plus tildes and equals padding`() {
+        // base64-shaped JWT-style token: dot-separated, with `+/=` padding.
+        // Earlier `[A-Za-z0-9._\-]{8,}` regex would have masked only "eyJraWQ"
+        // and left "abc+def/" raw — partial-leak.
+        val token = "eyJraWQ+abc/def~xyz=="
+        val redacted = Redactor.redact("Authorization: Bearer $token next=word")
+
+        assertFalse(redacted.contains("eyJraWQ"),  "head of token leaked")
+        assertFalse(redacted.contains("abc+def"),  "middle of token leaked through `+/` chars")
+        assertFalse(redacted.contains("xyz"),      "tail of token leaked before padding")
+        // Padding may or may not be eaten depending on regex shape — what matters
+        // is that the value-bearing portion is gone.
+        assertTrue(redacted.contains("Bearer"),    "Bearer marker still present")
+        assertTrue(redacted.contains("next=word"), "trailing tokens unrelated to bearer are preserved")
+    }
+
+    @Test
+    fun `accessToken with base64 slash-and-plus characters is fully redacted`() {
+        // JWT-shaped payload as accessToken= value.
+        val redacted = Redactor.redact("accessToken=eyJh.eyJp+xyz/abc=")
+        assertFalse(redacted.contains("eyJh"))
+        assertFalse(redacted.contains("xyz/abc"))
+        assertTrue(redacted.contains("<redacted>"))
+    }
 }
