@@ -191,6 +191,102 @@ Two-step verification before committing to a Wayland-native chunk:
 A test script for step 1+3 lives at `scripts/wayland-probe.sh` (to be
 added alongside this doc).
 
+## ── Trial result — 2026-05-13 (BLOCKED on upstream Skiko) ─────────────────
+
+The Trial AppImage (commit `c70e1d6`, `AURA_WAYLAND_TRIAL=1` baked into
+AppRun) was run on the user's Hyprland Wayland session. Verdict:
+**Wayland-native is currently blocked by Skiko, not by our code.**
+
+### What worked
+
+- `AURA_WAYLAND_TRIAL=1 → -Dawt.toolkit.name=WLToolkit` propagation
+  through `scripts/build-appimage.sh` to AppRun → JBR runtime
+  (fix in PR #135 `efa0d5b`).
+- `logToolkitAndSession()` captured the active toolkit. Confirmed line
+  in `launcher.log`:
+  ```
+  Display: toolkit=sun.awt.wl.WLToolkit XDG_SESSION_TYPE=wayland
+  XDG_CURRENT_DESKTOP=Hyprland WAYLAND_DISPLAY=wayland-1 DISPLAY=:1
+  ```
+- `setLinuxXToolkitAppClassName` failed with the expected
+  `ExceptionInInitializerError` (X11 classes don't initialise on
+  WLToolkit). Logged as WARN, non-fatal — exactly as designed.
+
+### What broke
+
+Crash within ~22s of startup, before the main window paints:
+
+```
+java.lang.IllegalStateException: Can't lock DrawingSurface
+    at org.jetbrains.skiko.DrawingSurface.lock(AWT.kt:35)
+    at org.jetbrains.skiko.AWTKt.useDrawingSurfacePlatformInfo(AWT.kt:12)
+    at org.jetbrains.skiko.HardwareLayer.init(HardwareLayer.kt:24)
+    at org.jetbrains.skiko.SkiaLayer.init(SkiaLayer.awt.kt:372)
+    at org.jetbrains.skiko.SkiaLayer.addNotify(SkiaLayer.awt.kt:257)
+    ...
+    at androidx.compose.ui.window.Application_desktopKt$awaitApplication
+```
+
+Skiko's AWT bridge for surface acquisition is X11-specific. On
+WLToolkit it can't obtain a `DrawingSurface` because the JDK doesn't
+expose a `sun.awt.wl.*` analogue of the X11 GLX surface that
+`useDrawingSurfacePlatformInfo` expects.
+
+### Skiko 0.144.6 inspection (the version pulled by `compose 1.11.0-alpha04`)
+
+`skiko-awt-0.144.6.jar` ships these renderer backends:
+
+| Class | API | Platform target |
+|-------|-----|-----------------|
+| `LinuxOpenGLRedrawer` | OpenGL via GLX | X11 only |
+| `LinuxSoftwareRedrawer` | CPU pixmap | Linux generic |
+| `WindowsOpenGLRedrawer` / `Direct3DRedrawer` / `AngleRedrawer` | GL / D3D11 / ANGLE | Windows |
+| `MetalRedrawer` | Metal | macOS |
+| `SoftwareRedrawer` | CPU | any |
+
+Notably absent: `LinuxVulkanRedrawer`, `LinuxWaylandRedrawer`,
+`WaylandRedrawer`, any `Vulkan*Redrawer`.
+
+`libskiko-linux-x64.so` (the native part) carries `XOpenDisplay`,
+`glXCreateContext`, `glXCreatePbuffer` symbols — and **none** of
+`wl_display`, `wl_compositor`, `xdg_*`, `vkInstance`. There's no
+Wayland surface code path in the native lib at all.
+
+### What this means for Vulkan
+
+User asked whether we could switch the renderer to Vulkan as a
+workaround. Answer: not in this version. Skiko 0.144.6 has no Vulkan
+backend on any platform — `SkikoRenderApi.VULKAN` constant exists in
+the enum but the corresponding redrawer class is not shipped.
+`-Dskiko.renderApi=VULKAN` is forward-looking config that future
+Skiko versions will honour.
+
+### Verdict
+
+The trial demonstrates the path is **architecturally correct** (env
+propagation works, toolkit selection works, our diagnostic infra
+works) but **upstream isn't ready**. Compose Desktop on WLToolkit
+requires Skiko to ship a Wayland surface acquisition path, which
+0.144.x does not.
+
+**Adoption chunk: FROZEN until upstream ships.** All the trial-side
+infrastructure (`AURA_WAYLAND_TRIAL` env, AppRun propagation, startup
+log line, trial CI workflow, investigation doc) stays in place — when
+a future Skiko/Compose bump adds Wayland support, re-firing the trial
+workflow is one click. JetBrains is actively building Compose for
+Linux native, so the wait is more likely measured in Compose minor
+versions than in years.
+
+**Re-trigger criteria:**
+- Skiko 0.145+ ships any class matching `*Wayland*Redrawer` or
+  `LinuxVulkanRedrawer`, OR
+- Compose Desktop changelog mentions Wayland surface support, OR
+- A non-Aura Compose project demonstrably runs on WLToolkit on a
+  pure Wayland session.
+
+When any of these land, re-fire `trial-appimage.yml`, re-test on
+Hyprland, document the new outcome in this section.
+
 ## ── Decision — 2026-05-12 ──────────────────────────────────────────────────
 
 **GO**, with conditions. Probe data above shows the path exists
