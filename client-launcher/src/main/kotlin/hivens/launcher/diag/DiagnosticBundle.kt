@@ -60,7 +60,7 @@ object DiagnosticBundle {
         Files.createDirectories(paths.dataDir)
 
         ZipOutputStream(Files.newOutputStream(output)).use { zip ->
-            writeText(zip, "system-info.txt", buildSystemInfo())
+            writeText(zip, "system-info.txt", buildSystemInfo(paths))
             writeText(zip, "action-ring.txt", buildActionRing())
 
             // Live log files
@@ -96,7 +96,7 @@ object DiagnosticBundle {
         return output
     }
 
-    private fun buildSystemInfo(): String = buildString {
+    private fun buildSystemInfo(paths: PlatformPaths): String = buildString {
         val rt = Runtime.getRuntime()
         appendLine("==============================")
         appendLine(" Aura Launcher diagnostic bundle")
@@ -118,7 +118,12 @@ object DiagnosticBundle {
         appendLine()
         appendLine(" user.home  : ${System.getProperty("user.home")}")
         appendLine(" user.dir   : ${System.getProperty("user.dir")}")
-        appendLine(" data.dir   : ${System.getProperty("aura.logs.dir", "(unset)").substringBeforeLast("/logs", "(unknown)")}")
+        // Path-based, not string-slicing: prior version did
+        // `aura.logs.dir.substringBeforeLast("/logs", "(unknown)")` which fell
+        // back to "(unknown)" on Windows because the path separator is `\`,
+        // dropping a support-critical signal exactly for Windows users.
+        appendLine(" data.dir   : ${paths.dataDir.toAbsolutePath()}")
+        appendLine(" logs.dir   : ${paths.logsDir.toAbsolutePath()}")
     }
 
     private fun buildActionRing(): String = buildString {

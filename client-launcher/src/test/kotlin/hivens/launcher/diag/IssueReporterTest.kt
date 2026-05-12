@@ -121,4 +121,24 @@ class IssueReporterTest {
         val r = fakeCrashReport()
         assertEquals(IssueReporter.crashIssueUrl(r), IssueReporter.crashIssueUrl(r))
     }
+
+    @Test
+    fun `crash issue TITLE is also redacted — tokens in exception messages must not leak via URL parameter`() {
+        // Title is built from the first stack-trace line, which can carry a
+        // sensitive query param (e.g. `accessToken=` in a failed-request
+        // exception). The URL ends up in browser history / proxy logs /
+        // GitHub request logs whether body is scrubbed or not — title needs
+        // the Redactor pass too.
+        val report = fakeCrashReport(
+            stack = "java.io.IOException: GET https://example/auth?accessToken=AAAA1234SECRET returned 500"
+        )
+        val url = IssueReporter.crashIssueUrl(report)
+        val titleParam = url.substringAfter("?").split("&").first { it.startsWith("title=") }.removePrefix("title=")
+        val decodedTitle = URLDecoder.decode(titleParam, Charsets.UTF_8)
+
+        assertFalse(decodedTitle.contains("AAAA1234SECRET"),
+            "raw token must NOT appear in the URL title parameter")
+        assertTrue(decodedTitle.contains("<redacted>"),
+            "redaction marker expected in title where the token was")
+    }
 }
