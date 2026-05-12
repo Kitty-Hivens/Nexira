@@ -59,14 +59,28 @@ mkdir -p \
 # against StartupWMClass=AuraLauncher and pick up the hicolor icon at the
 # correct size. Mirrors client-ui/build.gradle.kts — the fat jar bypasses the
 # Compose-generated launcher script, so its jvmArgs do not flow through here.
-cat > "$APPDIR/AppRun" << 'EOF'
+#
+# Wayland-Native trial: when AURA_WAYLAND_TRIAL=1 is set in the build env,
+# bake `-Dawt.toolkit.name=WLToolkit` into the AppRun so the AppImage runtime
+# selects JBR's native Wayland toolkit instead of XToolkit/XWayland fallback.
+# The gradle-side `compose.desktop.application.jvmArgs` does NOT propagate
+# into AppImage builds (jpackage path is for Win/macOS distributables) — the
+# AppRun script is the only place where flags actually reach runtime.
+WAYLAND_TRIAL_FLAG=""
+if [ "${AURA_WAYLAND_TRIAL:-}" = "1" ]; then
+    WAYLAND_TRIAL_FLAG="-Dawt.toolkit.name=WLToolkit"
+    echo "AppRun: AURA_WAYLAND_TRIAL=1 — baking -Dawt.toolkit.name=WLToolkit"
+fi
+
+cat > "$APPDIR/AppRun" << EOF
 #!/bin/sh
-HERE="$(dirname "$(readlink -f "$0")")"
-exec "$HERE/usr/bin/java" \
-     -Dawt.appClassName=AuraLauncher \
-     --add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED \
-     -jar "$HERE/usr/lib/aura-launcher.jar" \
-     "$@"
+HERE="\$(dirname "\$(readlink -f "\$0")")"
+exec "\$HERE/usr/bin/java" \\
+     -Dawt.appClassName=AuraLauncher \\
+     --add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED \\
+     ${WAYLAND_TRIAL_FLAG} \\
+     -jar "\$HERE/usr/lib/aura-launcher.jar" \\
+     "\$@"
 EOF
 chmod +x "$APPDIR/AppRun"
 
