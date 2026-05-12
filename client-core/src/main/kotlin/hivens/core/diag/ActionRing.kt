@@ -1,10 +1,9 @@
 package hivens.core.diag
 
 import java.time.Instant
-import java.util.concurrent.ConcurrentLinkedDeque
 
 /**
- * Bounded thread-safe ring buffer of the last [capacity] user-visible / lifecycle
+ * Bounded thread-safe ring buffer of the last [CAPACITY] user-visible / lifecycle
  * actions, with timestamps. Replaces the prior single-mutable-string
  * `CrashReporter.lastAction` which only remembered the most recent action and
  * therefore lost the sequence leading up to a crash.
@@ -16,6 +15,14 @@ import java.util.concurrent.ConcurrentLinkedDeque
  *
  * Concurrent reads/writes are safe — actions can be recorded from any thread
  * (UI, IO, game-output piping) without external synchronisation.
+ *
+ * Implementation note: previous version used `ConcurrentLinkedDeque` and
+ * `ring.size > CAPACITY` to trim. JDK documents that deque's `size()` is NOT
+ * a constant-time, accurate snapshot under concurrent modification — racing
+ * `record()` calls could leave the ring above CAPACITY, breaking the bounded
+ * contract. Switched to a plain `ArrayDeque` guarded by a `synchronized`
+ * block. `record` is invoked maybe a few hundred times per process lifetime;
+ * lock contention is irrelevant compared to the correctness gain.
  */
 object ActionRing {
 
@@ -32,28 +39,26 @@ object ActionRing {
         val text: String,
     )
 
-    // ConcurrentLinkedDeque is wait-free for the common record path and we
-    // only trim from the head when over-capacity, also lock-free. The size()
-    // call is O(n) but we only check it on each record, which is rare
-    // compared to other launcher hot paths.
-    private val ring = ConcurrentLinkedDeque<Entry>()
+    private val lock = Any()
+    private val ring = ArrayDeque<Entry>(CAPACITY)
 
     fun record(text: String) {
-        ring.add(Entry(Instant.now(), text))
-        while (ring.size > CAPACITY) {
-            ring.pollFirst()
+        val entry = Entry(Instant.now(), text)
+        synchronized(lock) {
+            if (ring.size >= CAPACITY) ring.removeFirst()
+            ring.addLast(entry)
         }
     }
 
     /** Returns the current snapshot oldest-first. Cheap defensive copy. */
-    fun snapshot(): List<Entry> = ring.toList()
+    fun snapshot(): List<Entry> = synchronized(lock) { ring.toList() }
 
     /**
      * Convenience for the most recent entry — covers the legacy
      * `CrashReporter.lastAction` use case while richer crash reports
      * adopt [snapshot].
      */
-    fun mostRecent(): Entry? = ring.peekLast()
+    fun mostRecent(): Entry? = synchronized(lock) { ring.lastOrNull() }
 
     /**
      * Test-only — never used in production. Public (rather than `internal`)
@@ -62,7 +67,5 @@ object ActionRing {
      * this in production would erase the diagnostic trail right when it's
      * most useful, so don't.
      */
-    fun clear() {
-        ring.clear()
-    }
+    fun clear() = synchronized(lock) { ring.clear() }
 }

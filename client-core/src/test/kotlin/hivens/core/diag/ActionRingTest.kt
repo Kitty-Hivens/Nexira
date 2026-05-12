@@ -57,4 +57,31 @@ class ActionRingTest {
         assertEquals(1, before.size)
         assertEquals(2, ActionRing.snapshot().size)
     }
+
+    @Test
+    fun `capacity holds under concurrent writers — synchronized trim must be atomic`() {
+        // Regression test for the prior ConcurrentLinkedDeque + size() implementation,
+        // which let racing threads overshoot CAPACITY because size() is documented
+        // non-atomic and the trim loop was outside any lock. Spawn many writers,
+        // each hammering record(), and assert the ring NEVER exceeds CAPACITY at
+        // any observation point.
+        val threads = (1..16).map { tIdx ->
+            Thread {
+                repeat(500) { i ->
+                    ActionRing.record("t${tIdx}-${i}")
+                    // Probe the size while writers are still active — must not exceed.
+                    val snap = ActionRing.snapshot()
+                    if (snap.size > ActionRing.CAPACITY) {
+                        throw AssertionError("size=${snap.size} exceeded CAPACITY=${ActionRing.CAPACITY}")
+                    }
+                }
+            }
+        }
+        threads.forEach { it.start() }
+        threads.forEach { it.join() }
+
+        val finalSize = ActionRing.snapshot().size
+        assertEquals(ActionRing.CAPACITY, finalSize,
+            "after 16×500 records the ring should be exactly at capacity")
+    }
 }
