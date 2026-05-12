@@ -55,8 +55,14 @@ object ActionRing {
      */
     fun mostRecent(): Entry? = ring.peekLast()
 
-    /** Test-only — never used in production. */
-    internal fun clear() {
+    /**
+     * Test-only — never used in production. Public (rather than `internal`)
+     * because tests live in `:client-launcher` while this class lives in
+     * `:client-core`, and `internal` doesn't span module boundaries. Calling
+     * this in production would erase the diagnostic trail right when it's
+     * most useful, so don't.
+     */
+    fun clear() {
         ring.clear()
     }
 }

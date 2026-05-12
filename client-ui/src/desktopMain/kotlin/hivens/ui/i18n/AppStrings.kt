@@ -164,6 +164,10 @@ interface AppStrings {
     /** Beacon: bundles crash reports + redacted logs + system info into one ZIP. */
     val settingsCreateDiagnosticBundle: String
     val settingsDiagnosticBundleHint: String
+    /** Companion to [settingsCreateDiagnosticBundle] — opens a pre-filled GitHub Issue
+     *  asking the user to drag-attach the just-created bundle. Off-machine action only
+     *  triggers when user clicks Submit in their browser — never the launcher itself. */
+    val settingsReportOnGithub: String
 
     // --- File Manager ---
     fun fileDownloading(n: Int): String

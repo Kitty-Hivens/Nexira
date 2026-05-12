@@ -158,6 +158,7 @@ object EnglishStrings : AppStrings {
     override val settingsOpenCrashReports        = "Crash reports"
     override val settingsCreateDiagnosticBundle  = "Create diagnostic bundle"
     override val settingsDiagnosticBundleHint    = "Bundles redacted logs, crash reports, action history and system info into one ZIP for support."
+    override val settingsReportOnGithub          = "Report on GitHub with bundle"
 
     // File Manager
     override fun fileDownloading(n: Int) = "Downloading updates ($n files)..."

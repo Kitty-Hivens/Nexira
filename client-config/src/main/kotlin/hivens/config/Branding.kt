@@ -30,4 +30,18 @@ object Branding {
      * `-Dminecraft.launcher.brand` so vanilla telemetry sees the right vendor.
      */
     const val UPSTREAM_NAME = "smartycraft"
+
+    /**
+     * GitHub `owner/repo` slug for this project. Used by AboutScreen links and
+     * the Beacon "Report on GitHub" buttons that pre-fill issue URLs from
+     * crash reports + diagnostic bundles. Centralised here so a fork doesn't
+     * have to grep for hard-coded URLs across the UI.
+     */
+    const val REPO_SLUG = "Kitty-Hivens/Aura-Launcher"
+
+    /** Computed convenience — base URL of the GitHub repo. */
+    val REPO_URL get() = "https://github.com/$REPO_SLUG"
+
+    /** New-issue endpoint accepting `?title=&body=&labels=` query params. */
+    val ISSUE_NEW_URL get() = "$REPO_URL/issues/new"
 }
