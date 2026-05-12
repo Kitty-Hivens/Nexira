@@ -146,6 +146,13 @@ fun main() {
     val paths = PlatformPaths.system()
     System.setProperty("aura.logs.dir", paths.logsDir.toString())
 
+    // Pulse: tag every log line in this process with a stable 8-char sessionId
+    // so a multi-launch user dump can be sliced per process invocation
+    // (`grep sessionId=abc12345 *.log`). System property (not MDC) because
+    // MDC is thread-local and we want this on every line from every thread —
+    // the logback pattern reads the property via `${aura.sessionId}`.
+    System.setProperty("aura.sessionId", java.util.UUID.randomUUID().toString().take(8))
+
     System.setProperty("jna.nosys", "true")
     System.setProperty("skiko.fps.limit", "60")
     // X11 WM_CLASS = "AuraLauncher". -Dawt.appClassName covers JBR; for stock
