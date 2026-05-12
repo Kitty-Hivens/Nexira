@@ -59,6 +59,7 @@ ktor-client-mock                = { group = "io.ktor", name = "ktor-client-mock"
 kotlinx-serialization-json      = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "serialization" }
 kotlinx-coroutines-test         = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test",    version.ref = "coroutines" }
 kotlinx-coroutines-swing        = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-swing",   version.ref = "coroutines" }
+kotlinx-coroutines-slf4j        = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-slf4j",   version.ref = "coroutines" }
 
 # DI
 koin-core                       = { group = "io.insert-koin", name = "koin-core",    version.ref = "koin" }

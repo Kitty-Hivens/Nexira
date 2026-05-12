@@ -27,12 +27,25 @@
 -->
 <configuration scan="false" packagingData="false">
 
-    <property name="LOGS_DIR" value="${aura.logs.dir:-logs}"/>
+    <!-- `%rmsg` is the redacted-message converter (Pulse): everything that
+         would normally come out as `%msg` is run through hivens.core.logging.Redactor
+         first, scrubbing accessTokens / passwords / Bearer tokens / UUIDs. We never
+         use raw `%msg` in any pattern below — the disk MUST NEVER carry the raw
+         values, even momentarily. -->
+    <conversionRule conversionWord="rmsg"
+                    converterClass="hivens.ui.logging.RedactingMessageConverter"/>
 
+    <property name="LOGS_DIR"   value="${aura.logs.dir:-logs}"/>
+    <property name="SESSION_ID" value="${aura.sessionId:-?}"/>
+
+    <!-- sessionId is process-wide (system property → logback variable interpolation
+         at config-load time). launchId is per-game-launch (MDC, propagated through
+         coroutines via MDCContext from kotlinx-coroutines-slf4j). The slash leaves
+         a visible `?/?` when neither is set rather than a confusing empty bracket. -->
     <property name="PATTERN_FILE"
-              value="%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%X{sessionId:-}/%X{launchId:-}] %logger{36} - %msg%n%ex"/>
+              value="%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [${SESSION_ID}/%X{launchId:-?}] %logger{36} - %rmsg%n%ex"/>
     <property name="PATTERN_CONSOLE"
-              value="%d{HH:mm:ss.SSS} %-5level %logger{36} - %msg%n%ex"/>
+              value="%d{HH:mm:ss.SSS} %-5level %logger{36} - %rmsg%n%ex"/>
 
     <!-- ── Console — kept for `gradle run` / IDE dev workflow. -->
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
@@ -80,8 +93,10 @@
         </rollingPolicy>
         <encoder>
             <!-- Game lines already carry their own log4j-style prefix; add only
-                 a thin timestamp so the file stays readable without doubling. -->
-            <pattern>%d{HH:mm:ss.SSS} %msg%n</pattern>
+                 a thin timestamp so the file stays readable without doubling.
+                 Still routed through `%rmsg` because game args sometimes echo
+                 accessToken / uuid into the JVM startup banner. -->
+            <pattern>%d{HH:mm:ss.SSS} %rmsg%n</pattern>
         </encoder>
     </appender>
 

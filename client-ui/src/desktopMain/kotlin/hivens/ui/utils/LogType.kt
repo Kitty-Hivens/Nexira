@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import hivens.core.logging.Redactor
 import hivens.launcher.platform.PlatformPaths
 import java.io.File
 import java.io.FileWriter
@@ -53,7 +54,11 @@ object GameConsoleService {
         if (logs.size >= maxLines) {
             logs.removeAt(0)
         }
-        val entry = LogEntry(text, type)
+        // Redact at append time: the in-memory buffer (which feeds ConsoleWindow,
+        // the auto-save file, and `Save to file` exports) NEVER carries raw
+        // accessTokens / passwords / UUIDs. Means a screenshot of the console or
+        // a Ctrl+C copy of a log line is safe to share for support.
+        val entry = LogEntry(Redactor.redact(text), type)
         logs.add(entry)
 
         // Auto-save to disk

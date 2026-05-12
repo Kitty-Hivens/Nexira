@@ -47,7 +47,15 @@ class LauncherController : KoinComponent {
     ) {
         if (_state.value is LaunchState.Prepare || _state.value is LaunchState.Downloading) return
 
-        launchJob = appScope.launch {
+        // Tag every log line emitted during this launch attempt with a stable
+        // launchId so a user dump can be sliced per-play-click via
+        // `grep launchId=abcd1234 *.log`. MDCContext (from
+        // kotlinx-coroutines-slf4j) propagates the value across every
+        // dispatcher hop the launch flow takes, including the downstream
+        // FileDownloadService coroutines and LauncherService.
+        val launchId = java.util.UUID.randomUUID().toString().take(8)
+
+        launchJob = appScope.launch(kotlinx.coroutines.slf4j.MDCContext(mapOf("launchId" to launchId))) {
             // Capture strings at launch time so the whole pipeline uses one locale
             val s = I18n.s
             val settings = settingsService.getSettings()
