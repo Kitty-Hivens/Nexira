@@ -59,7 +59,6 @@ object TrayManager {
     val canBeReady: Boolean get() = state == State.INITIALIZING || state == State.READY
 
     data class Strings(
-        val tooltip: String,
         val statusIdle: String,
         val statusRunning: String,
         val show: String,
@@ -78,20 +77,29 @@ object TrayManager {
 
     // ── Lifecycle ─────────────────────────────────────────────────────────
 
-    fun init(iconStream: InputStream, strings: Strings) {
+    /**
+     * @param iconStream Tray icon bytes (PNG).
+     * @param strings    Localised menu labels.
+     * @param appName    The actual AppIndicator title — what KDE/GNOME show
+     *                   on hover. dorkbox's [SystemTray.get] no-arg overload
+     *                   hardcodes this to "SystemTray", so pass an explicit
+     *                   name. Setting it via `setTooltip()` does NOT work:
+     *                   AppIndicator's `app_indicator_set_title()` only
+     *                   reads the value supplied at construction time.
+     */
+    fun init(iconStream: InputStream, strings: Strings, appName: String) {
         this.strings = strings
         if (state != State.NOT_STARTED) return
 
         state = State.INITIALIZING
         try {
             SystemTray.DEBUG = false
-            val t = SystemTray.get() ?: run {
+            val t = SystemTray.get(appName) ?: run {
                 logger.warn("SystemTray not supported on this platform")
                 state = State.FAILED
                 return
             }
             tray = t
-            t.setTooltip(strings.tooltip)
             t.setImage(iconStream)
             buildMenu(t.menu, strings)
             state = State.READY

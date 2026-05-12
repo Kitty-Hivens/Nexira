@@ -109,6 +109,7 @@ private fun ConsoleContent(
 
     // ── State ──────────────────────────────────────────────────────────────
     var searchQuery  by remember { mutableStateOf("") }
+    var regexMode    by remember { mutableStateOf(false) }
     var wrapText     by remember { mutableStateOf(true) }
     var fontSize     by remember { mutableStateOf(12) }
     var showFontMenu by remember { mutableStateOf(false) }
@@ -120,7 +121,16 @@ private fun ConsoleContent(
         GameConsoleService.logs.toList()
     }
 
-    val filtered = remember(logsCopy, searchQuery, filterInfo, filterWarn, filterError) {
+    // When regex mode is on, compile once per query change. An invalid pattern
+    // collapses to "match nothing" rather than crashing the filter — the user
+    // is still typing.
+    val searchRegex = remember(searchQuery, regexMode) {
+        if (regexMode && searchQuery.isNotBlank()) {
+            runCatching { Regex(searchQuery, RegexOption.IGNORE_CASE) }.getOrNull()
+        } else null
+    }
+
+    val filtered = remember(logsCopy, searchQuery, regexMode, searchRegex, filterInfo, filterWarn, filterError) {
         logsCopy.filter { entry ->
             val typeOk = when (entry.type) {
                 LogType.INFO    -> filterInfo
@@ -128,7 +138,11 @@ private fun ConsoleContent(
                 LogType.ERROR   -> filterError
                 LogType.DIVIDER -> true
             }
-            val searchOk = searchQuery.isBlank() || entry.text.contains(searchQuery, ignoreCase = true)
+            val searchOk = when {
+                searchQuery.isBlank() -> true
+                regexMode             -> searchRegex?.containsMatchIn(entry.text) ?: false
+                else                  -> entry.text.contains(searchQuery, ignoreCase = true)
+            }
             typeOk && searchOk
         }
     }
@@ -257,6 +271,17 @@ private fun ConsoleContent(
                         inner()
                     }
                 )
+                // Regex toggle. Highlights green when on; red when on AND the
+                // pattern fails to compile — visual feedback while the user
+                // is still typing the regex.
+                val regexTint = when {
+                    !regexMode                                     -> textColor.copy(alpha = 0.4f)
+                    searchQuery.isNotBlank() && searchRegex == null -> Color(0xFFEF5350)
+                    else                                            -> Color(0xFF4CAF50)
+                }
+                TextButton(onClick = { regexMode = !regexMode }) {
+                    Text(".*", color = regexTint, fontSize = 12.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                }
                 if (searchQuery.isNotEmpty()) {
                     TextButton(onClick = { searchQuery = "" }) {
                         Text("✕", color = textColor.copy(alpha = 0.5f), fontSize = 11.sp)

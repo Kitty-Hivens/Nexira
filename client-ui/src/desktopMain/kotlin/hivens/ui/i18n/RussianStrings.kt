@@ -4,7 +4,6 @@ object RussianStrings : AppStrings {
 
     // App
     override val appName = "Aura Launcher"
-    override val appVersion get() = appName
 
     // Login
     override val loginTitle        = "Aura Launcher"
@@ -12,25 +11,20 @@ object RussianStrings : AppStrings {
     override val loginPassword     = "Пароль"
     override val loginRemember     = "Запомнить пароль"
     override val loginButton       = "ВОЙТИ"
-    override val loginSuccess      = "УСПЕШНО"
-    override val loginLoading      = "ЗАГРУЗКА"
     override val loginErrorEmpty   = "Введите логин и пароль"
     override val loginErrorGeneric = "Ошибка входа"
     override val loginRegister     = "Зарегистрироваться"
 
     // Navigation
-    override val navHome     = "Главная"
-    override val navProfile  = "Профиль"
-    override val navSettings = "Настройки"
-    override val navConsole  = "Консоль"
     override val navLogout   = "Выйти"
     override val navBack     = "Назад"
 
     // Dashboard
     override fun dashboardWelcome(name: String) = "ДОБРО ПОЖАЛОВАТЬ, $name"
-    override val dashboardNews         = "Новости"
-    override val dashboardServers      = "ДОСТУПНЫЕ СЕРВЕРЫ"
-    override val dashboardServersEmpty = "Серверы не найдены"
+    override val dashboardServers              = "ДОСТУПНЫЕ СЕРВЕРЫ"
+    override val dashboardServersEmpty         = "Серверы не найдены"
+    override val dashboardLoginRequiredTitle   = "Войдите, чтобы увидеть серверы"
+    override val dashboardLoginRequiredHint    = "Воспользуйтесь панелью справа. Список серверов на SMARTYcraft скрыт за авторизацией."
 
     // Launch Control
     override val launchReady       = "Готов к игре"
@@ -75,8 +69,6 @@ object RussianStrings : AppStrings {
     override val settingsThemePicker        = "Выбор темы"
     override val settingsThemePickerSub     = "Кастомизируйте цветовую схему"
     override val settingsDarkTheme          = "Тёмная тема"
-    override val settingsSeasonEffect       = "Сезонный эффект"
-    override val settingsSeasonEffectSub    = "Анимация на заднем фоне"
     override val settingsCloseAfterLaunch   = "Закрывать лаунчер после запуска игры"
     override val settingsSaved              = "Настройки сохранены"
     override val settingsLanguage           = "Язык"
@@ -98,17 +90,13 @@ object RussianStrings : AppStrings {
 
     // News
     override val newsTitle   = "НОВОСТИ ПРОЕКТА"
-    override val newsLoading = "Загрузка новостей..."
     override val newsEmpty   = "Новостей пока нет..."
-    override val newsNoImage = "НЕТ ФОТО"
 
     // Server Detail
     override val serverDetailTitle         = "ИНФОРМАЦИЯ О СЕРВЕРЕ"
-    override val serverDetailLoading       = ""
     override val serverDetailNoImage       = "Нет изображения"
     override val serverDetailNoImageHint   = "banner.png"
     override val serverDetailMissingTitle  = "Информация отсутствует"
-    override val serverDetailMissingBody   = "Создайте файл в папке:"
     override fun serverDetailMissingPath(path: String, file: String) = "Создайте файл $file в папке:"
 
     // Server Settings
@@ -161,20 +149,19 @@ object RussianStrings : AppStrings {
     override val consoleJumpToBottom = "↓ К концу"
 
     // Tray
-    override val trayShowHide = "Показать / Скрыть"
     override val trayConsole  = "Открыть консоль"
     override val trayExit     = "Выход"
 
     // Settings: Diagnostics
-    override val settingsSectionDiagnostics = "Диагностика"
-    override val settingsOpenLogs           = "Открыть логи"
-    override val settingsOpenCrashReports   = "Отчёты о сбоях"
+    override val settingsSectionDiagnostics      = "Диагностика"
+    override val settingsOpenLogs                = "Открыть логи"
+    override val settingsOpenCrashReports        = "Отчёты о сбоях"
+    override val settingsCreateDiagnosticBundle  = "Собрать диагностический пакет"
+    override val settingsDiagnosticBundleHint    = "Соберёт в один ZIP redact'нутые логи, отчёты о сбоях, историю действий и сведения о системе — отправлять в поддержку."
+    override val settingsReportOnGithub          = "Сообщить на GitHub с пакетом"
 
     // File Manager
-    override val fileCheckIntegrity = "Проверка целостности файлов..."
-    override val fileNoUpdates      = "Файлы проверены, обновлений нет."
     override fun fileDownloading(n: Int) = "Загрузка обновлений ($n файлов)..."
-    override val fileClientSetup    = "Настройка клиента..."
 
     // --- Settings: Offline Mode ---
     override val settingsOfflineMode       = "Оффлайн-режим"
@@ -276,7 +263,6 @@ object RussianStrings : AppStrings {
     override val aboutCriticalUpdate       = "Критическое обновление"
     override val aboutSectionSystem        = "СИСТЕМА"
     override val aboutOs                   = "ОС"
-    override val aboutJvmHeap             = "JVM Heap"
     override val aboutSectionLinks         = "ССЫЛКИ"
     override val aboutLinkGithub           = "GitHub"
     override val aboutLinkBugReport        = "Сообщить о баге"

@@ -17,7 +17,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
 import hivens.config.Branding
 import hivens.core.api.interfaces.ISettingsService
+import hivens.launcher.diag.DiagnosticBundle
 import hivens.launcher.platform.PlatformPaths
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import hivens.ui.components.GlassCard
 import hivens.ui.easter.AprilFoolsButton
 import hivens.ui.easter.AprilFoolsDebugPanel
@@ -422,6 +425,85 @@ fun SettingsScreen(
                             ),
                         )
                     }
+
+                    Spacer(Modifier.height(8.dp))
+
+                    // Beacon: one-click ZIP for support — bundles redacted logs,
+                    // crash reports, action ring and system info. The companion
+                    // GitHub-Issue button below is enabled only after a bundle
+                    // exists in this session.
+                    //
+                    // Generation runs off the Compose UI thread: filesystem
+                    // reads + ZIP compression of a 200 MB launcher.log cap is
+                    // enough to freeze Settings for a noticeable beat. While
+                    // generating, the button is disabled so a double-click
+                    // doesn't fire two parallel writes to the same data dir.
+                    var lastBundlePath by remember { mutableStateOf<java.nio.file.Path?>(null) }
+                    var bundleBusy     by remember { mutableStateOf(false) }
+                    val bundleScope    = rememberCoroutineScope()
+
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        AprilFoolsButton(
+                            id       = "settings_create_diag_bundle_btn",
+                            text     = s.settingsCreateDiagnosticBundle,
+                            onClick  = {
+                                if (bundleBusy) return@AprilFoolsButton
+                                bundleBusy = true
+                                bundleScope.launch {
+                                    val zip = withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                        runCatching { DiagnosticBundle.create(paths) }.getOrNull()
+                                    }
+                                    if (zip != null) {
+                                        lastBundlePath = zip
+                                        if (Desktop.isDesktopSupported()) {
+                                            runCatching { Desktop.getDesktop().open(zip.parent.toFile()) }
+                                        }
+                                    }
+                                    bundleBusy = false
+                                }
+                            },
+                            modifier = Modifier.weight(1f),
+                            colors   = ButtonDefaults.buttonColors(
+                                containerColor = Color.Transparent,
+                                contentColor   = CelestiaTheme.colors.textPrimary.copy(
+                                    alpha = if (bundleBusy) 0.45f else 1f
+                                ),
+                            ),
+                            enabled  = !bundleBusy,
+                        )
+                        AprilFoolsButton(
+                            id       = "settings_report_github_btn",
+                            text     = s.settingsReportOnGithub,
+                            onClick  = {
+                                val zip = lastBundlePath ?: return@AprilFoolsButton
+                                runCatching {
+                                    // Copy path so the user can drag-attach from the file
+                                    // manager OR paste the path into a comment.
+                                    java.awt.Toolkit.getDefaultToolkit().systemClipboard
+                                        .setContents(java.awt.datatransfer.StringSelection(zip.toString()), null)
+                                    if (Desktop.isDesktopSupported()) {
+                                        Desktop.getDesktop().browse(
+                                            java.net.URI(hivens.launcher.diag.IssueReporter.bundleIssueUrl(zip))
+                                        )
+                                    }
+                                }
+                            },
+                            modifier = Modifier.weight(1f),
+                            colors   = ButtonDefaults.buttonColors(
+                                containerColor = Color.Transparent,
+                                contentColor   = CelestiaTheme.colors.textPrimary.copy(
+                                    alpha = if (lastBundlePath != null) 1f else 0.35f
+                                ),
+                            ),
+                            enabled  = lastBundlePath != null,
+                        )
+                    }
+                    Text(
+                        text     = s.settingsDiagnosticBundleHint,
+                        color    = CelestiaTheme.colors.textSecondary,
+                        fontSize = androidx.compose.ui.unit.TextUnit(11f, androidx.compose.ui.unit.TextUnitType.Sp),
+                        modifier = Modifier.padding(start = 8.dp, top = 2.dp)
+                    )
                 }
 
                 // ── About ─────────────────────────────────────────────────────

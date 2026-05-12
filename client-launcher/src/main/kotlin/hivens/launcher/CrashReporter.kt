@@ -1,11 +1,14 @@
 package hivens.launcher
 
 import hivens.config.Branding
+import hivens.core.diag.ActionRing
+import hivens.launcher.diag.IssueReporter
 import hivens.launcher.platform.PlatformPaths
 import java.awt.Desktop
 import java.awt.Toolkit
 import java.awt.datatransfer.StringSelection
 import java.io.File
+import java.net.URI
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -15,6 +18,8 @@ object CrashReporter {
 
     private val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH-mm-ss")
         .withZone(ZoneId.systemDefault())
+    private val entryTimeFmt = DateTimeFormatter.ofPattern("HH:mm:ss.SSS")
+        .withZone(ZoneId.systemDefault())
 
     /**
      * Resolved at process start by [hivens.ui.MainKt]. Default to the system-derived
@@ -22,9 +27,6 @@ object CrashReporter {
      */
     @Volatile
     var paths: PlatformPaths = PlatformPaths.system()
-
-    @Volatile
-    var lastAction: String? = null
 
     data class CrashReport(
         val timestamp: String,
@@ -35,7 +37,8 @@ object CrashReporter {
         val jvmVersion: String,
         val jvmVendor: String,
         val maxMemoryMb: Long,
-        val lastAction: String?,
+        /** Snapshot of [ActionRing] at crash time, oldest-first. */
+        val actions: List<ActionRing.Entry>,
         val thread: String,
         val stackTrace: String
     )
@@ -51,7 +54,7 @@ object CrashReporter {
             jvmVersion = System.getProperty("java.version"),
             jvmVendor = System.getProperty("java.vendor"),
             maxMemoryMb = rt.maxMemory() / 1_000_000,
-            lastAction = lastAction,
+            actions = ActionRing.snapshot(),
             thread = thread.name,
             stackTrace = throwable.stackTraceToString()
         )
@@ -74,7 +77,15 @@ object CrashReporter {
             appendLine(" Java      : ${report.jvmVersion} (${report.jvmVendor})")
             appendLine(" Max RAM   : ${report.maxMemoryMb} MB")
             appendLine(" Thread    : ${report.thread}")
-            appendLine(" Last action: ${report.lastAction ?: "Unknown"}")
+            appendLine()
+            appendLine(" Recent actions (oldest first):")
+            if (report.actions.isEmpty()) {
+                appendLine("   (none recorded)")
+            } else {
+                report.actions.forEach { entry ->
+                    appendLine("   [${entryTimeFmt.format(entry.timestamp)}] ${entry.text}")
+                }
+            }
             appendLine()
             appendLine(" Stack Trace:")
             appendLine(report.stackTrace)
@@ -94,7 +105,7 @@ object CrashReporter {
             Please send this file to the developers.
         """.trimIndent()
 
-        val options = arrayOf("Copy report", "Open folder", "Close")
+        val options = arrayOf("Report on GitHub", "Copy report", "Open folder", "Close")
         val choice = JOptionPane.showOptionDialog(
             null,
             message,
@@ -108,10 +119,20 @@ object CrashReporter {
 
         when (choice) {
             0 -> {
+                // Beacon "Report on GitHub": opens browser at a pre-filled new-Issue
+                // URL. Nothing leaves the user's machine until they click Submit on
+                // github.com — the launcher itself never POSTs anything.
+                runCatching {
+                    if (Desktop.isDesktopSupported()) {
+                        Desktop.getDesktop().browse(URI(IssueReporter.crashIssueUrl(report)))
+                    }
+                }
+            }
+            1 -> {
                 val clipboard = Toolkit.getDefaultToolkit().systemClipboard
                 clipboard.setContents(StringSelection(reportFile.readText()), null)
             }
-            1 -> {
+            2 -> {
                 if (Desktop.isDesktopSupported()) {
                     Desktop.getDesktop().open(reportFile.parentFile)
                 }

@@ -53,8 +53,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 import org.koin.core.qualifier.named
+import org.slf4j.LoggerFactory
 import java.awt.Desktop
 import java.net.URI
+
+private val log = LoggerFactory.getLogger("RightPanel")
 
 // ─── Right Panel ─────────────────────────────────────────────────────────────
 
@@ -131,6 +134,7 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
         isLoading    = true
         sslWarning   = false
         errorMessage = null
+        hivens.core.diag.ActionRing.record("Login attempt: user=$login")
         scope.launch {
             try {
                 val session = withContext(Dispatchers.IO) {
@@ -139,9 +143,13 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
                     if (rememberMe) credentialsManager.save(sess)
                     sess
                 }
+                hivens.core.diag.ActionRing.record("Login OK: user=$login")
                 onLogin(session)
             } catch (e: AuthException) {
                 isLoading = false
+                hivens.core.diag.ActionRing.record(
+                    "Login failed (auth): user=$login ssl=${e.isSslError} msg=${e.message?.take(80)}"
+                )
                 when {
                     e.isSslError -> sslWarning = true
                     else         -> errorMessage = e.message
@@ -151,6 +159,7 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
                 }
             } catch (e: Exception) {
                 isLoading    = false
+                hivens.core.diag.ActionRing.record("Login failed (generic): user=$login msg=${e.message?.take(80)}")
                 errorMessage = e.message ?: s.loginErrorGeneric
             }
         }
@@ -210,6 +219,7 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
                     }
                     Button(
                         onClick = {
+                            hivens.core.diag.ActionRing.record("SSL bypass accepted by user (login retry)")
                             NetworkState.sslBypassEnabled = true
                             doLogin(insecureAuthService)
                         },
@@ -430,7 +440,9 @@ fun CompactNewsFeed(
         try {
             val data = withContext(Dispatchers.IO) { serverListService.fetchDashboardData().get() }
             news = data.news
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            log.warn("Initial news fetch failed", e)
+        }
         loading = false
     }
 
@@ -439,7 +451,9 @@ fun CompactNewsFeed(
             try {
                 val data = withContext(Dispatchers.IO) { serverListService.fetchDashboardData().get() }
                 news = data.news
-            } catch (_: Exception) {}
+            } catch (e: Exception) {
+                log.warn("News fetch after SSL bypass failed", e)
+            }
             loading = false
         }
     }
@@ -591,7 +605,9 @@ private fun CompactNewsItem(item: NewsItem) {
                     ) {
                         Desktop.getDesktop().browse(URI(url))
                     }
-                } catch (_: Exception) {}
+                } catch (e: Exception) {
+                    log.warn("Could not open news link for item ${item.id}", e)
+                }
             }
             .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment     = Alignment.CenterVertically,

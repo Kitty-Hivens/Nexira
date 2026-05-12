@@ -4,7 +4,6 @@ interface AppStrings {
 
     // --- App ---
     val appName: String
-    val appVersion: String
 
     // --- Login ---
     val loginTitle: String
@@ -12,25 +11,22 @@ interface AppStrings {
     val loginPassword: String
     val loginRemember: String
     val loginButton: String
-    val loginSuccess: String
-    val loginLoading: String
     val loginErrorEmpty: String
     val loginErrorGeneric: String
     val loginRegister: String
 
     // --- Navigation ---
-    val navHome: String
-    val navProfile: String
-    val navSettings: String
-    val navConsole: String
     val navLogout: String
     val navBack: String
 
     // --- Dashboard ---
     fun dashboardWelcome(name: String): String
-    val dashboardNews: String
     val dashboardServers: String
     val dashboardServersEmpty: String
+    /** Shown in the main content area while no session exists — replaces the
+     *  ambiguous "spinning indicator forever" state for unauthenticated users. */
+    val dashboardLoginRequiredTitle: String
+    val dashboardLoginRequiredHint: String
 
     // --- Launch Control ---
     val launchReady: String
@@ -79,8 +75,6 @@ interface AppStrings {
     val settingsThemePicker: String
     val settingsThemePickerSub: String
     val settingsDarkTheme: String
-    val settingsSeasonEffect: String
-    val settingsSeasonEffectSub: String
     val settingsCloseAfterLaunch: String
     val settingsSaved: String
     val settingsLanguage: String
@@ -102,17 +96,13 @@ interface AppStrings {
 
     // --- News ---
     val newsTitle: String
-    val newsLoading: String
     val newsEmpty: String
-    val newsNoImage: String
 
     // --- Server Detail ---
     val serverDetailTitle: String
-    val serverDetailLoading: String
     val serverDetailNoImage: String
     val serverDetailNoImageHint: String
     val serverDetailMissingTitle: String
-    val serverDetailMissingBody: String
     fun serverDetailMissingPath(path: String, file: String): String
 
     // --- Server Settings ---
@@ -164,7 +154,6 @@ interface AppStrings {
     val consoleJumpToBottom: String
 
     // --- Tray ---
-    val trayShowHide: String
     val trayConsole: String
     val trayExit: String
 
@@ -172,12 +161,16 @@ interface AppStrings {
     val settingsSectionDiagnostics: String
     val settingsOpenLogs: String
     val settingsOpenCrashReports: String
+    /** Beacon: bundles crash reports + redacted logs + system info into one ZIP. */
+    val settingsCreateDiagnosticBundle: String
+    val settingsDiagnosticBundleHint: String
+    /** Companion to [settingsCreateDiagnosticBundle] — opens a pre-filled GitHub Issue
+     *  asking the user to drag-attach the just-created bundle. Off-machine action only
+     *  triggers when user clicks Submit in their browser — never the launcher itself. */
+    val settingsReportOnGithub: String
 
     // --- File Manager ---
-    val fileCheckIntegrity: String
-    val fileNoUpdates: String
     fun fileDownloading(n: Int): String
-    val fileClientSetup: String
 
     // --- Settings: Offline Mode ---
     val settingsOfflineMode: String
@@ -281,7 +274,6 @@ interface AppStrings {
     val aboutCriticalUpdate: String
     val aboutSectionSystem: String
     val aboutOs: String
-    val aboutJvmHeap: String
     val aboutSectionLinks: String
     val aboutLinkGithub: String
     val aboutLinkBugReport: String
