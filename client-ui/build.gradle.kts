@@ -182,7 +182,6 @@ compose.desktop {
             // Graphics optimization
             "-Dawt.useSystemAAFontSettings=on",
             "-Djdk.gtk.version=3",
-            "-Dwayland.debug.children=true",
             "-D_JAVA_AWT_WM_NONREPARENTING=1",
             "-Drobot.need_x11=false",
 
