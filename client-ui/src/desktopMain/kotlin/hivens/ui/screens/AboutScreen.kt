@@ -38,10 +38,13 @@ import hivens.ui.theme.CelestiaTheme
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
 import org.koin.compose.koinInject
+import org.slf4j.LoggerFactory
 import java.awt.Desktop
 import java.net.URI
 import java.text.SimpleDateFormat
 import java.util.*
+
+private val log = LoggerFactory.getLogger("AboutScreen")
 
 @Composable
 fun AboutScreen(onBack: () -> Unit) {
@@ -510,7 +513,9 @@ private fun LinkButton(label: String, url: String, icon: ImageVector) {
             try {
                 if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE))
                     Desktop.getDesktop().browse(URI(url))
-            } catch (_: Exception) {}
+            } catch (e: Exception) {
+                log.warn("Could not open external link {}", url, e)
+            }
         },
         modifier = Modifier.fillMaxWidth(),
         shape    = RoundedCornerShape(8.dp),

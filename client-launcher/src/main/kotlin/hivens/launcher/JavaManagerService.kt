@@ -1,6 +1,7 @@
 package hivens.launcher
 
 import hivens.core.api.HttpClientProvider
+import hivens.core.api.interfaces.IJavaManager
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
@@ -19,7 +20,7 @@ import java.util.zip.ZipInputStream
 class JavaManagerService(
     baseDir: Path,
     private val clientProvider: HttpClientProvider
-) {
+) : IJavaManager {
     private val log = LoggerFactory.getLogger(JavaManagerService::class.java)
     private val httpClient get() = clientProvider.current
     private val runtimesDir: Path = baseDir.resolve("runtimes")
@@ -28,7 +29,7 @@ class JavaManagerService(
      * Returns the path to the Java executable.
      * If the required version is not available, it downloads it.
      */
-    suspend fun getJavaPath(version: String): Path = withContext(Dispatchers.IO) {
+    override suspend fun getJavaPath(version: String): Path = withContext(Dispatchers.IO) {
         val javaVersion = detectJavaVersion(version)
         val os = getOsName()
         val arch = getArchName()
@@ -74,8 +75,9 @@ class JavaManagerService(
                     throw IOException("Loading error: ${httpResponse.status}")
                 }
                 val channel = httpResponse.bodyAsChannel()
-                val fileStream = FileOutputStream(archive.toFile())
-                channel.copyTo(fileStream)
+                FileOutputStream(archive.toFile()).use { fileStream ->
+                    channel.copyTo(fileStream)
+                }
             }
 
             log.info("Unpacking to $targetDir")

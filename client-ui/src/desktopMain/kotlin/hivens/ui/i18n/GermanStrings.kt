@@ -4,7 +4,6 @@ object GermanStrings : AppStrings {
 
     // App
     override val appName = "Aura Launcher"
-    override val appVersion get() = appName
 
     // Login
     override val loginTitle        = "Aura Launcher"
@@ -12,25 +11,20 @@ object GermanStrings : AppStrings {
     override val loginPassword     = "Passwort"
     override val loginRemember     = "Passwort speichern"
     override val loginButton       = "ANMELDEN"
-    override val loginSuccess      = "ERFOLG"
-    override val loginLoading      = "LADEN"
     override val loginErrorEmpty   = "Benutzername und Passwort eingeben"
     override val loginErrorGeneric = "Anmeldefehler"
     override val loginRegister     = "Konto erstellen"
 
     // Navigation
-    override val navHome     = "Startseite"
-    override val navProfile  = "Profil"
-    override val navSettings = "Einstellungen"
-    override val navConsole  = "Konsole"
     override val navLogout   = "Abmelden"
     override val navBack     = "Zurück"
 
     // Dashboard
     override fun dashboardWelcome(name: String) = "WILLKOMMEN ZURÜCK, $name"
-    override val dashboardNews         = "Neuigkeiten"
-    override val dashboardServers      = "VERFÜGBARE SERVER"
-    override val dashboardServersEmpty = "Keine Server gefunden"
+    override val dashboardServers              = "VERFÜGBARE SERVER"
+    override val dashboardServersEmpty         = "Keine Server gefunden"
+    override val dashboardLoginRequiredTitle   = "Anmelden, um Server zu sehen"
+    override val dashboardLoginRequiredHint    = "Bitte die rechte Seitenleiste zur Anmeldung verwenden. Die Serverliste ist auf SMARTYcraft nur nach Anmeldung verfügbar."
 
     // Launch Control
     override val launchReady       = "Bereit zum Spielen"
@@ -75,8 +69,6 @@ object GermanStrings : AppStrings {
     override val settingsThemePicker        = "Design auswählen"
     override val settingsThemePickerSub     = "Farbschema anpassen"
     override val settingsDarkTheme          = "Dunkles Design"
-    override val settingsSeasonEffect       = "Saisonaler Effekt"
-    override val settingsSeasonEffectSub    = "Hintergrundanimation"
     override val settingsCloseAfterLaunch   = "Launcher nach Spielstart schließen"
     override val settingsSaved              = "Einstellungen gespeichert"
     override val settingsLanguage           = "Sprache"
@@ -98,17 +90,13 @@ object GermanStrings : AppStrings {
 
     // News
     override val newsTitle   = "PROJEKTNEUIGKEITEN"
-    override val newsLoading = "Neuigkeiten werden geladen..."
     override val newsEmpty   = "Noch keine Neuigkeiten..."
-    override val newsNoImage = "KEIN BILD"
 
     // Server Detail
     override val serverDetailTitle         = "SERVER-INFORMATIONEN"
-    override val serverDetailLoading       = ""
     override val serverDetailNoImage       = "Kein Bild"
     override val serverDetailNoImageHint   = "banner.png"
     override val serverDetailMissingTitle  = "Informationen fehlen"
-    override val serverDetailMissingBody   = "Erstelle die Datei im Ordner:"
     override fun serverDetailMissingPath(path: String, file: String) = "Erstelle $file in:"
 
     // Server Settings
@@ -161,20 +149,19 @@ object GermanStrings : AppStrings {
     override val consoleJumpToBottom = "↓ Zum Ende"
 
     // Tray
-    override val trayShowHide = "Anzeigen / Ausblenden"
     override val trayConsole  = "Konsole öffnen"
     override val trayExit     = "Beenden"
 
     // Settings: Diagnostics
-    override val settingsSectionDiagnostics = "Diagnose"
-    override val settingsOpenLogs           = "Log-Ordner öffnen"
-    override val settingsOpenCrashReports   = "Absturzberichte"
+    override val settingsSectionDiagnostics      = "Diagnose"
+    override val settingsOpenLogs                = "Log-Ordner öffnen"
+    override val settingsOpenCrashReports        = "Absturzberichte"
+    override val settingsCreateDiagnosticBundle  = "Diagnosepaket erstellen"
+    override val settingsDiagnosticBundleHint    = "Bündelt redigierte Logs, Absturzberichte, Aktionshistorie und Systeminformationen in einer ZIP — für den Support."
+    override val settingsReportOnGithub          = "Mit Paket auf GitHub melden"
 
     // File Manager
-    override val fileCheckIntegrity = "Dateiintegrität wird überprüft..."
-    override val fileNoUpdates      = "Dateien überprüft, keine Updates gefunden."
     override fun fileDownloading(n: Int) = "Updates werden heruntergeladen ($n Dateien)..."
-    override val fileClientSetup    = "Client wird eingerichtet..."
 
     // --- Settings: Offline Mode ---
     override val settingsOfflineMode       = "Offlinemodus"
@@ -276,7 +263,6 @@ object GermanStrings : AppStrings {
     override val aboutCriticalUpdate       = "Kritisches Update"
     override val aboutSectionSystem        = "SYSTEM"
     override val aboutOs                   = "Betriebssystem"
-    override val aboutJvmHeap             = "JVM Heap"
     override val aboutSectionLinks         = "LINKS"
     override val aboutLinkGithub           = "GitHub"
     override val aboutLinkBugReport        = "Fehler melden"

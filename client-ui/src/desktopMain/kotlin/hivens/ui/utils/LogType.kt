@@ -4,12 +4,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import hivens.core.logging.Redactor
 import hivens.launcher.platform.PlatformPaths
+import org.slf4j.LoggerFactory
 import java.io.File
 import java.io.FileWriter
 import java.io.BufferedWriter
 import java.text.SimpleDateFormat
 import java.util.*
+
+private val log = LoggerFactory.getLogger("GameConsoleService")
 
 enum class LogType { INFO, ERROR, WARN, DIVIDER }
 
@@ -46,14 +50,20 @@ object GameConsoleService {
         try {
             val fileName = "game-output-${fileDateFmt.format(Date())}.log"
             sessionWriter = BufferedWriter(FileWriter(File(logsDir(), fileName), true))
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            log.warn("Could not open per-session game-output log; in-memory console still works", e)
+        }
     }
 
     fun append(text: String, type: LogType = LogType.INFO) {
         if (logs.size >= maxLines) {
             logs.removeAt(0)
         }
-        val entry = LogEntry(text, type)
+        // Redact at append time: the in-memory buffer (which feeds ConsoleWindow,
+        // the auto-save file, and `Save to file` exports) NEVER carries raw
+        // accessTokens / passwords / UUIDs. Means a screenshot of the console or
+        // a Ctrl+C copy of a log line is safe to share for support.
+        val entry = LogEntry(Redactor.redact(text), type)
         logs.add(entry)
 
         // Auto-save to disk
@@ -63,7 +73,11 @@ object GameConsoleService {
                 newLine()
                 flush()
             }
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            // Single line per occurrence; this fires on EVERY append so verbose
+            // levels would flood `launcher.log` if the writer is permanently broken.
+            log.debug("Failed to mirror console entry to per-session file", e)
+        }
     }
 
     fun saveToFile(): File? {

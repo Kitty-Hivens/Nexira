@@ -138,6 +138,28 @@ private fun setLinuxXToolkitAppClassName(name: String) {
 
 @OptIn(ExperimentalResourceApi::class, DelicateCoroutinesApi::class)
 fun main() {
+    // Resolve logs dir BEFORE any LoggerFactory.getLogger() call so logback.xml
+    // (which reads `${aura.logs.dir}` for its rolling-file appenders) sees the
+    // platform-correct path on its very first init. The first getLogger we
+    // could hit is inside setLinuxXToolkitAppClassName.onFailure below — set
+    // the property before that to keep logback's classpath scan clean.
+    val paths = PlatformPaths.system()
+    System.setProperty("aura.logs.dir", paths.logsDir.toString())
+
+    // Pulse: tag every log line in this process with a stable 8-char sessionId
+    // so a multi-launch user dump can be sliced per process invocation
+    // (`grep sessionId=abc12345 *.log`). System property (not MDC) because
+    // MDC is thread-local and we want this on every line from every thread —
+    // the logback pattern reads the property via `${aura.sessionId}`.
+    val sessionId = java.util.UUID.randomUUID().toString().take(8)
+    System.setProperty("aura.sessionId", sessionId)
+
+    // Beacon: the very first entry in the action ring — handy when reading a
+    // bundle to confirm what process / version / OS produced it.
+    hivens.core.diag.ActionRing.record(
+        "Launcher started (v${Branding.VERSION}, sessionId=$sessionId, os=${System.getProperty("os.name")})"
+    )
+
     System.setProperty("jna.nosys", "true")
     System.setProperty("skiko.fps.limit", "60")
     // X11 WM_CLASS = "AuraLauncher". -Dawt.appClassName covers JBR; for stock
@@ -145,7 +167,6 @@ fun main() {
     // first window is created. See jvmArgs in client-ui/build.gradle.kts.
     setLinuxXToolkitAppClassName(Branding.WM_CLASS)
 
-    val paths = PlatformPaths.system()
     java.nio.file.Files.createDirectories(paths.dataDir)
     CrashReporter.paths = paths
 
@@ -256,7 +277,6 @@ fun main() {
                         TrayManager.init(
                             iconStream = iconBytes.inputStream(),
                             strings    = TrayManager.Strings(
-                                tooltip       = "${Branding.TITLE} v${Branding.VERSION.removePrefix("v")}",
                                 statusIdle    = s.trayStatusIdle,
                                 statusRunning = s.trayStatusRunning,
                                 show          = s.trayShow,
@@ -264,7 +284,8 @@ fun main() {
                                 servers       = s.trayServers,
                                 noServers     = s.trayNoServers,
                                 exit          = s.trayExit
-                            )
+                            ),
+                            appName    = Branding.TITLE
                         )
                     } catch (_: Exception) {
                         runCatching {
@@ -272,7 +293,6 @@ fun main() {
                             TrayManager.init(
                                 iconStream = iconBytes.inputStream(),
                                 strings    = TrayManager.Strings(
-                                    tooltip       = Branding.TITLE,
                                     statusIdle    = s.trayStatusIdle,
                                     statusRunning = s.trayStatusRunning,
                                     show          = s.trayShow,
@@ -280,7 +300,8 @@ fun main() {
                                     servers       = s.trayServers,
                                     noServers     = s.trayNoServers,
                                     exit          = s.trayExit
-                                )
+                                ),
+                                appName    = Branding.TITLE
                             )
                         }
                     }
@@ -337,7 +358,10 @@ fun main() {
                                 )
                                 controller.launch(session, server)
                                 SwingUtilities.invokeLater { GameConsoleService.show() }
-                            } catch (_: Exception) {
+                            } catch (e: Exception) {
+                                LoggerFactory.getLogger("Main").warn(
+                                    "Tray-launched login failed for ${server.assetDir}", e
+                                )
                                 SwingUtilities.invokeLater { isWindowVisible = true }
                             }
                         } else {
@@ -529,18 +553,28 @@ fun AppRoot(
                         AppState.Authenticated(session)
                     } catch (e: AuthException) {
                         if (e.isSslError) {
+                            hivens.core.diag.ActionRing.record("SSL bypass auto-enabled on cached-credential auto-login (cert error)")
                             NetworkState.sslBypassEnabled = true
                             try {
                                 val server  = profileManager.lastServerId ?: Protocol.DEFAULT_SERVER_ID
                                 val session = insecureAuthService.login(saved.playerName, saved.cachedPassword!!, server)
                                 AppState.Authenticated(session)
-                            } catch (_: Exception) {
+                            } catch (e2: Exception) {
+                                LoggerFactory.getLogger("Main").warn(
+                                    "Auto-login with cached credentials failed after SSL bypass", e2
+                                )
                                 AppState.Unauthenticated
                             }
                         } else {
+                            LoggerFactory.getLogger("Main").warn(
+                                "Cached-credential auto-login failed (non-SSL)", e
+                            )
                             AppState.Unauthenticated
                         }
-                    } catch (_: Exception) {
+                    } catch (e: Exception) {
+                        LoggerFactory.getLogger("Main").warn(
+                            "Cached-credential auto-login failed with non-Auth exception", e
+                        )
                         AppState.Unauthenticated
                     }
                 }

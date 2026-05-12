@@ -4,9 +4,8 @@ import hivens.core.api.interfaces.*
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.LauncherLogType
 import hivens.core.data.SessionData
-import hivens.launcher.CrashReporter
+import hivens.core.diag.ActionRing
 import hivens.launcher.CredentialsManager
-import hivens.launcher.JavaManagerService
 import hivens.launcher.ManifestCache
 import hivens.launcher.ProfileManager
 import hivens.ui.easter.AprilFoolsProgress
@@ -28,7 +27,7 @@ class LauncherController : KoinComponent {
     private val credentialsManager: CredentialsManager by inject()
     private val settingsService: ISettingsService by inject()
     private val downloadService: IFileDownloadService by inject()
-    private val javaManagerService: JavaManagerService by inject()
+    private val javaManagerService: IJavaManager by inject()
     private val launcherService: ILauncherService by inject()
     private val manifestProcessor: IManifestProcessorService by inject()
     private val manifestCache: ManifestCache by inject()
@@ -48,7 +47,15 @@ class LauncherController : KoinComponent {
     ) {
         if (_state.value is LaunchState.Prepare || _state.value is LaunchState.Downloading) return
 
-        launchJob = appScope.launch {
+        // Tag every log line emitted during this launch attempt with a stable
+        // launchId so a user dump can be sliced per-play-click via
+        // `grep launchId=abcd1234 *.log`. MDCContext (from
+        // kotlinx-coroutines-slf4j) propagates the value across every
+        // dispatcher hop the launch flow takes, including the downstream
+        // FileDownloadService coroutines and LauncherService.
+        val launchId = java.util.UUID.randomUUID().toString().take(8)
+
+        launchJob = appScope.launch(kotlinx.coroutines.slf4j.MDCContext(mapOf("launchId" to launchId))) {
             // Capture strings at launch time so the whole pipeline uses one locale
             val s = I18n.s
             val settings = settingsService.getSettings()
@@ -62,7 +69,7 @@ class LauncherController : KoinComponent {
                 GameConsoleService.append("${s.appName}...", LogType.INFO)
                 GameConsoleService.append("→ ${server.name}" + if (isOffline) " [OFFLINE]" else "", LogType.INFO)
 
-                CrashReporter.lastAction = "Launching: ${server.name}"
+                ActionRing.record("Launching: ${server.name} (launchId=$launchId)")
 
                 // 1. Auth — skip in offline mode
                 updateProgress(0.1f, s.stateAuth)
@@ -163,7 +170,7 @@ class LauncherController : KoinComponent {
                 }
 
                 // 5. Launch
-                CrashReporter.lastAction = "Game running: ${server.name}"
+                ActionRing.record("Game running: ${server.name}")
                 GameConsoleService.append(s.stateLaunching, LogType.INFO)
 
                 val process = launcherService.launchClientWithLogs(
@@ -184,7 +191,7 @@ class LauncherController : KoinComponent {
                 _state.value = LaunchState.GameRunning(process)
 
                 val exitCode = process.waitFor()
-                CrashReporter.lastAction = "Game exited: ${server.name} (code $exitCode)"
+                ActionRing.record("Game exited: ${server.name} (code $exitCode)")
 
                 if (exitCode != 0) {
                     _state.value = LaunchState.Error(s.stateExitCode(exitCode))

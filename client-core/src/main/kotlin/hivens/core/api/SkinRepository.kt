@@ -56,7 +56,9 @@ class SkinRepository(
                     val respObj = json.decodeFromString<SmartyResponse>(bodyText)
                     if (respObj.status == "OK") return "OK"
                     return mapErrorStatus(respObj.status)
-                } catch (_: Exception) {}
+                } catch (e: Exception) {
+                    logger.debug("Skin upload response started with '{{' but failed JSON decode; falling through to text-based check", e)
+                }
             }
 
             if (bodyText.contains("OK")) return "OK"
