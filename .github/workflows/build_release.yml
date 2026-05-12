@@ -25,11 +25,60 @@ env:
 
 jobs:
   # ─────────────────────────────────────────────────────────────────────────
+  # Review gate — refuses to release un-reviewed code
+  #
+  # Resolves the PR that brought HEAD onto stable (`gh pr list --search
+  # sha:$GITHUB_SHA`) and asserts that PR carries at least one APPROVING
+  # review. Fails the entire pipeline early — before tests, before builds —
+  # if HEAD is not associated with an approved PR.
+  #
+  # Catches three failure modes:
+  #   1. Tag pushed against a stable HEAD that landed without going through PR
+  #      (direct push, force-push, or a maintainer who got merge-happy).
+  #   2. PR merged but Codex hit its rate limit and never approved — Codex
+  #      leaves a comment but no APPROVED review, so this gate stays red.
+  #   3. Compromised maintainer account pushes a tag against an unreviewed
+  #      sneak-in commit. Branch protection on stable catches the merge;
+  #      this catches the tag.
+  #
+  # The check uses `GH_TOKEN: secrets.GITHUB_TOKEN`, which has the necessary
+  # `pull_requests: read` scope by default. No extra setup needed.
+  # ─────────────────────────────────────────────────────────────────────────
+  review-gate:
+    name: Review Gate
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+      contents: read
+    steps:
+      - name: Verify HEAD originates from an approved PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_SHA:   ${{ github.sha }}
+          GH_REPO:  ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          echo "Resolving PR for HEAD $GH_SHA on $GH_REPO..."
+          PR=$(gh pr list --repo "$GH_REPO" --state merged --search "sha:$GH_SHA" --json number --jq '.[0].number // empty')
+          if [ -z "$PR" ]; then
+            echo "::error title=Review gate::HEAD ($GH_SHA) is not associated with any merged PR. Refusing to release un-PR-ed commits."
+            exit 1
+          fi
+          echo "Found PR #$PR — checking approving reviews..."
+          APPROVED=$(gh pr view "$PR" --repo "$GH_REPO" --json reviews --jq '[.reviews[] | select(.state=="APPROVED")] | length')
+          if [ "$APPROVED" -lt 1 ]; then
+            echo "::error title=Review gate::PR #$PR has zero APPROVED reviews. Possible causes: (1) merged without review, (2) Codex hit rate limit and only commented, (3) all approvals were dismissed by stale-review policy. Get a fresh approval before tagging."
+            exit 1
+          fi
+          echo "::notice title=Review gate::PR #$PR has $APPROVED approving review(s). Gate passes."
+
+  # ─────────────────────────────────────────────────────────────────────────
   # Tests - must pass BEFORE any build
   # ─────────────────────────────────────────────────────────────────────────
   test:
     name: Run Tests (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    needs: review-gate
     # fail-fast: false — one OS failing shouldn't kill the others; we want
     # to see ALL platform-specific failures in one run, not race-of-the-first.
     # shell: bash so steps work identically on Windows runners (PowerShell's
