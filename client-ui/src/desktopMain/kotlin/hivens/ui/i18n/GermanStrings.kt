@@ -153,9 +153,11 @@ object GermanStrings : AppStrings {
     override val trayExit     = "Beenden"
 
     // Settings: Diagnostics
-    override val settingsSectionDiagnostics = "Diagnose"
-    override val settingsOpenLogs           = "Log-Ordner öffnen"
-    override val settingsOpenCrashReports   = "Absturzberichte"
+    override val settingsSectionDiagnostics      = "Diagnose"
+    override val settingsOpenLogs                = "Log-Ordner öffnen"
+    override val settingsOpenCrashReports        = "Absturzberichte"
+    override val settingsCreateDiagnosticBundle  = "Diagnosepaket erstellen"
+    override val settingsDiagnosticBundleHint    = "Bündelt redigierte Logs, Absturzberichte, Aktionshistorie und Systeminformationen in einer ZIP — für den Support."
 
     // File Manager
     override fun fileDownloading(n: Int) = "Updates werden heruntergeladen ($n Dateien)..."

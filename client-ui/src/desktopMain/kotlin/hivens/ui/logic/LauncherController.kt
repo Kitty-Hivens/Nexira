@@ -4,7 +4,7 @@ import hivens.core.api.interfaces.*
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.LauncherLogType
 import hivens.core.data.SessionData
-import hivens.launcher.CrashReporter
+import hivens.core.diag.ActionRing
 import hivens.launcher.CredentialsManager
 import hivens.launcher.ManifestCache
 import hivens.launcher.ProfileManager
@@ -69,7 +69,7 @@ class LauncherController : KoinComponent {
                 GameConsoleService.append("${s.appName}...", LogType.INFO)
                 GameConsoleService.append("→ ${server.name}" + if (isOffline) " [OFFLINE]" else "", LogType.INFO)
 
-                CrashReporter.lastAction = "Launching: ${server.name}"
+                ActionRing.record("Launching: ${server.name} (launchId=$launchId)")
 
                 // 1. Auth — skip in offline mode
                 updateProgress(0.1f, s.stateAuth)
@@ -170,7 +170,7 @@ class LauncherController : KoinComponent {
                 }
 
                 // 5. Launch
-                CrashReporter.lastAction = "Game running: ${server.name}"
+                ActionRing.record("Game running: ${server.name}")
                 GameConsoleService.append(s.stateLaunching, LogType.INFO)
 
                 val process = launcherService.launchClientWithLogs(
@@ -191,7 +191,7 @@ class LauncherController : KoinComponent {
                 _state.value = LaunchState.GameRunning(process)
 
                 val exitCode = process.waitFor()
-                CrashReporter.lastAction = "Game exited: ${server.name} (code $exitCode)"
+                ActionRing.record("Game exited: ${server.name} (code $exitCode)")
 
                 if (exitCode != 0) {
                     _state.value = LaunchState.Error(s.stateExitCode(exitCode))

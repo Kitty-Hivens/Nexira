@@ -153,9 +153,11 @@ object EnglishStrings : AppStrings {
     override val trayExit     = "Exit"
 
     // Settings: Diagnostics
-    override val settingsSectionDiagnostics = "Diagnostics"
-    override val settingsOpenLogs           = "Open logs folder"
-    override val settingsOpenCrashReports   = "Crash reports"
+    override val settingsSectionDiagnostics      = "Diagnostics"
+    override val settingsOpenLogs                = "Open logs folder"
+    override val settingsOpenCrashReports        = "Crash reports"
+    override val settingsCreateDiagnosticBundle  = "Create diagnostic bundle"
+    override val settingsDiagnosticBundleHint    = "Bundles redacted logs, crash reports, action history and system info into one ZIP for support."
 
     // File Manager
     override fun fileDownloading(n: Int) = "Downloading updates ($n files)..."

@@ -151,7 +151,14 @@ fun main() {
     // (`grep sessionId=abc12345 *.log`). System property (not MDC) because
     // MDC is thread-local and we want this on every line from every thread —
     // the logback pattern reads the property via `${aura.sessionId}`.
-    System.setProperty("aura.sessionId", java.util.UUID.randomUUID().toString().take(8))
+    val sessionId = java.util.UUID.randomUUID().toString().take(8)
+    System.setProperty("aura.sessionId", sessionId)
+
+    // Beacon: the very first entry in the action ring — handy when reading a
+    // bundle to confirm what process / version / OS produced it.
+    hivens.core.diag.ActionRing.record(
+        "Launcher started (v${Branding.VERSION}, sessionId=$sessionId, os=${System.getProperty("os.name")})"
+    )
 
     System.setProperty("jna.nosys", "true")
     System.setProperty("skiko.fps.limit", "60")

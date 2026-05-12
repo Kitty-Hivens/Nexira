@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
 import hivens.config.Branding
 import hivens.core.api.interfaces.ISettingsService
+import hivens.launcher.diag.DiagnosticBundle
 import hivens.launcher.platform.PlatformPaths
 import hivens.ui.components.GlassCard
 import hivens.ui.easter.AprilFoolsButton
@@ -422,6 +423,34 @@ fun SettingsScreen(
                             ),
                         )
                     }
+
+                    Spacer(Modifier.height(8.dp))
+
+                    // Beacon: one-click ZIP for support — bundles redacted logs,
+                    // crash reports, action ring and system info.
+                    AprilFoolsButton(
+                        id       = "settings_create_diag_bundle_btn",
+                        text     = s.settingsCreateDiagnosticBundle,
+                        onClick  = {
+                            runCatching {
+                                val zip = DiagnosticBundle.create(paths)
+                                if (Desktop.isDesktopSupported()) {
+                                    Desktop.getDesktop().open(zip.parent.toFile())
+                                }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors   = ButtonDefaults.buttonColors(
+                            containerColor = Color.Transparent,
+                            contentColor   = CelestiaTheme.colors.textPrimary,
+                        ),
+                    )
+                    Text(
+                        text     = s.settingsDiagnosticBundleHint,
+                        color    = CelestiaTheme.colors.textSecondary,
+                        fontSize = androidx.compose.ui.unit.TextUnit(11f, androidx.compose.ui.unit.TextUnitType.Sp),
+                        modifier = Modifier.padding(start = 8.dp, top = 2.dp)
+                    )
                 }
 
                 // ── About ─────────────────────────────────────────────────────
