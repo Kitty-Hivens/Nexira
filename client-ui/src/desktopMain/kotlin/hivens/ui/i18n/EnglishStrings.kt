@@ -21,8 +21,10 @@ object EnglishStrings : AppStrings {
 
     // Dashboard
     override fun dashboardWelcome(name: String) = "WELCOME BACK, $name"
-    override val dashboardServers      = "AVAILABLE SERVERS"
-    override val dashboardServersEmpty = "No servers found"
+    override val dashboardServers              = "AVAILABLE SERVERS"
+    override val dashboardServersEmpty         = "No servers found"
+    override val dashboardLoginRequiredTitle   = "Sign in to see servers"
+    override val dashboardLoginRequiredHint    = "Use the panel on the right to log in. The server list lives behind authentication on SMARTYcraft."
 
     // Launch Control
     override val launchReady       = "Ready to play"

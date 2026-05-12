@@ -23,6 +23,10 @@ interface AppStrings {
     fun dashboardWelcome(name: String): String
     val dashboardServers: String
     val dashboardServersEmpty: String
+    /** Shown in the main content area while no session exists — replaces the
+     *  ambiguous "spinning indicator forever" state for unauthenticated users. */
+    val dashboardLoginRequiredTitle: String
+    val dashboardLoginRequiredHint: String
 
     // --- Launch Control ---
     val launchReady: String
