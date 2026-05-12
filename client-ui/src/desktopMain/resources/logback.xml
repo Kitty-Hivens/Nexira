@@ -35,6 +35,15 @@
     <conversionRule conversionWord="rmsg"
                     converterClass="hivens.ui.logging.RedactingMessageConverter"/>
 
+    <!-- `%rex` is the redacted-throwable counterpart for stack traces. Without
+         it the standard `%ex` / `%xEx` would print throwable.toString() raw and
+         leak tokens embedded in exception messages (e.g. URLs in IOException).
+         Listing `%rex` in the file patterns suppresses logback's automatic
+         throwable auto-append, which would otherwise re-inject the unredacted
+         `%xEx` at line end. -->
+    <conversionRule conversionWord="rex"
+                    converterClass="hivens.ui.logging.RedactingThrowableConverter"/>
+
     <property name="LOGS_DIR"   value="${aura.logs.dir:-logs}"/>
     <property name="SESSION_ID" value="${aura.sessionId:-?}"/>
 
@@ -43,9 +52,9 @@
          coroutines via MDCContext from kotlinx-coroutines-slf4j). The slash leaves
          a visible `?/?` when neither is set rather than a confusing empty bracket. -->
     <property name="PATTERN_FILE"
-              value="%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [${SESSION_ID}/%X{launchId:-?}] %logger{36} - %rmsg%n%ex"/>
+              value="%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [${SESSION_ID}/%X{launchId:-?}] %logger{36} - %rmsg%n%rex"/>
     <property name="PATTERN_CONSOLE"
-              value="%d{HH:mm:ss.SSS} %-5level %logger{36} - %rmsg%n%ex"/>
+              value="%d{HH:mm:ss.SSS} %-5level %logger{36} - %rmsg%n%rex"/>
 
     <!-- ── Console — kept for `gradle run` / IDE dev workflow. -->
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
@@ -141,9 +150,14 @@
         <appender-ref ref="CRASH_FILE"/>
     </logger>
 
-    <!-- Game stdout/stderr stream from ProcessLogHandler. -->
+    <!-- Game stdout/stderr stream from ProcessLogHandler. additivity=false so
+         the volume of game lines stays out of launcher.log + console; CRASH_FILE
+         is wired explicitly so ERROR-level game lines (mod crashes, JVM faults
+         caught by `ProcessLogHandler`'s text-pattern routing) still land in
+         crash.log alongside launcher-side errors. -->
     <logger name="hivens.launcher.game" level="INFO" additivity="false">
         <appender-ref ref="GAME_FILE"/>
+        <appender-ref ref="CRASH_FILE"/>
     </logger>
 
     <!-- Everything else: console + launcher.log + crash.log. -->
