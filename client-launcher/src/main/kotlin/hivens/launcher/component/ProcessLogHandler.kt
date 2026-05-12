@@ -36,30 +36,31 @@ internal class ProcessLogHandler {
     }
 
     private fun pipeOutput(stream: InputStream, type: LauncherLogType, onLog: (String, LauncherLogType) -> Unit) {
-        val reader = BufferedReader(InputStreamReader(stream))
         thread(isDaemon = true) {
-            try {
-                var line: String?
-                while (reader.readLine().also { line = it } != null) {
-                    val text = line ?: continue
+            // `.use { }` guarantees the underlying stream handle is released
+            // when the loop exits (EOF, exception, or process kill). Without
+            // it the reader stayed referenced until GC.
+            BufferedReader(InputStreamReader(stream)).use { reader ->
+                try {
+                    reader.lineSequence().forEach { text ->
+                        val finalType = when {
+                            type == LauncherLogType.ERROR -> LauncherLogType.ERROR
+                            text.contains("WARN", ignoreCase = true) -> LauncherLogType.WARN
+                            text.contains("ERROR", ignoreCase = true) || text.contains("Exception", ignoreCase = true) -> LauncherLogType.ERROR
+                            else -> LauncherLogType.INFO
+                        }
 
-                    val finalType = when {
-                        type == LauncherLogType.ERROR -> LauncherLogType.ERROR
-                        text.contains("WARN", ignoreCase = true) -> LauncherLogType.WARN
-                        text.contains("ERROR", ignoreCase = true) || text.contains("Exception", ignoreCase = true) -> LauncherLogType.ERROR
-                        else -> LauncherLogType.INFO
+                        onLog(text, finalType)
+
+                        when (finalType) {
+                            LauncherLogType.ERROR -> gameLog.error(text)
+                            LauncherLogType.WARN  -> gameLog.warn(text)
+                            else                  -> gameLog.info(text)
+                        }
                     }
-
-                    onLog(text, finalType)
-
-                    when (finalType) {
-                        LauncherLogType.ERROR -> gameLog.error(text)
-                        LauncherLogType.WARN  -> gameLog.warn(text)
-                        else                  -> gameLog.info(text)
-                    }
+                } catch (_: Exception) {
+                    // Ignore EOF when terminating the process
                 }
-            } catch (_: Exception) {
-                // Ignore EOF when terminating the process
             }
         }
     }
