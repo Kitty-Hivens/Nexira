@@ -10,7 +10,11 @@ import java.nio.file.Paths
  * 1. `AURA_DATA_DIR` environment variable (if set and non-blank) — universal override
  *    that lets a user move data to any drive without touching settings. Equivalent in
  *    spirit to Linux's `XDG_DATA_HOME` but works on every platform.
- * 2. Per-OS default:
+ * 2. [BootstrapConf] `data-dir` key — user-chosen override persisted via the
+ *    "Move data directory" Settings UI. Bootstrap conf lives outside the data
+ *    dir so the launcher can find the override before it even knows where the
+ *    data dir is.
+ * 3. Per-OS default:
  *    - Windows: `%LOCALAPPDATA%\AuraLauncher` (kept separate from the install dir under `%APPDATA%`)
  *    - macOS:   `~/Library/Application Support/AuraLauncher`
  *    - Linux:   `$XDG_DATA_HOME/aura-launcher` (default `~/.local/share/aura-launcher`)
@@ -21,15 +25,19 @@ import java.nio.file.Paths
 class PlatformPaths(
     osName: String,
     private val home: Path,
-    env: (String) -> String?
+    bootstrapDataDir: () -> Path? = { BootstrapConf.read()[BootstrapConf.KEY_DATA_DIR]?.let { Paths.get(it) } },
+    env: (String) -> String?,
 ) {
     private val isWindows = osName.contains("windows", ignoreCase = true)
     private val isMacOs = osName.contains("mac", ignoreCase = true) ||
             osName.contains("darwin", ignoreCase = true)
 
     val dataDir: Path = run {
-        val override = env("AURA_DATA_DIR")
-        if (!override.isNullOrBlank()) return@run Paths.get(override)
+        val envOverride = env("AURA_DATA_DIR")
+        if (!envOverride.isNullOrBlank()) return@run Paths.get(envOverride)
+
+        val confOverride = bootstrapDataDir()
+        if (confOverride != null) return@run confOverride
 
         when {
             isWindows -> {
