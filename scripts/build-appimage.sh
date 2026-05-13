@@ -78,6 +78,7 @@ HERE="\$(dirname "\$(readlink -f "\$0")")"
 exec "\$HERE/usr/bin/java" \\
      -Dawt.appClassName=AuraLauncher \\
      --add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED \\
+     --enable-native-access=ALL-UNNAMED \\
      ${WAYLAND_TRIAL_FLAG} \\
      -jar "\$HERE/usr/lib/aura-launcher.jar" \\
      "\$@"
