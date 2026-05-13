@@ -19,6 +19,10 @@ import hivens.config.Branding
 import hivens.core.api.interfaces.ISettingsService
 import hivens.launcher.diag.DiagnosticBundle
 import hivens.launcher.platform.PlatformPaths
+import io.github.vinceglb.filekit.FileKit
+import io.github.vinceglb.filekit.PlatformFile
+import io.github.vinceglb.filekit.dialogs.openDirectoryPicker
+import io.github.vinceglb.filekit.path
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import hivens.ui.components.GlassCard
@@ -495,18 +499,17 @@ fun SettingsScreen(
                             onClick = {
                                 showError = null
                                 moveScope.launch {
-                                    val picked = withContext(kotlinx.coroutines.Dispatchers.IO) {
-                                        runCatching {
-                                            val chooser = javax.swing.JFileChooser().apply {
-                                                fileSelectionMode  = javax.swing.JFileChooser.DIRECTORIES_ONLY
-                                                dialogTitle        = s.settingsDataDirPickerTitle
-                                                isMultiSelectionEnabled = false
-                                            }
-                                            if (chooser.showOpenDialog(null) == javax.swing.JFileChooser.APPROVE_OPTION) {
-                                                chooser.selectedFile?.toPath()
-                                            } else null
-                                        }.getOrNull()
-                                    } ?: return@launch
+                                    // filekit uses xdg-desktop-portal on Linux
+                                    // (your native Hyprland / KDE / GNOME picker),
+                                    // IFileDialog on Windows, NSOpenPanel on macOS.
+                                    // No Metal LAF eyesore.
+                                    val pickedFile = runCatching {
+                                        FileKit.openDirectoryPicker(
+                                            directory = PlatformFile(paths.dataDir.toFile()),
+                                        )
+                                    }.getOrNull() ?: return@launch
+
+                                    val picked = java.nio.file.Paths.get(pickedFile.path)
 
                                     if (picked.toAbsolutePath().normalize() == paths.dataDir.toAbsolutePath().normalize()) {
                                         showError = s.settingsDataDirErrorSamePath
