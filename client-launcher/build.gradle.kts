@@ -34,10 +34,12 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform {
-        // Both tags are dev / maintenance only — neither belongs in the
-        // regular unit-test set. `smoke` hits real smartycraft.ru;
-        // `live-keyring` hits the developer's own Secret Service daemon.
-        excludeTags("smoke", "live-keyring")
+        // Dev / maintenance only — none of these belong in the regular
+        // unit-test set. `smoke` hits real smartycraft.ru;
+        // `live-keyring` hits the developer's Secret Service daemon
+        // (Linux); `live-windows-keyring` hits real Windows Credential
+        // Manager (Windows only).
+        excludeTags("smoke", "live-keyring", "live-windows-keyring")
     }
 }
 
@@ -69,6 +71,22 @@ val liveKeyringTest by tasks.registering(Test::class) {
 // and Panama symbol lookup happens at construction time.
 tasks.test {
     jvmArgs("--enable-native-access=ALL-UNNAMED")
+}
+
+// Windows-only live probe against real Credential Manager via Panama
+// bindings to advapi32. Same opt-in shape as liveKeyringTest: skips
+// gracefully when not on Windows or when advapi32 isn't loadable.
+val liveWindowsKeyringTest by tasks.registering(Test::class) {
+    description = "Runs WindowsCredentialManagerKeyringStorage live probe against the local Credential Manager service."
+    group = "verification"
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform {
+        includeTags("live-windows-keyring")
+    }
+    jvmArgs("--enable-native-access=ALL-UNNAMED")
+    outputs.upToDateWhen { false }
+    shouldRunAfter(tasks.test)
 }
 
 // ── Live smoke tests — gated on real `smartycraft.ru` ────────────────────────
