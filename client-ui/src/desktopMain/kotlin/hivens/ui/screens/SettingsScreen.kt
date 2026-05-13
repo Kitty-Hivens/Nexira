@@ -560,11 +560,22 @@ fun SettingsScreen(
                                     )
                                     if (ok) {
                                         hivens.core.diag.ActionRing.record(
-                                            "Data-dir move scheduled: ${paths.dataDir} → $target (applies on next start)",
+                                            "Data-dir move scheduled: ${paths.dataDir} → $target — quitting for restart",
                                         )
+                                        // Hard exit — user explicitly clicked "Quit now". Avoids the
+                                        // tray-shutdown path that might re-show the window if a game
+                                        // is mid-launch. The pending move only applies AFTER the
+                                        // launcher restarts, so a clean process termination is the
+                                        // right move.
+                                        kotlin.system.exitProcess(0)
+                                    } else {
+                                        // Schedule was refused (target validations failed at the
+                                        // mover layer — e.g., race with another process touching
+                                        // the target between our UI check and DataDirMover.schedule).
+                                        // Close the dialog so the user can pick a different target.
+                                        pendingTarget = null
                                     }
-                                    pendingTarget = null
-                                }) { Text(s.settingsDataDirRestartRequired) }
+                                }) { Text(s.settingsDataDirQuitNow) }
                             },
                             dismissButton = {
                                 OutlinedButton(onClick = { pendingTarget = null }) {
