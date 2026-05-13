@@ -70,10 +70,17 @@ subprojects {
     }
 
     tasks.withType<Test>().configureEach {
-        maxParallelForks = Runtime.getRuntime().availableProcessors()
+        // CI wants maximum throughput (free runners, ephemeral); local
+        // dev wants the laptop to stay usable while tests run. Detect via
+        // the `CI` env var that GH Actions / most CI providers set.
+        // Local cap of 2 forks × 512MB heap = ~1GB peak — leaves modern
+        // dev machines (8+ cores) plenty of headroom for IDE/browser/etc.
+        val cores = Runtime.getRuntime().availableProcessors()
+        val isCi  = System.getenv("CI") == "true"
+        maxParallelForks = if (isCi) cores else minOf(2, cores)
 
         jvmArgs(
-            "-Xmx1g",
+            if (isCi) "-Xmx1g" else "-Xmx512m",
             "-XX:+UseParallelGC"
         )
     }
@@ -83,7 +90,12 @@ subprojects {
 // GRADLE DAEMON OPTIMIZATION
 // ========================================================================
 gradle.startParameter.apply {
-    maxWorkerCount = Runtime.getRuntime().availableProcessors()
+    val cores = Runtime.getRuntime().availableProcessors()
+    val isCi  = System.getenv("CI") == "true"
+    // Same CI-vs-local split — local builds shouldn't pin every CPU
+    // every time the daemon spins up. 4 workers is enough to parallelise
+    // most subproject compiles without thermal-throttling the laptop.
+    maxWorkerCount = if (isCi) cores else minOf(4, cores)
 }
 
 // dorkbox/SystemTray 4.4 has a hardcoded JNA version check; JBR 25 ships
