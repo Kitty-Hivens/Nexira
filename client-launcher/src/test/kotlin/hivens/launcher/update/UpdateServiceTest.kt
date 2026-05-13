@@ -252,6 +252,77 @@ class UpdateServiceTest {
         }
     }
 
+    @Test
+    fun `findAssetForCurrentOS picks aarch64 DMG on Apple Silicon (dual-arch release)`() {
+        val svc = createService("{}")
+        val originalOs = System.getProperty("os.name")
+        val originalArch = System.getProperty("os.arch")
+        try {
+            System.setProperty("os.name", "Mac OS X")
+            System.setProperty("os.arch", "aarch64")
+            val assets = listOf(
+                GitHubAsset("AuraLauncher-3.0.0-aarch64.dmg", "https://example.com/arm", 80_000_000),
+                GitHubAsset("AuraLauncher-3.0.0-x86_64.dmg",  "https://example.com/intel", 80_000_000),
+            )
+            assertEquals(
+                "AuraLauncher-3.0.0-aarch64.dmg",
+                svc.findAssetForCurrentOS(assets)?.name,
+                "Apple Silicon must NOT receive the x86_64 DMG (would fail with 'not supported on this Mac')",
+            )
+        } finally {
+            System.setProperty("os.name", originalOs)
+            System.setProperty("os.arch", originalArch)
+        }
+    }
+
+    @Test
+    fun `findAssetForCurrentOS picks x86_64 DMG on Intel Mac (dual-arch release)`() {
+        val svc = createService("{}")
+        val originalOs = System.getProperty("os.name")
+        val originalArch = System.getProperty("os.arch")
+        try {
+            System.setProperty("os.name", "Mac OS X")
+            System.setProperty("os.arch", "x86_64")
+            val assets = listOf(
+                GitHubAsset("AuraLauncher-3.0.0-aarch64.dmg", "https://example.com/arm", 80_000_000),
+                GitHubAsset("AuraLauncher-3.0.0-x86_64.dmg",  "https://example.com/intel", 80_000_000),
+            )
+            assertEquals(
+                "AuraLauncher-3.0.0-x86_64.dmg",
+                svc.findAssetForCurrentOS(assets)?.name,
+                "Intel Mac must NOT receive the aarch64 DMG (Rosetta only goes x86_64 → arm, not arm → x86_64)",
+            )
+        } finally {
+            System.setProperty("os.name", originalOs)
+            System.setProperty("os.arch", originalArch)
+        }
+    }
+
+    @Test
+    fun `findAssetForCurrentOS falls back to single dmg for legacy pre-dual-arch releases`() {
+        val svc = createService("{}")
+        val originalOs = System.getProperty("os.name")
+        val originalArch = System.getProperty("os.arch")
+        try {
+            System.setProperty("os.name", "Mac OS X")
+            System.setProperty("os.arch", "x86_64")
+            // Legacy release (≤ 2.2.12) shipped a single DMG with no arch suffix —
+            // updater must still find it for backward compatibility, even if the
+            // resulting binary may be wrong-arch on some hosts. Better than no
+            // update at all.
+            val assets = listOf(
+                GitHubAsset("AuraLauncher-2.2.11.dmg", "https://example.com/legacy", 80_000_000),
+            )
+            assertEquals(
+                "AuraLauncher-2.2.11.dmg",
+                svc.findAssetForCurrentOS(assets)?.name,
+            )
+        } finally {
+            System.setProperty("os.name", originalOs)
+            System.setProperty("os.arch", originalArch)
+        }
+    }
+
     // ═══════════════════════════════════════════════════════════════════════════
     // extractChecksum
     // ═══════════════════════════════════════════════════════════════════════════
