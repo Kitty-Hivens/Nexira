@@ -154,7 +154,7 @@ class EnvironmentPreparer(private val clientProvider: HttpClientProvider) {
     /**
      * Pulls .so/.dll to the root of the folder if they are in subfolders
      */
-    private fun flattenNatives(dir: Path) {
+    internal fun flattenNatives(dir: Path) {
         try {
             if (!Files.exists(dir)) return
             val libraries = Files.walk(dir)
@@ -176,7 +176,7 @@ class EnvironmentPreparer(private val clientProvider: HttpClientProvider) {
         }
     }
 
-    private fun isFolderValidForOs(dir: Path, os: String): Boolean {
+    internal fun isFolderValidForOs(dir: Path, os: String): Boolean {
         if (!Files.exists(dir)) return false
         val expectedExtension = when (os) {
             "linux" -> ".so"
@@ -229,7 +229,7 @@ class EnvironmentPreparer(private val clientProvider: HttpClientProvider) {
         }
     }
 
-    private fun getOsSuffix(): String {
+    internal fun getOsSuffix(): String {
         val osName = System.getProperty("os.name").lowercase(Locale.getDefault())
         return when {
             osName.contains("win") -> "windows"
