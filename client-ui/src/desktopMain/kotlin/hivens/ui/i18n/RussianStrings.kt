@@ -350,6 +350,18 @@ object RussianStrings : AppStrings {
     override val sslBypassRevoke        = "Отозвать"
     override fun sslBypassExpiresAt(formatted: String) = "Истекает: $formatted"
 
+    override val settingsSectionDataDir       = "Каталог данных"
+    override val settingsDataDirCurrent       = "Текущий путь:"
+    override val settingsDataDirMove          = "Переместить..."
+    override val settingsDataDirPickerTitle   = "Выбери новое место для данных Aura"
+    override val settingsDataDirConfirmTitle  = "Переместить каталог данных?"
+    override fun settingsDataDirConfirmBody(source: String, target: String) =
+        "Aura перенесёт данные:\nиз: $source\nв:  $target\n\nПеремещение применится при перезапуске лаунчера."
+    override val settingsDataDirRestartRequired = "Требуется перезапуск — Aura применит перемещение при следующем старте"
+    override val settingsDataDirQuitNow         = "Выйти сейчас"
+    override val settingsDataDirErrorSamePath   = "Это и есть текущий каталог — выбери другую папку"
+    override val settingsDataDirErrorNotEmpty   = "Целевая папка не пуста — выбери пустую папку или удали её содержимое"
+
     // ── JVM Args Builder ────────────────────────────────────────────────
     override val jvmTitle    = "Конструктор JVM-аргументов"
     override val jvmSubtitle = "Выбери пресет или собери флаги вручную. Результат запишется в jvmArgs."

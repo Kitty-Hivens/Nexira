@@ -458,6 +458,121 @@ fun SettingsScreen(
                     )
                 }
 
+                // ── Data directory (move to a different drive / folder) ───────
+                //
+                // Schedule-on-restart move via DataDirMover. The actual file
+                // copy happens on next launcher start (BEFORE PlatformPaths
+                // is consulted) so we don't have to fight Windows lock
+                // semantics or coordinate with background tasks. The UI here
+                // just persists the intent and prompts the user to restart.
+                item {
+                    SettingsSectionTitle(s.settingsSectionDataDir)
+
+                    var pendingTarget by remember { mutableStateOf<java.nio.file.Path?>(null) }
+                    var showError     by remember { mutableStateOf<String?>(null) }
+                    val moveScope     = rememberCoroutineScope()
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(CelestiaTheme.colors.background.copy(alpha = 0.4f))
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(
+                            text  = s.settingsDataDirCurrent,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = CelestiaTheme.colors.textSecondary,
+                        )
+                        Text(
+                            text       = paths.dataDir.toAbsolutePath().toString(),
+                            color      = CelestiaTheme.colors.textPrimary,
+                            fontWeight = FontWeight.SemiBold,
+                            style      = MaterialTheme.typography.bodyMedium,
+                        )
+                        OutlinedButton(
+                            onClick = {
+                                showError = null
+                                moveScope.launch {
+                                    val picked = withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                        runCatching {
+                                            val chooser = javax.swing.JFileChooser().apply {
+                                                fileSelectionMode  = javax.swing.JFileChooser.DIRECTORIES_ONLY
+                                                dialogTitle        = s.settingsDataDirPickerTitle
+                                                isMultiSelectionEnabled = false
+                                            }
+                                            if (chooser.showOpenDialog(null) == javax.swing.JFileChooser.APPROVE_OPTION) {
+                                                chooser.selectedFile?.toPath()
+                                            } else null
+                                        }.getOrNull()
+                                    } ?: return@launch
+
+                                    if (picked.toAbsolutePath().normalize() == paths.dataDir.toAbsolutePath().normalize()) {
+                                        showError = s.settingsDataDirErrorSamePath
+                                        return@launch
+                                    }
+                                    val populated = withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                        runCatching {
+                                            java.nio.file.Files.exists(picked) &&
+                                                java.nio.file.Files.list(picked).use { it.findAny().isPresent }
+                                        }.getOrDefault(false)
+                                    }
+                                    if (populated) {
+                                        showError = s.settingsDataDirErrorNotEmpty
+                                        return@launch
+                                    }
+                                    pendingTarget = picked
+                                }
+                            },
+                            shape = RoundedCornerShape(6.dp),
+                        ) {
+                            Text(s.settingsDataDirMove, color = CelestiaTheme.colors.textPrimary)
+                        }
+                        if (showError != null) {
+                            Text(
+                                text  = showError!!,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color(0xFFEF4444),
+                            )
+                        }
+                    }
+
+                    if (pendingTarget != null) {
+                        val target = pendingTarget!!
+                        AlertDialog(
+                            onDismissRequest = { pendingTarget = null },
+                            title = { Text(s.settingsDataDirConfirmTitle) },
+                            text  = {
+                                Text(s.settingsDataDirConfirmBody(
+                                    paths.dataDir.toAbsolutePath().toString(),
+                                    target.toAbsolutePath().toString(),
+                                ))
+                            },
+                            confirmButton = {
+                                Button(onClick = {
+                                    val ok = hivens.launcher.platform.DataDirMover.schedule(
+                                        source = paths.dataDir,
+                                        target = target,
+                                    )
+                                    if (ok) {
+                                        hivens.core.diag.ActionRing.record(
+                                            "Data-dir move scheduled: ${paths.dataDir} → $target (applies on next start)",
+                                        )
+                                    }
+                                    pendingTarget = null
+                                }) { Text(s.settingsDataDirRestartRequired) }
+                            },
+                            dismissButton = {
+                                OutlinedButton(onClick = { pendingTarget = null }) {
+                                    Text(s.sslWarningCancel)
+                                }
+                            },
+                            containerColor = CelestiaTheme.colors.surface,
+                        )
+                    }
+                }
+
                 // ── Diagnostics ───────────────────────────────────────────────
                 item {
                     // Secret: tap the diagnostics title 5 times to toggle the April Fools debug panel
