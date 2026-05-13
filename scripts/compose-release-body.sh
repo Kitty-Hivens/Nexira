@@ -57,7 +57,8 @@ done < "$CHECKSUMS_FILE"
   printf '| Windows Installer | [`AuraLauncher-%s-Setup.exe`](%s/AuraLauncher-%s-Setup.exe) |\n' "$APP_VERSION" "$REPO_BASE" "$APP_VERSION"
   printf '| Windows Portable  | [`AuraLauncher-%s-Windows-Portable.zip`](%s/AuraLauncher-%s-Windows-Portable.zip) |\n' "$APP_VERSION" "$REPO_BASE" "$APP_VERSION"
   printf '| Linux AppImage    | [`AuraLauncher-%s-x86_64.AppImage`](%s/AuraLauncher-%s-x86_64.AppImage) |\n' "$APP_VERSION" "$REPO_BASE" "$APP_VERSION"
-  printf '| macOS             | [`AuraLauncher-%s.dmg`](%s/AuraLauncher-%s.dmg) |\n\n' "$APP_VERSION" "$REPO_BASE" "$APP_VERSION"
+  printf '| macOS Apple Silicon | [`AuraLauncher-%s-aarch64.dmg`](%s/AuraLauncher-%s-aarch64.dmg) |\n' "$APP_VERSION" "$REPO_BASE" "$APP_VERSION"
+  printf '| macOS Intel       | [`AuraLauncher-%s-x86_64.dmg`](%s/AuraLauncher-%s-x86_64.dmg) |\n\n' "$APP_VERSION" "$REPO_BASE" "$APP_VERSION"
 
   printf '<details>\n<summary>SHA256 Checksums</summary>\n\n'
   printf '| File | SHA256 |\n|---|---|\n'
