@@ -350,6 +350,18 @@ object GermanStrings : AppStrings {
     override val sslBypassRevoke        = "Widerrufen"
     override fun sslBypassExpiresAt(formatted: String) = "Läuft ab: $formatted"
 
+    override val settingsSectionDataDir       = "Datenverzeichnis"
+    override val settingsDataDirCurrent       = "Aktueller Pfad:"
+    override val settingsDataDirMove          = "Verschieben..."
+    override val settingsDataDirPickerTitle   = "Neuen Speicherort für Aura-Daten wählen"
+    override val settingsDataDirConfirmTitle  = "Datenverzeichnis verschieben?"
+    override fun settingsDataDirConfirmBody(source: String, target: String) =
+        "Aura wird die Daten verschieben:\nvon: $source\nnach: $target\n\nDie Verschiebung wird beim nächsten Start angewendet."
+    override val settingsDataDirRestartRequired = "Neustart erforderlich — Aura wendet die Verschiebung beim nächsten Start an"
+    override val settingsDataDirQuitNow         = "Jetzt beenden"
+    override val settingsDataDirErrorSamePath   = "Das ist bereits das aktuelle Verzeichnis — wähle einen anderen Ordner"
+    override val settingsDataDirErrorNotEmpty   = "Zielordner ist nicht leer — wähle einen leeren Ordner oder lösche dessen Inhalt"
+
     // ── JVM Args Builder ────────────────────────────────────────────────
     override val jvmTitle    = "JVM-Argument-Builder"
     override val jvmSubtitle = "Wähle ein Preset oder stelle Flags manuell zusammen. Das Ergebnis landet in jvmArgs."

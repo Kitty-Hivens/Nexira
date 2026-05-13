@@ -160,6 +160,14 @@ private fun setLinuxXToolkitAppClassName(name: String) {
 
 @OptIn(ExperimentalResourceApi::class, DelicateCoroutinesApi::class)
 fun main() {
+    // BEFORE PlatformPaths resolution: apply any pending data-dir move
+    // scheduled from the Settings UI. If user clicked "Move data
+    // directory" → picker → restart, this is where the relocation
+    // actually happens. Bootstrap conf reads + file ops only; no logger
+    // initialised yet at this point so failures land in stderr.
+    // Operation is idempotent; safe to call on every startup.
+    hivens.launcher.platform.DataDirMover.applyPending()
+
     // Resolve logs dir BEFORE any LoggerFactory.getLogger() call so logback.xml
     // (which reads `${aura.logs.dir}` for its rolling-file appenders) sees the
     // platform-correct path on its very first init. The first getLogger we

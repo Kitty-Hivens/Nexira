@@ -354,6 +354,19 @@ interface AppStrings {
     /** Receives a pre-formatted local date/time string. */
     fun sslBypassExpiresAt(formatted: String): String
 
+    // --- Data directory (Settings → Data dir) ---
+    val settingsSectionDataDir: String
+    val settingsDataDirCurrent: String
+    val settingsDataDirMove: String
+    val settingsDataDirPickerTitle: String
+    val settingsDataDirConfirmTitle: String
+    /** Templated body: receives source and target paths. */
+    fun settingsDataDirConfirmBody(source: String, target: String): String
+    val settingsDataDirRestartRequired: String
+    val settingsDataDirQuitNow: String
+    val settingsDataDirErrorSamePath: String
+    val settingsDataDirErrorNotEmpty: String
+
     // ═══════════════════════════════════════════════════════════════════════
     // JVM Args Builder dialog
     // ═══════════════════════════════════════════════════════════════════════
