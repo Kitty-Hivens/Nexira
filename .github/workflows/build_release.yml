@@ -349,12 +349,32 @@ jobs:
           path: AuraLauncher-${{ env.APP_VERSION }}-x86_64.AppImage
 
   # ─────────────────────────────────────────────────────────────────────────
-  # MACOS — DMG
+  # MACOS — DMG, both architectures
+  #
+  # Compose Desktop's `packageReleaseDmg` produces a host-architecture
+  # DMG. macos-latest runners are Apple Silicon since the GH Actions
+  # migration in 2024-2025, so building only there left Intel Mac users
+  # (pre-2020 hardware) with a binary they literally cannot launch — they
+  # see "not supported on this Mac" before Gatekeeper even fires.
+  #
+  # Dual matrix: macos-latest (Apple Silicon → aarch64) + macos-13 (Intel
+  # → x86_64). Two DMGs ship alongside each other; users pick by their
+  # CPU. Universal-binary path via lipo would be cleaner UX but Compose
+  # Desktop nativeDistributions has no out-of-box support; revisit when
+  # we have a reason to prioritise that.
   # ─────────────────────────────────────────────────────────────────────────
   build-macos:
-    name: macOS (DMG)
-    runs-on: macos-latest
+    name: macOS (DMG, ${{ matrix.arch }})
     needs: changelog
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest    # Apple Silicon (M1+)
+            arch: aarch64
+          - os: macos-13        # Last Intel runner image GH actively maintains
+            arch: x86_64
+    runs-on: ${{ matrix.os }}
     env:
       APP_VERSION: ${{ needs.changelog.outputs.version }}
     steps:
@@ -370,15 +390,17 @@ jobs:
       - name: Build DMG
         run: ./gradlew :client-ui:packageReleaseDmg -PappVersion="$APP_VERSION"
 
-      - name: Rename DMG
+      - name: Rename DMG with architecture suffix
         run: |
           mv client-ui/build/compose/binaries/main-release/dmg/*.dmg \
-             "AuraLauncher-$APP_VERSION.dmg"
+             "AuraLauncher-$APP_VERSION-${{ matrix.arch }}.dmg"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: macos-artifacts
-          path: AuraLauncher-${{ env.APP_VERSION }}.dmg
+          # Per-arch artifact name — actions/upload-artifact v4 refuses to
+          # upload twice under the same name from different matrix jobs.
+          name: macos-artifacts-${{ matrix.arch }}
+          path: AuraLauncher-${{ env.APP_VERSION }}-${{ matrix.arch }}.dmg
 
   # ─────────────────────────────────────────────────────────────────────────
   # RELEASE — collect artifacts, publish with proper changelog body
@@ -401,7 +423,11 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
-          pattern: '*-artifacts'
+          # Pattern broadened from `*-artifacts` to `*-artifacts*` so the
+          # per-arch macOS suffixes (macos-artifacts-aarch64,
+          # macos-artifacts-x86_64) get pulled in alongside the Win/Linux
+          # ones. merge-multiple flattens them into a single dist/.
+          pattern: '*-artifacts*'
           merge-multiple: true
           path: dist/
 
@@ -432,6 +458,8 @@ jobs:
               *Setup.exe)             plat=windows; kind=installer ;;
               *Windows-Portable.zip)  plat=windows; kind=portable  ;;
               *.AppImage)             plat=linux;   kind=appimage  ;;
+              *aarch64.dmg)           plat=macos;   kind=dmg-arm64 ;;
+              *x86_64.dmg)            plat=macos;   kind=dmg-intel ;;
               *.dmg)                  plat=macos;   kind=dmg       ;;
               *)                      plat=unknown; kind=unknown   ;;
             esac
