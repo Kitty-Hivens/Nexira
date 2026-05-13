@@ -12,6 +12,7 @@
 #   client-ui/src/commonMain/composeResources/drawable/icon.png      (1024×1024)
 #   client-ui/src/commonMain/composeResources/drawable/favicon.png   (64×64)
 #   resources/icons/icon.ico                                         (Inno Setup + Windows Compose iconFile)
+#   resources/icons/icon.icns                                        (macOS Compose iconFile, via png2icns)
 #   resources/icons/256x256.png                                      (AppImage)
 #   resources/icons/512x512.png                                      (AppImage)
 #
@@ -67,6 +68,19 @@ echo "── app-icon.png  →  variants ─────────────
     -delete 0 \
     "$HICOLOR/icon.ico"
 
+# .icns for macOS — jpackage uses this for the .app bundle icon (sets the
+# Dock icon, Finder icon, and the icon shown when DMG is mounted). Without
+# it jpackage falls back to the default Compose/Kotlin "K + folder" placeholder.
+# png2icns is from `libicns` package on Linux distros / Homebrew on macOS.
+if command -v png2icns >/dev/null 2>&1; then
+    echo "── 256+512 PNG  →  icon.icns (macOS) ──────────────────────────────────"
+    png2icns "$HICOLOR/icon.icns" "$HICOLOR/256x256.png" "$HICOLOR/512x512.png" 2>&1 \
+        | grep -v "^WARNING:\|^deprecation\|^warning:" || true
+else
+    echo "WARN: png2icns not in PATH (install libicns) — skipping macOS icon regeneration"
+    echo "      existing $HICOLOR/icon.icns kept; Compose macOS build will use it as-is"
+fi
+
 # ── Tray icon ───────────────────────────────────────────────────────────────
 echo "── tray-icon.png  →  favicon.png ──────────────────────────────────────"
 
@@ -82,5 +96,6 @@ ls -la \
     "$DRAWABLE/icon.png" \
     "$DRAWABLE/favicon.png" \
     "$HICOLOR/icon.ico" \
+    "$HICOLOR/icon.icns" \
     "$HICOLOR/256x256.png" \
     "$HICOLOR/512x512.png"
