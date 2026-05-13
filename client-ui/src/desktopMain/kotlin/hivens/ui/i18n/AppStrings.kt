@@ -341,6 +341,18 @@ interface AppStrings {
     val sslWarningBody: String
     val sslWarningConnectAnyway: String
     val sslWarningCancel: String
+    val sslWarningTrustPrompt: String
+    val sslWarningTrustHour: String
+    val sslWarningTrust30Days: String
+    val sslWarningTrustAlways: String
+
+    // --- SSL Bypass list (Settings → Network) ---
+    val settingsSectionNetwork: String
+    val sslBypassListTitle: String
+    val sslBypassNoEntries: String
+    val sslBypassRevoke: String
+    /** Receives a pre-formatted local date/time string. */
+    fun sslBypassExpiresAt(formatted: String): String
 
     // ═══════════════════════════════════════════════════════════════════════
     // JVM Args Builder dialog

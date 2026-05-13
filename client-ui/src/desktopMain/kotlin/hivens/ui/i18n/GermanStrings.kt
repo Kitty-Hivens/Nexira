@@ -339,6 +339,16 @@ object GermanStrings : AppStrings {
     override val sslWarningBody         = "Das SSL-Zertifikat des Servers ist abgelaufen. Die Verbindung ist möglicherweise unsicher — die Identität des Servers kann nicht verifiziert werden. Auf eigenes Risiko fortfahren?"
     override val sslWarningConnectAnyway = "Trotzdem verbinden"
     override val sslWarningCancel       = "Abbrechen"
+    override val sslWarningTrustPrompt  = "Diesem Server vertrauen für:"
+    override val sslWarningTrustHour    = "1 Stunde"
+    override val sslWarningTrust30Days  = "30 Tage"
+    override val sslWarningTrustAlways  = "Immer"
+
+    override val settingsSectionNetwork = "Netzwerk"
+    override val sslBypassListTitle     = "Aktive SSL-Bypässe"
+    override val sslBypassNoEntries     = "Keine aktiven Bypässe"
+    override val sslBypassRevoke        = "Widerrufen"
+    override fun sslBypassExpiresAt(formatted: String) = "Läuft ab: $formatted"
 
     // ── JVM Args Builder ────────────────────────────────────────────────
     override val jvmTitle    = "JVM-Argument-Builder"
