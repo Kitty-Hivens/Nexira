@@ -206,35 +206,57 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
                     style = MaterialTheme.typography.bodySmall,
                     color = CelestiaTheme.colors.textPrimary.copy(alpha = 0.85f)
                 )
+                // Trust-duration prompt + 3 grant buttons. Each click both
+                // grants the bypass for that duration AND retries login —
+                // single-click UX. Cancel button is on its own row above so
+                // the dangerous actions don't accidentally read as the same
+                // affordance as the safe one.
+                OutlinedButton(
+                    onClick  = { sslWarning = false },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape    = RoundedCornerShape(6.dp)
+                ) {
+                    Text(s.sslWarningCancel, color = CelestiaTheme.colors.textSecondary)
+                }
+                Text(
+                    text  = s.sslWarningTrustPrompt,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = CelestiaTheme.colors.textSecondary,
+                )
+                val acceptColors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF59E0B))
+                fun acceptFor(unit: java.time.temporal.ChronoUnit, amount: Long, label: String) {
+                    // 100-year future for "always" — long enough that no user
+                    // will outlive it, short enough to not overflow ISO-8601
+                    // formatting that a far-future Instant.MAX would.
+                    val until = java.time.Instant.now().plus(amount, unit)
+                    hivens.core.diag.ActionRing.record(
+                        "SSL bypass accepted by user (login retry) — granted: $label",
+                    )
+                    NetworkState.grantBypass(hivens.config.Network.SSL_BYPASS_HOST, until)
+                    doLogin(insecureAuthService)
+                }
                 Row(
                     modifier              = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    OutlinedButton(
-                        onClick  = { sslWarning = false },
-                        modifier = Modifier.weight(1f),
-                        shape    = RoundedCornerShape(6.dp)
-                    ) {
-                        Text(s.sslWarningCancel, color = CelestiaTheme.colors.textSecondary)
-                    }
                     Button(
-                        onClick = {
-                            // 30-day default grant. Full "trust until: 1h / 30d / always"
-                            // picker UI is a followup chunk; this PR ships the per-host +
-                            // expiry plumbing so the followup is pure UI work.
-                            val until = java.time.Instant.now().plus(30, java.time.temporal.ChronoUnit.DAYS)
-                            hivens.core.diag.ActionRing.record("SSL bypass accepted by user (login retry) — granted for 30 days")
-                            NetworkState.grantBypass(hivens.config.Network.SSL_BYPASS_HOST, until)
-                            doLogin(insecureAuthService)
-                        },
+                        onClick  = { acceptFor(java.time.temporal.ChronoUnit.HOURS, 1, "1 hour") },
                         modifier = Modifier.weight(1f),
                         shape    = RoundedCornerShape(6.dp),
-                        colors   = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFFF59E0B)
-                        )
-                    ) {
-                        Text(s.sslWarningConnectAnyway, color = Color.Black)
-                    }
+                        colors   = acceptColors,
+                    ) { Text(s.sslWarningTrustHour, color = Color.Black) }
+                    Button(
+                        onClick  = { acceptFor(java.time.temporal.ChronoUnit.DAYS, 30, "30 days") },
+                        modifier = Modifier.weight(1f),
+                        shape    = RoundedCornerShape(6.dp),
+                        colors   = acceptColors,
+                    ) { Text(s.sslWarningTrust30Days, color = Color.Black) }
+                    Button(
+                        onClick  = { acceptFor(java.time.temporal.ChronoUnit.DAYS, 36500, "always (100y)") },
+                        modifier = Modifier.weight(1f),
+                        shape    = RoundedCornerShape(6.dp),
+                        colors   = acceptColors,
+                    ) { Text(s.sslWarningTrustAlways, color = Color.Black) }
                 }
             }
         }
