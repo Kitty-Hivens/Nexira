@@ -406,18 +406,36 @@ class UpdateService(
      * Selects the correct installer asset for the current OS.
      *
      * Windows: `.exe`  (Inno Setup — see setup.iss / build_release.yml)
-     * macOS:   `.dmg`
+     * macOS:   `-aarch64.dmg` on Apple Silicon, `-x86_64.dmg` on Intel.
+     *          Falls back to any `.dmg` for legacy pre-dual-arch releases
+     *          (i.e. ≤ 2.2.12 which shipped a single ARM64-only DMG).
      * Linux:   `.AppImage`
      */
     internal fun findAssetForCurrentOS(assets: List<GitHubAsset>): GitHubAsset? {
         val osName = System.getProperty("os.name").lowercase()
-        
+
         return when {
             // FIX: was .msi — CI builds .exe via Inno Setup, not MSI
             osName.contains("windows") -> assets.find {
                 it.name.endsWith(".exe") && it.name.contains("Setup", ignoreCase = true)
             }
-            osName.contains("mac") -> assets.find { it.name.endsWith(".dmg") }
+            osName.contains("mac") -> {
+                // Picking the first .dmg blindly was the bug pre-#89: dual-arch
+                // releases ship both aarch64 and x86_64; whichever came first
+                // alphabetically was returned, leaving Intel users with an
+                // ARM64 DMG that fails with "not supported on this Mac" before
+                // Gatekeeper even fires. Match on arch first.
+                val arch = System.getProperty("os.arch", "").lowercase()
+                val archSuffix = when {
+                    arch.contains("aarch64") || arch.contains("arm64") -> "aarch64.dmg"
+                    else -> "x86_64.dmg"
+                }
+                assets.find { it.name.endsWith(archSuffix) }
+                    // Legacy fallback for releases predating dual-arch
+                    // (single .dmg with no arch suffix). Will return wrong
+                    // arch in degraded cases but better than no update at all.
+                    ?: assets.find { it.name.endsWith(".dmg") }
+            }
             osName.contains("linux") -> assets.find { it.name.endsWith(".AppImage") }
             else -> null
         }

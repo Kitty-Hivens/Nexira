@@ -132,11 +132,12 @@ check_asset() {
     fi
 }
 
-check_asset "Setup\.exe$"     "Windows Installer (.exe)"
-check_asset "Portable\.zip$"  "Windows Portable (.zip)"
-check_asset "\.AppImage$"     "Linux AppImage"
-check_asset "\.dmg$"          "macOS DMG"
-check_asset "SHA256SUMS"      "SHA256 checksums file"
+check_asset "Setup\.exe$"      "Windows Installer (.exe)"
+check_asset "Portable\.zip$"   "Windows Portable (.zip)"
+check_asset "\.AppImage$"      "Linux AppImage"
+check_asset "aarch64\.dmg$"    "macOS DMG (Apple Silicon)"
+check_asset "x86_64\.dmg$"     "macOS DMG (Intel)"
+check_asset "SHA256SUMS"       "SHA256 checksums file"
 
 echo ""
 
