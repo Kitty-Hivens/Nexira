@@ -315,6 +315,85 @@ fun SettingsScreen(
                     }
                 }
 
+                // ── Network ───────────────────────────────────────────────────
+                //
+                // Currently surfaces just the SSL-bypass list (Vault #2 followup).
+                // Future: proxy override, channel routing toggles, etc. live
+                // here under one section so users have a single place to look
+                // for "things that affect how Aura talks to the network".
+                item {
+                    SettingsSectionTitle(s.settingsSectionNetwork)
+
+                    // Live snapshot — re-reads every 1s. Sufficient for a
+                    // settings screen (no rapid-fire updates expected). Avoids
+                    // setting up a Flow purely for this single read site.
+                    val bypasses = androidx.compose.runtime.produceState(initialValue = hivens.launcher.NetworkState.listBypasses()) {
+                        while (true) {
+                            value = hivens.launcher.NetworkState.listBypasses()
+                            kotlinx.coroutines.delay(1_000)
+                        }
+                    }.value
+                    val dateFormatter = java.time.format.DateTimeFormatter
+                        .ofLocalizedDateTime(java.time.format.FormatStyle.MEDIUM)
+                        .withZone(java.time.ZoneId.systemDefault())
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(CelestiaTheme.colors.background.copy(alpha = 0.4f))
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(
+                            text       = s.sslBypassListTitle,
+                            color      = CelestiaTheme.colors.textPrimary,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        if (bypasses.isEmpty()) {
+                            Text(
+                                text  = s.sslBypassNoEntries,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = CelestiaTheme.colors.textSecondary,
+                            )
+                        } else {
+                            bypasses.forEach { entry ->
+                                Row(
+                                    modifier              = Modifier.fillMaxWidth(),
+                                    verticalAlignment     = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text       = entry.host,
+                                            color      = CelestiaTheme.colors.textPrimary,
+                                            fontWeight = FontWeight.SemiBold,
+                                        )
+                                        Text(
+                                            text  = s.sslBypassExpiresAt(
+                                                dateFormatter.format(java.time.Instant.parse(entry.expiresAt)),
+                                            ),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = CelestiaTheme.colors.textSecondary,
+                                        )
+                                    }
+                                    OutlinedButton(
+                                        onClick = {
+                                            hivens.core.diag.ActionRing.record(
+                                                "SSL bypass revoked by user from Settings: ${entry.host}",
+                                            )
+                                            hivens.launcher.NetworkState.revokeBypass(entry.host)
+                                        },
+                                        shape = RoundedCornerShape(6.dp),
+                                    ) {
+                                        Text(s.sslBypassRevoke, color = CelestiaTheme.colors.textSecondary)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // ── Experimental features ─────────────────────────────────────
                 item {
                     SettingsSectionTitle(s.settingsSectionExperimental)

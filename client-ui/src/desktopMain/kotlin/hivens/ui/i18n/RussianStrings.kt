@@ -339,6 +339,16 @@ object RussianStrings : AppStrings {
     override val sslWarningBody         = "Сертификат сервера истёк. Соединение может быть небезопасным — данные передаются без проверки подлинности сервера. Продолжить на свой страх и риск?"
     override val sslWarningConnectAnyway = "Всё равно подключиться"
     override val sslWarningCancel       = "Отмена"
+    override val sslWarningTrustPrompt  = "Доверять серверу:"
+    override val sslWarningTrustHour    = "1 час"
+    override val sslWarningTrust30Days  = "30 дней"
+    override val sslWarningTrustAlways  = "Постоянно"
+
+    override val settingsSectionNetwork = "Сеть"
+    override val sslBypassListTitle     = "Активные SSL-исключения"
+    override val sslBypassNoEntries     = "Нет активных исключений"
+    override val sslBypassRevoke        = "Отозвать"
+    override fun sslBypassExpiresAt(formatted: String) = "Истекает: $formatted"
 
     // ── JVM Args Builder ────────────────────────────────────────────────
     override val jvmTitle    = "Конструктор JVM-аргументов"

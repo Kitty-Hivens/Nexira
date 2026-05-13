@@ -339,6 +339,16 @@ object EnglishStrings : AppStrings {
     override val sslWarningBody         = "The server's SSL certificate has expired. Your connection may be insecure — server identity cannot be verified. Proceed at your own risk?"
     override val sslWarningConnectAnyway = "Connect anyway"
     override val sslWarningCancel       = "Cancel"
+    override val sslWarningTrustPrompt  = "Trust this host for:"
+    override val sslWarningTrustHour    = "1 hour"
+    override val sslWarningTrust30Days  = "30 days"
+    override val sslWarningTrustAlways  = "Always"
+
+    override val settingsSectionNetwork = "Network"
+    override val sslBypassListTitle     = "Active SSL bypasses"
+    override val sslBypassNoEntries     = "No active bypasses"
+    override val sslBypassRevoke        = "Revoke"
+    override fun sslBypassExpiresAt(formatted: String) = "Expires: $formatted"
 
     // ── JVM Args Builder ────────────────────────────────────────────────
     override val jvmTitle    = "JVM Args Builder"
