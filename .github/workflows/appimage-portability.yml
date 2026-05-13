@@ -1,0 +1,132 @@
+name: AppImage Portability
+
+# ── Cross-distro AppImage smoke ────────────────────────────────────────────
+#
+# Aura is built on ubuntu-latest (Debian-family, recent glibc). Users run
+# it on a long tail: Fedora, Arch, openSUSE, Void, downstream Debian forks.
+# An AppImage that builds clean on Ubuntu can still fail on those distros
+# because of:
+#   - glibc version mismatch (we link to whatever Ubuntu LTS ships, older
+#     distros may have older glibc that lacks symbols our binary requires)
+#   - missing FUSE (AppImage 1.x uses libfuse2; some minimal containers
+#     don't ship it — we work around with --appimage-extract-and-run)
+#   - musl libc (Alpine, default Void) — fundamentally incompatible with
+#     glibc-linked binaries; documented as "won't fix" rather than tested
+#
+# This workflow downloads the latest released AppImage, extracts it, and
+# verifies the launcher gets past its init phase on each distro by
+# grepping captured stdout for the `Display: toolkit=...` log line that
+# Main.kt emits after toolkit init.
+#
+# That marker means: JVM ran, logback initialised, PlatformPaths resolved,
+# AWT toolkit chosen. Anything failing AFTER that (Compose window create,
+# Skiko paint, etc.) is a "no display" problem in the container, not a
+# distro-portability problem with our AppImage.
+#
+# Triggers:
+#   - workflow_dispatch  — run any time, ad hoc
+#   - schedule (weekly)  — pick up regressions from upstream distro updates
+#                          without waiting for a release tag
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 8 * * 1"   # Mondays, 08:00 UTC
+
+concurrency:
+  group: appimage-portability
+  cancel-in-progress: false
+
+jobs:
+  portability:
+    name: ${{ matrix.distro_name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - distro_name: Fedora-latest
+            container: fedora:latest
+            install_cmd: |
+              dnf install -y --setopt=install_weak_deps=False \
+                xorg-x11-server-Xvfb fuse-libs which findutils \
+                libsecret gh
+          - distro_name: Arch-latest
+            container: archlinux:latest
+            install_cmd: |
+              pacman -Sy --noconfirm \
+                xorg-server-xvfb fuse2 which libsecret github-cli
+          - distro_name: Debian-stable
+            container: debian:stable
+            install_cmd: |
+              apt-get update -qq
+              apt-get install -y --no-install-recommends \
+                xvfb libfuse2 libsecret-1-0 gh
+    container: ${{ matrix.container }}
+    steps:
+      - name: Install runtime deps for ${{ matrix.distro_name }}
+        run: ${{ matrix.install_cmd }}
+
+      - name: Download latest AppImage from GH releases
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p /tmp/aura
+          gh release download --repo ${{ github.repository }} \
+            --pattern "*x86_64.AppImage" \
+            --dir /tmp/aura
+          chmod +x /tmp/aura/*.AppImage
+          echo "Downloaded:"
+          ls -la /tmp/aura/
+
+      - name: Extract AppImage (skip FUSE — not always available in containers)
+        working-directory: /tmp
+        run: ./aura/*.AppImage --appimage-extract > /dev/null
+
+      - name: Launch with virtual display, capture init log
+        working-directory: /tmp
+        env:
+          AURA_DATA_DIR: /tmp/aura-data
+        run: |
+          # 8s wall budget: launcher gets to splash within 3-4s on a fresh
+          # container, logging the Display line on the way. Killed via
+          # `timeout` after that — exit code 124 means we hit the deadline,
+          # which is the expected signal (launcher was alive and rendering).
+          # Anything else means it crashed before we reached deadline.
+          set +e
+          timeout --kill-after=2s 8s xvfb-run -a \
+            squashfs-root/AppRun > /tmp/aura.stdout 2>&1
+          EXIT=$?
+          set -e
+
+          echo "── Launcher exit code: $EXIT (124 = timeout hit, expected; 0 = clean exit, unusual but ok)"
+          echo "── stdout tail:"
+          tail -30 /tmp/aura.stdout || true
+
+          if [[ "$EXIT" != "124" && "$EXIT" != "0" ]]; then
+            echo "::error title=Portability::Launcher crashed before timeout (exit $EXIT) on ${{ matrix.distro_name }}"
+            exit 1
+          fi
+
+      - name: Verify init phase reached
+        run: |
+          # The Display line from Main.kt is the canonical "init done" marker.
+          # If it's NOT in stdout, JVM died before logback's CONSOLE appender
+          # got to flush — meaning the AppImage's bundled JRE failed to load
+          # or PlatformPaths blew up before any logger was created.
+          if grep -q "Display: toolkit=" /tmp/aura.stdout; then
+            echo "::notice title=Portability::${{ matrix.distro_name }} reached toolkit-detection — distro is supported"
+          else
+            echo "::error title=Portability::No 'Display: toolkit=' line on ${{ matrix.distro_name }}. JRE / native lib / PlatformPaths failed before logging init."
+            echo "── full stdout:"
+            cat /tmp/aura.stdout || true
+            exit 1
+          fi
+
+      - name: Upload stdout on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: portability-stdout-${{ matrix.distro_name }}
+          path: /tmp/aura.stdout
+          retention-days: 7
