@@ -25,9 +25,17 @@ object KeyringStorageFactory {
     fun system(): IKeyringStorage {
         val osName = System.getProperty("os.name", "").lowercase()
         val candidate: IKeyringStorage? = when {
-            osName.contains("linux") -> tryProbe("LinuxLibsecret") { LinuxLibsecretKeyringStorage() }
-            // Windows + macOS impls land in follow-up PRs (Vault sub-chunks).
-            // Until then, those platforms get the file fallback via NoOp.
+            // BSDs ship the same Secret Service / libsecret stack as Linux
+            // desktops (FreeBSD ports: security/libsecret + gnome-keyring,
+            // OpenBSD: equivalent). Same JNI symbol resolution flow on ELF,
+            // same DBus protocol. The "Linux" name in the class is historical.
+            osName.contains("linux") || osName.contains("bsd") ->
+                tryProbe("LinuxLibsecret") { LinuxLibsecretKeyringStorage() }
+            osName.contains("windows") ->
+                tryProbe("WindowsCredentialManager") { WindowsCredentialManagerKeyringStorage() }
+            // macOS impl lands in a follow-up PR (SecItem* via Panama + Core
+            // Foundation marshalling). Until then macOS gets the file
+            // fallback via NoOp.
             else -> null
         }
         return when {
