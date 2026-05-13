@@ -158,6 +158,11 @@ compose.desktop {
             macOS {
                 bundleID = "com.hivens.auralauncher"
                 dockName = "Aura Launcher"
+                // Without iconFile, jpackage falls back to the default
+                // Compose/Kotlin "K + folder" placeholder. Regenerate via
+                // `png2icns` (libicns package) from the same source PNGs
+                // we use for Linux/Windows — see scripts/regenerate-icons.sh.
+                iconFile.set(rootProject.file("resources/icons/icon.icns"))
             }
         }
 
