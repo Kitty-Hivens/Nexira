@@ -11,6 +11,201 @@ below are for the GitHub release page and CHANGELOG readers.
 
 ## [Unreleased]
 
+## [2.2.12] - 2026-05-14
+
+Security and platform-completion release. Passwords and login tokens now
+live in your OS keyring instead of an AES-GCM file (Vault — Linux libsecret
+and Windows Credential Manager wired up; macOS pending). The "accept SSL
+warning" flow stops being all-or-nothing: each bypass is per-host and
+expires. Bridge pillar gets the missing UI for moving the data directory
+without env-var hackery. macOS finally ships proper dual-architecture
+DMGs with a real app icon. Plus a continuous AppImage portability check
+in CI to catch "works on my distro" regressions before users do.
+
+### Highlights
+- **OS keyring integration** (Vault): launcher credentials now persist
+  to GNOME Keyring / KWallet via libsecret on Linux and to Credential
+  Manager (DPAPI) on Windows. Falls back to a per-machine AES-GCM file
+  if no keyring is reachable, so nothing breaks on minimal desktops or
+  headless installs. Both the password and the access token are
+  protected — previously only the password was. macOS keyring impl is
+  the next chunk.
+- **Per-host SSL bypass with expiry**: when you accept a certificate
+  warning, the bypass is now scoped to that host and ends when you say
+  it does — session-only by default, with optional 1 hour / 1 day /
+  7 days. Previous behaviour granted "trust every HTTPS call this
+  process makes" until the launcher restarted. Settings → Network lists
+  every active bypass with a Revoke button.
+- **Move data directory** without touching `AURA_DATA_DIR`. Settings →
+  Data directory → pick a new location → "Quit now" or schedule for
+  next launch. The picker uses your desktop's native dialog
+  (xdg-desktop-portal on Linux, AppKit on macOS, Win32 on Windows)
+  instead of the Swing JFileChooser that looked broken on Hyprland and
+  several KDE themes.
+- **macOS dual-architecture DMGs** — separate builds for Apple Silicon
+  (`*-aarch64.dmg`) and Intel (`*-x86_64.dmg`). Auto-updater now reads
+  `os.arch` and downloads the correct one; previously the first DMG
+  asset wins, which on a dual-arch release produced a 50/50 wrong-arch
+  install. Plus a proper `.icns` app icon — the default Compose K-folder
+  placeholder is gone.
+- **Daily AppImage portability check**: a CI matrix downloads the latest
+  released AppImage on Fedora / Arch / Debian-stable containers and
+  verifies the app actually starts. Catches glibc / GTK / Skiko-loader
+  regressions on distros the maintainer doesn't run day-to-day.
+
+### Added
+- `hivens.core.security.IKeyringStorage` interface in `client-core` —
+  contract for `store(account, secret)` / `retrieve(account)` /
+  `clear(account)` / `isAvailable()`. Stays free of any platform
+  dependency so the per-OS impls can use Project Panama bindings
+  without leaking into shared code.
+- `hivens.launcher.security.LinuxLibsecretKeyringStorage` — Project
+  Panama bindings to `libsecret-1.so.0`. Stores credentials under
+  schema name `app.aura.launcher` with `account` attribute. Detects
+  daemon availability via a write-and-clear probe (the historical
+  "clear returns FALSE on no-match" semantics make a read-only probe
+  unreliable per libsecret docs).
+- `hivens.launcher.security.WindowsCredentialManagerKeyringStorage` —
+  Project Panama bindings to `advapi32` (`CredWriteW` / `CredReadW` /
+  `CredDeleteW` / `CredFree`). Targets `CRED_TYPE_GENERIC` with
+  `LOCAL_MACHINE` persistence. Account names are namespaced
+  `app.aura.launcher:<account>` to avoid colliding with other tools.
+- `hivens.launcher.security.NoOpKeyringStorage` — explicit "no native
+  store" sentinel returned by `KeyringStorageFactory.system()` when
+  the host has no reachable keyring; `CredentialsManager` then routes
+  to its AES-GCM file fallback.
+- `hivens.launcher.security.KeyringStorageFactory.system()` — picks
+  the impl by `os.name`, probes `isAvailable()` once, caches the
+  decision for the JVM lifetime. Wraps construction in `runCatching`
+  so an `UnsatisfiedLinkError` from missing libsecret can't kill the
+  launcher startup.
+- `hivens.core.security.SslBypassEntry` — `host` + ISO-8601 `expiresAt`,
+  serialised to `ssl-bypasses.json` in the data directory.
+- `hivens.launcher.NetworkState.bypassFor(host)` /
+  `grantBypass(host, until)` / `revokeBypass(host)` /
+  `listBypasses()` — replace the prior `sslBypassEnabled: Boolean`.
+  Existing call sites that just need a yes/no for a request now ask
+  by host instead of reading a global flag.
+- `hivens.launcher.platform.BootstrapConf` — flat `key=value` file at
+  `<user.home>/.aura-launcher.conf`, read before `PlatformPaths` is
+  available. Used to persist the "move data dir to X on next launch"
+  decision since the in-data-dir config can't reference where the data
+  dir is moving to.
+- `hivens.launcher.platform.DataDirMover.schedule(src, target)` /
+  `applyPending()` — schedule-on-restart pattern: the move runs at next
+  startup before any consumer has opened a handle in the old location,
+  avoiding "directory in use" errors on Windows.
+- Settings → Network section: lists every active SSL bypass (host +
+  remaining time) with a Revoke button per entry. New i18n keys
+  `settingsNetworkSection`, `settingsBypassListEmpty`,
+  `settingsBypassRevoke`, `settingsBypassExpiresIn`,
+  `settingsBypassSessionOnly` (EN / RU / DE).
+- Settings → Data directory section: shows the resolved current path,
+  a Choose button that opens the native directory picker, and a
+  Quit-now confirmation. New i18n keys `settingsDataDirSection`,
+  `settingsDataDirChoose`, `settingsDataDirSchedulePending`,
+  `settingsDataDirQuitNow` (EN / RU / DE).
+- SSL bypass duration picker on the warning dialog: session-only
+  (default) / 1 hour / 1 day / 7 days. New i18n keys
+  `sslBypassDurationLabel`, `sslBypassDurationSession`,
+  `sslBypassDurationHour`, `sslBypassDurationDay`,
+  `sslBypassDurationWeek` (EN / RU / DE).
+- `resources/icons/icon.icns` — proper macOS icon generated from the
+  existing 256/512 PNG sources via `png2icns`. Wired into the Compose
+  Desktop `nativeDistributions { macOS { iconFile.set(...) } }` block.
+- `.github/workflows/appimage-portability.yml` — daily cron + manual
+  dispatch. Pulls the latest release AppImage onto Fedora 40 / Arch /
+  Debian stable containers, runs it under Xvfb, and asserts the
+  "Display: toolkit=" log line is emitted before timeout.
+- `.github/workflows/smoke-daily.yml` — daily live smoke probe against
+  the real upstream so we catch wire-protocol drift on SMARTYcraft's
+  side without waiting for a release attempt.
+- `.github/workflows/trial-appimage.yml` — opt-in WLToolkit trial build
+  workflow for the Wayland-Native investigation.
+- Review-gate job at the top of `build_release.yml`: blocks the release
+  pipeline unless the merge-base PR has either an `APPROVED` review or
+  a Codex / Qodana engagement record. Designed for solo-maintainer
+  branch protection (count=0) where a second human reviewer isn't
+  available — automation engagement counts as a weak signal.
+- `LiveSmokeTest` + `@SmokeTest` JUnit Tag, plus `:client-launcher:smokeTest`
+  Gradle task. Runs against the real upstream; gated behind the tag so
+  the default `:test` run skips it.
+- `LinuxLibsecretLiveProbeTest` (`@Tag("live-keyring")`) +
+  `LiveWindowsKeyringProbeTest` (`@Tag("live-windows-keyring")`) — opt-in
+  end-to-end tests that exercise the real OS keyring on machines that
+  have one configured. Skipped by default `:test`.
+- `JavaManagerServiceTest` (22 cases): MC-version → Java-major mapping,
+  os/arch → BellSoft URL matrix, BellSoft archive layout discovery,
+  and zip-slip rejection.
+- `FileDownloadServiceTest` (18 cases): path normalisation against the
+  recognised root list, manifest flattening across nested directories,
+  MD5 computation against RFC 1321 vectors, and the
+  `isFileMissingOrChanged` predicate (including the `"any"` sentinel
+  and ProtectedPaths short-circuit).
+- `EnvironmentPreparerTest` (15 cases): `os.name` → LWJGL classifier,
+  per-platform native-extension presence check, and `flattenNatives`
+  hoisting from nested directories.
+- `CredentialsManagerTest`, `NetworkStateTest`, `BootstrapConfTest`,
+  `DataDirMoverTest`, `KeyringStorageFactoryTest`,
+  `NoOpKeyringStorageTest` — unit coverage for the new Vault and
+  Bridge surfaces.
+- `docs/src/content/docs/dev/wayland-investigation.md` and
+  `scripts/wayland-probe.sh` — documents the Wayland-Native probe
+  result (frozen pending upstream Skiko Wayland surface acquisition)
+  and the re-trigger criteria.
+
+### Changed
+- `CredentialsManager` (v3 → v4 schema): keyring-primary with file
+  fallback for both `password` and `accessToken`. Each value carries
+  a separate "stored in keyring" flag so a partial migration (keyring
+  lost one entry) recovers cleanly per-field instead of corrupting
+  the whole credential. Existing v3 files are read once and migrated
+  forward; the v3 file is removed only after successful re-encrypt.
+- `NetworkState.sslBypassEnabled: Boolean` removed in favour of the
+  per-host model. Every consumer (`HttpClientProvider.current` and the
+  warning-dialog flow) updated to ask by host. The persisted
+  `ssl-bypasses.json` lives next to other config in the data directory.
+- `UpdateService.findAssetForCurrentOS` now reads `os.arch` and
+  prefers `*-aarch64.dmg` on ARM hosts, `*-x86_64.dmg` on Intel hosts.
+  Falls back to the legacy single-`*.dmg` pattern for releases produced
+  before the dual-arch matrix existed (pre-2.2.12).
+- `build_release.yml` macOS leg converted to a 2-job matrix:
+  `macos-latest` (aarch64) + `macos-13` (x86_64), each producing a
+  per-arch artifact and uploaded with an arch suffix. Per-arch artifact
+  names are required because actions/upload-artifact v4 refuses
+  same-name uploads from parallel jobs.
+- `build_release.yml` review-gate widened to accept Qodana-scan
+  completion as a weak signal in addition to APPROVED reviews and
+  Codex engagement, so a real CI gate held when the primary reviewer
+  was rate-limited.
+- Local test runs cap `maxParallelForks` to 2 (was: number of cores)
+  and JVM heap to 512 MB (was: 1 GB). CI is unaffected — it still uses
+  the full core count and 1 GB heap. Triggered by local development on
+  laptops where the test suite was saturating the CPU.
+- `Settings → Move data directory` swapped from `JFileChooser` to
+  filekit's native directory picker. JFileChooser ignored the system
+  GTK theme and rendered with the Metal look-and-feel on Wayland
+  compositors that don't have a Swing GTK bridge.
+
+### Fixed
+- Auto-updater on macOS could install the wrong architecture's DMG
+  because `findAssetForCurrentOS` returned the first matching `.dmg`
+  asset regardless of arch. Now arch-aware (see above). Existing
+  pre-2.2.12 single-asset releases keep working through the legacy
+  fallback branch.
+- `AppRun` script in the AppImage was not propagating
+  `AURA_WAYLAND_TRIAL` into the JVM args, so the trial flag set in
+  the user's environment never reached `Main.main`. Fixed by
+  forwarding the env var explicitly.
+
+### Removed
+- Phantom `-Dwayland.debug.children=true` JVM arg from
+  `compose.desktop.application.jvmArgs`. The property exists nowhere
+  in OpenJDK or Skiko; it was a misremembered name and a no-op.
+- `NetworkState.sslBypassEnabled: Boolean` flag and its setter (see
+  Changed). No call site remains; existing `ssl-bypass-enabled` keys
+  in older state files are ignored.
+
 ## [2.2.11] - 2026-05-12
 
 Infrastructure-heavy release focused on debuggability when something goes
