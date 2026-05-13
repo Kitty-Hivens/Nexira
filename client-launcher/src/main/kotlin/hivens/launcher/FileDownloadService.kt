@@ -121,7 +121,7 @@ class FileDownloadService(
     /**
      * Recursively traverses the manifest and collects all files into one map.
      */
-    private fun flattenManifest(manifest: FileManifest): MutableMap<String, FileData> {
+    internal fun flattenManifest(manifest: FileManifest): MutableMap<String, FileData> {
         val result = HashMap<String, FileData>()
         fun traverse(m: FileManifest, currentPath: String) {
             m.files.forEach { (name, data) ->
@@ -350,7 +350,7 @@ class FileDownloadService(
      * Checks whether the file needs to be downloaded (no file, empty, or the hash does not match).
      * Includes protection for user-specific config files.
      */
-    private fun isFileMissingOrChanged(file: Path, expectedMd5: String, relativePath: String): Boolean {
+    internal fun isFileMissingOrChanged(file: Path, expectedMd5: String, relativePath: String): Boolean {
         if (!Files.exists(file)) return true
         if (Files.isDirectory(file)) return false
         if (expectedMd5 == "any") return false // "any" hash means "do not check"
@@ -470,7 +470,7 @@ class FileDownloadService(
     /**
      * Removes prefixes like "Industrial/mods/..." -> "mods/..."
      */
-    private fun normalizePath(rawPath: String): String {
+    internal fun normalizePath(rawPath: String): String {
         val parts = rawPath.split("/")
         if (parts.size < 2) return rawPath
 
@@ -482,7 +482,7 @@ class FileDownloadService(
         return rawPath.substring(root.length + 1)
     }
 
-    private fun calculateMD5(file: Path): String {
+    internal fun calculateMD5(file: Path): String {
         val md = MessageDigest.getInstance("MD5")
         Files.newInputStream(file).use { input ->
             val buffer = ByteArray(8192)
