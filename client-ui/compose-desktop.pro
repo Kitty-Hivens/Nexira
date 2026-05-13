@@ -94,6 +94,15 @@
 # --- System tray ---
 -keep class dorkbox.** { *; }
 
+# --- Project Panama foreign-function call sites ---
+# Classes that call MethodHandle.invokeExact(...) with java.lang.foreign.*
+# arguments. The method is @PolymorphicSignature — the JVM accepts any
+# descriptor at the call site, but ProGuard sees a concrete signature and
+# can't find it on java.lang.invoke.MethodHandle. List each class explicitly
+# so adding a new Panama caller is a deliberate edit, not silent suppression.
+-dontwarn hivens.launcher.security.LinuxLibsecretKeyringStorage
+-dontwarn hivens.launcher.security.WindowsCredentialManagerKeyringStorage
+
 # --- Suppress Warnings ---
 -dontwarn ch.qos.logback.**
 -dontwarn org.slf4j.**
