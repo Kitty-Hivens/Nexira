@@ -174,7 +174,16 @@ val appModule = module {
     single<java.nio.file.Path>(createdAtStart = true) { get<PlatformPaths>().dataDir }
 
     // Managers and services
-    single { CredentialsManager(get(), get()) }
+    //
+    // IKeyringStorage chosen at startup via KeyringStorageFactory.system()
+    // — Linux libsecret on this platform, NoOp fallback elsewhere or when
+    // the daemon is unreachable. CredentialsManager handles the file-fallback
+    // path internally when keyring.store() returns false, so this single
+    // line wires both the happy path and the degraded path.
+    single<hivens.core.security.IKeyringStorage> {
+        hivens.launcher.security.KeyringStorageFactory.system()
+    }
+    single { CredentialsManager(get(), get(), get()) }
 
     single<ISettingsService> {
         val dataDir: java.nio.file.Path = get()
