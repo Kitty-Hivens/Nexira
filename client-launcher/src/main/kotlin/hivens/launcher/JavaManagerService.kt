@@ -52,7 +52,7 @@ class JavaManagerService(
         return@withContext executable
     }
 
-    private fun detectJavaVersion(mcVersion: String): Int {
+    internal fun detectJavaVersion(mcVersion: String): Int {
         return when {
             mcVersion.startsWith("1.21") || mcVersion.startsWith("1.20.5") || mcVersion.startsWith("1.20.6") -> 21
             mcVersion.startsWith("1.17") || mcVersion.startsWith("1.18") || mcVersion.startsWith("1.19") || mcVersion.startsWith("1.20") -> 17
@@ -93,7 +93,7 @@ class JavaManagerService(
             Files.deleteIfExists(archive)
         }
     }
-    private fun getOsName(): String {
+    internal fun getOsName(): String {
         val os = System.getProperty("os.name").lowercase()
         return when {
             os.contains("win") -> "win"
@@ -103,7 +103,7 @@ class JavaManagerService(
         }
     }
 
-    private fun getArchName(): String {
+    internal fun getArchName(): String {
         val arch = System.getProperty("os.arch").lowercase()
         return when {
             arch.contains("aarch64") || arch.contains("arm64") -> "arm64"
@@ -113,7 +113,7 @@ class JavaManagerService(
         }
     }
 
-    private fun findJavaExecutable(dir: Path): Path? {
+    internal fun findJavaExecutable(dir: Path): Path? {
         if (!Files.exists(dir)) return null
 
         return try {
@@ -161,7 +161,7 @@ class JavaManagerService(
         }
     }
 
-    private fun unzip(zip: File, dest: Path) {
+    internal fun unzip(zip: File, dest: Path) {
         ZipInputStream(FileInputStream(zip)).use { zis ->
             var entry = zis.nextEntry
             while (entry != null) {
@@ -212,7 +212,7 @@ class JavaManagerService(
         }
     }
 
-    private fun getDownloadUrl(version: Int): String? {
+    internal fun getDownloadUrl(version: Int): String? {
         val os = getOsName()
         val arch = getArchName()
         return when (version) {
