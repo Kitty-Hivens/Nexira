@@ -62,9 +62,9 @@ fun DashboardScreen(
     var favoriteTrigger     by remember { mutableStateOf(0) }
     val favorites = remember(favoriteTrigger) { profileManager.favoriteServers }
     var isLoadingServers    by remember { mutableStateOf(true) }
-    val sslBypass by produceState(initialValue = NetworkState.sslBypassEnabled) {
+    val sslBypass by produceState(initialValue = NetworkState.bypassFor(hivens.config.Network.SSL_BYPASS_HOST)) {
         while (true) {
-            value = NetworkState.sslBypassEnabled
+            value = NetworkState.bypassFor(hivens.config.Network.SSL_BYPASS_HOST)
             delay(200)
         }
     }

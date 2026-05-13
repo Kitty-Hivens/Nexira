@@ -31,6 +31,16 @@ object Network {
     const val AUTH_URL = "$BASE_URL/launcher2/index.php"
 
     /**
+     * Host key used when granting / checking SSL-bypass via
+     * `NetworkState.bypassFor()`. Matches the certificate-validation
+     * target (the TLS server, not the SOCKS proxy in front of it).
+     * If we ever broaden to multiple smartycraft subdomains the
+     * NetworkState API can grow `bypassFor` to a pattern match; today
+     * only this one host ever has a reason to bypass.
+     */
+    const val SSL_BYPASS_HOST = "www.smartycraft.ru"
+
+    /**
      * Official SMARTYcraft launcher JAR — used by [hivens.core.api.ServerRepository]
      * to refresh `Protocol.DEFAULT_LAUNCHER_HASH` when the server replies with
      * `status: "UPDATE"`. Removing this file from the upstream site will break

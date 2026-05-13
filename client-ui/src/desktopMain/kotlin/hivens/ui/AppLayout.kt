@@ -66,9 +66,9 @@ fun AppLayout(
     val rowBackground = if (backgroundSettings.enabled) Color.Transparent
     else CelestiaTheme.colors.background
 
-    val sslBypass by produceState(initialValue = NetworkState.sslBypassEnabled) {
+    val sslBypass by produceState(initialValue = NetworkState.bypassFor(hivens.config.Network.SSL_BYPASS_HOST)) {
         while (true) {
-            value = NetworkState.sslBypassEnabled
+            value = NetworkState.bypassFor(hivens.config.Network.SSL_BYPASS_HOST)
             delay(200)
         }
     }
