@@ -219,8 +219,12 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
                     }
                     Button(
                         onClick = {
-                            hivens.core.diag.ActionRing.record("SSL bypass accepted by user (login retry)")
-                            NetworkState.sslBypassEnabled = true
+                            // 30-day default grant. Full "trust until: 1h / 30d / always"
+                            // picker UI is a followup chunk; this PR ships the per-host +
+                            // expiry plumbing so the followup is pure UI work.
+                            val until = java.time.Instant.now().plus(30, java.time.temporal.ChronoUnit.DAYS)
+                            hivens.core.diag.ActionRing.record("SSL bypass accepted by user (login retry) — granted for 30 days")
+                            NetworkState.grantBypass(hivens.config.Network.SSL_BYPASS_HOST, until)
                             doLogin(insecureAuthService)
                         },
                         modifier = Modifier.weight(1f),

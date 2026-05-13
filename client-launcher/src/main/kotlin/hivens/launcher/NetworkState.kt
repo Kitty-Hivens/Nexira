@@ -1,11 +1,136 @@
 package hivens.launcher
 
+import hivens.core.security.SslBypassEntry
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import org.slf4j.LoggerFactory
+import java.nio.file.Files
+import java.nio.file.Path
+import java.time.Instant
+
 /**
- * Global network state flags.
- * Shared between DI modules and UI layer.
+ * Global network policy state — currently the per-host SSL-bypass set.
+ *
+ * Replaced the prior `var sslBypassEnabled: Boolean` (a single global
+ * toggle that, once accepted, opened TLS verification for every HTTPS
+ * call until process exit) with a list of [SslBypassEntry] each
+ * carrying its own expiry. Practical effect: accepting a one-off cert
+ * outage on `smartycraft.ru` no longer silently weakens TLS for
+ * unrelated hosts, and stale acceptances stop applying after the user-
+ * set expiry instead of surviving forever in process memory.
+ *
+ * Persistence: when [initialize] is called with a path, all grants /
+ * revokes write the current state to that JSON file. On launcher
+ * restart the same file is re-read and **expired entries are dropped
+ * during the load**, so a 30-day grant from a month ago doesn't quietly
+ * re-arm itself. If [initialize] is never called (test mode), the state
+ * is in-memory only.
+ *
+ * Thread-safety: all public methods synchronise on a shared lock. The
+ * surface is small (4 methods) and contention is rare (UI accept,
+ * occasional `bypassFor` check on each HTTP call) so a single lock is
+ * the right shape.
+ *
+ * Singleton chosen deliberately — the previous boolean was also an
+ * `object`, callers throughout `client-ui` (composables) and
+ * `client-launcher` (DI selector) reach it without injection. Turning
+ * it into a Koin-injected class would have rippled into every
+ * @Composable that reads bypass state, for marginal testability gain
+ * that's already covered by extracting [SslBypassEntry] logic into
+ * its own data type with isolated tests.
  */
 object NetworkState {
-    /** Set to true when user explicitly accepted SSL bypass via warning dialog. */
-    @Volatile
-    var sslBypassEnabled: Boolean = false
+    private val log = LoggerFactory.getLogger(NetworkState::class.java)
+    private val json = Json { ignoreUnknownKeys = true; isLenient = true; encodeDefaults = true }
+
+    private val lock = Any()
+    private val bypasses = mutableListOf<SslBypassEntry>()
+    private var persistenceFile: Path? = null
+
+    /**
+     * Wire on-disk persistence + load any saved bypasses. Called from
+     * `Main.kt` after PlatformPaths is ready. Calling twice replaces the
+     * file path and re-loads from it; useful for tests but normal
+     * launcher path calls this exactly once.
+     */
+    fun initialize(file: Path) {
+        synchronized(lock) {
+            persistenceFile = file
+            bypasses.clear()
+            load()
+        }
+    }
+
+    /** True when [host] currently has an unexpired bypass entry. */
+    fun bypassFor(host: String): Boolean {
+        val now = Instant.now()
+        synchronized(lock) {
+            return bypasses.any { it.host == host && Instant.parse(it.expiresAt).isAfter(now) }
+        }
+    }
+
+    /**
+     * Grant or refresh a bypass for [host] valid until [until]. An
+     * existing entry for the same host is replaced (no duplicates).
+     */
+    fun grantBypass(host: String, until: Instant) {
+        synchronized(lock) {
+            bypasses.removeAll { it.host == host }
+            bypasses.add(SslBypassEntry(host, until.toString()))
+            save()
+        }
+        log.info("SSL bypass granted for {} until {}", host, until)
+    }
+
+    /** Revoke any existing bypass for [host]. Idempotent. */
+    fun revokeBypass(host: String) {
+        synchronized(lock) {
+            val removed = bypasses.removeAll { it.host == host }
+            if (removed) save()
+        }
+    }
+
+    /** Snapshot of current bypass entries (a copy — callers can iterate safely). */
+    fun listBypasses(): List<SslBypassEntry> = synchronized(lock) { bypasses.toList() }
+
+    /**
+     * Test-only: wipe in-memory state without touching the persistence
+     * file. Tests that don't want JVM-wide state bleed between cases
+     * call this in setup/teardown.
+     */
+    fun clearForTests() {
+        synchronized(lock) {
+            bypasses.clear()
+            persistenceFile = null
+        }
+    }
+
+    private fun load() {
+        val file = persistenceFile ?: return
+        if (!Files.exists(file)) return
+        try {
+            val text = Files.readString(file)
+            val list = json.decodeFromString<List<SslBypassEntry>>(text)
+            val now = Instant.now()
+            // Drop expired on load — stale grants from prior sessions must
+            // not silently re-arm.
+            list.filter { Instant.parse(it.expiresAt).isAfter(now) }.forEach(bypasses::add)
+            if (list.size != bypasses.size) {
+                log.info("Dropped {} expired SSL bypass entries during load", list.size - bypasses.size)
+            }
+        } catch (e: Exception) {
+            log.warn("Failed to read ssl-bypasses.json — starting with empty bypass set: {}", e.message)
+        }
+    }
+
+    private fun save() {
+        val file = persistenceFile ?: return
+        try {
+            if (file.parent != null) Files.createDirectories(file.parent)
+            Files.writeString(file, json.encodeToString(bypasses))
+        } catch (e: Exception) {
+            log.warn("Failed to write ssl-bypasses.json: {}", e.message)
+        }
+    }
 }

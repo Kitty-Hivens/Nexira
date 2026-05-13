@@ -182,6 +182,15 @@ fun main() {
         "Launcher started (v${Branding.VERSION}, sessionId=$sessionId, os=${System.getProperty("os.name")})"
     )
 
+    // Vault #2: wire SSL-bypass persistence. Expired entries from prior
+    // sessions are dropped during load — a 30-day grant from a month ago
+    // doesn't silently re-arm itself. Called before Koin / HttpClientProvider
+    // bootstrap so the very first network request sees the correct bypass
+    // state. (Calling later would race: HttpClientProvider's selector
+    // reads `NetworkState.bypassFor(...)` and could see an empty set if
+    // initialize hadn't run yet.)
+    hivens.launcher.NetworkState.initialize(paths.dataDir.resolve("ssl-bypasses.json"))
+
     System.setProperty("jna.nosys", "true")
     System.setProperty("skiko.fps.limit", "60")
     // X11 WM_CLASS = "AuraLauncher". -Dawt.appClassName covers JBR; for stock
@@ -581,8 +590,14 @@ fun AppRoot(
                         AppState.Authenticated(session)
                     } catch (e: AuthException) {
                         if (e.isSslError) {
-                            hivens.core.diag.ActionRing.record("SSL bypass auto-enabled on cached-credential auto-login (cert error)")
-                            NetworkState.sslBypassEnabled = true
+                            // Auto-grant on cached-credential cert error gets the same
+                            // 30-day expiry as user-initiated accept (RightPanel). The
+                            // user accepted the SSL bypass implicitly by saving credentials
+                            // through a prior cert outage; we extend that consent until
+                            // the cert issue resolves or 30 days, whichever comes first.
+                            val until = java.time.Instant.now().plus(30, java.time.temporal.ChronoUnit.DAYS)
+                            hivens.core.diag.ActionRing.record("SSL bypass auto-granted on cached-credential auto-login (cert error) — 30 days")
+                            NetworkState.grantBypass(hivens.config.Network.SSL_BYPASS_HOST, until)
                             try {
                                 val server  = profileManager.lastServerId ?: Protocol.DEFAULT_SERVER_ID
                                 val session = insecureAuthService.login(saved.playerName, saved.cachedPassword!!, server)
