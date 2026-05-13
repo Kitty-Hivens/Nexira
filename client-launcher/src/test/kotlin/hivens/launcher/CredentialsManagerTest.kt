@@ -274,6 +274,25 @@ class CredentialsManagerTest {
 
     // ── In-memory keyring fake ────────────────────────────────────────────
 
+    /**
+     * Simple in-memory [IKeyringStorage] that tracks entries by a
+     * `"service::account"` key. Covers two scenarios CredentialsManager
+     * cares about:
+     *
+     *  - **Happy path**: `store` succeeds, `retrieve` returns what was
+     *    written, `clear` removes (returns true only when something was
+     *    actually removed — matches libsecret's no-match semantics).
+     *  - **`failStore = true`**: simulates a keyring daemon that's
+     *    reachable (`isAvailable() = true`) but refuses every write.
+     *    Covers the "user revoked permission" / "default collection
+     *    locked" cases that should transparently degrade to the
+     *    AES-GCM file fallback.
+     *
+     * One toggle covers both password and accessToken paths because the
+     * production code calls `store` per-secret — flipping `failStore`
+     * triggers the file fallback for both, which is what we want to
+     * exercise in the file-mode tests.
+     */
     private class FakeKeyring : IKeyringStorage {
         val entries: MutableMap<String, String> = mutableMapOf()
         var failStore: Boolean = false
