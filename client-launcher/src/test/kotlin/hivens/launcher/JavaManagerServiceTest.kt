@@ -1,6 +1,12 @@
 package hivens.launcher
 
 import hivens.test.buildMockClient
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry
+import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream
+import org.apache.commons.compress.archivers.zip.UnixStat
+import org.apache.commons.compress.archivers.zip.ZipArchiveEntry
+import org.apache.commons.compress.archivers.zip.ZipArchiveOutputStream
+import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.nio.file.Files
@@ -13,6 +19,7 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
@@ -263,6 +270,73 @@ class JavaManagerServiceTest {
         svc.unzip(benign, dest)
 
         assertEquals("hello", Files.readString(dest / "subdir" / "inner.txt"))
+    }
+
+    @Test
+    fun `unzip throws SecurityException on symlink entry (#187)`() {
+        // BellSoft JDK ZIPs (Windows builds) ship plain files only. A symlink
+        // entry would either be packaging accident or hostile redirect — fail
+        // hard so the JDK install surfaces loudly instead of corrupting state.
+        val malicious = workDir.resolve("evil-jdk.zip").toFile()
+        ZipArchiveOutputStream(FileOutputStream(malicious)).use { zos ->
+            val link = ZipArchiveEntry("jdk/bin/javaw.exe")
+            link.unixMode = UnixStat.LINK_FLAG or 0b111_111_111
+            zos.putArchiveEntry(link)
+            zos.write("../../../../etc/passwd".toByteArray())
+            zos.closeArchiveEntry()
+        }
+        val dest = workDir / "extract-target"
+        Files.createDirectories(dest)
+        assertFailsWith<SecurityException> { svc.unzip(malicious, dest) }
+    }
+
+    // ── untargz: zip-slip + symlink/special-type rejection ──────────────
+
+    @Test
+    fun `untargz throws on tar entries that escape the destination`() {
+        val malicious = workDir.resolve("evil.tar.gz").toFile()
+        TarArchiveOutputStream(GzipCompressorOutputStream(FileOutputStream(malicious))).use { tos ->
+            val entry = TarArchiveEntry("../../etc/aura-took-this.txt")
+            entry.size = "escaped".length.toLong()
+            tos.putArchiveEntry(entry)
+            tos.write("escaped".toByteArray())
+            tos.closeArchiveEntry()
+        }
+        val dest = workDir / "extract-target"
+        Files.createDirectories(dest)
+        assertFails { svc.untargz(malicious, dest) }
+    }
+
+    @Test
+    fun `untargz throws SecurityException on symbolic-link tar entry (#187)`() {
+        val malicious = workDir.resolve("evil-link.tar.gz").toFile()
+        TarArchiveOutputStream(GzipCompressorOutputStream(FileOutputStream(malicious))).use { tos ->
+            val link = TarArchiveEntry("inside-link", TarArchiveEntry.LF_SYMLINK)
+            link.linkName = "/etc/passwd"
+            tos.putArchiveEntry(link)
+            tos.closeArchiveEntry()
+        }
+        val dest = workDir / "extract-target"
+        Files.createDirectories(dest)
+        assertFailsWith<SecurityException> {
+            svc.untargz(malicious, dest)
+        }
+    }
+
+    @Test
+    fun `untargz throws SecurityException on hard-link tar entry (#187)`() {
+        val malicious = workDir.resolve("evil-hardlink.tar.gz").toFile()
+        TarArchiveOutputStream(GzipCompressorOutputStream(FileOutputStream(malicious))).use { tos ->
+            val link = TarArchiveEntry("inside-hard", TarArchiveEntry.LF_LINK)
+            link.linkName = "../../../../etc/shadow"
+            tos.putArchiveEntry(link)
+            tos.closeArchiveEntry()
+        }
+        val dest = workDir / "extract-target"
+        Files.createDirectories(dest)
+        assertFailsWith<SecurityException> {
+            svc.untargz(malicious, dest)
+        }
     }
 
     // ── helpers ───────────────────────────────────────────────────────────

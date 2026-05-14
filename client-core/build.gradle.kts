@@ -19,6 +19,10 @@ dependencies {
     // JSON
     implementation(libs.kotlinx.serialization.json)
 
+    // Archive extraction with unix-mode-aware ZipArchiveEntry — needed by
+    // ZipUtils to reject symlink entries that bypass plain Zip Slip checks (#187).
+    implementation(libs.commons.compress)
+
     // TEST
     testImplementation(kotlin("test"))
     testImplementation(libs.ktor.client.mock)
