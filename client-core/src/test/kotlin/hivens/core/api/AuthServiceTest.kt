@@ -103,8 +103,46 @@ class AuthServiceTest {
     // ── completeTwoFactor (#159) ──────────────────────────────────────────
 
     @Test
-    fun `completeTwoFactor returns SessionData when twoauth=OK and second login succeeds`() = runTest {
-        // Two login() responses: first TWOAUTH, second OK after twoauth verify.
+    fun `completeTwoFactor uses cached TWOAUTH response when complete (no re-login)`() = runTest {
+        // Server returned a TWOAUTH login response that ALREADY carried full
+        // session fields (uuid + playername + uid). After twoauth=OK the
+        // launcher must promote that response directly into a SessionData
+        // without bouncing through a second login() — re-login is the
+        // fallback path, not the preferred one (#159 followup).
+        val proto = FakeServerProtocol().apply {
+            loginResult = {
+                LoginResponse(
+                    status = "TWOAUTH",
+                    uid = "abc-uid-128",
+                    uuid = "550e8400e29b41d4a716446655440000",
+                    playername = "TestPlayer",
+                    session = "ZmFrZS1zZXNzaW9uLWJ5dGVz",
+                    money = 50,
+                )
+            }
+            twoauthResult = { _, _, _ -> StatusOnlyResponse(status = "OK") }
+        }
+        val service = AuthService(proto)
+        val ex = assertFailsWith<TwoFactorRequiredException> {
+            service.login("user", "pass", "Industrial")
+        }
+        val session = service.completeTwoFactor(
+            username = "user", password = "pass", serverId = "Industrial",
+            uid = ex.uid!!, code = "123456",
+        )
+        assertEquals("TestPlayer", session.playerName)
+        assertEquals(AuthStatus.OK, session.status)
+        assertEquals(50, session.balance)
+        assertEquals(1, proto.twoauthCalls.size)
+        assertEquals(1, proto.loginCalls.size,
+            "no second login when the cached TWOAUTH response is complete")
+    }
+
+    @Test
+    fun `completeTwoFactor falls back to single re-login when cached TWOAUTH is sparse`() = runTest {
+        // Spec's minimal-shape case: TWOAUTH response carries only the uid
+        // (no uuid / playername / session), so cache promotion can't build a
+        // SessionData. Fall through to one re-login attempt.
         val proto = FakeServerProtocol().apply {
             var loginAttempt = 0
             loginResult = {
@@ -115,20 +153,44 @@ class AuthServiceTest {
             twoauthResult = { _, _, _ -> StatusOnlyResponse(status = "OK") }
         }
         val service = AuthService(proto)
-        // First call surfaces the TWOAUTH need.
         val ex = assertFailsWith<TwoFactorRequiredException> {
             service.login("user", "pass", "Industrial")
         }
-        // UI prompts for code, threads through uid + originating credentials.
         val session = service.completeTwoFactor(
             username = "user", password = "pass", serverId = "Industrial",
             uid = ex.uid!!, code = "123456",
         )
         assertEquals("TestPlayer", session.playerName)
-        assertEquals(AuthStatus.OK, session.status)
-        assertEquals(1, proto.twoauthCalls.size, "twoauth should be called exactly once")
-        assertEquals("123456", proto.twoauthCalls.single().third)
-        assertEquals(2, proto.loginCalls.size, "second login follows twoauth=OK")
+        assertEquals(2, proto.loginCalls.size, "fallback re-login fires when cache too sparse")
+    }
+
+    @Test
+    fun `completeTwoFactor breaks the TWOAUTH-on-re-login loop`() = runTest {
+        // Server quirk surfaced empirically (2026-05-15): re-login after a
+        // verified twoauth=OK still returns TWOAUTH (account doesn't actually
+        // have 2FA configured but the server routes through the gate anyway,
+        // OR the verify silently failed). Without loop detection the launcher
+        // would re-prompt for a code that can never satisfy the server.
+        // completeTwoFactor must surface TWO_FACTOR_EXPIRED instead.
+        val proto = FakeServerProtocol().apply {
+            // Always TWOAUTH with sparse fields.
+            loginResult = { LoginResponse(status = "TWOAUTH", uid = "abc-uid-128") }
+            twoauthResult = { _, _, _ -> StatusOnlyResponse(status = "OK") }
+        }
+        val service = AuthService(proto)
+        val firstEx = assertFailsWith<TwoFactorRequiredException> {
+            service.login("user", "pass", "Industrial")
+        }
+        val ex = assertFailsWith<AuthException> {
+            service.completeTwoFactor(
+                username = "user", password = "pass", serverId = "Industrial",
+                uid = firstEx.uid!!, code = "123456",
+            )
+        }
+        // NOT a TwoFactorRequiredException — the inner re-login loop got
+        // converted to a clean restart-the-flow signal.
+        assertFalse(ex is TwoFactorRequiredException)
+        assertEquals(AuthStatus.TWO_FACTOR_EXPIRED, ex.status)
     }
 
     @Test
