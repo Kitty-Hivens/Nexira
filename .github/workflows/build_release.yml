@@ -358,41 +358,28 @@ jobs:
           path: AuraLauncher-${{ env.APP_VERSION }}-x86_64.AppImage
 
   # ─────────────────────────────────────────────────────────────────────────
-  # MACOS — DMG, both architectures
+  # MACOS — DMG (Apple Silicon only in the release pipeline)
   #
   # Compose Desktop's `packageReleaseDmg` produces a host-architecture
   # DMG. macos-latest runners are Apple Silicon since the GH Actions
-  # migration in 2024-2025, so building only there left Intel Mac users
-  # (pre-2020 hardware) with a binary they literally cannot launch — they
-  # see "not supported on this Mac" before Gatekeeper even fires.
+  # migration in 2024-2025.
   #
-  # Dual matrix: macos-latest (Apple Silicon → aarch64) + macos-13 (Intel
-  # → x86_64). Two DMGs ship alongside each other; users pick by their
-  # CPU. Universal-binary path via lipo would be cleaner UX but Compose
-  # Desktop nativeDistributions has no out-of-box support; revisit when
-  # we have a reason to prioritise that.
-  #
-  # x86_64 is best-effort on free tier: macos-13 is the last Intel image
-  # GH still maintains and its concurrency pool is shrinking — queue
-  # times of 12+ hours have been observed during US workday peaks. We
-  # set `continue-on-error: true` for that arm so the release publishes
-  # with the aarch64 DMG (plus Win/Linux) even when x86_64 starves; the
-  # missing Intel build can be added later via a manual workflow run
-  # once the runner is available. aarch64 stays hard-required.
+  # x86_64 (Intel) build is intentionally absent from the release pipeline.
+  # The macos-13 runner (last Intel image GH actively maintains) sits in
+  # queue 12+ hours during US workday peaks on the free-tier pool, and
+  # `continue-on-error` does NOT help here: it only kicks in once a job
+  # finishes (success/failure/cancelled), so a job stuck in queue still
+  # blocks any dependent. The Intel DMG is produced separately via the
+  # manual `build-macos-x86_64.yml` workflow, dispatched by the maintainer
+  # against the published tag once macos-13 capacity returns. Intel users
+  # therefore see the DMG appear on the GitHub Release page with a
+  # delay — usually hours, occasionally days. Acceptable trade-off given
+  # the Intel-Mac install base in 2026 and our $0/year budget.
   # ─────────────────────────────────────────────────────────────────────────
   build-macos:
-    name: macOS (DMG, ${{ matrix.arch }})
+    name: macOS (DMG, aarch64)
     needs: changelog
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: macos-latest    # Apple Silicon (M1+)
-            arch: aarch64
-          - os: macos-13        # Last Intel runner image GH actively maintains
-            arch: x86_64
-    runs-on: ${{ matrix.os }}
-    continue-on-error: ${{ matrix.arch == 'x86_64' }}
+    runs-on: macos-latest
     env:
       APP_VERSION: ${{ needs.changelog.outputs.version }}
     steps:
@@ -411,14 +398,12 @@ jobs:
       - name: Rename DMG with architecture suffix
         run: |
           mv client-ui/build/compose/binaries/main-release/dmg/*.dmg \
-             "AuraLauncher-$APP_VERSION-${{ matrix.arch }}.dmg"
+             "AuraLauncher-$APP_VERSION-aarch64.dmg"
 
       - uses: actions/upload-artifact@v4
         with:
-          # Per-arch artifact name — actions/upload-artifact v4 refuses to
-          # upload twice under the same name from different matrix jobs.
-          name: macos-artifacts-${{ matrix.arch }}
-          path: AuraLauncher-${{ env.APP_VERSION }}-${{ matrix.arch }}.dmg
+          name: macos-artifacts-aarch64
+          path: AuraLauncher-${{ env.APP_VERSION }}-aarch64.dmg
 
   # ─────────────────────────────────────────────────────────────────────────
   # RELEASE — collect artifacts, publish with proper changelog body
