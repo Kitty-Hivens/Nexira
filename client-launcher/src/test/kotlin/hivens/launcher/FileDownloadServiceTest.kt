@@ -224,4 +224,82 @@ class FileDownloadServiceTest {
             "protected paths must short-circuit before MD5 comparison",
         )
     }
+
+    // ── ZIP-structure scan for mods/*.jar (#169) ─────────────────────────
+
+    @Test
+    fun `isFileMissingOrChanged returns true for corrupt mods jar even when MD5 matches`() {
+        // Bug reproducer: bytes-on-disk match the manifest's MD5 verbatim
+        // (server CDN serves them, hash matches), but the bytes don't form
+        // a valid ZIP — NeoForge BootstrapLauncher dies with
+        // `invalid CEN header (bad signature)` at launch. Pre-fix the
+        // launcher said "all good" and let the user crash; post-fix it
+        // forces a redownload.
+        val jar = workDir / "mods" / "broken.jar"
+        Files.createDirectories(jar.parent)
+        val garbage = "this is not a zip archive at all".toByteArray()
+        Files.write(jar, garbage)
+        val md5 = java.security.MessageDigest.getInstance("MD5")
+            .digest(garbage)
+            .joinToString("") { "%02x".format(it) }
+        // The MD5 matches what's on disk — only the ZIP-validity check
+        // can detect this. Without the fix, isFileMissingOrChanged would
+        // return false (file fine) → game launches → crash.
+        assertTrue(
+            svc.isFileMissingOrChanged(jar, md5, "mods/broken.jar"),
+            "matching MD5 must NOT shield a corrupt mods jar from re-download",
+        )
+    }
+
+    @Test
+    fun `isFileMissingOrChanged accepts valid mods jar with matching MD5`() {
+        val jar = workDir / "mods" / "ok.jar"
+        Files.createDirectories(jar.parent)
+        // Build a minimal but well-formed JAR.
+        java.util.jar.JarOutputStream(Files.newOutputStream(jar)).use { jos ->
+            jos.putNextEntry(java.util.jar.JarEntry("META-INF/MANIFEST.MF"))
+            jos.write("Manifest-Version: 1.0\n".toByteArray())
+            jos.closeEntry()
+        }
+        val bytes = Files.readAllBytes(jar)
+        val md5 = java.security.MessageDigest.getInstance("MD5")
+            .digest(bytes)
+            .joinToString("") { "%02x".format(it) }
+        assertFalse(svc.isFileMissingOrChanged(jar, md5, "mods/ok.jar"))
+    }
+
+    @Test
+    fun `ZIP-validity scan is scoped to mods only (libraries jars skip the scan)`() {
+        // Performance scope (#169 cheaper-alternative): scanning every
+        // libraries-dir JAR would dominate cold-start on heavy modpacks.
+        // Corruption is heavily concentrated in mods/, so only that
+        // sub-tree pays the JarFile open cost. Verify a corrupt jar
+        // OUTSIDE mods/ with matching MD5 is still considered fine —
+        // we accept the residual risk to keep cold start snappy.
+        val jar = workDir / "libraries" / "broken.jar"
+        Files.createDirectories(jar.parent)
+        val garbage = "not a zip".toByteArray()
+        Files.write(jar, garbage)
+        val md5 = java.security.MessageDigest.getInstance("MD5")
+            .digest(garbage)
+            .joinToString("") { "%02x".format(it) }
+        assertFalse(
+            svc.isFileMissingOrChanged(jar, md5, "libraries/broken.jar"),
+            "libraries jars are intentionally not scanned — keeps cold start fast",
+        )
+    }
+
+    @Test
+    fun `ZIP-validity scan triggers in nested mods subdirectories`() {
+        // Modpack convention: mods/<version>/foo.jar (e.g. mods/1.21.1/X.jar).
+        // The scope predicate must accept these too.
+        val jar = workDir / "mods" / "1.21.1" / "broken.jar"
+        Files.createDirectories(jar.parent)
+        val garbage = "not a zip".toByteArray()
+        Files.write(jar, garbage)
+        val md5 = java.security.MessageDigest.getInstance("MD5")
+            .digest(garbage)
+            .joinToString("") { "%02x".format(it) }
+        assertTrue(svc.isFileMissingOrChanged(jar, md5, "mods/1.21.1/broken.jar"))
+    }
 }

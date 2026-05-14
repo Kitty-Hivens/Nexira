@@ -146,20 +146,24 @@ class FileDownloadDiskIntegrationTest {
 
     @Test
     fun `missing local file is downloaded`() = runBlocking {
+        // config/* paths so the #169 mods-jar ZIP-validity scan doesn't
+        // trigger — focus of this test is the up-to-date-vs-missing
+        // dispatch, not jar integrity. Pre-existing file with matching
+        // MD5 must NOT be re-fetched.
         val files = mapOf(
-            "mods/foo.jar" to "foo".toByteArray(),
-            "mods/bar.jar" to "bar".toByteArray(),
+            "config/foo.cfg" to "foo content".toByteArray(),
+            "config/bar.cfg" to "bar content".toByteArray(),
         )
         val manifest = manifestOf(files)
         val (svc, requests) = newService(files)
 
         // Pre-populate one of two — the other is missing.
-        Files.createDirectories(clientDir.resolve("mods"))
-        Files.write(clientDir.resolve("mods/foo.jar"), "foo".toByteArray())
+        Files.createDirectories(clientDir.resolve("config"))
+        Files.write(clientDir.resolve("config/foo.cfg"), "foo content".toByteArray())
 
         svc.processSession(sessionWith(manifest), "Industrial", clientDir, null, null, null, null)
 
-        assertEquals("bar", Files.readString(clientDir.resolve("mods/bar.jar")))
+        assertEquals("bar content", Files.readString(clientDir.resolve("config/bar.cfg")))
         assertEquals(1, requests.get(),
             "only the missing file should be fetched — the up-to-date one stays put")
     }
