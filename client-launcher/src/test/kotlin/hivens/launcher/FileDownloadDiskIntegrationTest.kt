@@ -190,6 +190,47 @@ class FileDownloadDiskIntegrationTest {
         assertEquals(0, requests.get(), "no HTTP fetch should fire for a protected file")
     }
 
+    // ── #184: cache must yield to disk reality ────────────────────────────
+
+    @Test
+    fun `disk-wipe between syncs forces re-download even when manifest-cache is fresh`() = runBlocking {
+        // Reproduces the bug user hit on RPG: sync once successfully (cache
+        // marks Industrial clean), then the client dir is gone (data-dir
+        // move that left manifest-cache/ behind, manual rm, etc.). Pre-fix
+        // the second processSession trusted the cache and short-circuited,
+        // leaving an empty disk + a "clean" cache → game launched with
+        // empty classpath. The disk-sanity gate must catch this.
+        val files = mapOf(
+            "mods/foo.jar" to "foo bytes".toByteArray(),
+            "mods/bar.jar" to "bar bytes".toByteArray(),
+            "config/settings.cfg" to "key=value".toByteArray(),
+        )
+        val manifest = manifestOf(files)
+        val (svc, requests) = newService(files)
+
+        svc.processSession(sessionWith(manifest), "Industrial", clientDir, null, null, null, null)
+        val firstSyncRequests = requests.get()
+
+        // Wipe the client dir. The manifest-cache file at
+        // <workDir>/manifest-cache/Industrial.json stays untouched.
+        Files.walk(clientDir).sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }
+        Files.createDirectories(clientDir)
+
+        svc.processSession(sessionWith(manifest), "Industrial", clientDir, null, null, null, null)
+
+        // All files must be back on disk with correct content.
+        for ((relPath, expectedBytes) in files) {
+            val onDisk = clientDir.resolve(relPath)
+            assertTrue(Files.exists(onDisk), "missing after re-sync: $relPath")
+            assertEquals(expectedBytes.toList(), Files.readAllBytes(onDisk).toList(),
+                "byte mismatch on re-sync for $relPath")
+        }
+        // Re-sync should have re-downloaded each file — disk-sanity gate
+        // must invalidate the otherwise-clean cache.
+        assertEquals(firstSyncRequests * 2, requests.get(),
+            "post-wipe sync must refetch — cache should NOT short-circuit on missing files")
+    }
+
     // ── Network failure ───────────────────────────────────────────────────
 
     @Test
