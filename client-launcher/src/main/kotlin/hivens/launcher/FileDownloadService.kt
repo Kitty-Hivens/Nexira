@@ -47,6 +47,16 @@ class FileDownloadService(
         )
 
         private const val INDEX_FILENAME = ".extra_unpacked_index.json"
+
+        /**
+         * How many manifest entries to spot-check on disk before trusting
+         * the manifest-cache short-circuit (#184). Twenty is enough to
+         * catch the bulk-loss cases (data-dir-moved-without-files, manual
+         * `rm`, partial backup restore) without paying for a full walk —
+         * the existing per-file MD5 verification still runs when this
+         * gate fails.
+         */
+        private const val SANITY_SAMPLE_SIZE = 20
         private val indexJson = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
     }
 
@@ -77,13 +87,25 @@ class FileDownloadService(
         // mod stay loaded until the cache expires or the manifest changes
         // upstream. (Codex P2 on PR #128.)
         val manifestHash = manifestCache.hashOf(cacheKeyInputFor(manifest, ignoredFiles))
-        if (manifestCache.isClean(serverId, manifestHash)) {
+        // Disk-sanity gate (#184): the cache file alone can't tell that the
+        // user moved their data dir leaving manifest-cache/ behind, deleted
+        // clients/<id>/ by hand, or restored from a partial backup. Sample
+        // the first SANITY_SAMPLE_SIZE manifest entries and require all of
+        // them on disk — if even one is missing, force a full integrity
+        // walk + redownload instead of trusting the cache and starting the
+        // game with an empty classpath (which is exactly what the original
+        // bug looked like to the user). The flatten is needed for both the
+        // sanity sample and the downstream download path; compute it once.
+        val filesMap = flattenManifest(manifest)
+        val cacheValid = manifestCache.isClean(serverId, manifestHash) {
+            filesMap.entries.take(SANITY_SAMPLE_SIZE).all { (rawPath, _) ->
+                Files.exists(targetDir.resolve(normalizePath(rawPath)))
+            }
+        }
+        if (cacheValid) {
             messageUI?.invoke("Files verified (cached)")
             return@withContext
         }
-
-        // 1. Flatten manifest
-        val filesMap = flattenManifest(manifest)
 
         // 2. Filtering
         if (!ignoredFiles.isNullOrEmpty()) {

@@ -64,12 +64,32 @@ class ManifestCache(
         return md.digest().joinToString("") { "%02x".format(it) }
     }
 
-    fun isClean(serverId: String, manifestHash: String): Boolean {
+    /**
+     * @param diskSanityCheck called only when the cache is otherwise valid
+     *        (hash matches, within TTL). Returning false invalidates the
+     *        cache entry — this is how callers gate the short-circuit on
+     *        actual on-disk state. Cheap by design: a handful of
+     *        Files.exists checks against the manifest's top entries are
+     *        enough to catch the bulk-loss cases (#184: data dir moved
+     *        but cache stayed; user `rm`'d the client dir; partial
+     *        restore-from-backup), without paying for a full MD5 walk.
+     *        Default no-op preserves the legacy contract for callers that
+     *        only need the hash + TTL gate.
+     */
+    fun isClean(
+        serverId: String,
+        manifestHash: String,
+        diskSanityCheck: () -> Boolean = { true },
+    ): Boolean {
         val entry = read(serverId) ?: return false
         if (entry.hash != manifestHash) return false
         val ageMs = System.currentTimeMillis() - entry.syncedAt
         if (ageMs >= TTL_MS) {
             log.debug("manifest cache for {} expired ({}h old, TTL {}h)", serverId, ageMs / 3_600_000, TTL_MS / 3_600_000)
+            return false
+        }
+        if (!diskSanityCheck()) {
+            log.info("manifest cache for {} reports clean but disk state failed sanity check — forcing resync", serverId)
             return false
         }
         return true
