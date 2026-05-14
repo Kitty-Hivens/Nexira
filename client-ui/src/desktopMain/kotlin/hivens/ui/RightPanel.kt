@@ -34,7 +34,6 @@ import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
 import coil3.request.crossfade
-import hivens.config.Network
 import hivens.config.Protocol
 import hivens.core.api.AuthException
 import hivens.core.api.interfaces.IAuthService
@@ -44,6 +43,7 @@ import hivens.core.data.SessionData
 import hivens.launcher.CredentialsManager
 import hivens.launcher.NetworkState
 import hivens.launcher.ProfileManager
+import hivens.launcher.network.ServerProtocolConfig
 import hivens.ui.easter.AprilFoolsButton
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
@@ -105,6 +105,7 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
     val insecureAuthService: IAuthService      = koinInject(named("insecure"))
     val credentialsManager: CredentialsManager = koinInject()
     val profileManager: ProfileManager         = koinInject()
+    val protocolConfig: ServerProtocolConfig   = koinInject()
     val s            = LocalStrings.current
     val scope        = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
@@ -358,7 +359,7 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
             text    = s.loginRegister,
             onClick = {
                 runCatching {
-                    val url = "${Network.BASE_URL}/register"
+                    val url = "${protocolConfig.baseUrl}/register"
                     if (Desktop.isDesktopSupported() &&
                         Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)
                     ) {
@@ -614,6 +615,7 @@ private fun SkeletonNewsItem(brush: Brush) {
 
 @Composable
 private fun CompactNewsItem(item: NewsItem) {
+    val protocolConfig: ServerProtocolConfig = koinInject()
     // Try to open a URL if the NewsItem has one (currently description holds "Views: N",
     // but we keep the click hook ready for when the backend sends real URLs)
     val canOpenUrl = item.imageUrl != null  // reuse as proxy; swap for item.url when available
@@ -625,7 +627,7 @@ private fun CompactNewsItem(item: NewsItem) {
                 // Build a best-effort URL from the image URL pattern:
                 // https://smartycraft.ru/images/news/mini/news1.jpg  →  https://smartycraft.ru/news{id}
                 try {
-                    val url = "${Network.BASE_URL}/news${item.id}"
+                    val url = "${protocolConfig.baseUrl}/news${item.id}"
                     if (Desktop.isDesktopSupported() &&
                         Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)
                     ) {
