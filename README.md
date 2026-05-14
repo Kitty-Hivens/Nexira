@@ -33,16 +33,45 @@
 <details>
   <summary>Installation</summary>
 
-| Platform | File |
-  |---|---|
-| Windows | `AuraLauncher-*-Setup.exe` |
-| Windows (portable) | `AuraLauncher-*-Windows-Portable.zip` |
-| Linux | `AuraLauncher-*-x86_64.AppImage` |
-| macOS | `AuraLauncher-*.dmg` |
+| Platform | Tier | File |
+  |---|---|---|
+| Windows | tier-1 | `AuraLauncher-*-Setup.exe` |
+| Windows (portable) | tier-1 | `AuraLauncher-*-Windows-Portable.zip` |
+| Linux | tier-1 | `AuraLauncher-*-x86_64.AppImage` |
+| macOS Apple Silicon | tier-1 | `AuraLauncher-*-aarch64.dmg` |
+| macOS Intel | community | `AuraLauncher-*-x86_64-community.dmg` |
 
 → [**Latest Release**](https://github.com/Kitty-Hivens/Aura-Launcher/releases/latest)
 
 For detailed instructions see the [documentation](https://kitty-hivens.github.io/Aura-Launcher/).
+</details>
+
+<details>
+  <summary>Platform support tiers</summary>
+
+Aura is built and validated by a single maintainer on the platforms below.
+Tier choice reflects how confidently each release is exercised before publish,
+not the quality of the code path itself.
+
+  - **tier-1 — supported.** Built in the release pipeline on every tag. Tested
+    end-to-end on at least one machine before the release is cut. Bug reports
+    are acted on directly. Covers Windows x86_64, Linux x86_64 (AppImage),
+    macOS Apple Silicon (aarch64).
+
+  - **community-tier.** Asset is shipped but the maintainer doesn't routinely
+    boot it. Builds via a manual `workflow_dispatch` after the release is
+    published, so the DMG appears on the release page with a delay (hours, sometimes days).
+    Bug reports welcome and reviewed but turnaround depends on community
+    contributors who own the platform. Covers macOS Intel (x86_64).
+
+Why Intel macOS isn't tier-1: the macos-13 runner (last Intel image GitHub
+maintains) sits in the free-tier queue for hours during US peak, which would
+push every tier-1 release out by half a day if Intel were a hard dep. The
+Intel install base in 2026 is small enough that this trade-off is reasonable.
+The build is `*-community` named so the tier is obvious from the filename.
+
+For platforms not listed (FreeBSD, Linux ARM, etc.) the launcher likely runs
+under reasonable JVM availability but isn't tested. Patches welcome.
 </details>
 
 <details>

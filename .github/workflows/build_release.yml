@@ -327,11 +327,13 @@ jobs:
   # `continue-on-error` does NOT help here: it only kicks in once a job
   # finishes (success/failure/cancelled), so a job stuck in queue still
   # blocks any dependent. The Intel DMG is produced separately via the
-  # manual `build-macos-x86_64.yml` workflow, dispatched by the maintainer
-  # against the published tag once macos-13 capacity returns. Intel users
-  # therefore see the DMG appear on the GitHub Release page with a
-  # delay — usually hours, occasionally days. Acceptable trade-off given
-  # the Intel-Mac install base in 2026 and our $0/year budget.
+  # manual `build-macos-x86_64-community.yml` workflow, dispatched by the
+  # maintainer against the published tag once macos-13 capacity returns.
+  # Intel users therefore see the DMG appear on the GitHub Release page
+  # with a delay — usually hours, occasionally days. Acceptable trade-off
+  # given the Intel-Mac install base in 2026 and our $0/year budget.
+  # The asset is named `-x86_64-community` to make the tier obvious from
+  # the filename alone (#164).
   # ─────────────────────────────────────────────────────────────────────────
   build-macos:
     name: macOS (DMG, aarch64)
