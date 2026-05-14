@@ -281,7 +281,7 @@ val appModule = module {
     // Direct channel — Maven Central LWJGL/JInput natives don't need the proxy.
     single { EnvironmentPreparer(get(named("direct"))) }
     single { ClasspathProvider(get()) }
-    single { GameCommandBuilder() }
+    single { GameCommandBuilder(get()) }
     single { ProcessLogHandler() }
 
     single<IAuthService> { AuthService(get<IServerProtocol>()) }
@@ -295,7 +295,7 @@ val appModule = module {
         AuthService(get<IServerProtocol>(named("insecure")))
     }
 
-    single<IServerListService> { ServerListService(get()) }
+    single<IServerListService> { ServerListService(get(), get()) }
 
     single {
         val dataDir: java.nio.file.Path = get()

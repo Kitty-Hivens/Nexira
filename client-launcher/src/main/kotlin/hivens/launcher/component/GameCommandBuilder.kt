@@ -1,11 +1,11 @@
 package hivens.launcher.component
 
 import hivens.config.Branding
-import hivens.config.Network
 import hivens.config.Protocol
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.InstanceProfile
 import hivens.core.data.SessionData
+import hivens.launcher.network.ServerProtocolConfig
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.nio.file.Path
@@ -13,7 +13,9 @@ import java.nio.file.Path
 /**
  * Process Command Factory.
  */
-internal class GameCommandBuilder {
+internal class GameCommandBuilder(
+    private val protocolConfig: ServerProtocolConfig = ServerProtocolConfig(),
+) {
     private val logger = LoggerFactory.getLogger(GameCommandBuilder::class.java)
     private val neoForgeDetector = NeoForgeVersionDetector()
 
@@ -103,9 +105,9 @@ internal class GameCommandBuilder {
         }
 
         // 3. System Properties (Launcher Identity & Custom Authlib)
-        args.add("-Dminecraft.api.auth.host=${Network.BASE_URL}/launcher/")
-        args.add("-Dminecraft.api.account.host=${Network.BASE_URL}/launcher/")
-        args.add("-Dminecraft.api.session.host=${Network.BASE_URL}/launcher/")
+        args.add("-Dminecraft.api.auth.host=${protocolConfig.baseUrl}/launcher/")
+        args.add("-Dminecraft.api.account.host=${protocolConfig.baseUrl}/launcher/")
+        args.add("-Dminecraft.api.session.host=${protocolConfig.baseUrl}/launcher/")
         args.add("-Dminecraft.launcher.brand=${Branding.UPSTREAM_NAME}")
         args.add("-Dminecraft.launcher.version=${Protocol.MIMIC_LAUNCHER_VERSION}")
 
