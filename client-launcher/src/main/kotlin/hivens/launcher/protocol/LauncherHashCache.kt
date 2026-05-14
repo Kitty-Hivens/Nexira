@@ -26,7 +26,7 @@ import java.util.concurrent.atomic.AtomicInteger
  * 1. On startup, load cached hash from `<dataDir>/launcher-hash.txt` if
  *    file exists, else fall back to [Protocol.DEFAULT_LAUNCHER_HASH].
  * 2. Use that hash in `action=loader` requests.
- * 3. If server returns UPDATE: download [Network.OFFICIAL_JAR_URL], MD5 it,
+ * 3. If server returns UPDATE: download [config.officialJarUrl], MD5 it,
  *    write to cache file, update in-memory value, signal caller to retry.
  * 4. Cap at [MAX_REFRESH_ATTEMPTS_PER_SESSION] refreshes per launcher session
  *    to prevent loops if the upstream server is misconfigured (returning
