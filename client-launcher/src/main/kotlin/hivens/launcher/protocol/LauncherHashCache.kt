@@ -9,6 +9,7 @@ import io.ktor.client.request.get
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.security.MessageDigest
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Caches the MD5 of the official `smartycraft.jar` that the server expects
@@ -44,7 +45,14 @@ class LauncherHashCache(
 
     @Volatile
     private var current: String = readCachedOrDefault()
-    private var refreshAttempts: Int = 0
+    /**
+     * Refresh-attempt counter is read+modified from any coroutine that ends
+     * up suspended on [refresh] — a user double-clicking Play could trip
+     * two parallel calls, both observing `< MAX` and both incrementing,
+     * producing 3+ downloads against the cap of 2 (#189). AtomicInteger +
+     * CAS makes the cap check exact even under contention.
+     */
+    private val refreshAttempts = AtomicInteger(0)
 
     /** Hash to send in the next `action=loader` request. */
     fun get(): String = current
@@ -60,12 +68,18 @@ class LauncherHashCache(
      * re-downloading — caller should surface "client too old" error to user.
      */
     suspend fun refresh(): String? {
-        if (refreshAttempts >= MAX_REFRESH_ATTEMPTS_PER_SESSION) {
-            logger.warn("Hash refresh attempts exhausted ({}/{}); server likely demands a launcher upgrade we can't satisfy",
-                refreshAttempts, MAX_REFRESH_ATTEMPTS_PER_SESSION)
-            return null
+        // CAS loop: atomically reserve a refresh slot. If the slot count
+        // is at the cap, return null without spending bandwidth.
+        while (true) {
+            val current = refreshAttempts.get()
+            if (current >= MAX_REFRESH_ATTEMPTS_PER_SESSION) {
+                logger.warn("Hash refresh attempts exhausted ({}/{}); server likely demands a launcher upgrade we can't satisfy",
+                    current, MAX_REFRESH_ATTEMPTS_PER_SESSION)
+                return null
+            }
+            if (refreshAttempts.compareAndSet(current, current + 1)) break
+            // Lost the CAS race — re-read and decide again.
         }
-        refreshAttempts++
         return try {
             logger.info("Refreshing launcher hash from {}", config.officialJarUrl)
             val bytes = router.execute { client ->
