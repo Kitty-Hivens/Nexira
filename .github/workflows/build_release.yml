@@ -154,13 +154,22 @@ jobs:
   # Live smoke — answers "is the upstream API actually reachable RIGHT NOW?"
   # before we burn 25 minutes building artefacts that would ship a broken
   # auth flow. Runs once on Linux (single-OS suffices: this probes upstream,
-  # not platform-specific code paths). Hard gate — `changelog` and all build
-  # jobs need this to pass.
+  # not platform-specific code paths).
+  #
+  # Soft gate — `continue-on-error: true` because the smoke probe couples
+  # OUR release to UPSTREAM availability. SmartyCraft going dark for a few
+  # hours (silent 200/0-byte from launcher2/index.php on 2026-05-14) should
+  # not permanently block our release pipeline: their server is outside our
+  # control and their lazy-admin reputation means outages can persist for
+  # days. Drift detection lives elsewhere — `smoke-daily.yml` cron runs
+  # this same suite hourly-ish on its own schedule, so a real wire-protocol
+  # break is caught within 24 h independently of any release attempt.
   # ─────────────────────────────────────────────────────────────────────────
   smoke:
     name: Live Smoke (smartycraft.ru)
     runs-on: ubuntu-latest
     needs: test
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
