@@ -57,9 +57,10 @@ import hivens.ui.utils.SkinManager
 import java.awt.Toolkit
 import java.nio.file.Files
 import java.util.UUID
-import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -162,7 +163,7 @@ private fun setLinuxXToolkitAppClassName(name: String) {
     }
 }
 
-@OptIn(ExperimentalResourceApi::class, DelicateCoroutinesApi::class)
+@OptIn(ExperimentalResourceApi::class)
 fun main() {
     // BEFORE PlatformPaths resolution: apply any pending data-dir move
     // scheduled from the Settings UI. If user clicked "Move data
@@ -239,6 +240,14 @@ fun main() {
     DataDirMigration.run(paths)
 
     startKoin { modules(networkModule, appModule, uiModule) }
+
+    // Process-lifetime coroutine scope for fire-and-forget background work
+    // (tray-launch flow, AutoSync). SupervisorJob so a single failed child
+    // doesn't take down the rest. Shutdown hook cancels the scope on JVM
+    // exit so in-flight network sockets / file handles get released instead
+    // of being orphaned the way they were under GlobalScope (#191).
+    val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    Runtime.getRuntime().addShutdownHook(Thread { applicationScope.cancel() })
 
     // Conduit Phase 2: restore persisted force-proxy preference into the
     // in-memory NetworkState so ChannelRouter sees it on the very first
@@ -410,7 +419,7 @@ fun main() {
                 }
 
                 TrayManager.onLaunchServer = { server ->
-                    GlobalScope.launch(Dispatchers.IO) {
+                    applicationScope.launch {
                         val credentials = credentialsManager.load()
                         if (credentials?.cachedPassword != null) {
                             try {
@@ -449,15 +458,18 @@ fun main() {
                 // Fire-and-forget background sync of every installed pack.
                 // Gated by experimentalFeaturesEnabled master + autoSyncAllPacks
                 // child to match the rest of the experimental opt-ins. Runs on
-                // GlobalScope because we want it to survive composition resets;
-                // the service itself is a singleton and idempotent (will just
-                // no-op on subsequent calls if already running — TODO: enforce
-                // via in-flight flag once we add UI re-trigger).
+                // applicationScope so it survives composition resets but DOES
+                // get cancelled on JVM exit — under the prior GlobalScope a
+                // user closing the launcher mid-sync left network/file handles
+                // open until the process truly died (#191). The service itself
+                // is a singleton and idempotent (will no-op on subsequent calls
+                // if already running — TODO: enforce via in-flight flag once we
+                // add UI re-trigger).
                 if (settings.experimentalFeaturesEnabled
                     && settings.autoSyncAllPacks
                     && dashboardServers.isNotEmpty()
                 ) {
-                    GlobalScope.launch(Dispatchers.IO) {
+                    applicationScope.launch {
                         autoSyncService.syncAll(dashboardServers)
                     }
                 }

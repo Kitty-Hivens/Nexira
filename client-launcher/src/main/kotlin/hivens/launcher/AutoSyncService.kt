@@ -79,7 +79,9 @@ class AutoSyncService(
     /**
      * Sync every server in [allServers] that has a non-empty client directory.
      * Suspends until all servers processed. Caller decides on which dispatcher
-     * to run — typically `Dispatchers.IO` from a `GlobalScope.launch` in Main.
+     * to run — typically `Dispatchers.IO` from the applicationScope in Main
+     * (process-lifetime SupervisorJob, cancelled on JVM exit so a half-done
+     * sync doesn't orphan sockets / file descriptors).
      */
     suspend fun syncAll(allServers: List<ServerProfile>) {
         val creds = credentialsProvider()
