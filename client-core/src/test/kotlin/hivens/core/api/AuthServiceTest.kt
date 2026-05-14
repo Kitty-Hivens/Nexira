@@ -165,6 +165,65 @@ class AuthServiceTest {
     }
 
     @Test
+    fun `pending TWOAUTH cache is cleared by a fresh login attempt for the same triple`() = runTest {
+        // Audit catch on the 22-commit batch: pendingTwoFactor used to grow
+        // unbounded if the user cancelled the dialog and retried with a
+        // different password. The fresh-login invalidation guards that —
+        // verify by chaining a TWOAUTH-yielding login, a wrong-password
+        // attempt (clears the cache), then a TWOAUTH-yielding login again,
+        // and confirming the second TWOAUTH path goes through the cache-
+        // promotion fallback (which is only possible if the entry was
+        // re-inserted, not pre-existing from the first attempt).
+        val responses = mutableListOf<LoginResponse>(
+            LoginResponse(
+                status = "TWOAUTH", uid = "first-uid",
+                uuid = "550e8400e29b41d4a716446655440000",
+                playername = "TestPlayer",
+                session = "ZmFrZS1zZXNzaW9uLWJ5dGVz",
+            ),
+            LoginResponse(status = "PASSWORD"),
+            LoginResponse(
+                status = "TWOAUTH", uid = "second-uid",
+                uuid = "550e8400e29b41d4a716446655440000",
+                playername = "TestPlayer",
+                session = "ZmFrZS1zZXNzaW9uLWJ5dGVz",
+            ),
+        )
+        val proto = FakeServerProtocol().apply {
+            loginResult = { responses.removeAt(0) }
+            twoauthResult = { _, _, _ -> StatusOnlyResponse(status = "OK") }
+        }
+        val service = AuthService(proto)
+
+        // 1) First TWOAUTH — uid is "first-uid". User abandons the dialog.
+        val first = assertFailsWith<TwoFactorRequiredException> {
+            service.login("user", "pass", "Industrial")
+        }
+        assertEquals("first-uid", first.uid)
+
+        // 2) User retries with wrong password. PASSWORD branch fires; the
+        //    fresh-login invalidation must clear the "first-uid" entry from
+        //    pendingTwoFactor BEFORE the network call (otherwise the second
+        //    TWOAUTH attempt below would see the stale entry).
+        assertFailsWith<AuthException> {
+            service.login("user", "wrong-pass", "Industrial")
+        }
+
+        // 3) Third TWOAUTH for the original triple — uid is "second-uid".
+        //    Promote-from-cache should pull the SECOND response, not the first.
+        val second = assertFailsWith<TwoFactorRequiredException> {
+            service.login("user", "pass", "Industrial")
+        }
+        assertEquals("second-uid", second.uid)
+        val session = service.completeTwoFactor(
+            username = "user", password = "pass", serverId = "Industrial",
+            uid = second.uid!!, code = "111111",
+        )
+        // Promote-from-cache used the most recent response, not a stale one.
+        assertEquals("TestPlayer", session.playerName)
+    }
+
+    @Test
     fun `completeTwoFactor breaks the TWOAUTH-on-re-login loop`() = runTest {
         // Server quirk surfaced empirically (2026-05-15): re-login after a
         // verified twoauth=OK still returns TWOAUTH (account doesn't actually

@@ -80,6 +80,12 @@ class AuthService(
         // wrong/rotated password within the TTL would silently succeed
         // via cache. (Codex P2 on PR #128.)
         val passwordEncoded = HashUtils.md5(password)
+        // Each fresh login attempt invalidates any stale pendingTwoFactor
+        // entry for this triple — covers the case where the user cancelled
+        // a previous 2FA dialog (or it errored out) and is now retrying.
+        // Without this the map would grow unbounded across the launcher's
+        // lifetime (audit catch on the 22-commit batch).
+        pendingTwoFactor.remove(CacheKey(username, passwordEncoded, serverId))
         cachedFor(username, passwordEncoded, serverId)?.let {
             logger.info("Login via API V3 (server: {}) — cache hit, skipping network", serverId)
             return it
