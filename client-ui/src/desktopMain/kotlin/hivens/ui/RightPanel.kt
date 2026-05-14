@@ -36,6 +36,8 @@ import coil3.request.ImageRequest
 import coil3.request.crossfade
 import hivens.config.Protocol
 import hivens.core.api.AuthException
+import hivens.core.api.TwoFactorRequiredException
+import hivens.core.data.AuthStatus
 import hivens.core.api.interfaces.IAuthService
 import hivens.core.api.interfaces.IServerListService
 import hivens.core.data.NewsItem
@@ -44,6 +46,7 @@ import hivens.launcher.CredentialsManager
 import hivens.launcher.NetworkState
 import hivens.launcher.ProfileManager
 import hivens.launcher.network.ServerProtocolConfig
+import hivens.ui.components.ConfirmCodeDialog
 import hivens.ui.easter.AprilFoolsButton
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
@@ -117,6 +120,16 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var sslWarning   by remember { mutableStateOf(false) }
 
+    // 2FA flow state (#159). twoFactorPending is non-null while the
+    // ConfirmCodeDialog is open — it stores the originating credentials
+    // plus the uid the server returned in the TWOAUTH login response so
+    // completeTwoFactor() can sign the follow-up. Cleared on dismiss /
+    // success / TWO_FACTOR_EXPIRED.
+    data class TwoFactorPending(val uid: String, val username: String, val password: String, val serverId: String)
+    var twoFactorPending  by remember { mutableStateOf<TwoFactorPending?>(null) }
+    var twoFactorError    by remember { mutableStateOf<String?>(null) }
+    var twoFactorBusy     by remember { mutableStateOf(false) }
+
     val fieldColors = OutlinedTextFieldDefaults.colors(
         focusedTextColor        = CelestiaTheme.colors.textPrimary,
         unfocusedTextColor      = CelestiaTheme.colors.textPrimary,
@@ -146,6 +159,23 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
                 }
                 hivens.core.diag.ActionRing.record("Login OK: user=$login")
                 onLogin(session)
+            } catch (e: TwoFactorRequiredException) {
+                // Account has 2FA — open the code dialog instead of treating
+                // it as a hard error. uid may be null when the server omits
+                // it from the TWOAUTH response (spec quirk); surface clearly
+                // so user knows to retry the full login.
+                isLoading = false
+                hivens.core.diag.ActionRing.record("Login: 2FA required, user=$login uid=${e.uid?.take(8) ?: "<missing>"}")
+                val pendingUid = e.uid
+                if (pendingUid.isNullOrBlank()) {
+                    errorMessage = s.auth2faExpired
+                } else {
+                    val lastServer = profileManager.lastServerId ?: Protocol.DEFAULT_SERVER_ID
+                    twoFactorError = null
+                    twoFactorPending = TwoFactorPending(
+                        uid = pendingUid, username = login, password = password, serverId = lastServer,
+                    )
+                }
             } catch (e: AuthException) {
                 isLoading = false
                 hivens.core.diag.ActionRing.record(
@@ -164,6 +194,64 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
                 errorMessage = e.message ?: s.loginErrorGeneric
             }
         }
+    }
+
+    fun submitTwoFactor(code: String) {
+        val pending = twoFactorPending ?: return
+        twoFactorBusy = true
+        twoFactorError = null
+        scope.launch {
+            try {
+                val session = withContext(Dispatchers.IO) {
+                    val sess = authService.completeTwoFactor(
+                        username = pending.username, password = pending.password,
+                        serverId = pending.serverId, uid = pending.uid, code = code,
+                    )
+                    if (rememberMe) credentialsManager.save(sess)
+                    sess
+                }
+                hivens.core.diag.ActionRing.record("Login OK after 2FA: user=${pending.username}")
+                twoFactorBusy = false
+                twoFactorPending = null
+                onLogin(session)
+            } catch (e: AuthException) {
+                twoFactorBusy = false
+                hivens.core.diag.ActionRing.record(
+                    "2FA verify failed: user=${pending.username} status=${e.status}"
+                )
+                when (e.status) {
+                    AuthStatus.WRONG_CODE -> twoFactorError = s.auth2faInvalid
+                    AuthStatus.TWO_FACTOR_EXPIRED -> {
+                        // Session is gone server-side — close the dialog and
+                        // surface in the main login form so the user retries
+                        // from scratch.
+                        twoFactorPending = null
+                        errorMessage = s.auth2faExpired
+                    }
+                    else -> twoFactorError = e.message ?: s.loginErrorGeneric
+                }
+            } catch (e: Exception) {
+                twoFactorBusy = false
+                twoFactorError = e.message ?: s.loginErrorGeneric
+            }
+        }
+    }
+
+    // 2FA prompt — renders only while we're awaiting a code. Decoupled
+    // from the login form below so the form retains its state (username,
+    // password, rememberMe) for the resume path. Dismissal cancels the
+    // 2FA flow without clearing the form, letting the user retry.
+    twoFactorPending?.let {
+        ConfirmCodeDialog(
+            onDismiss = {
+                twoFactorPending = null
+                twoFactorError = null
+                twoFactorBusy = false
+            },
+            onSubmit = { code -> submitTwoFactor(code) },
+            errorMessage = twoFactorError,
+            isSubmitting = twoFactorBusy,
+        )
     }
 
     Column(
