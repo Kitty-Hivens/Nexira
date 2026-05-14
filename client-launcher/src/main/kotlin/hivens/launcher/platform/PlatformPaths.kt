@@ -59,7 +59,14 @@ class PlatformPaths(
     val skinCacheDir: Path get() = dataDir.resolve("skin-cache")
     val clientsDir: Path get() = dataDir.resolve("clients")
 
-    fun clientDir(assetDir: String): Path = clientsDir.resolve(assetDir)
+    /**
+     * @throws IllegalArgumentException when [assetDir] contains path-separator
+     *         or traversal characters (#188). The validator pins the allowed
+     *         set to ASCII alnum + `._-`; anything else is treated as a hostile
+     *         or malformed manifest and refused before [Path.resolve].
+     */
+    fun clientDir(assetDir: String): Path =
+        clientsDir.resolve(ServerNameValidator.require(assetDir))
 
     /** Pre-2.3 data directory; only the migration path should read this. */
     val legacyDataDir: Path = home.resolve(".aura")
