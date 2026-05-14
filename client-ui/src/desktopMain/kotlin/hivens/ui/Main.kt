@@ -198,6 +198,15 @@ fun main() {
     // reads `NetworkState.bypassFor(...)` and could see an empty set if
     // initialize hadn't run yet.)
     hivens.launcher.NetworkState.initialize(paths.dataDir.resolve("ssl-bypasses.json"))
+    // Conduit Phase 2: restore persisted force-proxy preference into the
+    // in-memory NetworkState so ChannelRouter sees it on the very first
+    // network call (before the user navigates to Settings).
+    runCatching {
+        val persistedSettings = org.koin.java.KoinJavaComponent.get<hivens.core.api.interfaces.ISettingsService>(
+            hivens.core.api.interfaces.ISettingsService::class.java
+        ).getSettings()
+        hivens.launcher.NetworkState.setForceProxyMode(persistedSettings.forceProxyMode)
+    }
 
     System.setProperty("jna.nosys", "true")
     System.setProperty("skiko.fps.limit", "60")

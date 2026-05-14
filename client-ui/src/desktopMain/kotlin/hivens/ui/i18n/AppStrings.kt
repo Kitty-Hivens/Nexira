@@ -354,6 +354,10 @@ interface AppStrings {
     /** Receives a pre-formatted local date/time string. */
     fun sslBypassExpiresAt(formatted: String): String
 
+    // --- Force proxy mode (Settings → Network) — Conduit Phase 2 ---
+    val settingsForceProxyTitle: String
+    val settingsForceProxyDesc: String
+
     // --- Data directory (Settings → Data dir) ---
     val settingsSectionDataDir: String
     val settingsDataDirCurrent: String

@@ -3,7 +3,7 @@ package hivens.launcher.protocol
 import hivens.config.Network
 import hivens.config.Protocol
 import hivens.config.Storage
-import hivens.core.api.HttpClientProvider
+import hivens.launcher.network.ChannelRouter
 import io.ktor.client.call.body
 import io.ktor.client.request.get
 import org.slf4j.LoggerFactory
@@ -36,7 +36,7 @@ import java.security.MessageDigest
  */
 class LauncherHashCache(
     dataDir: File,
-    private val httpClientProvider: HttpClientProvider,
+    private val router: ChannelRouter,
 ) {
     private val logger = LoggerFactory.getLogger(LauncherHashCache::class.java)
     private val cacheFile = File(dataDir, Storage.HASH_CACHE_FILE)
@@ -67,8 +67,9 @@ class LauncherHashCache(
         refreshAttempts++
         return try {
             logger.info("Refreshing launcher hash from {}", Network.OFFICIAL_JAR_URL)
-            val client = httpClientProvider.current
-            val bytes = client.get(Network.OFFICIAL_JAR_URL).body<ByteArray>()
+            val bytes = router.execute { client ->
+                client.get(Network.OFFICIAL_JAR_URL).body<ByteArray>()
+            }
             if (bytes.isEmpty()) {
                 logger.error("Official jar download returned empty bytes")
                 return null

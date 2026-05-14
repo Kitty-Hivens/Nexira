@@ -49,6 +49,30 @@ object NetworkState {
     private var persistenceFile: Path? = null
 
     /**
+     * User opt-in: skip the direct-channel attempt and route every smartycraft
+     * request through the SOCKS5 proxy from the first call. For users in
+     * censored regions / corporate firewalls where direct connections are
+     * known to fail. Default false — direct works for ~99% of users
+     * (see `reference_smartycraft_proxy` for empirical data).
+     *
+     * Persisted in-memory only for now. UI binding (Settings → Network →
+     * "Force proxy mode") wires through here. Survives via [SettingsService]
+     * persistence — the UI restores the saved value on each launch and calls
+     * [setForceProxyMode] to re-arm.
+     */
+    @Volatile
+    private var forceProxy: Boolean = false
+
+    /** True when the user has opted into proxy-only mode. */
+    fun forceProxyMode(): Boolean = forceProxy
+
+    /** Set the force-proxy toggle. Settings UI calls this on toggle change. */
+    fun setForceProxyMode(value: Boolean) {
+        forceProxy = value
+        log.info("Force proxy mode: {}", if (value) "ENABLED — skipping direct attempt" else "disabled (default)")
+    }
+
+    /**
      * Wire on-disk persistence + load any saved bypasses. Called from
      * `Main.kt` after PlatformPaths is ready. Calling twice replaces the
      * file path and re-loads from it; useful for tests but normal

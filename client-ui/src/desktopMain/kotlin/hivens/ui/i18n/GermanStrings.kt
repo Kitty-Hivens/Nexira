@@ -350,6 +350,9 @@ object GermanStrings : AppStrings {
     override val sslBypassRevoke        = "Widerrufen"
     override fun sslBypassExpiresAt(formatted: String) = "Läuft ab: $formatted"
 
+    override val settingsForceProxyTitle = "Nur Proxy verwenden"
+    override val settingsForceProxyDesc  = "Direktverbindung überspringen und alle Anfragen über den SmartyCraft-SOCKS-Proxy leiten. Aktivieren Sie dies, wenn in Ihrem Netzwerk Direktverbindungen blockiert werden."
+
     override val settingsSectionDataDir       = "Datenverzeichnis"
     override val settingsDataDirCurrent       = "Aktueller Pfad:"
     override val settingsDataDirMove          = "Verschieben..."
