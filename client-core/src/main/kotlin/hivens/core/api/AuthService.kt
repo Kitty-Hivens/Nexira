@@ -63,6 +63,18 @@ class AuthService(
     private val sessionCache = java.util.concurrent.ConcurrentHashMap<CacheKey, CachedSession>()
     private val sessionTtlMs = 30_000L
 
+    /**
+     * Per-user cache of the LoginResponse the server returned alongside a
+     * TWOAUTH status — held until [completeTwoFactor] consumes it (or a
+     * fresh login overwrites it). The official protocol's TWOAUTH response
+     * is sometimes status-only (per spec) and sometimes carries enough
+     * session fields to short-circuit the post-twoauth re-login loop.
+     * Caching it here lets [completeTwoFactor] try the no-re-login path
+     * first and avoids the loop the user observed when the server returns
+     * TWOAUTH on every login retry.
+     */
+    private val pendingTwoFactor = java.util.concurrent.ConcurrentHashMap<CacheKey, LoginResponse>()
+
     override suspend fun login(username: String, password: String, serverId: String): SessionData {
         // Hash first so the cache key includes the password — otherwise a
         // wrong/rotated password within the TTL would silently succeed
@@ -112,12 +124,13 @@ class AuthService(
         val parsedStatus = response.parsedStatus
         if (parsedStatus == ProtocolStatus.TWOAUTH) {
             // The TWOAUTH branch isn't a failure — it's a "do the second
-            // factor and call back". Surface as a typed exception so the
-            // UI can prompt for the code and resume via completeTwoFactor.
-            // uid is sometimes null in the TWOAUTH response (the spec
-            // shows the minimal status-only example) — pass through what
-            // we got; the resume path validates and surfaces the missing-
-            // uid case clearly.
+            // factor and call back". Cache the response so completeTwoFactor
+            // can build a SessionData directly from it (preferred path) and
+            // only fall back to a re-login when the cached fields are too
+            // sparse to construct one — necessary to avoid the
+            // login→TWOAUTH→twoauth=OK→login→TWOAUTH→… loop the server
+            // sometimes drops us into.
+            pendingTwoFactor[CacheKey(username, passwordEncoded, serverId)] = response
             throw TwoFactorRequiredException(uid = response.uid, login = username)
         }
         if (parsedStatus != ProtocolStatus.OK) {
@@ -137,20 +150,8 @@ class AuthService(
             throw AuthException(AuthStatus.INTERNAL_ERROR, "Incomplete profile data")
         }
 
-        val finalGameToken = generateGameToken(response.uid, response.session)
-        val cleanUuid = response.uuid.replace("-", "")
-
-        return SessionData(
-            status = AuthStatus.OK,
-            playerName = response.playername,
-            uid = response.uid ?: "",
-            uuid = cleanUuid,
-            accessToken = finalGameToken ?: "",
-            fileManifest = response.client,
-            serverId = serverId,
-            cachedPassword = password,
-            balance = response.money,
-        ).also { cacheSession(username, passwordEncoded, serverId, it) }
+        return buildSessionData(response, password, serverId)
+            .also { cacheSession(username, passwordEncoded, serverId, it) }
     }
 
     override suspend fun completeTwoFactor(
@@ -180,7 +181,7 @@ class AuthService(
         }
 
         when (twoauthResponse.parsedStatus) {
-            ProtocolStatus.OK -> Unit  // proceed to re-login below
+            ProtocolStatus.OK -> Unit  // proceed below
             ProtocolStatus.CODE -> throw AuthException(AuthStatus.WRONG_CODE, "Wrong 2FA code")
             ProtocolStatus.LOGIN -> throw AuthException(
                 AuthStatus.TWO_FACTOR_EXPIRED,
@@ -201,13 +202,59 @@ class AuthService(
             )
         }
 
-        // twoauth=OK — server now considers the second factor satisfied for
-        // this account. Re-do the full login: the second attempt should
-        // come back with full session data (uid, session, fileManifest).
-        // If the server STILL returns TWOAUTH, [login] will re-throw
-        // TwoFactorRequiredException which the caller can either retry or
-        // surface as a hard failure.
-        return login(username, password, serverId)
+        // twoauth=OK — server now considers the second factor satisfied.
+        // Two reconstruction strategies, in order:
+        //   1. The TWOAUTH login response is sometimes complete (uuid +
+        //      playername + session populated) — promote it to a SessionData
+        //      directly. Cheaper and avoids the next strategy's loop hazard.
+        //   2. If the cached response is too sparse, fall back to a single
+        //      re-login. If THAT comes back TWOAUTH again (server quirk —
+        //      observed empirically when the account doesn't actually have
+        //      2FA configured but the server still routes through the gate),
+        //      give up with TWO_FACTOR_EXPIRED rather than loop.
+        val passwordEncoded = HashUtils.md5(password)
+        val key = CacheKey(username, passwordEncoded, serverId)
+        val cachedResponse = pendingTwoFactor.remove(key)
+
+        if (cachedResponse != null && cachedResponse.uuid != null && cachedResponse.playername != null) {
+            return buildSessionData(cachedResponse, password, serverId)
+                .also { cacheSession(username, passwordEncoded, serverId, it) }
+        }
+
+        return try {
+            login(username, password, serverId)
+        } catch (_: TwoFactorRequiredException) {
+            // Re-login STILL returns TWOAUTH after our verified twoauth=OK.
+            // Either the server rejected the verify silently or the account
+            // is in a weird state. Whatever the cause, looping is wrong;
+            // surface as a clean restart-the-flow signal.
+            throw AuthException(
+                AuthStatus.TWO_FACTOR_EXPIRED,
+                "2FA verification didn't unlock the session. Please log in again.",
+            )
+        }
+    }
+
+    /**
+     * Reconstruct a [SessionData] from an OK-shaped [LoginResponse] without
+     * making any network calls. Shared between the cold-login OK path and
+     * the post-twoauth promotion path so the field mapping stays in one
+     * place. Caller is responsible for cache write.
+     */
+    private fun buildSessionData(response: LoginResponse, password: String, serverId: String): SessionData {
+        val finalGameToken = generateGameToken(response.uid, response.session)
+        val cleanUuid = response.uuid?.replace("-", "") ?: ""
+        return SessionData(
+            status = AuthStatus.OK,
+            playerName = response.playername ?: "",
+            uid = response.uid ?: "",
+            uuid = cleanUuid,
+            accessToken = finalGameToken ?: "",
+            fileManifest = response.client,
+            serverId = serverId,
+            cachedPassword = password,
+            balance = response.money,
+        )
     }
 
     /**
