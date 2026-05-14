@@ -190,7 +190,8 @@ private fun rememberSkiaImage(file: File): ImageBitmap? {
                 }
 
             } catch (e: Exception) {
-                e.printStackTrace()
+                org.slf4j.LoggerFactory.getLogger("CustomBackground")
+                    .error("Failed to decode custom background image", e)
             } finally {
                 bmp?.close()
                 codec?.close()

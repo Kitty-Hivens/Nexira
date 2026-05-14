@@ -501,20 +501,23 @@ class FileDownloadService(
 
         if (Files.exists(modsDir)) {
             try {
-                // Recursive search for files to delete
-                Files.walk(modsDir)
-                    .filter { Files.isRegularFile(it) }
-                    .forEach { file ->
-                        val fileName = file.fileName.toString()
-                        if (ignoredFiles.contains(fileName)) {
-                            try {
-                                Files.delete(file)
-                                deletedCount++
-                            } catch (e: Exception) {
-                                logger.warn("Failed to remove disabled mod: $fileName", e)
+                // .use{} closes the underlying directory stream; Files.walk holds
+                // an OS file handle that won't be released by .forEach termination.
+                Files.walk(modsDir).use { stream ->
+                    stream
+                        .filter { Files.isRegularFile(it) }
+                        .forEach { file ->
+                            val fileName = file.fileName.toString()
+                            if (ignoredFiles.contains(fileName)) {
+                                try {
+                                    Files.delete(file)
+                                    deletedCount++
+                                } catch (e: Exception) {
+                                    logger.warn("Failed to remove disabled mod: $fileName", e)
+                                }
                             }
                         }
-                    }
+                }
             } catch (e: Exception) {
                 logger.error("Error cleaning mods folder: ${e.message}")
             }

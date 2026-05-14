@@ -87,7 +87,8 @@ fun DashboardScreen(
                     }
                 }
             } catch (e: Exception) {
-                e.printStackTrace()
+                org.slf4j.LoggerFactory.getLogger("DashboardScreen")
+                    .error("Failed to load server list", e)
             } finally {
                 withContext(Dispatchers.Main) {
                     isLoadingServers = false
