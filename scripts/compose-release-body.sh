@@ -53,12 +53,17 @@ done < "$CHECKSUMS_FILE"
   fi
 
   printf '## Downloads\n\n'
-  printf '| Platform | File |\n|---|---|\n'
-  printf '| Windows Installer | [`AuraLauncher-%s-Setup.exe`](%s/AuraLauncher-%s-Setup.exe) |\n' "$APP_VERSION" "$REPO_BASE" "$APP_VERSION"
-  printf '| Windows Portable  | [`AuraLauncher-%s-Windows-Portable.zip`](%s/AuraLauncher-%s-Windows-Portable.zip) |\n' "$APP_VERSION" "$REPO_BASE" "$APP_VERSION"
-  printf '| Linux AppImage    | [`AuraLauncher-%s-x86_64.AppImage`](%s/AuraLauncher-%s-x86_64.AppImage) |\n' "$APP_VERSION" "$REPO_BASE" "$APP_VERSION"
-  printf '| macOS Apple Silicon | [`AuraLauncher-%s-aarch64.dmg`](%s/AuraLauncher-%s-aarch64.dmg) |\n' "$APP_VERSION" "$REPO_BASE" "$APP_VERSION"
-  printf '| macOS Intel       | [`AuraLauncher-%s-x86_64.dmg`](%s/AuraLauncher-%s-x86_64.dmg) |\n\n' "$APP_VERSION" "$REPO_BASE" "$APP_VERSION"
+  printf '| Platform | Tier | File |\n|---|---|---|\n'
+  printf '| Windows Installer | tier-1 | [`AuraLauncher-%s-Setup.exe`](%s/AuraLauncher-%s-Setup.exe) |\n' "$APP_VERSION" "$REPO_BASE" "$APP_VERSION"
+  printf '| Windows Portable  | tier-1 | [`AuraLauncher-%s-Windows-Portable.zip`](%s/AuraLauncher-%s-Windows-Portable.zip) |\n' "$APP_VERSION" "$REPO_BASE" "$APP_VERSION"
+  printf '| Linux AppImage    | tier-1 | [`AuraLauncher-%s-x86_64.AppImage`](%s/AuraLauncher-%s-x86_64.AppImage) |\n' "$APP_VERSION" "$REPO_BASE" "$APP_VERSION"
+  printf '| macOS Apple Silicon | tier-1 | [`AuraLauncher-%s-aarch64.dmg`](%s/AuraLauncher-%s-aarch64.dmg) |\n' "$APP_VERSION" "$REPO_BASE" "$APP_VERSION"
+  printf '| macOS Intel       | community | [`AuraLauncher-%s-x86_64-community.dmg`](%s/AuraLauncher-%s-x86_64-community.dmg) ※ |\n\n' "$APP_VERSION" "$REPO_BASE" "$APP_VERSION"
+
+  printf '> ※ The Intel macOS DMG is built and uploaded asynchronously by the maintainer\n'
+  printf '> via the `build-macos-x86_64-community.yml` workflow once macos-13 capacity\n'
+  printf '> is available. Expect a delay of hours to days after the rest of the assets\n'
+  printf '> appear; community-tier means best-effort with no validation SLA.\n\n'
 
   printf '<details>\n<summary>SHA256 Checksums</summary>\n\n'
   printf '| File | SHA256 |\n|---|---|\n'

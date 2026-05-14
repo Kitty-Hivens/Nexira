@@ -1,0 +1,78 @@
+name: macOS x86_64 (community-tier DMG)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Manual workflow_dispatch — Intel macOS isn't in the main release pipeline
+# (#165). The macos-13 runner is the last GitHub-maintained Intel image and
+# sits in the free-tier queue for hours during US peak; blocking the main
+# pipeline on it would push a tier-1 release out by half a day. Maintainer
+# (or a community contributor with write access) dispatches this workflow
+# manually against an already-published tag once macos-13 capacity returns.
+#
+# The artifact lands on the existing release with `-x86_64-community` in the
+# name so users can tell at a glance that:
+#   1. it's the Intel build (separate from the aarch64 tier-1 DMG)
+#   2. it's community-tier (per [[#164]] — best-effort, no validation SLA)
+#
+# Costs nothing because workflow_dispatch is on-demand and macos-13 is in the
+# standard free-tier minute pool. Aligns with the $0/year budget.
+# ─────────────────────────────────────────────────────────────────────────────
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing release tag to attach the DMG to (e.g. v2.2.13)'
+        required: true
+
+env:
+  JAVA_VERSION: '25'
+  JAVA_DISTRIBUTION: 'jetbrains'
+
+permissions:
+  contents: write  # gh release upload
+
+jobs:
+  build:
+    name: Build & upload Intel DMG
+    runs-on: macos-13
+    steps:
+      - name: Checkout the tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Resolve version
+        id: ver
+        run: |
+          # Strip the leading 'v' if present — Compose Desktop refuses a
+          # version string that starts with a non-digit.
+          tag="${{ inputs.tag }}"
+          version="${tag#v}"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: ${{ env.JAVA_DISTRIBUTION }}
+          java-version: ${{ env.JAVA_VERSION }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build DMG
+        run: ./gradlew :client-ui:packageReleaseDmg -PappVersion="${{ steps.ver.outputs.version }}"
+
+      - name: Rename with -x86_64-community suffix
+        run: |
+          src=$(ls client-ui/build/compose/binaries/main-release/dmg/*.dmg | head -n 1)
+          mv "$src" "AuraLauncher-${{ steps.ver.outputs.version }}-x86_64-community.dmg"
+
+      - name: Upload to existing release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # --clobber so a re-dispatch (e.g. retry after a transient
+          # gradle failure) overwrites the previous attempt instead of
+          # erroring out — the manual nature of this workflow means
+          # retries are common.
+          gh release upload "${{ inputs.tag }}" \
+            "AuraLauncher-${{ steps.ver.outputs.version }}-x86_64-community.dmg" \
+            --repo "${{ github.repository }}" --clobber
