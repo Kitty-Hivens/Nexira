@@ -110,12 +110,21 @@ class AuthService(
         }
 
         val parsedStatus = response.parsedStatus
+        if (parsedStatus == ProtocolStatus.TWOAUTH) {
+            // The TWOAUTH branch isn't a failure — it's a "do the second
+            // factor and call back". Surface as a typed exception so the
+            // UI can prompt for the code and resume via completeTwoFactor.
+            // uid is sometimes null in the TWOAUTH response (the spec
+            // shows the minimal status-only example) — pass through what
+            // we got; the resume path validates and surfaces the missing-
+            // uid case clearly.
+            throw TwoFactorRequiredException(uid = response.uid, login = username)
+        }
         if (parsedStatus != ProtocolStatus.OK) {
             val mapped = mapStatus(parsedStatus)
             val msg = when (parsedStatus) {
                 ProtocolStatus.LOGIN -> "User not found"
                 ProtocolStatus.PASSWORD -> "Invalid password"
-                ProtocolStatus.TWOAUTH -> "2FA required"
                 ProtocolStatus.ACTIVE -> "Account is not activated. Check your email."
                 ProtocolStatus.VIRTUAL -> "Virtual account"
                 ProtocolStatus.SERVER -> "Invalid server"
@@ -144,6 +153,51 @@ class AuthService(
         ).also { cacheSession(username, passwordEncoded, serverId, it) }
     }
 
+    override suspend fun completeTwoFactor(
+        username: String,
+        password: String,
+        serverId: String,
+        uid: String,
+        code: String,
+    ): SessionData {
+        if (uid.isBlank()) {
+            // The TWOAUTH login response didn't include a uid (server quirk
+            // documented in the protocol spec; sometimes the response is
+            // status-only). Without uid we can't sign the twoauth request.
+            throw AuthException(
+                AuthStatus.TWO_FACTOR_EXPIRED,
+                "2FA flow can't continue: server didn't return a session id. Please log in again.",
+            )
+        }
+        val twoauthResponse = try {
+            retryWithBackoff(operation = "twoauth verify", shouldRetry = ::isTransientNetworkError) {
+                protocol.twoauth(uid = uid, login = username, code = code)
+            }
+        } catch (e: Exception) {
+            if (e is AuthException) throw e
+            logger.error("twoauth network error", e)
+            throw AuthException(AuthStatus.INTERNAL_ERROR, "Network Error: ${e.message}")
+        }
+
+        when (val status = twoauthResponse.parsedStatus) {
+            ProtocolStatus.OK -> Unit  // proceed to re-login below
+            ProtocolStatus.CODE -> throw AuthException(AuthStatus.WRONG_CODE, "Wrong 2FA code")
+            ProtocolStatus.LOGIN -> throw AuthException(
+                AuthStatus.TWO_FACTOR_EXPIRED,
+                "2FA session expired. Please log in again.",
+            )
+            else -> throw AuthException(AuthStatus.INTERNAL_ERROR, "twoauth: server error ($status)")
+        }
+
+        // twoauth=OK — server now considers the second factor satisfied for
+        // this account. Re-do the full login: the second attempt should
+        // come back with full session data (uid, session, fileManifest).
+        // If the server STILL returns TWOAUTH, [login] will re-throw
+        // TwoFactorRequiredException which the caller can either retry or
+        // surface as a hard failure.
+        return login(username, password, serverId)
+    }
+
     /**
      * Map protocol-layer [ProtocolStatus] to UX-layer [AuthStatus]. Keep
      * aligned with [SessionData.status] consumers.
@@ -153,6 +207,7 @@ class AuthService(
         ProtocolStatus.LOGIN -> AuthStatus.BAD_LOGIN
         ProtocolStatus.PASSWORD -> AuthStatus.PASSWORD
         ProtocolStatus.TWOAUTH -> AuthStatus.NEED_2FA
+        ProtocolStatus.CODE -> AuthStatus.WRONG_CODE
         ProtocolStatus.ACTIVE -> AuthStatus.ACTIVE
         else -> AuthStatus.INTERNAL_ERROR
     }

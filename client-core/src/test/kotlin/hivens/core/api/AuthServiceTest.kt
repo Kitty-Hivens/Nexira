@@ -1,6 +1,7 @@
 package hivens.core.api
 
 import hivens.core.api.protocol.LoginResponse
+import hivens.core.api.protocol.StatusOnlyResponse
 import hivens.core.data.AuthStatus
 import hivens.test.FakeServerProtocol
 import kotlinx.coroutines.test.runTest
@@ -9,6 +10,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 /**
  * Post-Conduit-Phase-1 AuthService tests use [FakeServerProtocol] instead of
@@ -71,12 +73,102 @@ class AuthServiceTest {
     }
 
     @Test
-    fun `login throws AuthException with NEED_2FA status on TWOAUTH`() = runTest {
-        val ex = assertFailsWith<AuthException> {
-            AuthService(protocol(LoginResponse(status = "TWOAUTH")))
+    fun `login throws TwoFactorRequiredException on TWOAUTH (carries uid)`() = runTest {
+        // Server returns TWOAUTH with uid populated (the protocol spec
+        // shows minimal status-only example but real responses carry uid
+        // so the client can sign the twoauth follow-up).
+        val ex = assertFailsWith<TwoFactorRequiredException> {
+            AuthService(protocol(LoginResponse(status = "TWOAUTH", uid = "abc-uid-128")))
                 .login("2fa_user", "pass", "Industrial")
         }
         assertEquals(AuthStatus.NEED_2FA, ex.status)
+        assertEquals("abc-uid-128", ex.uid)
+        assertEquals("2fa_user", ex.login)
+    }
+
+    @Test
+    fun `login throws TwoFactorRequiredException with null uid when server omits it`() = runTest {
+        // Per protocol-spec note: the TWOAUTH response is sometimes status-only.
+        // Pass through whatever uid we got; completeTwoFactor handles the
+        // missing case explicitly. Important to surface the absence so the
+        // UI can decide to retry the full login rather than show a 2FA prompt
+        // that can never succeed.
+        val ex = assertFailsWith<TwoFactorRequiredException> {
+            AuthService(protocol(LoginResponse(status = "TWOAUTH")))
+                .login("2fa_user", "pass", "Industrial")
+        }
+        assertEquals(null, ex.uid)
+    }
+
+    // ── completeTwoFactor (#159) ──────────────────────────────────────────
+
+    @Test
+    fun `completeTwoFactor returns SessionData when twoauth=OK and second login succeeds`() = runTest {
+        // Two login() responses: first TWOAUTH, second OK after twoauth verify.
+        val proto = FakeServerProtocol().apply {
+            var loginAttempt = 0
+            loginResult = {
+                loginAttempt += 1
+                if (loginAttempt == 1) LoginResponse(status = "TWOAUTH", uid = "abc-uid-128")
+                else ok().copy(uid = "abc-uid-128")
+            }
+            twoauthResult = { _, _, _ -> StatusOnlyResponse(status = "OK") }
+        }
+        val service = AuthService(proto)
+        // First call surfaces the TWOAUTH need.
+        val ex = assertFailsWith<TwoFactorRequiredException> {
+            service.login("user", "pass", "Industrial")
+        }
+        // UI prompts for code, threads through uid + originating credentials.
+        val session = service.completeTwoFactor(
+            username = "user", password = "pass", serverId = "Industrial",
+            uid = ex.uid!!, code = "123456",
+        )
+        assertEquals("TestPlayer", session.playerName)
+        assertEquals(AuthStatus.OK, session.status)
+        assertEquals(1, proto.twoauthCalls.size, "twoauth should be called exactly once")
+        assertEquals("123456", proto.twoauthCalls.single().third)
+        assertEquals(2, proto.loginCalls.size, "second login follows twoauth=OK")
+    }
+
+    @Test
+    fun `completeTwoFactor throws WRONG_CODE when twoauth=CODE`() = runTest {
+        val proto = FakeServerProtocol().apply {
+            twoauthResult = { _, _, _ -> StatusOnlyResponse(status = "CODE") }
+        }
+        val ex = assertFailsWith<AuthException> {
+            AuthService(proto).completeTwoFactor("user", "pass", "Industrial",
+                uid = "abc-uid-128", code = "000000")
+        }
+        assertEquals(AuthStatus.WRONG_CODE, ex.status)
+        assertEquals(0, proto.loginCalls.size, "no second login attempt on wrong code")
+    }
+
+    @Test
+    fun `completeTwoFactor throws TWO_FACTOR_EXPIRED when twoauth=LOGIN`() = runTest {
+        val proto = FakeServerProtocol().apply {
+            twoauthResult = { _, _, _ -> StatusOnlyResponse(status = "LOGIN") }
+        }
+        val ex = assertFailsWith<AuthException> {
+            AuthService(proto).completeTwoFactor("user", "pass", "Industrial",
+                uid = "abc-uid-128", code = "123456")
+        }
+        assertEquals(AuthStatus.TWO_FACTOR_EXPIRED, ex.status)
+    }
+
+    @Test
+    fun `completeTwoFactor with blank uid fails fast without hitting the network`() = runTest {
+        // The TWOAUTH login response sometimes omits uid (server quirk per
+        // the protocol spec). The flow can't continue without it — fail
+        // immediately with a clear message so the UI can prompt for a full
+        // re-login instead of showing a 2FA dialog that can never succeed.
+        val proto = FakeServerProtocol()
+        val ex = assertFailsWith<AuthException> {
+            AuthService(proto).completeTwoFactor("user", "pass", "Industrial",
+                uid = "", code = "123456")
+        }
+        assertEquals(AuthStatus.TWO_FACTOR_EXPIRED, ex.status)
+        assertTrue(proto.twoauthCalls.isEmpty(), "fail-fast — no twoauth network call")
     }
 
     @Test
