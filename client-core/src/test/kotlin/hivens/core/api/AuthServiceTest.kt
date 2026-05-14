@@ -157,6 +157,24 @@ class AuthServiceTest {
     }
 
     @Test
+    fun `completeTwoFactor maps generic server ERROR to TWO_FACTOR_EXPIRED (close-dialog UX)`() = runTest {
+        // Empirically: the server returns ERROR when twoauth is sent for
+        // an account that doesn't actually have 2FA configured (the inverse
+        // of the spec's "server sometimes returns OK for accounts WITH 2FA").
+        // No code retry can recover; route to the close-dialog UX so the
+        // user retries from the credentials form, not from a verify button
+        // that will keep returning the same answer.
+        val proto = FakeServerProtocol().apply {
+            twoauthResult = { _, _, _ -> StatusOnlyResponse(status = "ERROR") }
+        }
+        val ex = assertFailsWith<AuthException> {
+            AuthService(proto).completeTwoFactor("user", "pass", "Industrial",
+                uid = "abc-uid-128", code = "123456")
+        }
+        assertEquals(AuthStatus.TWO_FACTOR_EXPIRED, ex.status)
+    }
+
+    @Test
     fun `completeTwoFactor with blank uid fails fast without hitting the network`() = runTest {
         // The TWOAUTH login response sometimes omits uid (server quirk per
         // the protocol spec). The flow can't continue without it — fail

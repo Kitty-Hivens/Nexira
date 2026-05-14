@@ -179,14 +179,26 @@ class AuthService(
             throw AuthException(AuthStatus.INTERNAL_ERROR, "Network Error: ${e.message}")
         }
 
-        when (val status = twoauthResponse.parsedStatus) {
+        when (twoauthResponse.parsedStatus) {
             ProtocolStatus.OK -> Unit  // proceed to re-login below
             ProtocolStatus.CODE -> throw AuthException(AuthStatus.WRONG_CODE, "Wrong 2FA code")
             ProtocolStatus.LOGIN -> throw AuthException(
                 AuthStatus.TWO_FACTOR_EXPIRED,
                 "2FA session expired. Please log in again.",
             )
-            else -> throw AuthException(AuthStatus.INTERNAL_ERROR, "twoauth: server error ($status)")
+            // Anything else (server-side ERROR, INTERNAL, an unexpected
+            // status the spec never mentions) is unrecoverable from the
+            // dialog: there's nothing the user can re-type that will
+            // change the answer. Per spec, the documented recovery is
+            // "restart full login" — which is exactly the contract of
+            // TWO_FACTOR_EXPIRED. Surface that status so the UI dismisses
+            // the dialog and routes the user back to the credentials
+            // form, instead of pinning them to a verify button that will
+            // keep returning the same error.
+            else -> throw AuthException(
+                AuthStatus.TWO_FACTOR_EXPIRED,
+                "2FA verification could not be completed. Please log in again.",
+            )
         }
 
         // twoauth=OK — server now considers the second factor satisfied for
