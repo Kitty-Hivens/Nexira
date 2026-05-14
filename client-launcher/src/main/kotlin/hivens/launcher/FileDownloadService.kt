@@ -387,11 +387,43 @@ class FileDownloadService(
             if (protectedPaths.isProtected(relativePath)) return false
 
             val localMd5 = calculateMD5(file)
-            !localMd5.equals(expectedMd5, ignoreCase = true)
+            if (!localMd5.equals(expectedMd5, ignoreCase = true)) return true
+
+            // ZIP-structure validation for mods/*.jar (#169). Bytes-on-disk
+            // can match the manifest's MD5 verbatim and still be a malformed
+            // ZIP — happens when the upstream CDN serves corrupt bytes that
+            // were already corrupt at hash-time, or a partial write got
+            // truncated mid-stream and the post-write integrity check
+            // missed it. NeoForge's BootstrapLauncher dies with
+            // "invalid CEN header (bad signature)" on the broken jar; the
+            // user has no signal except the crash. Scoped to mods/ only
+            // because that's where the corruption hot zone is and a
+            // 1000-file libraries-dir scan would dominate cold-start.
+            if (isModsJar(relativePath) && !isZipValid(file)) return true
+
+            false
         } catch (_: Exception) {
             true // In case of any reading error, it is better to re-download
         }
     }
+
+    private fun isModsJar(relativePath: String): Boolean {
+        val lower = relativePath.lowercase().replace('\\', '/')
+        return lower.endsWith(".jar") && (lower == "mods" || lower.contains("mods/"))
+    }
+
+    /**
+     * @return true if [file] opens cleanly as a JAR/ZIP and the central
+     *         directory walk completes without exception. False on any
+     *         exception (truncated archive, corrupt CEN, IO error). Cheap
+     *         enough to call per-jar on the mods set (~1-3s for the
+     *         Create-class 200-jar pack on SSD).
+     */
+    private fun isZipValid(file: Path): Boolean = try {
+        java.util.jar.JarFile(file.toFile()).use { jar ->
+            jar.entries().asSequence().count() > 0
+        }
+    } catch (_: Exception) { false }
 
     /**
      * Snapshot of the last successful extra.zip extraction. Persisted as
