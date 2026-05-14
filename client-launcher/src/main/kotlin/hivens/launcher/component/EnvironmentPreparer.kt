@@ -180,17 +180,34 @@ class EnvironmentPreparer(private val clientProvider: HttpClientProvider) {
         }
     }
 
+    /**
+     * The natives directory is "valid" only when the actual lwjgl native is
+     * present, not just *any* file with the platform's extension (#185).
+     * Pre-fix the check accepted a directory containing only `libjinput-*.so`
+     * as valid because jinput is a `.so` file — which let `prepareNatives`
+     * short-circuit on a half-populated dir, and the game then died with
+     * `UnsatisfiedLinkError: no lwjgl64 in java.library.path`.
+     *
+     * Substring match on `lwjgl` keeps the gate version-agnostic: catches
+     * LWJGL 2 (`liblwjgl.so` + `liblwjgl64.so`) and LWJGL 3 (`liblwjgl.so`,
+     * `liblwjgl-glfw.so`, …) and the missing `lib` prefix on the older
+     * Windows naming (`lwjgl.dll`) — without enumerating module names that
+     * could drift between versions.
+     */
     internal fun isFolderValidForOs(dir: Path, os: String): Boolean {
         if (!Files.exists(dir)) return false
-        val expectedExtension = when (os) {
-            "linux" -> ".so"
+        val extension = when (os) {
+            "linux"   -> ".so"
             "windows" -> ".dll"
-            "macos" -> ".dylib"
+            "macos"   -> ".dylib"
             else -> return false
         }
         return try {
             Files.list(dir).use { stream ->
-                stream.anyMatch { it.toString().lowercase().endsWith(expectedExtension) }
+                stream.anyMatch {
+                    val name = it.fileName.toString().lowercase()
+                    name.contains("lwjgl") && name.endsWith(extension)
+                }
             }
         } catch (_: Exception) { false }
     }
