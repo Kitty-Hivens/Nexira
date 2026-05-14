@@ -8,6 +8,7 @@ import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.StandardCopyOption
 import java.util.concurrent.ConcurrentHashMap
 
 class ProfileManager(
@@ -20,16 +21,21 @@ class ProfileManager(
     // Profile storage
     private val profiles = ConcurrentHashMap<String, InstanceProfile>()
 
-    // Favorites Vault
-    // We use synchronizedSet or simply HashSet with synchronization when writing,
-    // but for ease of reading in the UI, we’ll make a copy during get.
+    // Favorites set. ConcurrentHashMap.newKeySet gives thread-safe add/remove
+    // but `contains-then-add/remove` is still a TOCTOU race — use the
+    // `add()`/`remove()` boolean returns in toggleFavorite() to make the flip
+    // atomic instead.
     private val _favorites = ConcurrentHashMap.newKeySet<String>()
 
+    @Volatile
     var lastServerId: String? = null
 
     // Public access to favorites (for UI)
     val favoriteServers: Set<String>
         get() = _favorites.toSet()
+
+    /** Serializes save() so two concurrent writers can't produce a torn file. */
+    private val writeLock = Any()
 
     @Serializable
     private data class ProfilesContainer(
@@ -43,13 +49,22 @@ class ProfileManager(
     }
 
     /**
-     * Toggles the favorite status for the server.
+     * Atomically flips favorite state for [assetDir]. The previous
+     * `if (contains) remove else add` shape was a TOCTOU race — two parallel
+     * toggles on the same server could both observe contains=true and both
+     * call remove(), losing the user's second click. `Set.add` and
+     * `Set.remove` on ConcurrentHashMap.newKeySet return true iff they
+     * actually changed the set; we use those returns so a concurrent toggle
+     * pair always nets exactly one state flip.
+     *
+     * The mutation happens under [writeLock] so a concurrent save() can't
+     * iterate the keyset while another toggle is mid-add (CHM's iterator is
+     * weakly consistent but `_favorites.toSet()` can still throw
+     * NoSuchElementException if the size estimate races a removal).
      */
     fun toggleFavorite(assetDir: String) {
-        if (_favorites.contains(assetDir)) {
-            _favorites.remove(assetDir)
-        } else {
-            _favorites.add(assetDir)
+        synchronized(writeLock) {
+            if (!_favorites.add(assetDir)) _favorites.remove(assetDir)
         }
         save()
     }
@@ -59,7 +74,7 @@ class ProfileManager(
     }
 
     fun saveProfile(profile: InstanceProfile) {
-        profiles[profile.serverId] = profile
+        synchronized(writeLock) { profiles[profile.serverId] = profile }
         save()
     }
 
@@ -96,8 +111,17 @@ class ProfileManager(
         }
     }
 
-    fun save() {
+    /**
+     * Persist the current snapshot. Writes go through a temp file + atomic
+     * rename so a crash mid-serialize never leaves a half-JSON profiles.json
+     * on disk (the next boot would otherwise reset every per-server tweak
+     * the user made — they describe this as "settings reset themselves").
+     * Serialised by [writeLock] so two concurrent saves don't race the
+     * temp-file → final rename.
+     */
+    fun save() = synchronized(writeLock) {
         val file = workDir.resolve(fileName)
+        val tmp = workDir.resolve("$fileName.tmp")
         try {
             val container = ProfilesContainer(
                 lastServerId = lastServerId,
@@ -105,9 +129,18 @@ class ProfileManager(
                 favorites = _favorites.toSet()
             )
             val text = json.encodeToString(container)
-            Files.writeString(file, text)
+            Files.writeString(tmp, text)
+            try {
+                Files.move(tmp, file, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+            } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
+                // Some Windows-style filesystems (FAT32 over USB) don't support
+                // ATOMIC_MOVE across filename changes; fall back to plain
+                // replace which is still better than the prior writeString.
+                Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING)
+            }
         } catch (e: IOException) {
             log.error("Failed to save profiles!", e)
+            runCatching { Files.deleteIfExists(tmp) }
         }
     }
 }
