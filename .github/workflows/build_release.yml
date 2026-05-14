@@ -362,6 +362,14 @@ jobs:
   # CPU. Universal-binary path via lipo would be cleaner UX but Compose
   # Desktop nativeDistributions has no out-of-box support; revisit when
   # we have a reason to prioritise that.
+  #
+  # x86_64 is best-effort on free tier: macos-13 is the last Intel image
+  # GH still maintains and its concurrency pool is shrinking — queue
+  # times of 12+ hours have been observed during US workday peaks. We
+  # set `continue-on-error: true` for that arm so the release publishes
+  # with the aarch64 DMG (plus Win/Linux) even when x86_64 starves; the
+  # missing Intel build can be added later via a manual workflow run
+  # once the runner is available. aarch64 stays hard-required.
   # ─────────────────────────────────────────────────────────────────────────
   build-macos:
     name: macOS (DMG, ${{ matrix.arch }})
@@ -375,6 +383,7 @@ jobs:
           - os: macos-13        # Last Intel runner image GH actively maintains
             arch: x86_64
     runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.arch == 'x86_64' }}
     env:
       APP_VERSION: ${{ needs.changelog.outputs.version }}
     steps:
