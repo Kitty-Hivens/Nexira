@@ -9,13 +9,13 @@ import io.ktor.utils.io.jvm.javaio.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
+import org.apache.commons.compress.archivers.zip.ZipFile
 import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream
 import org.slf4j.LoggerFactory
 import java.io.*
 import java.nio.file.*
 import java.nio.file.attribute.BasicFileAttributes
 import java.nio.file.attribute.PosixFilePermission
-import java.util.zip.ZipInputStream
 
 class JavaManagerService(
     baseDir: Path,
@@ -162,27 +162,37 @@ class JavaManagerService(
     }
 
     internal fun unzip(zip: File, dest: Path) {
-        ZipInputStream(FileInputStream(zip)).use { zis ->
-            var entry = zis.nextEntry
-            while (entry != null) {
+        // ZipFile (random-access central-directory reader) over the streaming
+        // ZipInputStream — only the central directory carries unix-mode
+        // external-attributes, so the streaming variant can't see the
+        // symbolic-link bit (#187). A plain Zip Slip check (`startsWith(dest)`)
+        // catches `../` traversal but misses a symlink entry whose linked
+        // target sits outside [dest]; the next extraction would write
+        // attacker bytes to that target.
+        ZipFile.builder().setFile(zip).get().use { zf ->
+            for (entry in zf.entries) {
                 // Protection against Zip Slip vulnerabilities
                 val resolvedPath = dest.resolve(entry.name).normalize()
                 if (!resolvedPath.startsWith(dest)) {
                     throw IOException("Zip entry is outside of the target dir: ${entry.name}")
+                }
+                if (entry.isUnixSymlink) {
+                    throw SecurityException("Archive contains symlink entry: ${entry.name}")
                 }
 
                 if (entry.isDirectory) {
                     Files.createDirectories(resolvedPath)
                 } else {
                     Files.createDirectories(resolvedPath.parent)
-                    Files.copy(zis, resolvedPath, StandardCopyOption.REPLACE_EXISTING)
+                    zf.getInputStream(entry).use { input ->
+                        Files.copy(input, resolvedPath, StandardCopyOption.REPLACE_EXISTING)
+                    }
                 }
-                entry = zis.nextEntry
             }
         }
     }
 
-    private fun untargz(tar: File, dest: Path) {
+    internal fun untargz(tar: File, dest: Path) {
         FileInputStream(tar).use { fi ->
             BufferedInputStream(fi).use { bi ->
                 GzipCompressorInputStream(bi).use { gzi ->
@@ -192,6 +202,19 @@ class JavaManagerService(
                             val resolvedPath = dest.resolve(entry.name).normalize()
                             if (!resolvedPath.startsWith(dest)) {
                                 throw IOException("Tar entry is outside of the target dir: ${entry.name}")
+                            }
+                            // Reject every entry kind that isn't a plain file or
+                            // directory (#187). TAR natively encodes symlinks /
+                            // hardlinks / FIFOs / device nodes — none of which
+                            // belong in a BellSoft JDK tarball, but a tampered
+                            // upstream could ship one to redirect writes outside
+                            // [dest]. Hard fail rather than skip so a malicious
+                            // archive surfaces loudly in logs / crash report.
+                            if (entry.isSymbolicLink || entry.isLink ||
+                                entry.isFIFO || entry.isCharacterDevice || entry.isBlockDevice) {
+                                throw SecurityException(
+                                    "Archive contains non-regular entry (${entry.javaClass.simpleName}): ${entry.name}",
+                                )
                             }
 
                             if (entry.isDirectory) {
