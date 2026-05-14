@@ -1,6 +1,6 @@
 package hivens.launcher
 
-import hivens.config.Network
+import hivens.launcher.network.ServerProtocolConfig
 import hivens.core.api.HttpClientProvider
 import hivens.core.api.interfaces.IFileDownloadService
 import hivens.core.data.FileData
@@ -33,6 +33,7 @@ class FileDownloadService(
     private val clientProvider: HttpClientProvider,
     private val protectedPaths: ProtectedPaths,
     private val manifestCache: ManifestCache,
+    private val config: ServerProtocolConfig,
 ) : IFileDownloadService {
     private val client get() = clientProvider.current
 
@@ -239,7 +240,7 @@ class FileDownloadService(
         localPath: Path,
         onBytesRead: ((Int) -> Unit)? = null
     ) {
-        val url = "${Network.BASE_URL}/launcher/clients/" +
+        val url = "${config.clientFilesBase}/" +
                 serverPath.split("/").joinToString("/") { segment -> URLEncoder.encode(segment, "UTF-8").replace("+", "%20") }
         withContext(Dispatchers.IO) {
             if (localPath.parent != null) Files.createDirectories(localPath.parent)
