@@ -1,7 +1,7 @@
 package hivens.launcher.protocol
 
-import hivens.config.Network
 import hivens.config.Protocol
+import hivens.launcher.network.ServerProtocolConfig
 import hivens.core.api.interfaces.IServerProtocol
 import hivens.core.api.protocol.LoaderRequest
 import hivens.core.api.protocol.LoaderResponse
@@ -60,6 +60,7 @@ class SmartycraftV1Protocol(
     private val router: ChannelRouter,
     private val json: Json,
     private val launcherHashCache: LauncherHashCache,
+    private val config: ServerProtocolConfig,
 ) : IServerProtocol {
 
     private val logger = LoggerFactory.getLogger(SmartycraftV1Protocol::class.java)
@@ -151,7 +152,7 @@ class SmartycraftV1Protocol(
         val signature = SmartycraftSignatureBuilder.forUpload(uid, login)
         return try {
             val raw = router.execute { client ->
-                val response = client.post(Network.AUTH_URL) {
+                val response = client.post(config.authUrl) {
                     setBody(MultiPartFormDataContent(
                         formData {
                             append("action", action)
@@ -177,7 +178,7 @@ class SmartycraftV1Protocol(
     private suspend fun postForm(actionName: String, params: Parameters): String =
         try {
             router.execute { client ->
-                val response = client.post(Network.AUTH_URL) { setBody(FormDataContent(params)) }
+                val response = client.post(config.authUrl) { setBody(FormDataContent(params)) }
                 response.body<String>().trim()
             }
         } catch (e: Exception) {

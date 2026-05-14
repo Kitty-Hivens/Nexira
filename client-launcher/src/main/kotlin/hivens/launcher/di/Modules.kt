@@ -6,6 +6,8 @@ import hivens.config.Storage
 import hivens.core.api.AuthService
 import hivens.core.api.interfaces.IServerProtocol
 import hivens.launcher.network.ChannelRouter
+import hivens.launcher.network.ServerProtocolConfig
+import hivens.launcher.network.ServerProtocolConfigLoader
 import hivens.launcher.protocol.LauncherHashCache
 import hivens.launcher.protocol.SmartycraftV1Protocol
 import hivens.core.api.HttpClientProvider
@@ -58,23 +60,22 @@ val networkModule = module {
 
     /**
      * Smartycraft secure client. SSL verification on, SOCKS proxy always on.
-     * Backs the default (smartycraft) [HttpClientProvider].
+     * Backs the default (smartycraft) [HttpClientProvider]. Proxy creds and
+     * host/port come from [ServerProtocolConfig] (Conduit Phase 3) so a
+     * Mirror server with different proxy infra can plug in via config file.
      */
     single<OkHttpClient> {
-        // Global authorization for SOCKS (Java API)
+        val cfg: ServerProtocolConfig = get()
+
         java.net.Authenticator.setDefault(object : java.net.Authenticator() {
-            override fun getPasswordAuthentication(): java.net.PasswordAuthentication {
-                return java.net.PasswordAuthentication(
-                    Network.Proxy.USER,
-                    Network.Proxy.PASS.toCharArray()
-                )
-            }
+            override fun getPasswordAuthentication(): java.net.PasswordAuthentication =
+                java.net.PasswordAuthentication(cfg.proxyUser, cfg.proxyPass.toCharArray())
         })
 
         OkHttpClient.Builder()
             .connectTimeout(Network.TIMEOUT_CONNECT, TimeUnit.MILLISECONDS)
             .readTimeout(Network.TIMEOUT_READ, TimeUnit.MILLISECONDS)
-            .proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress(Network.Proxy.HOST, Network.Proxy.PORT)))
+            .proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress(cfg.proxyHost, cfg.proxyPort)))
             .applySmartycraftProtocols()
             .build()
     }
@@ -85,6 +86,7 @@ val networkModule = module {
      * Never injected by default — must be requested by named("insecure").
      */
     single<OkHttpClient>(named("insecure")) {
+        val cfg: ServerProtocolConfig = get()
         val (socketFactory, trustManager) = buildTrustAllSsl()
 
         OkHttpClient.Builder()
@@ -92,7 +94,7 @@ val networkModule = module {
             .readTimeout(Network.TIMEOUT_READ, TimeUnit.MILLISECONDS)
             .sslSocketFactory(socketFactory, trustManager)
             .hostnameVerifier { _, _ -> true }
-            .proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress(Network.Proxy.HOST, Network.Proxy.PORT)))
+            .proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress(cfg.proxyHost, cfg.proxyPort)))
             .applySmartycraftProtocols()
             .build()
     }
@@ -197,16 +199,30 @@ val networkModule = module {
         )
     }
 
-    single { LauncherHashCache(get<java.nio.file.Path>().toFile(), get<ChannelRouter>()) }
+    // ServerProtocolConfig — Conduit Phase 3. Loads from
+    // <dataDir>/server-config.json with smartycraft.ru defaults if absent.
+    // Optional system-property override aura.conduit.baseurl gates a runtime
+    // base URL change for Mirror development / test environments (gated by
+    // ExperimentalConduitOverride opt-in inside the loader).
+    single<ServerProtocolConfig> {
+        ServerProtocolConfigLoader(get()).load(get<java.nio.file.Path>())
+    }
+
+    single { LauncherHashCache(
+        dataDir = get<java.nio.file.Path>().toFile(),
+        router  = get<ChannelRouter>(),
+        config  = get<ServerProtocolConfig>(),
+    ) }
 
     single<IServerProtocol> {
-        SmartycraftV1Protocol(get<ChannelRouter>(), get(), get<LauncherHashCache>())
+        SmartycraftV1Protocol(get<ChannelRouter>(), get(), get<LauncherHashCache>(), get<ServerProtocolConfig>())
     }
     single<IServerProtocol>(named("insecure")) {
         SmartycraftV1Protocol(
             get<ChannelRouter>(named("insecure")),
             get(),
             get<LauncherHashCache>(),
+            get<ServerProtocolConfig>(),
         )
     }
 
@@ -257,7 +273,7 @@ val appModule = module {
         val dataDir: java.nio.file.Path = get()
         ManifestCache(dataDir.resolve("manifest-cache"), get())
     }
-    single<IFileDownloadService> { FileDownloadService(get(), get(), get()) }
+    single<IFileDownloadService> { FileDownloadService(get(), get(), get(), get<ServerProtocolConfig>()) }
 
     single<IManifestProcessorService> { ManifestProcessorService(get()) }
     single { ProfileManager(get(), get()) }

@@ -27,7 +27,17 @@ package hivens.config
  * the global SSL-bypass flag and any future routing changes here.
  */
 object Network {
+    @Deprecated(
+        message = "Use ServerProtocolConfig.baseUrl injected via DI — supports config file + system-property override per Conduit Phase 3. Will be removed in 2.2.14.",
+        level = DeprecationLevel.WARNING,
+    )
     const val BASE_URL = "https://www.smartycraft.ru"
+
+    @Deprecated(
+        message = "Use ServerProtocolConfig.authUrl injected via DI per Conduit Phase 3. Will be removed in 2.2.14.",
+        level = DeprecationLevel.WARNING,
+    )
+    @Suppress("DEPRECATION")
     const val AUTH_URL = "$BASE_URL/launcher2/index.php"
 
     /**
@@ -46,6 +56,11 @@ object Network {
      * `status: "UPDATE"`. Removing this file from the upstream site will break
      * the dashboard handshake.
      */
+    @Deprecated(
+        message = "Use ServerProtocolConfig.officialJarUrl injected via DI per Conduit Phase 3. Will be removed in 2.2.14.",
+        level = DeprecationLevel.WARNING,
+    )
+    @Suppress("DEPRECATION")
     const val OFFICIAL_JAR_URL = "$BASE_URL/downloads/smartycraft.jar"
 
     const val TIMEOUT_CONNECT = 30_000L
@@ -73,6 +88,10 @@ object Network {
      * from the decompiled official launcher) — they are public by definition,
      * not project secrets.
      */
+    @Deprecated(
+        message = "Use ServerProtocolConfig.proxyHost/Port/User/Pass injected via DI per Conduit Phase 3. Will be removed in 2.2.14.",
+        level = DeprecationLevel.WARNING,
+    )
     object Proxy {
         const val HOST = "proxy.smartycraft.ru"
         const val PORT = 58613

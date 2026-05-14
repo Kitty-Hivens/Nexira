@@ -36,7 +36,12 @@ class FileDownloadServiceTest {
         workDir = Files.createTempDirectory("aura-fds-test-")
         val protectedPaths = ProtectedPaths(workDir / "protected-paths.json", json)
         val manifestCache  = ManifestCache(workDir / "manifest-cache", json)
-        svc = FileDownloadService(buildMockClient(""), protectedPaths, manifestCache)
+        svc = FileDownloadService(
+            buildMockClient(""),
+            protectedPaths,
+            manifestCache,
+            hivens.launcher.network.ServerProtocolConfig(),
+        )
     }
 
     @AfterTest
