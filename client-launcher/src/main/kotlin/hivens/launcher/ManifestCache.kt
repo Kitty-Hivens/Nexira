@@ -1,6 +1,7 @@
 package hivens.launcher
 
 import hivens.core.data.FileManifest
+import hivens.launcher.platform.ServerNameValidator
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
@@ -125,10 +126,14 @@ class ManifestCache(
     /**
      * Defensive: server ids are trusted (they come from upstream config)
      * but we still don't want a server named `../etc/passwd` to escape
-     * the cache dir. Replace anything outside `[A-Za-z0-9._-]`.
+     * the cache dir. Replace anything outside the [ServerNameValidator]
+     * whitelist with `_` so a malformed id surfaces as a logged miss
+     * (the cache file simply won't match anything legitimate) rather
+     * than blowing up the cold-start cache lookup.
      */
     private fun sanitize(serverId: String): String =
-        serverId.map { if (it.isLetterOrDigit() || it == '_' || it == '-' || it == '.') it else '_' }.joinToString("")
+        if (ServerNameValidator.isValid(serverId)) serverId
+        else serverId.map { if (ServerNameValidator.isValid(it.toString())) it else '_' }.joinToString("")
 
     companion object {
         /**
