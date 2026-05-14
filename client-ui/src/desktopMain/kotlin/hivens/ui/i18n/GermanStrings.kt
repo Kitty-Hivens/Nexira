@@ -334,6 +334,15 @@ object GermanStrings : AppStrings {
     override fun aprilCloseEscapeCount(current: Int, max: Int) =
         "Der Schließen-Knopf ist $current / $max Mal geflohen"
 
+    // --- 2FA (TOTP) — #159 ---
+    override val auth2faTitle           = "Zwei-Faktor-Authentifizierung"
+    override val auth2faPrompt          = "Geben Sie den 6-stelligen Code aus Ihrer Authenticator-App ein, um die Anmeldung abzuschließen."
+    override val auth2faPlaceholder     = "000000"
+    override val auth2faSubmit          = "Bestätigen"
+    override val auth2faCancel          = "Abbrechen"
+    override val auth2faInvalid         = "Falscher Code. Bitte erneut versuchen."
+    override val auth2faExpired         = "Die 2FA-Sitzung ist abgelaufen. Bitte erneut anmelden."
+
     // --- SSL Warning ---
     override val sslWarningTitle        = "Serverzertifikat abgelaufen"
     override val sslWarningBody         = "Das SSL-Zertifikat des Servers ist abgelaufen. Die Verbindung ist möglicherweise unsicher — die Identität des Servers kann nicht verifiziert werden. Auf eigenes Risiko fortfahren?"

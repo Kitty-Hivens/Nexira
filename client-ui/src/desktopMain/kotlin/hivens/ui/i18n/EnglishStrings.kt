@@ -334,6 +334,15 @@ object EnglishStrings : AppStrings {
     override fun aprilCloseEscapeCount(current: Int, max: Int) =
         "The close button has fled $current / $max times"
 
+    // --- 2FA (TOTP) — #159 ---
+    override val auth2faTitle           = "Two-factor authentication"
+    override val auth2faPrompt          = "Enter the 6-digit code from your authenticator app to finish signing in."
+    override val auth2faPlaceholder     = "000000"
+    override val auth2faSubmit          = "Verify"
+    override val auth2faCancel          = "Cancel"
+    override val auth2faInvalid         = "Wrong code. Try again."
+    override val auth2faExpired         = "The 2FA session expired. Please sign in again."
+
     // --- SSL Warning ---
     override val sslWarningTitle        = "Server certificate expired"
     override val sslWarningBody         = "The server's SSL certificate has expired. Your connection may be insecure — server identity cannot be verified. Proceed at your own risk?"

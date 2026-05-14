@@ -336,6 +336,15 @@ interface AppStrings {
     val aprilCloseHideTray: String
     fun aprilCloseEscapeCount(current: Int, max: Int): String
 
+    // --- 2FA (TOTP) — #159 ---
+    val auth2faTitle: String
+    val auth2faPrompt: String
+    val auth2faPlaceholder: String
+    val auth2faSubmit: String
+    val auth2faCancel: String
+    val auth2faInvalid: String
+    val auth2faExpired: String
+
     // --- SSL Warning ---
     val sslWarningTitle: String
     val sslWarningBody: String

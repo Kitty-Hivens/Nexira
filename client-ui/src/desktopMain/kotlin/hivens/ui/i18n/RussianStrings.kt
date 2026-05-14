@@ -334,6 +334,15 @@ object RussianStrings : AppStrings {
     override fun aprilCloseEscapeCount(current: Int, max: Int) =
         "Кнопка сбежала $current / $max раз"
 
+    // --- 2FA (TOTP) — #159 ---
+    override val auth2faTitle           = "Двухфакторная аутентификация"
+    override val auth2faPrompt          = "Введите 6-значный код из приложения-аутентификатора, чтобы завершить вход."
+    override val auth2faPlaceholder     = "000000"
+    override val auth2faSubmit          = "Подтвердить"
+    override val auth2faCancel          = "Отмена"
+    override val auth2faInvalid         = "Неверный код. Попробуйте снова."
+    override val auth2faExpired         = "Сессия 2FA истекла. Пожалуйста, войдите заново."
+
     // --- SSL Warning ---
     override val sslWarningTitle        = "Сертификат безопасности устарел"
     override val sslWarningBody         = "Сертификат сервера истёк. Соединение может быть небезопасным — данные передаются без проверки подлинности сервера. Продолжить на свой страх и риск?"
