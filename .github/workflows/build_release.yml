@@ -151,55 +151,12 @@ jobs:
             client-launcher/build/reports/tests/
 
   # ─────────────────────────────────────────────────────────────────────────
-  # Live smoke — answers "is the upstream API actually reachable RIGHT NOW?"
-  # before we burn 25 minutes building artefacts that would ship a broken
-  # auth flow. Runs once on Linux (single-OS suffices: this probes upstream,
-  # not platform-specific code paths).
-  #
-  # Soft gate — `continue-on-error: true` because the smoke probe couples
-  # OUR release to UPSTREAM availability. SmartyCraft going dark for a few
-  # hours (silent 200/0-byte from launcher2/index.php on 2026-05-14) should
-  # not permanently block our release pipeline: their server is outside our
-  # control and their lazy-admin reputation means outages can persist for
-  # days. Drift detection lives elsewhere — `smoke-daily.yml` cron runs
-  # this same suite hourly-ish on its own schedule, so a real wire-protocol
-  # break is caught within 24 h independently of any release attempt.
-  # ─────────────────────────────────────────────────────────────────────────
-  smoke:
-    name: Live Smoke (smartycraft.ru)
-    runs-on: ubuntu-latest
-    needs: test
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-java@v4
-        with:
-          distribution: ${{ env.JAVA_DISTRIBUTION }}
-          java-version: ${{ env.JAVA_VERSION }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Run live smoke against real upstream
-        env:
-          SMARTY_TEST_USER: ${{ secrets.SMARTY_TEST_USER }}
-          SMARTY_TEST_PASS: ${{ secrets.SMARTY_TEST_PASS }}
-        run: ./gradlew :client-launcher:smokeTest
-
-      - name: Upload smoke report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: smoke-report
-          path: client-launcher/build/reports/tests/smokeTest/
-
-  # ─────────────────────────────────────────────────────────────────────────
   # Extract changelog section for this version from CHANGELOG.md
   # ─────────────────────────────────────────────────────────────────────────
   changelog:
     name: Extract Changelog
     runs-on: ubuntu-latest
-    needs: [test, smoke]   # tests AND live smoke must pass before we touch artefacts
+    needs: test   # tests must pass before we touch artefacts
     outputs:
       notes: ${{ steps.extract.outputs.notes }}
       version: ${{ steps.version.outputs.value }}

@@ -12,8 +12,8 @@ import kotlin.io.path.name
  * Auto-detection of NeoForge `--fml.*` argument values from a populated
  * `libraries-{mcVersion}/` directory.
  *
- * The official launcher's hardcoded q.java constants drift every time
- * Серафим bumps NeoForge/FML on the server. We mirror those constants
+ * The official launcher's hardcoded q.java constants drift every time the
+ * upstream bumps NeoForge/FML on the server. We mirror those constants
  * from `smrt-deco` syncs and have already shipped 21.1.506 / 4.0.42 by
  * hand — once. The version values are right there in the manifest sync
  * output: directory names under `net/neoforged/neoforge/` and

@@ -1,0 +1,116 @@
+package hivens.launcher.protocol
+
+import hivens.config.Network
+import hivens.config.Protocol
+import hivens.config.Storage
+import hivens.core.api.HttpClientProvider
+import io.ktor.client.call.body
+import io.ktor.client.request.get
+import org.slf4j.LoggerFactory
+import java.io.File
+import java.security.MessageDigest
+
+/**
+ * Caches the MD5 of the official `smartycraft.jar` that the server expects
+ * in the `cheksum` field of `action=loader` requests.
+ *
+ * Background: server gates the dashboard fetch behind a launcher-version
+ * check — the request body must include the MD5 of the official launcher
+ * binary corresponding to [Protocol.MIMIC_LAUNCHER_VERSION]. When the
+ * upstream binary is bumped, the hash changes and previously-baked
+ * [Protocol.DEFAULT_LAUNCHER_HASH] becomes stale — server returns
+ * `{"status":"UPDATE"}` until the launcher refreshes its cache.
+ *
+ * Self-fetch flow (Option B per Conduit planning, locked 2026-05-14):
+ * 1. On startup, load cached hash from `<dataDir>/launcher-hash.txt` if
+ *    file exists, else fall back to [Protocol.DEFAULT_LAUNCHER_HASH].
+ * 2. Use that hash in `action=loader` requests.
+ * 3. If server returns UPDATE: download [Network.OFFICIAL_JAR_URL], MD5 it,
+ *    write to cache file, update in-memory value, signal caller to retry.
+ * 4. Cap at [MAX_REFRESH_ATTEMPTS_PER_SESSION] refreshes per launcher session
+ *    to prevent loops if the upstream server is misconfigured (returning
+ *    UPDATE for any hash we send).
+ *
+ * Lifted out of `ServerRepository` as part of Conduit Phase 1 so the
+ * concern is separated from "make HTTP request" logic.
+ */
+class LauncherHashCache(
+    dataDir: File,
+    private val httpClientProvider: HttpClientProvider,
+) {
+    private val logger = LoggerFactory.getLogger(LauncherHashCache::class.java)
+    private val cacheFile = File(dataDir, Storage.HASH_CACHE_FILE)
+
+    @Volatile
+    private var current: String = readCachedOrDefault()
+    private var refreshAttempts: Int = 0
+
+    /** Hash to send in the next `action=loader` request. */
+    fun get(): String = current
+
+    /**
+     * Server returned UPDATE — try to refresh by downloading + MD5'ing the
+     * official jar. Returns the new hash on success, `null` on failure
+     * (network error, exhausted retries, or download produced empty bytes).
+     *
+     * After a successful refresh, [get] returns the new value and this
+     * call counts toward [MAX_REFRESH_ATTEMPTS_PER_SESSION]. Subsequent
+     * UPDATE responses past the cap return `null` immediately without
+     * re-downloading — caller should surface "client too old" error to user.
+     */
+    suspend fun refresh(): String? {
+        if (refreshAttempts >= MAX_REFRESH_ATTEMPTS_PER_SESSION) {
+            logger.warn("Hash refresh attempts exhausted ({}/{}); server likely demands a launcher upgrade we can't satisfy",
+                refreshAttempts, MAX_REFRESH_ATTEMPTS_PER_SESSION)
+            return null
+        }
+        refreshAttempts++
+        return try {
+            logger.info("Refreshing launcher hash from {}", Network.OFFICIAL_JAR_URL)
+            val client = httpClientProvider.current
+            val bytes = client.get(Network.OFFICIAL_JAR_URL).body<ByteArray>()
+            if (bytes.isEmpty()) {
+                logger.error("Official jar download returned empty bytes")
+                return null
+            }
+            val newHash = computeMd5Hex(bytes)
+            current = newHash
+            saveCache(newHash)
+            logger.info("Launcher hash refreshed to {} ({} bytes)", newHash, bytes.size)
+            newHash
+        } catch (e: Exception) {
+            logger.error("Failed to refresh launcher hash", e)
+            null
+        }
+    }
+
+    private fun readCachedOrDefault(): String {
+        if (!cacheFile.exists()) return Protocol.DEFAULT_LAUNCHER_HASH
+        return runCatching { cacheFile.readText().trim() }
+            .getOrNull()
+            ?.takeIf { it.isNotBlank() && it.length == 32 }
+            ?: Protocol.DEFAULT_LAUNCHER_HASH
+    }
+
+    private fun saveCache(hash: String) {
+        runCatching {
+            cacheFile.parentFile?.mkdirs()
+            cacheFile.writeText(hash)
+        }.onFailure { logger.warn("Could not persist launcher hash cache to {}", cacheFile, it) }
+    }
+
+    private fun computeMd5Hex(bytes: ByteArray): String {
+        val md = MessageDigest.getInstance("MD5")
+        return md.digest(bytes).joinToString("") { "%02x".format(it) }
+    }
+
+    companion object {
+        /**
+         * Max hash refreshes per launcher session. Two is enough for the
+         * legitimate "upstream bumped binary, our cache stale, refresh once,
+         * retry succeeds" path. Beyond that the server is misbehaving and
+         * we shouldn't keep hammering.
+         */
+        const val MAX_REFRESH_ATTEMPTS_PER_SESSION = 2
+    }
+}

@@ -175,7 +175,7 @@ class FileDownloadServiceTest {
     @Test
     fun `isFileMissingOrChanged returns false when expected hash is the special any sentinel`() {
         // "any" is the wire convention from the upstream manifest: file
-        // exists, don't validate. Used for files where Серафим doesn't
+        // exists, don't validate. Used for files where the server doesn't
         // care about content matching (logs, caches, etc.).
         val f = workDir / "any.txt"
         Files.writeString(f, "anything goes here")
