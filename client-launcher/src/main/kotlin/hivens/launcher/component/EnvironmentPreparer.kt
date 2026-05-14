@@ -157,13 +157,17 @@ class EnvironmentPreparer(private val clientProvider: HttpClientProvider) {
     internal fun flattenNatives(dir: Path) {
         try {
             if (!Files.exists(dir)) return
-            val libraries = Files.walk(dir)
-                .filter { Files.isRegularFile(it) }
-                .filter {
-                    val name = it.fileName.toString()
-                    name.endsWith(".so") || name.endsWith(".dll") || name.endsWith(".dylib")
-                }
-                .collect(Collectors.toList())
+            // .use{} closes the stream's underlying directory handle. Without
+            // it the OS fd leaks until GC eventually collects the stream object.
+            val libraries = Files.walk(dir).use { stream ->
+                stream
+                    .filter { Files.isRegularFile(it) }
+                    .filter {
+                        val name = it.fileName.toString()
+                        name.endsWith(".so") || name.endsWith(".dll") || name.endsWith(".dylib")
+                    }
+                    .collect(Collectors.toList())
+            }
 
             for (lib in libraries) {
                 val target = dir.resolve(lib.fileName)
@@ -203,8 +207,11 @@ class EnvironmentPreparer(private val clientProvider: HttpClientProvider) {
                 needUnzip = true
             } else {
                 try {
-                    // Rough check: if there are few files, then the unpacking was incorrect
-                    if (Files.list(objectsDir).count() < 10) needUnzip = true
+                    // Rough check: if there are few files, then the unpacking was incorrect.
+                    // .use{} ensures the directory stream is closed even though .count() is
+                    // a terminal operation — defensive against future refactor regressions.
+                    val count = Files.list(objectsDir).use { it.count() }
+                    if (count < 10) needUnzip = true
                 } catch (_: Exception) { needUnzip = true }
             }
         } else {

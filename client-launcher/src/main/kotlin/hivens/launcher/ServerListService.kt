@@ -12,6 +12,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.future.future
 import kotlinx.serialization.json.JsonObject
+import org.slf4j.LoggerFactory
 import java.text.SimpleDateFormat
 import java.time.Instant
 import java.time.ZoneId
@@ -21,6 +22,8 @@ import java.util.concurrent.CompletableFuture
 
 class ServerListService(private val repository: ServerRepository) : IServerListService {
 
+    private val logger = LoggerFactory.getLogger(ServerListService::class.java)
+    @Volatile
     private var cachedData: DashboardData? = null
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val dateFormatter = DateTimeFormatter
@@ -57,7 +60,7 @@ class ServerListService(private val repository: ServerRepository) : IServerListS
                 }
                 data
             } catch (e: Exception) {
-                e.printStackTrace()
+                logger.error("fetchDashboardData failed — returning empty dashboard", e)
                 DashboardData(emptyList(), emptyList())
             }
         }

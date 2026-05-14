@@ -198,15 +198,6 @@ fun main() {
     // reads `NetworkState.bypassFor(...)` and could see an empty set if
     // initialize hadn't run yet.)
     hivens.launcher.NetworkState.initialize(paths.dataDir.resolve("ssl-bypasses.json"))
-    // Conduit Phase 2: restore persisted force-proxy preference into the
-    // in-memory NetworkState so ChannelRouter sees it on the very first
-    // network call (before the user navigates to Settings).
-    runCatching {
-        val persistedSettings = org.koin.java.KoinJavaComponent.get<hivens.core.api.interfaces.ISettingsService>(
-            hivens.core.api.interfaces.ISettingsService::class.java
-        ).getSettings()
-        hivens.launcher.NetworkState.setForceProxyMode(persistedSettings.forceProxyMode)
-    }
 
     System.setProperty("jna.nosys", "true")
     System.setProperty("skiko.fps.limit", "60")
@@ -244,6 +235,21 @@ fun main() {
     DataDirMigration.run(paths)
 
     startKoin { modules(networkModule, appModule, uiModule) }
+
+    // Conduit Phase 2: restore persisted force-proxy preference into the
+    // in-memory NetworkState so ChannelRouter sees it on the very first
+    // network call. MUST run after startKoin — the previous version called
+    // KoinJavaComponent.get() before bootstrap and silently failed via
+    // runCatching, leaving the toggle effectively non-persistent.
+    runCatching {
+        val persistedSettings = org.koin.java.KoinJavaComponent.get<hivens.core.api.interfaces.ISettingsService>(
+            hivens.core.api.interfaces.ISettingsService::class.java
+        ).getSettings()
+        hivens.launcher.NetworkState.setForceProxyMode(persistedSettings.forceProxyMode)
+    }.onFailure {
+        LoggerFactory.getLogger("Main")
+            .warn("Failed to restore persisted forceProxyMode at startup", it)
+    }
 
     application {
         DisposableEffect(Unit) {

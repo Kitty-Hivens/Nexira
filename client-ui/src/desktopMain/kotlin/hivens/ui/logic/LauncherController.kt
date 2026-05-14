@@ -18,10 +18,13 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
+import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
 
 class LauncherController : KoinComponent {
+
+    private val logger = LoggerFactory.getLogger(LauncherController::class.java)
 
     private val authService: IAuthService by inject()
     private val credentialsManager: CredentialsManager by inject()
@@ -202,7 +205,7 @@ class LauncherController : KoinComponent {
 
             } catch (e: Exception) {
                 if (e !is CancellationException) {
-                    e.printStackTrace()
+                    logger.error("Launch flow failed for {}", server.name, e)
                     _state.value = LaunchState.Error(s.stateError(e.message ?: ""), e)
                     GameConsoleService.show()
                 } else {
