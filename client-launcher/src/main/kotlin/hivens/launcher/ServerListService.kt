@@ -1,12 +1,12 @@
 package hivens.launcher
 
-import hivens.config.Network
 import hivens.core.api.ServerRepository
 import hivens.core.api.dto.SmartyServer
 import hivens.core.api.interfaces.IServerListService
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.DashboardData
 import hivens.core.data.NewsItem
+import hivens.launcher.network.ServerProtocolConfig
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -20,7 +20,10 @@ import java.time.format.DateTimeFormatter
 import java.util.*
 import java.util.concurrent.CompletableFuture
 
-class ServerListService(private val repository: ServerRepository) : IServerListService {
+class ServerListService(
+    private val repository: ServerRepository,
+    private val protocolConfig: ServerProtocolConfig = ServerProtocolConfig(),
+) : IServerListService {
 
     private val logger = LoggerFactory.getLogger(ServerListService::class.java)
     private val lock = Any()
@@ -55,7 +58,7 @@ class ServerListService(private val repository: ServerRepository) : IServerListS
                     val servers = response.servers.map { getProfile(it) }
                     val news = response.news.map { newsDto ->
                         val imageName = if (newsDto.image.endsWith(".jpg")) newsDto.image else "${newsDto.image}.jpg"
-                        val imageUrl = "${Network.BASE_URL}/images/news/mini/$imageName"
+                        val imageUrl = "${protocolConfig.baseUrl}/images/news/mini/$imageName"
 
                         NewsItem(
                             id = newsDto.id,
