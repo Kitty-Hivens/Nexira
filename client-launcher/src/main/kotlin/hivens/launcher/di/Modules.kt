@@ -5,6 +5,7 @@ import hivens.config.Protocol
 import hivens.config.Storage
 import hivens.core.api.AuthService
 import hivens.core.api.interfaces.IServerProtocol
+import hivens.launcher.network.ChannelRouter
 import hivens.launcher.protocol.LauncherHashCache
 import hivens.launcher.protocol.SmartycraftV1Protocol
 import hivens.core.api.HttpClientProvider
@@ -160,21 +161,50 @@ val networkModule = module {
 
     // ── Conduit (network refactor) ──────────────────────────────────────────
     // IServerProtocol abstracts all `*.smartycraft.ru` traffic so repositories
-    // don't know URL paths or `action=` strings. Two bound variants:
-    //   - default: routes through whatever HttpClientProvider's `current` is
-    //     (today: SOCKS proxy; will become direct-with-fallback in Conduit Phase 2)
-    //   - named("insecure"): for the SSL-bypass login retry path; same
-    //     protocol shape, different underlying HTTP client.
+    // don't know URL paths or `action=` strings. ChannelRouter is the
+    // direct-default + proxy-fallback gate (Conduit Phase 2):
+    //
+    // Default channel: ChannelRouter wraps a direct + a proxied OkHttpClient.
+    // Each call tries direct first; on IOException retries via proxy. Users in
+    // censored networks toggle Settings → Network → "Force proxy mode" to
+    // skip the direct attempt (see NetworkState.forceProxyMode).
+    //
+    // Insecure channel: separate IServerProtocol bound for SSL-bypass login
+    // retry — uses a router that wraps the insecure-direct + insecure-proxy
+    // pair so the bypass survives the fallback chain.
+    //
     // Wire spec lives in docs/dev/smartycraft-v1-protocol.md.
 
-    single { LauncherHashCache(get<java.nio.file.Path>().toFile(), get<HttpClientProvider>()) }
+    single<ChannelRouter> {
+        ChannelRouter(
+            direct = buildHttpClient(get<OkHttpClient>(named("direct")), get()),
+            proxy  = buildHttpClient(get<OkHttpClient>(),                 get()),
+        )
+    }
+    single<ChannelRouter>(named("insecure")) {
+        // Insecure direct + insecure proxy. Used when user has accepted SSL
+        // bypass for the host; fallback still works, just without TLS check.
+        val (socketFactory, trustManager) = buildTrustAllSsl()
+        val insecureDirect = OkHttpClient.Builder()
+            .connectTimeout(Network.TIMEOUT_CONNECT, TimeUnit.MILLISECONDS)
+            .readTimeout(Network.TIMEOUT_READ, TimeUnit.MILLISECONDS)
+            .sslSocketFactory(socketFactory, trustManager)
+            .hostnameVerifier { _, _ -> true }
+            .build()
+        ChannelRouter(
+            direct = buildHttpClient(insecureDirect,                       get()),
+            proxy  = buildHttpClient(get<OkHttpClient>(named("insecure")), get()),
+        )
+    }
+
+    single { LauncherHashCache(get<java.nio.file.Path>().toFile(), get<ChannelRouter>()) }
 
     single<IServerProtocol> {
-        SmartycraftV1Protocol(get<HttpClientProvider>(), get(), get<LauncherHashCache>())
+        SmartycraftV1Protocol(get<ChannelRouter>(), get(), get<LauncherHashCache>())
     }
     single<IServerProtocol>(named("insecure")) {
         SmartycraftV1Protocol(
-            get<HttpClientProvider>(named("insecure")),
+            get<ChannelRouter>(named("insecure")),
             get(),
             get<LauncherHashCache>(),
         )

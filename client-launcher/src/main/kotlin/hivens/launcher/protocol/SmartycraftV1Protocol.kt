@@ -2,7 +2,6 @@ package hivens.launcher.protocol
 
 import hivens.config.Network
 import hivens.config.Protocol
-import hivens.core.api.HttpClientProvider
 import hivens.core.api.interfaces.IServerProtocol
 import hivens.core.api.protocol.LoaderRequest
 import hivens.core.api.protocol.LoaderResponse
@@ -13,6 +12,7 @@ import hivens.core.api.protocol.SpawnRequest
 import hivens.core.api.protocol.StatusOnlyResponse
 import hivens.core.api.protocol.TwoAuthRequest
 import hivens.core.api.protocol.UploadRequest
+import hivens.launcher.network.ChannelRouter
 import io.ktor.client.call.body
 import io.ktor.client.request.forms.FormDataContent
 import io.ktor.client.request.forms.MultiPartFormDataContent
@@ -57,13 +57,12 @@ import org.slf4j.LoggerFactory
  *   local-only crash flow per privacy stance, not server-side notification.
  */
 class SmartycraftV1Protocol(
-    private val httpClientProvider: HttpClientProvider,
+    private val router: ChannelRouter,
     private val json: Json,
     private val launcherHashCache: LauncherHashCache,
 ) : IServerProtocol {
 
     private val logger = LoggerFactory.getLogger(SmartycraftV1Protocol::class.java)
-    private val client get() = httpClientProvider.current
 
     override suspend fun loader(): LoaderResponse {
         val firstHash = launcherHashCache.get()
@@ -151,20 +150,22 @@ class SmartycraftV1Protocol(
         val jsonPayload = json.encodeToString(UploadRequest(login = login))
         val signature = SmartycraftSignatureBuilder.forUpload(uid, login)
         return try {
-            val response = client.post(Network.AUTH_URL) {
-                setBody(MultiPartFormDataContent(
-                    formData {
-                        append("action", action)
-                        append("json", jsonPayload)
-                        append("check", signature)
-                        append(binaryFieldName, bytes, Headers.build {
-                            append(HttpHeaders.ContentType, "image/png")
-                            append(HttpHeaders.ContentDisposition, "filename=\"$binaryFieldName.png\"")
-                        })
-                    }
-                ))
+            val raw = router.execute { client ->
+                val response = client.post(Network.AUTH_URL) {
+                    setBody(MultiPartFormDataContent(
+                        formData {
+                            append("action", action)
+                            append("json", jsonPayload)
+                            append("check", signature)
+                            append(binaryFieldName, bytes, Headers.build {
+                                append(HttpHeaders.ContentType, "image/png")
+                                append(HttpHeaders.ContentDisposition, "filename=\"$binaryFieldName.png\"")
+                            })
+                        }
+                    ))
+                }
+                response.body<String>().trim()
             }
-            val raw = response.body<String>().trim()
             parseJsonTolerant<StatusOnlyResponse>(raw)
                 ?: StatusOnlyResponse(status = "ERROR", message = "Malformed $action response")
         } catch (e: Exception) {
@@ -175,8 +176,10 @@ class SmartycraftV1Protocol(
 
     private suspend fun postForm(actionName: String, params: Parameters): String =
         try {
-            val response = client.post(Network.AUTH_URL) { setBody(FormDataContent(params)) }
-            response.body<String>().trim()
+            router.execute { client ->
+                val response = client.post(Network.AUTH_URL) { setBody(FormDataContent(params)) }
+                response.body<String>().trim()
+            }
         } catch (e: Exception) {
             logger.error("POST action=$actionName failed", e)
             ""
