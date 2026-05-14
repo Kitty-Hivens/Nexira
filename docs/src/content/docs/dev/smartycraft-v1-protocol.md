@@ -233,3 +233,35 @@ have launchers negotiate via Accept header.
 4. AES decryption of `session` token — smrt-deco x.java has the recipe
    (`AES/ECB/PKCS5Padding`, key = first 16 chars of `MD5(uid + AUTH_SALT)`),
    but we haven't validated the round-trip yet.
+
+## Network condition matrix (2026-05-14)
+
+Empirical RTT for `action=loader` from German residential IP (~470ms baseline RTT to RU):
+
+| Channel | RTT | Notes |
+|---|---|---|
+| HTTPS direct | **426 ms** | baseline target for 99% of users |
+| HTTP direct (no TLS) | 398 ms | server has plain HTTP listener on :80 too |
+| HTTPS via SOCKS5+auth proxy | **928 ms (+502 ms)** | proxy works correctly, ~50% overhead |
+| HTTP via SOCKS5+auth proxy | 489 ms | mixed mode |
+| HTTPS direct + HTTP/1.1 | 485 ms | no penalty for HTTP/1.1 |
+| HTTPS direct + HTTP/2 | 487 ms | **HTTP/2 works fine on smartycraft** |
+| HTTPS proxied + HTTP/2 | 731 ms | proxy supports HTTP/2 too |
+
+### Implications
+
+- **Switch default channel to direct** saves ~500 ms per request (~10-20 calls per session = 5-10 s lifetime savings).
+- **`FORCE_HTTP1_FOR_SMARTYCRAFT` workaround in `Network.kt` is obsolete as of 2026-05-14** — HTTP/2 negotiation works on both direct and proxied paths. Remove and rely on okhttp's ALPN default. Document removal in Conduit Phase 4 cleanup. (If issue resurfaces in future Серафим server reconfig, add back with concrete reproduction case.)
+- **No need for the no-SSL fallback** that smrt-deco has (`ck.q = false`) — direct HTTPS works for typical user. Skip that intermediate state in Aura's retry chain. Just direct → proxy on IOException, two states not three.
+- **Proxy is functionally fine** when our creds are correct. Initial assumption "creds rotated" was a transcription error on my side — Aura's hardcoded `Network.Proxy.PASS = "ngyxvpFfiUz4FB2OPx1nqEa4TEKigbKc"` matches the URL-safe-Base64-decoded value from smrt-deco line 83. Don't propose rotating these unless the actual proxy stops accepting them.
+- **Server validation surface is permissive**: User-Agent not checked, HTTP version not pinned, even `Host:` header doesn't have to be precise. So we don't need to obsess about mimicry headers — only the form-data shape matters.
+
+### What ABOUT bypassing censorship for specific users
+
+If a user is in a region where direct access is blocked but proxy works:
+- IOException retry chain (Conduit Phase 2) handles it transparently
+- Settings → Network → "Force proxy mode" toggle for users who know they need it day-1
+
+If a user is in a region where BOTH direct and proxy are blocked:
+- Outside of what we can reasonably solve from launcher side
+- Workaround for them: VPN or system-level SOCKS proxy (their problem, not ours)
