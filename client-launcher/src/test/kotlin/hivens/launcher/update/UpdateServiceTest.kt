@@ -754,9 +754,9 @@ class UpdateServiceTest {
     }
 
     @Test
-    fun `mandatory floor with v-prefix is normalised`() = runTest {
+    fun `mandatory floor with v-prefix is normalized`() = runTest {
         // Real-world authors will write "v2.2.8" out of habit — strip the v.
-        val channelMeta = """{"mandatory_min_version":"v999.0.0","reason":"normalised"}"""
+        val channelMeta = """{"mandatory_min_version":"v999.0.0","reason":"normalized"}"""
         val svc = createService(
             MockResponse(urlContains = "releases/latest",     body = githubReleaseJson(tagName = "v999.0.0")),
             MockResponse(urlContains = "releases",            body = "[${githubReleaseJson(tagName = "v999.0.0")}]"),

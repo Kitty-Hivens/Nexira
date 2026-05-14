@@ -71,7 +71,7 @@ class JavaManagerServiceTest {
 
     @Test
     fun `detectJavaVersion falls through unknown versions to Java 8 (legacy default)`() {
-        // Anything we don't recognise (very old / future versions Aura
+        // Anything we don't recognize (very old / future versions Aura
         // hasn't been updated for) defaults to Java 8 — historically the
         // safest fallback because all SmartyCraft 1.x.x servers run on it.
         assertEquals(8, svc.detectJavaVersion("1.5.2"))

@@ -20,7 +20,7 @@ class KeyringStorageFactoryTest {
     fun `system() on non-Linux returns NoOp until those platforms are wired`() {
         // Forward-looking: when Windows / macOS impls land in follow-up PRs,
         // this assertion changes shape (we'll need OS detection in the test
-        // itself). Until then, document the current behaviour explicitly.
+        // itself). Until then, document the current behavior explicitly.
         val osName = System.getProperty("os.name", "").lowercase()
         if (!osName.contains("linux") && !osName.contains("mac") && !osName.contains("windows")) {
             assertTrue(KeyringStorageFactory.system() is NoOpKeyringStorage)

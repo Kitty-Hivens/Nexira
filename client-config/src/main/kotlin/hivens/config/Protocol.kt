@@ -3,7 +3,7 @@ package hivens.config
 /**
  * Wire-protocol values the launcher must send to talk to SMARTYcraft.
  *
- * These constants mirror the official SMARTYcraft launcher's behaviour and
+ * These constants mirror the official SMARTYcraft launcher's behavior and
  * were recovered from the decompiled (Proguard-obfuscated) sources at
  * https://github.com/Kitty-Hivens/smrt-deco — keep that repository as the
  * source of truth when this protocol changes.

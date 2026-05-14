@@ -34,7 +34,7 @@ import kotlinx.serialization.Serializable
  *    Useful for one-off "test against mirror right now" CLI workflows.
  *
  * Both override paths are guarded by [ExperimentalConduitOverride] —
- * normal launcher behaviour reads through to the data class fields directly.
+ * normal launcher behavior reads through to the data class fields directly.
  */
 @Serializable
 data class ServerProtocolConfig(

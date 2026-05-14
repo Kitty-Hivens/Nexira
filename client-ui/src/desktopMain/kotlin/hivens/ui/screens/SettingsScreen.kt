@@ -803,7 +803,7 @@ private fun SettingsSectionTitle(text: String) {
 
 /**
  * Settings row with icon + title + description + switch. Mirrors the layout
- * used by the Offline Mode and Start-in-Tray rows above. [enabled] greys out
+ * used by the Offline Mode and Start-in-Tray rows above. [enabled] grays out
  * the whole row (used by experimental sub-toggles when the master is off).
  */
 @Composable

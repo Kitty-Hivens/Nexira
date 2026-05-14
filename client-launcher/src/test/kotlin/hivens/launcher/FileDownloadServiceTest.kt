@@ -20,7 +20,7 @@ import kotlin.test.assertTrue
  * The big network-driven flow ([processSession]) gets covered by the
  * existing [LaunchPipelineIntegrationTest] (MockEngine + tmpdir).
  * Here we focus on the helper logic that can produce subtle bugs:
- * path normalisation (server might or might not include the assetDir
+ * path normalization (server might or might not include the assetDir
  * prefix), manifest flattening (recursive directories), MD5 against
  * known content, and the file-staleness predicate (which gates ALL
  * downloads — wrong logic = mass re-download or missed updates).
@@ -52,7 +52,7 @@ class FileDownloadServiceTest {
     // ── normalizePath: strip server-prefix, keep canonical mod/config dirs ──
 
     @Test
-    fun `normalizePath strips assetDir prefix in front of a recognised root`() {
+    fun `normalizePath strips assetDir prefix in front of a recognized root`() {
         // "Industrial/mods/foo.jar" → "mods/foo.jar"
         assertEquals("mods/foo.jar", svc.normalizePath("Industrial/mods/foo.jar"))
         assertEquals("config/options.txt", svc.normalizePath("SkyBlock/config/options.txt"))
@@ -60,7 +60,7 @@ class FileDownloadServiceTest {
 
     @Test
     fun `normalizePath leaves canonical-root paths intact`() {
-        // First segment is already a recognised root → no stripping.
+        // First segment is already a recognized root → no stripping.
         assertEquals("mods/foo.jar", svc.normalizePath("mods/foo.jar"))
         assertEquals("libraries/asm-5.0.3.jar", svc.normalizePath("libraries/asm-5.0.3.jar"))
         assertEquals("natives/lwjgl.so", svc.normalizePath("natives/lwjgl.so"))
@@ -76,7 +76,7 @@ class FileDownloadServiceTest {
     fun `normalizePath handles partial root prefix matches`() {
         // First segment starts with "mods" — counts as canonical even if
         // it's "modsBackup" — by design (per the startsWith check in code).
-        // This pins current behaviour; if intent ever changes (exact-match
+        // This pins current behavior; if intent ever changes (exact-match
         // only), update both impl and this test together.
         assertEquals("modsArchive/old.jar", svc.normalizePath("modsArchive/old.jar"))
     }
@@ -217,7 +217,7 @@ class FileDownloadServiceTest {
         // even if the upstream hash differs. Default protected list
         // includes options.txt, servers.dat, etc.
         val f = workDir / "options.txt"
-        Files.writeString(f, "user-customised content")
+        Files.writeString(f, "user-customized content")
         // Upstream wants a different hash; default protected list shields it.
         assertFalse(
             svc.isFileMissingOrChanged(f, "deadbeef00000000deadbeef00000000", "options.txt"),

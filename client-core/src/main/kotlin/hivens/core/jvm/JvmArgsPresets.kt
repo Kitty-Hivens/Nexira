@@ -2,7 +2,7 @@ package hivens.core.jvm
 
 /**
  * A named, well-documented [JvmConfig] that the UI offers as a starting
- * point. Users can pick a preset and then customise individual fields.
+ * point. Users can pick a preset and then customize individual fields.
  */
 data class JvmPreset(
     val id: String,
@@ -85,7 +85,7 @@ object JvmArgsPresets {
     )
 
     /**
-     * Stock G1 — the JVM's default behaviour with no Aikar overrides. Useful
+     * Stock G1 — the JVM's default behavior with no Aikar overrides. Useful
      * as a comparison baseline or if you suspect Aikar's tuning is causing
      * problems on a specific pack.
      */
@@ -159,7 +159,7 @@ object JvmArgsPresets {
     )
 
     /**
-     * Throughput-first preset using ParallelGC. Old-school batch behaviour:
+     * Throughput-first preset using ParallelGC. Old-school batch behavior:
      * very high throughput between collections but stop-the-world pauses
      * scale with heap size. Almost never the right choice for interactive
      * MC — included for completeness and the rare "I just want benchmarks"

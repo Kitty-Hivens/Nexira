@@ -25,7 +25,7 @@ interface IUpdateApplicator {
      *   - rolling back on failure where it can.
      *
      * Throws [UnsupportedOperationException] from the no-op implementation
-     * registered on unrecognised platforms; callers should treat that as
+     * registered on unrecognized platforms; callers should treat that as
      * "ask the user to download and install manually".
      */
     fun scheduleUpdate(installerPath: Path)

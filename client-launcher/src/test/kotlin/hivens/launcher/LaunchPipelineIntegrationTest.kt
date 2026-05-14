@@ -34,7 +34,7 @@ import kotlin.test.assertTrue
  *     main class" (silent if no such test exists).
  *   - GameCommandBuilder picking wrong main class for the version field that
  *     auth populates.
- *   - Memory normalisation interacting with profile defaults under realistic shape.
+ *   - Memory normalization interacting with profile defaults under realistic shape.
  *
  * Pre-Conduit version of this test mocked HTTP at the [io.ktor.client.HttpClient]
  * boundary via MockEngine. Post-Conduit Phase 1 we mock at the

@@ -374,9 +374,9 @@ interface AppStrings {
     // ═══════════════════════════════════════════════════════════════════════
     // JVM Args Builder dialog
     // ═══════════════════════════════════════════════════════════════════════
-    // Technical -XX flag names and JVM-recognised identifiers (G1GC, ZGC,
+    // Technical -XX flag names and JVM-recognized identifiers (G1GC, ZGC,
     // MaxGCPauseMillis, AlwaysPreTouch, etc.) are kept hardcoded — they
-    // are not labels but actual flag names a user has to recognise. Only
+    // are not labels but actual flag names a user has to recognize. Only
     // the descriptive helpers, section headers, and button copy are
     // localised.
 

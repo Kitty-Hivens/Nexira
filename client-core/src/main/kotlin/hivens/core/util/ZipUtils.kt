@@ -11,7 +11,7 @@ object ZipUtils {
 
     /**
      * Unzips [zipFile] into [destDir]. Returns the relative paths of every
-     * file (NOT directory) extracted, normalised to forward slashes, in
+     * file (NOT directory) extracted, normalized to forward slashes, in
      * the order they appeared in the archive. Existing callers that
      * ignore the return value are unaffected.
      *
