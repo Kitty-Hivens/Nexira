@@ -1,32 +1,40 @@
 package hivens.core.api
 
-import hivens.config.Network
 import hivens.config.Protocol
 import hivens.core.api.interfaces.IAuthService
+import hivens.core.api.interfaces.IServerProtocol
+import hivens.core.api.protocol.LoginRequest
+import hivens.core.api.protocol.LoginResponse
+import hivens.core.api.protocol.ProtocolStatus
 import hivens.core.data.AuthStatus
-import hivens.core.data.FileManifest
 import hivens.core.data.SessionData
 import hivens.core.util.HashUtils
 import hivens.core.util.retryWithBackoff
-import io.ktor.client.call.*
-import io.ktor.client.request.forms.*
-import io.ktor.http.*
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 import java.nio.charset.StandardCharsets
-import java.util.*
+import java.util.Base64
+import java.util.Random
+import java.util.UUID
 import javax.crypto.Cipher
 import javax.crypto.spec.SecretKeySpec
 
+/**
+ * Login coordinator + per-server session cache.
+ *
+ * Pre-Conduit: built the wire request directly. Post-Conduit Phase 1: just
+ * delegates the actual network call to [IServerProtocol.login], keeping the
+ * session caching / password hashing / AES game-token generation / retry-
+ * with-backoff logic on the consumer side where it belongs.
+ *
+ * Status-mapping nuance: server returns [ProtocolStatus] enum, this class
+ * exposes [AuthStatus] (Aura's UX-facing enum, slightly different shape).
+ * Mapping happens in [mapStatus] — keep them aligned when adding new values.
+ */
 class AuthService(
-    private val clientProvider: HttpClientProvider,
-    private val json: Json
+    private val protocol: IServerProtocol,
 ) : IAuthService {
 
     private val logger = LoggerFactory.getLogger(AuthService::class.java)
-    private val client get() = clientProvider.current
 
     /**
      * Per-server session cache. The dashboard renders server cards by
@@ -55,33 +63,6 @@ class AuthService(
     private val sessionCache = java.util.concurrent.ConcurrentHashMap<CacheKey, CachedSession>()
     private val sessionTtlMs = 30_000L
 
-    @Serializable
-    private data class AuthRequest(
-        val login: String,
-        val password: String, // MD5 hash
-        val server: String,
-        val session: String,
-        val mac: String,
-        val osName: String,
-        val osBitness: Int,
-        val javaVersion: String,
-        val javaBitness: Int,
-        val javaHome: String,
-        val classPath: String = Protocol.DEFAULT_JAR,
-        val rtCheckSum: String = Protocol.DEFAULT_CSUM
-    )
-
-    @Serializable
-    private data class AuthResponse(
-        @SerialName("status") val status: AuthStatus? = null,
-        @SerialName("playername") val playername: String? = null,
-        @SerialName("uid") val uid: String? = null,
-        @SerialName("uuid") val uuid: String? = null,
-        @SerialName("session") val session: String? = null,
-        @SerialName("client") val client: FileManifest? = null,
-        @SerialName("money") val money: Int = 0
-    )
-
     override suspend fun login(username: String, password: String, serverId: String): SessionData {
         // Hash first so the cache key includes the password — otherwise a
         // wrong/rotated password within the TTL would silently succeed
@@ -96,8 +77,7 @@ class AuthService(
         val clientSessionId = UUID.randomUUID().toString().replace("-", "")
         val is64 = System.getProperty("os.arch").contains("64")
 
-        // Building request object
-        val requestPayload = AuthRequest(
+        val request = LoginRequest(
             login = username,
             password = passwordEncoded,
             server = serverId,
@@ -107,33 +87,14 @@ class AuthService(
             osBitness = if (is64) 64 else 32,
             javaVersion = System.getProperty("java.version"),
             javaBitness = if (is64) 64 else 32,
-            javaHome = System.getProperty("java.home")
+            javaHome = System.getProperty("java.home"),
+            classPath = Protocol.DEFAULT_JAR,
+            rtCheckSum = Protocol.DEFAULT_CSUM,
         )
 
-        // Serialize to JSON string
-        val jsonString = json.encodeToString(requestPayload)
-
-        val response: AuthResponse = try {
+        val response: LoginResponse = try {
             retryWithBackoff(operation = "auth login", shouldRetry = ::isTransientNetworkError) {
-                val call = client.submitForm(
-                    url = Network.AUTH_URL,
-                    formParameters = Parameters.build {
-                        append("action", "login")
-                        append("json", jsonString)
-                    }
-                )
-                // Reading the response body as a string for manual error handling
-                val rawBody = call.body<String>().trim()
-
-                // Handling text server errors. These are deliberate auth
-                // rejections from the server, never retryable; isTransientNetworkError
-                // returns false for AuthException so retryWithBackoff bubbles them
-                // out on the first attempt.
-                if (rawBody.contains("Bad login", ignoreCase = true)) throw AuthException(AuthStatus.BAD_LOGIN, "Invalid login or password")
-                if (rawBody.contains("User not found", ignoreCase = true)) throw AuthException(AuthStatus.BAD_LOGIN, "User not found")
-
-                // Parse JSON
-                json.decodeFromString<AuthResponse>(rawBody)
+                protocol.login(request)
             }
         } catch (e: Exception) {
             if (e is AuthException) throw e
@@ -148,22 +109,22 @@ class AuthService(
             throw AuthException(AuthStatus.INTERNAL_ERROR, "Network Error: ${e.message}")
         }
 
-        // Status check logic
-        if (response.status != AuthStatus.OK && response.status != AuthStatus.LOGIN) {
-            val msg = when (response.status) {
-                AuthStatus.BAD_LOGIN -> "User not found"
-                AuthStatus.PASSWORD -> "Invalid password"
-                AuthStatus.NEED_2FA -> "2FA required"
-                AuthStatus.BANNED -> "Account blocked"
-                AuthStatus.ACTIVE -> "Account is not activated. Check your email."
+        val parsedStatus = response.parsedStatus
+        if (parsedStatus != ProtocolStatus.OK) {
+            val mapped = mapStatus(parsedStatus)
+            val msg = when (parsedStatus) {
+                ProtocolStatus.LOGIN -> "User not found"
+                ProtocolStatus.PASSWORD -> "Invalid password"
+                ProtocolStatus.TWOAUTH -> "2FA required"
+                ProtocolStatus.ACTIVE -> "Account is not activated. Check your email."
+                ProtocolStatus.VIRTUAL -> "Virtual account"
+                ProtocolStatus.SERVER -> "Invalid server"
                 else -> "Server error: ${response.status}"
             }
-            throw AuthException(response.status ?: AuthStatus.INTERNAL_ERROR, msg)
+            throw AuthException(mapped, msg)
         }
 
-        // Only if the status is OK, check the profile data
         if (response.uuid == null || response.playername == null) {
-            // If the password is correct (OK), but the server did not send the profile, this is an internal error
             throw AuthException(AuthStatus.INTERNAL_ERROR, "Incomplete profile data")
         }
 
@@ -171,7 +132,7 @@ class AuthService(
         val cleanUuid = response.uuid.replace("-", "")
 
         return SessionData(
-            status = response.status,
+            status = AuthStatus.OK,
             playerName = response.playername,
             uid = response.uid ?: "",
             uuid = cleanUuid,
@@ -179,8 +140,21 @@ class AuthService(
             fileManifest = response.client,
             serverId = serverId,
             cachedPassword = password,
-            balance = response.money
+            balance = response.money,
         ).also { cacheSession(username, passwordEncoded, serverId, it) }
+    }
+
+    /**
+     * Map protocol-layer [ProtocolStatus] to UX-layer [AuthStatus]. Keep
+     * aligned with [SessionData.status] consumers.
+     */
+    private fun mapStatus(status: ProtocolStatus): AuthStatus = when (status) {
+        ProtocolStatus.OK -> AuthStatus.OK
+        ProtocolStatus.LOGIN -> AuthStatus.BAD_LOGIN
+        ProtocolStatus.PASSWORD -> AuthStatus.PASSWORD
+        ProtocolStatus.TWOAUTH -> AuthStatus.NEED_2FA
+        ProtocolStatus.ACTIVE -> AuthStatus.ACTIVE
+        else -> AuthStatus.INTERNAL_ERROR
     }
 
     private fun cachedFor(username: String, passwordHash: String, serverId: String): SessionData? {

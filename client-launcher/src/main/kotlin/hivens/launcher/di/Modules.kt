@@ -4,6 +4,9 @@ import hivens.config.Network
 import hivens.config.Protocol
 import hivens.config.Storage
 import hivens.core.api.AuthService
+import hivens.core.api.interfaces.IServerProtocol
+import hivens.launcher.protocol.LauncherHashCache
+import hivens.launcher.protocol.SmartycraftV1Protocol
 import hivens.core.api.HttpClientProvider
 import hivens.core.api.PlayerRepository
 import hivens.core.api.ServerRepository
@@ -155,10 +158,32 @@ val networkModule = module {
         HttpClientProvider { direct }
     }
 
-    // Repositories
-    single { ServerRepository(get(), get(), get<java.nio.file.Path>().toFile()) }
-    singleOf(::SkinRepository)
-    singleOf(::PlayerRepository)
+    // ── Conduit (network refactor) ──────────────────────────────────────────
+    // IServerProtocol abstracts all `*.smartycraft.ru` traffic so repositories
+    // don't know URL paths or `action=` strings. Two bound variants:
+    //   - default: routes through whatever HttpClientProvider's `current` is
+    //     (today: SOCKS proxy; will become direct-with-fallback in Conduit Phase 2)
+    //   - named("insecure"): for the SSL-bypass login retry path; same
+    //     protocol shape, different underlying HTTP client.
+    // Wire spec lives in docs/dev/smartycraft-v1-protocol.md.
+
+    single { LauncherHashCache(get<java.nio.file.Path>().toFile(), get<HttpClientProvider>()) }
+
+    single<IServerProtocol> {
+        SmartycraftV1Protocol(get<HttpClientProvider>(), get(), get<LauncherHashCache>())
+    }
+    single<IServerProtocol>(named("insecure")) {
+        SmartycraftV1Protocol(
+            get<HttpClientProvider>(named("insecure")),
+            get(),
+            get<LauncherHashCache>(),
+        )
+    }
+
+    // Repositories — thin adapters over IServerProtocol post-Conduit Phase 1.
+    single { ServerRepository(get<IServerProtocol>()) }
+    single { SkinRepository(get<IServerProtocol>()) }
+    single { PlayerRepository(get<IServerProtocol>()) }
 }
 
 /**
@@ -216,14 +241,15 @@ val appModule = module {
     single { GameCommandBuilder() }
     single { ProcessLogHandler() }
 
-    single<IAuthService> { AuthService(get(), get()) }
+    single<IAuthService> { AuthService(get<IServerProtocol>()) }
 
     /**
      * Insecure [IAuthService] — used exclusively for the SSL bypass login retry.
-     * Always connects without certificate verification.
+     * Always connects without certificate verification (via the insecure-channel
+     * IServerProtocol variant bound above in coreModule).
      */
     single<IAuthService>(named("insecure")) {
-        AuthService(get(named("insecure")), get())
+        AuthService(get<IServerProtocol>(named("insecure")))
     }
 
     single<IServerListService> { ServerListService(get()) }

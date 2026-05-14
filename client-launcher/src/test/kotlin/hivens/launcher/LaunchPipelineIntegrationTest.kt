@@ -2,12 +2,12 @@ package hivens.launcher
 
 import hivens.core.api.AuthService
 import hivens.core.api.model.ServerProfile
+import hivens.core.api.protocol.LoginResponse
+import hivens.core.data.FileData
 import hivens.core.data.FileManifest
 import hivens.launcher.component.ClasspathProvider
 import hivens.launcher.component.GameCommandBuilder
-import hivens.test.MockResponse
-import hivens.test.buildMockClient
-import io.ktor.http.HttpStatusCode
+import hivens.test.FakeServerProtocol
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import java.nio.file.Files
@@ -21,19 +21,25 @@ import kotlin.test.assertTrue
 
 /**
  * Test-harness chunk: end-to-end orchestration of the launch pipeline using
- * MockEngine for the auth boundary, real (non-mocked) [ManifestProcessorService] /
- * [ClasspathProvider] / [GameCommandBuilder], and a tmp-dir client root with
- * fake jars matching the manifest.
+ * [FakeServerProtocol] for the auth boundary, real (non-mocked)
+ * [ManifestProcessorService] / [ClasspathProvider] / [GameCommandBuilder],
+ * and a tmp-dir client root with fake jars matching the manifest.
  *
- * Stops short of `ProcessBuilder.start()` — never actually spawns a JVM. Catches
- * orchestration regressions that pure unit tests on each component miss:
+ * Stops short of `ProcessBuilder.start()` — never actually spawns a JVM.
+ * Catches orchestration regressions that pure unit tests on each component
+ * miss:
  *
- *   - Auth response shape change → SessionData.fileManifest empty → ClasspathProvider
- *     returns "" → JVM dies with "Could not find or load main class" (silent if no
- *     such test exists).
+ *   - Auth response shape change → SessionData.fileManifest empty →
+ *     ClasspathProvider returns "" → JVM dies with "Could not find or load
+ *     main class" (silent if no such test exists).
  *   - GameCommandBuilder picking wrong main class for the version field that
  *     auth populates.
  *   - Memory normalisation interacting with profile defaults under realistic shape.
+ *
+ * Pre-Conduit version of this test mocked HTTP at the [io.ktor.client.HttpClient]
+ * boundary via MockEngine. Post-Conduit Phase 1 we mock at the
+ * [hivens.core.api.interfaces.IServerProtocol] boundary instead — same coverage,
+ * less ceremony, doesn't depend on Ktor wire-format details.
  */
 class LaunchPipelineIntegrationTest {
 
@@ -58,38 +64,41 @@ class LaunchPipelineIntegrationTest {
     private fun makeClientRoot(): Path =
         Files.createTempDirectory("aura-pipeline-").also { tmpRoots.add(it) }
 
-    /** Auth response with a manifest carrying one library jar. */
-    private fun authResponseWithManifest(version: String, libRelPath: String) = """
-        {
-            "status": "OK",
-            "playername": "TestPlayer",
-            "uid": "1",
-            "uuid": "550e8400e29b41d4a716446655440000",
-            "session": "fake-session-token",
-            "money": 0,
-            "client": {
-                "directories": {
-                    "libraries": {
-                        "files": {
-                            "$libRelPath": { "md5": "deadbeef", "size": 100 }
-                        }
-                    }
-                },
-                "files": {}
+    /**
+     * Pre-programmed protocol that returns an OK login carrying a manifest
+     * with one library jar.
+     */
+    private fun protocolWithManifest(libRelPath: String): FakeServerProtocol =
+        FakeServerProtocol().apply {
+            loginResult = { req ->
+                LoginResponse(
+                    status = "OK",
+                    playername = "TestPlayer",
+                    uid = "1",
+                    uuid = "550e8400e29b41d4a716446655440000",
+                    session = "fake-session-token",
+                    money = 0,
+                    client = FileManifest(
+                        directories = mapOf(
+                            "libraries" to FileManifest(
+                                files = mapOf(libRelPath to FileData(md5 = "deadbeef", size = 100L))
+                            )
+                        ),
+                        files = emptyMap(),
+                    ),
+                )
             }
         }
-    """.trimIndent()
 
     @Test
-    fun `auth via MockEngine produces a SessionData with embedded manifest`() = runTest {
-        val client = buildMockClient(authResponseWithManifest("1.7.10", "launchwrapper-1.12.jar"))
-        val session = AuthService(client, json).login("user", "pass", "Industrial")
+    fun `auth via fake protocol produces a SessionData with embedded manifest`() = runTest {
+        val protocol = protocolWithManifest("launchwrapper-1.12.jar")
+        val session = AuthService(protocol).login("user", "pass", "Industrial")
 
         assertEquals("TestPlayer", session.playerName)
         assertEquals("550e8400e29b41d4a716446655440000", session.uuid)
         val manifest = session.fileManifest
         assertNotNull(manifest)
-        // Nested under "libraries" directory in the manifest.
         val libsDir = manifest.directories["libraries"]
         assertNotNull(libsDir)
         assertTrue(libsDir.files.keys.any { it == "launchwrapper-1.12.jar" })
@@ -102,10 +111,8 @@ class LaunchPipelineIntegrationTest {
         val libDir = (clientRoot / "libraries").also { Files.createDirectories(it) }
         Files.createFile(libDir / "launchwrapper-1.12.jar")
 
-        val authClient = buildMockClient(
-            MockResponse(body = authResponseWithManifest("1.7.10", "launchwrapper-1.12.jar"))
-        )
-        val session = AuthService(authClient, json).login("user", "pass", "Industrial")
+        val protocol = protocolWithManifest("launchwrapper-1.12.jar")
+        val session = AuthService(protocol).login("user", "pass", "Industrial")
 
         val manifestProcessor = ManifestProcessorService(json)
         val classpathProvider = ClasspathProvider(manifestProcessor)
@@ -121,10 +128,8 @@ class LaunchPipelineIntegrationTest {
         val libDir = (clientRoot / "libraries").also { Files.createDirectories(it) }
         Files.createFile(libDir / "launchwrapper-1.12.jar")
 
-        val authClient = buildMockClient(
-            MockResponse(body = authResponseWithManifest("1.7.10", "launchwrapper-1.12.jar"))
-        )
-        val session = AuthService(authClient, json).login("user", "pass", "Industrial")
+        val protocol = protocolWithManifest("launchwrapper-1.12.jar")
+        val session = AuthService(protocol).login("user", "pass", "Industrial")
 
         val manifestProcessor = ManifestProcessorService(json)
         val classpath = ClasspathProvider(manifestProcessor)
@@ -154,19 +159,19 @@ class LaunchPipelineIntegrationTest {
         assertTrue(command.contains("--tweakClass"), "1.7.10 must pass a tweakClass arg")
         assertTrue(command.contains("cpw.mods.fml.common.launcher.FMLTweaker"),
             "1.7.10 tweak must be the legacy FMLTweaker (cpw.mods.fml namespace)")
-        // Player identity flowed from MockEngine response through the entire pipeline.
+        // Player identity flowed from FakeServerProtocol response through the entire pipeline.
         val uuidIdx = command.indexOf("--uuid")
         assertTrue(uuidIdx >= 0, "--uuid arg must be present")
         assertEquals("550e8400e29b41d4a716446655440000", command[uuidIdx + 1])
     }
 
     @Test
-    fun `auth failure on MockEngine surfaces as AuthException — no command construction proceeds`() = runTest {
-        val authClient = buildMockClient(
-            MockResponse(status = HttpStatusCode.OK, body = """{"status":"PASSWORD"}""")
-        )
+    fun `auth failure on fake protocol surfaces as AuthException — no command construction proceeds`() = runTest {
+        val protocol = FakeServerProtocol().apply {
+            loginResult = { LoginResponse(status = "PASSWORD") }
+        }
         val ex = kotlin.runCatching {
-            AuthService(authClient, json).login("user", "wrong", "Industrial")
+            AuthService(protocol).login("user", "wrong", "Industrial")
         }.exceptionOrNull()
         assertNotNull(ex, "PASSWORD-status response must throw, not produce a SessionData")
         // We deliberately don't assert the specific exception type here — the
@@ -189,5 +194,4 @@ class LaunchPipelineIntegrationTest {
         // The point is that ClasspathProvider doesn't throw on an empty manifest.
         assertEquals("", classpath)
     }
-
 }
