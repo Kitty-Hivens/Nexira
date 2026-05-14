@@ -67,22 +67,6 @@ object Network {
     const val TIMEOUT_READ    = 300_000L
 
     /**
-     * Force HTTP/1.1 on the smartycraft channel.
-     *
-     * okhttp negotiates HTTP/2 by default when the server advertises ALPN
-     * support. h2 multiplexing over a SOCKS proxy with long-running response
-     * bodies (auth payloads, file manifest sync) periodically dies with
-     * `Connection reset` mid-stream — observed in the wild on the SMARTYcraft
-     * channel. HTTP/1.1 with parallel connections trades multiplexing for
-     * resilience to mid-stream resets and is the safer default while we
-     * don't control the proxy or the upstream server.
-     *
-     * The direct channel (GitHub, BellSoft, Maven Central) is unaffected —
-     * those endpoints have rock-solid h2 stacks and no SOCKS hop.
-     */
-    const val FORCE_HTTP1_FOR_SMARTYCRAFT = true
-
-    /**
      * Hardcoded SOCKS proxy that the upstream service expects every client
      * to tunnel through. The credentials are part of the protocol (recovered
      * from the decompiled official launcher) — they are public by definition,
