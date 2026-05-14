@@ -130,11 +130,22 @@ class UpdateService(
                 return@withContext null
             }
 
-            // Prefer the machine-readable manifest. Older releases without one
-            // fall back to scraping the markdown table from the release body.
+            // release-manifest.json is mandatory: it pins the SHA-256 the auto-
+            // updater verifies before launching the installer. Without a manifest
+            // (or without an entry for this asset) we refuse to construct an
+            // update — auto-install of unverified bytes is a remote-code-execution
+            // path if the release page were ever tampered with. Releases ≥ 2.2.7-rc3
+            // ship the manifest; older releases require manual reinstall.
             val manifest = tryFetchManifest(release)
             val checksum = manifest?.assets?.find { it.name == asset.name }?.sha256
-                ?: extractChecksum(release.body, asset.name)
+            if (checksum.isNullOrBlank()) {
+                logger.warn(
+                    "Refusing auto-update: release {} has no verifiable SHA-256 for {} " +
+                        "(manifest present: {}). User must reinstall manually.",
+                    release.tagName, asset.name, manifest != null,
+                )
+                return@withContext null
+            }
             val highlights = manifest?.highlights?.takeIf { it.isNotBlank() }
 
             val isCritical = release.name.contains("[CRITICAL]", ignoreCase = true) ||
@@ -465,7 +476,11 @@ class UpdateService(
 
     /**
      * Extracts SHA256 checksum for [fileName] from the GitHub release body.
-     * Used as a fallback for legacy releases without a `release-manifest.json` asset.
+     *
+     * No longer called by [checkForUpdate] — release-manifest.json is now the
+     * single source of truth for verifiable hashes (see #186). Kept and tested
+     * because the parser is generic and may be wired back in for an out-of-band
+     * recovery flow (e.g. signed manifest fetch from a secondary mirror).
      *
      * Supports two formats commonly found in release notes:
      *   1. Markdown table:  `| \`filename\` | \`hash\` |`
@@ -483,10 +498,18 @@ class UpdateService(
         return plainPattern.find(releaseBody)?.groupValues?.get(1) ?: ""
     }
 
+    /**
+     * Defense-in-depth gate at the install boundary: an empty [expectedChecksum]
+     * is treated as a verification failure, not "skip." The cold path in
+     * [checkForUpdate] already refuses to construct an update without a
+     * manifest-pinned hash, so empty here means a bug elsewhere (cached
+     * `LauncherUpdate` from before this fix, malformed deserialization, etc.) —
+     * fail closed instead of trusting unverified bytes.
+     */
     internal fun verifyChecksum(file: Path, expectedChecksum: String): Boolean {
-        if (expectedChecksum.isEmpty()) {
-            logger.warn("No checksum provided, skipping verification")
-            return true
+        if (expectedChecksum.isBlank()) {
+            logger.error("Refusing to install: no checksum to verify against ({})", file.fileName)
+            return false
         }
 
         return runCatching {
