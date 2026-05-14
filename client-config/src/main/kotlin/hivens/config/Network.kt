@@ -48,6 +48,11 @@ object Network {
      * NetworkState API can grow `bypassFor` to a pattern match; today
      * only this one host ever has a reason to bypass.
      */
+    @Deprecated(
+        message = "Per-host SSL bypass is now persisted in NetworkState (Vault #2). " +
+                "Derive the host from ServerProtocolConfig.baseUrl in 2.2.14 instead of pinning the constant.",
+        level = DeprecationLevel.WARNING,
+    )
     const val SSL_BYPASS_HOST = "www.smartycraft.ru"
 
     /**
