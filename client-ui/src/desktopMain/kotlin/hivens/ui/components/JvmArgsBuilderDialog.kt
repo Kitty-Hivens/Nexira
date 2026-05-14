@@ -29,7 +29,7 @@ import hivens.ui.theme.CelestiaTheme
  *
  * Opens as a modal dialog. User picks a preset (Aikar's flags / Heavy
  * modded / ZGC / etc.), then optionally fine-tunes individual knobs in
- * categorised tabs. A live preview at the bottom shows the resulting
+ * categorized tabs. A live preview at the bottom shows the resulting
  * arg string. [onApply] receives the composed args when the user clicks
  * Apply; [onDismiss] when they Cancel or click outside.
  *

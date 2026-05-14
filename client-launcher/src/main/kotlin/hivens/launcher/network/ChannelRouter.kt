@@ -10,7 +10,7 @@ import java.io.IOException
  * Routes smartycraft network calls through the right channel with automatic
  * IOException-fallback to the SOCKS proxy.
  *
- * ## Behaviour
+ * ## Behavior
  *
  * Default mode (forceProxyMode=false, the typical user):
  * 1. Try via [direct] (no proxy, normal HTTPS to www.smartycraft.ru)

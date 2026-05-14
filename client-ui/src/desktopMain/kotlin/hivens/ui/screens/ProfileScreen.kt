@@ -35,7 +35,7 @@ import java.awt.Desktop
 import java.io.File
 import java.net.URI
 
-/** Tri-state for the skin upload status so colour is not determined by string content. */
+/** Tri-state for the skin upload status so color is not determined by string content. */
 private sealed class UploadStatus {
     object None    : UploadStatus()
     object Loading : UploadStatus()

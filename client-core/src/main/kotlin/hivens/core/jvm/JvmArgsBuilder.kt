@@ -140,7 +140,7 @@ data class G1Tuning(
         val AikarDefaults = G1Tuning()
 
         /**
-         * JVM out-of-the-box behaviour with no Aikar-style overrides.
+         * JVM out-of-the-box behavior with no Aikar-style overrides.
          * Useful as a comparison baseline or for vanilla Minecraft.
          */
         val Stock = G1Tuning(

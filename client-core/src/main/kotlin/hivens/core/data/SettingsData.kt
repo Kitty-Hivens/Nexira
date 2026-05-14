@@ -26,7 +26,7 @@ data class SettingsData(
     var startInTray: Boolean = false,
 
     // ── Experimental features ─────────────────────────────────────────────────
-    // Three knobs that opt the user into faster-but-less-stable update behaviour.
+    // Three knobs that opt the user into faster-but-less-stable update behavior.
     // The master toggle gates both children — switching it off disables the
     // sub-toggles regardless of their stored values. Defaults are ON because
     // the upstream protocol is currently a moving target and we need users to

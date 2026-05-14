@@ -276,7 +276,7 @@ class FileDownloadService(
                             // 416: partial on disk is bigger than the upstream file
                             // (corrupt write or upstream shrank). Clear and let retry
                             // fetch from byte 0. Throw the dedicated subclass so
-                            // isTransientDownloadError recognises it as retryable
+                            // isTransientDownloadError recognizes it as retryable
                             // — a plain IOException with this message would NOT
                             // match the predicate's substring checks and would
                             // hard-fail instead of recovering.
@@ -378,7 +378,7 @@ class FileDownloadService(
      *
      * Default-constructed (empty hash + empty paths) when no previous
      * snapshot exists — first unpack writes the index, second-and-later
-     * unpacks get the prune behaviour.
+     * unpacks get the prune behavior.
      */
     @kotlinx.serialization.Serializable
     private data class ExtraZipIndex(
