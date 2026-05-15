@@ -15,15 +15,18 @@ data class SettingsData(
      */
     var memoryMB: Int = 6144,
     var isDarkTheme: Boolean = true,
-    var closeAfterStart: Boolean = true,
+    /** Hide launcher window to tray after the user clicks Play. Off by
+     *  default — most users want the launcher to stay visible after
+     *  launching the game (it's where they go back to switch servers,
+     *  open console, etc). Opt-in for users who specifically want the
+     *  out-of-sight behaviour. */
+    var closeAfterStart: Boolean = false,
     var saveCredentials: Boolean = true,
     var savedFileManifest: FileManifest? = null,
     /** BCP-47 language tag: "ru", "en", "de" */
     var locale: String = "en",
     /** Offline Mode: skip authentication, use cached session */
     var isOfflineMode: Boolean = false,
-    /** Start minimized to tray; hide window on close instead of exiting */
-    var startInTray: Boolean = false,
 
     // ── Experimental features ─────────────────────────────────────────────────
     // Three knobs that opt the user into faster-but-less-stable update behavior.
