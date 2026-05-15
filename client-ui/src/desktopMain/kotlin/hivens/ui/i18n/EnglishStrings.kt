@@ -305,7 +305,7 @@ object EnglishStrings : AppStrings {
     override val settingsAutoSyncAllPacks       = "Auto-sync installed packs on launch"
     override val settingsAutoSyncAllPacksDesc   = "Quietly refresh every server pack you've already installed when the launcher starts. Costs background bandwidth — useful if you switch between many servers and want fresh state without clicking each one."
     override val settingsJvmBuilder             = "Visual JVM args builder"
-    override val settingsJvmBuilderDesc         = "Reveals a 'Build args' button in the per-server constructor. Pick a GC algorithm, tune heap regions, enable AppCDS or JFR profiling — without memorising flags. Curated presets cover Aikar's recipe, GTNH-class heavy modded, ZGC for huge heaps, and more."
+    override val settingsJvmBuilderDesc         = "Reveals a 'Build args' button in the per-server constructor. Pick a GC algorithm, tune heap regions, enable AppCDS or JFR profiling — without memorizing flags. Curated presets cover Aikar's recipe, GTNH-class heavy modded, ZGC for huge heaps, and more."
     override fun dashboardAutoSyncProgress(serverName: String, current: Int, total: Int) =
         "Syncing $serverName ($current/$total)"
     override fun dashboardAutoSyncBytes(readMB: Long, totalMB: Long) = "$readMB / $totalMB MB"
@@ -334,6 +334,15 @@ object EnglishStrings : AppStrings {
     override fun aprilCloseEscapeCount(current: Int, max: Int) =
         "The close button has fled $current / $max times"
 
+    // --- 2FA (TOTP) — #159 ---
+    override val auth2faTitle           = "Two-factor authentication"
+    override val auth2faPrompt          = "Enter the 6-digit code from your authenticator app to finish signing in."
+    override val auth2faPlaceholder     = "000000"
+    override val auth2faSubmit          = "Verify"
+    override val auth2faCancel          = "Cancel"
+    override val auth2faInvalid         = "Wrong code. Try again."
+    override val auth2faExpired         = "The 2FA session expired. Please sign in again."
+
     // --- SSL Warning ---
     override val sslWarningTitle        = "Server certificate expired"
     override val sslWarningBody         = "The server's SSL certificate has expired. Your connection may be insecure — server identity cannot be verified. Proceed at your own risk?"
@@ -349,6 +358,9 @@ object EnglishStrings : AppStrings {
     override val sslBypassNoEntries     = "No active bypasses"
     override val sslBypassRevoke        = "Revoke"
     override fun sslBypassExpiresAt(formatted: String) = "Expires: $formatted"
+
+    override val settingsForceProxyTitle = "Force proxy mode"
+    override val settingsForceProxyDesc  = "Skip the direct connection attempt and route every request through the SmartyCraft SOCKS proxy. Enable if you're in a region or network where direct access fails."
 
     override val settingsSectionDataDir       = "Data directory"
     override val settingsDataDirCurrent       = "Current path:"

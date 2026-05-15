@@ -1,146 +1,93 @@
 package hivens.launcher
 
-import hivens.test.MockResponse
-import hivens.test.buildMockClient
-import io.ktor.http.*
+import hivens.core.api.ServerRepository
+import hivens.core.api.dto.SmartyNews
+import hivens.core.api.dto.SmartyServer
+import hivens.core.api.protocol.LoaderResponse
+import hivens.test.FakeServerProtocol
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.Json
-import kotlin.test.*
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
+/**
+ * Post-Conduit-Phase-1 ServerRepository test surface. The repository is now
+ * a thin adapter — its test coverage focuses on what it actually does:
+ * shape conversion from [LoaderResponse] to [hivens.core.api.dto.SmartyResponse]
+ * and exception → ERROR fallback.
+ *
+ * UPDATE recovery, hash refresh, HTTP retries — those moved to
+ * [hivens.launcher.protocol.SmartycraftV1Protocol] +
+ * [hivens.launcher.protocol.LauncherHashCache] tests.
+ */
 class ServerRepositoryTest {
-
-    private val json = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-        encodeDefaults = true
-    }
-
-    // region Fixtures
-
-    private fun dashboardOkResponse(serverCount: Int = 2) = buildString {
-        append("""{"status":"OK","servers":[""")
-        repeat(serverCount) { i ->
-            if (i > 0) append(",")
-            append("""{"name":"Server$i","address":"play.example.com","port":${25565 + i},"version":"1.7.10","online":10,"max":100}""")
-        }
-        append("""],"news":[{"id":1,"name":"Big Update","image":"news1","date":1700000000,"views":500}]}""")
-    }
-
-    private val updateResponse = """{"status":"UPDATE","servers":[],"news":[]}"""
-    private val fakeJarBytes   = "PK\u0003\u0004fake-jar-content-for-hash-test"
-
-    // endregion
 
     @Test
     fun `fetchDashboard returns servers and news on OK response`() = runTest {
-        val result = hivens.core.api.ServerRepository(buildMockClient(dashboardOkResponse(2)), json)
-            .fetchDashboard()
+        val protocol = FakeServerProtocol().apply {
+            loaderResult = {
+                LoaderResponse(
+                    status = "OK",
+                    servers = listOf(
+                        SmartyServer(id = "Server0", ip = "play.example.com", port = 25565, version = "1.7.10"),
+                        SmartyServer(id = "Server1", ip = "play.example.com", port = 25566, version = "1.7.10"),
+                    ),
+                    news = listOf(SmartyNews(id = 1, name = "Big Update", image = "news1", date = 1700000000L)),
+                )
+            }
+        }
+        val result = ServerRepository(protocol).fetchDashboard()
 
         assertEquals("OK", result.status)
         assertEquals(2, result.servers.size)
         assertEquals(1, result.news.size)
         assertEquals("Server0", result.servers[0].id)
+        assertEquals(1, protocol.loaderCalls.size)
     }
 
     @Test
     fun `fetchDashboard handles empty server list`() = runTest {
-        val result = hivens.core.api.ServerRepository(buildMockClient(dashboardOkResponse(0)), json)
-            .fetchDashboard()
+        val protocol = FakeServerProtocol().apply {
+            loaderResult = { LoaderResponse(status = "OK") }
+        }
+        val result = ServerRepository(protocol).fetchDashboard()
 
         assertEquals("OK", result.status)
         assertTrue(result.servers.isEmpty())
+        assertTrue(result.news.isEmpty())
     }
 
     @Test
-    fun `fetchDashboard re-fetches after UPDATE and returns final OK response`() = runTest {
-        val client = buildMockClient(
-            MockResponse(urlContains = "index.php",       body = updateResponse),
-            MockResponse(urlContains = "smartycraft.jar", body = fakeJarBytes),
-            MockResponse(urlContains = "index.php",       body = dashboardOkResponse(3)),
-        )
-        val result = hivens.core.api.ServerRepository(client, json).fetchDashboard()
+    fun `fetchDashboard surfaces UPDATE status untouched (protocol's job to recover)`() = runTest {
+        val protocol = FakeServerProtocol().apply {
+            loaderResult = { LoaderResponse(status = "UPDATE") }
+        }
+        val result = ServerRepository(protocol).fetchDashboard()
 
-        assertEquals("OK", result.status)
-        assertEquals(3, result.servers.size)
-    }
-
-    @Test
-    fun `fetchDashboard does not loop when JAR download fails after UPDATE`() = runTest {
-        val client = buildMockClient(
-            MockResponse(urlContains = "index.php",       body = updateResponse),
-            MockResponse(urlContains = "smartycraft.jar", body = "", status = HttpStatusCode.NotFound),
-        )
-        val result = hivens.core.api.ServerRepository(client, json).fetchDashboard()
-
-        assertNotNull(result)
-    }
-
-    @Test
-    fun `fetchDashboard returns ERROR status on HTTP 500`() = runTest {
-        val result = hivens.core.api.ServerRepository(
-            buildMockClient(
-                body = "Internal Server Error",
-                status = HttpStatusCode.InternalServerError,
-                contentType = ContentType.Text.Plain
-            ),
-            json
-        ).fetchDashboard()
-
-        assertEquals("ERROR", result.status)
-        assertTrue(result.servers.isEmpty())
-    }
-
-    @Test
-    fun `fetchDashboard returns ERROR on malformed JSON`() = runTest {
-        val result = hivens.core.api.ServerRepository(
-            buildMockClient(body = "not json at all {{{{", contentType = ContentType.Text.Plain),
-            json
-        ).fetchDashboard()
-
-        assertEquals("ERROR", result.status)
-    }
-
-    @Test
-    fun `fetchDashboard does not loop on repeated UPDATE status`() = runTest {
-        val client = buildMockClient(
-            MockResponse(urlContains = "index.php",       body = updateResponse),
-            MockResponse(urlContains = "smartycraft.jar", body = fakeJarBytes),
-            MockResponse(urlContains = "index.php",       body = updateResponse),
-        )
-        val result = hivens.core.api.ServerRepository(client, json).fetchDashboard()
-
-        assertNotNull(result)
         assertEquals("UPDATE", result.status)
+        assertTrue(result.servers.isEmpty())
     }
 
     @Test
-    fun `fetchDashboard maps server fields correctly`() = runTest {
-        val body = """
-            {
-                "status": "OK",
-                "servers": [{
-                    "name": "Nevermine",
-                    "address": "play.nevermine.ru",
-                    "port": 25566,
-                    "version": "1.12.2",
-                    "online": 42,
-                    "max": 500,
-                    "title": "Nevermine Adventures",
-                    "extraCheckSum": "abc123"
-                }],
-                "news": []
-            }
-        """.trimIndent()
-        val server = hivens.core.api.ServerRepository(buildMockClient(body), json)
-            .fetchDashboard()
-            .servers
-            .first()
+    fun `fetchDashboard returns ERROR shape when protocol throws`() = runTest {
+        val protocol = FakeServerProtocol().apply {
+            loaderResult = { throw java.io.IOException("network broken") }
+        }
+        val result = ServerRepository(protocol).fetchDashboard()
 
-        assertEquals("Nevermine", server.id)
-        assertEquals("play.nevermine.ru", server.ip)
-        assertEquals(25566, server.port)
-        assertEquals("1.12.2", server.version)
-        assertEquals(42, server.online)
-        assertEquals("abc123", server.extraCheckSum)
+        assertEquals("ERROR", result.status)
+        assertTrue(result.message?.contains("network broken") == true)
+        assertTrue(result.servers.isEmpty())
+    }
+
+    @Test
+    fun `fetchDashboard preserves message field from protocol response`() = runTest {
+        val protocol = FakeServerProtocol().apply {
+            loaderResult = { LoaderResponse(status = "ERROR", message = "Custom error from server") }
+        }
+        val result = ServerRepository(protocol).fetchDashboard()
+
+        assertEquals("ERROR", result.status)
+        assertEquals("Custom error from server", result.message)
     }
 }

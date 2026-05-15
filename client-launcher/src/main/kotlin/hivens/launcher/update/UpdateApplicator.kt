@@ -8,7 +8,7 @@ import java.nio.file.Path
  * Factory entry point for [IUpdateApplicator] selection.
  *
  * Picks the right platform implementation based on [OS]; falls back to
- * [NoOpUpdateApplicator] on anything unrecognised. The Koin module wires
+ * [NoOpUpdateApplicator] on anything unrecognized. The Koin module wires
  * the result of [forCurrentPlatform] as a singleton so callers (notably
  * `UpdateDialog` in `client-ui`) get the right concrete via injection.
  *

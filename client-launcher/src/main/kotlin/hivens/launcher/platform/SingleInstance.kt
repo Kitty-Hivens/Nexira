@@ -97,7 +97,18 @@ object SingleInstance {
     private fun writeShowSignal(dataDir: Path) {
         runCatching {
             val show = dataDir.resolve(".show")
-            if (!Files.exists(show)) Files.createFile(show)
+            // Atomic create — the prior `if (!Files.exists) createFile` was
+            // a TOCTOU window: two launchers started in the same millisecond
+            // could both observe the file missing and one would then throw
+            // FileAlreadyExistsException (silently swallowed by runCatching),
+            // potentially losing the "raise window" intent on the watcher
+            // side. createFile + ignore-if-exists collapses the race.
+            try {
+                Files.createFile(show)
+            } catch (_: java.nio.file.FileAlreadyExistsException) {
+                // Already signalled by a sibling launcher attempt — fine,
+                // the running instance's watcher will pick it up either way.
+            }
         }
     }
 

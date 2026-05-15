@@ -334,6 +334,15 @@ object RussianStrings : AppStrings {
     override fun aprilCloseEscapeCount(current: Int, max: Int) =
         "Кнопка сбежала $current / $max раз"
 
+    // --- 2FA (TOTP) — #159 ---
+    override val auth2faTitle           = "Двухфакторная аутентификация"
+    override val auth2faPrompt          = "Введите 6-значный код из приложения-аутентификатора, чтобы завершить вход."
+    override val auth2faPlaceholder     = "000000"
+    override val auth2faSubmit          = "Подтвердить"
+    override val auth2faCancel          = "Отмена"
+    override val auth2faInvalid         = "Неверный код. Попробуйте снова."
+    override val auth2faExpired         = "Сессия 2FA истекла. Пожалуйста, войдите заново."
+
     // --- SSL Warning ---
     override val sslWarningTitle        = "Сертификат безопасности устарел"
     override val sslWarningBody         = "Сертификат сервера истёк. Соединение может быть небезопасным — данные передаются без проверки подлинности сервера. Продолжить на свой страх и риск?"
@@ -349,6 +358,9 @@ object RussianStrings : AppStrings {
     override val sslBypassNoEntries     = "Нет активных исключений"
     override val sslBypassRevoke        = "Отозвать"
     override fun sslBypassExpiresAt(formatted: String) = "Истекает: $formatted"
+
+    override val settingsForceProxyTitle = "Только через прокси"
+    override val settingsForceProxyDesc  = "Не пытаться подключаться напрямую — все запросы пойдут через SOCKS-прокси SmartyCraft. Включи если в твоей сети прямое соединение блокируется."
 
     override val settingsSectionDataDir       = "Каталог данных"
     override val settingsDataDirCurrent       = "Текущий путь:"

@@ -15,7 +15,7 @@ import kotlin.test.assertEquals
 
 /**
  * Probe-lite scope: verifies the policies extracted from [LauncherService] into
- * its internal companion (memory normalisation + Java-path resolution). Both
+ * its internal companion (memory normalization + Java-path resolution). Both
  * live as companion functions specifically so tests can hit them without
  * having to construct the full collaborator graph or spawn a real process.
  *

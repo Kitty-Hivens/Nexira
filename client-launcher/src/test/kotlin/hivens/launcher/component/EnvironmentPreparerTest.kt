@@ -108,6 +108,60 @@ class EnvironmentPreparerTest {
         assertFalse(svc.isFolderValidForOs(nativesDir, "unknown"))
     }
 
+    // ── #185 — jinput-only must NOT count as valid lwjgl natives ──────────
+
+    @Test
+    fun `isFolderValidForOs rejects jinput-only directory (#185)`() {
+        // Bug reproducer: lwjgl-platform Maven download silently failed,
+        // leaving only the jinput natives. Pre-fix `anyMatch { ends in .so }`
+        // returned true — game then died with UnsatisfiedLinkError.
+        val nativesDir = (workDir / "natives").also { Files.createDirectories(it) }
+        Files.createFile(nativesDir / "libjinput-linux64.so")
+        Files.createFile(nativesDir / "libjinput-linux.so")
+        assertFalse(svc.isFolderValidForOs(nativesDir, "linux"),
+            "directory missing liblwjgl* must NOT short-circuit prepareNatives")
+    }
+
+    @Test
+    fun `isFolderValidForOs accepts liblwjgl + liblwjgl64 (LWJGL2 64-bit layout)`() {
+        // Real LWJGL 2 lib-name on linux64 — the modded-MC majority case.
+        val nativesDir = (workDir / "natives").also { Files.createDirectories(it) }
+        Files.createFile(nativesDir / "liblwjgl.so")
+        Files.createFile(nativesDir / "liblwjgl64.so")
+        Files.createFile(nativesDir / "libjinput-linux64.so")  // jinput co-exists, not a problem
+        assertTrue(svc.isFolderValidForOs(nativesDir, "linux"))
+    }
+
+    @Test
+    fun `isFolderValidForOs accepts LWJGL3 module layout (liblwjgl-glfw etc)`() {
+        // Modern MC (1.13+) uses LWJGL 3 split into modules. Each module is
+        // its own native; the gate must still pass on the core liblwjgl.so.
+        val nativesDir = (workDir / "natives").also { Files.createDirectories(it) }
+        Files.createFile(nativesDir / "liblwjgl.so")
+        Files.createFile(nativesDir / "liblwjgl-glfw.so")
+        Files.createFile(nativesDir / "liblwjgl-openal.so")
+        Files.createFile(nativesDir / "liblwjgl-opengl.so")
+        assertTrue(svc.isFolderValidForOs(nativesDir, "linux"))
+    }
+
+    @Test
+    fun `isFolderValidForOs is case-insensitive on the lwjgl substring`() {
+        // Defensive: should the upstream zip ever ship mixed case (Windows
+        // FAT32 quirks have historically uppercased filenames) the gate
+        // still recognises the native.
+        val nativesDir = (workDir / "natives").also { Files.createDirectories(it) }
+        Files.createFile(nativesDir / "LIBLWJGL.SO")
+        assertTrue(svc.isFolderValidForOs(nativesDir, "linux"))
+    }
+
+    @Test
+    fun `isFolderValidForOs rejects directory containing only non-lwjgl natives`() {
+        val nativesDir = (workDir / "natives").also { Files.createDirectories(it) }
+        Files.createFile(nativesDir / "libfoo.so")
+        Files.createFile(nativesDir / "libbar.so")
+        assertFalse(svc.isFolderValidForOs(nativesDir, "linux"))
+    }
+
     // ── flattenNatives: lift libs from subdirs to root ───────────────────
 
     @Test

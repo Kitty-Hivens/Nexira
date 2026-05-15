@@ -33,9 +33,8 @@ object KeyringStorageFactory {
                 tryProbe("LinuxLibsecret") { LinuxLibsecretKeyringStorage() }
             osName.contains("windows") ->
                 tryProbe("WindowsCredentialManager") { WindowsCredentialManagerKeyringStorage() }
-            // macOS impl lands in a follow-up PR (SecItem* via Panama + Core
-            // Foundation marshalling). Until then macOS gets the file
-            // fallback via NoOp.
+            osName.contains("mac") || osName.contains("darwin") ->
+                tryProbe("MacOSKeychain") { MacOSKeychainStorage() }
             else -> null
         }
         return when {

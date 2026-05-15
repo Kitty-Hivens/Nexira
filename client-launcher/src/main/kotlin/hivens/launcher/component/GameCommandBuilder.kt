@@ -1,11 +1,11 @@
 package hivens.launcher.component
 
 import hivens.config.Branding
-import hivens.config.Network
 import hivens.config.Protocol
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.InstanceProfile
 import hivens.core.data.SessionData
+import hivens.launcher.network.ServerProtocolConfig
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.nio.file.Path
@@ -13,7 +13,9 @@ import java.nio.file.Path
 /**
  * Process Command Factory.
  */
-internal class GameCommandBuilder {
+internal class GameCommandBuilder(
+    private val protocolConfig: ServerProtocolConfig = ServerProtocolConfig(),
+) {
     private val logger = LoggerFactory.getLogger(GameCommandBuilder::class.java)
     private val neoForgeDetector = NeoForgeVersionDetector()
 
@@ -103,9 +105,9 @@ internal class GameCommandBuilder {
         }
 
         // 3. System Properties (Launcher Identity & Custom Authlib)
-        args.add("-Dminecraft.api.auth.host=${Network.BASE_URL}/launcher/")
-        args.add("-Dminecraft.api.account.host=${Network.BASE_URL}/launcher/")
-        args.add("-Dminecraft.api.session.host=${Network.BASE_URL}/launcher/")
+        args.add("-Dminecraft.api.auth.host=${protocolConfig.baseUrl}/launcher/")
+        args.add("-Dminecraft.api.account.host=${protocolConfig.baseUrl}/launcher/")
+        args.add("-Dminecraft.api.session.host=${protocolConfig.baseUrl}/launcher/")
         args.add("-Dminecraft.launcher.brand=${Branding.UPSTREAM_NAME}")
         args.add("-Dminecraft.launcher.version=${Protocol.MIMIC_LAUNCHER_VERSION}")
 
@@ -169,12 +171,27 @@ internal class GameCommandBuilder {
                 jvmModuleKeywords.any { lowerPath.contains(it) }
             }
 
-            if (validModules.isNotEmpty()) {
-                args.add("-p")
-                args.add(validModules.joinToString(File.pathSeparator))
-            } else {
-                logger.error("CRITICAL: No NeoForge boot modules found in classpath!")
+            if (validModules.isEmpty()) {
+                // Fail-loud at command-build time instead of letting the JVM
+                // limp into BootstrapLauncher without `-p`. The downstream
+                // failure mode is a cryptic Java module-resolution error at
+                // game startup ("module not found: cpw.mods.bootstraplauncher")
+                // that surfaces in the game console long after the user has
+                // committed to a launch — diagnosed in audit pass on the
+                // 2.2.13 batch as a real silent-failure path. The exception
+                // propagates through LauncherService into the existing
+                // LauncherController error-dialog flow so the user sees a
+                // launcher-side message about the missing libraries instead.
+                throw IllegalStateException(
+                    "Cannot launch ${config.mainClass}: no NeoForge boot modules " +
+                        "(securejarhandler, bootstraplauncher, ow2/asm, jarjar) found " +
+                        "in the synced classpath. The pack's libraries directory is " +
+                        "missing the module-path entries — re-sync the server or " +
+                        "delete clients/<server>/manifest-cache to force a full re-download.",
+                )
             }
+            args.add("-p")
+            args.add(validModules.joinToString(File.pathSeparator))
         }
 
         // 8. Classpath & Entry Point

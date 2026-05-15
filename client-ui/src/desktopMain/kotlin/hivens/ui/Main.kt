@@ -30,6 +30,7 @@ import hivens.launcher.ProfileManager
 import hivens.launcher.di.appModule
 import hivens.launcher.di.networkModule
 import hivens.launcher.platform.DataDirMigration
+import hivens.launcher.platform.DataDirMover
 import hivens.launcher.platform.PlatformPaths
 import hivens.launcher.platform.SingleInstance
 import hivens.ui.background.BackgroundManager
@@ -53,9 +54,13 @@ import hivens.ui.theme.ThemeManager
 import hivens.ui.tray.TrayManager
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.utils.SkinManager
-import kotlinx.coroutines.DelicateCoroutinesApi
+import java.awt.Toolkit
+import java.nio.file.Files
+import java.util.UUID
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -70,9 +75,9 @@ import org.koin.core.module.dsl.singleOf
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
 import org.slf4j.LoggerFactory
-import java.io.File
 import javax.swing.SwingUtilities
 import kotlin.system.exitProcess
+import kotlin.time.Duration.Companion.milliseconds
 
 // ─── DI ──────────────────────────────────────────────────────────────────────
 
@@ -105,7 +110,7 @@ sealed class Screen {
 // ─── Entry Point ─────────────────────────────────────────────────────────────
 
 /**
- * Single startup line summarising which AWT toolkit JBR/JDK picked and what
+ * Single startup line summarizing which AWT toolkit JBR/JDK picked and what
  * Linux display-server environment we're in. The Wayland-Native investigation
  * (docs/dev/wayland-investigation.md) needs every log we get back from a real
  * user to triangulate the toolkit-vs-session matrix; this line makes it
@@ -132,7 +137,7 @@ private fun logToolkitAndSession() {
  *
  * Stock OpenJDK derives WM_CLASS from the launcher binary's argv[0] and exposes
  * no public knob to override it; JBR exposes `-Dawt.appClassName` but only that
- * one vendor honours it. Reflection into the package-private static field works
+ * one vendor honors it. Reflection into the package-private static field works
  * across both — provided we run before any window is shown (XWindow.setWMClass
  * snapshots the value at construction time) and the JVM was launched with
  * `--add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED`.
@@ -144,7 +149,7 @@ private fun setLinuxXToolkitAppClassName(name: String) {
     if (!System.getProperty("os.name").lowercase().contains("linux")) return
     runCatching {
         // Triggers XToolkit class load + initial awtAppClassName assignment.
-        java.awt.Toolkit.getDefaultToolkit()
+        Toolkit.getDefaultToolkit()
         val cls = Class.forName("sun.awt.X11.XToolkit")
         val field = cls.getDeclaredField("awtAppClassName")
         field.isAccessible = true
@@ -158,15 +163,15 @@ private fun setLinuxXToolkitAppClassName(name: String) {
     }
 }
 
-@OptIn(ExperimentalResourceApi::class, DelicateCoroutinesApi::class)
+@OptIn(ExperimentalResourceApi::class)
 fun main() {
     // BEFORE PlatformPaths resolution: apply any pending data-dir move
     // scheduled from the Settings UI. If user clicked "Move data
     // directory" → picker → restart, this is where the relocation
     // actually happens. Bootstrap conf reads + file ops only; no logger
-    // initialised yet at this point so failures land in stderr.
+    // initialized yet at this point so failures land in stderr.
     // Operation is idempotent; safe to call on every startup.
-    hivens.launcher.platform.DataDirMover.applyPending()
+    DataDirMover.applyPending()
 
     // Resolve logs dir BEFORE any LoggerFactory.getLogger() call so logback.xml
     // (which reads `${aura.logs.dir}` for its rolling-file appenders) sees the
@@ -181,7 +186,7 @@ fun main() {
     // (`grep sessionId=abc12345 *.log`). System property (not MDC) because
     // MDC is thread-local and we want this on every line from every thread —
     // the logback pattern reads the property via `${aura.sessionId}`.
-    val sessionId = java.util.UUID.randomUUID().toString().take(8)
+    val sessionId = UUID.randomUUID().toString().take(8)
     System.setProperty("aura.sessionId", sessionId)
 
     // Beacon: the very first entry in the action ring — handy when reading a
@@ -197,7 +202,7 @@ fun main() {
     // state. (Calling later would race: HttpClientProvider's selector
     // reads `NetworkState.bypassFor(...)` and could see an empty set if
     // initialize hadn't run yet.)
-    hivens.launcher.NetworkState.initialize(paths.dataDir.resolve("ssl-bypasses.json"))
+    NetworkState.initialize(paths.dataDir.resolve("ssl-bypasses.json"))
 
     System.setProperty("jna.nosys", "true")
     System.setProperty("skiko.fps.limit", "60")
@@ -212,7 +217,7 @@ fun main() {
     // Wayland-Native investigation matrix.
     logToolkitAndSession()
 
-    java.nio.file.Files.createDirectories(paths.dataDir)
+    Files.createDirectories(paths.dataDir)
     CrashReporter.paths = paths
 
     Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
@@ -235,6 +240,29 @@ fun main() {
     DataDirMigration.run(paths)
 
     startKoin { modules(networkModule, appModule, uiModule) }
+
+    // Process-lifetime coroutine scope for fire-and-forget background work
+    // (tray-launch flow, AutoSync). SupervisorJob so a single failed child
+    // doesn't take down the rest. Shutdown hook cancels the scope on JVM
+    // exit so in-flight network sockets / file handles get released instead
+    // of being orphaned the way they were under GlobalScope (#191).
+    val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    Runtime.getRuntime().addShutdownHook(Thread { applicationScope.cancel() })
+
+    // Conduit Phase 2: restore persisted force-proxy preference into the
+    // in-memory NetworkState so ChannelRouter sees it on the very first
+    // network call. MUST run after startKoin — the previous version called
+    // KoinJavaComponent.get() before bootstrap and silently failed via
+    // runCatching, leaving the toggle effectively non-persistent.
+    runCatching {
+        val persistedSettings = org.koin.java.KoinJavaComponent.get<ISettingsService>(
+            ISettingsService::class.java
+        ).getSettings()
+        NetworkState.setForceProxyMode(persistedSettings.forceProxyMode)
+    }.onFailure {
+        LoggerFactory.getLogger("Main")
+            .warn("Failed to restore persisted forceProxyMode at startup", it)
+    }
 
     application {
         DisposableEffect(Unit) {
@@ -274,11 +302,10 @@ fun main() {
         LaunchedEffect(Unit) {
             val showFile = paths.dataDir.resolve(".show").toFile()
             while (true) {
-                delay(500)
+                delay(500.milliseconds)
                 if (showFile.exists()) {
                     showFile.delete()
-                    // Un-minimize: setting visible=true alone leaves a taskbar-
-                    // minimized window minimized.
+                    // Un-minimize: setting visible=true alone leaves a taskbar-minimized window minimized.
                     if (windowState.isMinimized) windowState.isMinimized = false
                     isWindowVisible = true
                     raiseTick++
@@ -309,9 +336,9 @@ fun main() {
             var customTheme   by remember { mutableStateOf(themeManager.loadTheme()) }
 
             // Tray needs a 64-px glyph; the window chrome and KDE overview want the
-            // detailed hi-res icon so they can downscale cleanly to whatever the
+            // detailed hi-res icon so they can be downscale cleanly to whatever the
             // compositor demands.
-            val trayIcon   = painterResource(Res.drawable.favicon)
+            val trayIcon   = painterResource(Res.drawable.favicon) // TODO: not used
             val windowIcon = painterResource(Res.drawable.icon)
 
             // ── Tray init on background thread ────────────────────────────
@@ -392,7 +419,7 @@ fun main() {
                 }
 
                 TrayManager.onLaunchServer = { server ->
-                    GlobalScope.launch(Dispatchers.IO) {
+                    applicationScope.launch {
                         val credentials = credentialsManager.load()
                         if (credentials?.cachedPassword != null) {
                             try {
@@ -431,15 +458,18 @@ fun main() {
                 // Fire-and-forget background sync of every installed pack.
                 // Gated by experimentalFeaturesEnabled master + autoSyncAllPacks
                 // child to match the rest of the experimental opt-ins. Runs on
-                // GlobalScope because we want it to survive composition resets;
-                // the service itself is a singleton and idempotent (will just
-                // no-op on subsequent calls if already running — TODO: enforce
-                // via in-flight flag once we add UI re-trigger).
+                // applicationScope so it survives composition resets but DOES
+                // get cancelled on JVM exit — under the prior GlobalScope a
+                // user closing the launcher mid-sync left network/file handles
+                // open until the process truly died (#191). The service itself
+                // is a singleton and idempotent (will no-op on subsequent calls
+                // if already running — TODO: enforce via in-flight flag once we
+                // add UI re-trigger).
                 if (settings.experimentalFeaturesEnabled
                     && settings.autoSyncAllPacks
                     && dashboardServers.isNotEmpty()
                 ) {
-                    GlobalScope.launch(Dispatchers.IO) {
+                    applicationScope.launch {
                         autoSyncService.syncAll(dashboardServers)
                     }
                 }
@@ -461,7 +491,7 @@ fun main() {
                         // taking its time. If it ultimately fails, the user
                         // can quit via tray (when it appears) or kill the
                         // process — strictly better than exiting on a close
-                        // request the user clearly meant as "minimise".
+                        // request the user clearly meant as "minimize".
                         isWindowVisible = false
                     } else {
                         exitApplication()

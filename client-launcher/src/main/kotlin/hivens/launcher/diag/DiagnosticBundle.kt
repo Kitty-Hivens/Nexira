@@ -34,7 +34,7 @@ import java.util.zip.ZipOutputStream
  *
  * All log file contents are routed through [Redactor] one more time at
  * bundle-time. The Pulse pipeline already redacts on write, but this is
- * a defence-in-depth pass: if a future code path ever logs raw without
+ * a defense-in-depth pass: if a future code path ever logs raw without
  * going through `%rmsg`, the bundle still ships a redacted copy. Cheap;
  * Redactor is a few regex replaces over text we're streaming anyway.
  */
@@ -84,13 +84,17 @@ object DiagnosticBundle {
             // secrets itself). The reason is `throwable.stackTraceToString()`:
             // exception messages can echo URL params from a failed request,
             // including accessToken values. Since the bundle is explicitly
-            // intended for sharing with maintainers, defence-in-depth here
+            // intended for sharing with maintainers, defense-in-depth here
             // prevents a sneaky leak path that the Pulse `%rmsg` / `%rex`
             // pipeline would have caught only for newly-logged events.
             val crashDir = paths.crashDir
             if (Files.exists(crashDir)) {
                 Files.list(crashDir).use { stream ->
-                    stream.filter { Files.isRegularFile(it) }.forEach { f ->
+                    // NOFOLLOW_LINKS so a symlink dropped into crash-reports/
+                    // (deliberately or by tooling) doesn't leak its target's
+                    // contents into a bundle that's about to be sent to
+                    // maintainers. Same family as #187 ZIP/TAR hardening.
+                    stream.filter { Files.isRegularFile(it, java.nio.file.LinkOption.NOFOLLOW_LINKS) }.forEach { f ->
                         copyTextRedacted(zip, "crash-reports/${f.fileName}", f)
                     }
                 }

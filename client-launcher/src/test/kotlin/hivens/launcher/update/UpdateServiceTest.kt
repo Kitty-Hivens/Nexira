@@ -47,8 +47,17 @@ class UpdateServiceTest {
     ): UpdateService {
         val tempDir = Files.createTempDirectory("update-test")
         tempDir.toFile().deleteOnExit()
+        // Auto-prepend a default manifest response unless the test stages one
+        // explicitly (e.g. to assert the no-manifest refusal path). Manifest
+        // matching is more specific than "releases" so it MUST come first in
+        // the queue, otherwise the broader rule would shadow it.
+        val withManifest = if (responses.any { it.urlContains?.contains("release-manifest") == true }) {
+            responses.toList()
+        } else {
+            listOf(MockResponse(urlContains = "release-manifest", body = releaseManifestJson())) + responses
+        }
         return UpdateService(
-            clientProvider = buildMockClient(*responses),
+            clientProvider = buildMockClient(*withManifest.toTypedArray()),
             json = json,
             dataDirectory = tempDir,
             settingsService = settings
@@ -64,8 +73,11 @@ class UpdateServiceTest {
         tempDir.toFile().deleteOnExit()
         return UpdateService(
             clientProvider = buildMockClient(
-                MockResponse(urlContains = "releases/latest", body = body,      status = status),
-                MockResponse(urlContains = "releases",        body = "[$body]", status = status)
+                // Manifest first — substring "release-manifest" is more specific
+                // than "releases/latest" and must win the match.
+                MockResponse(urlContains = "release-manifest", body = releaseManifestJson()),
+                MockResponse(urlContains = "releases/latest",  body = body,      status = status),
+                MockResponse(urlContains = "releases",         body = "[$body]", status = status)
             ),
             json = json,
             dataDirectory = tempDir,
@@ -85,6 +97,10 @@ class UpdateServiceTest {
             assetJson("AuraLauncher-2.0.0-Windows-Portable.zip", "https://example.com/AuraLauncher-2.0.0-Windows-Portable.zip", 60_000_000),
             assetJson("AuraLauncher-2.0.0-x86_64.AppImage", "https://example.com/AuraLauncher-2.0.0-x86_64.AppImage", 70_000_000),
             assetJson("AuraLauncher-2.0.0.dmg", "https://example.com/AuraLauncher-2.0.0.dmg", 80_000_000),
+            // Required since #186 — without a manifest entry the cold path
+            // refuses to construct a LauncherUpdate. Default fixture bundles
+            // it so existing tests don't have to wire it explicitly.
+            assetJson("release-manifest.json", "https://example.com/release-manifest.json", 1024),
             assetJson("SHA256SUMS.txt", "https://example.com/SHA256SUMS.txt", 512)
         )
     ) = """
@@ -100,6 +116,35 @@ class UpdateServiceTest {
 
     private fun assetJson(name: String, url: String, size: Long) = """
         {"name":"$name","browser_download_url":"$url","size":$size}
+    """.trimIndent()
+
+    /**
+     * Default release-manifest.json fixture. Hashes are placeholder zeros —
+     * tests that exercise the integrity gate ([downloadUpdate]) supply real
+     * hashes via [releaseManifestJson] with explicit asset list.
+     *
+     * platform/kind/size fields are required by [hivens.core.data.ReleaseAsset];
+     * deserialization fails (silently → manifest becomes null) without them.
+     */
+    private fun manifestAssetJson(name: String, sha256: String, platform: String, kind: String) =
+        """{"name":"$name","platform":"$platform","kind":"$kind","sha256":"$sha256","size":1000}"""
+
+    private fun releaseManifestJson(
+        version: String = "2.0.0",
+        highlights: String? = null,
+        assets: List<String> = listOf(
+            manifestAssetJson("AuraLauncher-2.0.0-Setup.exe",            "0".repeat(64), "windows", "installer"),
+            manifestAssetJson("AuraLauncher-2.0.0-Windows-Portable.zip", "0".repeat(64), "windows", "portable"),
+            manifestAssetJson("AuraLauncher-2.0.0-x86_64.AppImage",      "0".repeat(64), "linux",   "appimage"),
+            manifestAssetJson("AuraLauncher-2.0.0.dmg",                  "0".repeat(64), "macos",   "dmg"),
+        )
+    ) = """
+        {
+            "schemaVersion": 1,
+            "version": "$version",
+            "highlights": ${if (highlights != null) "\"$highlights\"" else "null"},
+            "assets": [${assets.joinToString(",")}]
+        }
     """.trimIndent()
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -413,13 +458,18 @@ class UpdateServiceTest {
     }
 
     @Test
-    fun `verifyChecksum returns true when expected is empty (skip mode)`() {
+    fun `verifyChecksum refuses empty checksum (no silent skip)`() {
+        // Regression for #186: an empty expectedChecksum must be treated as
+        // verification failure, not a free pass. The cold path in checkForUpdate
+        // already won't construct an update without a manifest hash, but this
+        // is the install-boundary defense-in-depth.
         val svc = createService("{}")
         val tempFile = Files.createTempFile("checksum-test", ".bin")
         tempFile.toFile().deleteOnExit()
         Files.writeString(tempFile, "anything")
 
-        assertTrue(svc.verifyChecksum(tempFile, ""))
+        assertFalse(svc.verifyChecksum(tempFile, ""))
+        assertFalse(svc.verifyChecksum(tempFile, "   "), "blank string must also fail closed")
     }
 
     @Test
@@ -519,6 +569,52 @@ class UpdateServiceTest {
         )
         val update = svc.checkForUpdate(force = true)
         assertNull(update, "No matching installer asset should return null")
+    }
+
+    @Test
+    fun `checkForUpdate refuses to construct update when manifest is absent`() = runTest {
+        // Regression for #186: with no release-manifest.json asset shipped in
+        // the release, the launcher must NOT auto-install — there is no
+        // verifiable hash to gate against. Older releases that pre-date the
+        // manifest convention require manual reinstall.
+        val release = githubReleaseJson(
+            tagName = "v99.0.0",
+            assets = listOf(
+                assetJson("AuraLauncher-99.0.0-Setup.exe", "https://example.com/AuraLauncher-99.0.0-Setup.exe", 50_000_000),
+                assetJson("AuraLauncher-99.0.0-Windows-Portable.zip", "https://example.com/AuraLauncher-99.0.0-Windows-Portable.zip", 60_000_000),
+                assetJson("AuraLauncher-99.0.0-x86_64.AppImage", "https://example.com/AuraLauncher-99.0.0-x86_64.AppImage", 70_000_000),
+                assetJson("AuraLauncher-99.0.0.dmg", "https://example.com/AuraLauncher-99.0.0.dmg", 80_000_000),
+            )
+        )
+        // Stage manifest URL explicitly returning 404 — the test's intent
+        // is "no manifest available," not "manifest accidentally garbled."
+        val svc = createService(
+            MockResponse(urlContains = "release-manifest", body = "Not Found", status = HttpStatusCode.NotFound),
+            MockResponse(urlContains = "releases/latest",  body = release),
+            MockResponse(urlContains = "releases",         body = "[$release]"),
+        )
+        val update = svc.checkForUpdate(force = true)
+        assertNull(update, "Auto-update must refuse when manifest is missing — no silent skip")
+    }
+
+    @Test
+    fun `checkForUpdate refuses when manifest lacks entry for selected asset`() = runTest {
+        // Subtler variant of #186: the manifest is present but doesn't list
+        // the asset we'd install (e.g. a partial manifest published by mistake,
+        // or a new platform asset added without updating the manifest). Same
+        // outcome — refuse, force manual install.
+        val release = githubReleaseJson(tagName = "v99.0.0")
+        val emptyManifest = releaseManifestJson(
+            version = "99.0.0",
+            assets = listOf(manifestAssetJson("SomeOtherFile.zip", "1".repeat(64), "windows", "installer")),
+        )
+        val svc = createService(
+            MockResponse(urlContains = "release-manifest", body = emptyManifest),
+            MockResponse(urlContains = "releases/latest",  body = release),
+            MockResponse(urlContains = "releases",         body = "[$release]"),
+        )
+        val update = svc.checkForUpdate(force = true)
+        assertNull(update, "Manifest without the selected asset's hash must refuse update")
     }
 
     @Test
@@ -754,9 +850,9 @@ class UpdateServiceTest {
     }
 
     @Test
-    fun `mandatory floor with v-prefix is normalised`() = runTest {
+    fun `mandatory floor with v-prefix is normalized`() = runTest {
         // Real-world authors will write "v2.2.8" out of habit — strip the v.
-        val channelMeta = """{"mandatory_min_version":"v999.0.0","reason":"normalised"}"""
+        val channelMeta = """{"mandatory_min_version":"v999.0.0","reason":"normalized"}"""
         val svc = createService(
             MockResponse(urlContains = "releases/latest",     body = githubReleaseJson(tagName = "v999.0.0")),
             MockResponse(urlContains = "releases",            body = "[${githubReleaseJson(tagName = "v999.0.0")}]"),
