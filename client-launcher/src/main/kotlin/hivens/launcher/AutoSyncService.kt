@@ -122,23 +122,34 @@ class AutoSyncService(
                 totalBytes = 0,
             )
 
-            val ok = runCatching {
-                val session = try {
-                    authService.login(creds.playerName, pass, server.assetDir)
-                } catch (_: hivens.core.api.TwoFactorRequiredException) {
-                    // 2FA account — fall back to the cached manifest from
-                    // the last successful online sync. Auto-sync is best-
-                    // effort: serving stale-but-valid data on a 2FA account
-                    // is strictly better than failing every server every
-                    // launcher start (which would also trigger a 2FA
-                    // prompt the user didn't ask for). If no cache yet,
-                    // skip this server — the runCatching captures it as a
-                    // sync failure, which is the right signal for the
-                    // dashboard.
-                    val cached = manifestCache.loadManifest(server.assetDir)
-                        ?: throw IllegalStateException("2FA account, no cached manifest for ${server.assetDir}")
+            // Try to obtain a SessionData for this server. Three outcomes:
+            //   * regular login → use that session directly
+            //   * 2FA gate WITH cached manifest → use cached creds + manifest
+            //   * 2FA gate WITHOUT cached manifest → mark SKIPPED (not failed)
+            //     and move on. This isn't a failure — the account just hasn't
+            //     been through 2FA on this machine for this server yet, so
+            //     we have nothing to sync against. Red FAILED would imply
+            //     "server is broken"; SKIPPED reads as "awaiting user action".
+            val session: SessionData? = try {
+                authService.login(creds.playerName, pass, server.assetDir)
+            } catch (_: hivens.core.api.TwoFactorRequiredException) {
+                val cached = manifestCache.loadManifest(server.assetDir)
+                if (cached == null) {
+                    log.info(
+                        "Auto-sync skipped for {}: 2FA + no cached manifest yet, awaiting manual login",
+                        server.assetDir,
+                    )
+                    ActionRing.record("Auto-sync skipped: ${server.assetDir} needs manual 2FA login")
+                    _serverStates.update { it + (server.assetDir to ServerState.SKIPPED) }
+                    null
+                } else {
                     creds.copy(fileManifest = cached, serverId = server.assetDir)
                 }
+            }
+
+            if (session == null) continue  // SKIPPED above; counters not bumped (it's neither succeeded nor failed)
+
+            val ok = runCatching {
                 val userState = optionalModsStateProvider(server.assetDir)
                 val ignoredFiles = manifestProcessor.calculateIgnoredFiles(server, userState)
                 val clientDir = dataDirectory.resolve("clients").resolve(server.assetDir)
