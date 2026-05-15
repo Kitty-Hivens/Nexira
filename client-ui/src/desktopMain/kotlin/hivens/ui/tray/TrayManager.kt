@@ -113,7 +113,15 @@ object TrayManager {
             val builder = TrayBuilder(
                 title = appName,
                 iconBytes = iconBytes,
-                tooltip = "$appName — ${strings.statusIdle}",
+                // Just the status — NO `appName` prefix. Modern tray
+                // hosts (Plasma, waybar with default templates, GNOME
+                // SNI extensions) resolve the application name from the
+                // SNI Id by looking up the matching `.desktop` file and
+                // render it themselves; if libtray ALSO prefixes, the
+                // user sees "Aura Launcher — Aura Launcher — status".
+                // Hosts that don't resolve still get a meaningful
+                // tooltip ("● Idle"); the icon identifies the app.
+                tooltip = strings.statusIdle,
                 menu = buildMenu(strings, servers, gameRunning, gameServerName),
             )
             val t = Tray.create(builder) ?: run {
@@ -169,6 +177,7 @@ object TrayManager {
         gameRunning = running
         gameServerName = serverName
         rebuildMenu()
+        // No appName prefix here either — same reasoning as in [init].
         val tooltipLabel = when {
             running && serverName != null -> "▶  $serverName"
             running -> strings?.statusRunning ?: "▶  Running"
