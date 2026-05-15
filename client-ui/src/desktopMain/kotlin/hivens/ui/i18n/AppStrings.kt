@@ -303,10 +303,6 @@ interface AppStrings {
     val trayServers: String
     val trayNoServers: String
 
-    // --- Settings: Start in tray ---
-    val settingsStartInTray: String
-    val settingsStartInTrayDesc: String
-
     // --- Settings: Experimental features ---
     val settingsSectionExperimental: String
     val settingsExperimentalMaster: String
