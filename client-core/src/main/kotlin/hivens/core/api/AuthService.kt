@@ -222,7 +222,16 @@ class AuthService(
         val key = CacheKey(username, passwordEncoded, serverId)
         val cachedResponse = pendingTwoFactor.remove(key)
 
-        if (cachedResponse != null && cachedResponse.uuid != null && cachedResponse.playername != null) {
+        // `session` MUST be checked too — it's the AES-encrypted bytes that
+        // become accessToken via generateGameToken. A TWOAUTH response with
+        // uuid + playername populated but session null would build a
+        // SessionData with an empty accessToken and the game would die at
+        // smartycraft auth-host with no signal back to the launcher.
+        // Audit-pass catch on the 25-commit batch.
+        if (cachedResponse != null &&
+            cachedResponse.uuid != null &&
+            cachedResponse.playername != null &&
+            cachedResponse.session != null) {
             return buildSessionData(cachedResponse, password, serverId)
                 .also { cacheSession(username, passwordEncoded, serverId, it) }
         }

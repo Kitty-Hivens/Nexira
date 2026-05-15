@@ -139,6 +139,43 @@ class AuthServiceTest {
     }
 
     @Test
+    fun `completeTwoFactor falls back to re-login when cached TWOAUTH lacks session field`() = runTest {
+        // Audit-pass catch on the 25-commit batch: a TWOAUTH response that
+        // populated uuid + playername but left session null was promoting
+        // through the cache path and producing a SessionData with empty
+        // accessToken — which would die at the smartycraft auth-host with
+        // no signal back to the launcher. Force the re-login fallback
+        // when session is absent so the OK response (which carries it) can
+        // populate the field.
+        var loginAttempt = 0
+        val proto = FakeServerProtocol().apply {
+            loginResult = {
+                loginAttempt += 1
+                if (loginAttempt == 1) LoginResponse(
+                    status = "TWOAUTH", uid = "abc-uid-128",
+                    uuid = "550e8400e29b41d4a716446655440000",
+                    playername = "TestPlayer",
+                    session = null,
+                ) else ok().copy(uid = "abc-uid-128")
+            }
+            twoauthResult = { _, _, _ -> StatusOnlyResponse(status = "OK") }
+        }
+        val service = AuthService(proto)
+        val ex = assertFailsWith<TwoFactorRequiredException> {
+            service.login("user", "pass", "Industrial")
+        }
+        val session = service.completeTwoFactor(
+            username = "user", password = "pass", serverId = "Industrial",
+            uid = ex.uid!!, code = "123456",
+        )
+        assertEquals("TestPlayer", session.playerName)
+        // 2 login calls = cold + re-login (cache promotion was correctly
+        // skipped because session was null). Without this guard the test
+        // would see 1 login call and an empty accessToken on the result.
+        assertEquals(2, proto.loginCalls.size)
+    }
+
+    @Test
     fun `completeTwoFactor falls back to single re-login when cached TWOAUTH is sparse`() = runTest {
         // Spec's minimal-shape case: TWOAUTH response carries only the uid
         // (no uuid / playername / session), so cache promotion can't build a
