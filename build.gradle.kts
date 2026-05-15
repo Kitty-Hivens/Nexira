@@ -32,13 +32,12 @@ val appVersion = providers.gradleProperty("appVersion")
 allprojects {
     repositories {
         mavenCentral()
-        // libtray ships from local Maven cache during the integration
-        // window — published via `./gradlew publishToMavenLocal` in the
-        // sibling repo. Switches to mavenCentral coordinates once libtray
-        // cuts its first tagged release. Dev-only repo at the bottom of
-        // the resolution chain so a stale local copy can't shadow a real
-        // central artifact.
-        mavenLocal()
+        // libtray (Kitty-Hivens/libtray) is consumed via JitPack until it
+        // cuts a real Maven Central release. Pinned by commit sha in
+        // libs.versions.toml so an upstream main-branch break doesn't
+        // silently drift the build. Switches to mavenCentral coordinates
+        // once libtray ships 0.1.0 + verifies its sonatype namespace.
+        maven { url = uri("https://jitpack.io") }
     }
     version = appVersion
     group = "hivens"
