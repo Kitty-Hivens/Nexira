@@ -36,6 +36,7 @@ class AutoSyncService(
     private val authService: IAuthService,
     private val downloadService: IFileDownloadService,
     private val manifestProcessor: IManifestProcessorService,
+    private val manifestCache: ManifestCache,
     private val dataDirectory: Path,
     /**
      * Loads cached credentials. Lambda-injected (rather than holding a
@@ -122,7 +123,22 @@ class AutoSyncService(
             )
 
             val ok = runCatching {
-                val session = authService.login(creds.playerName, pass, server.assetDir)
+                val session = try {
+                    authService.login(creds.playerName, pass, server.assetDir)
+                } catch (_: hivens.core.api.TwoFactorRequiredException) {
+                    // 2FA account — fall back to the cached manifest from
+                    // the last successful online sync. Auto-sync is best-
+                    // effort: serving stale-but-valid data on a 2FA account
+                    // is strictly better than failing every server every
+                    // launcher start (which would also trigger a 2FA
+                    // prompt the user didn't ask for). If no cache yet,
+                    // skip this server — the runCatching captures it as a
+                    // sync failure, which is the right signal for the
+                    // dashboard.
+                    val cached = manifestCache.loadManifest(server.assetDir)
+                        ?: throw IllegalStateException("2FA account, no cached manifest for ${server.assetDir}")
+                    creds.copy(fileManifest = cached, serverId = server.assetDir)
+                }
                 val userState = optionalModsStateProvider(server.assetDir)
                 val ignoredFiles = manifestProcessor.calculateIgnoredFiles(server, userState)
                 val clientDir = dataDirectory.resolve("clients").resolve(server.assetDir)
