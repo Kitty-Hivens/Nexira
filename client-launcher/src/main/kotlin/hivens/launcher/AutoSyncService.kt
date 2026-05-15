@@ -122,7 +122,7 @@ class AutoSyncService(
                 totalBytes = 0,
             )
 
-            // Try to obtain a SessionData for this server. Three outcomes:
+            // Try to obtain a SessionData for this server. Four outcomes:
             //   * regular login → use that session directly
             //   * 2FA gate WITH cached manifest → use cached creds + manifest
             //   * 2FA gate WITHOUT cached manifest → mark SKIPPED (not failed)
@@ -130,6 +130,13 @@ class AutoSyncService(
             //     been through 2FA on this machine for this server yet, so
             //     we have nothing to sync against. Red FAILED would imply
             //     "server is broken"; SKIPPED reads as "awaiting user action".
+            //   * any other login throw (network, server reject, etc) →
+            //     mark FAILED for this server and continue. Pre-refactor
+            //     the outer runCatching covered everything; the refactor
+            //     split login + processSession, so non-2FA throws need
+            //     their own catch — without it a single login exception
+            //     terminates syncAll for every later server.
+            var sessionFailed = false
             val session: SessionData? = try {
                 authService.login(creds.playerName, pass, server.assetDir)
             } catch (_: hivens.core.api.TwoFactorRequiredException) {
@@ -145,8 +152,17 @@ class AutoSyncService(
                 } else {
                     creds.copy(fileManifest = cached, serverId = server.assetDir)
                 }
+            } catch (e: Exception) {
+                log.warn("Auto-sync login failed for {}: {}", server.assetDir, e.message)
+                sessionFailed = true
+                null
             }
 
+            if (sessionFailed) {
+                _serverStates.update { it + (server.assetDir to ServerState.FAILED) }
+                failed++
+                continue
+            }
             if (session == null) continue  // SKIPPED above; counters not bumped (it's neither succeeded nor failed)
 
             val ok = runCatching {
