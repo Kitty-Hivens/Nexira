@@ -87,7 +87,6 @@ object TrayManager {
     // events; "server:<assetDir>" for the per-server entries so the
     // dispatch can recover the asset id on click.
 
-    private const val ID_STATUS  = "_status"
     private const val ID_SERVERS = "_servers"
     private const val ID_NOSERVERS = "_noservers"
     private const val ID_SHOW    = "show"
@@ -188,21 +187,15 @@ object TrayManager {
     private fun buildMenu(
         s: Strings,
         servers: List<ServerProfile>,
-        running: Boolean,
-        serverName: String?,
+        @Suppress("UNUSED_PARAMETER") running: Boolean,
+        @Suppress("UNUSED_PARAMETER") serverName: String?,
     ): TrayMenu {
         val items = mutableListOf<TrayMenuItem>()
 
-        // Status line — disabled, acts as a label that reflects current
-        // game state. Hosts render disabled items in muted colour so the
-        // user reads it as informational rather than clickable.
-        val statusLabel = when {
-            running && serverName != null -> serverName
-            running -> s.statusRunning
-            else    -> s.statusIdle
-        }
-        items += TrayMenuItem.Standard(id = ID_STATUS, label = statusLabel, enabled = false)
-        items += TrayMenuItem.Separator
+        // Status used to live as the first (disabled) menu entry too, but
+        // the same string is already in the SNI tooltip — the menu line
+        // was pure duplication. Removed; running/serverName params are
+        // kept on the signature so callers don't have to change shape.
         items += TrayMenuItem.Standard(id = ID_SHOW,    label = s.show)
         items += TrayMenuItem.Standard(id = ID_CONSOLE, label = s.console)
         items += TrayMenuItem.Separator
