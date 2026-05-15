@@ -166,21 +166,31 @@ private fun setLinuxXToolkitAppClassName(name: String) {
 
 @OptIn(ExperimentalResourceApi::class)
 fun main() {
-    // BEFORE PlatformPaths resolution: apply any pending data-dir move
-    // scheduled from the Settings UI. If user clicked "Move data
-    // directory" → picker → restart, this is where the relocation
-    // actually happens. Bootstrap conf reads + file ops only; no logger
-    // initialized yet at this point so failures land in stderr.
-    // Operation is idempotent; safe to call on every startup.
-    DataDirMover.applyPending()
-
-    // Resolve logs dir BEFORE any LoggerFactory.getLogger() call so logback.xml
-    // (which reads `${aura.logs.dir}` for its rolling-file appenders) sees the
-    // platform-correct path on its very first init. The first getLogger we
-    // could hit is inside setLinuxXToolkitAppClassName.onFailure below — set
-    // the property before that to keep logback's classpath scan clean.
+    // Resolve logs dir BEFORE any LoggerFactory.getLogger() call so
+    // logback.xml (which reads `${aura.logs.dir}` for its rolling-file
+    // appenders) sees the platform-correct path on its very first init.
+    // PlatformPaths.system() is pure computation — no logger init —
+    // safe to call before the property is set. DataDirMover and
+    // BootstrapConf both have lazy log fields specifically so this
+    // ordering works without their applyPending() / read() touching
+    // logback first; see those files for the long-form rationale.
     val paths = PlatformPaths.system()
     System.setProperty("aura.logs.dir", paths.logsDir.toString())
+
+    // NOW safe to apply any pending data-dir move scheduled from the
+    // Settings UI. If user clicked "Move data directory" → picker →
+    // restart, this is where the relocation actually happens. Operation
+    // is idempotent; safe to call on every startup. The first log line
+    // it produces (only in the actual-move case, no-op otherwise) lands
+    // in `paths.logsDir/launcher.log`, not `./logs/launcher.log`.
+    //
+    // Edge case: if applyPending DOES move the data dir, paths.logsDir
+    // points at the old location and logback opens the file there —
+    // log entries about the move itself stream to the old path right
+    // up until the source dir is deleted. Next startup uses the new
+    // path correctly. The user opted into this two-restart flow when
+    // they clicked Move, so the one-time misdirect is acceptable.
+    DataDirMover.applyPending()
 
     // Pulse: tag every log line in this process with a stable 8-char sessionId
     // so a multi-launch user dump can be sliced per process invocation

@@ -33,7 +33,11 @@ import java.nio.file.Paths
  * startup, so there's no concurrent-writer scenario to worry about.
  */
 object BootstrapConf {
-    private val log = LoggerFactory.getLogger(BootstrapConf::class.java)
+    // Lazy logger — same rationale as [DataDirMover]: BootstrapConf is
+    // touched during Main.kt's pre-logger bootstrap. Eager init would
+    // open the rolling file at the wrong path. See DataDirMover.kt for
+    // the long-form explanation.
+    private val log by lazy { LoggerFactory.getLogger(BootstrapConf::class.java) }
 
     const val KEY_DATA_DIR = "data-dir"
     const val KEY_PENDING_SOURCE = "data-dir-pending-source"
