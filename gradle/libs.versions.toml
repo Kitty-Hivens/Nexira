@@ -6,7 +6,7 @@
 # ── Toolchain & language plugins ─────────────────────────────────────────────
 # Kotlin held at 2.3.20-RC3 (next release-line bump is 2.4.0-Beta2, skipped —
 # beta of a new major). Compose moved alpha04 → rc01 of the same 1.11.0 line.
-kotlin            = "2.3.20-RC3"
+kotlin            = "2.3.21"
 compose           = "1.11.0-alpha04"
 buildconfigPlugin = "6.0.9"
 versionsPlugin    = "0.54.0"
