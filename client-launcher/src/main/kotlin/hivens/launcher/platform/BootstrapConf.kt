@@ -18,7 +18,7 @@ import java.nio.file.Paths
  * folder listings on Linux/macOS; Windows shows it normally but it
  * doesn't clutter anything important.
  *
- * Recognised keys:
+ * Recognized keys:
  *   - `data-dir`                  — absolute path of user-chosen data dir
  *   - `data-dir-pending-source`   — set by UI when scheduling a move
  *   - `data-dir-pending-target`   — set by UI when scheduling a move

@@ -46,12 +46,12 @@ class ProtectedPathsTest {
     }
 
     @Test
-    fun `endsWith pattern matches case-insensitively after path normalisation`() {
+    fun `endsWith pattern matches case-insensitively after path normalization`() {
         val pp = ProtectedPaths(configFile, json)
         assertTrue(pp.isProtected("options.txt"))
         assertTrue(pp.isProtected("OPTIONS.TXT"))
         assertTrue(pp.isProtected("Industrial/options.txt"))
-        assertTrue(pp.isProtected("Industrial\\options.txt"), "backslashes must be normalised to /")
+        assertTrue(pp.isProtected("Industrial\\options.txt"), "backslashes must be normalized to /")
         assertTrue(pp.isProtected("servers.dat"))
     }
 

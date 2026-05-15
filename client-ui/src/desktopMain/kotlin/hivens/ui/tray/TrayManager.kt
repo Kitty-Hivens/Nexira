@@ -12,7 +12,7 @@ import java.io.InputStream
  * System tray manager backed by dorkbox/SystemTray 4.4.
  *
  * All callbacks are invoked on the AWT thread by dorkbox.
- * Must be initialised once from Main.kt after Koin is ready.
+ * Must be initialized once from Main.kt after Koin is ready.
  */
 object TrayManager {
 
@@ -51,9 +51,9 @@ object TrayManager {
 
     /**
      * True when the tray either is ready or is still in the middle of
-     * initialising. Use this for close-request handlers: if the tray
+     * initializing. Use this for close-request handlers: if the tray
      * might still come up, prefer "hide to tray" over "exit application",
-     * since the user's intent is "minimise" and we don't want to kill the
+     * since the user's intent is "minimize" and we don't want to kill the
      * launcher because dorkbox's GTK probe is slow.
      */
     val canBeReady: Boolean get() = state == State.INITIALIZING || state == State.READY

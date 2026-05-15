@@ -46,7 +46,7 @@ import javax.crypto.spec.SecretKeySpec
  * file (though in practice both succeed or fail together with the same
  * daemon).
  *
- * Load behaviour: a session whose accessToken cannot be resolved
+ * Load behavior: a session whose accessToken cannot be resolved
  * (keyring entry wiped, decryption failed, no legacy fallback) returns
  * null from [load], cleanly triggering the re-login path. A session whose
  * password is missing but accessToken survived returns a SessionData with

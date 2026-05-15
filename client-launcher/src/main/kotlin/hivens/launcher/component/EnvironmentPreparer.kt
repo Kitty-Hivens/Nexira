@@ -157,13 +157,17 @@ class EnvironmentPreparer(private val clientProvider: HttpClientProvider) {
     internal fun flattenNatives(dir: Path) {
         try {
             if (!Files.exists(dir)) return
-            val libraries = Files.walk(dir)
-                .filter { Files.isRegularFile(it) }
-                .filter {
-                    val name = it.fileName.toString()
-                    name.endsWith(".so") || name.endsWith(".dll") || name.endsWith(".dylib")
-                }
-                .collect(Collectors.toList())
+            // .use{} closes the stream's underlying directory handle. Without
+            // it the OS fd leaks until GC eventually collects the stream object.
+            val libraries = Files.walk(dir).use { stream ->
+                stream
+                    .filter { Files.isRegularFile(it) }
+                    .filter {
+                        val name = it.fileName.toString()
+                        name.endsWith(".so") || name.endsWith(".dll") || name.endsWith(".dylib")
+                    }
+                    .collect(Collectors.toList())
+            }
 
             for (lib in libraries) {
                 val target = dir.resolve(lib.fileName)
@@ -176,17 +180,34 @@ class EnvironmentPreparer(private val clientProvider: HttpClientProvider) {
         }
     }
 
+    /**
+     * The natives directory is "valid" only when the actual lwjgl native is
+     * present, not just *any* file with the platform's extension (#185).
+     * Pre-fix the check accepted a directory containing only `libjinput-*.so`
+     * as valid because jinput is a `.so` file — which let `prepareNatives`
+     * short-circuit on a half-populated dir, and the game then died with
+     * `UnsatisfiedLinkError: no lwjgl64 in java.library.path`.
+     *
+     * Substring match on `lwjgl` keeps the gate version-agnostic: catches
+     * LWJGL 2 (`liblwjgl.so` + `liblwjgl64.so`) and LWJGL 3 (`liblwjgl.so`,
+     * `liblwjgl-glfw.so`, …) and the missing `lib` prefix on the older
+     * Windows naming (`lwjgl.dll`) — without enumerating module names that
+     * could drift between versions.
+     */
     internal fun isFolderValidForOs(dir: Path, os: String): Boolean {
         if (!Files.exists(dir)) return false
-        val expectedExtension = when (os) {
-            "linux" -> ".so"
+        val extension = when (os) {
+            "linux"   -> ".so"
             "windows" -> ".dll"
-            "macos" -> ".dylib"
+            "macos"   -> ".dylib"
             else -> return false
         }
         return try {
             Files.list(dir).use { stream ->
-                stream.anyMatch { it.toString().lowercase().endsWith(expectedExtension) }
+                stream.anyMatch {
+                    val name = it.fileName.toString().lowercase()
+                    name.contains("lwjgl") && name.endsWith(extension)
+                }
             }
         } catch (_: Exception) { false }
     }
@@ -203,8 +224,11 @@ class EnvironmentPreparer(private val clientProvider: HttpClientProvider) {
                 needUnzip = true
             } else {
                 try {
-                    // Rough check: if there are few files, then the unpacking was incorrect
-                    if (Files.list(objectsDir).count() < 10) needUnzip = true
+                    // Rough check: if there are few files, then the unpacking was incorrect.
+                    // .use{} ensures the directory stream is closed even though .count() is
+                    // a terminal operation — defensive against future refactor regressions.
+                    val count = Files.list(objectsDir).use { it.count() }
+                    if (count < 10) needUnzip = true
                 } catch (_: Exception) { needUnzip = true }
             }
         } else {

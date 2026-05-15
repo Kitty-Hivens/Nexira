@@ -69,7 +69,7 @@ object IssueReporter {
         val truncatedStack = report.stackTrace.take(STACK_TRACE_LIMIT) +
             if (report.stackTrace.length > STACK_TRACE_LIMIT) "\n... (truncated; full trace in crash file)" else ""
 
-        // All free-form fields routed through Redactor — defence in depth.
+        // All free-form fields routed through Redactor — defense in depth.
         // CrashReporter doesn't generate report.lastAction-style sensitive fields
         // anymore, but stack traces can include URL params with tokens.
         return Redactor.redact(buildString {

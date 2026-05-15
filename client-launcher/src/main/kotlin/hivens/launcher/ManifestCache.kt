@@ -1,6 +1,7 @@
 package hivens.launcher
 
 import hivens.core.data.FileManifest
+import hivens.launcher.platform.ServerNameValidator
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
@@ -63,12 +64,32 @@ class ManifestCache(
         return md.digest().joinToString("") { "%02x".format(it) }
     }
 
-    fun isClean(serverId: String, manifestHash: String): Boolean {
+    /**
+     * @param diskSanityCheck called only when the cache is otherwise valid
+     *        (hash matches, within TTL). Returning false invalidates the
+     *        cache entry — this is how callers gate the short-circuit on
+     *        actual on-disk state. Cheap by design: a handful of
+     *        Files.exists checks against the manifest's top entries are
+     *        enough to catch the bulk-loss cases (#184: data dir moved
+     *        but cache stayed; user `rm`'d the client dir; partial
+     *        restore-from-backup), without paying for a full MD5 walk.
+     *        Default no-op preserves the legacy contract for callers that
+     *        only need the hash + TTL gate.
+     */
+    fun isClean(
+        serverId: String,
+        manifestHash: String,
+        diskSanityCheck: () -> Boolean = { true },
+    ): Boolean {
         val entry = read(serverId) ?: return false
         if (entry.hash != manifestHash) return false
         val ageMs = System.currentTimeMillis() - entry.syncedAt
         if (ageMs >= TTL_MS) {
             log.debug("manifest cache for {} expired ({}h old, TTL {}h)", serverId, ageMs / 3_600_000, TTL_MS / 3_600_000)
+            return false
+        }
+        if (!diskSanityCheck()) {
+            log.info("manifest cache for {} reports clean but disk state failed sanity check — forcing resync", serverId)
             return false
         }
         return true
@@ -125,10 +146,14 @@ class ManifestCache(
     /**
      * Defensive: server ids are trusted (they come from upstream config)
      * but we still don't want a server named `../etc/passwd` to escape
-     * the cache dir. Replace anything outside `[A-Za-z0-9._-]`.
+     * the cache dir. Replace anything outside the [ServerNameValidator]
+     * whitelist with `_` so a malformed id surfaces as a logged miss
+     * (the cache file simply won't match anything legitimate) rather
+     * than blowing up the cold-start cache lookup.
      */
     private fun sanitize(serverId: String): String =
-        serverId.map { if (it.isLetterOrDigit() || it == '_' || it == '-' || it == '.') it else '_' }.joinToString("")
+        if (ServerNameValidator.isValid(serverId)) serverId
+        else serverId.map { if (ServerNameValidator.isValid(it.toString())) it else '_' }.joinToString("")
 
     companion object {
         /**

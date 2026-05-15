@@ -336,6 +336,15 @@ interface AppStrings {
     val aprilCloseHideTray: String
     fun aprilCloseEscapeCount(current: Int, max: Int): String
 
+    // --- 2FA (TOTP) — #159 ---
+    val auth2faTitle: String
+    val auth2faPrompt: String
+    val auth2faPlaceholder: String
+    val auth2faSubmit: String
+    val auth2faCancel: String
+    val auth2faInvalid: String
+    val auth2faExpired: String
+
     // --- SSL Warning ---
     val sslWarningTitle: String
     val sslWarningBody: String
@@ -354,6 +363,10 @@ interface AppStrings {
     /** Receives a pre-formatted local date/time string. */
     fun sslBypassExpiresAt(formatted: String): String
 
+    // --- Force proxy mode (Settings → Network) — Conduit Phase 2 ---
+    val settingsForceProxyTitle: String
+    val settingsForceProxyDesc: String
+
     // --- Data directory (Settings → Data dir) ---
     val settingsSectionDataDir: String
     val settingsDataDirCurrent: String
@@ -370,9 +383,9 @@ interface AppStrings {
     // ═══════════════════════════════════════════════════════════════════════
     // JVM Args Builder dialog
     // ═══════════════════════════════════════════════════════════════════════
-    // Technical -XX flag names and JVM-recognised identifiers (G1GC, ZGC,
+    // Technical -XX flag names and JVM-recognized identifiers (G1GC, ZGC,
     // MaxGCPauseMillis, AlwaysPreTouch, etc.) are kept hardcoded — they
-    // are not labels but actual flag names a user has to recognise. Only
+    // are not labels but actual flag names a user has to recognize. Only
     // the descriptive helpers, section headers, and button copy are
     // localised.
 

@@ -58,6 +58,7 @@ fun SettingsScreen(
     var prereleaseChannel      by remember { mutableStateOf(initialSettings.prereleaseChannelEnabled) }
     var autoSyncAllPacks       by remember { mutableStateOf(initialSettings.autoSyncAllPacks) }
     var jvmBuilderEnabled      by remember { mutableStateOf(initialSettings.jvmBuilderEnabled) }
+    var forceProxyMode         by remember { mutableStateOf(initialSettings.forceProxyMode) }
     var langDropdownExpanded   by remember { mutableStateOf(false) }
     var showSavedMessage       by remember { mutableStateOf(false) }
 
@@ -77,9 +78,13 @@ fun SettingsScreen(
                 mandatoryUpdatesEnabled     = mandatoryUpdates,
                 prereleaseChannelEnabled    = prereleaseChannel,
                 autoSyncAllPacks            = autoSyncAllPacks,
-                jvmBuilderEnabled           = jvmBuilderEnabled
+                jvmBuilderEnabled           = jvmBuilderEnabled,
+                forceProxyMode              = forceProxyMode
             )
         )
+        // Mirror to NetworkState so ChannelRouter sees it on the very next
+        // request without waiting for launcher restart.
+        hivens.launcher.NetworkState.setForceProxyMode(forceProxyMode)
         showSavedMessage = true
     }
 
@@ -394,6 +399,31 @@ fun SettingsScreen(
                                     }
                                 }
                             }
+                        }
+
+                        // ── Force proxy mode (Conduit Phase 2) ────────────────
+                        Spacer(Modifier.height(12.dp))
+                        Row(
+                            modifier              = Modifier.fillMaxWidth(),
+                            verticalAlignment     = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                                Text(
+                                    text       = s.settingsForceProxyTitle,
+                                    color      = CelestiaTheme.colors.textPrimary,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                                Text(
+                                    text  = s.settingsForceProxyDesc,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = CelestiaTheme.colors.textSecondary,
+                                )
+                            }
+                            Switch(
+                                checked         = forceProxyMode,
+                                onCheckedChange = { forceProxyMode = it; save() },
+                            )
                         }
                     }
                 }
@@ -773,7 +803,7 @@ private fun SettingsSectionTitle(text: String) {
 
 /**
  * Settings row with icon + title + description + switch. Mirrors the layout
- * used by the Offline Mode and Start-in-Tray rows above. [enabled] greys out
+ * used by the Offline Mode and Start-in-Tray rows above. [enabled] grays out
  * the whole row (used by experimental sub-toggles when the master is off).
  */
 @Composable

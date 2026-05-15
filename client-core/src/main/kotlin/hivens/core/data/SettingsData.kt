@@ -26,7 +26,7 @@ data class SettingsData(
     var startInTray: Boolean = false,
 
     // ── Experimental features ─────────────────────────────────────────────────
-    // Three knobs that opt the user into faster-but-less-stable update behaviour.
+    // Three knobs that opt the user into faster-but-less-stable update behavior.
     // The master toggle gates both children — switching it off disables the
     // sub-toggles regardless of their stored values. Defaults are ON because
     // the upstream protocol is currently a moving target and we need users to
@@ -67,5 +67,19 @@ data class SettingsData(
      * Off by default because the feature is power-user-grade and the free-
      * text field is enough for users who already know what they want.
      */
-    var jvmBuilderEnabled: Boolean = false
+    var jvmBuilderEnabled: Boolean = false,
+
+    /**
+     * Conduit Phase 2: skip the direct-channel attempt and route every
+     * SmartyCraft request through the SOCKS5 proxy from the first call.
+     *
+     * Default false — direct works for ~99% of users (`reference_smartycraft_proxy`).
+     * Enable when in censored regions or corporate firewalls where
+     * `smartycraft.ru:443` is blocked but `proxy.smartycraft.ru:58613`
+     * (despite the unusual port) gets through.
+     *
+     * Persisted here so the toggle survives launcher restart — users in
+     * those networks need to set this once, not every session.
+     */
+    var forceProxyMode: Boolean = false,
 )

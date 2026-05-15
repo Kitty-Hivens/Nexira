@@ -141,4 +141,41 @@ class ManifestCacheTest {
         assertNotNull(loaded)
         assertEquals(1, loaded.files.size)
     }
+
+    // ── Disk-sanity gate (#184) ────────────────────────────────────────────
+
+    @Test
+    fun `isClean invalidates entry when diskSanityCheck returns false`() {
+        // Hash matches and the entry is fresh, but the caller knows the
+        // disk lost the files (data dir moved without the cache, manual
+        // rm, partial restore). The cache must yield to disk reality.
+        cache.markClean("Industrial", "abc")
+        assertFalse(
+            cache.isClean("Industrial", "abc") { false },
+            "diskSanityCheck=false must override an otherwise-valid cache",
+        )
+    }
+
+    @Test
+    fun `isClean honours diskSanityCheck even on the same call shape`() {
+        // The lambda is the only thing different — must flip the result.
+        cache.markClean("Industrial", "abc")
+        assertTrue(cache.isClean("Industrial", "abc") { true })
+        assertFalse(cache.isClean("Industrial", "abc") { false })
+    }
+
+    @Test
+    fun `diskSanityCheck is NOT consulted when the hash gate already failed`() {
+        // Optimization the production code relies on — the lambda may walk
+        // the filesystem; don't bother running it when we've already
+        // decided to refresh because of a hash mismatch.
+        cache.markClean("Industrial", "abc")
+        var called = false
+        val result = cache.isClean("Industrial", "different-hash") {
+            called = true
+            true
+        }
+        assertFalse(result)
+        assertFalse(called, "hash mismatch should short-circuit before disk-sanity work")
+    }
 }

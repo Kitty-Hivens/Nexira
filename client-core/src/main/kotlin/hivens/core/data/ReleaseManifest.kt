@@ -5,12 +5,13 @@ import kotlinx.serialization.Serializable
 
 /**
  * Machine-readable description of a GitHub release. Published by CI as
- * `release-manifest.json` alongside the binaries; the launcher prefers it
- * over scraping the markdown release body for checksums.
+ * `release-manifest.json` alongside the binaries; the launcher REQUIRES it
+ * — `UpdateService` refuses to auto-install when the manifest is missing or
+ * doesn't list the selected asset (#186 hardening: empty checksum was
+ * previously a silent skip).
  *
- * Older releases that pre-date the manifest contract are handled by
- * [hivens.launcher.update.UpdateService.extractChecksum] which falls back
- * to the legacy table-row regex.
+ * Older releases (pre-2.2.7-rc3) that ship without a manifest can no longer
+ * be auto-updated to and require manual reinstall.
  */
 @Serializable
 data class ReleaseManifest(

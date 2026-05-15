@@ -1,6 +1,6 @@
 package hivens.launcher
 
-import hivens.config.Network
+import hivens.launcher.network.ServerProtocolConfig
 import hivens.core.api.HttpClientProvider
 import hivens.core.api.interfaces.IFileDownloadService
 import hivens.core.data.FileData
@@ -33,6 +33,7 @@ class FileDownloadService(
     private val clientProvider: HttpClientProvider,
     private val protectedPaths: ProtectedPaths,
     private val manifestCache: ManifestCache,
+    private val config: ServerProtocolConfig,
 ) : IFileDownloadService {
     private val client get() = clientProvider.current
 
@@ -46,6 +47,16 @@ class FileDownloadService(
         )
 
         private const val INDEX_FILENAME = ".extra_unpacked_index.json"
+
+        /**
+         * How many manifest entries to spot-check on disk before trusting
+         * the manifest-cache short-circuit (#184). Twenty is enough to
+         * catch the bulk-loss cases (data-dir-moved-without-files, manual
+         * `rm`, partial backup restore) without paying for a full walk —
+         * the existing per-file MD5 verification still runs when this
+         * gate fails.
+         */
+        private const val SANITY_SAMPLE_SIZE = 20
         private val indexJson = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
     }
 
@@ -76,13 +87,25 @@ class FileDownloadService(
         // mod stay loaded until the cache expires or the manifest changes
         // upstream. (Codex P2 on PR #128.)
         val manifestHash = manifestCache.hashOf(cacheKeyInputFor(manifest, ignoredFiles))
-        if (manifestCache.isClean(serverId, manifestHash)) {
+        // Disk-sanity gate (#184): the cache file alone can't tell that the
+        // user moved their data dir leaving manifest-cache/ behind, deleted
+        // clients/<id>/ by hand, or restored from a partial backup. Sample
+        // the first SANITY_SAMPLE_SIZE manifest entries and require all of
+        // them on disk — if even one is missing, force a full integrity
+        // walk + redownload instead of trusting the cache and starting the
+        // game with an empty classpath (which is exactly what the original
+        // bug looked like to the user). The flatten is needed for both the
+        // sanity sample and the downstream download path; compute it once.
+        val filesMap = flattenManifest(manifest)
+        val cacheValid = manifestCache.isClean(serverId, manifestHash) {
+            filesMap.entries.take(SANITY_SAMPLE_SIZE).all { (rawPath, _) ->
+                Files.exists(targetDir.resolve(normalizePath(rawPath)))
+            }
+        }
+        if (cacheValid) {
             messageUI?.invoke("Files verified (cached)")
             return@withContext
         }
-
-        // 1. Flatten manifest
-        val filesMap = flattenManifest(manifest)
 
         // 2. Filtering
         if (!ignoredFiles.isNullOrEmpty()) {
@@ -239,7 +262,7 @@ class FileDownloadService(
         localPath: Path,
         onBytesRead: ((Int) -> Unit)? = null
     ) {
-        val url = "${Network.BASE_URL}/launcher/clients/" +
+        val url = "${config.clientFilesBase}/" +
                 serverPath.split("/").joinToString("/") { segment -> URLEncoder.encode(segment, "UTF-8").replace("+", "%20") }
         withContext(Dispatchers.IO) {
             if (localPath.parent != null) Files.createDirectories(localPath.parent)
@@ -275,7 +298,7 @@ class FileDownloadService(
                             // 416: partial on disk is bigger than the upstream file
                             // (corrupt write or upstream shrank). Clear and let retry
                             // fetch from byte 0. Throw the dedicated subclass so
-                            // isTransientDownloadError recognises it as retryable
+                            // isTransientDownloadError recognizes it as retryable
                             // — a plain IOException with this message would NOT
                             // match the predicate's substring checks and would
                             // hard-fail instead of recovering.
@@ -364,11 +387,43 @@ class FileDownloadService(
             if (protectedPaths.isProtected(relativePath)) return false
 
             val localMd5 = calculateMD5(file)
-            !localMd5.equals(expectedMd5, ignoreCase = true)
+            if (!localMd5.equals(expectedMd5, ignoreCase = true)) return true
+
+            // ZIP-structure validation for mods/*.jar (#169). Bytes-on-disk
+            // can match the manifest's MD5 verbatim and still be a malformed
+            // ZIP — happens when the upstream CDN serves corrupt bytes that
+            // were already corrupt at hash-time, or a partial write got
+            // truncated mid-stream and the post-write integrity check
+            // missed it. NeoForge's BootstrapLauncher dies with
+            // "invalid CEN header (bad signature)" on the broken jar; the
+            // user has no signal except the crash. Scoped to mods/ only
+            // because that's where the corruption hot zone is and a
+            // 1000-file libraries-dir scan would dominate cold-start.
+            if (isModsJar(relativePath) && !isZipValid(file)) return true
+
+            false
         } catch (_: Exception) {
             true // In case of any reading error, it is better to re-download
         }
     }
+
+    private fun isModsJar(relativePath: String): Boolean {
+        val lower = relativePath.lowercase().replace('\\', '/')
+        return lower.endsWith(".jar") && (lower == "mods" || lower.contains("mods/"))
+    }
+
+    /**
+     * @return true if [file] opens cleanly as a JAR/ZIP and the central
+     *         directory walk completes without exception. False on any
+     *         exception (truncated archive, corrupt CEN, IO error). Cheap
+     *         enough to call per-jar on the mods set (~1-3s for the
+     *         Create-class 200-jar pack on SSD).
+     */
+    private fun isZipValid(file: Path): Boolean = try {
+        java.util.jar.JarFile(file.toFile()).use { jar ->
+            jar.entries().asSequence().count() > 0
+        }
+    } catch (_: Exception) { false }
 
     /**
      * Snapshot of the last successful extra.zip extraction. Persisted as
@@ -377,7 +432,7 @@ class FileDownloadService(
      *
      * Default-constructed (empty hash + empty paths) when no previous
      * snapshot exists — first unpack writes the index, second-and-later
-     * unpacks get the prune behaviour.
+     * unpacks get the prune behavior.
      */
     @kotlinx.serialization.Serializable
     private data class ExtraZipIndex(
@@ -500,20 +555,23 @@ class FileDownloadService(
 
         if (Files.exists(modsDir)) {
             try {
-                // Recursive search for files to delete
-                Files.walk(modsDir)
-                    .filter { Files.isRegularFile(it) }
-                    .forEach { file ->
-                        val fileName = file.fileName.toString()
-                        if (ignoredFiles.contains(fileName)) {
-                            try {
-                                Files.delete(file)
-                                deletedCount++
-                            } catch (e: Exception) {
-                                logger.warn("Failed to remove disabled mod: $fileName", e)
+                // .use{} closes the underlying directory stream; Files.walk holds
+                // an OS file handle that won't be released by .forEach termination.
+                Files.walk(modsDir).use { stream ->
+                    stream
+                        .filter { Files.isRegularFile(it) }
+                        .forEach { file ->
+                            val fileName = file.fileName.toString()
+                            if (ignoredFiles.contains(fileName)) {
+                                try {
+                                    Files.delete(file)
+                                    deletedCount++
+                                } catch (e: Exception) {
+                                    logger.warn("Failed to remove disabled mod: $fileName", e)
+                                }
                             }
                         }
-                    }
+                }
             } catch (e: Exception) {
                 logger.error("Error cleaning mods folder: ${e.message}")
             }

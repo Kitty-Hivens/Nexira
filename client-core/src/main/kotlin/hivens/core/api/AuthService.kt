@@ -1,32 +1,40 @@
 package hivens.core.api
 
-import hivens.config.Network
 import hivens.config.Protocol
 import hivens.core.api.interfaces.IAuthService
+import hivens.core.api.interfaces.IServerProtocol
+import hivens.core.api.protocol.LoginRequest
+import hivens.core.api.protocol.LoginResponse
+import hivens.core.api.protocol.ProtocolStatus
 import hivens.core.data.AuthStatus
-import hivens.core.data.FileManifest
 import hivens.core.data.SessionData
 import hivens.core.util.HashUtils
 import hivens.core.util.retryWithBackoff
-import io.ktor.client.call.*
-import io.ktor.client.request.forms.*
-import io.ktor.http.*
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 import java.nio.charset.StandardCharsets
-import java.util.*
+import java.util.Base64
+import java.util.Random
+import java.util.UUID
 import javax.crypto.Cipher
 import javax.crypto.spec.SecretKeySpec
 
+/**
+ * Login coordinator + per-server session cache.
+ *
+ * Pre-Conduit: built the wire request directly. Post-Conduit Phase 1: just
+ * delegates the actual network call to [IServerProtocol.login], keeping the
+ * session caching / password hashing / AES game-token generation / retry-
+ * with-backoff logic on the consumer side where it belongs.
+ *
+ * Status-mapping nuance: server returns [ProtocolStatus] enum, this class
+ * exposes [AuthStatus] (Aura's UX-facing enum, slightly different shape).
+ * Mapping happens in [mapStatus] — keep them aligned when adding new values.
+ */
 class AuthService(
-    private val clientProvider: HttpClientProvider,
-    private val json: Json
+    private val protocol: IServerProtocol,
 ) : IAuthService {
 
     private val logger = LoggerFactory.getLogger(AuthService::class.java)
-    private val client get() = clientProvider.current
 
     /**
      * Per-server session cache. The dashboard renders server cards by
@@ -55,38 +63,29 @@ class AuthService(
     private val sessionCache = java.util.concurrent.ConcurrentHashMap<CacheKey, CachedSession>()
     private val sessionTtlMs = 30_000L
 
-    @Serializable
-    private data class AuthRequest(
-        val login: String,
-        val password: String, // MD5 hash
-        val server: String,
-        val session: String,
-        val mac: String,
-        val osName: String,
-        val osBitness: Int,
-        val javaVersion: String,
-        val javaBitness: Int,
-        val javaHome: String,
-        val classPath: String = Protocol.DEFAULT_JAR,
-        val rtCheckSum: String = Protocol.DEFAULT_CSUM
-    )
-
-    @Serializable
-    private data class AuthResponse(
-        @SerialName("status") val status: AuthStatus? = null,
-        @SerialName("playername") val playername: String? = null,
-        @SerialName("uid") val uid: String? = null,
-        @SerialName("uuid") val uuid: String? = null,
-        @SerialName("session") val session: String? = null,
-        @SerialName("client") val client: FileManifest? = null,
-        @SerialName("money") val money: Int = 0
-    )
+    /**
+     * Per-user cache of the LoginResponse the server returned alongside a
+     * TWOAUTH status — held until [completeTwoFactor] consumes it (or a
+     * fresh login overwrites it). The official protocol's TWOAUTH response
+     * is sometimes status-only (per spec) and sometimes carries enough
+     * session fields to short-circuit the post-twoauth re-login loop.
+     * Caching it here lets [completeTwoFactor] try the no-re-login path
+     * first and avoids the loop the user observed when the server returns
+     * TWOAUTH on every login retry.
+     */
+    private val pendingTwoFactor = java.util.concurrent.ConcurrentHashMap<CacheKey, LoginResponse>()
 
     override suspend fun login(username: String, password: String, serverId: String): SessionData {
         // Hash first so the cache key includes the password — otherwise a
         // wrong/rotated password within the TTL would silently succeed
         // via cache. (Codex P2 on PR #128.)
         val passwordEncoded = HashUtils.md5(password)
+        // Each fresh login attempt invalidates any stale pendingTwoFactor
+        // entry for this triple — covers the case where the user cancelled
+        // a previous 2FA dialog (or it errored out) and is now retrying.
+        // Without this the map would grow unbounded across the launcher's
+        // lifetime (audit catch on the 22-commit batch).
+        pendingTwoFactor.remove(CacheKey(username, passwordEncoded, serverId))
         cachedFor(username, passwordEncoded, serverId)?.let {
             logger.info("Login via API V3 (server: {}) — cache hit, skipping network", serverId)
             return it
@@ -96,8 +95,7 @@ class AuthService(
         val clientSessionId = UUID.randomUUID().toString().replace("-", "")
         val is64 = System.getProperty("os.arch").contains("64")
 
-        // Building request object
-        val requestPayload = AuthRequest(
+        val request = LoginRequest(
             login = username,
             password = passwordEncoded,
             server = serverId,
@@ -107,33 +105,14 @@ class AuthService(
             osBitness = if (is64) 64 else 32,
             javaVersion = System.getProperty("java.version"),
             javaBitness = if (is64) 64 else 32,
-            javaHome = System.getProperty("java.home")
+            javaHome = System.getProperty("java.home"),
+            classPath = Protocol.DEFAULT_JAR,
+            rtCheckSum = Protocol.DEFAULT_CSUM,
         )
 
-        // Serialize to JSON string
-        val jsonString = json.encodeToString(requestPayload)
-
-        val response: AuthResponse = try {
+        val response: LoginResponse = try {
             retryWithBackoff(operation = "auth login", shouldRetry = ::isTransientNetworkError) {
-                val call = client.submitForm(
-                    url = Network.AUTH_URL,
-                    formParameters = Parameters.build {
-                        append("action", "login")
-                        append("json", jsonString)
-                    }
-                )
-                // Reading the response body as a string for manual error handling
-                val rawBody = call.body<String>().trim()
-
-                // Handling text server errors. These are deliberate auth
-                // rejections from the server, never retryable; isTransientNetworkError
-                // returns false for AuthException so retryWithBackoff bubbles them
-                // out on the first attempt.
-                if (rawBody.contains("Bad login", ignoreCase = true)) throw AuthException(AuthStatus.BAD_LOGIN, "Invalid login or password")
-                if (rawBody.contains("User not found", ignoreCase = true)) throw AuthException(AuthStatus.BAD_LOGIN, "User not found")
-
-                // Parse JSON
-                json.decodeFromString<AuthResponse>(rawBody)
+                protocol.login(request)
             }
         } catch (e: Exception) {
             if (e is AuthException) throw e
@@ -148,39 +127,163 @@ class AuthService(
             throw AuthException(AuthStatus.INTERNAL_ERROR, "Network Error: ${e.message}")
         }
 
-        // Status check logic
-        if (response.status != AuthStatus.OK && response.status != AuthStatus.LOGIN) {
-            val msg = when (response.status) {
-                AuthStatus.BAD_LOGIN -> "User not found"
-                AuthStatus.PASSWORD -> "Invalid password"
-                AuthStatus.NEED_2FA -> "2FA required"
-                AuthStatus.BANNED -> "Account blocked"
-                AuthStatus.ACTIVE -> "Account is not activated. Check your email."
+        val parsedStatus = response.parsedStatus
+        if (parsedStatus == ProtocolStatus.TWOAUTH) {
+            // The TWOAUTH branch isn't a failure — it's a "do the second
+            // factor and call back". Cache the response so completeTwoFactor
+            // can build a SessionData directly from it (preferred path) and
+            // only fall back to a re-login when the cached fields are too
+            // sparse to construct one — necessary to avoid the
+            // login→TWOAUTH→twoauth=OK→login→TWOAUTH→… loop the server
+            // sometimes drops us into.
+            pendingTwoFactor[CacheKey(username, passwordEncoded, serverId)] = response
+            throw TwoFactorRequiredException(uid = response.uid, login = username)
+        }
+        if (parsedStatus != ProtocolStatus.OK) {
+            val mapped = mapStatus(parsedStatus)
+            val msg = when (parsedStatus) {
+                ProtocolStatus.LOGIN -> "User not found"
+                ProtocolStatus.PASSWORD -> "Invalid password"
+                ProtocolStatus.ACTIVE -> "Account is not activated. Check your email."
+                ProtocolStatus.VIRTUAL -> "Virtual account"
+                ProtocolStatus.SERVER -> "Invalid server"
                 else -> "Server error: ${response.status}"
             }
-            throw AuthException(response.status ?: AuthStatus.INTERNAL_ERROR, msg)
+            throw AuthException(mapped, msg)
         }
 
-        // Only if the status is OK, check the profile data
         if (response.uuid == null || response.playername == null) {
-            // If the password is correct (OK), but the server did not send the profile, this is an internal error
             throw AuthException(AuthStatus.INTERNAL_ERROR, "Incomplete profile data")
         }
 
-        val finalGameToken = generateGameToken(response.uid, response.session)
-        val cleanUuid = response.uuid.replace("-", "")
+        return buildSessionData(response, password, serverId)
+            .also { cacheSession(username, passwordEncoded, serverId, it) }
+    }
 
+    override suspend fun completeTwoFactor(
+        username: String,
+        password: String,
+        serverId: String,
+        uid: String,
+        code: String,
+    ): SessionData {
+        if (uid.isBlank()) {
+            // The TWOAUTH login response didn't include a uid (server quirk
+            // documented in the protocol spec; sometimes the response is
+            // status-only). Without uid we can't sign the twoauth request.
+            throw AuthException(
+                AuthStatus.TWO_FACTOR_EXPIRED,
+                "2FA flow can't continue: server didn't return a session id. Please log in again.",
+            )
+        }
+        val twoauthResponse = try {
+            retryWithBackoff(operation = "twoauth verify", shouldRetry = ::isTransientNetworkError) {
+                protocol.twoauth(uid = uid, login = username, code = code)
+            }
+        } catch (e: Exception) {
+            if (e is AuthException) throw e
+            logger.error("twoauth network error", e)
+            throw AuthException(AuthStatus.INTERNAL_ERROR, "Network Error: ${e.message}")
+        }
+
+        when (twoauthResponse.parsedStatus) {
+            ProtocolStatus.OK -> Unit  // proceed below
+            ProtocolStatus.CODE -> throw AuthException(AuthStatus.WRONG_CODE, "Wrong 2FA code")
+            ProtocolStatus.LOGIN -> throw AuthException(
+                AuthStatus.TWO_FACTOR_EXPIRED,
+                "2FA session expired. Please log in again.",
+            )
+            // Anything else (server-side ERROR, INTERNAL, an unexpected
+            // status the spec never mentions) is unrecoverable from the
+            // dialog: there's nothing the user can re-type that will
+            // change the answer. Per spec, the documented recovery is
+            // "restart full login" — which is exactly the contract of
+            // TWO_FACTOR_EXPIRED. Surface that status so the UI dismisses
+            // the dialog and routes the user back to the credentials
+            // form, instead of pinning them to a verify button that will
+            // keep returning the same error.
+            else -> throw AuthException(
+                AuthStatus.TWO_FACTOR_EXPIRED,
+                "2FA verification could not be completed. Please log in again.",
+            )
+        }
+
+        // twoauth=OK — server now considers the second factor satisfied.
+        // Two reconstruction strategies, in order:
+        //   1. The TWOAUTH login response is sometimes complete (uuid +
+        //      playername + session populated) — promote it to a SessionData
+        //      directly. Cheaper and avoids the next strategy's loop hazard.
+        //   2. If the cached response is too sparse, fall back to a single
+        //      re-login. If THAT comes back TWOAUTH again (server quirk —
+        //      observed empirically when the account doesn't actually have
+        //      2FA configured but the server still routes through the gate),
+        //      give up with TWO_FACTOR_EXPIRED rather than loop.
+        val passwordEncoded = HashUtils.md5(password)
+        val key = CacheKey(username, passwordEncoded, serverId)
+        val cachedResponse = pendingTwoFactor.remove(key)
+
+        // `session` MUST be checked too — it's the AES-encrypted bytes that
+        // become accessToken via generateGameToken. A TWOAUTH response with
+        // uuid + playername populated but session null would build a
+        // SessionData with an empty accessToken and the game would die at
+        // smartycraft auth-host with no signal back to the launcher.
+        // Audit-pass catch on the 25-commit batch.
+        if (cachedResponse != null &&
+            cachedResponse.uuid != null &&
+            cachedResponse.playername != null &&
+            cachedResponse.session != null) {
+            return buildSessionData(cachedResponse, password, serverId)
+                .also { cacheSession(username, passwordEncoded, serverId, it) }
+        }
+
+        return try {
+            login(username, password, serverId)
+        } catch (_: TwoFactorRequiredException) {
+            // Re-login STILL returns TWOAUTH after our verified twoauth=OK.
+            // Either the server rejected the verify silently or the account
+            // is in a weird state. Whatever the cause, looping is wrong;
+            // surface as a clean restart-the-flow signal.
+            throw AuthException(
+                AuthStatus.TWO_FACTOR_EXPIRED,
+                "2FA verification didn't unlock the session. Please log in again.",
+            )
+        }
+    }
+
+    /**
+     * Reconstruct a [SessionData] from an OK-shaped [LoginResponse] without
+     * making any network calls. Shared between the cold-login OK path and
+     * the post-twoauth promotion path so the field mapping stays in one
+     * place. Caller is responsible for cache write.
+     */
+    private fun buildSessionData(response: LoginResponse, password: String, serverId: String): SessionData {
+        val finalGameToken = generateGameToken(response.uid, response.session)
+        val cleanUuid = response.uuid?.replace("-", "") ?: ""
         return SessionData(
-            status = response.status,
-            playerName = response.playername,
+            status = AuthStatus.OK,
+            playerName = response.playername ?: "",
             uid = response.uid ?: "",
             uuid = cleanUuid,
             accessToken = finalGameToken ?: "",
             fileManifest = response.client,
             serverId = serverId,
             cachedPassword = password,
-            balance = response.money
-        ).also { cacheSession(username, passwordEncoded, serverId, it) }
+            balance = response.money,
+        )
+    }
+
+    /**
+     * Map protocol-layer [ProtocolStatus] to UX-layer [AuthStatus]. Keep
+     * aligned with [SessionData.status] consumers.
+     */
+    private fun mapStatus(status: ProtocolStatus): AuthStatus = when (status) {
+        ProtocolStatus.OK -> AuthStatus.OK
+        ProtocolStatus.LOGIN -> AuthStatus.BAD_LOGIN
+        ProtocolStatus.PASSWORD -> AuthStatus.PASSWORD
+        ProtocolStatus.TWOAUTH -> AuthStatus.NEED_2FA
+        ProtocolStatus.CODE -> AuthStatus.WRONG_CODE
+        ProtocolStatus.ACTIVE -> AuthStatus.ACTIVE
+        else -> AuthStatus.INTERNAL_ERROR
     }
 
     private fun cachedFor(username: String, passwordHash: String, serverId: String): SessionData? {
