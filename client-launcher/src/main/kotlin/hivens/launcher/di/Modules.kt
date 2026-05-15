@@ -317,6 +317,7 @@ val appModule = module {
             authService = get(),
             downloadService = get(),
             manifestProcessor = get(),
+            manifestCache = get(),
             dataDirectory = dataDir,
             credentialsProvider = { credentials.load() },
             optionalModsStateProvider = { serverId ->

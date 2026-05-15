@@ -424,11 +424,20 @@ fun main() {
                         val credentials = credentialsManager.load()
                         if (credentials?.cachedPassword != null) {
                             try {
-                                val session = authService.login(
-                                    credentials.playerName,
-                                    credentials.cachedPassword!!,
-                                    server.assetDir
-                                )
+                                val session = try {
+                                    authService.login(
+                                        credentials.playerName,
+                                        credentials.cachedPassword!!,
+                                        server.assetDir,
+                                    )
+                                } catch (_: TwoFactorRequiredException) {
+                                    // Tray-launched 2FA accounts: same trust-the-cache
+                                    // policy as the auto-login path. controller.launch
+                                    // augments the session with a cached manifest if
+                                    // needed (and reports cleanly when the cache is
+                                    // empty, which is its job).
+                                    credentials.copy(serverId = server.assetDir)
+                                }
                                 controller.launch(session, server)
                                 SwingUtilities.invokeLater { GameConsoleService.show() }
                             } catch (e: Exception) {

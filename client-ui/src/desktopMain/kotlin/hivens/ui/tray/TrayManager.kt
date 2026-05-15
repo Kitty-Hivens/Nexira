@@ -115,15 +115,7 @@ object TrayManager {
             val builder = TrayBuilder(
                 title = appName,
                 iconBytes = iconBytes,
-                // Compose the full "App — status" here ourselves. libtray
-                // intentionally doesn't compose (it'd double up on hosts
-                // that resolve .desktop names from the SNI Id), and the
-                // hosts we actually ship to (waybar, Hyprland tray
-                // helpers, GNOME minimal SNI consumers) don't do that
-                // resolution either — they just print Title verbatim.
-                // So the prefix has to live on the caller side or it's
-                // gone from the tooltip entirely.
-                tooltip = "$appName — ${strings.statusIdle}",
+                tooltip = "$appName | ${strings.statusIdle}",
                 menu = buildMenu(strings, servers, gameRunning, gameServerName),
             )
             val t = Tray.create(builder) ?: run {
@@ -181,13 +173,11 @@ object TrayManager {
         rebuildMenu()
         val s = strings
         val statusPart = when {
-            running && serverName != null -> "▶  $serverName"
-            running -> s?.statusRunning ?: "▶  Running"
-            else    -> s?.statusIdle ?: "●  Ready"
+            running && serverName != null -> serverName
+            running -> s?.statusRunning ?: "Running"
+            else    -> s?.statusIdle ?: "Ready"
         }
-        // Same prefix policy as [init] — see the comment on TrayBuilder
-        // construction. appName is what we passed as `title` at init time.
-        tray?.setTooltip("$appName — $statusPart")
+        tray?.setTooltip("$appName | $statusPart")
     }
 
     private fun rebuildMenu() {
@@ -207,7 +197,7 @@ object TrayManager {
         // game state. Hosts render disabled items in muted colour so the
         // user reads it as informational rather than clickable.
         val statusLabel = when {
-            running && serverName != null -> "▶  $serverName"
+            running && serverName != null -> serverName
             running -> s.statusRunning
             else    -> s.statusIdle
         }

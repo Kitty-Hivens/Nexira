@@ -95,6 +95,23 @@ class LauncherController : KoinComponent {
                         } else {
                             GameConsoleService.append(s.stateNoPassword, LogType.WARN)
                         }
+                    } catch (_: hivens.core.api.TwoFactorRequiredException) {
+                        // 2FA account — refusing to prompt the user for a code
+                        // every time they click Play. The cached accessToken
+                        // in `session` is from a previous successful 2FA flow
+                        // and is what the game uses anyway. Augment it with a
+                        // cached manifest (same path the offline branch
+                        // takes) so processSession has something to walk.
+                        val cached = manifestCache.loadManifest(targetServerId)
+                        if (cached != null) {
+                            session = session.copy(fileManifest = cached)
+                            ActionRing.record("Launch: 2FA account, using cached manifest for $targetServerId")
+                        } else {
+                            // No cached manifest and no fresh login → first time
+                            // launching this server on a 2FA account. Surface
+                            // clearly so user knows to re-login from the form.
+                            GameConsoleService.append(s.stateAuthFail + " (2FA — manual login required)", LogType.WARN)
+                        }
                     } catch (e: Exception) {
                         GameConsoleService.append("${s.stateAuthFail}: ${e.message}", LogType.WARN)
                         // If auth fails and we're NOT in offline mode, we still try to continue
