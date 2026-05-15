@@ -104,12 +104,30 @@
 -dontwarn hivens.launcher.security.LinuxLibsecretKeyringStorage
 -dontwarn hivens.launcher.security.WindowsCredentialManagerKeyringStorage
 -dontwarn hivens.launcher.security.MacOSKeychainStorage
--dontwarn dev.hivens.libtray.linux.SniTrayImpl
--dontwarn dev.hivens.libtray.linux.SniTrayImpl$Companion
--dontwarn dev.hivens.libtray.windows.Win32TrayImpl
--dontwarn dev.hivens.libtray.windows.Win32TrayImpl$Companion
--dontwarn dev.hivens.libtray.macos.AppKitTrayImpl
--dontwarn dev.hivens.libtray.macos.AppKitTrayImpl$Companion
+
+# ── libtray: keep + dontwarn the entire namespace ─────────────────────────
+# CRITICAL: libtray's per-platform backends register Panama upcall stubs
+# via `MethodHandles.lookup().findStatic(class, "wndProcEntry"|"onMenuItemEntry"|…, …)`.
+# These methods have NO direct call sites in source — they're invoked at
+# runtime by the OS through the upcall stub function pointer (Win32 WndProc,
+# Cocoa NSMenuItem target-action, etc). ProGuard's reachability analysis
+# sees the methods as orphaned, removes them, and the next `findStatic` at
+# runtime fails with NoSuchMethodException → Tray.create returns null →
+# user sees "no tray icon".
+#
+# This bit production Win11 users on 2.2.13 (issue #197): launcher.log has
+# repeated `libtray.Win32Tray - WndProc upcall stub creation failed: no
+# such method: dev.hivens.libtray.windows.Win32TrayImpl.wndProcEntry(...)`.
+# The same pattern would fire on macOS (AppKitTrayImpl.onMenuItemEntry) once
+# Phase 4 ships through ProGuard, and probably already breaks Linux SNI's
+# release builds the same way (we just hadn't validated proguardReleaseJars
+# for the libtray pieces specifically).
+#
+# Wildcard `-keep class dev.hivens.libtray.** { *; }` is the right fix:
+# the libtray jar is opaque to us anyway, every backend uses the same
+# upcall pattern, and a single rule covers current + future backends.
+-keep class dev.hivens.libtray.** { *; }
+-dontwarn dev.hivens.libtray.**
 
 # --- Suppress Warnings ---
 -dontwarn ch.qos.logback.**
