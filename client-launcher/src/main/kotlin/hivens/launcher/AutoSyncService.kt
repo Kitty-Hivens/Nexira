@@ -36,6 +36,7 @@ class AutoSyncService(
     private val authService: IAuthService,
     private val downloadService: IFileDownloadService,
     private val manifestProcessor: IManifestProcessorService,
+    private val manifestCache: ManifestCache,
     private val dataDirectory: Path,
     /**
      * Loads cached credentials. Lambda-injected (rather than holding a
@@ -121,8 +122,34 @@ class AutoSyncService(
                 totalBytes = 0,
             )
 
+            // Try to obtain a SessionData for this server. Three outcomes:
+            //   * regular login → use that session directly
+            //   * 2FA gate WITH cached manifest → use cached creds + manifest
+            //   * 2FA gate WITHOUT cached manifest → mark SKIPPED (not failed)
+            //     and move on. This isn't a failure — the account just hasn't
+            //     been through 2FA on this machine for this server yet, so
+            //     we have nothing to sync against. Red FAILED would imply
+            //     "server is broken"; SKIPPED reads as "awaiting user action".
+            val session: SessionData? = try {
+                authService.login(creds.playerName, pass, server.assetDir)
+            } catch (_: hivens.core.api.TwoFactorRequiredException) {
+                val cached = manifestCache.loadManifest(server.assetDir)
+                if (cached == null) {
+                    log.info(
+                        "Auto-sync skipped for {}: 2FA + no cached manifest yet, awaiting manual login",
+                        server.assetDir,
+                    )
+                    ActionRing.record("Auto-sync skipped: ${server.assetDir} needs manual 2FA login")
+                    _serverStates.update { it + (server.assetDir to ServerState.SKIPPED) }
+                    null
+                } else {
+                    creds.copy(fileManifest = cached, serverId = server.assetDir)
+                }
+            }
+
+            if (session == null) continue  // SKIPPED above; counters not bumped (it's neither succeeded nor failed)
+
             val ok = runCatching {
-                val session = authService.login(creds.playerName, pass, server.assetDir)
                 val userState = optionalModsStateProvider(server.assetDir)
                 val ignoredFiles = manifestProcessor.calculateIgnoredFiles(server, userState)
                 val clientDir = dataDirectory.resolve("clients").resolve(server.assetDir)

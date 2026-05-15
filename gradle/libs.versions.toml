@@ -6,7 +6,7 @@
 # ── Toolchain & language plugins ─────────────────────────────────────────────
 # Kotlin held at 2.3.20-RC3 (next release-line bump is 2.4.0-Beta2, skipped —
 # beta of a new major). Compose moved alpha04 → rc01 of the same 1.11.0 line.
-kotlin            = "2.3.20-RC3"
+kotlin            = "2.3.21"
 compose           = "1.11.0-alpha04"
 buildconfigPlugin = "6.0.9"
 versionsPlugin    = "0.54.0"
@@ -30,14 +30,14 @@ logback           = "1.5.32"
 
 # ── Misc runtime ─────────────────────────────────────────────────────────────
 commonsCompress   = "1.28.0"
-systemTray        = "4.4"
 proguard          = "7.8.2"
 
-# ── JNA — must stay 6.1.6 globally for dorkbox/SystemTray's hardcoded
-# version check; client-ui additionally declares 5.18.1 explicitly to keep
-# Windows happy. See root build.gradle.kts resolutionStrategy. ───────────────
-jna               = "6.1.6"
-jnaWindows        = "5.18.1"
+# Pure-Panama tray library (Kitty-Hivens/libtray) — replaces dorkbox/SystemTray
+# for the native tray icon. Pulled via JitPack (root build.gradle.kts
+# repositories chain) until libtray cuts its first Maven Central release;
+# pinned to a commit sha rather than a branch so upstream main-branch
+# changes don't silently land in our build.
+libtray           = "c88d51f"
 
 # ── Test ─────────────────────────────────────────────────────────────────────
 mockk             = "1.13.12"
@@ -82,11 +82,10 @@ filekit-dialogs-compose         = { group = "io.github.vinceglb", name = "fileki
 
 # Misc
 commons-compress                = { group = "org.apache.commons", name = "commons-compress", version.ref = "commonsCompress" }
-dorkbox-systemtray               = { group = "com.dorkbox",        name = "SystemTray",        version.ref = "systemTray" }
+libtray                          = { group = "com.github.Kitty-Hivens", name = "libtray",      version.ref = "libtray" }
 
-# JNA (Windows-only explicit pin in client-ui)
-jna                              = { group = "net.java.dev.jna", name = "jna",          version.ref = "jnaWindows" }
-jna-platform                     = { group = "net.java.dev.jna", name = "jna-platform", version.ref = "jnaWindows" }
+# JNA dropped — was only present for dorkbox/SystemTray. libtray is
+# pure java.lang.foreign (Project Panama) and pulls no JNA transitively.
 
 # Test
 mockk                            = { group = "io.mockk", name = "mockk", version.ref = "mockk" }

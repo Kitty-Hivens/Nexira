@@ -32,6 +32,12 @@ val appVersion = providers.gradleProperty("appVersion")
 allprojects {
     repositories {
         mavenCentral()
+        // libtray (Kitty-Hivens/libtray) is consumed via JitPack until it
+        // cuts a real Maven Central release. Pinned by commit sha in
+        // libs.versions.toml so an upstream main-branch break doesn't
+        // silently drift the build. Switches to mavenCentral coordinates
+        // once libtray ships 0.1.0 + verifies its sonatype namespace.
+        maven { url = uri("https://jitpack.io") }
     }
     version = appVersion
     group = "hivens"
@@ -98,14 +104,8 @@ gradle.startParameter.apply {
     maxWorkerCount = if (isCi) cores else minOf(4, cores)
 }
 
-// dorkbox/SystemTray 4.4 has a hardcoded JNA version check; JBR 25 ships
-// JNA 7.x natively. Pin the global resolution to whatever the catalog says.
-val pinnedJnaVersion = libs.versions.jna.get()
-configurations.all {
-    resolutionStrategy.eachDependency {
-        if (requested.group == "net.java.dev.jna") {
-            useVersion(pinnedJnaVersion)
-            because("dorkbox/SystemTray requires exactly JNA $pinnedJnaVersion")
-        }
-    }
-}
+// JNA pin removed alongside dorkbox/SystemTray (replaced by libtray, the
+// pure-Panama tray library at github.com/Kitty-Hivens/libtray). The
+// pin existed only to satisfy dorkbox's hardcoded JNA version check;
+// libtray uses java.lang.foreign and never pulls in net.java.dev.jna.
+// JBR 25's bundled JNA 7.x can resolve naturally now.

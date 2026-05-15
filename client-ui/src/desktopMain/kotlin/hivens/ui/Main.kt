@@ -17,6 +17,7 @@ import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import hivens.config.Branding
 import hivens.config.Protocol
 import hivens.core.api.AuthException
+import hivens.core.api.TwoFactorRequiredException
 import hivens.core.api.interfaces.IAuthService
 import hivens.core.api.interfaces.IServerListService
 import hivens.core.api.interfaces.ISettingsService
@@ -423,11 +424,20 @@ fun main() {
                         val credentials = credentialsManager.load()
                         if (credentials?.cachedPassword != null) {
                             try {
-                                val session = authService.login(
-                                    credentials.playerName,
-                                    credentials.cachedPassword!!,
-                                    server.assetDir
-                                )
+                                val session = try {
+                                    authService.login(
+                                        credentials.playerName,
+                                        credentials.cachedPassword!!,
+                                        server.assetDir,
+                                    )
+                                } catch (_: TwoFactorRequiredException) {
+                                    // Tray-launched 2FA accounts: same trust-the-cache
+                                    // policy as the auto-login path. controller.launch
+                                    // augments the session with a cached manifest if
+                                    // needed (and reports cleanly when the cache is
+                                    // empty, which is its job).
+                                    credentials.copy(serverId = server.assetDir)
+                                }
                                 controller.launch(session, server)
                                 SwingUtilities.invokeLater { GameConsoleService.show() }
                             } catch (e: Exception) {
@@ -626,6 +636,24 @@ fun AppRoot(
                         val server  = profileManager.lastServerId ?: Protocol.DEFAULT_SERVER_ID
                         val session = authService.login(saved.playerName, saved.cachedPassword!!, server)
                         AppState.Authenticated(session)
+                    } catch (e: TwoFactorRequiredException) {
+                        // 2FA accounts already paid the 2FA cost when they
+                        // got the cached accessToken. Re-validating with
+                        // login() just re-triggers the gate on every
+                        // launcher startup — which is what the cached
+                        // accessToken is supposed to prevent. Trust the
+                        // cache: promote `saved` straight to Authenticated.
+                        // If the token is actually stale, the server will
+                        // reject it at game launch and the user re-logs in
+                        // from the credentials form — same recovery path
+                        // as a server-side logout. Fix for the "double
+                        // login on every launch with 2FA" report.
+                        hivens.core.diag.ActionRing.record(
+                            "Auto-login: 2FA account, trusting cached accessToken (uid=${e.uid?.take(8) ?: "<missing>"})"
+                        )
+                        AppState.Authenticated(
+                            saved.copy(serverId = profileManager.lastServerId),
+                        )
                     } catch (e: AuthException) {
                         if (e.isSslError) {
                             // Auto-grant on cached-credential cert error gets the same
