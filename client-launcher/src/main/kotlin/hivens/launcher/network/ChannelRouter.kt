@@ -89,13 +89,14 @@ class ChannelRouter(
     private fun isFallbackable(t: Throwable): Boolean {
         var cause: Throwable? = t
         while (cause != null) {
-            when (cause) {
-                is IOException,
-                is java.net.SocketException,
-                is java.net.SocketTimeoutException,
-                is java.net.ConnectException,
-                is io.ktor.utils.io.ClosedByteChannelException -> return true
-            }
+            // SocketException / SocketTimeoutException / ConnectException all
+            // descend from IOException, and ClosedByteChannelException does
+            // too — the original `when` enumerated them explicitly for
+            // documentation but Qodana correctly flagged the subclass arms
+            // as unreachable. Single `is IOException` is the load-bearing
+            // check; the comment block above the function still names the
+            // concrete cases for the reader.
+            if (cause is IOException) return true
             cause = cause.cause
         }
         return false
