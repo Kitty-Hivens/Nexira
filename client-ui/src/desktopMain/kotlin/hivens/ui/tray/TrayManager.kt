@@ -1,41 +1,42 @@
 package hivens.ui.tray
 
-import dorkbox.systemTray.Menu
-import dorkbox.systemTray.MenuItem
-import dorkbox.systemTray.Separator
-import dorkbox.systemTray.SystemTray
+import dev.hivens.libtray.Tray
+import dev.hivens.libtray.TrayBuilder
+import dev.hivens.libtray.TrayEvent
+import dev.hivens.libtray.TrayMenu
+import dev.hivens.libtray.TrayMenuItem
 import hivens.core.api.model.ServerProfile
 import org.slf4j.LoggerFactory
 import java.io.InputStream
 
 /**
- * System tray manager backed by dorkbox/SystemTray 4.4.
+ * System tray manager backed by libtray (`dev.hivens:libtray`),
+ * a Project-Panama-only replacement for dorkbox/SystemTray. Host renders
+ * the menu via DBusMenu on Linux / Shell_NotifyIcon menu on Windows /
+ * NSMenu on macOS — we publish the layout, the desktop draws it.
  *
- * All callbacks are invoked on the AWT thread by dorkbox.
- * Must be initialized once from Main.kt after Koin is ready.
+ * Lifecycle:
+ *   - `init(iconStream, strings, appName)` once from Main.kt after Koin
+ *     is ready and the localised strings are resolved.
+ *   - `setGameStatus` and `updateServers` may fire any time; they push a
+ *     fresh menu/tooltip via libtray's setters.
+ *   - `shutdown` on application exit. Idempotent.
+ *
+ * State machine still distinguishes NOT_STARTED / INITIALIZING / READY /
+ * FAILED so the close-request handler in Main.kt can prefer "hide to
+ * tray" over "exit application" while libtray is still bringing up the
+ * D-Bus / Shell_NotifyIcon registration.
  */
 object TrayManager {
 
     private val logger = LoggerFactory.getLogger("TrayManager")
 
-    private var tray: SystemTray? = null
-    private var statusItem: MenuItem? = null
-    private var serversSubmenu: Menu? = null
-    private val serverItems = mutableListOf<MenuItem>()
-    private var noServersItem: MenuItem? = null
-    private var strings: Strings? = null
-
     /**
      * Lifecycle state of the tray. Distinguishes "init has not even started"
-     * from "init is running but hasn't completed yet" — critical because
-     * dorkbox's `SystemTray.get()` can stall for up to ~60s on Linux setups
-     * with broken/missing GTK libraries before falling back to Swing. During
-     * that window the user might close the launcher window expecting the
-     * standard "minimize-to-tray" behavior; without this state we'd see
-     * `isSupported == false` and call `exitApplication()` instead, killing
-     * the launcher (and any game launch in progress).
-     *
-     * Volatile because [init] runs on Dispatchers.IO and the close-request
+     * from "init is running but hasn't completed yet" so the window's
+     * close-request handler can prefer "minimize to tray" while libtray
+     * is still bringing up the D-Bus / Shell_NotifyIcon side. Volatile
+     * because [init] runs on Dispatchers.IO and the close-request
      * callbacks in Main.kt read state from the AWT thread.
      */
     enum class State { NOT_STARTED, INITIALIZING, READY, FAILED }
@@ -43,10 +44,15 @@ object TrayManager {
     @Volatile
     private var state: State = State.NOT_STARTED
 
-    /**
-     * True only when the tray is fully registered. Use this when a code
-     * path needs to *act* on the tray right now (e.g. update menu items).
-     */
+    private var tray: Tray? = null
+    private var strings: Strings? = null
+    private var unsubscribe: (() -> Unit)? = null
+
+    @Volatile private var servers: List<ServerProfile> = emptyList()
+    @Volatile private var gameRunning: Boolean = false
+    @Volatile private var gameServerName: String? = null
+
+    /** True only when libtray has a live tray icon. */
     val isSupported: Boolean get() = state == State.READY
 
     /**
@@ -54,7 +60,7 @@ object TrayManager {
      * initializing. Use this for close-request handlers: if the tray
      * might still come up, prefer "hide to tray" over "exit application",
      * since the user's intent is "minimize" and we don't want to kill the
-     * launcher because dorkbox's GTK probe is slow.
+     * launcher because libtray is taking its time to register on D-Bus.
      */
     val canBeReady: Boolean get() = state == State.INITIALIZING || state == State.READY
 
@@ -65,27 +71,37 @@ object TrayManager {
         val console: String,
         val servers: String,
         val noServers: String,
-        val exit: String
+        val exit: String,
     )
 
     // ── Callbacks ─────────────────────────────────────────────────────────
 
-    var onShowWindow:   (() -> Unit)? = null
-    var onExit:         (() -> Unit)? = null
-    var onShowConsole:  (() -> Unit)? = null
+    var onShowWindow: (() -> Unit)? = null
+    var onExit: (() -> Unit)? = null
+    var onShowConsole: (() -> Unit)? = null
     var onLaunchServer: ((ServerProfile) -> Unit)? = null
+
+    // ── Menu item ids — internal protocol with dispatchMenu ──────────────
+    // Prefixed with `_` for items that shouldn't surface as launchable
+    // events; "server:<assetDir>" for the per-server entries so the
+    // dispatch can recover the asset id on click.
+
+    private const val ID_STATUS  = "_status"
+    private const val ID_SERVERS = "_servers"
+    private const val ID_NOSERVERS = "_noservers"
+    private const val ID_SHOW    = "show"
+    private const val ID_CONSOLE = "console"
+    private const val ID_EXIT    = "exit"
+    private const val ID_SERVER_PREFIX = "server:"
 
     // ── Lifecycle ─────────────────────────────────────────────────────────
 
     /**
-     * @param iconStream Tray icon bytes (PNG).
+     * @param iconStream Tray icon bytes (PNG). Read once into memory for libtray.
      * @param strings    Localised menu labels.
-     * @param appName    The actual AppIndicator title — what KDE/GNOME show
-     *                   on hover. dorkbox's [SystemTray.get] no-arg overload
-     *                   hardcodes this to "SystemTray", so pass an explicit
-     *                   name. Setting it via `setTooltip()` does NOT work:
-     *                   AppIndicator's `app_indicator_set_title()` only
-     *                   reads the value supplied at construction time.
+     * @param appName    The tray-host-visible title — what KDE/GNOME/Win11
+     *                   tooltip resolves to when the user hovers. Stored as
+     *                   the libtray Tray identifier for life of the icon.
      */
     fun init(iconStream: InputStream, strings: Strings, appName: String) {
         this.strings = strings
@@ -93,97 +109,129 @@ object TrayManager {
 
         state = State.INITIALIZING
         try {
-            SystemTray.DEBUG = false
-            val t = SystemTray.get(appName) ?: run {
-                logger.warn("SystemTray not supported on this platform")
+            val iconBytes = iconStream.readAllBytes()
+            val builder = TrayBuilder(
+                title = appName,
+                iconBytes = iconBytes,
+                tooltip = "$appName — ${strings.statusIdle}",
+                menu = buildMenu(strings, servers, gameRunning, gameServerName),
+            )
+            val t = Tray.create(builder) ?: run {
+                logger.warn("libtray Tray.create returned null — no tray host reachable on this session")
                 state = State.FAILED
                 return
             }
             tray = t
-            t.setImage(iconStream)
-            buildMenu(t.menu, strings)
+            unsubscribe = t.onEvent { event ->
+                when (event) {
+                    // Left click → restore window. Matches the previous
+                    // dorkbox default and what every other tray-icon app
+                    // does on every desktop.
+                    is TrayEvent.Activated -> onShowWindow?.invoke()
+                    is TrayEvent.MenuItemSelected -> dispatchMenu(event.id)
+                    else -> Unit
+                }
+            }
             state = State.READY
-            logger.info("TrayManager initialized ({})", t.javaClass.simpleName)
+            logger.info("TrayManager initialized via libtray (title='{}')", appName)
         } catch (t: Throwable) {
             state = State.FAILED
             logger.error("Failed to initialize TrayManager", t)
         }
     }
 
-    private fun buildMenu(menu: Menu, s: Strings) {
-        // Status line — disabled, acts as label
-        val status = MenuItem(s.statusIdle)
-        status.setEnabled(false)
-        menu.add(status)
-        statusItem = status
-
-        menu.add(Separator())
-
-        menu.add(MenuItem(s.show) { onShowWindow?.invoke() })
-        menu.add(MenuItem(s.console) { onShowConsole?.invoke() })
-
-        menu.add(Separator())
-
-        // Servers submenu
-        val sub = Menu(s.servers)
-        val noServers = MenuItem(s.noServers)
-        noServers.setEnabled(false)
-        sub.add(noServers)
-        noServersItem = noServers
-        serversSubmenu = sub
-        menu.add(sub)
-
-        menu.add(Separator())
-
-        menu.add(MenuItem(s.exit) { onExit?.invoke() })
-    }
-
-    // ── State updates ──────────────────────────────────────────────────────
-
-    fun updateServers(servers: List<ServerProfile>) {
-        val sub = serversSubmenu ?: return
-
-        serverItems.forEach { sub.remove(it) }
-        serverItems.clear()
-
-        if (servers.isEmpty()) {
-            if (noServersItem == null) {
-                val placeholder = MenuItem("—")
-                placeholder.setEnabled(false)
-                sub.add(placeholder)
-                noServersItem = placeholder
-            }
-            return
-        }
-
-        noServersItem?.let { sub.remove(it) }
-        noServersItem = null
-
-        servers.forEach { server ->
-            val item = MenuItem(server.title ?: server.name) {
+    private fun dispatchMenu(id: String) {
+        when {
+            id == ID_SHOW    -> onShowWindow?.invoke()
+            id == ID_CONSOLE -> onShowConsole?.invoke()
+            id == ID_EXIT    -> onExit?.invoke()
+            id.startsWith(ID_SERVER_PREFIX) -> {
+                val assetDir = id.removePrefix(ID_SERVER_PREFIX)
+                val server = servers.firstOrNull { it.assetDir == assetDir } ?: return
                 onShowWindow?.invoke()
                 onLaunchServer?.invoke(server)
             }
-            sub.add(item)
-            serverItems.add(item)
+            // _status / _noservers / _servers are non-clickable surfaces
+            // (disabled items + the submenu parent itself); the host
+            // shouldn't fire MenuItemSelected for them, but ignore
+            // defensively in case it does.
         }
     }
 
+    // ── State updates ─────────────────────────────────────────────────────
+
+    fun updateServers(newServers: List<ServerProfile>) {
+        servers = newServers
+        rebuildMenu()
+    }
+
     fun setGameStatus(running: Boolean, serverName: String? = null) {
-        statusItem?.setText(when {
+        gameRunning = running
+        gameServerName = serverName
+        rebuildMenu()
+        val tooltipLabel = when {
             running && serverName != null -> "▶  $serverName"
             running -> strings?.statusRunning ?: "▶  Running"
             else    -> strings?.statusIdle ?: "●  Ready"
-        })
+        }
+        tray?.setTooltip(tooltipLabel)
+    }
+
+    private fun rebuildMenu() {
+        val s = strings ?: return
+        tray?.setMenu(buildMenu(s, servers, gameRunning, gameServerName))
+    }
+
+    private fun buildMenu(
+        s: Strings,
+        servers: List<ServerProfile>,
+        running: Boolean,
+        serverName: String?,
+    ): TrayMenu {
+        val items = mutableListOf<TrayMenuItem>()
+
+        // Status line — disabled, acts as a label that reflects current
+        // game state. Hosts render disabled items in muted colour so the
+        // user reads it as informational rather than clickable.
+        val statusLabel = when {
+            running && serverName != null -> "▶  $serverName"
+            running -> s.statusRunning
+            else    -> s.statusIdle
+        }
+        items += TrayMenuItem.Standard(id = ID_STATUS, label = statusLabel, enabled = false)
+        items += TrayMenuItem.Separator
+        items += TrayMenuItem.Standard(id = ID_SHOW,    label = s.show)
+        items += TrayMenuItem.Standard(id = ID_CONSOLE, label = s.console)
+        items += TrayMenuItem.Separator
+
+        // Servers submenu — non-empty fallback so the parent is never an
+        // empty submenu (dbusmenu spec rejects that, libtray's
+        // TrayMenuItem.Submenu init enforces it too).
+        val serverItems: List<TrayMenuItem> = if (servers.isEmpty()) {
+            listOf(TrayMenuItem.Standard(id = ID_NOSERVERS, label = s.noServers, enabled = false))
+        } else {
+            servers.map { srv ->
+                TrayMenuItem.Standard(
+                    id = "$ID_SERVER_PREFIX${srv.assetDir}",
+                    label = srv.title ?: srv.name,
+                )
+            }
+        }
+        items += TrayMenuItem.Submenu(id = ID_SERVERS, label = s.servers, items = serverItems)
+        items += TrayMenuItem.Separator
+        items += TrayMenuItem.Standard(id = ID_EXIT, label = s.exit)
+
+        return TrayMenu(items)
     }
 
     fun shutdown() {
-        runCatching { tray?.shutdown() }
+        runCatching { unsubscribe?.invoke() }
+        runCatching { tray?.close() }
         tray = null
-        serverItems.clear()
-        serversSubmenu = null
-        statusItem = null
-        noServersItem = null
+        unsubscribe = null
+        servers = emptyList()
+        gameRunning = false
+        gameServerName = null
         state = State.NOT_STARTED
     }
 }

@@ -58,12 +58,8 @@ kotlin {
                 implementation(libs.kotlinx.coroutines.swing)
                 implementation(libs.kotlinx.coroutines.slf4j)
                 implementation(libs.logback.classic)
-                implementation(libs.dorkbox.systemtray)
+                implementation(libs.libtray)
                 implementation(libs.ktor.client.core)
-
-                // Windows-only explicit pin: see libs.versions.toml comment on jnaWindows.
-                implementation(libs.jna)
-                implementation(libs.jna.platform)
             }
         }
     }
@@ -206,11 +202,10 @@ compose.desktop {
             "-XX:MaxMetaspaceSize=256m",
             "-XX:ReservedCodeCacheSize=128m",
 
-            // Security
+            // Security — libtray's Panama bindings need access to native
+            // memory + downcall stubs. Same flag also enables the
+            // macOS keyring + libsecret bindings shipped in 2.2.13.
             "--enable-native-access=ALL-UNNAMED",
-
-            // prevent JNA native lib version conflict
-            "-Djna.nosys=true",
 
             // ── Wayland-Native trial flag ─────────────────────────────────
             //

@@ -30,14 +30,13 @@ logback           = "1.5.32"
 
 # ── Misc runtime ─────────────────────────────────────────────────────────────
 commonsCompress   = "1.28.0"
-systemTray        = "4.4"
 proguard          = "7.8.2"
 
-# ── JNA — must stay 6.1.6 globally for dorkbox/SystemTray's hardcoded
-# version check; client-ui additionally declares 5.18.1 explicitly to keep
-# Windows happy. See root build.gradle.kts resolutionStrategy. ───────────────
-jna               = "6.1.6"
-jnaWindows        = "5.18.1"
+# Pure-Panama tray library (Kitty-Hivens/libtray) — replaces dorkbox/SystemTray
+# for the native tray icon. Local SNAPSHOT consumed via `mavenLocal()` in the
+# root build script during the integration window; switches to mavenCentral
+# coordinates once libtray cuts its first tagged release.
+libtray           = "0.1.0-SNAPSHOT"
 
 # ── Test ─────────────────────────────────────────────────────────────────────
 mockk             = "1.13.12"
@@ -82,11 +81,10 @@ filekit-dialogs-compose         = { group = "io.github.vinceglb", name = "fileki
 
 # Misc
 commons-compress                = { group = "org.apache.commons", name = "commons-compress", version.ref = "commonsCompress" }
-dorkbox-systemtray               = { group = "com.dorkbox",        name = "SystemTray",        version.ref = "systemTray" }
+libtray                          = { group = "dev.hivens",         name = "libtray",           version.ref = "libtray" }
 
-# JNA (Windows-only explicit pin in client-ui)
-jna                              = { group = "net.java.dev.jna", name = "jna",          version.ref = "jnaWindows" }
-jna-platform                     = { group = "net.java.dev.jna", name = "jna-platform", version.ref = "jnaWindows" }
+# JNA dropped — was only present for dorkbox/SystemTray. libtray is
+# pure java.lang.foreign (Project Panama) and pulls no JNA transitively.
 
 # Test
 mockk                            = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
