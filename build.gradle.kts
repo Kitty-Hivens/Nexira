@@ -32,6 +32,13 @@ val appVersion = providers.gradleProperty("appVersion")
 allprojects {
     repositories {
         mavenCentral()
+        // libtray ships from local Maven cache during the integration
+        // window — published via `./gradlew publishToMavenLocal` in the
+        // sibling repo. Switches to mavenCentral coordinates once libtray
+        // cuts its first tagged release. Dev-only repo at the bottom of
+        // the resolution chain so a stale local copy can't shadow a real
+        // central artifact.
+        mavenLocal()
     }
     version = appVersion
     group = "hivens"
@@ -98,14 +105,8 @@ gradle.startParameter.apply {
     maxWorkerCount = if (isCi) cores else minOf(4, cores)
 }
 
-// dorkbox/SystemTray 4.4 has a hardcoded JNA version check; JBR 25 ships
-// JNA 7.x natively. Pin the global resolution to whatever the catalog says.
-val pinnedJnaVersion = libs.versions.jna.get()
-configurations.all {
-    resolutionStrategy.eachDependency {
-        if (requested.group == "net.java.dev.jna") {
-            useVersion(pinnedJnaVersion)
-            because("dorkbox/SystemTray requires exactly JNA $pinnedJnaVersion")
-        }
-    }
-}
+// JNA pin removed alongside dorkbox/SystemTray (replaced by libtray, the
+// pure-Panama tray library at github.com/Kitty-Hivens/libtray). The
+// pin existed only to satisfy dorkbox's hardcoded JNA version check;
+// libtray uses java.lang.foreign and never pulls in net.java.dev.jna.
+// JBR 25's bundled JNA 7.x can resolve naturally now.
