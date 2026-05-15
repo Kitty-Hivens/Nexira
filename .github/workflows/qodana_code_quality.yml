@@ -34,6 +34,9 @@ jobs:
           post-pr-comment: true
           use-annotations: true
           # Upload Qodana results (SARIF, other artifacts, logs) as an artifact to the job
-          upload-result: false
+          # Enabled so PR reviewers (and the maintainer locally via `gh run download`)
+          # can pull the SARIF for line-level findings instead of only seeing the
+          # aggregate count from post-pr-comment.
+          upload-result: true
           # quick-fixes available in Ultimate and Ultimate Plus plans
           push-fixes: 'none'
