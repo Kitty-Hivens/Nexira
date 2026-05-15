@@ -11,6 +11,211 @@ below are for the GitHub release page and CHANGELOG readers.
 
 ## [Unreleased]
 
+## [2.2.13] - 2026-05-15
+
+Security, concurrency, and platform-completion release. The auto-updater
+now refuses to install bytes it cannot integrity-verify against a manifest
+hash. The mod-pack file sync gained a sample-existence sanity gate that
+catches the case where the manifest cache says "synced" but the actual
+files are gone (the bug behind the empty-classpath crash on cold launches).
+Two-factor authentication finally works in the launcher itself instead of
+locking out 2FA-enabled accounts. macOS Apple Silicon joins Linux and
+Windows on the OS-keyring path. Conduit pillar — the network-layer
+refactor — is feature-complete; the `Network.BASE_URL` constant is no
+longer reached by production code.
+
+### Highlights
+- **TOTP 2FA login** — accounts with two-factor authentication enabled
+  in SmartyCraft can now sign in directly from Aura. A 6-digit code
+  prompt appears after the password step; wrong codes re-prompt
+  inline; expired sessions surface a clear "log in again" message
+  instead of getting stuck in a verify loop. Russian / English /
+  German strings shipped.
+- **Auto-update refuses unverified installers** — every released asset
+  now requires a SHA-256 entry in `release-manifest.json` before the
+  launcher will install it. The pre-fix path silently treated an empty
+  hash as success, which would have driven arbitrary bytes through the
+  updater if anyone had edited a release page out from under it. Older
+  releases that pre-date the manifest convention require manual
+  reinstall — the auto-updater will refuse them rather than guess.
+- **Cold-launch reliability fixes** — three classes of "click Play,
+  game dies" reports addressed: (a) the manifest cache no longer lies
+  when the client directory has been wiped between syncs (e.g. after a
+  data-dir move or manual `rm`); (b) the natives-folder validity gate
+  now requires the actual `lwjgl` library, not just any `.so` file
+  (jinput-only directories used to pass and crash the game with
+  `UnsatisfiedLinkError`); (c) `mods/*.jar` files are spot-checked
+  for ZIP integrity even when their MD5 matches, catching the rare
+  corrupt-bytes-with-correct-hash case that NeoForge would otherwise
+  surface as "invalid CEN header" mid-launch.
+- **macOS keyring (Apple Silicon)** — the third platform on the OS
+  keyring path, after Linux libsecret and Windows DPAPI. Passwords
+  and access tokens land in the user's login Keychain via the modern
+  `SecItem*` API (Project Panama bindings to Security.framework).
+  Falls back to the per-machine AES-GCM file when Keychain isn't
+  reachable, identical to the Linux/Windows flow.
+- **macOS Intel as community-tier** — Apple Silicon stays tier-1 (built
+  on every release tag); Intel macOS now ships asynchronously via a
+  manual `workflow_dispatch` build and is named
+  `*-x86_64-community.dmg` so the support shape is obvious from the
+  filename. The README has a new "Platform support tiers" section
+  spelling out what tier-1 vs community means.
+
+### Added
+- `hivens.launcher.security.MacOSKeychainStorage` — Project Panama
+  bindings to `Security.framework`'s `SecItem*` family
+  (`SecItemAdd` / `SecItemCopyMatching` / `SecItemUpdate` /
+  `SecItemDelete`) plus CoreFoundation marshalling for
+  `kSecClass` / `kSecAttrService` / `kSecAttrAccount` / `kSecValueData`
+  constants. Plugged into `KeyringStorageFactory.system()` for
+  `os.name` containing `mac` or `darwin`.
+- `hivens.core.api.TwoFactorRequiredException` — typed subclass of
+  `AuthException` that the login flow throws when the server returns
+  `TWOAUTH`. Carries the `uid` from the TWOAUTH response so the
+  follow-up `twoauth(uid, login, code)` call can sign correctly.
+- `IAuthService.completeTwoFactor(username, password, serverId, uid, code)`
+  — sends the verification code, then promotes the cached TWOAUTH
+  login response to `SessionData` directly when complete (uuid +
+  playername + session populated) or falls through to a single
+  re-login when the cached fields are sparse. Detects the
+  re-login-also-returns-TWOAUTH loop and gives up with
+  `TWO_FACTOR_EXPIRED` instead of pinning the user to a verify
+  button that can never satisfy the server.
+- `hivens.ui.components.ConfirmCodeDialog` — Compose 6-digit input
+  with monospace styling, paste-friendly digit-only filter, inline
+  error for `WRONG_CODE`, dismiss-on-cancel preserves credentials.
+  i18n `auth2fa*` keys in EN / RU / DE.
+- `hivens.launcher.platform.ServerNameValidator` — central whitelist
+  (`[A-Za-z0-9._-]+` plus explicit rejection of `.`, `..`, and
+  `..`-containing strings) used by `PlatformPaths.clientDir` and
+  `ManifestCache.sanitize` so server-supplied identifiers can't
+  escape the per-server data dir.
+- `hivens.launcher.network.ServerProtocolConfig` reaches the last four
+  `Network.BASE_URL` call sites (`ServerListService`,
+  `GameCommandBuilder`, `RightPanel` register / news links) via DI
+  / `koinInject`. Production code no longer references the const
+  directly — only `Network.kt` itself does.
+- `FileDownloadDiskIntegrationTest` — disk-level integration harness
+  for `FileDownloadService.processSession` against a sandbox tempdir
+  with MockEngine HTTP. Covers happy path, idempotent re-sync,
+  corruption recovery, missing-file recovery, ProtectedPaths
+  preservation, upstream HTTP failure, and the disk-wipe-between-syncs
+  scenario from the manifest-cache bug.
+- `ProfileManagerTest` — new test class plus three unit-test classes
+  for the cache concurrency fixes (`ServerListServiceTest`,
+  `SettingsServiceTest`, `LauncherHashCacheTest`).
+- `ZipUtilsTest` — coverage for the symlink-rejection and
+  Zip-Slip paths.
+- `ClasspathProviderTest` — Linux / Windows / macOS native filtering
+  + the unknown-OS defensive default.
+- `.github/workflows/build-macos-x86_64-community.yml` — manual
+  `workflow_dispatch` workflow that builds the Intel macOS DMG on
+  `macos-13` against an existing tag and uploads to the matching
+  release as `AuraLauncher-<version>-x86_64-community.dmg`.
+- README "Platform support tiers" collapsible section explaining
+  what tier-1 (Windows, Linux x86_64, macOS Apple Silicon) and
+  community-tier (macOS Intel) mean in terms of validation SLA.
+
+### Changed
+- `UpdateService.checkForUpdate` now requires
+  `release-manifest.json` to publish an SHA-256 for the asset before
+  it constructs a `LauncherUpdate`. The legacy markdown-table
+  fallback is no longer wired into the cold path; the parser stays
+  in `extractChecksum` for an out-of-band recovery flow but doesn't
+  gate installs.
+- `verifyChecksum` returns false on blank input — defense in depth
+  at the install boundary so a stale cached `LauncherUpdate` or
+  future code path can't bypass the gate.
+- `ManifestCache.isClean` accepts an optional disk-sanity-check
+  lambda. `FileDownloadService.processSession` passes a 20-entry
+  spot-check that forces a full integrity walk when the cache
+  reports clean but the on-disk files are missing.
+- `EnvironmentPreparer.isFolderValidForOs` matches on filenames
+  containing `lwjgl` (case-insensitive) instead of any file with the
+  platform's native extension. `liblwjgl.so` + `liblwjgl64.so` (LWJGL 2
+  64-bit), the LWJGL 3 module split, and `lwjgl.dll` (Windows) all
+  pass; jinput-only directories no longer do.
+- `FileDownloadService.isFileMissingOrChanged` adds a JarFile open +
+  central-directory walk for `mods/*.jar` files that pass MD5. Scoped
+  to `mods/` because that's the corruption hot zone; `libraries/`
+  skips the scan to keep cold-start fast.
+- `ClasspathProvider` drops `*-natives-{otherOs}.jar` entries from
+  the JVM classpath (server manifests ship every platform's
+  classifier; pre-fix the launcher loaded all of them).
+- `PlatformPaths.clientDir(assetDir)` requires the assetDir to pass
+  `ServerNameValidator` before resolving — a malicious manifest can
+  no longer point the client directory outside the data dir on
+  filesystems where `Path.resolve` would have accepted the input.
+- `ZipUtils.unzip` and `JavaManagerService.unzip` switched from
+  `java.util.zip.ZipInputStream` to commons-compress `ZipFile` so
+  the central-directory unix-mode bits are visible. Symlink entries
+  are rejected before any byte is written. `JavaManagerService.untargz`
+  rejects symlinks, hard links, FIFOs, and device-node entries.
+- `DataDirMover` and `DiagnosticBundle` walks now skip symlinks
+  consistently with the ZIP/TAR family.
+- `ServerListService`, `SettingsService`, and `LauncherHashCache`
+  use proper synchronization for cache state — fetchDashboardData
+  single-flights through a tracked in-flight future, settings
+  reads / writes go through a monitor lock, and refresh-attempt
+  counting uses an atomic CAS so the cap is exact under contention.
+- `ProfileManager.save()` writes through a temp file + atomic move
+  with `writeLock` serialization, so concurrent saves and crash-mid-
+  write can't leave torn JSON on disk. `toggleFavorite` flip is now
+  atomic via `Set.add`'s boolean return.
+- Background flows in `Main.kt` (tray-launch, AutoSync) moved off
+  `GlobalScope.launch` onto a process-lifetime
+  `applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)`
+  with a JVM shutdown hook. In-flight network sockets and file
+  handles get released on launcher exit instead of being orphaned.
+- `GameCommandBuilder` throws a recovery-hinted
+  `IllegalStateException` when the NeoForge boot modules
+  (securejarhandler / bootstraplauncher / ow2/asm / jarjar) are
+  missing from the classpath, so the user sees a launcher dialog
+  instead of a Java module-resolution crash at game startup.
+- `ChannelRouter.isFallbackable` simplified to a single
+  `is IOException` check — the previous explicit per-subclass `when`
+  arms were unreachable.
+- `SkinManager`'s in-memory caches are now LRU-capped at 64 entries
+  per skin orientation. Long sessions with many viewed players no
+  longer accumulate `ImageBitmap` GPU texture memory until OOM.
+- `SingleInstance.writeShowSignal` uses `Files.createFile` with
+  `FileAlreadyExistsException` swallowing instead of a TOCTOU
+  `if (!exists) createFile()` race.
+
+### Removed
+- `Network.FORCE_HTTP1_FOR_SMARTYCRAFT` and
+  `applySmartycraftProtocols()` — empirically confirmed obsolete; the
+  modern okhttp + upstream proxy negotiate HTTP/2 cleanly direct and
+  proxied.
+- `LiveSmokeTest` + `smoke-daily.yml` workflow + `:smokeTest` Gradle
+  task. The pure-MockEngine + integration-harness coverage is
+  sufficient and the live smoke probe was getting flaky against the
+  real upstream during outages.
+
+### Fixed
+- Auto-updater silently installing un-checksummed assets (#186).
+- ZIP / TAR archive extractors accepting symlink entries that bypass
+  the `startsWith(destDir)` Zip Slip check (#187).
+- `PlatformPaths.clientDir(assetDir)` accepting unvalidated server
+  identifiers (#188).
+- Cache state in `ServerListService` / `SettingsService` /
+  `LauncherHashCache` racing under concurrent reads / writes (#189).
+- `ProfileManager` toggleFavorite TOCTOU and torn-write on save (#190).
+- `GlobalScope.launch` orphaning sockets / file handles past launcher
+  shutdown (#191).
+- `ManifestCache.isClean` returning true when the client directory
+  was wiped after the cache was marked clean (#184) — the
+  empty-classpath cold-launch crash on RPG.
+- `EnvironmentPreparer.isFolderValidForOs` accepting jinput-only
+  directories as valid LWJGL natives (#185) — the
+  `UnsatisfiedLinkError: lwjgl64` on first launch of un-installed packs.
+- `FileDownloadService` not catching corrupt-but-MD5-matching
+  jars in `mods/` before launch (#169).
+- `RightPanel` register and news links plus `ServerListService`
+  news image URL plus `GameCommandBuilder` `-D` flags reaching the
+  deprecated `Network.BASE_URL` constant — all migrated to
+  `ServerProtocolConfig.baseUrl` injection.
+
 ## [2.2.12] - 2026-05-14
 
 Security and platform-completion release. Passwords and login tokens now
