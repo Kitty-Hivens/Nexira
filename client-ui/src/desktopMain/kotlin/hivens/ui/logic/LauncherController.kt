@@ -107,10 +107,16 @@ class LauncherController : KoinComponent {
                             session = session.copy(fileManifest = cached)
                             ActionRing.record("Launch: 2FA account, using cached manifest for $targetServerId")
                         } else {
-                            // No cached manifest and no fresh login → first time
-                            // launching this server on a 2FA account. Surface
-                            // clearly so user knows to re-login from the form.
-                            GameConsoleService.append(s.stateAuthFail + " (2FA — manual login required)", LogType.WARN)
+                            // No cached manifest and no fresh login. Continuing
+                            // hits "File manifest is empty!" deep in
+                            // processSession — cryptic for the user. Throw
+                            // with the same string the 2FA dialog uses so the
+                            // outer LaunchState.Error renders an actionable
+                            // message ("re-login from the form"), not a
+                            // misleading internal one. Caught by the
+                            // top-level handler at the bottom of this fn.
+                            ActionRing.record("Launch: 2FA + no cached manifest for $targetServerId — re-login required")
+                            throw IllegalStateException(s.auth2faExpired)
                         }
                     } catch (e: Exception) {
                         GameConsoleService.append("${s.stateAuthFail}: ${e.message}", LogType.WARN)
