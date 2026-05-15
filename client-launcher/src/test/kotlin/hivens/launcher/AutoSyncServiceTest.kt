@@ -26,6 +26,7 @@ class AutoSyncServiceTest {
     private lateinit var authService: IAuthService
     private lateinit var downloadService: IFileDownloadService
     private lateinit var manifestProcessor: IManifestProcessorService
+    private lateinit var manifestCache: ManifestCache
     private var stubCredentials: SessionData? = null
     private lateinit var service: AutoSyncService
 
@@ -35,6 +36,11 @@ class AutoSyncServiceTest {
         authService = mockk()
         downloadService = mockk()
         manifestProcessor = mockk()
+        // ManifestCache is a final class — relaxed mockk so the
+        // 2FA fallback path's loadManifest call returns null without
+        // a per-test setup. Tests that exercise the cache-hit branch
+        // can override per-test.
+        manifestCache = mockk(relaxed = true)
         stubCredentials = null
 
         every { manifestProcessor.calculateIgnoredFiles(any(), any()) } returns emptySet()
@@ -43,6 +49,7 @@ class AutoSyncServiceTest {
             authService = authService,
             downloadService = downloadService,
             manifestProcessor = manifestProcessor,
+            manifestCache = manifestCache,
             dataDirectory = sandbox,
             credentialsProvider = { stubCredentials },
             optionalModsStateProvider = { emptyMap() },
