@@ -171,12 +171,27 @@ internal class GameCommandBuilder(
                 jvmModuleKeywords.any { lowerPath.contains(it) }
             }
 
-            if (validModules.isNotEmpty()) {
-                args.add("-p")
-                args.add(validModules.joinToString(File.pathSeparator))
-            } else {
-                logger.error("CRITICAL: No NeoForge boot modules found in classpath!")
+            if (validModules.isEmpty()) {
+                // Fail-loud at command-build time instead of letting the JVM
+                // limp into BootstrapLauncher without `-p`. The downstream
+                // failure mode is a cryptic Java module-resolution error at
+                // game startup ("module not found: cpw.mods.bootstraplauncher")
+                // that surfaces in the game console long after the user has
+                // committed to a launch — diagnosed in audit pass on the
+                // 2.2.13 batch as a real silent-failure path. The exception
+                // propagates through LauncherService into the existing
+                // LauncherController error-dialog flow so the user sees a
+                // launcher-side message about the missing libraries instead.
+                throw IllegalStateException(
+                    "Cannot launch ${config.mainClass}: no NeoForge boot modules " +
+                        "(securejarhandler, bootstraplauncher, ow2/asm, jarjar) found " +
+                        "in the synced classpath. The pack's libraries directory is " +
+                        "missing the module-path entries — re-sync the server or " +
+                        "delete clients/<server>/manifest-cache to force a full re-download.",
+                )
             }
+            args.add("-p")
+            args.add(validModules.joinToString(File.pathSeparator))
         }
 
         // 8. Classpath & Entry Point
