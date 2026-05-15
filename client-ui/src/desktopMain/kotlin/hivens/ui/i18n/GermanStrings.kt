@@ -284,8 +284,8 @@ object GermanStrings : AppStrings {
     override val spawnResetError   = "Serverfehler"
 
     // --- Tray ---
-    override val trayStatusIdle    = "● Wartend"
-    override val trayStatusRunning = "▶ Spiel läuft"
+    override val trayStatusIdle    = "Wartend"
+    override val trayStatusRunning = "Spiel läuft"
     override val trayShow          = "Launcher anzeigen"
     override val trayServers       = "Server"
     override val trayNoServers     = "Keine Server geladen"

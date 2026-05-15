@@ -92,7 +92,8 @@
 }
 
 # --- System tray ---
--keep class dorkbox.** { *; }
+# dorkbox removed in 2.2.14 (libtray swap). The libtray Panama callers
+# below take its place; the dorkbox keep rule was retired with the dep.
 
 # --- Project Panama foreign-function call sites ---
 # Classes that call MethodHandle.invokeExact(...) with java.lang.foreign.*
@@ -102,6 +103,13 @@
 # so adding a new Panama caller is a deliberate edit, not silent suppression.
 -dontwarn hivens.launcher.security.LinuxLibsecretKeyringStorage
 -dontwarn hivens.launcher.security.WindowsCredentialManagerKeyringStorage
+-dontwarn hivens.launcher.security.MacOSKeychainStorage
+-dontwarn dev.hivens.libtray.linux.SniTrayImpl
+-dontwarn dev.hivens.libtray.linux.SniTrayImpl$Companion
+-dontwarn dev.hivens.libtray.windows.Win32TrayImpl
+-dontwarn dev.hivens.libtray.windows.Win32TrayImpl$Companion
+-dontwarn dev.hivens.libtray.macos.AppKitTrayImpl
+-dontwarn dev.hivens.libtray.macos.AppKitTrayImpl$Companion
 
 # --- Suppress Warnings ---
 -dontwarn ch.qos.logback.**
