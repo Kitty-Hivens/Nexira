@@ -129,6 +129,28 @@
 -keep class dev.hivens.libtray.** { *; }
 -dontwarn dev.hivens.libtray.**
 
+# ── dbus-java: ServiceLoader-resolved transport providers ─────────────────
+# Linux fielded report (file picker silently broken on AppImage): filekit's
+# XdgFilePickerPortal calls `DBusConnectionBuilder.forSessionBus()` which
+# triggers `TransportBuilder.findTransportProvider()` → `ServiceLoader<
+# ITransportProvider>` lookup. The provider class
+# `org.freedesktop.dbus.transport.jre.NativeTransportProvider` is loaded
+# only via META-INF/services — no direct call site in our code or in
+# dbus-java's call graph. ProGuard's reachability sees it as orphaned and
+# strips the class, then runtime ServiceLoader.iterator throws:
+#   ServiceConfigurationError: ITransportProvider: Provider
+#   org.freedesktop.dbus.transport.jre.NativeTransportProvider not found
+#
+# Side effect: filekit falls back to its non-portal LinuxFilePicker path,
+# which on Wayland (Hyprland / Plasma 6 wayland-only) produces no window
+# at all → user clicks "Open folder" / "Pick Java" → nothing happens.
+#
+# `-adaptresourcefilecontents META-INF/services/**` already preserves the
+# service descriptor file contents, but we ALSO need to keep the actual
+# implementation classes the descriptors point at. Wildcard the dbus-java
+# namespace; we don't ship anything else in those packages.
+-keep class org.freedesktop.dbus.** { *; }
+
 # --- Suppress Warnings ---
 -dontwarn ch.qos.logback.**
 -dontwarn org.slf4j.**
