@@ -38,13 +38,28 @@ class SkinManager(
         private const val BASE_SKIN_URL  = "https://www.smartycraft.ru/skins/"
         private const val BASE_CLOAK_URL = "https://www.smartycraft.ru/cloaks/"
         private const val CACHE_TTL_MS   = 30 * 60 * 1000L // 30 minutes
+        /** Hard cap on per-cache entries to bound GPU texture memory. */
+        private const val SKIN_CACHE_MAX = 64
     }
 
     private val logger = LoggerFactory.getLogger("SkinManager")
 
-    // In-memory LRU (small, just for the current session)
-    private val frontCache = mutableMapOf<String, ImageBitmap>()
-    private val backCache  = mutableMapOf<String, ImageBitmap>()
+    // In-memory LRU (small, just for the current session). Bounded —
+    // each ImageBitmap holds GPU texture memory and an unbounded session
+    // cache (server admins switching between dozens of alt accounts) led
+    // to OOM crashes during long sessions. Cap at SKIN_CACHE_MAX entries
+    // per cache; eldest gets evicted on overflow. Access-order (3rd ctor
+    // arg = true) so freshly-viewed skins survive evictions.
+    private val frontCache = lruCache(SKIN_CACHE_MAX)
+    private val backCache  = lruCache(SKIN_CACHE_MAX)
+
+    private fun lruCache(maxEntries: Int): MutableMap<String, ImageBitmap> =
+        java.util.Collections.synchronizedMap(
+            object : java.util.LinkedHashMap<String, ImageBitmap>(maxEntries, 0.75f, true) {
+                override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, ImageBitmap>?): Boolean =
+                    size > maxEntries
+            },
+        )
 
     // Disk cache directory — lazy-initialized
     private val cacheDir: File by lazy {
