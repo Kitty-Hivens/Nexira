@@ -293,8 +293,11 @@ fun main() {
 
         val settings = remember { settingsService.getSettings() }
 
-        // If startInTray — keep hidden until tray is confirmed ready
-        var isWindowVisible by remember { mutableStateOf(!settings.startInTray) }
+        // Window starts visible — `startInTray` was retired in 2.2.14:
+        // it confused users (launcher invisible after first run) and
+        // had no clear use case. Tray is the dock-style fallback for
+        // close-while-game-running, not a launcher hide-by-default mode.
+        var isWindowVisible by remember { mutableStateOf(true) }
 
         var isDarkTheme   by remember { mutableStateOf(settings.isDarkTheme) }
         var currentLocale by remember {
@@ -391,12 +394,10 @@ fun main() {
                 }
 
                 // Tray failed to init — restore the window so the user isn't
-                // stuck with no reachable UI. Two scenarios converge here:
-                //   1. startInTray=true: window was hidden by design, but
-                //      there's now no tray to bring it back. Show it.
-                //   2. startInTray=false but the user clicked the close
-                //      button during the INITIALIZING window (the close
-                //      handler at the bottom of this file uses canBeReady,
+                // stuck with no reachable UI. The scenario is:
+                //   - the user clicked the close button during the
+                //     INITIALIZING window (the close handler at the bottom
+                //     of this file uses canBeReady, not isSupported,
                 //      not isSupported, to avoid killing the launcher
                 //      mid-init). Same outcome — window hidden, no tray
                 //      either. Without this restore the process keeps
