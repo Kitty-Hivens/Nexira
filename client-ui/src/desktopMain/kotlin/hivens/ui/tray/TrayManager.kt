@@ -46,6 +46,7 @@ object TrayManager {
 
     private var tray: Tray? = null
     private var strings: Strings? = null
+    private var appName: String = "Aura Launcher"
     private var unsubscribe: (() -> Unit)? = null
 
     @Volatile private var servers: List<ServerProfile> = emptyList()
@@ -105,6 +106,7 @@ object TrayManager {
      */
     fun init(iconStream: InputStream, strings: Strings, appName: String) {
         this.strings = strings
+        this.appName = appName
         if (state != State.NOT_STARTED) return
 
         state = State.INITIALIZING
@@ -113,15 +115,15 @@ object TrayManager {
             val builder = TrayBuilder(
                 title = appName,
                 iconBytes = iconBytes,
-                // Just the status — NO `appName` prefix. Modern tray
-                // hosts (Plasma, waybar with default templates, GNOME
-                // SNI extensions) resolve the application name from the
-                // SNI Id by looking up the matching `.desktop` file and
-                // render it themselves; if libtray ALSO prefixes, the
-                // user sees "Aura Launcher — Aura Launcher — status".
-                // Hosts that don't resolve still get a meaningful
-                // tooltip ("● Idle"); the icon identifies the app.
-                tooltip = strings.statusIdle,
+                // Compose the full "App — status" here ourselves. libtray
+                // intentionally doesn't compose (it'd double up on hosts
+                // that resolve .desktop names from the SNI Id), and the
+                // hosts we actually ship to (waybar, Hyprland tray
+                // helpers, GNOME minimal SNI consumers) don't do that
+                // resolution either — they just print Title verbatim.
+                // So the prefix has to live on the caller side or it's
+                // gone from the tooltip entirely.
+                tooltip = "$appName — ${strings.statusIdle}",
                 menu = buildMenu(strings, servers, gameRunning, gameServerName),
             )
             val t = Tray.create(builder) ?: run {
@@ -177,13 +179,15 @@ object TrayManager {
         gameRunning = running
         gameServerName = serverName
         rebuildMenu()
-        // No appName prefix here either — same reasoning as in [init].
-        val tooltipLabel = when {
+        val s = strings
+        val statusPart = when {
             running && serverName != null -> "▶  $serverName"
-            running -> strings?.statusRunning ?: "▶  Running"
-            else    -> strings?.statusIdle ?: "●  Ready"
+            running -> s?.statusRunning ?: "▶  Running"
+            else    -> s?.statusIdle ?: "●  Ready"
         }
-        tray?.setTooltip(tooltipLabel)
+        // Same prefix policy as [init] — see the comment on TrayBuilder
+        // construction. appName is what we passed as `title` at init time.
+        tray?.setTooltip("$appName — $statusPart")
     }
 
     private fun rebuildMenu() {
