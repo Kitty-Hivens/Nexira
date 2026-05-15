@@ -52,7 +52,6 @@ fun SettingsScreen(
     val initialSettings        = remember { settingsService.getSettings() }
     var closeAfterStart        by remember { mutableStateOf(initialSettings.closeAfterStart) }
     var isOfflineMode          by remember { mutableStateOf(initialSettings.isOfflineMode) }
-    var startInTray            by remember { mutableStateOf(initialSettings.startInTray) }
     var experimentalEnabled    by remember { mutableStateOf(initialSettings.experimentalFeaturesEnabled) }
     var mandatoryUpdates       by remember { mutableStateOf(initialSettings.mandatoryUpdatesEnabled) }
     var prereleaseChannel      by remember { mutableStateOf(initialSettings.prereleaseChannelEnabled) }
@@ -73,7 +72,6 @@ fun SettingsScreen(
             current.copy(
                 closeAfterStart             = closeAfterStart,
                 isOfflineMode               = isOfflineMode,
-                startInTray                 = startInTray,
                 experimentalFeaturesEnabled = experimentalEnabled,
                 mandatoryUpdatesEnabled     = mandatoryUpdates,
                 prereleaseChannelEnabled    = prereleaseChannel,
@@ -274,51 +272,6 @@ fun SettingsScreen(
                             colors = SwitchDefaults.colors(
                                 checkedThumbColor = CelestiaTheme.colors.error,
                                 checkedTrackColor = CelestiaTheme.colors.error.copy(alpha = 0.5f)
-                            )
-                        )
-                    }
-                    Spacer(Modifier.height(16.dp))
-
-                    // System Tray
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(CelestiaTheme.colors.background.copy(alpha = 0.4f))
-                            .padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(
-                                Icons.Default.Minimize,
-                                null,
-                                tint = CelestiaTheme.colors.primary,
-                                modifier = Modifier.size(24.dp)
-                            )
-                            Spacer(Modifier.width(16.dp))
-                            Column {
-                                Text(
-                                    s.settingsStartInTray,
-                                    color = CelestiaTheme.colors.textPrimary,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    s.settingsStartInTrayDesc,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = CelestiaTheme.colors.textSecondary
-                                )
-                            }
-                        }
-                        Switch(
-                            checked = startInTray,
-                            onCheckedChange = { startInTray = it; save() },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = CelestiaTheme.colors.primary,
-                                checkedTrackColor = CelestiaTheme.colors.primary.copy(alpha = 0.5f)
                             )
                         )
                     }

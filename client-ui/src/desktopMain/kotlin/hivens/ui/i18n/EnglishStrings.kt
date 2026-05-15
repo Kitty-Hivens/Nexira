@@ -69,7 +69,7 @@ object EnglishStrings : AppStrings {
     override val settingsThemePicker        = "Choose theme"
     override val settingsThemePickerSub     = "Customize the color scheme"
     override val settingsDarkTheme          = "Dark theme"
-    override val settingsCloseAfterLaunch   = "Close launcher after game starts"
+    override val settingsCloseAfterLaunch   = "Hide launcher to tray after server starts"
     override val settingsSaved              = "Settings saved"
     override val settingsLanguage           = "Language"
 
@@ -289,10 +289,6 @@ object EnglishStrings : AppStrings {
     override val trayShow          = "Show launcher"
     override val trayServers       = "Servers"
     override val trayNoServers     = "No servers loaded"
-
-    // --- Settings: Start in tray ---
-    override val settingsStartInTray     = "Start in tray"
-    override val settingsStartInTrayDesc = "Launch minimized; closing the window hides it to tray"
 
     // --- Settings: Experimental features ---
     override val settingsSectionExperimental    = "Experimental features"

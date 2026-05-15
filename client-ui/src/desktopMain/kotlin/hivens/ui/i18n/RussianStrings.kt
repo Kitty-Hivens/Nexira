@@ -69,7 +69,7 @@ object RussianStrings : AppStrings {
     override val settingsThemePicker        = "Выбор темы"
     override val settingsThemePickerSub     = "Кастомизируйте цветовую схему"
     override val settingsDarkTheme          = "Тёмная тема"
-    override val settingsCloseAfterLaunch   = "Закрывать лаунчер после запуска игры"
+    override val settingsCloseAfterLaunch   = "Свернуть лаунчер в трей после запуска сервера"
     override val settingsSaved              = "Настройки сохранены"
     override val settingsLanguage           = "Язык"
 
@@ -290,9 +290,6 @@ object RussianStrings : AppStrings {
     override val trayServers       = "Серверы"
     override val trayNoServers     = "Серверы не загружены"
 
-    // --- Settings: Start in tray ---
-    override val settingsStartInTray     = "Запускать в трее"
-    override val settingsStartInTrayDesc = "Лаунчер стартует свёрнутым; закрытие окна прячет его в трей"
 
     // --- Settings: Experimental features ---
     override val settingsSectionExperimental    = "Экспериментальные функции"
