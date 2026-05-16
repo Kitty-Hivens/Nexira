@@ -231,9 +231,14 @@ compose.desktop {
             "-XX:+OptimizeStringConcat",
             "-XX:+UseCompressedOops",
 
-            // Startup optimization
-            "-XX:TieredStopAtLevel=1",
-            "-XX:+TieredCompilation",
+            // No JIT-level lock. The previous block here set TieredStopAtLevel=1
+            // (cap at C1, no C2) plus an explicit +TieredCompilation (already the
+            // HotSpot default since Java 8). The cap was wrong for Aura's shape:
+            // launcher sessions are long-running (multi-minute downloads + game
+            // launch + tray idle), Compose recompose is hot, file verify + jdk
+            // extract are CPU-bound. C2 compilation pays for itself many times
+            // over once the steady state kicks in; the startup ms saved by C1-only
+            // are noise next to the 5+ seconds we spend on first window paint.
 
             // Memory optimization
             "-Xms128m",
@@ -264,13 +269,18 @@ compose.desktop {
                 emptyArray()
             }),
 
-            // Puppet mode (hivens.ui.puppet.PuppetServer) — opt-in HTTP
+            // Puppet mode (hivens.ui.puppet.PuppetServer) -- opt-in HTTP
             // control surface for CLI-driven UI testing. Activated when
             // the launcher is run with `-PauraPuppetPort=N` (forwarded
             // into the JVM as -Daura.puppet.port=N). Without the property
             // the puppet server's startIfRequested() is a no-op.
-            *(project.findProperty("auraPuppetPort")
-                ?.toString()
+            //
+            // providers.gradleProperty(...) over project.findProperty(...):
+            // the Provider variant registers the read with the configuration
+            // cache, so a property flip invalidates correctly; findProperty
+            // bypasses the cache hook and bakes the value in on first
+            // config-resolve.
+            *(providers.gradleProperty("auraPuppetPort").orNull
                 ?.let { arrayOf("-Daura.puppet.port=$it") }
                 ?: emptyArray())
         )
@@ -283,50 +293,92 @@ compose.resources {
     generateResClass = always
 }
 
-// ========================================================================
-// KOTLIN COMPILER OPTIMIZATIONS
-// ========================================================================
+// Kotlin compiler options for every JVM compile task in client-ui.
+//
+// freeCompilerArgs are split into "always on" and "opt-in" groups.
+//
+// Removed 2026-05-17 (audit chunk 2 item #26) and worth recording why so
+// they do not creep back in:
+//
+//   * -Xinline-classes : deprecated since the value-classes language feature
+//     stabilized (Kotlin 1.5+). Compiler treats it as no-op-or-warning today.
+//
+//   * -Xno-param-assertions / -Xno-call-assertions / -Xno-receiver-assertions :
+//     strip Kotlin's generated nullability runtime checks. Trades a handful
+//     of microseconds per call for a deep-stack NullPointerException whenever
+//     a non-null contract is violated, instead of an IllegalArgumentException
+//     pointing at the boundary. Launcher workloads are nowhere near hot enough
+//     for the micros to matter and contract-violation triage suffers a lot
+//     from the masked failure mode; the throw-on-boundary side wins.
+//
+// The Compose-compiler metrics + reports flags are now opt-in via
+// `-PauraComposeMetrics=true`. They write per-compile files into
+// build/compose_metrics and build/compose_reports, which is useful for
+// recomposition audits but wasted IO on every regular compile.
 tasks.withType<KotlinJvmCompile>().configureEach {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_25)
 
+        val composeMetricsEnabled = providers.gradleProperty("auraComposeMetrics")
+            .map { it == "true" }.orElse(false).get()
+        val buildDirAbsolute = layout.buildDirectory.get().asFile.absolutePath
+
         freeCompilerArgs.addAll(
-            // Language features
+            // Language: nested typealiases are used in AprilFoolsEngine.kt
+            // for the floating-button Event signature. Without the flag the
+            // compiler restricts typealiases to top level only.
             "-XXLanguage:+NestedTypeAliases",
 
-            // Backend optimizations
+            // Bytecode: emit default methods directly (legal on jvmTarget=25).
+            // Smaller class files, removes the DefaultImpls indirection.
             "-jvm-default=no-compatibility",
+
+            // Bytecode: invokedynamic-based lambdas instead of synthetic
+            // anonymous classes. Smaller jar, slightly slower first invoke
+            // per lambda site.
             "-Xlambdas=indy",
 
-            // Disable debug features
+            // Compose compiler: disable live literals (hot-reload-style swap
+            // of constant values at runtime). Production never observes a
+            // live-literal swap; flag pays only at recompose cost.
             "-P", "plugin:androidx.compose.compiler.plugins.kotlin:liveLiterals=false",
-
-            // Metrics (optional, for analysis)
-            "-P", "plugin:androidx.compose.compiler.plugins.kotlin:metricsDestination=${project.layout.buildDirectory.get().asFile.absolutePath}/compose_metrics",
-            "-P", "plugin:androidx.compose.compiler.plugins.kotlin:reportsDestination=${project.layout.buildDirectory.get().asFile.absolutePath}/compose_reports",
-
-            // Aggressive inline
-            "-Xinline-classes",
-            "-Xno-param-assertions",
-            "-Xno-call-assertions",
-            "-Xno-receiver-assertions"
         )
+
+        if (composeMetricsEnabled) {
+            freeCompilerArgs.addAll(
+                "-P", "plugin:androidx.compose.compiler.plugins.kotlin:metricsDestination=$buildDirAbsolute/compose_metrics",
+                "-P", "plugin:androidx.compose.compiler.plugins.kotlin:reportsDestination=$buildDirAbsolute/compose_reports",
+            )
+        }
     }
 }
 
-// ========================================================================
-// JAR OPTIMIZATION
-// ========================================================================
+// Jar packaging.
+//
+// Removed 2026-05-17 (audit chunk 2 item #27):
+//   exclude("**/*.kotlin_metadata"), exclude("**/*.kotlin_builtins").
+//   Stripping those breaks reflection on our own classes -- kotlin-reflect
+//   (which is on the runtime classpath at 3 MB), sealed-class enumeration,
+//   KClass.members, and kotlinx.serialization runtime fallback paths all
+//   read .kotlin_metadata for type information. The size win was kilobytes
+//   per jar against the risk of silent runtime reflection breakage that
+//   would only show up in production -- not a trade worth making.
 tasks.withType<Jar>().configureEach {
-    // Remove debug metadata
+    // Signed-JAR manifest metadata: not relevant; we ship unsigned and
+    // jpackage / Inno Setup handle authenticode on their own envelope.
     exclude("META-INF/*.SF", "META-INF/*.DSA", "META-INF/*.RSA")
-    exclude("**/*.kotlin_metadata")
-    exclude("**/*.kotlin_builtins")
+    // kotlinx.coroutines debug-mode instrumentation. Only consulted when
+    // launched with -Dkotlinx.coroutines.debug=on; production never does.
     exclude("DebugProbesKt.bin")
+    // ProGuard config shipped inside third-party jars (so consumers can
+    // apply recommended keep rules). Not needed at runtime; we have our
+    // own compose-desktop.pro and shrink ourselves.
     exclude("META-INF/proguard/**")
+    // Android tooling artifacts (lint baselines, mocked-resources hints).
+    // JVM-only desktop; never loaded.
     exclude("META-INF/com.android.tools/**")
 
-    // Compression
+    // Reproducibility / deterministic packaging
     isPreserveFileTimestamps = false
     isReproducibleFileOrder = true
 
