@@ -339,6 +339,89 @@ class JavaManagerServiceTest {
         }
     }
 
+    // ── #202: in-target symlinks must be ALLOWED ─────────────────────────
+    //
+    // BellSoft's Linux/macOS JDK tarballs ship legitimate intra-package
+    // symlinks (jre/lib/.../libjsig.so → libjsig.so.0 and similar). The
+    // post-#187 blanket rejection turned every Linux fresh install into a
+    // SecurityException at JDK-extract time. Allow them when the target,
+    // resolved relative to the symlink's parent, stays within [dest].
+
+    @Test
+    fun `untargz allows in-target symbolic link (BellSoft JDK layout)`() {
+        val archive = workDir.resolve("jdk-with-symlink.tar.gz").toFile()
+        TarArchiveOutputStream(GzipCompressorOutputStream(FileOutputStream(archive))).use { tos ->
+            // The real target file.
+            val real = TarArchiveEntry("lib/libjsig.so.0")
+            val bytes = "fake-elf".toByteArray()
+            real.size = bytes.size.toLong()
+            tos.putArchiveEntry(real)
+            tos.write(bytes)
+            tos.closeArchiveEntry()
+            // Symlink alongside it pointing to the real file via a relative path
+            // — same shape as the BellSoft tarball entry that previously broke
+            // Linux fresh installs.
+            val link = TarArchiveEntry("lib/libjsig.so", TarArchiveEntry.LF_SYMLINK)
+            link.linkName = "libjsig.so.0"
+            tos.putArchiveEntry(link)
+            tos.closeArchiveEntry()
+        }
+        val dest = workDir / "extract-jdk"
+        Files.createDirectories(dest)
+
+        svc.untargz(archive, dest)
+
+        val symlink = dest / "lib" / "libjsig.so"
+        assertEquals(true, Files.isSymbolicLink(symlink), "expected symlink at $symlink")
+        // Resolving the link should land on the real file inside dest.
+        assertEquals("fake-elf", Files.readString(symlink.toRealPath()))
+    }
+
+    @Test
+    fun `untargz rejects symbolic link whose target escapes destination`() {
+        val malicious = workDir.resolve("evil-escaping-symlink.tar.gz").toFile()
+        TarArchiveOutputStream(GzipCompressorOutputStream(FileOutputStream(malicious))).use { tos ->
+            // Relative path that climbs out of [dest] entirely.
+            val link = TarArchiveEntry("inside/safe-name", TarArchiveEntry.LF_SYMLINK)
+            link.linkName = "../../../../etc/passwd"
+            tos.putArchiveEntry(link)
+            tos.closeArchiveEntry()
+        }
+        val dest = workDir / "extract-target"
+        Files.createDirectories(dest)
+        assertFailsWith<SecurityException> {
+            svc.untargz(malicious, dest)
+        }
+    }
+
+    @Test
+    fun `unzip allows in-target symbolic link`() {
+        val archive = workDir.resolve("zip-with-symlink.zip").toFile()
+        ZipArchiveOutputStream(FileOutputStream(archive)).use { zos ->
+            // Real file.
+            val real = ZipArchiveEntry("inner/target.txt")
+            val bytes = "hello".toByteArray()
+            real.size = bytes.size.toLong()
+            zos.putArchiveEntry(real)
+            zos.write(bytes)
+            zos.closeArchiveEntry()
+            // Symlink with target stored as the entry's payload (Zip convention).
+            val link = ZipArchiveEntry("inner/link.txt")
+            link.unixMode = UnixStat.LINK_FLAG or 0b111_111_111
+            zos.putArchiveEntry(link)
+            zos.write("target.txt".toByteArray())
+            zos.closeArchiveEntry()
+        }
+        val dest = workDir / "extract-zip-target"
+        Files.createDirectories(dest)
+
+        svc.unzip(archive, dest)
+
+        val symlink = dest / "inner" / "link.txt"
+        assertEquals(true, Files.isSymbolicLink(symlink), "expected symlink at $symlink")
+        assertEquals("hello", Files.readString(symlink.toRealPath()))
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────
 
     private inline fun <T> withSystemProp(key: String, value: String, block: () -> T): T {

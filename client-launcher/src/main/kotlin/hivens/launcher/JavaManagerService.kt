@@ -177,7 +177,22 @@ class JavaManagerService(
                     throw IOException("Zip entry is outside of the target dir: ${entry.name}")
                 }
                 if (entry.isUnixSymlink) {
-                    throw SecurityException("Archive contains symlink entry: ${entry.name}")
+                    // For Zip, the link target is stored as the entry's payload
+                    // bytes (not a separate field like TAR). Validate that the
+                    // target, resolved relative to the symlink's parent, stays
+                    // within [dest] — same CVE-resistant pattern as the
+                    // TAR path below.
+                    val linkTarget = zf.getInputStream(entry).use { it.readBytes() }.decodeToString()
+                    val resolvedTarget = resolvedPath.parent.resolve(linkTarget).normalize()
+                    if (!resolvedTarget.startsWith(dest)) {
+                        throw SecurityException(
+                            "Symlink target escapes destination: ${entry.name} -> $linkTarget",
+                        )
+                    }
+                    Files.createDirectories(resolvedPath.parent)
+                    Files.deleteIfExists(resolvedPath)
+                    Files.createSymbolicLink(resolvedPath, Path.of(linkTarget))
+                    continue
                 }
 
                 if (entry.isDirectory) {
@@ -203,21 +218,41 @@ class JavaManagerService(
                             if (!resolvedPath.startsWith(dest)) {
                                 throw IOException("Tar entry is outside of the target dir: ${entry.name}")
                             }
-                            // Reject every entry kind that isn't a plain file or
-                            // directory (#187). TAR natively encodes symlinks /
-                            // hardlinks / FIFOs / device nodes — none of which
-                            // belong in a BellSoft JDK tarball, but a tampered
-                            // upstream could ship one to redirect writes outside
-                            // [dest]. Hard fail rather than skip so a malicious
-                            // archive surfaces loudly in logs / crash report.
-                            if (entry.isSymbolicLink || entry.isLink ||
-                                entry.isFIFO || entry.isCharacterDevice || entry.isBlockDevice) {
+                            // Hard-reject entry kinds that have no legitimate use
+                            // in any archive we extract: hardlinks (would let a
+                            // tampered tarball create a hardlink to a sensitive
+                            // file outside [dest] for the next write to clobber),
+                            // FIFOs, character devices, block devices.
+                            if (entry.isLink || entry.isFIFO ||
+                                entry.isCharacterDevice || entry.isBlockDevice) {
                                 throw SecurityException(
                                     "Archive contains non-regular entry (${entry.javaClass.simpleName}): ${entry.name}",
                                 )
                             }
 
-                            if (entry.isDirectory) {
+                            if (entry.isSymbolicLink) {
+                                // BellSoft Linux/macOS JDK tarballs include
+                                // legitimate intra-package symlinks (e.g.
+                                // jre/lib/.../libjsig.so → libjsig.so.0).
+                                // Allow the link when its target, resolved
+                                // relative to the symlink's parent, stays
+                                // within [dest]; reject when it would escape,
+                                // so a tampered upstream can't redirect the
+                                // next write outside our extraction root.
+                                // (#202 — was blanket-rejected before, which
+                                // broke fresh Linux installs since every
+                                // BellSoft Linux JDK ships symlinks.)
+                                val linkTarget = entry.linkName ?: ""
+                                val resolvedTarget = resolvedPath.parent.resolve(linkTarget).normalize()
+                                if (!resolvedTarget.startsWith(dest)) {
+                                    throw SecurityException(
+                                        "Symlink target escapes destination: ${entry.name} -> $linkTarget",
+                                    )
+                                }
+                                Files.createDirectories(resolvedPath.parent)
+                                Files.deleteIfExists(resolvedPath)
+                                Files.createSymbolicLink(resolvedPath, Path.of(linkTarget))
+                            } else if (entry.isDirectory) {
                                 Files.createDirectories(resolvedPath)
                             } else {
                                 Files.createDirectories(resolvedPath.parent)
