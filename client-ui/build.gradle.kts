@@ -12,11 +12,9 @@ plugins {
 
 group = "hivens"
 
-repositories {
-    google()
-    mavenCentral()
-    maven("https://maven.pkg.jetbrains.space/public/p/compose/dev")
-}
+// Repositories live in settings.gradle.kts (dependencyResolutionManagement
+// with FAIL_ON_PROJECT_REPOS). Adding a `repositories { ... }` block here
+// is a build-time error by design -- changes go in one place only.
 
 kotlin {
     jvm("desktop")
