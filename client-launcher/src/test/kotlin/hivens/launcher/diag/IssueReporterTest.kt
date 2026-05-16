@@ -82,7 +82,7 @@ class IssueReporterTest {
         )
         val body = decodedBody(IssueReporter.crashIssueUrl(report))
         assertFalse(body.contains("AAAA1234BBBB5678"),
-            "raw access token must NOT appear in the issue body — Redactor must run")
+            "raw access token must NOT appear in the issue body -- Redactor must run")
         assertTrue(body.contains("<redacted>"),
             "redaction marker expected where the token was")
     }
@@ -99,7 +99,7 @@ class IssueReporterTest {
         assertTrue(body.contains("aura-diagnostic-abc12345-2026-05-12.zip"),
             "bundle filename must appear in body so the user knows what to drag-attach")
         assertFalse(body.contains("/home/haru"),
-            "absolute path with home dir must NOT appear in URL body — that would leak username/host info")
+            "absolute path with home dir must NOT appear in URL body -- that would leak username/host info")
         assertFalse(body.contains(".local/share"),
             "data directory path must NOT appear in URL body")
     }
@@ -114,7 +114,7 @@ class IssueReporterTest {
 
     @Test
     fun `body truncation keeps URL under reasonable browser cap`() {
-        // Synthesise a stack trace much larger than the truncation limit.
+        // Synthesize a stack trace much larger than the truncation limit.
         val huge = (1..100_000).joinToString("\n") { "stackline-$it.com.example.foo.bar.Baz.method(Baz.kt:$it)" }
         val url = IssueReporter.crashIssueUrl(fakeCrashReport(stack = huge))
         // Loose ceiling: ≤ 16 KB total URL (URL-encoding ~doubles char count
@@ -122,7 +122,7 @@ class IssueReporterTest {
         // Firefox limits are ≥ 32 KB, but our raw body cap is ~6 KB so even
         // worst-case encoded that's well under any browser limit.
         assertTrue(url.length < 16_000,
-            "URL grew to ${url.length} chars — truncation likely failed")
+            "URL grew to ${url.length} chars -- truncation likely failed")
     }
 
     @Test
@@ -132,11 +132,11 @@ class IssueReporterTest {
     }
 
     @Test
-    fun `crash issue TITLE is also redacted — tokens in exception messages must not leak via URL parameter`() {
+    fun `crash issue TITLE is also redacted -- tokens in exception messages must not leak via URL parameter`() {
         // Title is built from the first stack-trace line, which can carry a
         // sensitive query param (e.g. `accessToken=` in a failed-request
         // exception). The URL ends up in browser history / proxy logs /
-        // GitHub request logs whether body is scrubbed or not — title needs
+        // GitHub request logs whether body is scrubbed or not -- title needs
         // the Redactor pass too.
         val report = fakeCrashReport(
             stack = "java.io.IOException: GET https://example/auth?accessToken=AAAA1234SECRET returned 500"

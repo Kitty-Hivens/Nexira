@@ -28,7 +28,7 @@ import javax.crypto.spec.SecretKeySpec
  *
  * Status-mapping nuance: server returns [ProtocolStatus] enum, this class
  * exposes [AuthStatus] (Aura's UX-facing enum, slightly different shape).
- * Mapping happens in [mapStatus] — keep them aligned when adding new values.
+ * Mapping happens in [mapStatus] -- keep them aligned when adding new values.
  */
 class AuthService(
     private val protocol: IServerProtocol,
@@ -39,7 +39,7 @@ class AuthService(
     /**
      * Per-server session cache. The dashboard renders server cards by
      * doing a "list servers" auth, then the Play button does a "launch
-     * server" auth — historically two consecutive logins for the same
+     * server" auth -- historically two consecutive logins for the same
      * serverId within ~3 seconds. Both call sites are legitimate; they
      * just don't share state. Caching here deduplicates them down to
      * one network request as long as the user clicks Play within the
@@ -50,12 +50,12 @@ class AuthService(
      * with the *wrong* password within the 30 s TTL would silently
      * succeed via cache, masking real credential rotation (Codex P2 on
      * PR #128). We use the MD5 already computed for the auth request,
-     * not the plaintext password — same secret-handling profile as the
+     * not the plaintext password -- same secret-handling profile as the
      * rest of the call.
      *
-     * 30 s TTL: long enough for "open launcher → pick server → click Play",
+     * 30 s TTL: long enough for "open launcher -> pick server -> click Play",
      * short enough that the upstream server still considers the session
-     * fresh. Cache is in-memory only — process restart re-auths.
+     * fresh. Cache is in-memory only -- process restart re-auths.
      */
     private data class CacheKey(val username: String, val passwordHash: String, val serverId: String)
     private data class CachedSession(val session: SessionData, val expiresAt: Long)
@@ -65,7 +65,7 @@ class AuthService(
 
     /**
      * Per-user cache of the LoginResponse the server returned alongside a
-     * TWOAUTH status — held until [completeTwoFactor] consumes it (or a
+     * TWOAUTH status -- held until [completeTwoFactor] consumes it (or a
      * fresh login overwrites it). The official protocol's TWOAUTH response
      * is sometimes status-only (per spec) and sometimes carries enough
      * session fields to short-circuit the post-twoauth re-login loop.
@@ -76,18 +76,18 @@ class AuthService(
     private val pendingTwoFactor = java.util.concurrent.ConcurrentHashMap<CacheKey, LoginResponse>()
 
     override suspend fun login(username: String, password: String, serverId: String): SessionData {
-        // Hash first so the cache key includes the password — otherwise a
+        // Hash first so the cache key includes the password -- otherwise a
         // wrong/rotated password within the TTL would silently succeed
         // via cache. (Codex P2 on PR #128.)
         val passwordEncoded = HashUtils.md5(password)
         // Each fresh login attempt invalidates any stale pendingTwoFactor
-        // entry for this triple — covers the case where the user cancelled
+        // entry for this triple -- covers the case where the user canceled
         // a previous 2FA dialog (or it errored out) and is now retrying.
         // Without this the map would grow unbounded across the launcher's
         // lifetime (audit catch on the 22-commit batch).
         pendingTwoFactor.remove(CacheKey(username, passwordEncoded, serverId))
         cachedFor(username, passwordEncoded, serverId)?.let {
-            logger.info("Login via API V3 (server: {}) — cache hit, skipping network", serverId)
+            logger.info("Login via API V3 (server: {}) -- cache hit, skipping network", serverId)
             return it
         }
         logger.info("Login via API V3 (server: {})...", serverId)
@@ -129,12 +129,12 @@ class AuthService(
 
         val parsedStatus = response.parsedStatus
         if (parsedStatus == ProtocolStatus.TWOAUTH) {
-            // The TWOAUTH branch isn't a failure — it's a "do the second
+            // The TWOAUTH branch isn't a failure -- it's a "do the second
             // factor and call back". Cache the response so completeTwoFactor
             // can build a SessionData directly from it (preferred path) and
             // only fall back to a re-login when the cached fields are too
-            // sparse to construct one — necessary to avoid the
-            // login→TWOAUTH→twoauth=OK→login→TWOAUTH→… loop the server
+            // sparse to construct one -- necessary to avoid the
+            // login->TWOAUTH->twoauth=OK->login->TWOAUTH->… loop the server
             // sometimes drops us into.
             pendingTwoFactor[CacheKey(username, passwordEncoded, serverId)] = response
             throw TwoFactorRequiredException(uid = response.uid, login = username)
@@ -197,7 +197,7 @@ class AuthService(
             // status the spec never mentions) is unrecoverable from the
             // dialog: there's nothing the user can re-type that will
             // change the answer. Per spec, the documented recovery is
-            // "restart full login" — which is exactly the contract of
+            // "restart full login" -- which is exactly the contract of
             // TWO_FACTOR_EXPIRED. Surface that status so the UI dismisses
             // the dialog and routes the user back to the credentials
             // form, instead of pinning them to a verify button that will
@@ -208,13 +208,13 @@ class AuthService(
             )
         }
 
-        // twoauth=OK — server now considers the second factor satisfied.
+        // twoauth=OK -- server now considers the second factor satisfied.
         // Two reconstruction strategies, in order:
         //   1. The TWOAUTH login response is sometimes complete (uuid +
-        //      playername + session populated) — promote it to a SessionData
+        //      playername + session populated) -- promote it to a SessionData
         //      directly. Cheaper and avoids the next strategy's loop hazard.
         //   2. If the cached response is too sparse, fall back to a single
-        //      re-login. If THAT comes back TWOAUTH again (server quirk —
+        //      re-login. If THAT comes back TWOAUTH again (server quirk --
         //      observed empirically when the account doesn't actually have
         //      2FA configured but the server still routes through the gate),
         //      give up with TWO_FACTOR_EXPIRED rather than loop.
@@ -222,7 +222,7 @@ class AuthService(
         val key = CacheKey(username, passwordEncoded, serverId)
         val cachedResponse = pendingTwoFactor.remove(key)
 
-        // `session` MUST be checked too — it's the AES-encrypted bytes that
+        // `session` MUST be checked too -- it's the AES-encrypted bytes that
         // become accessToken via generateGameToken. A TWOAUTH response with
         // uuid + playername populated but session null would build a
         // SessionData with an empty accessToken and the game would die at
@@ -333,7 +333,7 @@ class AuthService(
 
     /**
      * True for the narrow set of transient network failures we've seen on
-     * the SMARTYcraft channel — h2 frame resets over SOCKS, raw socket
+     * the SMARTYcraft channel -- h2 frame resets over SOCKS, raw socket
      * resets during TLS, ktor's wrapped channel-closed exception. NOT true
      * for [AuthException] (those are server-side rejections, retrying just
      * locks the user out faster) or SSL cert errors (those need user opt-in,

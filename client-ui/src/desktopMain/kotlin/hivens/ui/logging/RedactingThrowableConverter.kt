@@ -7,7 +7,7 @@ import hivens.core.logging.Redactor
 /**
  * Companion to [RedactingMessageConverter] for the THROWABLE half of a log event.
  * Logback's standard `%ex` / `%xEx` print stack traces straight from
- * `Throwable.toString()` — message text included — so exceptions like
+ * `Throwable.toString()` -- message text included -- so exceptions like
  * `IOException("GET /auth?accessToken=xxx returned 500")` would leak the token
  * to disk even though the surrounding message went through `%rmsg`.
  *

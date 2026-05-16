@@ -9,14 +9,14 @@ import java.time.Instant
 /**
  * One-shot migration of user data from ~/.aura/ to the platform-correct directory.
  *
- * Copies (does not move) — the legacy directory is left in place so the user can
+ * Copies (does not move) -- the legacy directory is left in place so the user can
  * verify the migration before deleting it manually. A marker file is written into
  * the legacy directory to prevent re-running.
  *
  * Skipped when:
  * - the legacy directory does not exist (clean install);
  * - the marker file is already present (already migrated);
- * - the target directory exists and is non-empty (defensive — never overwrite).
+ * - the target directory exists and is non-empty (defensive -- never overwrite).
  */
 object DataDirMigration {
     private val log = LoggerFactory.getLogger(DataDirMigration::class.java)
@@ -25,7 +25,7 @@ object DataDirMigration {
     /**
      * Files the launcher writes to its dataDir BEFORE migration runs (because
      * SingleInstance.acquire grabs the lock before DataDirMigration.run, by
-     * design — see Main.kt). Their presence MUST NOT make the target look
+     * design -- see Main.kt). Their presence MUST NOT make the target look
      * "already populated" or first-run migration silently skips and the
      * legacy `.aura/` payload is lost.
      *
@@ -88,7 +88,7 @@ object DataDirMigration {
      * True when the directory contains anything beyond [HOUSEKEEPING].
      *
      * The launcher writes housekeeping markers (.lock / .lock.pid / .show /
-     * .migrated) before migration runs — see Main.kt's startup sequence.
+     * .migrated) before migration runs -- see Main.kt's startup sequence.
      * Treating those as "user data" would cause us to skip a legitimate
      * first-run migration (the lock files from this very startup would
      * already be in place).

@@ -63,7 +63,7 @@ fun BackgroundSettingsScreen(
         settings = BackgroundSettings(); onSettingsChanged(settings)
     }
     // Sliders are float-valued; PuppetField (string) doesn't fit naturally.
-    // Out of MVP scope — a numeric setter shape can be added later if needed.
+    // Out of MVP scope -- a numeric setter shape can be added later if needed.
     // Note: scale-mode + tint-color buttons reachable from in-process state,
     // but selecting them by enum/hex name belongs in a follow-up.
 

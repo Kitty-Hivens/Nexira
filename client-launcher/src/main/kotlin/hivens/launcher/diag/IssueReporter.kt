@@ -13,7 +13,7 @@ import java.time.format.DateTimeFormatter
  * Builds pre-filled GitHub `/issues/new?title=&body=&labels=` URLs for the two
  * Beacon entry points: crash dialog and diagnostic bundle dialog. Opening one
  * of these URLs takes the user to a GitHub Issue editor with everything we
- * could autofill already in place — they review, edit, submit. Nothing leaves
+ * could autofill already in place -- they review, edit, submit. Nothing leaves
  * the machine until the user clicks the GitHub "Submit" button on github.com.
  *
  * This is the principled alternative to telemetry (see [[user_privacy_stance]]):
@@ -56,7 +56,7 @@ object IssueReporter {
     private fun buildCrashBody(report: CrashReporter.CrashReport): String {
         // Use the snapshot frozen at crash time, NOT a fresh ActionRing.snapshot():
         // if the process keeps running after an uncaught exception (which the
-        // default handler does — it shows the dialog without exiting), the ring
+        // default handler does -- it shows the dialog without exiting), the ring
         // accumulates more entries before the user clicks "Report on GitHub",
         // and we'd ship a body that doesn't match the crash file the user
         // can also see on disk. report.actions is the authoritative crash-time
@@ -69,7 +69,7 @@ object IssueReporter {
         val truncatedStack = report.stackTrace.take(STACK_TRACE_LIMIT) +
             if (report.stackTrace.length > STACK_TRACE_LIMIT) "\n... (truncated; full trace in crash file)" else ""
 
-        // All free-form fields routed through Redactor — defense in depth.
+        // All free-form fields routed through Redactor -- defense in depth.
         // CrashReporter doesn't generate report.lastAction-style sensitive fields
         // anymore, but stack traces can include URL params with tokens.
         return Redactor.redact(buildString {
@@ -99,7 +99,7 @@ object IssueReporter {
     }
 
     private fun buildBundleBody(bundlePath: Path): String = buildString {
-        // ONLY the file name lands in the URL — never the absolute path. The
+        // ONLY the file name lands in the URL -- never the absolute path. The
         // absolute path leaks `~/.local/share/...` (Linux) or
         // `C:\Users\<username>\AppData\...` (Windows) into the GitHub URL,
         // which becomes part of browser history, proxy logs, GitHub request

@@ -7,7 +7,6 @@ import org.apache.commons.compress.archivers.zip.UnixStat
 import org.apache.commons.compress.archivers.zip.ZipArchiveEntry
 import org.apache.commons.compress.archivers.zip.ZipArchiveOutputStream
 import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream
-import java.io.File
 import java.io.FileOutputStream
 import java.nio.file.Files
 import java.nio.file.Path
@@ -39,7 +38,7 @@ class JavaManagerServiceTest {
         Files.walk(workDir).sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }
     }
 
-    // ── detectJavaVersion: MC version → Java major ───────────────────────
+    // ── detectJavaVersion: MC version -> Java major ───────────────────────
 
     @Test
     fun `detectJavaVersion maps 1_7_10 to Java 8`() {
@@ -65,7 +64,7 @@ class JavaManagerServiceTest {
 
     @Test
     fun `detectJavaVersion maps 1_20_5 onwards to Java 21`() {
-        // The 1.20.5/1.20.6 carve-out — Mojang bumped Java required mid-release
+        // The 1.20.5/1.20.6 carve-out -- Mojang bumped Java required mid-release
         assertEquals(21, svc.detectJavaVersion("1.20.5"))
         assertEquals(21, svc.detectJavaVersion("1.20.6"))
     }
@@ -79,13 +78,13 @@ class JavaManagerServiceTest {
     @Test
     fun `detectJavaVersion falls through unknown versions to Java 8 (legacy default)`() {
         // Anything we don't recognize (very old / future versions Aura
-        // hasn't been updated for) defaults to Java 8 — historically the
+        // hasn't been updated for) defaults to Java 8 -- historically the
         // safest fallback because all SmartyCraft 1.x.x servers run on it.
         assertEquals(8, svc.detectJavaVersion("1.5.2"))
         assertEquals(8, svc.detectJavaVersion("alpha-1.0.0"))
     }
 
-    // ── getOsName: os.name → short tag ───────────────────────────────────
+    // ── getOsName: os.name -> short tag ───────────────────────────────────
 
     @Test
     fun `getOsName maps Windows variants to win`() {
@@ -118,7 +117,7 @@ class JavaManagerServiceTest {
         }
     }
 
-    // ── getArchName: os.arch → short tag ─────────────────────────────────
+    // ── getArchName: os.arch -> short tag ─────────────────────────────────
 
     @Test
     fun `getArchName maps aarch64 and arm64 to arm64`() {
@@ -155,7 +154,7 @@ class JavaManagerServiceTest {
     @Test
     fun `getDownloadUrl returns BellSoft url for known os arch combos`() {
         // Spot-check one combo per Java major. Full matrix coverage isn't
-        // needed — the when() arms are repetitive and the value is
+        // needed -- the when() arms are repetitive and the value is
         // catching "url constant rotted" not "logic mistake".
         withSystemProp("os.name", "Linux") {
             withSystemProp("os.arch", "amd64") {
@@ -196,8 +195,8 @@ class JavaManagerServiceTest {
 
     @Test
     fun `getDownloadUrl returns null for unknown Java major`() {
-        // Anything outside of {8, 17, 21} — e.g., a hypothetical 25 we
-        // haven't wired yet — falls through to null. The download path
+        // Anything outside {8, 17, 21} -- e.g., a hypothetical 25 we
+        // haven't wired yet -- falls through to null. The download path
         // surfaces this as a clear "no Java build for this system" error.
         withSystemProp("os.name", "Linux") {
             withSystemProp("os.arch", "amd64") {
@@ -275,7 +274,7 @@ class JavaManagerServiceTest {
     @Test
     fun `unzip throws SecurityException on symlink entry (#187)`() {
         // BellSoft JDK ZIPs (Windows builds) ship plain files only. A symlink
-        // entry would either be packaging accident or hostile redirect — fail
+        // entry would either be packaging accident or hostile redirect -- fail
         // hard so the JDK install surfaces loudly instead of corrupting state.
         val malicious = workDir.resolve("evil-jdk.zip").toFile()
         ZipArchiveOutputStream(FileOutputStream(malicious)).use { zos ->
@@ -342,8 +341,8 @@ class JavaManagerServiceTest {
     // ── #202: in-target symlinks must be ALLOWED ─────────────────────────
     //
     // BellSoft's Linux/macOS JDK tarballs ship legitimate intra-package
-    // symlinks (jre/lib/.../libjsig.so → libjsig.so.0 and similar). The
-    // post-#187 blanket rejection turned every Linux fresh install into a
+    // symlinks (jre/lib/.../libjsig.so -> libjsig.so.0 and similar). The
+    // post-#187 blanket rejection turned every Linux fresh installation into a
     // SecurityException at JDK-extract time. Allow them when the target,
     // resolved relative to the symlink's parent, stays within [dest].
 
@@ -359,8 +358,8 @@ class JavaManagerServiceTest {
             tos.write(bytes)
             tos.closeArchiveEntry()
             // Symlink alongside it pointing to the real file via a relative path
-            // — same shape as the BellSoft tarball entry that previously broke
-            // Linux fresh installs.
+            // -- same shape as the BellSoft tarball entry that previously broke
+            // Linux fresh installations.
             val link = TarArchiveEntry("lib/libjsig.so", TarArchiveEntry.LF_SYMLINK)
             link.linkName = "libjsig.so.0"
             tos.putArchiveEntry(link)

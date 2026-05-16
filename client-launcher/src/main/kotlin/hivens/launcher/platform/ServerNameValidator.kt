@@ -7,8 +7,8 @@ package hivens.launcher.platform
  * data directory (`<dataDir>/clients/<assetDir>/`) and the cache-file name
  * (`<dataDir>/manifest-cache/<assetDir>.json`). A malicious or malformed upstream
  * could send `../etc/passwd` and have either of those resolve outside the launcher
- * data dir. JVM `Path.resolve()` doesn't reject the traversal — it composes the
- * absolute path verbatim — so the gate has to live before resolution.
+ * data dir. JVM `Path.resolve()` doesn't reject the traversal -- it composes the
+ * absolute path verbatim -- so the gate has to live before resolution.
  *
  * Allowed characters: ASCII letters, digits, `_`, `-`, `.`. This matches every
  * SmartyCraft server id that has ever shipped (`Industrial`, `RPG`, `SkyBlock`,
@@ -45,7 +45,7 @@ object ServerNameValidator {
      *     regex but are filesystem traversal primitives),
      *   - any string with `..` anywhere (matches Windows alternate-stream-style
      *     constructs like `Industrial..\\evil` after the regex has separately
-     *     filtered the slash — defense in depth),
+     *     filtered the slash -- defense in depth),
      *   - anything outside the character whitelist.
      */
     fun isValid(name: String): Boolean =

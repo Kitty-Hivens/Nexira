@@ -28,7 +28,7 @@ class NoOpKeyringStorageTest {
     }
 
     @Test
-    fun `singleton identity — same instance across calls`() {
+    fun `singleton identity -- same instance across calls`() {
         // The factory hands out NoOpKeyringStorage by reference; if a
         // future refactor accidentally turns it into a class, the
         // unnecessary allocations on every Koin resolve would matter.

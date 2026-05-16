@@ -81,7 +81,7 @@ val networkModule = module {
     /**
      * Smartycraft insecure client (SSL verification disabled).
      * Registered only for the explicit "connect anyway" user flow.
-     * Never injected by default — must be requested by named("insecure").
+     * Never injected by default -- must be requested by named("insecure").
      *
      * **Conduit Phase 4 audit (#157):** the default `HttpClientProvider`
      * already returns this insecure client when `NetworkState.bypassFor()`
@@ -92,7 +92,7 @@ val networkModule = module {
      * its dependent ChannelRouter / IServerProtocol / IAuthService) is
      * therefore redundant for the standard "Connect anyway" flow and is
      * planned for removal in 2.2.14 once the UI call sites have been
-     * migrated. Until then it stays — it remains useful as a one-shot
+     * migrated. Until then it stays -- it remains useful as a one-shot
      * insecure transport that doesn't require touching `NetworkState`.
      */
     single<OkHttpClient>(named("insecure")) {
@@ -110,7 +110,7 @@ val networkModule = module {
 
     // ── Direct channel ────────────────────────────────────────────────────────
     // No proxy, strict TLS. For third-party CDNs (GitHub releases, BellSoft
-    // JDKs, Maven Central). Survives any SMARTYcraft proxy outage by design —
+    // JDKs, Maven Central). Survives any SMARTYcraft proxy outage by design --
     // the auto-updater must keep working when the upstream proxy doesn't.
 
     /**
@@ -130,7 +130,7 @@ val networkModule = module {
     }
 
     /**
-     * Default (smartycraft) [HttpClientProvider] — thin wrapper that resolves
+     * Default (smartycraft) [HttpClientProvider] -- thin wrapper that resolves
      * the correct proxied [HttpClient] on every request via
      * [NetworkState.sslBypassEnabled].
      *
@@ -144,14 +144,14 @@ val networkModule = module {
         HttpClientProvider {
             // Per-host SSL bypass with expiry (Vault #2). Default channel
             // talks only to *.smartycraft.ru, so the single host check is
-            // sufficient — direct-channel hosts (GitHub, BellSoft, Maven
+            // sufficient -- direct-channel hosts (GitHub, BellSoft, Maven
             // Central) have their own provider and never bypass.
             if (NetworkState.bypassFor(Network.SSL_BYPASS_HOST)) insecure else secure
         }
     }
 
     /**
-     * Named insecure [HttpClientProvider] for [AuthService] — always uses
+     * Named insecure [HttpClientProvider] for [AuthService] -- always uses
      * the insecure smartycraft client regardless of [NetworkState], because it
      * is injected specifically for the "connect anyway" login retry path.
      */
@@ -163,7 +163,7 @@ val networkModule = module {
     /**
      * Direct-channel [HttpClientProvider]. Inject this (`named("direct")`)
      * for any outbound call that does NOT need to tunnel through the
-     * SMARTYcraft proxy — see routing notes in `hivens.config.Network`.
+     * SMARTYcraft proxy -- see routing notes in `hivens.config.Network`.
      */
     single<HttpClientProvider>(named("direct")) {
         val direct = buildHttpClient(get<OkHttpClient>(named("direct")), get())
@@ -177,11 +177,11 @@ val networkModule = module {
     //
     // Default channel: ChannelRouter wraps a direct + a proxied OkHttpClient.
     // Each call tries direct first; on IOException retries via proxy. Users in
-    // censored networks toggle Settings → Network → "Force proxy mode" to
+    // censored networks toggle Settings -> Network -> "Force proxy mode" to
     // skip the direct attempt (see NetworkState.forceProxyMode).
     //
     // Insecure channel: separate IServerProtocol bound for SSL-bypass login
-    // retry — uses a router that wraps the insecure-direct + insecure-proxy
+    // retry -- uses a router that wraps the insecure-direct + insecure-proxy
     // pair so the bypass survives the fallback chain.
     //
     // Wire spec lives in docs/dev/smartycraft-v1-protocol.md.
@@ -208,7 +208,7 @@ val networkModule = module {
         )
     }
 
-    // ServerProtocolConfig — Conduit Phase 3. Loads from
+    // ServerProtocolConfig -- Conduit Phase 3. Loads from
     // <dataDir>/server-config.json with smartycraft.ru defaults if absent.
     // Optional system-property override aura.conduit.baseurl gates a runtime
     // base URL change for Mirror development / test environments (gated by
@@ -235,7 +235,7 @@ val networkModule = module {
         )
     }
 
-    // Repositories — thin adapters over IServerProtocol post-Conduit Phase 1.
+    // Repositories -- thin adapters over IServerProtocol post-Conduit Phase 1.
     single { ServerRepository(get<IServerProtocol>()) }
     single { SkinRepository(get<IServerProtocol>()) }
     single { PlayerRepository(get<IServerProtocol>()) }
@@ -260,7 +260,7 @@ val appModule = module {
     // Managers and services
     //
     // IKeyringStorage chosen at startup via KeyringStorageFactory.system()
-    // — Linux libsecret on this platform, NoOp fallback elsewhere or when
+    // -- Linux libsecret on this platform, NoOp fallback elsewhere or when
     // the daemon is unreachable. CredentialsManager handles the file-fallback
     // path internally when keyring.store() returns false, so this single
     // line wires both the happy path and the degraded path.
@@ -286,11 +286,11 @@ val appModule = module {
 
     single<IManifestProcessorService> { ManifestProcessorService(get()) }
     single { ProfileManager(get(), get()) }
-    // Direct channel — BellSoft JDK CDN does not require the SMARTYcraft proxy.
+    // Direct channel -- BellSoft JDK CDN does not require the SMARTYcraft proxy.
     single<IJavaManager> { JavaManagerService(get(), get(named("direct"))) }
 
     // Launch pipeline collaborators
-    // Direct channel — Maven Central LWJGL/JInput natives don't need the proxy.
+    // Direct channel -- Maven Central LWJGL/JInput natives don't need the proxy.
     single { EnvironmentPreparer(get(named("direct"))) }
     single { ClasspathProvider(get()) }
     single { GameCommandBuilder(get()) }
@@ -299,7 +299,7 @@ val appModule = module {
     single<IAuthService> { AuthService(get<IServerProtocol>()) }
 
     /**
-     * Insecure [IAuthService] — used exclusively for the SSL bypass login retry.
+     * Insecure [IAuthService] -- used exclusively for the SSL bypass login retry.
      * Always connects without certificate verification (via the insecure-channel
      * IServerProtocol variant bound above in coreModule).
      */
@@ -341,7 +341,7 @@ val appModule = module {
         )
     }
 
-    // Update Service — direct channel. GitHub releases must remain reachable
+    // Update Service -- direct channel. GitHub releases must remain reachable
     // even when the SMARTYcraft proxy is down, otherwise the auto-updater
     // cannot ship the very fix that restores proxy connectivity.
     single {

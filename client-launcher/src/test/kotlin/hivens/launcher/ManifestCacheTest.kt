@@ -10,6 +10,7 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -50,7 +51,7 @@ class ManifestCacheTest {
     }
 
     @Test
-    fun `cache is per-server — Industrial mark doesn't satisfy Create check`() {
+    fun `cache is per-server -- Industrial mark doesn't satisfy Create check`() {
         cache.markClean("Industrial", "abc123")
         assertFalse(cache.isClean("Create", "abc123"))
     }
@@ -74,20 +75,20 @@ class ManifestCacheTest {
     fun `hashOf differs for different input`() {
         val a = cache.hashOf("""{"foo":"bar"}""")
         val b = cache.hashOf("""{"foo":"baz"}""")
-        assertFalse(a == b)
+        assertNotEquals(a, b)
     }
 
     @Test
     fun `serverId with traversal characters is sanitised`() {
-        // Defensive — server id is from upstream config but we still don't
+        // Defensive -- server id is from upstream config, but we still don't
         // want a malicious value to escape the cache dir.
         cache.markClean("../etc/passwd", "abc")
         // Cache file lands in cacheDir, not above it. We can't directly
-        // observe the sanitised filename without opening implementation
+        // observe the sanitized filename without opening implementation
         // details, but we can confirm the file shows up under cacheDir:
         val files = Files.list(cacheDir).use { it.toList() }
         assertEquals(1, files.size)
-        assertTrue(files[0].parent == cacheDir, "sanitised file must stay inside cacheDir")
+        assertEquals(files[0].parent, cacheDir, "sanitised file must stay inside cacheDir")
     }
 
     @Test
@@ -130,7 +131,7 @@ class ManifestCacheTest {
     }
 
     @Test
-    fun `loadManifest ignores TTL — stale-but-present manifest is still returned`() {
+    fun `loadManifest ignores TTL -- stale-but-present manifest is still returned`() {
         // Offline-launch fallback intentionally serves expired entries:
         // a stale file list is strictly better than launching with empty
         // classpath (which is what triggered the original bug).
@@ -158,7 +159,7 @@ class ManifestCacheTest {
 
     @Test
     fun `isClean honours diskSanityCheck even on the same call shape`() {
-        // The lambda is the only thing different — must flip the result.
+        // The lambda is the only thing different -- must flip the result.
         cache.markClean("Industrial", "abc")
         assertTrue(cache.isClean("Industrial", "abc") { true })
         assertFalse(cache.isClean("Industrial", "abc") { false })
@@ -166,7 +167,7 @@ class ManifestCacheTest {
 
     @Test
     fun `diskSanityCheck is NOT consulted when the hash gate already failed`() {
-        // Optimization the production code relies on — the lambda may walk
+        // Optimization the production code relies on -- the lambda may walk
         // the filesystem; don't bother running it when we've already
         // decided to refresh because of a hash mismatch.
         cache.markClean("Industrial", "abc")

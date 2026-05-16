@@ -7,7 +7,7 @@ import hivens.core.util.HashUtils
  * (spawn, twoauth, uploadSkin, uploadCloak, report).
  *
  * Scheme is `MD5(timeBucket | uid | login | <action-specific-fields>)` where
- * [timeBucket] is `currentTimeSec / 10` — gives ~10-second tolerance window
+ * [timeBucket] is `currentTimeSec / 10` -- gives ~10-second tolerance window
  * for clock drift / network latency, also serves as anti-replay (signature
  * valid only briefly).
  *
@@ -21,7 +21,7 @@ import hivens.core.util.HashUtils
 internal object SmartycraftSignatureBuilder {
 
     /**
-     * Current ten-second time bucket. Exposed for testing — production code
+     * Current ten-second time bucket. Exposed for testing -- production code
      * computes its own. [System.currentTimeMillis] is read once per call.
      */
     fun currentTimeBucket(): Long = System.currentTimeMillis() / 1000L / 10L

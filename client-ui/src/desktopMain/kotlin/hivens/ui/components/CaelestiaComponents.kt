@@ -14,13 +14,13 @@ import hivens.ui.effects.pulsatingGlow
 import hivens.ui.theme.CelestiaTheme
 
 /**
- * Main Celestia container — translucent, with a thin border.
+ * Main Celestia container -- translucent, with a thin border.
  *
  * [borderColor] is now theme-aware: if [Color.Unspecified] is passed (or omitted),
  * a light gray border is used in light theme, and dark gray in dark theme.
  */
 @Composable
-fun GlassCard(
+fun GlassCard( // TODO: translate to English!
     modifier: Modifier = Modifier,
     shape: Shape = MaterialTheme.shapes.medium,
     backgroundColor: Color = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
@@ -47,7 +47,7 @@ fun GlassCard(
 /**
  * Кнопка Celestia.
  *
- * [glowing] = true включает пульсирующий неоновый эффект —
+ * [glowing] = true включает пульсирующий неоновый эффект --
  * идеально для кнопки PLAY в состоянии Idle.
  */
 @Composable

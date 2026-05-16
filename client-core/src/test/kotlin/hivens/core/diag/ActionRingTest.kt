@@ -24,7 +24,7 @@ class ActionRingTest {
     }
 
     @Test
-    fun `capacity is enforced — oldest entries fall off`() {
+    fun `capacity is enforced -- oldest entries fall off`() {
         repeat(ActionRing.CAPACITY + 10) { ActionRing.record("e$it") }
         val snap = ActionRing.snapshot()
         assertEquals(ActionRing.CAPACITY, snap.size)
@@ -50,7 +50,7 @@ class ActionRingTest {
     }
 
     @Test
-    fun `snapshot is a defensive copy — mutations on the ring after the call don't affect it`() {
+    fun `snapshot is a defensive copy -- mutations on the ring after the call don't affect it`() {
         ActionRing.record("first")
         val before = ActionRing.snapshot()
         ActionRing.record("second")
@@ -59,7 +59,7 @@ class ActionRingTest {
     }
 
     @Test
-    fun `capacity holds under concurrent writers — synchronized trim must be atomic`() {
+    fun `capacity holds under concurrent writers -- synchronized trim must be atomic`() {
         // Regression test for the prior ConcurrentLinkedDeque + size() implementation,
         // which let racing threads overshoot CAPACITY because size() is documented
         // non-atomic and the trim loop was outside any lock. Spawn many writers,
@@ -69,7 +69,7 @@ class ActionRingTest {
             Thread {
                 repeat(500) { i ->
                     ActionRing.record("t${tIdx}-${i}")
-                    // Probe the size while writers are still active — must not exceed.
+                    // Probe the size while writers are still active -- must not exceed.
                     val snap = ActionRing.snapshot()
                     if (snap.size > ActionRing.CAPACITY) {
                         throw AssertionError("size=${snap.size} exceeded CAPACITY=${ActionRing.CAPACITY}")

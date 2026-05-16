@@ -29,9 +29,9 @@ import hivens.ui.theme.CelestiaTheme
  * Pure presentation: filters input to digits only, caps at 6, surfaces an
  * inline error string supplied by the caller, disables the submit button
  * until the field is exactly 6 digits long. The actual `completeTwoFactor`
- * call lives in the LoginPanel — that layer keeps the originating
+ * call lives in the LoginPanel -- that layer keeps the originating
  * username/password/serverId in scope and decides whether to keep the
- * dialog open (CODE — re-prompt) or dismiss + restart (TWO_FACTOR_EXPIRED).
+ * dialog open (CODE -- re-prompt) or dismiss + restart (TWO_FACTOR_EXPIRED).
  *
  * @param errorMessage non-null when the previous submit failed; rendered
  *        below the field so the user sees what went wrong without losing
@@ -83,8 +83,8 @@ fun ConfirmCodeDialog(
                 OutlinedTextField(
                     value = code,
                     onValueChange = { raw ->
-                        // Cap at 6, strip non-digits — the server rejects anything
-                        // else and we'd rather not send it. Pasting a code with a
+                        // Cap at 6, strip non-digits -- the server rejects anything
+                        // else, and we'd rather not send it. Pasting a code with a
                         // surrounding "code: 123456" prefix becomes "123456".
                         code = raw.filter { it.isDigit() }.take(6)
                     },

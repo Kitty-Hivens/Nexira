@@ -102,7 +102,7 @@ fun ConsoleWindow(isDarkTheme: Boolean, onClose: () -> Unit) {
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 private fun ConsoleContent(
-    bg: Color,
+    bg: Color, // TODO: not used
     toolbarBg: Color,
     textColor: Color,
     isDarkTheme: Boolean
@@ -126,7 +126,7 @@ private fun ConsoleContent(
     }
 
     // When regex mode is on, compile once per query change. An invalid pattern
-    // collapses to "match nothing" rather than crashing the filter — the user
+    // collapses to "match nothing" rather than crashing the filter -- the user
     // is still typing.
     val searchRegex = remember(searchQuery, regexMode) {
         if (regexMode && searchQuery.isNotBlank()) {
@@ -174,7 +174,7 @@ private fun ConsoleContent(
 
     // Puppet: console toolbar + search wiring. The ConsoleWindow itself is
     // a separate OS window, so "screen" semantics overlap with whichever
-    // main launcher screen is active. We don't override [currentScreen] —
+    // main launcher screen is active. We don't override [currentScreen] --
     // drivers detect console presence via `console.*` ids being registered.
     PuppetScreen("Console")
     PuppetToggle("console.filterInfo", filterInfo)   { filterInfo = it }
@@ -195,7 +195,7 @@ private fun ConsoleContent(
     PuppetClick("console.jumpToBottom", enabled = filtered.isNotEmpty()) {
         scope.launch { listState.scrollToItem(filtered.lastIndex) }
     }
-    // Font-size picker — one click per available size (no need for a dropdown
+    // Font-size picker -- one click per available size (no need for a dropdown
     // open/close dance).
     FONT_SIZES.forEach { size ->
         PuppetClick("console.fontSize.$size") { fontSize = size }
@@ -305,7 +305,7 @@ private fun ConsoleContent(
                     }
                 )
                 // Regex toggle. Highlights green when on; red when on AND the
-                // pattern fails to compile — visual feedback while the user
+                // pattern fails to compile -- visual feedback while the user
                 // is still typing the regex.
                 val regexTint = when {
                     !regexMode                                     -> textColor.copy(alpha = 0.4f)

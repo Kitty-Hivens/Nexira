@@ -15,7 +15,7 @@ object ZipUtils {
      * ignore the return value are unaffected.
      *
      * The path list is what powers `FileDownloadService`'s extra.zip
-     * orphan-pruning — by snapshotting the contents of the previous
+     * orphan-pruning -- by snapshotting the contents of the previous
      * unpack we can diff against the new contents and remove files that
      * the upstream modpack dropped.
      *
@@ -49,7 +49,7 @@ object ZipUtils {
 
                 // Symlink / non-regular-file rejection. SmartyCraft modpacks and
                 // assets archives ship plain files only; anything else is either
-                // a packaging accident or a hostile payload — refuse and skip.
+                // a packaging accident or a hostile payload -- refuse and skip.
                 if (zipEntry.isUnixSymlink) {
                     logger.warn("Refusing symlink entry from archive {}: {}", zipFile.name, zipEntry.name)
                     continue

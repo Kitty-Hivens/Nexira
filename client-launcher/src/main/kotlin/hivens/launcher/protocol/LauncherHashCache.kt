@@ -16,10 +16,10 @@ import java.util.concurrent.atomic.AtomicInteger
  * in the `cheksum` field of `action=loader` requests.
  *
  * Background: server gates the dashboard fetch behind a launcher-version
- * check — the request body must include the MD5 of the official launcher
+ * check -- the request body must include the MD5 of the official launcher
  * binary corresponding to [Protocol.MIMIC_LAUNCHER_VERSION]. When the
  * upstream binary is bumped, the hash changes and previously-baked
- * [Protocol.DEFAULT_LAUNCHER_HASH] becomes stale — server returns
+ * [Protocol.DEFAULT_LAUNCHER_HASH] becomes stale -- server returns
  * `{"status":"UPDATE"}` until the launcher refreshes its cache.
  *
  * Self-fetch flow (Option B per Conduit planning, locked 2026-05-14):
@@ -47,7 +47,7 @@ class LauncherHashCache(
     private var current: String = readCachedOrDefault()
     /**
      * Refresh-attempt counter is read+modified from any coroutine that ends
-     * up suspended on [refresh] — a user double-clicking Play could trip
+     * up suspended on [refresh] -- a user double-clicking Play could trip
      * two parallel calls, both observing `< MAX` and both incrementing,
      * producing 3+ downloads against the cap of 2 (#189). AtomicInteger +
      * CAS makes the cap check exact even under contention.
@@ -58,14 +58,14 @@ class LauncherHashCache(
     fun get(): String = current
 
     /**
-     * Server returned UPDATE — try to refresh by downloading + MD5'ing the
+     * Server returned UPDATE -- try to refresh by downloading + MD5'ing the
      * official jar. Returns the new hash on success, `null` on failure
      * (network error, exhausted retries, or download produced empty bytes).
      *
      * After a successful refresh, [get] returns the new value and this
      * call counts toward [MAX_REFRESH_ATTEMPTS_PER_SESSION]. Subsequent
      * UPDATE responses past the cap return `null` immediately without
-     * re-downloading — caller should surface "client too old" error to user.
+     * re-downloading -- caller should surface "client too old" error to user.
      */
     suspend fun refresh(): String? {
         // CAS loop: atomically reserve a refresh slot. If the slot count
@@ -78,7 +78,7 @@ class LauncherHashCache(
                 return null
             }
             if (refreshAttempts.compareAndSet(current, current + 1)) break
-            // Lost the CAS race — re-read and decide again.
+            // Lost the CAS race -- re-read and decide again.
         }
         return try {
             logger.info("Refreshing launcher hash from {}", config.officialJarUrl)

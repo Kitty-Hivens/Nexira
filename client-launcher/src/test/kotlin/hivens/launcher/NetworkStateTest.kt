@@ -47,7 +47,7 @@ class NetworkStateTest {
 
     @Test
     fun `bypassFor returns false after expiry passes`() {
-        // Grant for 1 millisecond, then wait it out — deterministic, no
+        // Grant for 1 millisecond, then wait it out -- deterministic, no
         // sleeps longer than needed.
         val almostNow = Instant.now().plus(1, ChronoUnit.MILLIS)
         NetworkState.grantBypass("www.smartycraft.ru", almostNow)
@@ -56,7 +56,7 @@ class NetworkStateTest {
     }
 
     @Test
-    fun `bypassFor is host-scoped — grant for one host doesn't affect another`() {
+    fun `bypassFor is host-scoped -- grant for one host doesn't affect another`() {
         val future = Instant.now().plus(1, ChronoUnit.HOURS)
         NetworkState.grantBypass("www.smartycraft.ru", future)
         assertTrue(NetworkState.bypassFor("www.smartycraft.ru"))
@@ -86,7 +86,7 @@ class NetworkStateTest {
     }
 
     @Test
-    fun `revokeBypass is idempotent — revoking absent entry doesn't throw`() {
+    fun `revokeBypass is idempotent -- revoking absent entry doesn't throw`() {
         NetworkState.revokeBypass("never-existed.example.com")
         assertEquals(0, NetworkState.listBypasses().size)
     }
@@ -115,7 +115,7 @@ class NetworkStateTest {
     }
 
     @Test
-    fun `expired entries are dropped during load — no silent re-arm across restart`() {
+    fun `expired entries are dropped during load -- no silent re-arm across restart`() {
         // Write an already-expired entry to disk directly, then initialize.
         // This simulates a 30-day grant from a month ago when the user
         // restarts the launcher today.
@@ -131,7 +131,7 @@ class NetworkStateTest {
     }
 
     @Test
-    fun `corrupt JSON file leaves bypass set empty — no crash`() {
+    fun `corrupt JSON file leaves bypass set empty -- no crash`() {
         Files.writeString(bypassFile, "{ not valid json at all")
         NetworkState.clearForTests()
         NetworkState.initialize(bypassFile)

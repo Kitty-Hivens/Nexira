@@ -10,7 +10,7 @@ import java.nio.file.Path
 import java.time.Instant
 
 /**
- * Global network policy state — currently the per-host SSL-bypass set.
+ * Global network policy state -- currently the per-host SSL-bypass set.
  *
  * Replaced the prior `var sslBypassEnabled: Boolean` (a single global
  * toggle that, once accepted, opened TLS verification for every HTTPS
@@ -32,7 +32,7 @@ import java.time.Instant
  * occasional `bypassFor` check on each HTTP call) so a single lock is
  * the right shape.
  *
- * Singleton chosen deliberately — the previous boolean was also an
+ * Singleton chosen deliberately -- the previous boolean was also an
  * `object`, callers throughout `client-ui` (composables) and
  * `client-launcher` (DI selector) reach it without injection. Turning
  * it into a Koin-injected class would have rippled into every
@@ -52,12 +52,12 @@ object NetworkState {
      * User opt-in: skip the direct-channel attempt and route every smartycraft
      * request through the SOCKS5 proxy from the first call. For users in
      * censored regions / corporate firewalls where direct connections are
-     * known to fail. Default false — direct works for ~99% of users
+     * known to fail. Default false -- direct works for ~99% of users
      * (see `reference_smartycraft_proxy` for empirical data).
      *
-     * Persisted in-memory only for now. UI binding (Settings → Network →
+     * Persisted in-memory only for now. UI binding (Settings -> Network ->
      * "Force proxy mode") wires through here. Survives via [SettingsService]
-     * persistence — the UI restores the saved value on each launch and calls
+     * persistence -- the UI restores the saved value on each launch and calls
      * [setForceProxyMode] to re-arm.
      */
     @Volatile
@@ -69,7 +69,7 @@ object NetworkState {
     /** Set the force-proxy toggle. Settings UI calls this on toggle change. */
     fun setForceProxyMode(value: Boolean) {
         forceProxy = value
-        log.info("Force proxy mode: {}", if (value) "ENABLED — skipping direct attempt" else "disabled (default)")
+        log.info("Force proxy mode: {}", if (value) "ENABLED -- skipping direct attempt" else "disabled (default)")
     }
 
     /**
@@ -115,7 +115,7 @@ object NetworkState {
         }
     }
 
-    /** Snapshot of current bypass entries (a copy — callers can iterate safely). */
+    /** Snapshot of current bypass entries (a copy -- callers can iterate safely). */
     fun listBypasses(): List<SslBypassEntry> = synchronized(lock) { bypasses.toList() }
 
     /**
@@ -137,14 +137,14 @@ object NetworkState {
             val text = Files.readString(file)
             val list = json.decodeFromString<List<SslBypassEntry>>(text)
             val now = Instant.now()
-            // Drop expired on load — stale grants from prior sessions must
+            // Drop expired on load -- stale grants from prior sessions must
             // not silently re-arm.
             list.filter { Instant.parse(it.expiresAt).isAfter(now) }.forEach(bypasses::add)
             if (list.size != bypasses.size) {
                 log.info("Dropped {} expired SSL bypass entries during load", list.size - bypasses.size)
             }
         } catch (e: Exception) {
-            log.warn("Failed to read ssl-bypasses.json — starting with empty bypass set: {}", e.message)
+            log.warn("Failed to read ssl-bypasses.json -- starting with empty bypass set: {}", e.message)
         }
     }
 

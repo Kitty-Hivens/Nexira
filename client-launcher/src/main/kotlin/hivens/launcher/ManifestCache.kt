@@ -20,7 +20,7 @@ import java.security.MessageDigest
  * If the manifest hash is identical to the last successful sync AND
  * that sync was within [TTL_MS], we presume the local install is still
  * good and short-circuit the integrity walk. The TTL is the safety
- * valve — files corrupt on disk, users delete things by hand, etc.,
+ * valve -- files corrupt on disk, users delete things by hand, etc.,
  * and we don't want a stale cache to mask that forever.
  *
  * Cache location: `<dataDir>/manifest-cache/<serverId>.json`. One file
@@ -67,7 +67,7 @@ class ManifestCache(
     /**
      * @param diskSanityCheck called only when the cache is otherwise valid
      *        (hash matches, within TTL). Returning false invalidates the
-     *        cache entry — this is how callers gate the short-circuit on
+     *        cache entry -- this is how callers gate the short-circuit on
      *        actual on-disk state. Cheap by design: a handful of
      *        Files.exists checks against the manifest's top entries are
      *        enough to catch the bulk-loss cases (#184: data dir moved
@@ -89,7 +89,7 @@ class ManifestCache(
             return false
         }
         if (!diskSanityCheck()) {
-            log.info("manifest cache for {} reports clean but disk state failed sanity check — forcing resync", serverId)
+            log.info("manifest cache for {} reports clean but disk state failed sanity check -- forcing resync", serverId)
             return false
         }
         return true
@@ -113,7 +113,7 @@ class ManifestCache(
      * Used by the offline launch path: if the user starts the launcher with
      * no network, `session.fileManifest` is null (sync was skipped). We
      * recover it from the last successful online sync so [ClasspathProvider]
-     * has something to walk. Cache age doesn't matter here — a stale manifest
+     * has something to walk. Cache age doesn't matter here -- a stale manifest
      * is still better than launching with an empty classpath. The on-disk
      * files are presumed unchanged; if they aren't, the game itself will
      * complain on launch.
@@ -121,7 +121,7 @@ class ManifestCache(
     fun loadManifest(serverId: String): FileManifest? = read(serverId)?.manifest
 
     /**
-     * Drops the cache for [serverId] — call when the user explicitly
+     * Drops the cache for [serverId] -- call when the user explicitly
      * requests "verify integrity" or after a known-corrupting event
      * (failed game launch, repair tool run). Best-effort.
      */

@@ -15,7 +15,7 @@ import kotlin.concurrent.thread
  *
  * Lines are also pushed into the `hivens.launcher.game` SLF4J logger so
  * Pulse routes them to `game.log` on disk in parallel with the in-app
- * `ConsoleWindow` — useful for crash forensics when the launcher dies
+ * `ConsoleWindow` -- useful for crash forensics when the launcher dies
  * before the user has a chance to hit "Save to file".
  */
 internal class ProcessLogHandler {

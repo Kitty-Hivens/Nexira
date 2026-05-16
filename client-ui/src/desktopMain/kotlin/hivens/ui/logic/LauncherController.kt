@@ -21,6 +21,7 @@ import org.koin.core.component.inject
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.UUID
 
 class LauncherController : KoinComponent {
 
@@ -56,7 +57,7 @@ class LauncherController : KoinComponent {
         // kotlinx-coroutines-slf4j) propagates the value across every
         // dispatcher hop the launch flow takes, including the downstream
         // FileDownloadService coroutines and LauncherService.
-        val launchId = java.util.UUID.randomUUID().toString().take(8)
+        val launchId = UUID.randomUUID().toString().take(8)
 
         launchJob = appScope.launch(kotlinx.coroutines.slf4j.MDCContext(mapOf("launchId" to launchId))) {
             // Capture strings at launch time so the whole pipeline uses one locale
@@ -67,14 +68,14 @@ class LauncherController : KoinComponent {
             try {
                 _state.value = LaunchState.Prepare(s.stateInit, 0.0f)
 
-                // Start new session — adds divider and opens auto-save file
+                // Start new session -- adds divider and opens auto-save file
                 GameConsoleService.startSession()
                 GameConsoleService.append("${s.appName}...", LogType.INFO)
-                GameConsoleService.append("→ ${server.name}" + if (isOffline) " [OFFLINE]" else "", LogType.INFO)
+                GameConsoleService.append("-> ${server.name}" + if (isOffline) " [OFFLINE]" else "", LogType.INFO)
 
                 ActionRing.record("Launching: ${server.name} (launchId=$launchId)")
 
-                // 1. Auth — skip in offline mode
+                // 1. Auth -- skip in offline mode
                 updateProgress(0.1f, s.stateAuth)
                 var session = currentSession
                 val targetServerId = server.assetDir
@@ -96,7 +97,7 @@ class LauncherController : KoinComponent {
                             GameConsoleService.append(s.stateNoPassword, LogType.WARN)
                         }
                     } catch (_: hivens.core.api.TwoFactorRequiredException) {
-                        // 2FA account — refusing to prompt the user for a code
+                        // 2FA account -- refusing to prompt the user for a code
                         // every time they click Play. The cached accessToken
                         // in `session` is from a previous successful 2FA flow
                         // and is what the game uses anyway. Augment it with a
@@ -109,18 +110,18 @@ class LauncherController : KoinComponent {
                         } else {
                             // No cached manifest and no fresh login. Continuing
                             // hits "File manifest is empty!" deep in
-                            // processSession — cryptic for the user. Throw
+                            // processSession -- cryptic for the user. Throw
                             // with the same string the 2FA dialog uses so the
                             // outer LaunchState.Error renders an actionable
                             // message ("re-login from the form"), not a
                             // misleading internal one. Caught by the
                             // top-level handler at the bottom of this fn.
-                            ActionRing.record("Launch: 2FA + no cached manifest for $targetServerId — re-login required")
+                            ActionRing.record("Launch: 2FA + no cached manifest for $targetServerId -- re-login required")
                             throw IllegalStateException(s.auth2faExpired)
                         }
                     } catch (e: Exception) {
                         GameConsoleService.append("${s.stateAuthFail}: ${e.message}", LogType.WARN)
-                        // If auth fails and we're NOT in offline mode, we still try to continue
+                        // If auth fails, and we're NOT in offline mode, we still try to continue
                         // with the existing session (graceful degradation)
                     }
                 }
@@ -128,7 +129,7 @@ class LauncherController : KoinComponent {
                 // 2. Ignored files
                 val ignoredFiles = calculateIgnoredFiles(server)
 
-                // 3. Download — skip in offline mode if client exists
+                // 3. Download -- skip in offline mode if client exists
                 updateProgress(0.2f, s.stateSync)
                 val clientDir = dataDirectory.resolve("clients").resolve(targetServerId)
                 if (!Files.exists(clientDir)) Files.createDirectories(clientDir)
@@ -143,12 +144,12 @@ class LauncherController : KoinComponent {
                     }
                     // Recover the file manifest from the last successful online sync.
                     // Without it, ClasspathProvider has nothing to walk and builds an
-                    // empty -cp argument — the JVM then dies with "Could not find or
+                    // empty -cp argument -- the JVM then dies with "Could not find or
                     // load main class net.minecraft.launchwrapper.Launch" because the
                     // class IS on disk but classpath is "". TTL is intentionally
                     // ignored here: a stale-but-present manifest is strictly better
                     // than launching with no classpath. If the user has never logged
-                    // in online, the cache is empty and we bail with an actionable
+                    // in online, the cache is empty, and we bail with an actionable
                     // error rather than a cryptic JVM message.
                     if (session.fileManifest == null) {
                         val cached = manifestCache.loadManifest(targetServerId)

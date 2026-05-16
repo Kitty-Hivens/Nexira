@@ -13,15 +13,15 @@ import java.nio.file.Paths
  * [DataDirMover] to schedule pending moves that apply on next startup.
  *
  * Path: `<user.home>/.aura-launcher.conf`. Same flat location on all
- * platforms — debuggable by `cat` / Notepad, no XDG hunting, no
+ * platforms -- debuggable by `cat` / Notepad, no XDG hunting, no
  * Preferences API quirks. The dotfile prefix keeps it out of casual
  * folder listings on Linux/macOS; Windows shows it normally but it
  * doesn't clutter anything important.
  *
  * Recognized keys:
- *   - `data-dir`                  — absolute path of user-chosen data dir
- *   - `data-dir-pending-source`   — set by UI when scheduling a move
- *   - `data-dir-pending-target`   — set by UI when scheduling a move
+ *   - `data-dir`                  -- absolute path of user-chosen data dir
+ *   - `data-dir-pending-source`   -- set by UI when scheduling a move
+ *   - `data-dir-pending-target`   -- set by UI when scheduling a move
  *
  * Lines that don't match `key=value` are ignored on read; the writer
  * preserves only known keys. Comments are not supported (simpler than
@@ -33,7 +33,7 @@ import java.nio.file.Paths
  * startup, so there's no concurrent-writer scenario to worry about.
  */
 object BootstrapConf {
-    // Lazy logger — same rationale as [DataDirMover]: BootstrapConf is
+    // Lazy logger -- same rationale as [DataDirMover]: BootstrapConf is
     // touched during Main.kt's pre-logger bootstrap. Eager init would
     // open the rolling file at the wrong path. See DataDirMover.kt for
     // the long-form explanation.
@@ -43,7 +43,7 @@ object BootstrapConf {
     const val KEY_PENDING_SOURCE = "data-dir-pending-source"
     const val KEY_PENDING_TARGET = "data-dir-pending-target"
 
-    /** Default location — overridable in tests via [resolveFor]. */
+    /** Default location -- overridable in tests via [resolveFor]. */
     fun defaultPath(): Path = Paths.get(System.getProperty("user.home", "."), ".aura-launcher.conf")
 
     fun read(file: Path = defaultPath()): Map<String, String> {

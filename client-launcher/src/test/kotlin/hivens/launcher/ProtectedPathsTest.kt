@@ -86,7 +86,7 @@ class ProtectedPathsTest {
         val pp = ProtectedPaths(configFile, json)
         assertTrue(pp.isProtected("config/my-special-config.txt"))
         assertTrue(pp.isProtected("mods/mymod/data.bin"))
-        // Defaults are NOT additive — user file fully replaces them. This is
+        // Defaults are NOT additive -- user file fully replaces them. This is
         // intentional: keeps the file shape predictable for users editing it
         // by hand. If you want defaults+yours, copy the defaults in.
         assertFalse(pp.isProtected("options.txt"))

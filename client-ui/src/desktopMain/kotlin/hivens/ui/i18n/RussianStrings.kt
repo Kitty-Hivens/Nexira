@@ -446,7 +446,7 @@ object RussianStrings : AppStrings {
     override val jvmJfrDurationLabel        = "Длительность (минуты)"
     override val jvmJfrSettingsHeader       = "Пресет настроек"
     override val jvmJfrSettingsDefaultHint  = "Низкий overhead, подходит для обычной игры."
-    override val jvmJfrSettingsProfileHint  = "Method-level профайлинг. ~5% overhead."
+    override val jvmJfrSettingsProfileHint  = "Method-level профилирование. ~5% overhead."
     override val jvmJfrOutputPathLabel      = "Путь к выходному .jfr (опционально)"
 
     override val jvmCustomHeader = "Свои флаги"

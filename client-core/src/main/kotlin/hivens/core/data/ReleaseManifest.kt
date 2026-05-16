@@ -6,12 +6,12 @@ import kotlinx.serialization.Serializable
 /**
  * Machine-readable description of a GitHub release. Published by CI as
  * `release-manifest.json` alongside the binaries; the launcher REQUIRES it
- * — `UpdateService` refuses to auto-install when the manifest is missing or
+ * -- `UpdateService` refuses to auto-install when the manifest is missing or
  * doesn't list the selected asset (#186 hardening: empty checksum was
  * previously a silent skip).
  *
  * Older releases (pre-2.2.7-rc3) that ship without a manifest can no longer
- * be auto-updated to and require manual reinstall.
+ * be auto-updated to and require manual reinstallation.
  */
 @Serializable
 data class ReleaseManifest(
@@ -27,7 +27,7 @@ data class ReleaseManifest(
     /**
      * User-facing one-paragraph summary extracted from the `### Highlights`
      * subsection of the version's CHANGELOG entry. Null when the entry has no
-     * Highlights block — clients should fall back to the full changelog.
+     * Highlights block -- clients should fall back to the full changelog.
      */
     @SerialName("highlights") val highlights: String? = null,
 
@@ -37,9 +37,9 @@ data class ReleaseManifest(
 @Serializable
 data class ReleaseAsset(
     @SerialName("name") val name: String,
-    /** "windows" | "macos" | "linux" — coarse platform tag. */
+    /** "windows" | "macos" | "linux" -- coarse platform tag. */
     @SerialName("platform") val platform: String,
-    /** "installer" | "portable" | "appimage" | "dmg" — distribution kind. */
+    /** "installer" | "portable" | "appimage" | "dmg" -- distribution kind. */
     @SerialName("kind") val kind: String,
     @SerialName("sha256") val sha256: String,
     @SerialName("size") val size: Long

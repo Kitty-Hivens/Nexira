@@ -30,7 +30,7 @@ class PlayerRepository(
      */
     suspend fun resetSpawn(session: SessionData, serverId: String): Boolean {
         if (session.uid.isBlank()) {
-            logger.warn("resetSpawn called with blank uid — refusing to send unsigned request")
+            logger.warn("resetSpawn called with blank uid -- refusing to send unsigned request")
             return false
         }
         val response = protocol.spawn(uid = session.uid, login = session.playerName, server = serverId)

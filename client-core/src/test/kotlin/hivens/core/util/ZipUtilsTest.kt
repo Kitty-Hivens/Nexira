@@ -15,11 +15,11 @@ import kotlin.test.assertTrue
 
 /**
  * Coverage focuses on the security-relevant edges:
- *   - Zip Slip (`../` escape) — already protected, regression watchdog.
- *   - Symlink entries — added in #187 as a separate vector that
+ *   - Zip Slip (`../` escape) -- already protected, regression watchdog.
+ *   - Symlink entries -- added in #187 as a separate vector that
  *     plain Zip Slip checks miss.
  *
- * Happy-path extraction is intentionally light here — the launcher's
+ * Happy-path extraction is intentionally light here -- the launcher's
  * extra.zip flow exercises that thoroughly through FileDownloadServiceTest.
  */
 class ZipUtilsTest {
@@ -56,7 +56,7 @@ class ZipUtilsTest {
     fun `unzip skips symlink entries (#187)`() {
         // Hostile archive: a symlink entry called inside-payload.txt whose
         // payload is the path of the link target. Plain Zip Slip allows this
-        // since the entry name normalizes inside dest — only the unix-mode
+        // since the entry name normalizes inside dest -- only the unix-mode
         // type bits (UnixStat.LINK_FLAG = 0xA000) reveal it as a symlink.
         // ZipUtils must drop the entry and continue, NOT write the payload
         // to the resolved path.

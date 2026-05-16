@@ -109,7 +109,7 @@ object CrashReporter {
         val choice = JOptionPane.showOptionDialog(
             null,
             message,
-            "Crash Report — ${Branding.TITLE}",
+            "Crash Report -- ${Branding.TITLE}",
             JOptionPane.DEFAULT_OPTION,
             JOptionPane.ERROR_MESSAGE,
             null,
@@ -121,7 +121,7 @@ object CrashReporter {
             0 -> {
                 // Beacon "Report on GitHub": opens browser at a pre-filled new-Issue
                 // URL. Nothing leaves the user's machine until they click Submit on
-                // github.com — the launcher itself never POSTs anything.
+                // github.com -- the launcher itself never POSTs anything.
                 runCatching {
                     if (Desktop.isDesktopSupported()) {
                         Desktop.getDesktop().browse(URI(IssueReporter.crashIssueUrl(report)))

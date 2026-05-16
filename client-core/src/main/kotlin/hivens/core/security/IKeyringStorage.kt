@@ -9,18 +9,18 @@ package hivens.core.security
  * `KeyringStorageFactory` that picks one at runtime; this interface lives in
  * `client-core` so domain code can depend on it without pulling JNA.
  *
- * Identity tuple: `(service, account)`. `service` is the launcher's brand-
- * scope identifier (`"AuraLauncher"`); `account` is the user-facing key
+ * Identity tuple: `(service, account)`. `service` is the launcher's brand-scope
+ * identifier (`"AuraLauncher"`); `account` is the user-facing key
  * inside that service ("session" for the active access-token bundle, etc.).
  * Both must be non-blank.
  *
- * Failure mode is **non-throwing** — every method returns a result that
+ * Failure mode is **non-throwing** -- every method returns a result that
  * tells you whether the underlying store is reachable:
  *
- *   - [retrieve] → null when the secret is not stored OR the store is
+ *   - [retrieve] -> null when the secret is not stored OR the store is
  *     unreachable. Callers that need to distinguish those cases should
  *     consult [isAvailable] first.
- *   - [store], [clear] → boolean success. False means either "store is
+ *   - [store], [clear] -> boolean success. False means either "store is
  *     unreachable" or "operation rejected by the store" (e.g. user
  *     denied access via an OS prompt).
  *
@@ -53,7 +53,7 @@ interface IKeyringStorage {
     /**
      * Remove the secret under [service]/[account]. Returns true if the
      * delete operation succeeded (including when there was nothing to
-     * delete — clear is idempotent).
+     * delete -- clear is idempotent).
      */
     fun clear(service: String, account: String): Boolean
 }

@@ -72,7 +72,7 @@ fun UpdateDialog(
         exitProcess(0)
     }
     PuppetClick("update.download", enabled = downloadState is DownloadState.Idle) {
-        scope.launch {
+        scope.launch { // TODO: move to method
             downloadState = DownloadState.Downloading(0L, 0L, 0.0)
             errorMessage  = null
             try {
@@ -89,7 +89,7 @@ fun UpdateDialog(
     }
     PuppetClick("update.install", enabled = downloadState is DownloadState.Ready) {
         val path = (downloadState as? DownloadState.Ready)?.installerPath ?: return@PuppetClick
-        try {
+        try { // TODO: move to method
             updateApplicator.scheduleUpdate(java.nio.file.Paths.get(path))
             logger.info("Update scheduled, exiting...")
             exitProcess(0)
@@ -189,7 +189,7 @@ fun UpdateDialog(
                 Spacer(Modifier.height(8.dp))
 
                 // Highlights are short prose, full changelog can be paragraphs of
-                // commit-flavoured text. Cap height in both cases — the dialog is
+                // commit-flavored text. Cap height in both cases -- the dialog is
                 // 700dp wide and would dominate the screen otherwise.
                 val bodyMaxHeight = if (hasHighlights) 200.dp else 350.dp
                 Box(
@@ -276,10 +276,10 @@ fun UpdateDialog(
                         Spacer(Modifier.width(8.dp))
                     }
 
-                    // Mandatory updates need a hard exit path — without it the
+                    // Mandatory updates need a hard exit path -- without it the
                     // user's only choices are "install now" or "kill the
                     // process from outside". Hidden mid-download to avoid the
-                    // user yanking themselves out of an install in progress.
+                    // user yanking themselves out of an installation in progress.
                     if (update.isMandatory && downloadState !is DownloadState.Downloading) {
                         TextButton(onClick = { exitProcess(0) }) {
                             Text(s.updateExit, color = CelestiaTheme.colors.textSecondary)
@@ -291,7 +291,7 @@ fun UpdateDialog(
                         is DownloadState.Idle -> {
                             Button(
                                 onClick = {
-                                    scope.launch {
+                                    scope.launch { // TODO: move to method
                                         downloadState = DownloadState.Downloading(0L, 0L, 0.0)
                                         errorMessage  = null
                                         try {
@@ -342,7 +342,7 @@ fun UpdateDialog(
                             val path = (downloadState as DownloadState.Ready).installerPath
                             Button(
                                 onClick = {
-                                    try {
+                                    try { // TODO: move to method
                                         updateApplicator.scheduleUpdate(java.nio.file.Paths.get(path))
                                         logger.info("Update scheduled, exiting...")
                                         exitProcess(0)
@@ -392,7 +392,7 @@ private fun DownloadProgress(state: DownloadState.Downloading) {
                 style = MaterialTheme.typography.bodySmall,
                 color = CelestiaTheme.colors.textSecondary
             )
-            
+
             if (state.speed > 0) {
                 Text(
                     "%.2f MB/s".format(speedMB),

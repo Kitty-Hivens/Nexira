@@ -1,5 +1,6 @@
 package hivens.launcher.security
 
+import org.junit.jupiter.api.Assumptions
 import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.Tag
 import kotlin.test.Test
@@ -18,7 +19,7 @@ import kotlin.test.assertTrue
  *   ./gradlew :client-launcher:liveKeyringTest
  *
  * Skips with [Assumptions.assumeTrue] when the daemon isn't reachable
- * or when not running on Linux — never fails the build because of a
+ * or when not running on Linux -- never fails the build because of a
  * missing keyring service.
  */
 @Tag("live-keyring")
@@ -36,12 +37,12 @@ class LinuxLibsecretLiveProbeTest {
         )
         assumeTrue(
             keyring.isAvailable(),
-            "Secret Service daemon not reachable on this host — skipping live probe",
+            "Secret Service daemon not reachable on this host -- skipping live probe",
         )
     }
 
     @Test
-    fun `round-trip — store then retrieve returns the same secret`() {
+    fun `round-trip -- store then retrieve returns the same secret`() {
         assumeLinux()
         val secret = "round-trip-${System.nanoTime()}"
         try {
@@ -54,7 +55,7 @@ class LinuxLibsecretLiveProbeTest {
     }
 
     @Test
-    fun `clear removes the entry — subsequent retrieve returns null`() {
+    fun `clear removes the entry -- subsequent retrieve returns null`() {
         assumeLinux()
         val secret = "to-be-cleared-${System.nanoTime()}"
         keyring.store(service, account, secret)
@@ -67,7 +68,7 @@ class LinuxLibsecretLiveProbeTest {
         assumeLinux()
         // libsecret's secret_password_clear_sync returns TRUE only when
         // an entry was actually removed; FALSE otherwise (including the
-        // common "nothing matched" case). Pin the contract — this is
+        // common "nothing matched" case). Pin the contract -- this is
         // why isAvailable() probes via store-then-clear, not bare clear.
         assertFalse(
             keyring.clear(service, "definitely-does-not-exist-${System.nanoTime()}"),

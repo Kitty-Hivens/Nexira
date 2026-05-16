@@ -13,10 +13,10 @@ import java.nio.file.Path
  * override on top via [ServerProtocolConfig.resolve].
  *
  * Failure modes (malformed JSON, partial fields):
- * - Malformed JSON → log warn, use defaults. Aura should not fail to start
+ * - Malformed JSON -> log warn, use defaults. Aura should not fail to start
  *   because someone hand-edited the file wrong.
- * - Unknown extra fields → tolerated by [Json.ignoreUnknownKeys].
- * - Missing fields → defaults from [ServerProtocolConfig] data class.
+ * - Unknown extra fields -> tolerated by [Json.ignoreUnknownKeys].
+ * - Missing fields -> defaults from [ServerProtocolConfig] data class.
  */
 class ServerProtocolConfigLoader(
     private val json: Json,
@@ -37,10 +37,10 @@ class ServerProtocolConfigLoader(
                 val text = Files.readString(file)
                 json.decodeFromString(ServerProtocolConfig.serializer(), text)
             } catch (e: SerializationException) {
-                logger.warn("Could not parse {}: {} — using defaults", file, e.message)
+                logger.warn("Could not parse {}: {} -- using defaults", file, e.message)
                 ServerProtocolConfig()
             } catch (e: Exception) {
-                logger.warn("Could not read {}: {} — using defaults", file, e.message)
+                logger.warn("Could not read {}: {} -- using defaults", file, e.message)
                 ServerProtocolConfig()
             }
         } else {

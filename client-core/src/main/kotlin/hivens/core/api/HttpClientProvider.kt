@@ -12,10 +12,10 @@ import io.ktor.client.HttpClient
  * `client-launcher/.../di/Modules.kt` registers two providers, one per outbound
  * routing channel (see `hivens.config.Network` for the full taxonomy):
  *
- *   ◆ default      — Smartycraft channel: SOCKS-proxied, SSL-bypass-aware.
+ *   ◆ default      -- Smartycraft channel: SOCKS-proxied, SSL-bypass-aware.
  *                    Inject for any call to `*.smartycraft.ru`.
  *
- *   ❖ named("direct") — Direct channel: no proxy, strict TLS.
+ *   ❖ named("direct") -- Direct channel: no proxy, strict TLS.
  *                       Inject for third-party CDNs (GitHub, BellSoft, Maven
  *                       Central). Stays online when the upstream proxy doesn't.
  *

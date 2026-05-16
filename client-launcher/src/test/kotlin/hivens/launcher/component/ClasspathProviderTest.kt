@@ -7,7 +7,6 @@ import kotlinx.serialization.json.Json
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
-import kotlin.io.path.div
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -18,8 +17,8 @@ import kotlin.test.assertTrue
  * Coverage focused on the wrong-OS-natives filter (#157). Server-side
  * manifests ship every platform's native classifier to every client; the
  * launcher must drop the foreign ones before they reach the JVM, otherwise
- * loading a `*-natives-windows.jar` on Linux either wastes RAM or — when
- * the JVM tries to dlopen the embedded Mach-O / DLL — raises
+ * loading a `*-natives-windows.jar` on Linux either wastes RAM or -- when
+ * the JVM tries to dlopen the embedded Mach-O / DLL -- raises
  * UnsatisfiedLinkError at game start.
  */
 class ClasspathProviderTest {
@@ -45,7 +44,7 @@ class ClasspathProviderTest {
     }
 
     private fun manifestOf(vararg paths: String): FileManifest {
-        // Flat manifest at the libraries level — ManifestProcessor.flattenManifest
+        // Flat manifest at the libraries level -- ManifestProcessor.flattenManifest
         // walks both the files map and nested directories recursively. Build
         // the directory tree by splitting on '/'.
         data class Node(
@@ -74,7 +73,7 @@ class ClasspathProviderTest {
         touch("libraries/lwjgl-3.3.3-natives-linux.jar")
         touch("libraries/lwjgl-3.3.3-natives-windows.jar")
         touch("libraries/lwjgl-3.3.3-natives-macos.jar")
-        touch("libraries/lwjgl-3.3.3-natives-osx.jar")  // legacy LWJGL2 mac classifier
+        touch("libraries/lwjgl-3.3.3-natives-osx.jar")  // legacy LWJGL2 Mac classifier
 
         val cp = provider("Linux").buildClasspath(
             clientRoot = clientRoot,
@@ -154,7 +153,7 @@ class ClasspathProviderTest {
 
     @Test
     fun `unknown OS keeps every native (safer than dropping all)`() {
-        // Defensive: if os.name comes back as something we don't recognise
+        // Defensive: if os.name comes back as something we don't recognize
         // (Plan9 etc.), prefer leaving the classpath wide rather than
         // accidentally stripping the platform's own native and crashing
         // on startup with no recourse.

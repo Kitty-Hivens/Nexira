@@ -79,6 +79,7 @@ import org.slf4j.LoggerFactory
 import javax.swing.SwingUtilities
 import kotlin.system.exitProcess
 import kotlin.time.Duration.Companion.milliseconds
+import org.koin.java.KoinJavaComponent
 
 // ─── DI ──────────────────────────────────────────────────────────────────────
 
@@ -117,12 +118,12 @@ sealed class Screen {
  * user to triangulate the toolkit-vs-session matrix; this line makes it
  * trivial to grep across `launcher.log` files attached to bundles.
  *
- * Always-on (not gated by AURA_WAYLAND_TRIAL) — the diagnostic value applies
+ * Always-on (not gated by AURA_WAYLAND_TRIAL) -- the diagnostic value applies
  * to every Linux user, not just trial participants.
  */
 private fun logToolkitAndSession() {
     if (!System.getProperty("os.name").lowercase().contains("linux")) return
-    val toolkit = runCatching { java.awt.Toolkit.getDefaultToolkit().javaClass.name }
+    val toolkit = runCatching { Toolkit.getDefaultToolkit().javaClass.name }
         .getOrElse { "<unavailable: ${it.javaClass.simpleName}>" }
     fun env(k: String) = System.getenv(k) ?: "<unset>"
     LoggerFactory.getLogger("Main").info(
@@ -139,14 +140,14 @@ private fun logToolkitAndSession() {
  * Stock OpenJDK derives WM_CLASS from the launcher binary's argv[0] and exposes
  * no public knob to override it; JBR exposes `-Dawt.appClassName` but only that
  * one vendor honors it. Reflection into the package-private static field works
- * across both — provided we run before any window is shown (XWindow.setWMClass
+ * across both -- provided we run before any window is shown (XWindow.setWMClass
  * snapshots the value at construction time) and the JVM was launched with
  * `--add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED`.
  *
- * No-op on macOS/Windows. Failures are logged but never fatal — a wrong icon
+ * No-op on macOS/Windows. Failures are logged but never fatal -- a wrong icon
  * is annoying, not crash-worthy.
  */
-private fun setLinuxXToolkitAppClassName(name: String) {
+private fun setLinuxXToolkitAppClassName(name: String) { // TODO: Value of parameter 'name' is always 'Branding.WM_CLASS'
     if (!System.getProperty("os.name").lowercase().contains("linux")) return
     runCatching {
         // Triggers XToolkit class load + initial awtAppClassName assignment.
@@ -169,7 +170,7 @@ fun main() {
     // Resolve logs dir BEFORE any LoggerFactory.getLogger() call so
     // logback.xml (which reads `${aura.logs.dir}` for its rolling-file
     // appenders) sees the platform-correct path on its very first init.
-    // PlatformPaths.system() is pure computation — no logger init —
+    // PlatformPaths.system() is pure computation -- no logger init --
     // safe to call before the property is set. DataDirMover and
     // BootstrapConf both have lazy log fields specifically so this
     // ordering works without their applyPending() / read() touching
@@ -178,14 +179,14 @@ fun main() {
     System.setProperty("aura.logs.dir", paths.logsDir.toString())
 
     // NOW safe to apply any pending data-dir move scheduled from the
-    // Settings UI. If user clicked "Move data directory" → picker →
+    // Settings UI. If user clicked "Move data directory" -> picker ->
     // restart, this is where the relocation actually happens. Operation
     // is idempotent; safe to call on every startup. The first log line
     // it produces (only in the actual-move case, no-op otherwise) lands
     // in `paths.logsDir/launcher.log`, not `./logs/launcher.log`.
     //
     // Edge case: if applyPending DOES move the data dir, paths.logsDir
-    // points at the old location and logback opens the file there —
+    // points at the old location and logback opens the file there --
     // log entries about the move itself stream to the old path right
     // up until the source dir is deleted. Next startup uses the new
     // path correctly. The user opted into this two-restart flow when
@@ -195,19 +196,19 @@ fun main() {
     // Pulse: tag every log line in this process with a stable 8-char sessionId
     // so a multi-launch user dump can be sliced per process invocation
     // (`grep sessionId=abc12345 *.log`). System property (not MDC) because
-    // MDC is thread-local and we want this on every line from every thread —
+    // MDC is thread-local, and we want this on every line from every thread --
     // the logback pattern reads the property via `${aura.sessionId}`.
     val sessionId = UUID.randomUUID().toString().take(8)
     System.setProperty("aura.sessionId", sessionId)
 
-    // Beacon: the very first entry in the action ring — handy when reading a
+    // Beacon: the very first entry in the action ring -- handy when reading a
     // bundle to confirm what process / version / OS produced it.
     hivens.core.diag.ActionRing.record(
         "Launcher started (v${Branding.VERSION}, sessionId=$sessionId, os=${System.getProperty("os.name")})"
     )
 
     // Vault #2: wire SSL-bypass persistence. Expired entries from prior
-    // sessions are dropped during load — a 30-day grant from a month ago
+    // sessions are dropped during load -- a 30-day grant from a month ago
     // doesn't silently re-arm itself. Called before Koin / HttpClientProvider
     // bootstrap so the very first network request sees the correct bypass
     // state. (Calling later would race: HttpClientProvider's selector
@@ -223,7 +224,7 @@ fun main() {
     setLinuxXToolkitAppClassName(Branding.WM_CLASS)
 
     // Capture toolkit + session-type as soon as the toolkit has been triggered
-    // by setLinuxXToolkitAppClassName above. One INFO line per launch — gives
+    // by setLinuxXToolkitAppClassName above. One INFO line per launch -- gives
     // every user-attached `launcher.log` enough context to slot into the
     // Wayland-Native investigation matrix.
     logToolkitAndSession()
@@ -262,11 +263,11 @@ fun main() {
 
     // Conduit Phase 2: restore persisted force-proxy preference into the
     // in-memory NetworkState so ChannelRouter sees it on the very first
-    // network call. MUST run after startKoin — the previous version called
+    // network call. MUST run after startKoin -- the previous version called
     // KoinJavaComponent.get() before bootstrap and silently failed via
     // runCatching, leaving the toggle effectively non-persistent.
     runCatching {
-        val persistedSettings = org.koin.java.KoinJavaComponent.get<ISettingsService>(
+        val persistedSettings = KoinJavaComponent.get<ISettingsService>(
             ISettingsService::class.java
         ).getSettings()
         NetworkState.setForceProxyMode(persistedSettings.forceProxyMode)
@@ -303,7 +304,7 @@ fun main() {
 
         val settings = remember { settingsService.getSettings() }
 
-        // Window starts visible — `startInTray` was retired in 2.2.14:
+        // Window starts visible -- `startInTray` was retired in 2.2.14:
         // it confused users (launcher invisible after first run) and
         // had no clear use case. Tray is the dock-style fallback for
         // close-while-game-running, not a launcher hide-by-default mode.
@@ -362,7 +363,7 @@ fun main() {
             // Tray needs a 64-px glyph; the window chrome and KDE overview want the
             // detailed hi-res icon so they can be downscale cleanly to whatever the
             // compositor demands.
-            val trayIcon   = painterResource(Res.drawable.favicon) // TODO: not used
+            val trayIcon   = painterResource(Res.drawable.favicon) // TODO: not used!
             val windowIcon = painterResource(Res.drawable.icon)
 
             // ── Tray init on background thread ────────────────────────────
@@ -403,16 +404,16 @@ fun main() {
                     }
                 }
 
-                // Tray failed to init — restore the window so the user isn't
+                // Tray failed to init -- restore the window so the user isn't
                 // stuck with no reachable UI. The scenario is:
                 //   - the user clicked the close button during the
                 //     INITIALIZING window (the close handler at the bottom
                 //     of this file uses canBeReady, not isSupported,
                 //      not isSupported, to avoid killing the launcher
-                //      mid-init). Same outcome — window hidden, no tray
+                //      mid-init). Same outcome -- window hidden, no tray
                 //      either. Without this restore the process keeps
                 //      running with no UI and the user has to kill it.
-                //   (Codex P1 from PR #131 — the canBeReady-during-INIT
+                //   (Codex P1 from PR #131 -- the canBeReady-during-INIT
                 //   path needs this failure-path unhide.)
                 if (!TrayManager.isSupported && !isWindowVisible) {
                     isWindowVisible = true
@@ -490,11 +491,11 @@ fun main() {
                 // Gated by experimentalFeaturesEnabled master + autoSyncAllPacks
                 // child to match the rest of the experimental opt-ins. Runs on
                 // applicationScope so it survives composition resets but DOES
-                // get cancelled on JVM exit — under the prior GlobalScope a
+                // get cancelled on JVM exit -- under the prior GlobalScope a
                 // user closing the launcher mid-sync left network/file handles
                 // open until the process truly died (#191). The service itself
                 // is a singleton and idempotent (will no-op on subsequent calls
-                // if already running — TODO: enforce via in-flight flag once we
+                // if already running -- TODO: enforce via in-flight flag once we
                 // add UI re-trigger).
                 if (settings.experimentalFeaturesEnabled
                     && settings.autoSyncAllPacks
@@ -521,7 +522,7 @@ fun main() {
                         // launcher mid-init when dorkbox's GTK probe is
                         // taking its time. If it ultimately fails, the user
                         // can quit via tray (when it appears) or kill the
-                        // process — strictly better than exiting on a close
+                        // process -- strictly better than exiting on a close
                         // request the user clearly meant as "minimize".
                         isWindowVisible = false
                     } else {
@@ -544,7 +545,7 @@ fun main() {
                         // The isAlwaysOnTop trick is the only cross-WM way to
                         // force a raise on X11 (KDE / Hyprland / GNOME all
                         // ignore plain toFront() to discourage focus-stealing).
-                        // Pulse it: enable → toFront → requestFocus → disable.
+                        // Pulse it: enable -> toFront -> requestFocus -> disable.
                         window.isAlwaysOnTop = true
                         window.toFront()
                         window.requestFocus()
@@ -661,12 +662,12 @@ fun AppRoot(
                         // 2FA accounts already paid the 2FA cost when they
                         // got the cached accessToken. Re-validating with
                         // login() just re-triggers the gate on every
-                        // launcher startup — which is what the cached
+                        // launcher startup -- which is what the cached
                         // accessToken is supposed to prevent. Trust the
                         // cache: promote `saved` straight to Authenticated.
                         // If the token is actually stale, the server will
                         // reject it at game launch and the user re-logs in
-                        // from the credentials form — same recovery path
+                        // from the credentials form -- same recovery path
                         // as a server-side logout. Fix for the "double
                         // login on every launch with 2FA" report.
                         hivens.core.diag.ActionRing.record(
@@ -683,8 +684,8 @@ fun AppRoot(
                             // through a prior cert outage; we extend that consent until
                             // the cert issue resolves or 30 days, whichever comes first.
                             val until = java.time.Instant.now().plus(30, java.time.temporal.ChronoUnit.DAYS)
-                            hivens.core.diag.ActionRing.record("SSL bypass auto-granted on cached-credential auto-login (cert error) — 30 days")
-                            NetworkState.grantBypass(hivens.config.Network.SSL_BYPASS_HOST, until)
+                            hivens.core.diag.ActionRing.record("SSL bypass auto-granted on cached-credential auto-login (cert error) -- 30 days")
+                            NetworkState.grantBypass(hivens.config.Network.SSL_BYPASS_HOST, until) // TODO: Deprecated
                             try {
                                 val server  = profileManager.lastServerId ?: Protocol.DEFAULT_SERVER_ID
                                 val session = insecureAuthService.login(saved.playerName, saved.cachedPassword!!, server)
