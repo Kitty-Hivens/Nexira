@@ -36,6 +36,10 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.rememberWindowState
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.puppet.PuppetClick
+import hivens.ui.puppet.PuppetField
+import hivens.ui.puppet.PuppetScreen
+import hivens.ui.puppet.PuppetToggle
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.utils.LogEntry
 import hivens.ui.utils.LogType
@@ -167,6 +171,35 @@ private fun ConsoleContent(
 
     // ── Horizontal scroll for no-wrap mode ───────────────────────────────
     val hScroll = rememberScrollState()
+
+    // Puppet: console toolbar + search wiring. The ConsoleWindow itself is
+    // a separate OS window, so "screen" semantics overlap with whichever
+    // main launcher screen is active. We don't override [currentScreen] —
+    // drivers detect console presence via `console.*` ids being registered.
+    PuppetScreen("Console")
+    PuppetToggle("console.filterInfo", filterInfo)   { filterInfo = it }
+    PuppetToggle("console.filterWarn", filterWarn)   { filterWarn = it }
+    PuppetToggle("console.filterError", filterError) { filterError = it }
+    PuppetToggle("console.wrap", wrapText)           { wrapText = it }
+    PuppetToggle("console.regexMode", regexMode)     { regexMode = it }
+    PuppetField("console.search", searchQuery)       { searchQuery = it }
+    PuppetClick("console.clearSearch", enabled = searchQuery.isNotEmpty()) { searchQuery = "" }
+    PuppetClick("console.saveToFile") { GameConsoleService.saveToFile() }
+    PuppetClick("console.copyAll") {
+        val text = logsCopy.joinToString("\n") { e ->
+            if (e.type == LogType.DIVIDER) e.text else "[${e.timestamp}] ${e.text}"
+        }
+        scope.launch { clipboard.setClipEntry(ClipEntry(StringSelection(text))) }
+    }
+    PuppetClick("console.clear") { GameConsoleService.clear() }
+    PuppetClick("console.jumpToBottom", enabled = filtered.isNotEmpty()) {
+        scope.launch { listState.scrollToItem(filtered.lastIndex) }
+    }
+    // Font-size picker — one click per available size (no need for a dropdown
+    // open/close dance).
+    FONT_SIZES.forEach { size ->
+        PuppetClick("console.fontSize.$size") { fontSize = size }
+    }
 
     Column(Modifier.fillMaxSize()) {
 
