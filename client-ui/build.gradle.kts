@@ -103,25 +103,37 @@ compose.desktop {
                 TargetFormat.Dmg
             )
 
-            // ====================================================================
-            // PROGUARD AGGRESSIVE OPTIMIZATION
-            // ====================================================================
+            // Shrinker: ProGuard 7.8.2, configured via compose-desktop.pro.
+            // optimize=true enables the optimization passes declared in the
+            // .pro file; obfuscate=false keeps stack traces / class names
+            // readable in crash reports (Aura is GPL, hiding names earns nothing).
+            // The `version.set(...)` pin ties ProGuard to the libs catalog
+            // entry so a Compose-MP bump cannot silently drift the shrinker.
             buildTypes.release.proguard {
                 isEnabled.set(true)
                 optimize.set(true)
                 obfuscate.set(false)
-
                 configurationFiles.from(project.file("compose-desktop.pro"))
-
-                // Additional runtime optimizations
                 version.set(libs.versions.proguard.get())
             }
 
             packageName = "AuraLauncher"
+
+            // jpackage expects a strictly numeric VersionInfoVersion: MAJOR.MINOR
+            // [.BUILD[.REVISION]], digits only, no pre-release suffix. Our git
+            // tags follow `v<semver>[-<suffix>]` convention (e.g. v2.2.14-rc1,
+            // v2.2.14), so:
+            //   1. Strip the leading "v" if present (tag invocation forces it,
+            //      manual -PappVersion overrides may or may not).
+            //   2. Drop everything from the first "-" (rc / beta / dirty suffix).
+            //   3. Sanity check what is left actually matches digits-and-dots; if
+            //      not, fall back to "1.0.0" so packaging doesn't fail loud on a
+            //      cosmetically broken version override.
+            // The same normalization runs in setup.iss for Windows installer
+            // VersionInfoVersion -- both must agree, otherwise upgrade detection
+            // breaks.
             val cleanVersion = project.version.toString().removePrefix("v").substringBefore("-")
-
             val safeVersion = if (cleanVersion.matches(Regex("\\d+\\.\\d+.*"))) cleanVersion else "1.0.0"
-
             packageVersion = safeVersion
             description = "Aura Launcher v${project.version} (unofficial)"
             copyright = "© 2026 Hivens"
@@ -189,7 +201,13 @@ compose.desktop {
             "-Dawt.appClassName=AuraLauncher",
             "--add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED",
 
-            // Graphics optimization
+            // X11/Linux desktop tuning. macOS/Windows JVMs silently ignore
+            // these properties (XToolkit code path is not even loaded), so
+            // shipping them unconditionally is noise rather than wrong. If
+            // Compose-MP ever gains per-platform jvmArgs support upstream we
+            // should move them into a linux { ... } block; until then keep
+            // here with a comment so a contributor reading the file does
+            // not waste time wondering why a Mac build sets _JAVA_AWT_WM_*.
             "-Dawt.useSystemAAFontSettings=on",
             "-Djdk.gtk.version=3",
             "-D_JAVA_AWT_WM_NONREPARENTING=1",
