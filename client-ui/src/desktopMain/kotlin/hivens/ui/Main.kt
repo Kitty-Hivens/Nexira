@@ -277,19 +277,26 @@ fun main() {
     }
 
     // Puppet mode: opt-in localhost HTTP control surface for automated
-    // UI driving (see hivens.ui.puppet.PuppetServer). Bind ONLY happens
-    // when -Daura.puppet.port=N is set; without the flag this is inert
-    // even though the classes are in the JAR. MUST run after Koin so
-    // PuppetRegistry-using Composables can resolve their dependencies,
-    // and before `application` so the server is listening when the
-    // first Composable registers itself.
-    hivens.ui.puppet.PuppetServer.startIfRequested()
+    // UI driving (see hivens.ui.puppet.PuppetServerLifecycle + Loader).
+    // Two-layer gating:
+    //   1. Build-time: RealPuppetServer + Ktor server classes are only
+    //      compiled into the desktop target when `-PauraPuppetPort=N`
+    //      is on the Gradle command line. Default production builds do
+    //      not contain the implementation at all -- ServiceLoader returns
+    //      nothing, the loader falls back to NoOpPuppetServer.
+    //   2. Runtime: even when the real impl IS on the classpath,
+    //      `startIfRequested()` only binds when `-Daura.puppet.port=N`
+    //      is set as a JVM system property.
+    // MUST run after Koin so PuppetRegistry-using Composables can resolve
+    // their dependencies, and before `application` so the server is
+    // listening when the first Composable registers itself.
+    hivens.ui.puppet.PuppetServerLoader.instance.startIfRequested()
 
     application {
         DisposableEffect(Unit) {
             onDispose {
                 TrayManager.shutdown()
-                hivens.ui.puppet.PuppetServer.stop()
+                hivens.ui.puppet.PuppetServerLoader.instance.stop()
                 stopKoin()
             }
         }
