@@ -4,8 +4,10 @@
 
 [versions]
 # ── Toolchain & language plugins ─────────────────────────────────────────────
-# Kotlin held at 2.3.20-RC3 (next release-line bump is 2.4.0-Beta2, skipped —
-# beta of a new major). Compose moved alpha04 → rc01 of the same 1.11.0 line.
+# Compose Multiplatform 1.11.0-alpha04: held because no rc has shipped yet
+# on the 1.11.0 line. Downgrade to last 1.10.x stable is on the table --
+# grep confirms zero usage of 1.11-alpha-only APIs (adaptive*, FlowRow,
+# LookaheadScope, requiredSize, runtime.tracing). Track in issue #TBD.
 kotlin            = "2.3.21"
 compose           = "1.11.0-alpha04"
 buildconfigPlugin = "6.0.9"
