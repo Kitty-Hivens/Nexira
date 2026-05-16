@@ -26,6 +26,7 @@ import hivens.ui.components.ServerGrid
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.logic.LaunchState
 import hivens.ui.logic.LauncherController
+import hivens.ui.puppet.PuppetScreen
 import hivens.ui.theme.CelestiaTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -44,6 +45,8 @@ fun DashboardScreen(
     onOpenServerSettings: (ServerProfile) -> Unit,
     onOpenDetails: (ServerProfile) -> Unit
 ) {
+    PuppetScreen("Dashboard")
+
     val serverListService: IServerListService = koinInject()
     val settingsService: ISettingsService     = koinInject()
     val profileManager: ProfileManager        = koinInject()
