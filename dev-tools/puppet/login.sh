@@ -77,9 +77,41 @@ echo "[puppet] filling password"
 echo "[puppet] click login.submit"
 "$(dirname "$0")/click.sh" login.submit >/dev/null
 
-reached="$(wait_screen_either Dashboard Login_2FA | tail -n 1)"
+# Success detection: account.logout appears in the registry once
+# AppState transitions to Authenticated (the right-panel AccountPanel
+# renders). We do NOT rely on /screen — Aura preserves the previously-
+# selected Screen across logout, so after login we may land back on
+# Settings instead of Dashboard, and the screen marker can lag because
+# PuppetScreen uses last-writer-wins (see PR #201 known limitations).
+# 2FA detection: login.twoFactor.code appears.
+wait_post_login() {
+    local deadline now
+    deadline=$(( $(date +%s) + WAIT_TIMEOUT ))
+    while true; do
+        local snapshot
+        snapshot="$(curl -sS "${PUPPET_BASE}/elements" 2>/dev/null || echo '{}')"
+        if jq -e '.elements[] | select(.id == "login.twoFactor.code")' <<<"$snapshot" >/dev/null 2>&1; then
+            echo "[puppet] 2FA prompt detected"
+            printf '%s' "2FA"
+            return 0
+        fi
+        if jq -e '.elements[] | select(.id == "account.logout")' <<<"$snapshot" >/dev/null 2>&1; then
+            echo "[puppet] authenticated (account.logout in registry)"
+            printf '%s' "OK"
+            return 0
+        fi
+        now=$(date +%s)
+        if (( now >= deadline )); then
+            echo "[puppet] timeout waiting for post-login state" >&2
+            return 1
+        fi
+        sleep 0.3
+    done
+}
 
-if [[ "$reached" == "Login_2FA" ]]; then
+reached="$(wait_post_login | tail -n 1)"
+
+if [[ "$reached" == "2FA" ]]; then
     if [[ -z "$TOTP_CODE" ]]; then
         echo "[puppet] 2FA required but no code supplied; pass as 3rd arg" >&2
         exit 1
@@ -88,7 +120,8 @@ if [[ "$reached" == "Login_2FA" ]]; then
     "$(dirname "$0")/set-field.sh" login.twoFactor.code "$TOTP_CODE" >/dev/null
     echo "[puppet] click login.twoFactor.submit"
     "$(dirname "$0")/click.sh" login.twoFactor.submit >/dev/null
-    wait_screen Dashboard >/dev/null
+    # Same registry-based success detection after the 2FA submit.
+    wait_post_login >/dev/null
 fi
 
 echo "[puppet] logged in OK"
