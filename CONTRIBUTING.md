@@ -75,11 +75,11 @@ you really need to push WIP, but please don't make a habit of it.
 
 ## ── Stack ──
 
-Kotlin · Compose Multiplatform · Ktor · Koin · Skiko · dorkbox/SystemTray · Logback
+Kotlin · Compose Multiplatform · Ktor · Koin · Skiko · libtray · Logback
 
 ## ── Platform notes ──
 
-- **Windows**: JNA must stay pinned to `5.18.1` in `client-ui` and forced to `6.1.6` globally via `resolutionStrategy` — dorkbox/SystemTray 4.4 has a hardcoded version check.
+- **Windows**: native tray icon goes through `libtray` (in-house pure-Panama replacement for dorkbox/SystemTray, github.com/Kitty-Hivens/libtray). The previous JNA-pin requirement (`5.18.1` in client-ui, `6.1.6` globally via `resolutionStrategy`) was a dorkbox 4.4 hardcoded version check; both pins have been dropped along with the dorkbox dependency.
 - **Linux**: AppImage is assembled manually in CI (`build_release.yml`), not via Compose packaging.
 - **macOS**: DMG via `:client-ui:packageReleaseDmg`.
 
