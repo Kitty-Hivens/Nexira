@@ -12,7 +12,7 @@ import kotlinx.serialization.Serializable
  * single config object so:
  *
  *   - The launcher can be pointed at a Mirror (Project Mirror, post-Void)
- *     without recompiling — drop a `<dataDir>/server-config.json` with the
+ *     without recompiling -- drop a `<dataDir>/server-config.json` with the
  *     mirror's URL, restart.
  *   - Per-server differences (test/staging environments, regional mirrors)
  *     are first-class data, not tribal knowledge in scattered constants.
@@ -27,19 +27,19 @@ import kotlinx.serialization.Serializable
  *
  * ## Override paths (opt-in via [ExperimentalConduitOverride])
  *
- * 1. **Config file** at `<dataDir>/server-config.json` — full data class
+ * 1. **Config file** at `<dataDir>/server-config.json` -- full data class
  *    serialised. Loader merges with defaults so partial files are fine.
- * 2. **System property** `aura.conduit.baseurl` — overrides just the
+ * 2. **System property** `aura.conduit.baseurl` -- overrides just the
  *    base URL, leaves everything else at config-file or default.
  *    Useful for one-off "test against mirror right now" CLI workflows.
  *
- * Both override paths are guarded by [ExperimentalConduitOverride] —
+ * Both override paths are guarded by [ExperimentalConduitOverride] --
  * normal launcher behavior reads through to the data class fields directly.
  */
 @Serializable
 data class ServerProtocolConfig(
     /**
-     * Origin of the SmartyCraft API — `https://www.smartycraft.ru` for
+     * Origin of the SmartyCraft API -- `https://www.smartycraft.ru` for
      * production. No trailing slash. Derived URLs ([authUrl],
      * [officialJarUrl], [clientFilesBase]) append paths.
      */
@@ -55,7 +55,7 @@ data class ServerProtocolConfig(
     val proxyUser: String = DEFAULT_PROXY_USER,
 
     /**
-     * SOCKS5 proxy password. Recovered from smrt-deco — public per-protocol
+     * SOCKS5 proxy password. Recovered from smrt-deco -- public per-protocol
      * value, not a secret. See `feedback_secrets_vs_interop`.
      */
     val proxyPass: String = DEFAULT_PROXY_PASS,
@@ -63,10 +63,10 @@ data class ServerProtocolConfig(
     /** POST endpoint for `action=login`/`action=loader`/etc. */
     val authUrl: String get() = "$baseUrl/launcher2/index.php"
 
-    /** Latest official launcher binary — used by [hivens.launcher.protocol.LauncherHashCache]. */
+    /** Latest official launcher binary -- used by [hivens.launcher.protocol.LauncherHashCache]. */
     val officialJarUrl: String get() = "$baseUrl/downloads/smartycraft.jar"
 
-    /** Per-server client-file CDN root — `FileDownloadService` appends `/<server>/<file>`. */
+    /** Per-server client-file CDN root -- `FileDownloadService` appends `/<server>/<file>`. */
     val clientFilesBase: String get() = "$baseUrl/launcher/clients"
 
     companion object {

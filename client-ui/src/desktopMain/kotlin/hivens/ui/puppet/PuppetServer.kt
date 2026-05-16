@@ -21,7 +21,7 @@ import org.slf4j.LoggerFactory
 /**
  * Localhost HTTP server that exposes [PuppetRegistry] over a small JSON
  * API, allowing external scripts (curl, automated UI test harnesses)
- * to drive the Compose UI semantically — querying the current screen,
+ * to drive the Compose UI semantically -- querying the current screen,
  * clicking buttons, filling fields, toggling switches.
  *
  * **Strictly opt-in.** Only binds when `-Daura.puppet.port=N` is set
@@ -29,7 +29,7 @@ import org.slf4j.LoggerFactory
  * occupied; production builds therefore cannot accidentally expose
  * the surface even with the classes present in the JAR.
  *
- * Bind is hardcoded to `127.0.0.1` — no remote access, no auth, the
+ * Bind is hardcoded to `127.0.0.1` -- no remote access, no auth, the
  * threat model assumes a trusted developer workstation. If you need
  * authentication beyond "only local processes can connect", that's a
  * separate iteration.
@@ -45,11 +45,11 @@ import org.slf4j.LoggerFactory
  * reads.
  *
  * Endpoints:
- *   * `GET  /screen`     → { screen: String }
- *   * `GET  /elements`   → { screen: String, elements: [PuppetElement] }
- *   * `POST /click`      ← { id: String }                  → { ok: true } | 404
- *   * `POST /setField`   ← { id: String, value: String }   → { ok: true } | 404
- *   * `POST /setToggle`  ← { id: String, value: Boolean }  → { ok: true } | 404
+ *   * `GET  /screen`     -> { screen: String }
+ *   * `GET  /elements`   -> { screen: String, elements: [PuppetElement] }
+ *   * `POST /click`      <- { id: String }                  -> { ok: true } | 404
+ *   * `POST /setField`   <- { id: String, value: String }   -> { ok: true } | 404
+ *   * `POST /setToggle`  <- { id: String, value: Boolean }  -> { ok: true } | 404
  */
 internal object PuppetServer {
 
@@ -60,13 +60,13 @@ internal object PuppetServer {
 
     /**
      * Start the puppet HTTP server if `-Daura.puppet.port=N` is set.
-     * Idempotent — a second call when already running is a no-op.
+     * Idempotent -- a second call when already running is a no-op.
      */
     fun startIfRequested() {
         if (server != null) return
         val portProp = System.getProperty("aura.puppet.port") ?: return
         val port = portProp.toIntOrNull() ?: run {
-            log.warn("aura.puppet.port='{}' is not an integer — puppet mode disabled", portProp)
+            log.warn("aura.puppet.port='{}' is not an integer -- puppet mode disabled", portProp)
             return
         }
 
@@ -106,7 +106,7 @@ internal object PuppetServer {
             s.start(wait = false)
             server = s
             log.warn(
-                "PUPPET MODE ACTIVE — HTTP control surface on http://127.0.0.1:{}. " +
+                "PUPPET MODE ACTIVE -- HTTP control surface on http://127.0.0.1:{}. " +
                 "Do not enable in production.",
                 port,
             )

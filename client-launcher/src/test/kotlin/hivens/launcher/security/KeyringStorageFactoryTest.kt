@@ -32,7 +32,7 @@ class KeyringStorageFactoryTest {
         // Defensive: blank ids would silently coexist in the real store
         // (libsecret happily stores a "" attribute). Catch at the boundary.
         val noop: IKeyringStorage = NoOpKeyringStorage
-        // NoOp doesn't enforce — it's the platform impls that throw.
+        // NoOp doesn't enforce -- it's the platform impls that throw.
         // This test pins the API surface so a future refactor doesn't
         // accidentally weaken the contract by swapping NoOp into the
         // checked path.

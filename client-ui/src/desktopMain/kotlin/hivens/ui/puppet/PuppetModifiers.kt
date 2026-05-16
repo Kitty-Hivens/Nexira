@@ -5,13 +5,13 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.rememberUpdatedState
 
 /**
- * Composable side-effects that register interactive widgets with
+ * Composable side effects that register interactive widgets with
  * [PuppetRegistry] for the duration of their composition.
  *
  * Pattern:
  *   * Each helper uses [rememberUpdatedState] for every captured
  *     parameter, so the registry always invokes the LATEST lambda /
- *     reads the LATEST value — even when the host Composable
+ *     reads the LATEST value -- even when the host Composable
  *     recomposes with new arguments.
  *   * [DisposableEffect] keyed on `id` registers on entry and
  *     unregisters on exit; navigating away from a screen removes its
@@ -28,7 +28,7 @@ import androidx.compose.runtime.rememberUpdatedState
  * ```
  *
  * Place the puppet call NEXT TO the widget it shadows, not wrapped
- * around it — keeps the existing UI tree untouched and the puppet
+ * around it -- keeps the existing UI tree untouched and the puppet
  * declarations skimmable.
  */
 
@@ -101,7 +101,7 @@ internal fun PuppetToggle(
  * Dashboard, Settings, …). The puppet HTTP `/screen` endpoint returns
  * whatever was last set here.
  *
- * Nested calls are NOT scoped (out of MVP scope) — if two PuppetScreen
+ * Nested calls are NOT scoped (out of MVP scope) -- if two PuppetScreen
  * declarations are alive simultaneously, the most recently composed
  * one wins. Aura's current navigation is a single top-level screen at
  * a time, so this is fine.

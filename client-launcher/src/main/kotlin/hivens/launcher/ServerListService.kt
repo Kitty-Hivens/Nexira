@@ -13,7 +13,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.future.future
 import kotlinx.serialization.json.JsonObject
 import org.slf4j.LoggerFactory
-import java.text.SimpleDateFormat
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -30,8 +29,8 @@ class ServerListService(
     @Volatile
     private var cachedData: DashboardData? = null
     /**
-     * Single in-flight fetch — if dashboard load is already running when a
-     * second caller arrives (autosync + dashboard composition + tray-launch
+     * Single in-flight fetch -- if dashboard load is already running when a
+     * second caller arrives (auto-sync + dashboard composition + tray-launch
      * can overlap on cold start) they share the same future instead of each
      * firing their own request and racing to populate [cachedData] (#189).
      */
@@ -75,7 +74,7 @@ class ServerListService(
                     }
                     data
                 } catch (e: Exception) {
-                    logger.error("fetchDashboardData failed — returning empty dashboard", e)
+                    logger.error("fetchDashboardData failed -- returning empty dashboard", e)
                     DashboardData(emptyList(), emptyList())
                 }
             }

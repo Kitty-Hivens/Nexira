@@ -20,7 +20,7 @@ class UpdateServiceTest {
 
     /**
      * Stub settings service backed by a mutable [SettingsData] reference.
-     * Tests pre-load whatever toggles they want via [fakeSettings] and pass
+     * Tests preload whatever toggles they want via [fakeSettings] and pass
      * the result to [createService].
      */
     private class FakeSettingsService(initial: SettingsData) : ISettingsService {
@@ -73,7 +73,7 @@ class UpdateServiceTest {
         tempDir.toFile().deleteOnExit()
         return UpdateService(
             clientProvider = buildMockClient(
-                // Manifest first — substring "release-manifest" is more specific
+                // Manifest first -- substring "release-manifest" is more specific
                 // than "releases/latest" and must win the match.
                 MockResponse(urlContains = "release-manifest", body = releaseManifestJson()),
                 MockResponse(urlContains = "releases/latest",  body = body,      status = status),
@@ -97,7 +97,7 @@ class UpdateServiceTest {
             assetJson("AuraLauncher-2.0.0-Windows-Portable.zip", "https://example.com/AuraLauncher-2.0.0-Windows-Portable.zip", 60_000_000),
             assetJson("AuraLauncher-2.0.0-x86_64.AppImage", "https://example.com/AuraLauncher-2.0.0-x86_64.AppImage", 70_000_000),
             assetJson("AuraLauncher-2.0.0.dmg", "https://example.com/AuraLauncher-2.0.0.dmg", 80_000_000),
-            // Required since #186 — without a manifest entry the cold path
+            // Required since #186 -- without a manifest entry the cold path
             // refuses to construct a LauncherUpdate. Default fixture bundles
             // it so existing tests don't have to wire it explicitly.
             assetJson("release-manifest.json", "https://example.com/release-manifest.json", 1024),
@@ -119,12 +119,12 @@ class UpdateServiceTest {
     """.trimIndent()
 
     /**
-     * Default release-manifest.json fixture. Hashes are placeholder zeros —
-     * tests that exercise the integrity gate ([downloadUpdate]) supply real
+     * Default release-manifest.json fixture. Hashes are placeholder zeros --
+     * tests that exercise the integrity gate (`downloadUpdate`) supply real
      * hashes via [releaseManifestJson] with explicit asset list.
      *
      * platform/kind/size fields are required by [hivens.core.data.ReleaseAsset];
-     * deserialization fails (silently → manifest becomes null) without them.
+     * deserialization fails (silently -> manifest becomes null) without them.
      */
     private fun manifestAssetJson(name: String, sha256: String, platform: String, kind: String) =
         """{"name":"$name","platform":"$platform","kind":"$kind","sha256":"$sha256","size":1000}"""
@@ -192,7 +192,7 @@ class UpdateServiceTest {
     @Test
     fun `compareVersions ranks final above any prerelease at same base`() {
         val svc = createService("{}")
-        // Final 1.3.0 > 1.3.0-rc3 — without this the prerelease channel would
+        // Final 1.3.0 > 1.3.0-rc3 -- without this the prerelease channel would
         // accidentally consider users on a final build "behind" the latest RC.
         assertTrue(svc.compareVersions("1.3.0", "1.3.0-rc3") > 0)
         assertTrue(svc.compareVersions("1.3.0-rc3", "1.3.0") < 0)
@@ -217,7 +217,7 @@ class UpdateServiceTest {
     @Test
     fun `compareVersions handles versions with different segment counts`() {
         val svc = createService("{}")
-        // 1.3 vs 1.3.0 — missing segments treated as 0
+        // 1.3 vs 1.3.0 -- missing segments treated as 0
         assertEquals(0, svc.compareVersions("1.3", "1.3.0"))
         assertTrue(svc.compareVersions("1.3.1", "1.3") > 0)
     }
@@ -292,7 +292,7 @@ class UpdateServiceTest {
         )
         val os = System.getProperty("os.name").lowercase()
         if (os.contains("windows")) {
-            // Portable ZIP doesn't end with .exe — should return null
+            // Portable ZIP doesn't end with .exe -- should return null
             assertNull(svc.findAssetForCurrentOS(assets))
         }
     }
@@ -335,7 +335,7 @@ class UpdateServiceTest {
             assertEquals(
                 "AuraLauncher-3.0.0-x86_64.dmg",
                 svc.findAssetForCurrentOS(assets)?.name,
-                "Intel Mac must NOT receive the aarch64 DMG (Rosetta only goes x86_64 → arm, not arm → x86_64)",
+                "Intel Mac must NOT receive the aarch64 DMG (Rosetta only goes x86_64 -> arm, not arm -> x86_64)",
             )
         } finally {
             System.setProperty("os.name", originalOs)
@@ -351,7 +351,7 @@ class UpdateServiceTest {
         try {
             System.setProperty("os.name", "Mac OS X")
             System.setProperty("os.arch", "x86_64")
-            // Legacy release (≤ 2.2.12) shipped a single DMG with no arch suffix —
+            // Legacy release (≤ 2.2.12) shipped a single DMG with no arch suffix --
             // updater must still find it for backward compatibility, even if the
             // resulting binary may be wrong-arch on some hosts. Better than no
             // update at all.
@@ -377,7 +377,7 @@ class UpdateServiceTest {
         val svc = createService("{}")
         val body = """
             ## SHA256 Checksums
-            
+
             | File | SHA256 |
             |---|---|
             | `AuraLauncher-2.0.0-Setup.exe` | `abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890` |
@@ -574,9 +574,9 @@ class UpdateServiceTest {
     @Test
     fun `checkForUpdate refuses to construct update when manifest is absent`() = runTest {
         // Regression for #186: with no release-manifest.json asset shipped in
-        // the release, the launcher must NOT auto-install — there is no
+        // the release, the launcher must NOT auto-install -- there is no
         // verifiable hash to gate against. Older releases that pre-date the
-        // manifest convention require manual reinstall.
+        // manifest convention require manual reinstallation.
         val release = githubReleaseJson(
             tagName = "v99.0.0",
             assets = listOf(
@@ -586,7 +586,7 @@ class UpdateServiceTest {
                 assetJson("AuraLauncher-99.0.0.dmg", "https://example.com/AuraLauncher-99.0.0.dmg", 80_000_000),
             )
         )
-        // Stage manifest URL explicitly returning 404 — the test's intent
+        // Stage manifest URL explicitly returning 404 -- the test's intent
         // is "no manifest available," not "manifest accidentally garbled."
         val svc = createService(
             MockResponse(urlContains = "release-manifest", body = "Not Found", status = HttpStatusCode.NotFound),
@@ -594,7 +594,7 @@ class UpdateServiceTest {
             MockResponse(urlContains = "releases",         body = "[$release]"),
         )
         val update = svc.checkForUpdate(force = true)
-        assertNull(update, "Auto-update must refuse when manifest is missing — no silent skip")
+        assertNull(update, "Auto-update must refuse when manifest is missing -- no silent skip")
     }
 
     @Test
@@ -602,7 +602,7 @@ class UpdateServiceTest {
         // Subtler variant of #186: the manifest is present but doesn't list
         // the asset we'd install (e.g. a partial manifest published by mistake,
         // or a new platform asset added without updating the manifest). Same
-        // outcome — refuse, force manual install.
+        // outcome -- refuse, force manual installation.
         val release = githubReleaseJson(tagName = "v99.0.0")
         val emptyManifest = releaseManifestJson(
             version = "99.0.0",
@@ -677,7 +677,7 @@ class UpdateServiceTest {
     fun `prerelease channel ON picks first non-draft from releases list`() = runTest {
         // Two releases in the list: a draft (must be skipped) and a published
         // RC (must be picked). The /releases/latest endpoint isn't even hit
-        // when prereleases are on — wire it to fail to prove that.
+        // when prereleases are on -- wire it to fail to prove that.
         val draft = githubReleaseJson(tagName = "v99.9.9", body = "draft")
             .replace("\"prerelease\": false", "\"prerelease\": false,\n            \"draft\": true")
         val rc = githubReleaseJson(tagName = "v99.0.0-rc1", body = "rc body")
@@ -693,7 +693,7 @@ class UpdateServiceTest {
 
     @Test
     fun `prerelease channel OFF still uses releases-latest endpoint`() = runTest {
-        // /releases (the list endpoint) is broken — if the code accidentally
+        // /releases (the list endpoint) is broken -- if the code accidentally
         // hits it when prereleases are off, the test will fail.
         val svc = createService(
             MockResponse(urlContains = "releases/latest", body = githubReleaseJson(tagName = "v99.0.0")),
@@ -707,7 +707,7 @@ class UpdateServiceTest {
 
     @Test
     fun `experimental master OFF forces both children OFF`() = runTest {
-        // Master off → prereleases off (so /releases/latest is the path, not
+        // Master off -> prereleases off (so /releases/latest is the path, not
         // /releases) AND mandatory off (so even a high floor doesn't block).
         val release = githubReleaseJson(tagName = "v99.0.0")
         val channelMeta = """{"mandatory_min_version":"999.0.0","reason":"upstream broke"}"""
@@ -743,7 +743,7 @@ class UpdateServiceTest {
 
     @Test
     fun `mandatory floor at-or-below current does not mandate`() = runTest {
-        // Floor "0.0.0" — strictly below any real installed version.
+        // Floor "0.0.0" -- strictly below any real installed version.
         val channelMeta = """{"mandatory_min_version":"0.0.0","reason":null}"""
         val svc = createService(
             MockResponse(urlContains = "releases/latest",     body = githubReleaseJson(tagName = "v999.0.0")),
@@ -851,7 +851,7 @@ class UpdateServiceTest {
 
     @Test
     fun `mandatory floor with v-prefix is normalized`() = runTest {
-        // Real-world authors will write "v2.2.8" out of habit — strip the v.
+        // Real-world authors will write "v2.2.8" out of habit -- strip the v.
         val channelMeta = """{"mandatory_min_version":"v999.0.0","reason":"normalized"}"""
         val svc = createService(
             MockResponse(urlContains = "releases/latest",     body = githubReleaseJson(tagName = "v999.0.0")),

@@ -76,7 +76,7 @@ fun ProfileScreen(session: SessionData, skinRepository: SkinRepository) {
                 Desktop.getDesktop().browse(URI(url))
         }
     }
-    // Note: profile.uploadSkin triggers a native file picker — unreachable
+    // Note: profile.uploadSkin triggers a native file picker -- unreachable
     // from puppet without supplying a path argument. Out of MVP scope.
 
     Column(Modifier.fillMaxSize().padding(24.dp)) {
@@ -192,7 +192,7 @@ fun ProfileScreen(session: SessionData, skinRepository: SkinRepository) {
                             else -> Unit
                         }
 
-                        // Top up balance — chaos target
+                        // Top up balance -- chaos target
                         AprilFoolsButton(
                             id      = "profile_topup_btn",
                             text    = s.profileTopUp,
@@ -212,7 +212,7 @@ fun ProfileScreen(session: SessionData, skinRepository: SkinRepository) {
 
                         Spacer(Modifier.height(16.dp))
 
-                        // Upload skin — chaos target
+                        // Upload skin -- chaos target
                         AprilFoolsButton(
                             id      = "profile_upload_skin_btn",
                             text    = s.profileUploadSkin,

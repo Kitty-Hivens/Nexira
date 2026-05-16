@@ -1,7 +1,7 @@
 package hivens.config
 
 /**
- * What the launcher calls itself in front of the user — title, version, upstream
+ * What the launcher calls itself in front of the user -- title, version, upstream
  * affiliation. Pure cosmetics; nothing here is sent on the wire.
  */
 object Branding {
@@ -18,7 +18,7 @@ object Branding {
     const val WM_CLASS = "AuraLauncher"
 
     /**
-     * This launcher's own semantic version — generated at build time from
+     * This launcher's own semantic version -- generated at build time from
      * `git describe --tags --dirty`, so it tracks the released artifact.
      */
     const val VERSION: String = BuildConfig.FORK_VERSION
@@ -39,7 +39,7 @@ object Branding {
      */
     const val REPO_SLUG = "Kitty-Hivens/Aura-Launcher"
 
-    /** Computed convenience — base URL of the GitHub repo. */
+    /** Computed convenience -- base URL of the GitHub repo. */
     val REPO_URL get() = "https://github.com/$REPO_SLUG"
 
     /** New-issue endpoint accepting `?title=&body=&labels=` query params. */

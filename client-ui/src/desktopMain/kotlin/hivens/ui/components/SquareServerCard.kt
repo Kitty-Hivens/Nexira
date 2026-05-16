@@ -60,19 +60,20 @@ import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 import javax.imageio.ImageIO
 import kotlin.math.abs
+import kotlin.time.Duration.Companion.milliseconds
 
 // ─── Server color palette ─────────────────────────────────────────────────────
 // Each server gets a stable unique gradient derived from its name.
 
 private val SERVER_PALETTES = listOf(
-    Pair(Color(0xFF7C3AED), Color(0xFF4F46E5)), // violet → indigo
-    Pair(Color(0xFF0EA5E9), Color(0xFF6366F1)), // sky → violet
-    Pair(Color(0xFF10B981), Color(0xFF0EA5E9)), // emerald → sky
-    Pair(Color(0xFFF59E0B), Color(0xFFEF4444)), // amber → red
-    Pair(Color(0xFFEC4899), Color(0xFF8B5CF6)), // pink → purple
-    Pair(Color(0xFF14B8A6), Color(0xFF3B82F6)), // teal → blue
-    Pair(Color(0xFFF97316), Color(0xFFEAB308)), // orange → yellow
-    Pair(Color(0xFF6366F1), Color(0xFFEC4899)), // indigo → pink
+    Pair(Color(0xFF7C3AED), Color(0xFF4F46E5)), // violet -> indigo
+    Pair(Color(0xFF0EA5E9), Color(0xFF6366F1)), // sky -> violet
+    Pair(Color(0xFF10B981), Color(0xFF0EA5E9)), // emerald -> sky
+    Pair(Color(0xFFF59E0B), Color(0xFFEF4444)), // amber -> red
+    Pair(Color(0xFFEC4899), Color(0xFF8B5CF6)), // pink -> purple
+    Pair(Color(0xFF14B8A6), Color(0xFF3B82F6)), // teal -> blue
+    Pair(Color(0xFFF97316), Color(0xFFEAB308)), // orange -> yellow
+    Pair(Color(0xFF6366F1), Color(0xFFEC4899)), // indigo -> pink
 )
 
 private fun serverPalette(name: String): Pair<Color, Color> =
@@ -143,7 +144,7 @@ fun SquareServerCard(
     // ── Theme-aware overlay colors ─────────────────────────────────────────
     val bgBase      = CelestiaTheme.colors.background
     val surfaceBase = CelestiaTheme.colors.surface
-    // In dark theme bg is near-black; in light theme it's light gray — both look correct.
+    // In dark theme bg is near-black; in light theme it's light gray -- both look correct.
     val cardOverlay     = bgBase.copy(alpha = 0.65f)
     val actionBarColor  = surfaceBase.copy(alpha = 0.92f)
     val scrimMid        = bgBase.copy(alpha = 0.50f)
@@ -151,7 +152,7 @@ fun SquareServerCard(
     val badgeBgFallback = colorB.copy(0.22f)
 
     // When the chaos engine has taken control, the original card is invisible
-    // and the clone lives in ChaosOverlay — block all pointer events on the ghost.
+    // and the clone lives in ChaosOverlay -- block all pointer events on the ghost.
     val isChaosEscaped = AprilFools.isActive() && !chaosBtn.originalVisible
     val chaosBlocker: Modifier = if (isChaosEscaped) {
         Modifier.pointerInput(Unit) {
@@ -211,7 +212,7 @@ fun SquareServerCard(
                 modifier           = Modifier.fillMaxSize(),
                 contentScale       = ContentScale.Crop
             )
-            // Gradient scrim — uses theme background color so it blends in both themes
+            // Gradient scrim -- uses theme background color so it blends in both themes
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -353,8 +354,8 @@ private fun CardIconButton(icon: ImageVector, color: Color = Color.White.copy(0.
 }
 
 /**
- * Tiny pill-shaped badge for AutoSyncService state. Lives in the card's top-
- * right corner. Auto-hides 5 seconds after entering SYNCED so the dashboard
+ * Tiny pill-shaped badge for AutoSyncService state. Lives in the card's top-right corner.
+ * Auto-hides 5 seconds after entering SYNCED so the dashboard
  * doesn't stay decorated with green checkmarks across sessions.
  */
 @Composable
@@ -365,7 +366,7 @@ private fun SyncBadge(state: AutoSyncService.ServerState, modifier: Modifier = M
     // the next sync cycle replaces or clears them.
     LaunchedEffect(state) {
         if (state == AutoSyncService.ServerState.SYNCED) {
-            kotlinx.coroutines.delay(5000)
+            kotlinx.coroutines.delay(5000.milliseconds)
             visible = false
         }
     }

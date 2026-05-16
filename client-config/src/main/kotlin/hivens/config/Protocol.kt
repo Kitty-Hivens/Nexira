@@ -5,7 +5,7 @@ package hivens.config
  *
  * These constants mirror the official SMARTYcraft launcher's behavior and
  * were recovered from the decompiled (Proguard-obfuscated) sources at
- * https://github.com/Kitty-Hivens/smrt-deco — keep that repository as the
+ * https://github.com/Kitty-Hivens/smrt-deco -- keep that repository as the
  * source of truth when this protocol changes.
  *
  * Don't propose hiding these in `secrets.properties`: anyone who downloads
@@ -13,13 +13,13 @@ package hivens.config
  */
 object Protocol {
     /**
-     * The mimicked launcher version — sent in the dashboard handshake,
+     * The mimicked launcher version -- sent in the dashboard handshake,
      * the `User-Agent` header, and the child JVM's `-Dminecraft.launcher.version`.
      *
      * Resolved on every read: the JVM system property `smrt.mimic.version`
      * (see [SYSTEM_PROP_MIMIC_VERSION]) wins if set, otherwise we return
      * [DEFAULT_MIMIC_LAUNCHER_VERSION]. The runtime override exists so users
-     * can react to an upstream version pin faster than our release cycle —
+     * can react to an upstream version pin faster than our release cycle --
      * pass `-Dsmrt.mimic.version=X.Y.Z` on the JVM command line and restart.
      *
      * Reading this property is safe and opt-in-free; *setting* the override is
@@ -32,7 +32,7 @@ object Protocol {
             ?.takeIf { it.isNotBlank() }
             ?: DEFAULT_MIMIC_LAUNCHER_VERSION
 
-    /** What we ship as known-good — last validated against upstream. */
+    /** What we ship as known-good -- last validated against upstream. */
     const val DEFAULT_MIMIC_LAUNCHER_VERSION = "3.6.5"
 
     /**
@@ -43,11 +43,11 @@ object Protocol {
     const val SYSTEM_PROP_MIMIC_VERSION = "smrt.mimic.version"
 
     /**
-     * Programmatic override — sets (or clears, if `version` is null/blank) the
+     * Programmatic override -- sets (or clears, if `version` is null/blank) the
      * runtime mimic version. Settings UI hooks into this once the Settings-move
      * chunk lands; for now it's reachable from tests and ad-hoc Kotlin scripts.
      */
-    @ExperimentalProtocolOverride
+    @ExperimentalProtocolOverride // TODO: Not used, review
     fun setMimicLauncherVersion(version: String?) {
         if (version.isNullOrBlank()) {
             System.clearProperty(SYSTEM_PROP_MIMIC_VERSION)
@@ -69,7 +69,7 @@ object Protocol {
     /** AES key derivation salt for the session-token round-trip in [hivens.core.api.AuthService]. */
     const val AUTH_SALT = "sdgsdfhgosd8dfrg"
 
-    /** Cargo-cult field in the auth payload — server requires presence, content is ignored. */
+    /** Cargo-cult field in the auth payload -- server requires presence, content is ignored. */
     const val DEFAULT_JAR = "smartycraft.jar"
 
     /** MD5 of an empty string. Server requires the `rtCheckSum` field; it isn't actually validated. */

@@ -18,7 +18,7 @@ import javax.crypto.spec.SecretKeySpec
 
 /**
  * Secure credential storage with OS-keyring primary + AES-256-GCM file
- * fallback. Two independent sensitive fields — password and accessToken —
+ * fallback. Two independent sensitive fields -- password and accessToken --
  * are each handled through the same per-secret chain.
  *
  * Per-secret storage hierarchy (most-to-least preferred):
@@ -26,22 +26,22 @@ import javax.crypto.spec.SecretKeySpec
  *  1. **OS keyring** (libsecret on Linux, follow-ups for Win/Mac).
  *     The plaintext lives here when [IKeyringStorage.isAvailable] and
  *     `store()` succeed. The credentials JSON file then carries
- *     `keyringHasX=true` and a null `encryptedX` field — keyring is
+ *     `keyringHasX=true` and a null `encryptedX` field -- keyring is
  *     the sole source of the secret.
  *
  *  2. **AES-256-GCM file** (`credentials.json`). Activated when keyring
  *     is unreachable (no daemon, no library, no permission). Encryption
- *     key is derived from a machine-specific seed via PBKDF2 — the
+ *     key is derived from a machine-specific seed via PBKDF2 -- the
  *     classic "casual file-copy" defense, not real protection.
  *
- *  3. **Legacy plaintext** — read-only path for older format files,
+ *  3. **Legacy plaintext** -- read-only path for older format files,
  *     migrated to v4 on the next successful save. Two legacy entries
  *     supported: v1 `savedPasswordBase64`, and v3 plaintext `accessToken`.
  *
  * The credentials file ALWAYS exists when there's a session and stays
  * the source of truth for `username` / `uuid` / `uid` and the
  * "which storage mode is active" flags. Only the secret ciphertexts move
- * between locations based on keyring availability — per-secret, so a
+ * between locations based on keyring availability -- per-secret, so a
  * keyring outage for one doesn't necessarily force the other into the
  * file (though in practice both succeed or fail together with the same
  * daemon).
@@ -50,7 +50,7 @@ import javax.crypto.spec.SecretKeySpec
  * (keyring entry wiped, decryption failed, no legacy fallback) returns
  * null from [load], cleanly triggering the re-login path. A session whose
  * password is missing but accessToken survived returns a SessionData with
- * `cachedPassword=null` — the user can still play; re-login is requested
+ * `cachedPassword=null` -- the user can still play; re-login is requested
  * the next time the password is actually needed.
  */
 class CredentialsManager(
@@ -111,12 +111,12 @@ class CredentialsManager(
 
         /**
          * @deprecated Legacy plaintext accessToken from v3 and earlier.
-         * Read-only — populated only when loading older files. Always
+         * Read-only -- populated only when loading older files. Always
          * null in v4+ writes; the next save() migrates the value into
          * either the keyring or [encryptedAccessToken].
          */
         val accessToken: String? = null,
-        /** @deprecated Legacy Base64-encoded password — read-only for migration */
+        /** @deprecated Legacy Base64-encoded password -- read-only for migration */
         val savedPasswordBase64: String? = null,
 
         /** Format version: 1 = Base64 password, 2 = AES-GCM password, 3 = keyring-or-AES-GCM password + plaintext accessToken, 4 = keyring-or-AES-GCM for both */
@@ -124,7 +124,7 @@ class CredentialsManager(
     )
 
     fun save(session: SessionData) {
-        // Skip when there's nothing real to save — accessToken is the
+        // Skip when there's nothing real to save -- accessToken is the
         // canary for "auth actually completed" since blank means we
         // never got a session back.
         if (session.accessToken.isBlank()) return
@@ -134,7 +134,7 @@ class CredentialsManager(
             // AES-GCM file. Independent per-secret so a transient
             // keyring failure for one doesn't force both into the file.
             // (Practically speaking they tend to succeed or fail
-            // together — same daemon — but the modeling is cleaner.)
+            // together -- same daemon -- but the modeling is cleaner.)
             val passwordInKeyring = session.cachedPassword?.let { pw ->
                 keyring.store(KEYRING_SERVICE, KEYRING_ACCOUNT_PASSWORD, pw)
             } ?: false
@@ -188,7 +188,7 @@ class CredentialsManager(
             val password = resolvePassword(data)
             val accessToken = resolveAccessToken(data)
 
-            // accessToken is load-blocking — without it the launcher cannot
+            // accessToken is load-blocking -- without it the launcher cannot
             // launch the game, so a missing/decryption-failed accessToken
             // means the session is effectively gone and the user must
             // re-login. Returning null here cleanly triggers that path in
@@ -196,7 +196,7 @@ class CredentialsManager(
             if (accessToken.isNullOrBlank()) {
                 log.warn(
                     "credentials present but accessToken could not be resolved " +
-                        "(keyring entry wiped? AES decryption failed?) — treating session as gone",
+                        "(keyring entry wiped? AES decryption failed?) -- treating session as gone",
                 )
                 return null
             }
@@ -221,7 +221,7 @@ class CredentialsManager(
             if (it == null) {
                 log.warn(
                     "credentials file marks keyring-resident password, " +
-                        "but keyring lookup returned null — re-login may be required",
+                        "but keyring lookup returned null -- re-login may be required",
                 )
             }
         }
@@ -230,7 +230,7 @@ class CredentialsManager(
         data.encryptedPassword != null && data.passwordIv != null ->
             decryptString(data.encryptedPassword, data.passwordIv)
 
-        // v1 legacy: Base64 — implicit migration on next save.
+        // v1 legacy: Base64 -- implicit migration on next save.
         data.savedPasswordBase64 != null -> {
             log.info("Migrating password from v1 Base64 to keyring-or-AES")
             String(Base64.getDecoder().decode(data.savedPasswordBase64))
@@ -322,7 +322,7 @@ class CredentialsManager(
     /**
      * Derives a machine-specific AES key via PBKDF2 for the file-fallback
      * encryption path. The seed combines OS username, user.home, and
-     * os.name — different machines / users will have different keys.
+     * os.name -- different machines / users will have different keys.
      * Not perfect (no TPM/Keyring), but prevents casual file-copy attacks.
      * Only used when the keyring path is unavailable; the keyring is the
      * preferred storage when it works.

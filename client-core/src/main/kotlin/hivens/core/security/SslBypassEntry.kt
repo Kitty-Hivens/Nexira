@@ -7,12 +7,12 @@ import kotlinx.serialization.Serializable
  *
  * The model deliberately keeps **host** and **expiry** as the only fields:
  * we don't store fingerprints, certificate chains, or per-port granularity
- * because the use case is narrow — a transient cert outage on the
+ * because the use case is narrow -- a transient cert outage on the
  * `smartycraft.ru` channel where the user explicitly accepted the risk
  * for a bounded time window. A real public-key-pinning model belongs
  * elsewhere (Vault sub-pillar continuation, not this chunk).
  *
- * `expiresAt` is serialised as an **ISO-8601 string** so the on-disk JSON
+ * `expiresAt` is serialized as an **ISO-8601 string** so the on-disk JSON
  * is debuggable by eye. Code reading the entry compares against
  * `Instant.now()` and treats anything in the past as effectively absent.
  *

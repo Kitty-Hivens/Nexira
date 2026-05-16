@@ -4,6 +4,8 @@ import hivens.core.api.ServerRepository
 import hivens.core.api.dto.SmartyNews
 import hivens.core.api.dto.SmartyServer
 import hivens.core.api.protocol.LoaderResponse
+import hivens.launcher.protocol.SmartycraftV1Protocol
+import hivens.launcher.protocol.LauncherHashCache
 import hivens.test.FakeServerProtocol
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -12,13 +14,12 @@ import kotlin.test.assertTrue
 
 /**
  * Post-Conduit-Phase-1 ServerRepository test surface. The repository is now
- * a thin adapter — its test coverage focuses on what it actually does:
+ * a thin adapter -- its test coverage focuses on what it actually does:
  * shape conversion from [LoaderResponse] to [hivens.core.api.dto.SmartyResponse]
- * and exception → ERROR fallback.
+ * and exception -> ERROR fallback.
  *
- * UPDATE recovery, hash refresh, HTTP retries — those moved to
- * [hivens.launcher.protocol.SmartycraftV1Protocol] +
- * [hivens.launcher.protocol.LauncherHashCache] tests.
+ * UPDATE recovery, hash refresh, HTTP retries -- those moved to
+ * [SmartycraftV1Protocol] + [LauncherHashCache] tests.
  */
 class ServerRepositoryTest {
 
@@ -76,7 +77,7 @@ class ServerRepositoryTest {
         val result = ServerRepository(protocol).fetchDashboard()
 
         assertEquals("ERROR", result.status)
-        assertTrue(result.message?.contains("network broken") == true)
+        assertEquals(result.message?.contains("network broken"), true)
         assertTrue(result.servers.isEmpty())
     }
 

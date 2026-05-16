@@ -7,10 +7,10 @@ import java.nio.file.Paths
  * Resolves the per-OS application data directory.
  *
  * Resolution order:
- * 1. `AURA_DATA_DIR` environment variable (if set and non-blank) — universal override
+ * 1. `AURA_DATA_DIR` environment variable (if set and non-blank) -- universal override
  *    that lets a user move data to any drive without touching settings. Equivalent in
  *    spirit to Linux's `XDG_DATA_HOME` but works on every platform.
- * 2. [BootstrapConf] `data-dir` key — user-chosen override persisted via the
+ * 2. [BootstrapConf] `data-dir` key -- user-chosen override persisted via the
  *    "Move data directory" Settings UI. Bootstrap conf lives outside the data
  *    dir so the launcher can find the override before it even knows where the
  *    data dir is.

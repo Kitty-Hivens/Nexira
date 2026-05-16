@@ -184,14 +184,14 @@ class EnvironmentPreparer(private val clientProvider: HttpClientProvider) {
      * The natives directory is "valid" only when the actual lwjgl native is
      * present, not just *any* file with the platform's extension (#185).
      * Pre-fix the check accepted a directory containing only `libjinput-*.so`
-     * as valid because jinput is a `.so` file — which let `prepareNatives`
+     * as valid because jinput is a `.so` file -- which let `prepareNatives`
      * short-circuit on a half-populated dir, and the game then died with
      * `UnsatisfiedLinkError: no lwjgl64 in java.library.path`.
      *
      * Substring match on `lwjgl` keeps the gate version-agnostic: catches
      * LWJGL 2 (`liblwjgl.so` + `liblwjgl64.so`) and LWJGL 3 (`liblwjgl.so`,
      * `liblwjgl-glfw.so`, …) and the missing `lib` prefix on the older
-     * Windows naming (`lwjgl.dll`) — without enumerating module names that
+     * Windows naming (`lwjgl.dll`) -- without enumerating module names that
      * could drift between versions.
      */
     internal fun isFolderValidForOs(dir: Path, os: String): Boolean {
@@ -226,7 +226,7 @@ class EnvironmentPreparer(private val clientProvider: HttpClientProvider) {
                 try {
                     // Rough check: if there are few files, then the unpacking was incorrect.
                     // .use{} ensures the directory stream is closed even though .count() is
-                    // a terminal operation — defensive against future refactor regressions.
+                    // a terminal operation -- defensive against future refactor regressions.
                     val count = Files.list(objectsDir).use { it.count() }
                     if (count < 10) needUnzip = true
                 } catch (_: Exception) { needUnzip = true }

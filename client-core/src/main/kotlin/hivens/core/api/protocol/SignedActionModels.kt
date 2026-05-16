@@ -3,7 +3,7 @@ package hivens.core.api.protocol
 import kotlinx.serialization.Serializable
 
 /**
- * Generic minimal response for signed actions that don't return data —
+ * Generic minimal response for signed actions that don't return data --
  * just a status. Used by `spawn`, `twoauth`, `skinupload`, `cloakupload`.
  */
 @Serializable
@@ -15,15 +15,15 @@ data class StatusOnlyResponse(
 }
 
 /**
- * Request body for `action=spawn` (NOT `tospawn` — the upstream server has both;
+ * Request body for `action=spawn` (NOT `tospawn` -- the upstream server has both;
  * `spawn` is "reset player's spawn point in-game", `tospawn` is "start game
- * session". Aura uses `spawn` only — game session is established by passing
+ * session". Aura uses `spawn` only -- game session is established by passing
  * the access token from [LoginResponse.session] to the child JVM directly).
  *
  * Signed: signature = `md5(time/10 | uid | login | server)` passed as
  * `check=` URL parameter. See [SmartycraftSignatureBuilder].
  *
- * Currently 1.12.2-only per gameplay convention.
+ * Currently, 1.12.2-only per gameplay convention.
  */
 @Serializable
 data class SpawnRequest(
@@ -48,7 +48,7 @@ data class TwoAuthRequest(
 /**
  * Request body for `action=skinupload` and `action=cloakupload`. The actual
  * binary payload (PNG bytes) is sent as a separate multipart part named
- * "skin" or "cloak" — see protocol impl.
+ * "skin" or "cloak" -- see protocol impl.
  *
  * Signed: signature = `md5(time/10 | uid | login)` (no extra context fields).
  */

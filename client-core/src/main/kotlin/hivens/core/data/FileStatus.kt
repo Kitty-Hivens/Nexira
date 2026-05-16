@@ -3,7 +3,7 @@ package hivens.core.data
 /**
  * Determines the status of a local file during an integrity check.
  */
-enum class FileStatus {
+enum class FileStatus { // TODO: NOT USED
     /** The file is missing from the disk. */
     MISSING,
 

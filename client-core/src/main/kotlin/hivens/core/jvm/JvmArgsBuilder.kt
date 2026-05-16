@@ -5,18 +5,18 @@ import kotlinx.serialization.Serializable
 /**
  * Pure-data model for the experimental "JVM args builder" UI.
  *
- * The model represents user choices for tuning the game JVM — GC algorithm,
- * G1/Z/Shenandoah tuning, AppCDS, JIT, performance flags, JFR profiling —
+ * The model represents user choices for tuning the game JVM -- GC algorithm,
+ * G1/Z/Shenandoah tuning, AppCDS, JIT, performance flags, JFR profiling --
  * and emits a list of `-XX:` / `-X` arguments via [toArgs]. The result is
  * dropped into [hivens.core.data.InstanceProfile.jvmArgs] (space-joined)
  * so the existing launch path picks it up unchanged.
  *
  * Liberica JDK ships JFR, ZGC, Shenandoah, AppCDS, and large-page support
- * unrestricted. The full surface is therefore fair game in our builder —
+ * unrestricted. The full surface is therefore fair game in our builder --
  * we are not constrained to Oracle's commercial-feature lockouts of older
  * JDKs.
  *
- * The model is intentionally **dumb** — no validation, no platform-specific
+ * The model is intentionally **dumb** -- no validation, no platform-specific
  * gating. The UI layer is responsible for surfacing "this only works on
  * Linux" hints and for filtering presets that need a JDK newer than the
  * configured runtime.
@@ -32,7 +32,7 @@ data class JvmConfig(
     val perf: PerfFlags = PerfFlags.AikarDefaults,
     val jfr: JfrConfig = JfrConfig.Disabled,
     /**
-     * Power-user passthrough — extra flags appended verbatim.
+     * Power-user passthrough -- extra flags appended verbatim.
      * Useful for one-off experiments or vendor-specific knobs we don't
      * surface in the UI yet.
      */
@@ -60,25 +60,25 @@ data class JvmConfig(
 
 @Serializable
 enum class GcChoice {
-    /** G1GC — recommended default for modded MC at 4-32GB heaps. */
+    /** G1GC -- recommended default for modded MC at 4-32GB heaps. */
     G1,
 
-    /** ParallelGC — high throughput, latency-tolerant. Old default. */
+    /** ParallelGC -- high throughput, latency-tolerant. Old default. */
     Parallel,
 
     /**
-     * ZGC — sub-millisecond pause times, scales to TBs of heap.
+     * ZGC -- sub-millisecond pause times, scales to TBs of heap.
      * Java 15+ stable. Generational variant since Java 21 (`-XX:+ZGenerational`).
      */
     Z,
 
     /**
-     * Shenandoah — low-pause concurrent collector from Red Hat / OpenJDK.
+     * Shenandoah -- low-pause concurrent collector from Red Hat / OpenJDK.
      * Liberica ships it; Oracle JDK does not.
      */
     Shenandoah,
 
-    /** SerialGC — single-threaded, only useful for tiny heaps (< 1GB). */
+    /** SerialGC -- single-threaded, only useful for tiny heaps (< 1GB). */
     Serial;
 
     fun toArgs(): List<String> = when (this) {
@@ -93,7 +93,7 @@ enum class GcChoice {
 // ─── G1GC tuning ─────────────────────────────────────────────────────────
 
 /**
- * G1GC tuning knobs. Defaults match Aikar's flags — the canonical
+ * G1GC tuning knobs. Defaults match Aikar's flags -- the canonical
  * Paper/Forge server tuning that's also been the de-facto modded MC
  * client recipe for years.
  *
@@ -136,7 +136,7 @@ data class G1Tuning(
     }
 
     companion object {
-        /** Aikar's flags — the canonical modded-MC G1 recipe. */
+        /** Aikar's flags -- the canonical modded-MC G1 recipe. */
         val AikarDefaults = G1Tuning()
 
         /**
@@ -273,12 +273,12 @@ data class PerfFlags(
      */
     val disableExplicitGc: Boolean = true,
     /**
-     * `-XX:+UseLargePages`. Linux only — requires `/proc/sys/vm/nr_hugepages`
+     * `-XX:+UseLargePages`. Linux only -- requires `/proc/sys/vm/nr_hugepages`
      * pre-allocated. Worth ~2-5% on modded MC if you set it up.
      */
     val useLargePages: Boolean = false,
     /**
-     * `-XX:+UseTransparentHugePages`. Linux only — uses the kernel's THP
+     * `-XX:+UseTransparentHugePages`. Linux only -- uses the kernel's THP
      * feature instead of explicit hugepages. Easier to set up than
      * [useLargePages] but adds latency spikes during defrag.
      */
@@ -312,7 +312,7 @@ data class PerfFlags(
 // ─── JFR profiling ──────────────────────────────────────────────────────
 
 /**
- * Java Flight Recorder — open in OpenJDK / Liberica (was Oracle-commercial
+ * Java Flight Recorder -- open in OpenJDK / Liberica (was Oracle-commercial
  * in older JDKs). Drop the resulting `.jfr` into JDK Mission Control or
  * IntelliJ to inspect allocation hot spots, lock contention, and thread states.
  */
@@ -324,9 +324,9 @@ data class JfrConfig(
     val settings: SettingsPreset = SettingsPreset.Default,
 ) {
     enum class SettingsPreset {
-        /** Low-overhead default — < 1% impact, suitable for normal play. */
+        /** Low-overhead default -- < 1% impact, suitable for normal play. */
         Default,
-        /** Higher-detail profile — ~5% impact, captures method-level info. */
+        /** Higher-detail profile -- ~5% impact, captures method-level info. */
         Profile,
     }
 

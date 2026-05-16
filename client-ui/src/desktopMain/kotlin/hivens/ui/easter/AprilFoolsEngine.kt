@@ -8,6 +8,7 @@ import androidx.compose.ui.unit.IntSize
 import kotlinx.coroutines.*
 import kotlin.math.*
 import kotlin.random.Random
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * The chaos event engine. Call [run] from a LaunchedEffect inside [AprilFoolsWrapper].
@@ -17,7 +18,7 @@ import kotlin.random.Random
  *  - A shake coroutine runs for screen earthquakes, updating [ChaosState.shakeOffset].
  *  - The main event loop picks random events at [AprilFools.intervalMs] intervals
  *    and launches them as child coroutines.
- *  - Each event drives [FloatingButton] Animatable properties directly —
+ *  - Each event drives [FloatingButton] Animatable properties directly --
  *    no Compose calls, pure coroutine code.
  */
 object AprilFoolsEngine {
@@ -34,7 +35,7 @@ object AprilFoolsEngine {
     }
 
     // ─── Tilt drift ───────────────────────────────────────────────────────────
-    // Slowly tilts the entire UI back and forth — more extreme each day.
+    // Slowly tilts the entire UI back and forth -- more extreme each day.
 
     private suspend fun runTiltDrift() {
         while (true) {
@@ -49,9 +50,9 @@ object AprilFoolsEngine {
             repeat(steps) { i ->
                 val t = i / steps.toFloat()
                 ChaosState.globalTiltDeg = lerp(current, target, easeInOut(t))
-                delay(16L)
+                delay(16L.milliseconds)
             }
-            delay(holdDelay)
+            delay(holdDelay.milliseconds)
         }
     }
 
@@ -63,7 +64,7 @@ object AprilFoolsEngine {
         ws: () -> IntSize,
     ) {
         while (true) {
-            delay(AprilFools.intervalMs())
+            delay(AprilFools.intervalMs().milliseconds)
             if (!AprilFools.isActive()) break
 
             // Spawn up to maxParallel events simultaneously
@@ -77,7 +78,7 @@ object AprilFoolsEngine {
                     runCatching { event(btn, cursor, ws) }
                         .onFailure { /* event coroutines should never crash the app */ }
                 }
-                delay(Random.nextLong(300L, 800L)) // stagger multi-event starts
+                delay(Random.nextLong(300L, 800L).milliseconds) // stagger multi-event starts
             }
         }
     }
@@ -89,7 +90,7 @@ object AprilFoolsEngine {
     private fun pickEvent(): Event {
         val t = AprilFools.intensity()
 
-        // (event, weight) — higher weight = more likely.
+        // (event, weight) -- higher weight = more likely.
         // Weirder events unlock as intensity grows.
         val pool = buildList<Pair<Event, Float>> {
             add(::eventCursorSticky  to 1.2f)
@@ -127,12 +128,12 @@ object AprilFoolsEngine {
         val stickEnd = System.currentTimeMillis() + Random.nextLong(2_500L, 5_000L)
         while (System.currentTimeMillis() < stickEnd) {
             val c = cursor()
-            // Offset so it's not dead-center on cursor — feels more natural/creepy
+            // Offset so it's not dead-center on cursor -- feels more natural/creepy
             btn.overlayX.animateTo(c.x - btn.widthPx / 2f + 10f, tween(90, easing = LinearEasing))
             btn.overlayY.animateTo(c.y - btn.heightPx / 2f + 5f,  tween(90, easing = LinearEasing))
         }
 
-        // Fling to a random spot — fast and dramatic
+        // Fling to a random spot -- fast and dramatic
         val w = ws()
         val restX   = Random.nextFloat() * (w.width  - btn.widthPx  - 30f) + 15f
         val restY   = Random.nextFloat() * (w.height - btn.heightPx - 30f) + 15f
@@ -146,7 +147,7 @@ object AprilFoolsEngine {
             launch { btn.overlayScale.animateTo(0.9f + Random.nextFloat() * 0.4f, tween(300)) }
         }
 
-        delay(Random.nextLong(7_000L, 16_000L))
+        delay(Random.nextLong(7_000L, 16_000L).milliseconds)
         returnToOrigin(btn)
     }
 
@@ -155,8 +156,8 @@ object AprilFoolsEngine {
 
     private suspend fun eventDrunkWobble(
         btn: FloatingButton,
-        cursor: () -> Offset,
-        ws: () -> IntSize,
+        cursor: () -> Offset, // TODO: unused
+        ws: () -> IntSize,    // TODO: unused
     ) {
         btn.snapToOrigin()
         btn.phase = ChaosPhase.DRUNK_WOBBLE
@@ -168,7 +169,7 @@ object AprilFoolsEngine {
 
         while (System.currentTimeMillis() < end) {
             t += 0.035f
-            // Multiple sine waves summed — creates irregular, natural-looking wobble
+            // Multiple sine waves summed -- creates irregular, natural-looking wobble
             val dx  = sin(t * 2.1f) * 9f + sin(t * 4.3f) * 4f + cos(t * 1.1f) * 3f
             val dy  = cos(t * 1.7f) * 6f + sin(t * 3.2f) * 2f
             val rot = sin(t * 1.4f) * 9f + cos(t * 2.8f) * 4f
@@ -176,7 +177,7 @@ object AprilFoolsEngine {
             btn.overlayX.snapTo(btn.originPx.x + dx)
             btn.overlayY.snapTo(btn.originPx.y + dy)
             btn.overlayRot.snapTo(rot)
-            delay(16L)
+            delay(16L.milliseconds)
         }
 
         returnToOrigin(btn)
@@ -221,7 +222,7 @@ object AprilFoolsEngine {
                 btn.overlayY.animateTo(newY, tween(40, easing = LinearEasing))
                 btn.overlayRot.animateTo(lean, tween(80))
             } else {
-                delay(30L)
+                delay(30L.milliseconds)
             }
         }
 
@@ -233,7 +234,7 @@ object AprilFoolsEngine {
 
     private suspend fun eventSpinAndFly(
         btn: FloatingButton,
-        cursor: () -> Offset,
+        cursor: () -> Offset, // TODO: unused
         ws: () -> IntSize,
     ) {
         btn.snapToOrigin()
@@ -246,7 +247,7 @@ object AprilFoolsEngine {
         coroutineScope {
             launch { btn.overlayRot.animateTo(360f * spins, rpm) }
             launch {
-                delay(200)
+                delay(200.milliseconds)
                 btn.overlayScale.animateTo(1.25f, tween(300))
             }
         }
@@ -264,7 +265,7 @@ object AprilFoolsEngine {
             launch { btn.overlayScale.animateTo(1f, tween(300)) }
         }
 
-        delay(Random.nextLong(6_000L, 14_000L))
+        delay(Random.nextLong(6_000L, 14_000L).milliseconds)
         returnToOrigin(btn)
     }
 
@@ -273,7 +274,7 @@ object AprilFoolsEngine {
 
     private suspend fun eventTeleport(
         btn: FloatingButton,
-        cursor: () -> Offset,
+        cursor: () -> Offset, // TODO: unused
         ws: () -> IntSize,
     ) {
         btn.snapToOrigin()
@@ -306,17 +307,17 @@ object AprilFoolsEngine {
         btn.overlayScale.animateTo(weirdScale,         tween(100, easing = LinearEasing))
 
         btn.phase = ChaosPhase.RESTING
-        delay(Random.nextLong(8_000L, 15_000L))
+        delay(Random.nextLong(8_000L, 15_000L).milliseconds)
         returnToOrigin(btn)
     }
 
     // ─── EVENT: Ghost clone ───────────────────────────────────────────────────
-    // A semi-transparent ghost copy floats upward and fades — original stays put.
+    // A semi-transparent ghost copy floats upward and fades -- original stays put.
 
     private suspend fun eventGhostClone(
         btn: FloatingButton,
-        cursor: () -> Offset,
-        ws: () -> IntSize,
+        cursor: () -> Offset, // TODO: unused
+        ws: () -> IntSize,    // TODO: unused
     ) {
         val ghost = FloatingButton(
             id      = "ghost_${btn.id}_${System.currentTimeMillis()}",
@@ -352,7 +353,7 @@ object AprilFoolsEngine {
                 ghost.overlayRot.animateTo(ghost.overlayRot.value + (Random.nextFloat() * 2f - 1f) * 30f, tween(3_200))
             }
             launch {
-                delay(1_600)
+                delay(1_600.milliseconds)
                 ghost.overlayAlpha.animateTo(0f, tween(1_600))
             }
         }
@@ -365,7 +366,7 @@ object AprilFoolsEngine {
 
     private suspend fun eventLegsWalk(
         btn: FloatingButton,
-        cursor: () -> Offset,
+        cursor: () -> Offset, // TODO: unused
         ws: () -> IntSize,
     ) {
         btn.snapToOrigin()
@@ -387,15 +388,15 @@ object AprilFoolsEngine {
             btn.overlayX.snapTo(newX)
             btn.overlayY.snapTo(btn.originPx.y + bobY)
             btn.legCycle = (btn.legCycle + 0.035f) % 1f
-            delay(16L)
+            delay(16L.milliseconds)
 
-            // Reached edge — stop early
+            // Reached edge -- stop early
             if (newX <= 0f || newX >= w.width - btn.widthPx) break
         }
 
         btn.hasLegs  = false
         btn.phase    = ChaosPhase.RESTING
-        delay(Random.nextLong(4_000L, 9_000L))
+        delay(Random.nextLong(4_000L, 9_000L).milliseconds)
         returnToOrigin(btn)
     }
 
@@ -403,9 +404,9 @@ object AprilFoolsEngine {
     // Entire UI shakes violently for under a second.
 
     private suspend fun eventEarthquake(
-        btn: FloatingButton,          // Unused — earthquakes are screen-wide
-        cursor: () -> Offset,
-        ws: () -> IntSize,
+        btn: FloatingButton,          // TODO: unused
+        cursor: () -> Offset,         // TODO: unused
+        ws: () -> IntSize,            // TODO: unused
     ) {
         val amplitude = AprilFools.intensity() * 20f + 5f
         val duration  = Random.nextLong(350L, 800L)
@@ -416,7 +417,7 @@ object AprilFoolsEngine {
                 x = (Random.nextFloat() * 2f - 1f) * amplitude,
                 y = (Random.nextFloat() * 2f - 1f) * amplitude * 0.55f,
             )
-            delay(16L)
+            delay(16L.milliseconds)
         }
         ChaosState.shakeOffset = Offset.Zero
     }
@@ -425,7 +426,7 @@ object AprilFoolsEngine {
     // Every idle button escapes simultaneously (only fires on high intensity days).
 
     private suspend fun eventMassEscape(
-        btn: FloatingButton,
+        btn: FloatingButton, // TODO: unused
         cursor: () -> Offset,
         ws: () -> IntSize,
     ) {
@@ -435,7 +436,7 @@ object AprilFoolsEngine {
         coroutineScope {
             idles.forEach { b ->
                 launch { eventSpinAndFly(b, cursor, ws) }
-                delay(120L)
+                delay(120L.milliseconds)
             }
         }
     }

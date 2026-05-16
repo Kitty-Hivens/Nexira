@@ -152,7 +152,7 @@ class LinuxUpdateApplicator : IUpdateApplicator {
         // When running as AppImage, the runtime automatically sets $APPIMAGE
         // to the real path of the .AppImage file on disk.
         //
-        // DO NOT use /proc/self/exe naively — under AppImage it resolves to the
+        // DO NOT use /proc/self/exe naively -- under AppImage it resolves to the
         // temporary FUSE mount point (/tmp/.mount_AuraLaXXXXX/usr/bin/AuraLauncher)
         // which is gone the moment the process exits.
         val appImageEnv = System.getenv("APPIMAGE")

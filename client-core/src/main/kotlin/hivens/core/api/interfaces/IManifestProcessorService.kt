@@ -21,12 +21,12 @@ interface IManifestProcessorService {
      * Computes the set of jar names to exclude from sync based on which optional
      * mods the user has unchecked.
      *
-     * [userState] maps `mod.id → enabled?`. If a mod isn't in the map we fall
+     * [userState] maps `mod.id -> enabled?`. If a mod isn't in the map we fall
      * back to its `isDefault`. Disabled mods contribute their `jars` (and
      * `infoFile`, if any) to the ignored set.
      *
      * Both LauncherController (per-server launch sync) and AutoSyncService
-     * (background sync of all installed packs) call this — keeping it here
+     * (background sync of all installed packs) call this -- keeping it here
      * keeps the two pipelines from drifting on what counts as ignored.
      */
     fun calculateIgnoredFiles(profile: ServerProfile, userState: Map<String, Boolean>): Set<String>

@@ -19,8 +19,9 @@ import kotlinx.coroutines.delay
 import java.io.File
 import java.lang.ref.WeakReference
 import java.util.concurrent.ConcurrentLinkedQueue
+import kotlin.time.Duration.Companion.milliseconds
 
-// ─── Global tracker — register Skia objects from anywhere ────────────────────
+// ─── Global tracker -- register Skia objects from anywhere ────────────────────
 
 object SkiaTracker {
     private val refs = ConcurrentLinkedQueue<Pair<String, WeakReference<Any>>>()
@@ -41,7 +42,7 @@ object SkiaTracker {
 // ─── Overlay composable ───────────────────────────────────────────────────────
 
 /**
- * Debug overlay — shows:
+ * Debug overlay -- shows:
  *  - JVM heap used / max
  *  - Process RSS from /proc/self/status (actual native + heap)
  *  - Tracked Skia objects via [SkiaTracker]
@@ -50,7 +51,7 @@ object SkiaTracker {
  * Toggle visibility with [visible]. Keep out of release builds.
  */
 @Composable
-fun SkiaDebugOverlay(
+fun SkiaDebugOverlay( // TODO: rework, expand debug functionality to ui (Project Atelier)
     visible: Boolean = true,
     modifier: Modifier = Modifier
 ) {
@@ -72,7 +73,7 @@ fun SkiaDebugOverlay(
             rss       = readRssMb()
             skiaByType = SkiaTracker.snapshot()
             skiaTotal  = SkiaTracker.total()
-            delay(2000)
+            delay(2000.milliseconds)
         }
     }
 
@@ -95,7 +96,7 @@ fun SkiaDebugOverlay(
                     else       -> Color(0xFF4CAF50)
                 }
                 Text(
-                    "⬤ MEM  RSS: ${rss} MB   Heap: ${heapUsed}/${heapMax} MB   ${if (expanded) "▲" else "▼"}",
+                    "⬤ MEM  RSS: $rss MB   Heap: ${heapUsed}/${heapMax} MB   ${if (expanded) "▲" else "▼"}",
                     color      = rssColor,
                     fontSize   = 11.sp,
                     fontWeight = FontWeight.Bold,
@@ -145,7 +146,7 @@ fun SkiaDebugOverlay(
                     val nativeEst = rss - heapUsed
                     if (nativeEst > 0) {
                         Text(
-                            "Native est. ${nativeEst} MB  (RSS − heap)",
+                            "Native est. $nativeEst MB  (RSS − heap)",
                             color      = if (nativeEst > 500) Color(0xFFFFD54F) else Color.Gray,
                             fontSize   = 10.sp,
                             fontFamily = FontFamily.Monospace
@@ -156,7 +157,7 @@ fun SkiaDebugOverlay(
 
                     // ── Buttons ───────────────────────────────────────────────
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        // System.runFinalization() removed — deprecated in Java 18 and
+                        // System.runFinalization() removed -- deprecated in Java 18 and
                         // a no-op since Java 9 (finalizers aren't guaranteed to run
                         // synchronously regardless). Two-shot GC is the modern recipe.
                         DebugButton("Force GC") {
@@ -197,6 +198,6 @@ private fun readRssMb(): Long = try {
         .firstOrNull { it.startsWith("VmRSS:") }
         ?.replace(Regex("[^0-9]"), "")
         ?.toLongOrNull()
-        ?.div(1024) // kB → MB
+        ?.div(1024) // kB -> MB
         ?: 0L
 } catch (_: Exception) { 0L }

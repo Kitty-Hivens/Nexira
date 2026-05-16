@@ -14,7 +14,7 @@ import java.lang.invoke.MethodHandle
  * macOS-side [IKeyringStorage] backed by the **Keychain Services** API
  * (the modern `SecItem*` surface introduced in 10.6, NOT the legacy
  * `SecKeychain*` calls which are deprecated since 10.10). Implemented with
- * **Project Panama** ([java.lang.foreign], JEP 454) — same approach as the
+ * **Project Panama** ([java.lang.foreign], JEP 454) -- same approach as the
  * Linux libsecret peer in [LinuxLibsecretKeyringStorage] and the Windows
  * Credential Manager peer in [WindowsCredentialManagerKeyringStorage].
  *
@@ -40,7 +40,7 @@ import java.lang.invoke.MethodHandle
  * CoreFoundation. Every CF object we create must be CFRelease'd by us;
  * `result` returned from CopyMatching is also caller-owned.
  *
- * Platform-untested at write time — this implementation lands without a
+ * Platform-untested at write time -- this implementation lands without a
  * physical Mac for end-to-end validation. The Panama bridge layout follows
  * Apple's documented C ABI, the call shapes match the public framework
  * headers, and the Linux/Windows peers serve as the cross-implementation
@@ -52,7 +52,7 @@ internal class MacOSKeychainStorage : IKeyringStorage {
     private val log = LoggerFactory.getLogger(MacOSKeychainStorage::class.java)
 
     private companion object {
-        // System framework absolute paths — `dlopen` accepts these directly,
+        // System framework absolute paths -- `dlopen` accepts these directly,
         // `SymbolLookup.libraryLookup` chains through. Bare names like
         // "Security" don't resolve on macOS without DYLD search paths set.
         const val SECURITY_FRAMEWORK = "/System/Library/Frameworks/Security.framework/Security"
@@ -66,11 +66,11 @@ internal class MacOSKeychainStorage : IKeyringStorage {
         const val errSecItemNotFound: Int  = -25300
         const val errSecDuplicateItem: Int = -25299
 
-        // CFStringEncoding constant for UTF-8 — value defined in
+        // CFStringEncoding constant for UTF-8 -- value defined in
         // CFStringEncodingExt.h; not exported as a symbol so we hard-code it.
         const val kCFStringEncodingUTF8: Int = 0x08000100
 
-        /** Probe service for [isAvailable] — same shape as the Linux/Windows peers. */
+        /** Probe service for [isAvailable] -- same shape as the Linux/Windows peers. */
         const val PROBE_SERVICE = "io.github.kitty_hivens.AuraLauncher.probe"
         const val PROBE_ACCOUNT = "isAvailable"
     }
@@ -118,7 +118,7 @@ internal class MacOSKeychainStorage : IKeyringStorage {
         "CFStringCreateWithBytes",
         FunctionDescriptor.of(
             ValueLayout.ADDRESS,    // CFStringRef
-            ValueLayout.ADDRESS,    // allocator (NULL → default)
+            ValueLayout.ADDRESS,    // allocator (NULL -> default)
             ValueLayout.ADDRESS,    // bytes
             ValueLayout.JAVA_LONG,  // CFIndex (signed long)
             ValueLayout.JAVA_INT,   // CFStringEncoding
@@ -152,10 +152,10 @@ internal class MacOSKeychainStorage : IKeyringStorage {
     )
 
     // ── Dereferenced kSec / kCFBoolean constants ──────────────────────────
-    // Each is `extern const CFTypeRef kFoo;` — the symbol's address is the
+    // Each is `extern const CFTypeRef kFoo;` -- the symbol's address is the
     // storage location of a pointer; deref once to get the actual CFTypeRef
     // we'd pass as a value. The kCFType*CallBacks are STRUCTS (not pointers),
-    // so we keep their raw address — passing &kCFTypeDictionaryKeyCallBacks
+    // so we keep their raw address -- passing &kCFTypeDictionaryKeyCallBacks
     // is what the C call expects.
     private val kSecClass                = derefCFConstant(securityLookup, "kSecClass")
     private val kSecClassGenericPassword = derefCFConstant(securityLookup, "kSecClassGenericPassword")
@@ -207,7 +207,7 @@ internal class MacOSKeychainStorage : IKeyringStorage {
 
                 var status = (secItemAddHandle!!.invokeExact(addQuery, MemorySegment.NULL) as Int)
                 if (status == errSecDuplicateItem) {
-                    // Item already exists — switch to update. SecItemUpdate
+                    // Item already exists -- switch to update. SecItemUpdate
                     // wants the locator dict (no kSecValueData) and a separate
                     // attrs-to-update dict carrying just the new value.
                     val locator = createCFDictionary(call,

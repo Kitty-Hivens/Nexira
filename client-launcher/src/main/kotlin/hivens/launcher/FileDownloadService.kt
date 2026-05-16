@@ -75,7 +75,7 @@ class FileDownloadService(
         //
         // ignoredFiles is part of the cache input because cleanupIgnoredFiles
         // (which physically deletes disabled mod jars) lives below this
-        // gate — caching only on manifest hash would let a freshly-disabled
+        // gate -- caching only on manifest hash would let a freshly-disabled
         // mod stay loaded until the cache expires or the manifest changes
         // upstream. (Codex P2 on PR #128.)
         val manifestHash = manifestCache.hashOf(cacheKeyInputFor(manifest, ignoredFiles))
@@ -98,7 +98,7 @@ class FileDownloadService(
         //
         // Pre-#203, this check sampled only the first 20 manifest entries.
         // A user-caused deletion or truncation outside the top 20 (the
-        // normal case — Aura's modpacks have 50-1000+ entries, the affected
+        // normal case -- Aura's modpacks have 50-1000+ entries, the affected
         // file is rarely at the top of the alphabetical traversal) slipped
         // past the gate, the cache was trusted, and Minecraft launched with
         // a missing/corrupt mod and crashed with a downstream
@@ -134,7 +134,7 @@ class FileDownloadService(
         // 4. Processing Extra.zip
         processExtraZip(targetDir, filesMap, extraCheckSum, messageUI)
 
-        // 5. Mark this manifest as cleanly synced — next session with the
+        // 5. Mark this manifest as cleanly synced -- next session with the
         // same manifest hash short-circuits the integrity walk above.
         // Pass the manifest content too: the offline-launch path
         // (LauncherController) recovers it from cache when sync is
@@ -144,7 +144,7 @@ class FileDownloadService(
 
     /**
      * Composes the cache-key input as `<canonical-manifest-json>|ignored:<sorted-csv>`.
-     * Sorting the ignored set is mandatory — `Set` iteration order isn't
+     * Sorting the ignored set is mandatory -- `Set` iteration order isn't
      * stable, and the cache must be insensitive to insertion order while
      * sensitive to membership changes.
      */
@@ -294,15 +294,15 @@ class FileDownloadService(
                 }.execute { response ->
                     when (response.status) {
                         HttpStatusCode.PartialContent -> {
-                            // 206: server is honouring the Range — append the remainder.
+                            // 206: server is honouring the Range -- append the remainder.
                             // Report the already-on-disk bytes upfront so the UI's
                             // total-bytes progress hits 100% on completion. (Long-to-Int
-                            // narrowing is fine here — modpack assets are well under 2GB.)
+                            // narrowing is fine here -- modpack assets are well under 2GB.)
                             if (existing > 0) onBytesRead?.invoke(existing.toInt())
                             writeBody(response, localPath, append = true, onBytesRead)
                         }
                         HttpStatusCode.OK -> {
-                            // 200: server ignored Range (or we sent none) — overwrite.
+                            // 200: server ignored Range (or we sent none) -- overwrite.
                             // Don't report existing bytes; we're throwing them away.
                             writeBody(response, localPath, append = false, onBytesRead)
                         }
@@ -311,7 +311,7 @@ class FileDownloadService(
                             // (corrupt write or upstream shrank). Clear and let retry
                             // fetch from byte 0. Throw the dedicated subclass so
                             // isTransientDownloadError recognizes it as retryable
-                            // — a plain IOException with this message would NOT
+                            // -- a plain IOException with this message would NOT
                             // match the predicate's substring checks and would
                             // hard-fail instead of recovering.
                             Files.deleteIfExists(localPath)
@@ -348,13 +348,13 @@ class FileDownloadService(
      * [downloadFileInternal], which deletes the bad partial before
      * raising this so the next retry fetches from byte 0. Adding a
      * subclass instead of pattern-matching the message keeps the contract
-     * explicit — string matching on `cause.message` was the bug Codex
+     * explicit -- string matching on `cause.message` was the bug Codex
      * caught on PR #128.
      */
     private class RetryableHttpException(message: String) : IOException(message)
 
     private fun isTransientDownloadError(t: Throwable): Boolean {
-        // CancellationException must NEVER be retried — it's how the parent
+        // CancellationException must NEVER be retried -- it's how the parent
         // coroutine signals "stop"; swallowing and retrying would deadlock
         // the launch flow.
         if (t is CancellationException) return false
@@ -403,7 +403,7 @@ class FileDownloadService(
 
             // ZIP-structure validation for mods/*.jar (#169). Bytes-on-disk
             // can match the manifest's MD5 verbatim and still be a malformed
-            // ZIP — happens when the upstream CDN serves corrupt bytes that
+            // ZIP -- happens when the upstream CDN serves corrupt bytes that
             // were already corrupt at hash-time, or a partial write got
             // truncated mid-stream and the post-write integrity check
             // missed it. NeoForge's BootstrapLauncher dies with
@@ -443,7 +443,7 @@ class FileDownloadService(
      * against new and prune files the upstream modpack removed.
      *
      * Default-constructed (empty hash + empty paths) when no previous
-     * snapshot exists — first unpack writes the index, second-and-later
+     * snapshot exists -- first unpack writes the index, second-and-later
      * unpacks get the prune behavior.
      */
     @kotlinx.serialization.Serializable
@@ -474,7 +474,7 @@ class FileDownloadService(
             else                                                                    -> null
         }
         if (skipReason != null) {
-            logger.debug("extra.zip unpack skipped — {}", skipReason)
+            logger.debug("extra.zip unpack skipped -- {}", skipReason)
             return
         }
 
@@ -490,7 +490,7 @@ class FileDownloadService(
 
     /**
      * Files in [previousPaths] that no longer appear in [currentPaths] are
-     * orphans — the upstream modpack removed them, so the local install
+     * orphans -- the upstream modpack removed them, so the local install
      * should drop them too. Protected paths (per [protectedPaths]) are
      * never touched even if the index says they were last there: the
      * user may have edited an `options.txt` that originally arrived in
@@ -504,7 +504,7 @@ class FileDownloadService(
         var pruned = 0
         for (rel in orphans) {
             if (protectedPaths.isProtected(rel)) {
-                logger.debug("orphan {} kept — protected path", rel)
+                logger.debug("orphan {} kept -- protected path", rel)
                 continue
             }
             val target = baseDir.resolve(rel)

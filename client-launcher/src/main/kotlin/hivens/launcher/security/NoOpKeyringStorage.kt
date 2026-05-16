@@ -9,7 +9,7 @@ import hivens.core.security.IKeyringStorage
  * is reachable on the current host (CI without a desktop session,
  * KVM-headless server, exotic Linux without libsecret, etc.).
  *
- * Singleton — there's no per-instance state. Use
+ * Singleton -- there's no per-instance state. Use
  * [NoOpKeyringStorage.INSTANCE] to avoid pointless object allocations
  * on every factory miss.
  */

@@ -142,7 +142,7 @@ fun LaunchControlPanel(
             )
         }
         // Puppet: single action whose semantic depends on the current LaunchState.
-        // Same mapping as the CelestiaButton onClick above — driver doesn't need
+        // Same mapping as the CelestiaButton onClick above -- driver doesn't need
         // to know whether it's currently a Play / Abort / ClearError button, just
         // "do the action attached to the launch control".
         PuppetClick("dashboard.launch", enabled = state !is LaunchState.GameRunning) {

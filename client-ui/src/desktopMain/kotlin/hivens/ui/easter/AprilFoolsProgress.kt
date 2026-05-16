@@ -10,12 +10,12 @@ import kotlin.random.Random
  * before passing to [hivens.ui.components.LaunchControlPanel].
  *
  * On April Fools, ~15% of progress ticks will subtract a small random amount
- * instead of advancing — the bar visually crawls backwards for a moment.
+ * instead of advancing -- the bar visually crawls backwards for a moment.
  * The underlying download is completely unaffected; this is display-only.
  */
 object AprilFoolsProgress {
  
-    // Internally tracked display value — never exposed to actual download logic
+    // Internally tracked display value -- never exposed to actual download logic
     private var displayProgress = 0f
  
     fun reset() { displayProgress = 0f }
@@ -38,7 +38,7 @@ object AprilFoolsProgress {
             // Go backwards by 2–8%
             (displayProgress - Random.nextFloat() * 0.06f - 0.02f).coerceAtLeast(0f)
         } else {
-            // Normal advance — lerp toward real value so it eventually catches up
+            // Normal advance -- lerp toward real value so it eventually catches up
             val lerped = displayProgress + (real - displayProgress) * 0.25f
             lerped.coerceIn(0f, 1f)
         }

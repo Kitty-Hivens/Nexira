@@ -1,18 +1,17 @@
 package hivens.core.api.protocol
 
 import hivens.core.data.FileManifest
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
  * Request body for `action=login`. Unsigned (uses password MD5 in body).
  *
- * All 12 fields are required — server returns HTTP 500 if any is absent
+ * All 12 fields are required -- server returns HTTP 500 if any is absent
  * (verified empirically 2026-05-14). [classPath] and [rtCheckSum] are
- * cargo-cult — server reads them but doesn't validate content; pass any
+ * cargo-cult -- server reads them but doesn't validate content; pass any
  * non-blank string.
  *
- * [password] must be `MD5(plaintext)` lowercase hex. No salt — server stores
+ * [password] must be `MD5(plaintext)` lowercase hex. No salt -- server stores
  * passwords as plain MD5 (security posture documented in
  * `reference_smartycraft_community.md`).
  *
@@ -41,11 +40,11 @@ data class LoginRequest(
  * the game and download files.
  *
  * - [uid]: 128-char hex (SHA-512-shaped). Used as input to all signed-action
- *   signatures. Treat as opaque — never log raw, redact to first 8 chars when
+ *   signatures. Treat as opaque -- never log raw, redact to first 8 chars when
  *   diagnostic context demands.
  * - [session]: Base64 of 32 bytes. AES-encrypted continuation token.
  *   Decrypts via key = first 16 chars of `MD5(uid + AUTH_SALT)`,
- *   `AES/ECB/PKCS5Padding`. We don't decrypt it — pass through as-is to the
+ *   `AES/ECB/PKCS5Padding`. We don't decrypt it -- pass through as-is to the
  *   game's `--accessToken` argument.
  * - [client]: file manifest the launcher must reconcile to local disk before
  *   game launch. [hivens.launcher.FileDownloadService] consumes this.

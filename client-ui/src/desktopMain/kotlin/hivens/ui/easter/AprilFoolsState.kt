@@ -12,7 +12,7 @@ import java.time.LocalDate
 object AprilFools {
     // ── Debug overrides ───────────────────────────────────────────────────────
     // Set via the hidden debug panel in SettingsScreen.
-    // Both are null by default — production behavior unchanged.
+    // Both are null by default -- production behavior unchanged.
 
     /** When non-null, forces isActive() = true regardless of date */
     var debugForceActive: Boolean? by mutableStateOf(null)
@@ -34,7 +34,7 @@ object AprilFools {
 
     /**
      * Normalized chaos intensity: 0.07 on day 1, 1.0 on day 14.
-     * Used as a multiplier everywhere — crank it to 1.0 for local testing.
+     * Used as a multiplier everywhere -- crank it to 1.0 for local testing.
      */
     fun intensity(): Float {
         if (!isActive()) return 0f
@@ -93,7 +93,7 @@ enum class ChaosPhase {
 
     /**
      * Runs away from cursor on hover.
-     * The original button is still visible but keeps fleeing —
+     * The original button is still visible but keeps fleeing --
      * no overlay clone for this one, pure local offset.
      */
     FLEEING,
@@ -144,7 +144,7 @@ class FloatingButton(
 
     fun isEscaped() = phase !in setOf(ChaosPhase.IDLE, ChaosPhase.FLEEING)
 
-    /** Snap overlay transform to match current origin — call before escaping. */
+    /** Snap overlay transform to match current origin -- call before escaping. */
     suspend fun snapToOrigin() {
         overlayX.snapTo(originPx.x)
         overlayY.snapTo(originPx.y)
@@ -170,10 +170,10 @@ object ChaosState {
 
     // ── Screen-wide effects ────────────────────────────────────────────────────
 
-    /** Applied to the root Box via graphicsLayer — shake/earthquake effect */
+    /** Applied to the root Box via graphicsLayer -- shake/earthquake effect */
     var shakeOffset by mutableStateOf(Offset.Zero)
 
-    /** Global tilt angle in degrees — drifts slowly */
+    /** Global tilt angle in degrees -- drifts slowly */
     var globalTiltDeg by mutableStateOf(0f)
 
     // ── Close dialog ──────────────────────────────────────────────────────────

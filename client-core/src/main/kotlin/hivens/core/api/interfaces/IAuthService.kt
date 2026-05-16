@@ -18,7 +18,7 @@ interface IAuthService {
      * @param password User password.
      * @param serverId The ID of the selected server (as defined by the API).
      * @return A SessionData object containing the token, UUID, and client data.
-     * @throws TwoFactorRequiredException when the account has TOTP 2FA — caller
+     * @throws TwoFactorRequiredException when the account has TOTP 2FA -- caller
      *         must prompt for the code and call [completeTwoFactor] to finish.
      * @throws AuthException for other authentication errors (incorrect password, ban, etc.).
      * @throws IOException in case of network errors (I/O, timeouts, DNS).
@@ -28,7 +28,7 @@ interface IAuthService {
     /**
      * Completes the 2FA flow started by [login] when it threw
      * [TwoFactorRequiredException]. Sends the user-provided 6-digit code to
-     * the server, then re-runs the full login on success — the second login
+     * the server, then re-runs the full login on success -- the second login
      * is what produces a valid [SessionData] (the first one was rejected at
      * the TWOAUTH gate).
      *
@@ -39,7 +39,7 @@ interface IAuthService {
      * @throws AuthException with [hivens.core.data.AuthStatus.WRONG_CODE]
      *         if the code is wrong (UI should re-prompt, max 3 attempts).
      * @throws AuthException with [hivens.core.data.AuthStatus.TWO_FACTOR_EXPIRED]
-     *         if the TWOAUTH session has expired server-side — UI must
+     *         if the TWOAUTH session has expired server-side -- UI must
      *         restart the full login.
      * @throws AuthException for other errors (network, server-side).
      */
