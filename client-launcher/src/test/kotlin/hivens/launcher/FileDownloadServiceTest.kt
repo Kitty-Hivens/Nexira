@@ -17,13 +17,13 @@ import kotlin.test.assertTrue
 /**
  * Tests for the pure-function helpers inside FileDownloadService.
  *
- * The big network-driven flow ([processSession]) gets covered by the
+ * The big network-driven flow (`processSession`) gets covered by the
  * existing [LaunchPipelineIntegrationTest] (MockEngine + tmpdir).
  * Here we focus on the helper logic that can produce subtle bugs:
  * path normalization (server might or might not include the assetDir
  * prefix), manifest flattening (recursive directories), MD5 against
  * known content, and the file-staleness predicate (which gates ALL
- * downloads — wrong logic = mass re-download or missed updates).
+ * downloads -- wrong logic = mass re-download or missed updates).
  */
 class FileDownloadServiceTest {
 
@@ -53,14 +53,14 @@ class FileDownloadServiceTest {
 
     @Test
     fun `normalizePath strips assetDir prefix in front of a recognized root`() {
-        // "Industrial/mods/foo.jar" → "mods/foo.jar"
+        // "Industrial/mods/foo.jar" -> "mods/foo.jar"
         assertEquals("mods/foo.jar", svc.normalizePath("Industrial/mods/foo.jar"))
         assertEquals("config/options.txt", svc.normalizePath("SkyBlock/config/options.txt"))
     }
 
     @Test
     fun `normalizePath leaves canonical-root paths intact`() {
-        // First segment is already a recognized root → no stripping.
+        // First segment is already a recognized root -> no stripping.
         assertEquals("mods/foo.jar", svc.normalizePath("mods/foo.jar"))
         assertEquals("libraries/asm-5.0.3.jar", svc.normalizePath("libraries/asm-5.0.3.jar"))
         assertEquals("natives/lwjgl.so", svc.normalizePath("natives/lwjgl.so"))
@@ -74,14 +74,14 @@ class FileDownloadServiceTest {
 
     @Test
     fun `normalizePath handles partial root prefix matches`() {
-        // First segment starts with "mods" — counts as canonical even if
-        // it's "modsBackup" — by design (per the startsWith check in code).
+        // First segment starts with "mods" -- counts as canonical even if
+        // it's "modsBackup" -- by design (per the startsWith check in code).
         // This pins current behavior; if intent ever changes (exact-match
         // only), update both impl and this test together.
         assertEquals("modsArchive/old.jar", svc.normalizePath("modsArchive/old.jar"))
     }
 
-    // ── flattenManifest: nested directories → flat (path, FileData) map ──
+    // ── flattenManifest: nested directories -> flat (path, FileData) map ──
 
     @Test
     fun `flattenManifest empty manifest yields empty map`() {
@@ -135,7 +135,7 @@ class FileDownloadServiceTest {
         assertTrue(flat.containsKey("config/industrialcraft/recipes.cfg"))
     }
 
-    // ── calculateMD5: known content → known hash ─────────────────────────
+    // ── calculateMD5: known content -> known hash ─────────────────────────
 
     @Test
     fun `calculateMD5 returns known hash for empty file`() {
@@ -211,8 +211,8 @@ class FileDownloadServiceTest {
     }
 
     @Test
-    fun `isFileMissingOrChanged respects ProtectedPaths — present-and-non-empty wins over hash mismatch`() {
-        // ProtectedPaths protects user-edited config files — once the
+    fun `isFileMissingOrChanged respects ProtectedPaths -- present-and-non-empty wins over hash mismatch`() {
+        // ProtectedPaths protects user-edited config files -- once the
         // file exists with content, we do NOT overwrite it on sync,
         // even if the upstream hash differs. Default protected list
         // includes options.txt, servers.dat, etc.
@@ -231,7 +231,7 @@ class FileDownloadServiceTest {
     fun `isFileMissingOrChanged returns true for corrupt mods jar even when MD5 matches`() {
         // Bug reproducer: bytes-on-disk match the manifest's MD5 verbatim
         // (server CDN serves them, hash matches), but the bytes don't form
-        // a valid ZIP — NeoForge BootstrapLauncher dies with
+        // a valid ZIP -- NeoForge BootstrapLauncher dies with
         // `invalid CEN header (bad signature)` at launch. Pre-fix the
         // launcher said "all good" and let the user crash; post-fix it
         // forces a redownload.
@@ -242,9 +242,9 @@ class FileDownloadServiceTest {
         val md5 = java.security.MessageDigest.getInstance("MD5")
             .digest(garbage)
             .joinToString("") { "%02x".format(it) }
-        // The MD5 matches what's on disk — only the ZIP-validity check
+        // The MD5 matches what's on disk -- only the ZIP-validity check
         // can detect this. Without the fix, isFileMissingOrChanged would
-        // return false (file fine) → game launches → crash.
+        // return false (file fine) -> game launches -> crash.
         assertTrue(
             svc.isFileMissingOrChanged(jar, md5, "mods/broken.jar"),
             "matching MD5 must NOT shield a corrupt mods jar from re-download",
@@ -273,8 +273,8 @@ class FileDownloadServiceTest {
         // Performance scope (#169 cheaper-alternative): scanning every
         // libraries-dir JAR would dominate cold-start on heavy modpacks.
         // Corruption is heavily concentrated in mods/, so only that
-        // sub-tree pays the JarFile open cost. Verify a corrupt jar
-        // OUTSIDE mods/ with matching MD5 is still considered fine —
+        // subtree pays the JarFile open cost. Verify a corrupt jar
+        // OUTSIDE mods/ with matching MD5 is still considered fine --
         // we accept the residual risk to keep cold start snappy.
         val jar = workDir / "libraries" / "broken.jar"
         Files.createDirectories(jar.parent)
@@ -285,7 +285,7 @@ class FileDownloadServiceTest {
             .joinToString("") { "%02x".format(it) }
         assertFalse(
             svc.isFileMissingOrChanged(jar, md5, "libraries/broken.jar"),
-            "libraries jars are intentionally not scanned — keeps cold start fast",
+            "libraries jars are intentionally not scanned -- keeps cold start fast",
         )
     }
 

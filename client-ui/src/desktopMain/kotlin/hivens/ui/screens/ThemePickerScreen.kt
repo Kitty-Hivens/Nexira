@@ -44,7 +44,7 @@ fun ThemePickerScreen(
     PuppetClick("themePicker.back") { onBack() }
     PuppetClick("themePicker.apply") { onThemeSelected(selectedTheme) }
     // Per-theme select. Puppet driver names themes by their canonical
-    // theme.name (free text — Tea Sakura, Aurora, etc.). LazyVerticalGrid
+    // theme.name (free text -- Tea Sakura, Aurora, etc.). LazyVerticalGrid
     // only composes visible rows; scroll the grid first if you target an
     // off-screen theme. Aura's preset list fits in one viewport.
     themes.forEach { theme ->
@@ -78,7 +78,7 @@ fun ThemePickerScreen(
                 )
             }
 
-            // Apply button — chaos target
+            // Apply button -- chaos target
             AprilFoolsButton(
                 id      = "theme_picker_apply_btn",
                 text    = s.themePickerApply,

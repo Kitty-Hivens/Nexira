@@ -18,7 +18,7 @@ import java.nio.file.Path
  * Background sync of all installed server packs on launcher startup.
  *
  * Opt-in via `SettingsData.autoSyncAllPacks`. Walks installed servers
- * sequentially (one at a time) — parallel sync fights for bandwidth on
+ * sequentially (one at a time) -- parallel sync fights for bandwidth on
  * slow connections and competes for disk IO during MD5 verification.
  * Power users with all 7 SMARTYcraft packs trade ~2 minutes of background
  * traffic for "click any server, it's ready".
@@ -26,7 +26,7 @@ import java.nio.file.Path
  * Skipped servers:
  * - User has no cached credentials (never logged in / opted not to save)
  * - Pack directory missing or empty (would mean a fresh many-GB download
- *   which the user clearly hasn't asked for — they've never launched this
+ *   which the user clearly hasn't asked for -- they've never launched this
  *   server before)
  *
  * Per-server failures don't abort the rest of the queue; they're logged
@@ -41,9 +41,9 @@ class AutoSyncService(
     /**
      * Loads cached credentials. Lambda-injected (rather than holding a
      * CredentialsManager directly) so the service is testable without
-     * the real CredentialsManager — it's a `final class` and our test
+     * the real CredentialsManager -- it's a `final class` and our test
      * setup doesn't include mockk's inline-mock agent. Returning null
-     * means "no creds available" → sync is skipped.
+     * means "no creds available" -> sync is skipped.
      */
     private val credentialsProvider: () -> SessionData?,
     /**
@@ -80,7 +80,7 @@ class AutoSyncService(
     /**
      * Sync every server in [allServers] that has a non-empty client directory.
      * Suspends until all servers processed. Caller decides on which dispatcher
-     * to run — typically `Dispatchers.IO` from the applicationScope in Main
+     * to run -- typically `Dispatchers.IO` from the applicationScope in Main
      * (process-lifetime SupervisorJob, cancelled on JVM exit so a half-done
      * sync doesn't orphan sockets / file descriptors).
      */
@@ -123,18 +123,18 @@ class AutoSyncService(
             )
 
             // Try to obtain a SessionData for this server. Four outcomes:
-            //   * regular login → use that session directly
-            //   * 2FA gate WITH cached manifest → use cached creds + manifest
-            //   * 2FA gate WITHOUT cached manifest → mark SKIPPED (not failed)
-            //     and move on. This isn't a failure — the account just hasn't
+            //   * regular login -> use that session directly
+            //   * 2FA gate WITH cached manifest -> use cached creds + manifest
+            //   * 2FA gate WITHOUT cached manifest -> mark SKIPPED (not failed)
+            //     and move on. This isn't a failure -- the account just hasn't
             //     been through 2FA on this machine for this server yet, so
             //     we have nothing to sync against. Red FAILED would imply
             //     "server is broken"; SKIPPED reads as "awaiting user action".
-            //   * any other login throw (network, server reject, etc) →
+            //   * any other login throw (network, server reject, etc) ->
             //     mark FAILED for this server and continue. Pre-refactor
             //     the outer runCatching covered everything; the refactor
             //     split login + processSession, so non-2FA throws need
-            //     their own catch — without it a single login exception
+            //     their own catch -- without it a single login exception
             //     terminates syncAll for every later server.
             var sessionFailed = false
             val session: SessionData? = try {
@@ -207,7 +207,7 @@ class AutoSyncService(
     /**
      * "Installed" = the per-server client directory exists and has at least
      * one entry. We never trigger a fresh many-GB pack download in the
-     * background — the user must explicitly launch a server at least once
+     * background -- the user must explicitly launch a server at least once
      * to opt that pack into the auto-sync set.
      */
     private fun hasClientFiles(server: ServerProfile): Boolean {

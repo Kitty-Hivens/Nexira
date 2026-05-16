@@ -24,7 +24,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 /**
- * #189 — LauncherHashCache.refreshAttempts was a plain Int. Two parallel
+ * #189 -- LauncherHashCache.refreshAttempts was a plain Int. Two parallel
  * refresh() calls could both observe `< MAX`, both pass the cap, and both
  * download. AtomicInteger + CAS makes the cap exact under contention.
  */
@@ -60,10 +60,10 @@ class LauncherHashCacheTest {
         val successful = results.count { it != null }
         val rejected = results.count { it == null }
         assertEquals(LauncherHashCache.MAX_REFRESH_ATTEMPTS_PER_SESSION, successful,
-            "only MAX refreshes may consume a slot — got $successful")
+            "only MAX refreshes may consume a slot -- got $successful")
         assertEquals(parallel - LauncherHashCache.MAX_REFRESH_ATTEMPTS_PER_SESSION, rejected)
         assertEquals(LauncherHashCache.MAX_REFRESH_ATTEMPTS_PER_SESSION, downloads.get(),
-            "download count must match successful refresh count — got ${downloads.get()}")
+            "download count must match successful refresh count -- got ${downloads.get()}")
     }
 
     @Test
@@ -93,7 +93,7 @@ class LauncherHashCacheTest {
         )
 
         assertNull(cache.refresh())
-        assertEquals(1, downloads.get(), "the network attempt did happen — slot is consumed")
+        assertEquals(1, downloads.get(), "the network attempt did happen -- slot is consumed")
     }
 
     private fun countingRouter(counter: AtomicInteger, body: ByteArray): ChannelRouter {
@@ -110,7 +110,7 @@ class LauncherHashCacheTest {
             }
         }
         // ChannelRouter needs both clients but for these tests both go to the
-        // same counting MockEngine — we're not exercising fallback behaviour.
+        // same counting MockEngine -- we're not exercising fallback behavior.
         return ChannelRouter(direct = client, proxy = client)
     }
 }

@@ -42,6 +42,7 @@ import org.jetbrains.compose.resources.painterResource
 import org.koin.compose.koinInject
 import org.slf4j.LoggerFactory
 import java.awt.Desktop
+import java.lang.management.ManagementFactory
 import java.net.URI
 import java.text.SimpleDateFormat
 import java.util.*
@@ -56,13 +57,13 @@ fun AboutScreen(onBack: () -> Unit) {
 
     var updateState by remember { mutableStateOf<UpdateCheckState>(UpdateCheckState.Idle) }
 
-    // When true, the full UpdateDialog is shown — same dialog used by UpdateManager
+    // When true, the full UpdateDialog is shown -- same dialog used by UpdateManager
     var showUpdateDialog by remember { mutableStateOf(false) }
 
     // ── System Info pre-computation ──────────────────────────────────────────
     val systemRam = remember {
         try {
-            val osBean = java.lang.management.ManagementFactory.getOperatingSystemMXBean()
+            val osBean = ManagementFactory.getOperatingSystemMXBean()
             val method = osBean.javaClass.getMethod("getTotalPhysicalMemorySize")
             method.isAccessible = true
             ((method.invoke(osBean) as Long) / (1024 * 1024)).toInt()
@@ -89,7 +90,7 @@ fun AboutScreen(onBack: () -> Unit) {
     PuppetScreen("About")
     PuppetClick("about.back") { onBack() }
     PuppetClick("about.checkUpdates", enabled = updateState is UpdateCheckState.Idle) {
-        updateState = UpdateCheckState.Checking
+        updateState = UpdateCheckState.Checking // TODO: move to method
         scope.launch {
             updateState = try {
                 val update = updateService.checkForUpdate(force = true)
@@ -148,7 +149,7 @@ fun AboutScreen(onBack: () -> Unit) {
                         )
                         Spacer(Modifier.height(16.dp))
 
-                        // App title — low probability corruption
+                        // App title -- low probability corruption
                         Text(
                             AprilFoolsText.maybeGibberish(Branding.TITLE, probability = 0.15f),
                             style = MaterialTheme.typography.headlineMedium,
@@ -157,7 +158,7 @@ fun AboutScreen(onBack: () -> Unit) {
                         )
                         Spacer(Modifier.height(8.dp))
 
-                        // Version badge — fake version numbers
+                        // Version badge -- fake version numbers
                         Box(
                             Modifier.clip(RoundedCornerShape(6.dp))
                                 .background(CelestiaTheme.colors.primary.copy(alpha = 0.15f))
@@ -179,10 +180,10 @@ fun AboutScreen(onBack: () -> Unit) {
                             try {
                                 SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault())
                                     .format(Date(BuildConfig.BUILD_TIME))
-                            } catch (_: Exception) { "—" }
+                            } catch (_: Exception) { "--" }
                         }
 
-                        // Build date — may corrupt to lorem or reversed
+                        // Build date -- may corrupt to lorem or reversed
                         Text(
                             AprilFoolsText.maybeGibberish(s.aboutBuildDate(buildDate), probability = 0.25f),
                             style = MaterialTheme.typography.bodySmall,
@@ -190,7 +191,7 @@ fun AboutScreen(onBack: () -> Unit) {
                         )
                         Spacer(Modifier.height(16.dp))
 
-                        // Description — may become jargon
+                        // Description -- may become jargon
                         Text(
                             AprilFoolsText.maybeGibberish(
                                 s.aboutDescription(Branding.UPSTREAM_NAME),
@@ -223,7 +224,7 @@ fun AboutScreen(onBack: () -> Unit) {
                                     fontWeight = FontWeight.Bold,
                                     color = CelestiaTheme.colors.textPrimary
                                 )
-                                // Role — scrambled on April Fools
+                                // Role -- scrambled on April Fools
                                 Text(
                                     AprilFoolsText.maybeGibberish(
                                         "Architect & Developer",
@@ -253,7 +254,7 @@ fun AboutScreen(onBack: () -> Unit) {
                             Row(Modifier.padding(vertical = 3.dp)) {
                                 Text("•", color = CelestiaTheme.colors.primary, fontWeight = FontWeight.Bold)
                                 Spacer(Modifier.width(8.dp))
-                                // Tech name — may zalgo-ify
+                                // Tech name -- may zalgo-ify
                                 Text(
                                     AprilFoolsText.maybeGibberish(name, probability = 0.20f, mode = GibberishMode.ZALGO),
                                     fontWeight = FontWeight.Medium,
@@ -261,9 +262,9 @@ fun AboutScreen(onBack: () -> Unit) {
                                     fontSize = 13.sp
                                 )
                                 Spacer(Modifier.width(6.dp))
-                                // Description — may become jargon
+                                // Description -- may become jargon
                                 Text(
-                                    "— ${AprilFoolsText.maybeGibberish(desc, probability = 0.40f, mode = GibberishMode.JARGON)}",
+                                    "-- ${AprilFoolsText.maybeGibberish(desc, probability = 0.40f, mode = GibberishMode.JARGON)}",
                                     color = CelestiaTheme.colors.textSecondary,
                                     fontSize = 13.sp
                                 )
@@ -274,7 +275,7 @@ fun AboutScreen(onBack: () -> Unit) {
                         SectionLabel(s.aboutSectionLicense)
                         Spacer(Modifier.height(8.dp))
 
-                        // License text — high probability lorem ipsum
+                        // License text -- high probability lorem ipsum
                         Text(
                             AprilFoolsText.maybeGibberish(
                                 s.aboutLicenseText,
@@ -290,7 +291,7 @@ fun AboutScreen(onBack: () -> Unit) {
 
             // ══════════════════════════════════════════════════════════════════
             // RIGHT: Updates + System + Links
-            // No gibberish here — user needs to be able to read system info
+            // No gibberish here -- user needs to be able to read system info
             // and actually click the links when desperate enough.
             // ══════════════════════════════════════════════════════════════════
             Column(
@@ -306,13 +307,13 @@ fun AboutScreen(onBack: () -> Unit) {
                         Spacer(Modifier.height(16.dp))
 
                         when (val state = updateState) {
-                            // ── Idle: check button — chaos target ─────────────
+                            // ── Idle: check button -- chaos target ─────────────
                             UpdateCheckState.Idle -> {
                                 AprilFoolsButton(
                                     id      = "about_check_updates_btn",
                                     text    = s.aboutCheckUpdates,
                                     onClick = {
-                                        updateState = UpdateCheckState.Checking
+                                        updateState = UpdateCheckState.Checking // TODO: move to method
                                         scope.launch {
                                             updateState = try {
                                                 val update = updateService.checkForUpdate(force = true)
@@ -330,7 +331,7 @@ fun AboutScreen(onBack: () -> Unit) {
                                 )
                             }
 
-                            // ── Checking: spinner — not chaos, user needs feedback
+                            // ── Checking: spinner -- not chaos, user needs feedback
                             UpdateCheckState.Checking -> {
                                 Row(
                                     Modifier.fillMaxWidth().padding(12.dp),
@@ -396,7 +397,7 @@ fun AboutScreen(onBack: () -> Unit) {
 
                                 Spacer(Modifier.height(12.dp))
 
-                                // Download & install — opens the full UpdateDialog
+                                // Download & install -- opens the full UpdateDialog
                                 Button(
                                     onClick = { showUpdateDialog = true },
                                     modifier = Modifier.fillMaxWidth(),

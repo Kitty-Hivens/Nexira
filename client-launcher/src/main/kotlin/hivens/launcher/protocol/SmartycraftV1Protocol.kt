@@ -37,23 +37,23 @@ import org.slf4j.LoggerFactory
  *
  * ## Quirks deliberately preserved
  *
- * - Field name `cheksum` (not `checksum`) — matches what server expects;
+ * - Field name `cheksum` (not `checksum`) -- matches what server expects;
  *   typo originated upstream, we mirror.
  * - All login requests need `classPath` and `rtCheckSum` fields even
  *   though server doesn't validate their content (HTTP 500 if absent).
  *   Cargo-cult cargo, kept for compatibility.
- * - Loader UPDATE recovery is handled here transparently — first attempt
+ * - Loader UPDATE recovery is handled here transparently -- first attempt
  *   uses cached hash, on UPDATE we ask [LauncherHashCache] to refresh,
  *   second attempt uses fresh hash. Caller sees a single successful
  *   `loader()` call.
  *
  * ## Out of scope
  *
- * - HTTP retry / channel switching — that's [HttpClientProvider]'s job
+ * - HTTP retry / channel switching -- that's [HttpClientProvider]'s job
  *   (becomes ChannelRouter in Conduit Phase 2 #155).
- * - Response caching — repositories cache their own session/dashboard
+ * - Response caching -- repositories cache their own session/dashboard
  *   results when appropriate.
- * - Crash report submission (`action=report`) — Aura uses Beacon for
+ * - Crash report submission (`action=report`) -- Aura uses Beacon for
  *   local-only crash flow per privacy stance, not server-side notification.
  */
 class SmartycraftV1Protocol(
@@ -188,7 +188,7 @@ class SmartycraftV1Protocol(
 
     private inline fun <reified T> parseJsonTolerant(raw: String): T? {
         if (raw.isBlank()) return null
-        // Server returns Content-Type: text/html for JSON bodies — parse
+        // Server returns Content-Type: text/html for JSON bodies -- parse
         // only when the body actually starts with a JSON object opener.
         if (!raw.startsWith("{")) return null
         return runCatching { json.decodeFromString<T>(raw) }

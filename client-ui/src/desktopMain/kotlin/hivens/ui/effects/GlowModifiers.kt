@@ -16,7 +16,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Pulsating outer glow — animates spread and alpha behind the composable
+// Pulsating outer glow -- animates spread and alpha behind the composable
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Suppress("ModifierComposedModifier")
@@ -53,7 +53,7 @@ fun Modifier.pulsatingGlow(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Shimmer overlay — a light sweep drawn above the content
+// Shimmer overlay -- a light sweep drawn above the content
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Suppress("ModifierComposedModifier")
@@ -89,7 +89,7 @@ fun Modifier.shimmerOverlay(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Neon animated border — pulsates inside clip bounds, no overflow issues
+// Neon animated border -- pulsates inside clip bounds, no overflow issues
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Suppress("ModifierComposedModifier")
@@ -135,10 +135,10 @@ fun Modifier.neonBorder(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Static neon glow (non-animated) — useful for always-on accents
+// Static neon glow (non-animated) -- useful for always-on accents
 // ─────────────────────────────────────────────────────────────────────────────
 
-fun Modifier.neonGlow(
+fun Modifier.neonGlow( // TODO: unused
     color: Color,
     glowRadius: Dp   = 10.dp,
     cornerRadius: Dp = 12.dp

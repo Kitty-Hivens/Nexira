@@ -14,12 +14,12 @@ import kotlin.test.assertTrue
 
 /**
  * Post-Conduit-Phase-1 AuthService tests use [FakeServerProtocol] instead of
- * MockEngine — same coverage of the response→[hivens.core.data.SessionData]
+ * MockEngine -- same coverage of the response->[hivens.core.data.SessionData]
  * mapping, status enum routing, and edge cases like AES token decryption,
  * but no Ktor wire-format ceremony.
  *
  * Network-level failures (HTTP 500, malformed JSON, etc.) now belong in
- * [hivens.launcher.protocol.SmartycraftV1ProtocolTest] — that's where the
+ * [hivens.launcher.protocol.SmartycraftV1ProtocolTest] -- that's where the
  * actual HTTP client lives. Here we test what AuthService DOES with a
  * protocol response, not how the protocol assembles HTTP requests.
  */
@@ -107,7 +107,7 @@ class AuthServiceTest {
         // Server returned a TWOAUTH login response that ALREADY carried full
         // session fields (uuid + playername + uid). After twoauth=OK the
         // launcher must promote that response directly into a SessionData
-        // without bouncing through a second login() — re-login is the
+        // without bouncing through a second login() -- re-login is the
         // fallback path, not the preferred one (#159 followup).
         val proto = FakeServerProtocol().apply {
             loginResult = {
@@ -143,7 +143,7 @@ class AuthServiceTest {
         // Audit-pass catch on the 25-commit batch: a TWOAUTH response that
         // populated uuid + playername but left session null was promoting
         // through the cache path and producing a SessionData with empty
-        // accessToken — which would die at the smartycraft auth-host with
+        // accessToken -- which would die at the smartycraft auth-host with
         // no signal back to the launcher. Force the re-login fallback
         // when session is absent so the OK response (which carries it) can
         // populate the field.
@@ -204,14 +204,14 @@ class AuthServiceTest {
     @Test
     fun `pending TWOAUTH cache is cleared by a fresh login attempt for the same triple`() = runTest {
         // Audit catch on the 22-commit batch: pendingTwoFactor used to grow
-        // unbounded if the user cancelled the dialog and retried with a
-        // different password. The fresh-login invalidation guards that —
+        // unbounded if the user canceled the dialog and retried with a
+        // different password. The fresh-login invalidation guards that --
         // verify by chaining a TWOAUTH-yielding login, a wrong-password
         // attempt (clears the cache), then a TWOAUTH-yielding login again,
-        // and confirming the second TWOAUTH path goes through the cache-
-        // promotion fallback (which is only possible if the entry was
+        // and confirming the second TWOAUTH path goes through the cache-promotion
+        // fallback (which is only possible if the entry was
         // re-inserted, not pre-existing from the first attempt).
-        val responses = mutableListOf<LoginResponse>(
+        val responses = mutableListOf(
             LoginResponse(
                 status = "TWOAUTH", uid = "first-uid",
                 uuid = "550e8400e29b41d4a716446655440000",
@@ -232,7 +232,7 @@ class AuthServiceTest {
         }
         val service = AuthService(proto)
 
-        // 1) First TWOAUTH — uid is "first-uid". User abandons the dialog.
+        // 1) First TWOAUTH -- uid is "first-uid". User abandons the dialog.
         val first = assertFailsWith<TwoFactorRequiredException> {
             service.login("user", "pass", "Industrial")
         }
@@ -246,7 +246,7 @@ class AuthServiceTest {
             service.login("user", "wrong-pass", "Industrial")
         }
 
-        // 3) Third TWOAUTH for the original triple — uid is "second-uid".
+        // 3) Third TWOAUTH for the original triple -- uid is "second-uid".
         //    Promote-from-cache should pull the SECOND response, not the first.
         val second = assertFailsWith<TwoFactorRequiredException> {
             service.login("user", "pass", "Industrial")
@@ -265,7 +265,7 @@ class AuthServiceTest {
         // Server quirk surfaced empirically (2026-05-15): re-login after a
         // verified twoauth=OK still returns TWOAUTH (account doesn't actually
         // have 2FA configured but the server routes through the gate anyway,
-        // OR the verify silently failed). Without loop detection the launcher
+        // OR to verify silently failed). Without loop detection the launcher
         // would re-prompt for a code that can never satisfy the server.
         // completeTwoFactor must surface TWO_FACTOR_EXPIRED instead.
         val proto = FakeServerProtocol().apply {
@@ -283,7 +283,7 @@ class AuthServiceTest {
                 uid = firstEx.uid!!, code = "123456",
             )
         }
-        // NOT a TwoFactorRequiredException — the inner re-login loop got
+        // NOT a TwoFactorRequiredException -- the inner re-login loop got
         // converted to a clean restart-the-flow signal.
         assertFalse(ex is TwoFactorRequiredException)
         assertEquals(AuthStatus.TWO_FACTOR_EXPIRED, ex.status)
@@ -335,7 +335,7 @@ class AuthServiceTest {
     @Test
     fun `completeTwoFactor with blank uid fails fast without hitting the network`() = runTest {
         // The TWOAUTH login response sometimes omits uid (server quirk per
-        // the protocol spec). The flow can't continue without it — fail
+        // the protocol spec). The flow can't continue without it -- fail
         // immediately with a clear message so the UI can prompt for a full
         // re-login instead of showing a 2FA dialog that can never succeed.
         val proto = FakeServerProtocol()
@@ -344,7 +344,7 @@ class AuthServiceTest {
                 uid = "", code = "123456")
         }
         assertEquals(AuthStatus.TWO_FACTOR_EXPIRED, ex.status)
-        assertTrue(proto.twoauthCalls.isEmpty(), "fail-fast — no twoauth network call")
+        assertTrue(proto.twoauthCalls.isEmpty(), "fail-fast -- no twoauth network call")
     }
 
     @Test
@@ -362,7 +362,7 @@ class AuthServiceTest {
             AuthService(protocol(LoginResponse(status = "BANNED")))
                 .login("banned_user", "pass", "Industrial")
         }
-        // Unknown status → ProtocolStatus.ERROR → AuthStatus.INTERNAL_ERROR
+        // Unknown status -> ProtocolStatus.ERROR -> AuthStatus.INTERNAL_ERROR
         assertEquals(AuthStatus.INTERNAL_ERROR, ex.status)
     }
 
@@ -428,7 +428,7 @@ class AuthServiceTest {
     }
 
     @Test
-    fun `cache miss when different password — different cache key`() = runTest {
+    fun `cache miss when different password -- different cache key`() = runTest {
         val proto = protocol(ok())
         val service = AuthService(proto)
         service.login("user", "pass1", "Industrial")

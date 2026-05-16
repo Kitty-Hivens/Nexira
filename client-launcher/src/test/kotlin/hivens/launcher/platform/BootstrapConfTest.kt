@@ -27,12 +27,12 @@ class BootstrapConfTest {
     }
 
     @Test
-    fun `read on missing file — returns empty map, doesn't throw`() {
+    fun `read on missing file -- returns empty map, doesn't throw`() {
         assertEquals(emptyMap(), BootstrapConf.read(confFile))
     }
 
     @Test
-    fun `write then read — round-trips known keys`() {
+    fun `write then read -- round-trips known keys`() {
         BootstrapConf.write(mapOf(
             BootstrapConf.KEY_DATA_DIR to "/tmp/custom-aura-data",
         ), confFile)

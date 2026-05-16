@@ -8,7 +8,7 @@ data class JvmPreset(
     val id: String,
     /** Human-readable label for the picker. */
     val displayName: String,
-    /** One-paragraph description shown next to the picker — when to choose this. */
+    /** One-paragraph description shown next to the picker -- when to choose this. */
     val description: String,
     val config: JvmConfig,
     /**
@@ -30,7 +30,7 @@ data class JvmPreset(
  * something about JVM tuning by reading the descriptions, not just by
  * blind copy-pasting flags from the wiki.
  *
- * Order matters — the UI lists them top to bottom and the first one is
+ * Order matters -- the UI lists them top to bottom and the first one is
  * the default selection.
  */
 object JvmArgsPresets {
@@ -59,7 +59,7 @@ object JvmArgsPresets {
     /**
      * Larger heap-region size and bigger young generation for huge
      * modpacks (300+ mods, GTNH-class). The Aikar baseline assumes
-     * "medium-heavy" — once you're past 12GB heap and have a thousand
+     * "medium-heavy" -- once you're past 12GB heap and have a thousand
      * loaded mod classes per chunk gen, the larger regions reduce
      * mixed-collection time.
      */
@@ -69,7 +69,7 @@ object JvmArgsPresets {
         description = "Aikar's flags with 16 MB G1 regions and a larger young " +
             "generation. Targets huge modpacks with 300+ mods at 12-32 GB " +
             "heap. Use this for GTNH, Project Ozone Lite, big GregTech-style " +
-            "packs. At smaller heaps, prefer Aikar's instead — bigger regions " +
+            "packs. At smaller heaps, prefer Aikar's instead -- bigger regions " +
             "waste memory without paying off.",
         config = JvmConfig(
             gc = GcChoice.G1,
@@ -85,7 +85,7 @@ object JvmArgsPresets {
     )
 
     /**
-     * Stock G1 — the JVM's default behavior with no Aikar overrides. Useful
+     * Stock G1 -- the JVM's default behavior with no Aikar overrides. Useful
      * as a comparison baseline or if you suspect Aikar's tuning is causing
      * problems on a specific pack.
      */
@@ -107,7 +107,7 @@ object JvmArgsPresets {
     /**
      * ZGC for very large heaps where pause-time dominates throughput. ZGC
      * pauses are sub-millisecond regardless of heap size, vs G1's tens of
-     * ms — but ZGC costs ~10-15% throughput in exchange. Worth it once you
+     * ms -- but ZGC costs ~10-15% throughput in exchange. Worth it once you
      * pass 16 GB heap, especially on modern Java (21+ with generational mode).
      */
     val ZgcLowLatency = JvmPreset(
@@ -116,7 +116,7 @@ object JvmArgsPresets {
         description = "Sub-millisecond GC pauses regardless of heap size. " +
             "Trades ~10-15% throughput for consistent frame times on huge " +
             "heaps. Best at 16 GB+. Requires Java 17 (Java 21+ unlocks " +
-            "generational ZGC, which is significantly better — auto-enabled).",
+            "generational ZGC, which is significantly better -- auto-enabled).",
         config = JvmConfig(
             gc = GcChoice.Z,
             zgc = ZgcTuning(generational = true),
@@ -132,7 +132,7 @@ object JvmArgsPresets {
     )
 
     /**
-     * Shenandoah is conceptually similar to ZGC — concurrent, low-pause —
+     * Shenandoah is conceptually similar to ZGC -- concurrent, low-pause --
      * but is from the Red Hat / OpenJDK lineage rather than Oracle's. Liberica
      * ships it; Oracle JDK does not. Slightly different performance profile:
      * better at smaller heaps than ZGC, similar at huge heaps.
@@ -162,13 +162,13 @@ object JvmArgsPresets {
      * Throughput-first preset using ParallelGC. Old-school batch behavior:
      * very high throughput between collections but stop-the-world pauses
      * scale with heap size. Almost never the right choice for interactive
-     * MC — included for completeness and the rare "I just want benchmarks"
+     * MC -- included for completeness and the rare "I just want benchmarks"
      * case.
      */
     val Throughput = JvmPreset(
         id = "parallel",
         displayName = "Throughput (ParallelGC, batch only)",
-        description = "ParallelGC — maximum throughput with full stop-the-world " +
+        description = "ParallelGC -- maximum throughput with full stop-the-world " +
             "pauses. Pauses can be hundreds of ms on multi-GB heaps, which " +
             "feels awful in interactive MC. Almost never the right choice. " +
             "Included for benchmarking and academic comparison.",
@@ -195,6 +195,6 @@ object JvmArgsPresets {
         Throughput,
     )
 
-    /** Default selection for new users — Aikar covers the 95% case. */
+    /** Default selection for new users -- Aikar covers the 95% case. */
     val default: JvmPreset = Aikar
 }

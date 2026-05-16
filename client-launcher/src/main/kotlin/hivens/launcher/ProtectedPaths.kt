@@ -16,7 +16,7 @@ import java.nio.file.Path
  * configs, JourneyMap data, JEI bookmarks). Without this gate, every
  * server-side modpack push would erase a player's hand-tuned settings.
  *
- * Externalized so users can extend the list without recompiling — drop a
+ * Externalized so users can extend the list without recompiling -- drop a
  * mod name into `~/.local/share/aura-launcher/protected-paths.json` and
  * restart. On first run the file is created with the defaults so users
  * can see what's already covered before adding their own.
@@ -62,7 +62,7 @@ class ProtectedPaths(
                 Files.writeString(configFile, json.encodeToString(defaults))
                 log.info("Wrote default protected-paths.json at {}", configFile)
             }.onFailure {
-                log.warn("Failed to write default protected-paths.json — using in-memory defaults", it)
+                log.warn("Failed to write default protected-paths.json -- using in-memory defaults", it)
             }
             return defaults
         }
@@ -70,7 +70,7 @@ class ProtectedPaths(
             val text = Files.readString(configFile)
             json.decodeFromString<ProtectedPathsConfig>(text)
         }.onFailure {
-            log.warn("Failed to parse protected-paths.json — falling back to defaults (in-memory only, file left intact)", it)
+            log.warn("Failed to parse protected-paths.json -- falling back to defaults (in-memory only, file left intact)", it)
         }.getOrDefault(ProtectedPathsConfig())
     }
 }

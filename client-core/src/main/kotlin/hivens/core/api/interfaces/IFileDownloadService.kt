@@ -1,7 +1,6 @@
 package hivens.core.api.interfaces
 
 import hivens.core.data.SessionData
-import java.io.IOException
 import java.nio.file.Path
 
 /**

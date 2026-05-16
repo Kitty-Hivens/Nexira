@@ -4,7 +4,7 @@ import java.nio.file.Path
 
 /**
  * Schedules a downloaded update installer to be applied when the launcher
- * exits. Implementations are platform-specific — they all run their work
+ * exits. Implementations are platform-specific -- they all run their work
  * via a [Runtime.addShutdownHook] so the user-visible `exitProcess(0)`
  * call from `UpdateDialog` triggers the install.
  *
@@ -12,8 +12,8 @@ import java.nio.file.Path
  * picks the right [IUpdateApplicator] implementation by [hivens.launcher.platform.OS].
  *
  * Lives in `client-core` so `UpdateDialog` (in `client-ui`) can inject the
- * interface without depending on the concrete platform classes — keeps
- * the layering one-way (config ← core ← launcher ← ui).
+ * interface without depending on the concrete platform classes -- keeps
+ * the layering one-way (config <- core <- launcher <- ui).
  */
 interface IUpdateApplicator {
     /**

@@ -13,11 +13,11 @@ import java.io.InputStream
  * System tray manager backed by libtray (`dev.hivens:libtray`),
  * a Project-Panama-only replacement for dorkbox/SystemTray. Host renders
  * the menu via DBusMenu on Linux / Shell_NotifyIcon menu on Windows /
- * NSMenu on macOS — we publish the layout, the desktop draws it.
+ * NSMenu on macOS -- we publish the layout, the desktop draws it.
  *
  * Lifecycle:
  *   - `init(iconStream, strings, appName)` once from Main.kt after Koin
- *     is ready and the localised strings are resolved.
+ *     is ready and the localized strings are resolved.
  *   - `setGameStatus` and `updateServers` may fire any time; they push a
  *     fresh menu/tooltip via libtray's setters.
  *   - `shutdown` on application exit. Idempotent.
@@ -82,13 +82,13 @@ object TrayManager {
     var onShowConsole: (() -> Unit)? = null
     var onLaunchServer: ((ServerProfile) -> Unit)? = null
 
-    // ── Menu item ids — internal protocol with dispatchMenu ──────────────
+    // ── Menu item ids -- internal protocol with dispatchMenu ──────────────
     // Prefixed with `_` for items that shouldn't surface as launchable
     // events; "server:<assetDir>" for the per-server entries so the
     // dispatch can recover the asset id on click.
 
     private const val ID_SERVERS = "_servers"
-    private const val ID_NOSERVERS = "_noservers"
+    private const val ID_NOSERVERS = "_servers"
     private const val ID_SHOW    = "show"
     private const val ID_CONSOLE = "console"
     private const val ID_EXIT    = "exit"
@@ -99,7 +99,7 @@ object TrayManager {
     /**
      * @param iconStream Tray icon bytes (PNG). Read once into memory for libtray.
      * @param strings    Localised menu labels.
-     * @param appName    The tray-host-visible title — what KDE/GNOME/Win11
+     * @param appName    The tray-host-visible title -- what KDE/GNOME/Win11
      *                   tooltip resolves to when the user hovers. Stored as
      *                   the libtray Tray identifier for life of the icon.
      */
@@ -118,14 +118,14 @@ object TrayManager {
                 menu = buildMenu(strings, servers, gameRunning, gameServerName),
             )
             val t = Tray.create(builder) ?: run {
-                logger.warn("libtray Tray.create returned null — no tray host reachable on this session")
+                logger.warn("libtray Tray.create returned null -- no tray host reachable on this session")
                 state = State.FAILED
                 return
             }
             tray = t
             unsubscribe = t.onEvent { event ->
                 when (event) {
-                    // Left click → restore window. Matches the previous
+                    // Left click -> restore window. Matches the previous
                     // dorkbox default and what every other tray-icon app
                     // does on every desktop.
                     is TrayEvent.Activated -> onShowWindow?.invoke()
@@ -193,14 +193,14 @@ object TrayManager {
         val items = mutableListOf<TrayMenuItem>()
 
         // Status used to live as the first (disabled) menu entry too, but
-        // the same string is already in the SNI tooltip — the menu line
+        // the same string is already in the SNI tooltip -- the menu line
         // was pure duplication. Removed; running/serverName params are
         // kept on the signature so callers don't have to change shape.
         items += TrayMenuItem.Standard(id = ID_SHOW,    label = s.show)
         items += TrayMenuItem.Standard(id = ID_CONSOLE, label = s.console)
         items += TrayMenuItem.Separator
 
-        // Servers submenu — non-empty fallback so the parent is never an
+        // Servers submenu -- non-empty fallback so the parent is never an
         // empty submenu (dbusmenu spec rejects that, libtray's
         // TrayMenuItem.Submenu init enforces it too).
         val serverItems: List<TrayMenuItem> = if (servers.isEmpty()) {

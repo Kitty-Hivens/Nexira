@@ -4,7 +4,6 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import hivens.core.api.HttpClientProvider
 import hivens.launcher.platform.PlatformPaths
-import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
@@ -44,7 +43,7 @@ class SkinManager(
 
     private val logger = LoggerFactory.getLogger("SkinManager")
 
-    // In-memory LRU (small, just for the current session). Bounded —
+    // In-memory LRU (small, just for the current session). Bounded --
     // each ImageBitmap holds GPU texture memory and an unbounded session
     // cache (server admins switching between dozens of alt accounts) led
     // to OOM crashes during long sessions. Cap at SKIN_CACHE_MAX entries
@@ -53,7 +52,7 @@ class SkinManager(
     private val frontCache = lruCache(SKIN_CACHE_MAX)
     private val backCache  = lruCache(SKIN_CACHE_MAX)
 
-    private fun lruCache(maxEntries: Int): MutableMap<String, ImageBitmap> =
+    private fun lruCache(maxEntries: Int): MutableMap<String, ImageBitmap> = // TODO: Value of parameter 'maxEntries' is always 'SkinManager.SKIN_CACHE_MAX'
         java.util.Collections.synchronizedMap(
             object : java.util.LinkedHashMap<String, ImageBitmap>(maxEntries, 0.75f, true) {
                 override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, ImageBitmap>?): Boolean =
@@ -61,7 +60,7 @@ class SkinManager(
             },
         )
 
-    // Disk cache directory — lazy-initialized
+    // Disk cache directory -- lazy-initialized
     private val cacheDir: File by lazy {
         paths.skinCacheDir.toFile().also { it.mkdirs() }
     }
@@ -99,10 +98,8 @@ class SkinManager(
         if (diskFile.exists() && !isExpired(diskFile)) {
             try {
                 val skiaImage = org.jetbrains.skia.Image.makeFromEncoded(diskFile.readBytes())
-                val result = try {
+                val result = skiaImage.use { skiaImage ->
                     skiaImage.toComposeImageBitmap()
-                } finally {
-                    skiaImage.close()
                 }
                 frontCache[nickname] = result
                 logger.debug("Front skin loaded from disk cache: {}", nickname)
@@ -118,7 +115,9 @@ class SkinManager(
         val processed = assembleSkin(rawSkin, isFront = true, cloak = null)
         val result = run {
             val img = org.jetbrains.skia.Image.makeFromBitmap(processed)
-            try { img.toComposeImageBitmap() } finally { img.close() }
+            img.use { img ->
+                img.toComposeImageBitmap()
+            }
         }
 
         // Save to caches
@@ -131,15 +130,13 @@ class SkinManager(
     suspend fun getSkinBack(nickname: String, cloakHash: String? = null): ImageBitmap? = withContext(Dispatchers.IO) {
         backCache[nickname]?.let { return@withContext it }
 
-        // FIX: raw nickname for file path, not encoded — must match invalidate()
+        // FIX: raw nickname for file path, not encoded -- must match invalidate()
         val diskFile = File(cacheDir, "back_${nickname}.png")
         if (diskFile.exists() && !isExpired(diskFile)) {
             try {
                 val skiaImage = org.jetbrains.skia.Image.makeFromEncoded(diskFile.readBytes())
-                val result = try {
+                val result = skiaImage.use { skiaImage ->
                     skiaImage.toComposeImageBitmap()
-                } finally {
-                    skiaImage.close()
                 }
                 backCache[nickname] = result
                 logger.debug("Back skin loaded from disk cache: {}", nickname)
@@ -163,7 +160,9 @@ class SkinManager(
         val processed = assembleSkin(rawSkin, isFront = false, cloak = rawCloak)
         val result = run {
             val img = org.jetbrains.skia.Image.makeFromBitmap(processed)
-            try { img.toComposeImageBitmap() } finally { img.close() }
+            img.use { img ->
+                img.toComposeImageBitmap()
+            }
         }
 
         backCache[nickname] = result
@@ -212,10 +211,8 @@ class SkinManager(
     private fun saveBitmapToDisk(bitmap: org.jetbrains.skia.Bitmap, file: File) {
         try {
             val image = org.jetbrains.skia.Image.makeFromBitmap(bitmap)
-            val data = try {
+            val data = image.use { image ->
                 image.encodeToData(org.jetbrains.skia.EncodedImageFormat.PNG)
-            } finally {
-                image.close()
             }
             if (data != null) {
                 file.parentFile?.mkdirs()
@@ -358,7 +355,7 @@ class SkinManager(
         return output
     }
 
-    // ── URL encoding — only for network requests, never for file paths ─────
+    // ── URL encoding -- only for network requests, never for file paths ─────
     private fun encodeNickname(nickname: String): String =
         URLEncoder.encode(nickname, Charsets.UTF_8.name()).replace("+", "%20")
 }

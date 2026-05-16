@@ -46,7 +46,7 @@ class DataDirMoverTest {
         val conf = BootstrapConf.read(confFile)
         assertEquals(source.toAbsolutePath().toString(), conf[BootstrapConf.KEY_PENDING_SOURCE])
         assertEquals(target.toAbsolutePath().toString(), conf[BootstrapConf.KEY_PENDING_TARGET])
-        // data-dir key NOT yet set — only on successful apply.
+        // data-dir key NOT yet set -- only on successful apply.
         assertNull(conf[BootstrapConf.KEY_DATA_DIR])
     }
 
@@ -79,7 +79,7 @@ class DataDirMoverTest {
         // Source is gone
         assertFalse(Files.exists(source))
 
-        // Conf reflects committed state — pending cleared, data-dir set
+        // Conf reflects committed state -- pending cleared, data-dir set
         val conf = BootstrapConf.read(confFile)
         assertEquals(target.toAbsolutePath().toString(), conf[BootstrapConf.KEY_DATA_DIR])
         assertNull(conf[BootstrapConf.KEY_PENDING_SOURCE])
@@ -87,8 +87,8 @@ class DataDirMoverTest {
     }
 
     @Test
-    fun `applyPending when no pending is recorded — no-op`() {
-        // Empty conf — should silently do nothing.
+    fun `applyPending when no pending is recorded -- no-op`() {
+        // Empty conf -- should silently do nothing.
         DataDirMover.applyPending(confFile)
         // Source untouched.
         assertTrue(Files.exists(source / "credentials.json"))
@@ -96,7 +96,7 @@ class DataDirMoverTest {
     }
 
     @Test
-    fun `applyPending is idempotent — source already moved, commits target as data-dir`() {
+    fun `applyPending is idempotent -- source already moved, commits target as data-dir`() {
         // Simulate: previous apply succeeded for the copy but crashed
         // before clearing pending markers. On re-run, source is gone but
         // target has the data.
@@ -113,7 +113,7 @@ class DataDirMoverTest {
     }
 
     @Test
-    fun `applyPending refuses to overwrite populated target — clears pending`() {
+    fun `applyPending refuses to overwrite populated target -- clears pending`() {
         DataDirMover.schedule(source, target, confFile)
         // Pre-populate target with unrelated data.
         Files.createDirectories(target)

@@ -110,7 +110,7 @@ class GameCommandBuilderTest {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // Common structure — applies to all versions
+    // Common structure -- applies to all versions
     // ═══════════════════════════════════════════════════════════════════════════
 
     @Test
@@ -213,7 +213,7 @@ class GameCommandBuilderTest {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // 1.7.10 — Legacy LaunchWrapper + FML
+    // 1.7.10 -- Legacy LaunchWrapper + FML
     // ═══════════════════════════════════════════════════════════════════════════
 
     @Test
@@ -256,7 +256,7 @@ class GameCommandBuilderTest {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // 1.12.2 — LaunchWrapper + Forge FML (different package)
+    // 1.12.2 -- LaunchWrapper + Forge FML (different package)
     // ═══════════════════════════════════════════════════════════════════════════
 
     @Test
@@ -280,7 +280,7 @@ class GameCommandBuilderTest {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // 1.21.1 — NeoForge / BootstrapLauncher
+    // 1.21.1 -- NeoForge / BootstrapLauncher
     // ═══════════════════════════════════════════════════════════════════════════
 
     @Test

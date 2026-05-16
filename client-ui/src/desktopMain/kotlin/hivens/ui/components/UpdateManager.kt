@@ -3,6 +3,7 @@ package hivens.ui.components
 import androidx.compose.runtime.*
 import hivens.core.data.LauncherUpdate
 import hivens.launcher.update.UpdateService
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
@@ -25,7 +26,7 @@ fun UpdateManager() {
             if (update != null) {
                 availableUpdate = update
                 // Critical AND mandatory both skip the corner-notification step
-                // and open the modal directly — neither is something the user
+                // and open the modal directly -- neither is something the user
                 // should be able to ignore by clicking past a small badge.
                 if (update.isCritical || update.isMandatory) {
                     showDialog = true
@@ -44,8 +45,8 @@ fun UpdateManager() {
     // mid-tick still gets picked up promptly.
     LaunchedEffect(Unit) {
         while (true) {
-            kotlinx.coroutines.delay(60_000L)
-            // Skip when a dialog is already up — the user is already being
+            kotlinx.coroutines.delay(60_000L.milliseconds)
+            // Skip when a dialog is already up -- the user is already being
             // asked to act on whatever update is queued.
             if (showDialog) continue
             val mandatory = updateService.checkForMandatoryUpdate()

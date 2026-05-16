@@ -27,7 +27,7 @@ class EnvironmentPreparerTest {
         Files.walk(workDir).sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }
     }
 
-    // ── getOsSuffix: os.name → LWJGL Maven Central classifier suffix ─────
+    // ── getOsSuffix: os.name -> LWJGL Maven Central classifier suffix ─────
 
     @Test
     fun `getOsSuffix maps Linux variants to linux`() {
@@ -81,7 +81,7 @@ class EnvironmentPreparerTest {
         val nativesDir = (workDir / "natives").also { Files.createDirectories(it) }
         Files.createFile(nativesDir / "lwjgl.dll")
         Files.createFile(nativesDir / "lwjgl.dylib")
-        // Asking for linux — only .so counts.
+        // Asking for linux -- only .so counts.
         assertFalse(svc.isFolderValidForOs(nativesDir, "linux"))
     }
 
@@ -108,13 +108,13 @@ class EnvironmentPreparerTest {
         assertFalse(svc.isFolderValidForOs(nativesDir, "unknown"))
     }
 
-    // ── #185 — jinput-only must NOT count as valid lwjgl natives ──────────
+    // ── #185 -- jinput-only must NOT count as valid lwjgl natives ──────────
 
     @Test
     fun `isFolderValidForOs rejects jinput-only directory (#185)`() {
         // Bug reproducer: lwjgl-platform Maven download silently failed,
         // leaving only the jinput natives. Pre-fix `anyMatch { ends in .so }`
-        // returned true — game then died with UnsatisfiedLinkError.
+        // returned true -- game then died with UnsatisfiedLinkError.
         val nativesDir = (workDir / "natives").also { Files.createDirectories(it) }
         Files.createFile(nativesDir / "libjinput-linux64.so")
         Files.createFile(nativesDir / "libjinput-linux.so")
@@ -124,7 +124,7 @@ class EnvironmentPreparerTest {
 
     @Test
     fun `isFolderValidForOs accepts liblwjgl + liblwjgl64 (LWJGL2 64-bit layout)`() {
-        // Real LWJGL 2 lib-name on linux64 — the modded-MC majority case.
+        // Real LWJGL 2 lib-name on linux64 -- the modded-MC majority case.
         val nativesDir = (workDir / "natives").also { Files.createDirectories(it) }
         Files.createFile(nativesDir / "liblwjgl.so")
         Files.createFile(nativesDir / "liblwjgl64.so")
@@ -148,7 +148,7 @@ class EnvironmentPreparerTest {
     fun `isFolderValidForOs is case-insensitive on the lwjgl substring`() {
         // Defensive: should the upstream zip ever ship mixed case (Windows
         // FAT32 quirks have historically uppercased filenames) the gate
-        // still recognises the native.
+        // still recognizes the native.
         val nativesDir = (workDir / "natives").also { Files.createDirectories(it) }
         Files.createFile(nativesDir / "LIBLWJGL.SO")
         assertTrue(svc.isFolderValidForOs(nativesDir, "linux"))
@@ -167,7 +167,7 @@ class EnvironmentPreparerTest {
     @Test
     fun `flattenNatives moves nested so files to dir root`() {
         // LWJGL Maven jars unpack with internal layout like
-        // "natives/linux/x64/lwjgl.so" — the launcher expects them
+        // "natives/linux/x64/lwjgl.so" -- the launcher expects them
         // directly at "natives/lwjgl.so" so the JVM can load via
         // -Djava.library.path. flattenNatives walks the tree and
         // hoists matching extensions up.
@@ -222,7 +222,7 @@ class EnvironmentPreparerTest {
 
         svc.flattenNatives(root)
 
-        // Only the .so was lifted up.
+        // Only the .so was lifted.
         assertTrue(Files.exists(root / "lwjgl.so"))
         assertFalse(Files.exists(root / "notes.txt"))
         assertFalse(Files.exists(root / "lwjgl.jar"))
@@ -239,7 +239,7 @@ class EnvironmentPreparerTest {
 
     // ── helpers ───────────────────────────────────────────────────────────
 
-    private inline fun <T> withSystemProp(key: String, value: String, block: () -> T): T {
+    private inline fun <T> withSystemProp(key: String, value: String, block: () -> T): T { // TODO: key value always os.name
         val original = System.getProperty(key)
         try {
             System.setProperty(key, value)

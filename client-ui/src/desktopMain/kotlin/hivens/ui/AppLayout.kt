@@ -35,6 +35,7 @@ import kotlinx.coroutines.delay
 import org.koin.compose.koinInject
 import kotlin.math.sin
 import kotlin.random.Random
+import kotlin.time.Duration.Companion.milliseconds
 
 // ─── Layout ──────────────────────────────────────────────────────────────────
 
@@ -67,10 +68,10 @@ fun AppLayout(
     val rowBackground = if (backgroundSettings.enabled) Color.Transparent
     else CelestiaTheme.colors.background
 
-    val sslBypass by produceState(initialValue = NetworkState.bypassFor(hivens.config.Network.SSL_BYPASS_HOST)) {
+    val sslBypass by produceState(initialValue = NetworkState.bypassFor(hivens.config.Network.SSL_BYPASS_HOST)) { // TODO: Deprecated
         while (true) {
-            value = NetworkState.bypassFor(hivens.config.Network.SSL_BYPASS_HOST)
-            delay(200)
+            value = NetworkState.bypassFor(hivens.config.Network.SSL_BYPASS_HOST) // TODO: deprecated
+            delay(200.milliseconds)
         }
     }
 
@@ -109,7 +110,7 @@ fun AppLayout(
                                 onOpenDetails         = { onScreenChange(Screen.ServerDetails(it)) }
                             )
                             // `Loading` is the brief window between startup and resolved
-                            // credentials — spinner is appropriate. `Unauthenticated` is
+                            // credentials -- spinner is appropriate. `Unauthenticated` is
                             // a stable state waiting on user input; show the explicit
                             // "sign in" copy so the spinning placeholder doesn't read as
                             // a stuck network request.
@@ -206,7 +207,7 @@ fun AppSidebar(
     val aboutActive    = currentScreen is Screen.About
 
     // ── April Fools: nav clicks have a 30% chance of being silently swallowed ──
-    // The button doesn't move or react — it just feels like the UI froze.
+    // The button doesn't move or react -- it just feels like the UI froze.
     // Logout is intentionally excluded so the user can always escape.
     fun chaosNavClick(originalClick: () -> Unit): () -> Unit {
         if (!AprilFools.isActive()) return originalClick
@@ -214,7 +215,7 @@ fun AppSidebar(
             if (Random.nextFloat() > 0.30f) {
                 originalClick()
             }
-            // else: click silently consumed — simulates UI "lag"
+            // else: click silently consumed -- simulates UI "lag"
         }
     }
 
@@ -240,14 +241,14 @@ fun AppSidebar(
         label = "bounceCycle"
     )
 
-    // Different phase offset per button — they never all peak at the same time
+    // Different phase offset per button -- they never all peak at the same time
     val homeOffset    = sin(bounceCycle + 0.0f) * bounceAmplitude
     val profileOffset = sin(bounceCycle + 1.1f) * bounceAmplitude
     val settingsOffset= sin(bounceCycle + 2.2f) * bounceAmplitude
     val aboutOffset   = sin(bounceCycle + 3.3f) * bounceAmplitude
 
     // Puppet: sidebar navigation. Puppet driver bypasses the AprilFools
-    // chaos wrapper — those are user-facing pranks, not behaviour we want
+    // chaos wrapper -- those are user-facing pranks, not behavior we want
     // to test against. Direct onScreenChange calls keep test runs
     // deterministic regardless of the calendar.
     PuppetClick("nav.home")     { onScreenChange(Screen.Home) }
@@ -307,7 +308,7 @@ fun AppSidebar(
         // ── Bottom actions ────────────────────────────────────────────────
         Spacer(Modifier.weight(1f))
 
-        // Console toggle — not bouncing, user needs to be able to open it
+        // Console toggle -- not bouncing, user needs to be able to open it
         IconButton(
             onClick  = {
                 if (GameConsoleService.shouldShowConsole) GameConsoleService.hide()
@@ -326,7 +327,7 @@ fun AppSidebar(
             )
         }
 
-        // Logout — NOT chaos-wrapped, NOT bouncing — user must always be able to log out
+        // Logout -- NOT chaos-wrapped, NOT bouncing -- user must always be able to log out
         if (isAuthenticated) {
             IconButton(onClick = onLogout, modifier = Modifier.size(48.dp)) {
                 Icon(

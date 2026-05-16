@@ -60,6 +60,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import javax.imageio.ImageIO
+import kotlin.time.Duration.Companion.milliseconds
 
 private sealed class SpawnResetState {
     object Idle    : SpawnResetState()
@@ -154,7 +155,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
     val borderColor = CelestiaTheme.colors.textSecondary.copy(alpha = 0.2f)
 
     // Puppet ids prefixed with the server's assetDir so concurrent settings
-    // dialogs (theoretical — Aura keeps only one open at a time today) stay
+    // dialogs (theoretical -- Aura keeps only one open at a time today) stay
     // disambiguated, and tests can verify they're acting on the intended server.
     val pkey = "serverSettings.${server.assetDir}"
     PuppetScreen("ServerSettings.${server.assetDir}")
@@ -177,7 +178,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
         onBack()
     }
     PuppetClick("$pkey.openJvmBuilder", enabled = jvmBuilderEnabled) { showJvmBuilder = true }
-    // Per-mod toggle. Mods load asynchronously — registry mirrors what's
+    // Per-mod toggle. Mods load asynchronously -- registry mirrors what's
     // currently composed, so puppet calls before modsLoaded return 404.
     mods.forEach { mod ->
         PuppetToggle("$pkey.mod.${mod.id}", modStates[mod.id] ?: mod.isDefault) {
@@ -226,7 +227,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                 contentAlignment = Alignment.Center
             ) {
                 if (serverIcon != null) {
-                    androidx.compose.foundation.Image(
+                    Image(
                         painter = BitmapPainter(serverIcon!!),
                         contentDescription = null,
                         modifier = Modifier.fillMaxSize(),
@@ -254,7 +255,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
 
         Row(Modifier.fillMaxSize()) {
             // ══════════════════════════════════════════════════════════════════
-            // LEFT COLUMN — System settings
+            // LEFT COLUMN -- System settings
             // ══════════════════════════════════════════════════════════════════
             GlassCard(Modifier.weight(1f).fillMaxHeight()) {
                 Column(Modifier.padding(24.dp).verticalScroll(rememberScrollState())) {
@@ -263,7 +264,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                     Text(s.serverSettingsSectionSystem, style = MaterialTheme.typography.titleSmall, color = CelestiaTheme.colors.primary)
                     Spacer(Modifier.height(16.dp))
 
-                    // ── RAM — RamSelector replaces old Slider ─────────────────
+                    // ── RAM -- RamSelector replaces old Slider ─────────────────
                     RamSelector(
                         currentMb = memory,
                         onValueChanged = { memory = it }
@@ -403,7 +404,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                     Spacer(Modifier.weight(1f))
 
                     // ── Open folder ───────────────────────────────────────────
-                    // Was AprilFoolsButton with a colors-passthrough hack — produced
+                    // Was AprilFoolsButton with a colors-passthrough hack -- produced
                     // a flat filled chip that visually clashed with CelestiaButton's
                     // outlined style on Reset Client. Until AprilFools gets a proper
                     // CelestiaButton-based wrapper that can also host the future
@@ -422,7 +423,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
 
                     Spacer(Modifier.height(12.dp))
 
-                    // Reset client — NOT chaos-wrapped (destructive action)
+                    // Reset client -- NOT chaos-wrapped (destructive action)
                     CelestiaButton(s.serverSettingsReset, onClick = {
                         val path = dataDirectory.resolve("clients").resolve(server.assetDir)
                         path.toFile().deleteRecursively()
@@ -430,13 +431,13 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                         onBack()
                     }, modifier = Modifier.fillMaxWidth(), primary = false)
 
-                    // ── Return to spawn (only 1.12.2) — chaos target in Idle ──
+                    // ── Return to spawn (only 1.12.2) -- chaos target in Idle ──
                     if (server.version.startsWith("1.12")) {
                         Spacer(Modifier.height(12.dp))
 
                         if (spawnResetState == SpawnResetState.Idle) {
-                            // Only chaos-wrap when idle — Loading/Success/Error states need reliable feedback
-                            // Same rationale as the Open Folder button above — uses
+                            // Only chaos-wrap when idle -- Loading/Success/Error states need reliable feedback
+                            // Same rationale as the Open Folder button above -- uses
                             // CelestiaButton until AprilFoolsButton gets a wrapper
                             // that respects the Celestia / Atelier visual systems.
                             CelestiaButton(
@@ -449,7 +450,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                                         }
                                         if (credentials == null) {
                                             spawnResetState = SpawnResetState.Error
-                                            delay(3000)
+                                            delay(3000.milliseconds)
                                             spawnResetState = SpawnResetState.Idle
                                             return@launch
                                         }
@@ -457,7 +458,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                                             playerRepository.resetSpawn(credentials, server.name)
                                         }
                                         spawnResetState = if (ok) SpawnResetState.Success else SpawnResetState.Error
-                                        delay(3000)
+                                        delay(3000.milliseconds)
                                         spawnResetState = SpawnResetState.Idle
                                     }
                                 },
@@ -465,7 +466,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                                 primary  = false,
                             )
                         } else {
-                            // Loading / Success / Error — plain reliable button, no chaos
+                            // Loading / Success / Error -- plain reliable button, no chaos
                             CelestiaButton(
                                 text    = when (spawnResetState) {
                                     SpawnResetState.Loading -> s.spawnResetLoading
@@ -486,7 +487,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
             Spacer(Modifier.width(24.dp))
 
             // ══════════════════════════════════════════════════════════════════
-            // RIGHT COLUMN — Mods
+            // RIGHT COLUMN -- Mods
             // ══════════════════════════════════════════════════════════════════
             GlassCard(Modifier.weight(1f).fillMaxHeight()) {
                 Column(Modifier.padding(24.dp)) {

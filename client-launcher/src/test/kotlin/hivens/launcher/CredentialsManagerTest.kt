@@ -65,7 +65,7 @@ class CredentialsManagerTest {
     // ── save() ─────────────────────────────────────────────────────────────
 
     @Test
-    fun `save with keyring available — both secrets land in keyring, file holds flags`() {
+    fun `save with keyring available -- both secrets land in keyring, file holds flags`() {
         manager.save(session())
 
         assertEquals("secret-pw", keyring.entries[passwordKey])
@@ -82,7 +82,7 @@ class CredentialsManagerTest {
     }
 
     @Test
-    fun `save with keyring failing — both secrets fall back to AES-GCM file`() {
+    fun `save with keyring failing -- both secrets fall back to AES-GCM file`() {
         keyring.failStore = true
         manager.save(session())
 
@@ -98,7 +98,7 @@ class CredentialsManagerTest {
     }
 
     @Test
-    fun `save with blank accessToken — no-op, no file written`() {
+    fun `save with blank accessToken -- no-op, no file written`() {
         val noToken = session(accessToken = "")
         manager.save(noToken)
         assertFalse(Files.exists(workDir / "credentials.json"))
@@ -106,7 +106,7 @@ class CredentialsManagerTest {
     }
 
     @Test
-    fun `save with null cachedPassword — password not stored, accessToken still goes to keyring`() {
+    fun `save with null cachedPassword -- password not stored, accessToken still goes to keyring`() {
         manager.save(session(password = null))
 
         assertNull(keyring.entries[passwordKey], "keyring must not store null password")
@@ -121,7 +121,7 @@ class CredentialsManagerTest {
     // ── load() ─────────────────────────────────────────────────────────────
 
     @Test
-    fun `load v4 keyring-mode — both secrets come from keyring`() {
+    fun `load v4 keyring-mode -- both secrets come from keyring`() {
         manager.save(session())
         val freshManager = CredentialsManager(workDir, json, keyring)
         val loaded = freshManager.load()
@@ -133,9 +133,9 @@ class CredentialsManagerTest {
     }
 
     @Test
-    fun `load v4 keyring-mode but accessToken entry wiped — returns null (session gone)`() {
+    fun `load v4 keyring-mode but accessToken entry wiped -- returns null (session gone)`() {
         manager.save(session())
-        // Wipe only the accessToken keyring entry — daemon issue, manual
+        // Wipe only the accessToken keyring entry -- daemon issue, manual
         // delete in seahorse, etc. Without accessToken the launcher cannot
         // launch the game; load returns null to trigger re-login.
         keyring.entries.remove(accessTokenKey)
@@ -144,7 +144,7 @@ class CredentialsManagerTest {
     }
 
     @Test
-    fun `load v4 keyring-mode but password entry wiped — session loads with null cachedPassword`() {
+    fun `load v4 keyring-mode but password entry wiped -- session loads with null cachedPassword`() {
         manager.save(session())
         // Wipe only the password entry. accessToken still works, so the
         // user can still launch the game; only password-dependent flows
@@ -153,13 +153,13 @@ class CredentialsManagerTest {
         val freshManager = CredentialsManager(workDir, json, keyring)
         val loaded = freshManager.load()
 
-        assertNotNull(loaded, "accessToken survived — session is usable")
+        assertNotNull(loaded, "accessToken survived -- session is usable")
         assertEquals("fake-game-token", loaded.accessToken)
-        assertNull(loaded.cachedPassword, "password is gone — relogin needed for re-auth")
+        assertNull(loaded.cachedPassword, "password is gone -- relogin needed for re-auth")
     }
 
     @Test
-    fun `load v4 file-mode — both secrets come from AES-GCM file`() {
+    fun `load v4 file-mode -- both secrets come from AES-GCM file`() {
         keyring.failStore = true
         manager.save(session())
         val freshManager = CredentialsManager(workDir, json, keyring)
@@ -171,10 +171,10 @@ class CredentialsManagerTest {
     }
 
     @Test
-    fun `load v3 legacy file with plaintext accessToken — migrates on next save`() {
+    fun `load v3 legacy file with plaintext accessToken -- migrates on next save`() {
         // Hand-craft a v3-format file: password in keyring (flag set, no
         // ciphertext) but accessToken still plaintext on disk. This is
-        // exactly what a launcher upgraded from #139 → this PR would have
+        // exactly what a launcher upgraded from #139 -> this PR would have
         // on disk for an already-logged-in user.
         val legacyFile = workDir / "credentials.json"
         keyring.entries[passwordKey] = "v3-password" // pretend keyring had it
@@ -206,8 +206,8 @@ class CredentialsManagerTest {
     }
 
     @Test
-    fun `load v1 legacy Base64 — migrates password on read, returns valid session`() {
-        // v1 schema also had plaintext accessToken — same migration path
+    fun `load v1 legacy Base64 -- migrates password on read, returns valid session`() {
+        // v1 schema also had plaintext accessToken -- same migration path
         // as v3 for the token; password comes from savedPasswordBase64.
         val legacyFile = workDir / "credentials.json"
         val legacyB64 = Base64.getEncoder().encodeToString("legacy-pw".toByteArray())
@@ -231,12 +231,12 @@ class CredentialsManagerTest {
     }
 
     @Test
-    fun `load with no file — returns null`() {
+    fun `load with no file -- returns null`() {
         assertNull(manager.load())
     }
 
     @Test
-    fun `load with malformed file — returns null instead of throwing`() {
+    fun `load with malformed file -- returns null instead of throwing`() {
         Files.writeString(workDir / "credentials.json", "not valid json {{{")
         assertNull(manager.load(), "load should swallow parse errors and return null")
     }
@@ -255,7 +255,7 @@ class CredentialsManagerTest {
     }
 
     @Test
-    fun `clear is idempotent — calling twice does not throw`() {
+    fun `clear is idempotent -- calling twice does not throw`() {
         manager.save(session())
         manager.clear()
         manager.clear()
@@ -263,7 +263,7 @@ class CredentialsManagerTest {
     }
 
     @Test
-    fun `clear when only file path is in use — still wipes both sides`() {
+    fun `clear when only file path is in use -- still wipes both sides`() {
         keyring.failStore = true
         manager.save(session())
         manager.clear()
@@ -281,7 +281,7 @@ class CredentialsManagerTest {
      *
      *  - **Happy path**: `store` succeeds, `retrieve` returns what was
      *    written, `clear` removes (returns true only when something was
-     *    actually removed — matches libsecret's no-match semantics).
+     *    actually removed -- matches libsecret's no-match semantics).
      *  - **`failStore = true`**: simulates a keyring daemon that's
      *    reachable (`isAvailable() = true`) but refuses every write.
      *    Covers the "user revoked permission" / "default collection
@@ -289,7 +289,7 @@ class CredentialsManagerTest {
      *    AES-GCM file fallback.
      *
      * One toggle covers both password and accessToken paths because the
-     * production code calls `store` per-secret — flipping `failStore`
+     * production code calls `store` per-secret -- flipping `failStore`
      * triggers the file fallback for both, which is what we want to
      * exercise in the file-mode tests.
      */

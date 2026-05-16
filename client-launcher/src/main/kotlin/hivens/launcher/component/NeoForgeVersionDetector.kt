@@ -15,7 +15,7 @@ import kotlin.io.path.name
  * The official launcher's hardcoded q.java constants drift every time the
  * upstream bumps NeoForge/FML on the server. We mirror those constants
  * from `smrt-deco` syncs and have already shipped 21.1.506 / 4.0.42 by
- * hand — once. The version values are right there in the manifest sync
+ * hand -- once. The version values are right there in the manifest sync
  * output: directory names under `net/neoforged/neoforge/` and
  * `net/neoforged/fancymodloader/loader/`, plus the embedded
  * `Implementation-Version` inside the universal jar's `MANIFEST.MF`.
@@ -111,7 +111,7 @@ internal class NeoForgeVersionDetector {
     /**
      * Compares strings like `21.1.506`, `4.0.42`, `1.21.1` part-by-part as
      * integers when possible, alphabetically otherwise. Sufficient for the
-     * NeoForge / FML version schemes — neither uses pre-release tags.
+     * NeoForge / FML version schemes -- neither uses pre-release tags.
      */
     private object VersionComparator : Comparator<String> {
         override fun compare(a: String, b: String): Int {

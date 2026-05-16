@@ -1,7 +1,7 @@
 package hivens.ui.easter
- 
+
 import kotlin.random.Random
- 
+
 /**
  * Provides chaos text transformations for the About screen.
  *
@@ -11,11 +11,11 @@ import kotlin.random.Random
  *  - Fake version numbers
  *  - Completely unrelated technical jargon
  *
- * [maybeGibberish] is the main entry point — call it around any
+ * [maybeGibberish] is the main entry point -- call it around any
  * string that should occasionally corrupt itself.
  */
 object AprilFoolsText {
- 
+
     private val loremFragments = listOf(
         "Lorem ipsum dolor sit amet",
         "consectetur adipiscing elit",
@@ -23,6 +23,8 @@ object AprilFoolsText {
         "NullPointerException at line 42",
         "Segmentation fault (core dumped)",
         "Error 418: I'm a teapot",
+        "Congratulations! You have died.",
+        "Happy birthday",
         $$"javax.swing.SwingUtilities$2.run(Unknown Source)",
         "at sun.reflect.NativeMethodAccessorImpl.invoke0",
         "FATAL: connection to server lost",
@@ -33,12 +35,12 @@ object AprilFoolsText {
         "OutOfMemoryError: Java heap space",
         "Caused by: who knows at this point",
     )
- 
+
     private val zalgoChars = listOf(
         '\u0300', '\u0301', '\u0302', '\u0303', '\u0308',
         '\u0330', '\u0331', '\u0332', '\u0333', '\u0334',
     )
- 
+
     private val fakeVersions = listOf(
         "v0.0.0-alpha-pre-beta-rc1",
         "v∞.∞.∞",
@@ -47,7 +49,7 @@ object AprilFoolsText {
         "v2026.04.01-april-fools",
         "v9999.0.0-SNAPSHOT",
     )
- 
+
     private val jargon = listOf(
         "Kotlin Multiplatform Gradle DSL Compose M3 Ktor Koin Skiko JVM",
         "Reticulating splines...",
@@ -57,7 +59,7 @@ object AprilFoolsText {
         "Compiling Rust at 0.001 MB/s",
         "Waiting for GC... (estimated: never)",
     )
- 
+
     /**
      * Returns a corrupted version of [text] with [probability] chance.
      * When April Fools is inactive, always returns [text] unchanged.
@@ -73,7 +75,7 @@ object AprilFoolsText {
     ): String {
         if (!AprilFools.isActive()) return text
         if (Random.nextFloat() > probability) return text
- 
+
         val chosenMode = mode ?: GibberishMode.entries.random()
         return when (chosenMode) {
             GibberishMode.LOREM      -> loremFragments.random()
@@ -84,7 +86,7 @@ object AprilFoolsText {
             GibberishMode.SCRAMBLED  -> text.toList().shuffled().joinToString("")
         }
     }
- 
+
     private fun zalgoify(text: String): String = buildString {
         text.forEach { c ->
             append(c)
@@ -94,7 +96,7 @@ object AprilFoolsText {
             }
         }
     }
- 
+
     enum class GibberishMode {
         LOREM, ZALGO, FAKE_VER, JARGON, REVERSED, SCRAMBLED
     }

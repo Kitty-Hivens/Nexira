@@ -177,7 +177,7 @@ internal class GameCommandBuilder(
                 // failure mode is a cryptic Java module-resolution error at
                 // game startup ("module not found: cpw.mods.bootstraplauncher")
                 // that surfaces in the game console long after the user has
-                // committed to a launch — diagnosed in audit pass on the
+                // committed to a launch -- diagnosed in audit pass on the
                 // 2.2.13 batch as a real silent-failure path. The exception
                 // propagates through LauncherService into the existing
                 // LauncherController error-dialog flow so the user sees a
@@ -186,7 +186,7 @@ internal class GameCommandBuilder(
                     "Cannot launch ${config.mainClass}: no NeoForge boot modules " +
                         "(securejarhandler, bootstraplauncher, ow2/asm, jarjar) found " +
                         "in the synced classpath. The pack's libraries directory is " +
-                        "missing the module-path entries — re-sync the server or " +
+                        "missing the module-path entries -- re-sync the server or " +
                         "delete clients/<server>/manifest-cache to force a full re-download.",
                 )
             }
@@ -247,7 +247,7 @@ internal class GameCommandBuilder(
 
         if (isModernEnvironment) {
             // NeoForge needs --fml.{neoForgeVersion,fmlVersion,mcVersion,neoFormVersion}.
-            // Auto-detect from libraries-{mcVersion}/ first — the values live in directory
+            // Auto-detect from libraries-{mcVersion}/ first -- the values live in directory
             // names and the universal jar's MANIFEST.MF, so a manifest sync always brings
             // matching versions and we never drift. Fall back to baked-in defaults if the
             // directory layout is unexpected.
@@ -265,7 +265,7 @@ internal class GameCommandBuilder(
                 )
             }
 
-            // Backend arguments still win — server can override what was detected.
+            // Backend arguments still win -- server can override what was detected.
             val backendArgs = profile.neoForgeArgs ?: emptyMap()
             val finalFmlArgs = defaultFmlArgs + backendArgs
 

@@ -1,5 +1,6 @@
 package hivens.launcher.security
 
+import org.junit.jupiter.api.Assumptions
 import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.Tag
 import kotlin.test.Test
@@ -18,7 +19,7 @@ import kotlin.test.assertTrue
  *   ./gradlew :client-launcher:liveWindowsKeyringTest
  *
  * Skips with [Assumptions.assumeTrue] when not running on Windows or
- * when advapi32 isn't loadable — never fails the build because we're
+ * when advapi32 isn't loadable -- never fails the build because we're
  * on the wrong platform.
  *
  * GH Actions `windows-latest` runners DO have a working Credential
@@ -40,12 +41,12 @@ class LiveWindowsKeyringProbeTest {
         )
         assumeTrue(
             keyring.isAvailable(),
-            "advapi32 not loadable / Credential Manager unreachable — skipping live probe",
+            "advapi32 not loadable / Credential Manager unreachable -- skipping live probe",
         )
     }
 
     @Test
-    fun `round-trip — CredWriteW then CredReadW returns the same secret`() {
+    fun `round-trip -- CredWriteW then CredReadW returns the same secret`() {
         assumeWindows()
         val secret = "round-trip-${System.nanoTime()}"
         try {
@@ -57,7 +58,7 @@ class LiveWindowsKeyringProbeTest {
     }
 
     @Test
-    fun `clear removes the entry — subsequent retrieve returns null`() {
+    fun `clear removes the entry -- subsequent retrieve returns null`() {
         assumeWindows()
         val secret = "to-be-cleared-${System.nanoTime()}"
         keyring.store(service, account, secret)
@@ -85,10 +86,10 @@ class LiveWindowsKeyringProbeTest {
     @Test
     fun `unicode secret round-trips through UTF-16LE encoding`() {
         assumeWindows()
-        // Verifies the UTF-16LE marshalling we do for CredentialBlob —
+        // Verifies the UTF-16LE marshaling we do for CredentialBlob --
         // CredWriteW takes raw bytes via the blob pointer, we encode as
         // UTF-16LE before the call. If the encoding were wrong (say UTF-8
-        // or platform default), unicode characters would corrupt.
+        // or platform default), Unicode characters would corrupt.
         val secret = "пароль-секрет-密码-🔑"
         try {
             assertTrue(keyring.store(service, account, secret))

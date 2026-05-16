@@ -24,7 +24,7 @@ import java.nio.file.StandardOpenOption
  *
  * Failure mode is **fail-open**: if lock acquisition itself crashes for
  * an unexpected reason (FS oddities, permissions), we log the warning
- * and return true — better a possibly-double instance than no launcher
+ * and return true -- better a possibly-double instance than no launcher
  * startup at all. The corresponding correctness concern (double migration
  * race) is now defused because [DataDirMigration] runs *after* this gate.
  */
@@ -81,7 +81,7 @@ object SingleInstance {
     }
 
     /**
-     * Idempotent release — safe to call from a shutdown hook *and* from
+     * Idempotent release -- safe to call from a shutdown hook *and* from
      * an explicit teardown path; the second call is a no-op.
      */
     fun release() {
@@ -97,7 +97,7 @@ object SingleInstance {
     private fun writeShowSignal(dataDir: Path) {
         runCatching {
             val show = dataDir.resolve(".show")
-            // Atomic create — the prior `if (!Files.exists) createFile` was
+            // Atomic create -- the prior `if (!Files.exists) createFile` was
             // a TOCTOU window: two launchers started in the same millisecond
             // could both observe the file missing and one would then throw
             // FileAlreadyExistsException (silently swallowed by runCatching),
@@ -106,7 +106,7 @@ object SingleInstance {
             try {
                 Files.createFile(show)
             } catch (_: java.nio.file.FileAlreadyExistsException) {
-                // Already signalled by a sibling launcher attempt — fine,
+                // Already signalled by a sibling launcher attempt -- fine,
                 // the running instance's watcher will pick it up either way.
             }
         }
@@ -115,7 +115,7 @@ object SingleInstance {
     /**
      * PID is written to a SEPARATE `.lock.pid` file rather than into `.lock`
      * itself because Windows treats `FileChannel.tryLock()` as a mandatory
-     * OS-level lock — once acquired, no other handle (even in the same JVM)
+     * OS-level lock -- once acquired, no other handle (even in the same JVM)
      * can open the file for read, and `Files.readString(.lock)` throws
      * IOException. Linux and macOS use advisory locks where reads work
      * fine, but cross-platform consistency wins. `.lock` stays empty and

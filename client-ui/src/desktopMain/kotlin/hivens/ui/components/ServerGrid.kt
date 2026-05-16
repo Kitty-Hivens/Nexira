@@ -87,7 +87,7 @@ fun ServerGrid(
                     // pick a specific server by name (e.g. "SkyBlock") instead
                     // of having to know its grid index. Only registered while
                     // the card is composed (LazyVerticalGrid only composes
-                    // visible items) — off-screen cards won't be reachable
+                    // visible items) -- off-screen cards won't be reachable
                     // until scrolled into view. Not a problem with Aura's
                     // current 7-server inventory; document if it grows.
                     val asset = item.profile.assetDir

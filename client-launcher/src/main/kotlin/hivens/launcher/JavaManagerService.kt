@@ -163,7 +163,7 @@ class JavaManagerService(
 
     internal fun unzip(zip: File, dest: Path) {
         // ZipFile (random-access central-directory reader) over the streaming
-        // ZipInputStream — only the central directory carries unix-mode
+        // ZipInputStream -- only the central directory carries unix-mode
         // external-attributes, so the streaming variant can't see the
         // symbolic-link bit (#187). A plain Zip Slip check (`startsWith(dest)`)
         // catches `../` traversal but misses a symlink entry whose linked
@@ -180,7 +180,7 @@ class JavaManagerService(
                     // For Zip, the link target is stored as the entry's payload
                     // bytes (not a separate field like TAR). Validate that the
                     // target, resolved relative to the symlink's parent, stays
-                    // within [dest] — same CVE-resistant pattern as the
+                    // within [dest] -- same CVE-resistant pattern as the
                     // TAR path below.
                     val linkTarget = zf.getInputStream(entry).use { it.readBytes() }.decodeToString()
                     val resolvedTarget = resolvedPath.parent.resolve(linkTarget).normalize()
@@ -233,13 +233,13 @@ class JavaManagerService(
                             if (entry.isSymbolicLink) {
                                 // BellSoft Linux/macOS JDK tarballs include
                                 // legitimate intra-package symlinks (e.g.
-                                // jre/lib/.../libjsig.so → libjsig.so.0).
+                                // jre/lib/.../libjsig.so -> libjsig.so.0).
                                 // Allow the link when its target, resolved
                                 // relative to the symlink's parent, stays
                                 // within [dest]; reject when it would escape,
                                 // so a tampered upstream can't redirect the
                                 // next write outside our extraction root.
-                                // (#202 — was blanket-rejected before, which
+                                // (#202 -- was blanket-rejected before, which
                                 // broke fresh Linux installs since every
                                 // BellSoft Linux JDK ships symlinks.)
                                 val linkTarget = entry.linkName ?: ""

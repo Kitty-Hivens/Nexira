@@ -37,6 +37,7 @@ import hivens.ui.theme.CelestiaTheme
 import org.koin.compose.koinInject
 import java.awt.Desktop
 import java.io.File
+import kotlin.time.Duration.Companion.milliseconds
 
 @Composable
 fun SettingsScreen(
@@ -55,18 +56,18 @@ fun SettingsScreen(
     val s = LocalStrings.current
 
     val initialSettings        = remember { settingsService.getSettings() }
-    var closeAfterStart        by remember { mutableStateOf(initialSettings.closeAfterStart) }
+    var closeAfterStart        by remember { mutableStateOf(initialSettings.closeAfterStart) } // TODO: Duplicate
     var isOfflineMode          by remember { mutableStateOf(initialSettings.isOfflineMode) }
     var experimentalEnabled    by remember { mutableStateOf(initialSettings.experimentalFeaturesEnabled) }
     var mandatoryUpdates       by remember { mutableStateOf(initialSettings.mandatoryUpdatesEnabled) }
-    var prereleaseChannel      by remember { mutableStateOf(initialSettings.prereleaseChannelEnabled) }
+    var prereleaseChannel      by remember { mutableStateOf(initialSettings.prereleaseChannelEnabled) } // TODO: Duplicate
     var autoSyncAllPacks       by remember { mutableStateOf(initialSettings.autoSyncAllPacks) }
     var jvmBuilderEnabled      by remember { mutableStateOf(initialSettings.jvmBuilderEnabled) }
     var forceProxyMode         by remember { mutableStateOf(initialSettings.forceProxyMode) }
     var langDropdownExpanded   by remember { mutableStateOf(false) }
     var showSavedMessage       by remember { mutableStateOf(false) }
 
-    // ── April Fools debug panel — secret unlock ────────────────────────────────
+    // ── April Fools debug panel -- secret unlock ────────────────────────────────
     // Tap the DIAGNOSTICS section title 5 times to reveal the debug panel.
     var debugTapCount  by remember { mutableStateOf(0) }
     var showAprilDebug by remember { mutableStateOf(false) }
@@ -163,7 +164,7 @@ fun SettingsScreen(
                                         onClick = { langDropdownExpanded = false; onLocaleChanged(locale) }
                                     )
                                     // Puppet: per-locale direct click. Drivers can switch
-                                    // language without opening the dropdown first — the
+                                    // language without opening the dropdown first -- the
                                     // onLocaleChanged callback is what actually mutates
                                     // state, the dropdown is presentation only.
                                     PuppetClick("settings.language.${locale.name}") {
@@ -306,13 +307,13 @@ fun SettingsScreen(
                 item {
                     SettingsSectionTitle(s.settingsSectionNetwork)
 
-                    // Live snapshot — re-reads every 1s. Sufficient for a
+                    // Live snapshot -- re-reads every 1s. Sufficient for a
                     // settings screen (no rapid-fire updates expected). Avoids
                     // setting up a Flow purely for this single read site.
                     val bypasses = androidx.compose.runtime.produceState(initialValue = hivens.launcher.NetworkState.listBypasses()) {
                         while (true) {
                             value = hivens.launcher.NetworkState.listBypasses()
-                            kotlinx.coroutines.delay(1_000)
+                            kotlinx.coroutines.delay(1_000.milliseconds)
                         }
                     }.value
                     val dateFormatter = java.time.format.DateTimeFormatter
@@ -586,9 +587,9 @@ fun SettingsScreen(
                                     )
                                     if (ok) {
                                         hivens.core.diag.ActionRing.record(
-                                            "Data-dir move scheduled: ${paths.dataDir} → $target — quitting for restart",
+                                            "Data-dir move scheduled: ${paths.dataDir} -> $target -- quitting for restart",
                                         )
-                                        // Hard exit — user explicitly clicked "Quit now". Avoids the
+                                        // Hard exit -- user explicitly clicked "Quit now". Avoids the
                                         // tray-shutdown path that might re-show the window if a game
                                         // is mid-launch. The pending move only applies AFTER the
                                         // launcher restarts, so a clean process termination is the
@@ -596,7 +597,7 @@ fun SettingsScreen(
                                         kotlin.system.exitProcess(0)
                                     } else {
                                         // Schedule was refused (target validations failed at the
-                                        // mover layer — e.g., race with another process touching
+                                        // mover layer -- e.g., race with another process touching
                                         // the target between our UI check and DataDirMover.schedule).
                                         // Close the dialog so the user can pick a different target.
                                         pendingTarget = null
@@ -636,7 +637,7 @@ fun SettingsScreen(
                     }
 
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        // Open logs — chaos target
+                        // Open logs -- chaos target
                         AprilFoolsButton(
                             id       = "settings_open_logs_btn",
                             text     = s.settingsOpenLogs,
@@ -648,7 +649,7 @@ fun SettingsScreen(
                             ),
                         )
                         PuppetClick("settings.openLogsDir") { openFolder(paths.logsDir.toString()) }
-                        // Open crash reports — chaos target
+                        // Open crash reports -- chaos target
                         AprilFoolsButton(
                             id       = "settings_crash_reports_btn",
                             text     = s.settingsOpenCrashReports,
@@ -664,7 +665,7 @@ fun SettingsScreen(
 
                     Spacer(Modifier.height(8.dp))
 
-                    // Beacon: one-click ZIP for support — bundles redacted logs,
+                    // Beacon: one-click ZIP for support -- bundles redacted logs,
                     // crash reports, action ring and system info. The companion
                     // GitHub-Issue button below is enabled only after a bundle
                     // exists in this session.
@@ -672,7 +673,7 @@ fun SettingsScreen(
                     // Generation runs off the Compose UI thread: filesystem
                     // reads + ZIP compression of a 200 MB launcher.log cap is
                     // enough to freeze Settings for a noticeable beat. While
-                    // generating, the button is disabled so a double-click
+                    // generating, the button is disabled so a double click
                     // doesn't fire two parallel writes to the same data dir.
                     var lastBundlePath by remember { mutableStateOf<java.nio.file.Path?>(null) }
                     var bundleBusy     by remember { mutableStateOf(false) }
@@ -785,7 +786,7 @@ fun SettingsScreen(
                             Column {
                                 Text(Branding.TITLE, color = CelestiaTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
                                 Text(
-                                    "v${Branding.VERSION.removePrefix("v")} — GPLv3",
+                                    "v${Branding.VERSION.removePrefix("v")} -- GPLv3",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = CelestiaTheme.colors.textSecondary
                                 )
@@ -803,7 +804,7 @@ fun SettingsScreen(
                 Text(s.settingsSaved, color = CelestiaTheme.colors.success, style = MaterialTheme.typography.bodySmall)
             }
             LaunchedEffect(showSavedMessage) {
-                if (showSavedMessage) { kotlinx.coroutines.delay(2000); showSavedMessage = false }
+                if (showSavedMessage) { kotlinx.coroutines.delay(2000.milliseconds); showSavedMessage = false }
             }
         }
     }

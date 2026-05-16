@@ -22,7 +22,7 @@ class ProfileManager(
     private val profiles = ConcurrentHashMap<String, InstanceProfile>()
 
     // Favorites set. ConcurrentHashMap.newKeySet gives thread-safe add/remove
-    // but `contains-then-add/remove` is still a TOCTOU race — use the
+    // but `contains-then-add/remove` is still a TOCTOU race -- use the
     // `add()`/`remove()` boolean returns in toggleFavorite() to make the flip
     // atomic instead.
     private val _favorites = ConcurrentHashMap.newKeySet<String>()
@@ -50,7 +50,7 @@ class ProfileManager(
 
     /**
      * Atomically flips favorite state for [assetDir]. The previous
-     * `if (contains) remove else add` shape was a TOCTOU race — two parallel
+     * `if (contains) remove else add` shape was a TOCTOU race -- two parallel
      * toggles on the same server could both observe contains=true and both
      * call remove(), losing the user's second click. `Set.add` and
      * `Set.remove` on ConcurrentHashMap.newKeySet return true iff they
@@ -115,9 +115,9 @@ class ProfileManager(
      * Persist the current snapshot. Writes go through a temp file + atomic
      * rename so a crash mid-serialize never leaves a half-JSON profiles.json
      * on disk (the next boot would otherwise reset every per-server tweak
-     * the user made — they describe this as "settings reset themselves").
+     * the user made -- they describe this as "settings reset themselves").
      * Serialised by [writeLock] so two concurrent saves don't race the
-     * temp-file → final rename.
+     * temp-file -> final rename.
      */
     fun save() = synchronized(writeLock) {
         val file = workDir.resolve(fileName)

@@ -25,12 +25,12 @@ import kotlin.test.assertTrue
  * [ManifestProcessorService] / [ClasspathProvider] / [GameCommandBuilder],
  * and a tmp-dir client root with fake jars matching the manifest.
  *
- * Stops short of `ProcessBuilder.start()` — never actually spawns a JVM.
+ * Stops short of `ProcessBuilder.start()` -- never actually spawns a JVM.
  * Catches orchestration regressions that pure unit tests on each component
  * miss:
  *
- *   - Auth response shape change → SessionData.fileManifest empty →
- *     ClasspathProvider returns "" → JVM dies with "Could not find or load
+ *   - Auth response shape change -> SessionData.fileManifest empty ->
+ *     ClasspathProvider returns "" -> JVM dies with "Could not find or load
  *     main class" (silent if no such test exists).
  *   - GameCommandBuilder picking wrong main class for the version field that
  *     auth populates.
@@ -38,7 +38,7 @@ import kotlin.test.assertTrue
  *
  * Pre-Conduit version of this test mocked HTTP at the [io.ktor.client.HttpClient]
  * boundary via MockEngine. Post-Conduit Phase 1 we mock at the
- * [hivens.core.api.interfaces.IServerProtocol] boundary instead — same coverage,
+ * [hivens.core.api.interfaces.IServerProtocol] boundary instead -- same coverage,
  * less ceremony, doesn't depend on Ktor wire-format details.
  */
 class LaunchPipelineIntegrationTest {
@@ -68,9 +68,9 @@ class LaunchPipelineIntegrationTest {
      * Pre-programmed protocol that returns an OK login carrying a manifest
      * with one library jar.
      */
-    private fun protocolWithManifest(libRelPath: String): FakeServerProtocol =
+    private fun protocolWithManifest(libRelPath: String): FakeServerProtocol = // TODO: Value of parameter 'libRelPath' is always '"launchwrapper-1.12.jar"'
         FakeServerProtocol().apply {
-            loginResult = { req ->
+            loginResult = { _ ->
                 LoginResponse(
                     status = "OK",
                     playername = "TestPlayer",
@@ -105,7 +105,7 @@ class LaunchPipelineIntegrationTest {
     }
 
     @Test
-    fun `full pipeline 1_7_10 — auth manifest builds a non-empty classpath with the jar`() = runTest {
+    fun `full pipeline 1_7_10 -- auth manifest builds a non-empty classpath with the jar`() = runTest {
         val clientRoot = makeClientRoot()
         // Place the actual jar on disk so ClasspathProvider's existence check passes.
         val libDir = (clientRoot / "libraries").also { Files.createDirectories(it) }
@@ -123,7 +123,7 @@ class LaunchPipelineIntegrationTest {
     }
 
     @Test
-    fun `full pipeline 1_7_10 — GameCommandBuilder produces a valid launch command`() = runTest {
+    fun `full pipeline 1_7_10 -- GameCommandBuilder produces a valid launch command`() = runTest {
         val clientRoot = makeClientRoot()
         val libDir = (clientRoot / "libraries").also { Files.createDirectories(it) }
         Files.createFile(libDir / "launchwrapper-1.12.jar")
@@ -158,7 +158,7 @@ class LaunchPipelineIntegrationTest {
             "1.7.10 main class must be Launchwrapper")
         assertTrue(command.contains("--tweakClass"), "1.7.10 must pass a tweakClass arg")
         assertTrue(command.contains("cpw.mods.fml.common.launcher.FMLTweaker"),
-            "1.7.10 tweak must be the legacy FMLTweaker (cpw.mods.fml namespace)")
+            "1.7.10 tweak must be the legacy SFMLTweaker (cpw.mods.fml namespace)")
         // Player identity flowed from FakeServerProtocol response through the entire pipeline.
         val uuidIdx = command.indexOf("--uuid")
         assertTrue(uuidIdx >= 0, "--uuid arg must be present")
@@ -166,7 +166,7 @@ class LaunchPipelineIntegrationTest {
     }
 
     @Test
-    fun `auth failure on fake protocol surfaces as AuthException — no command construction proceeds`() = runTest {
+    fun `auth failure on fake protocol surfaces as AuthException -- no command construction proceeds`() = runTest {
         val protocol = FakeServerProtocol().apply {
             loginResult = { LoginResponse(status = "PASSWORD") }
         }
@@ -174,14 +174,14 @@ class LaunchPipelineIntegrationTest {
             AuthService(protocol).login("user", "wrong", "Industrial")
         }.exceptionOrNull()
         assertNotNull(ex, "PASSWORD-status response must throw, not produce a SessionData")
-        // We deliberately don't assert the specific exception type here — the
+        // We deliberately don't assert the specific exception type here -- the
         // value of this test is "auth failure stops the pipeline before any
-        // launch artefacts get assembled". The AuthServiceTest suite covers
+        // launch artifacts get assembled". The AuthServiceTest suite covers
         // the exception type details.
     }
 
     @Test
-    fun `pipeline degrades gracefully when manifest is empty — classpath empty, no crash`() = runTest {
+    fun `pipeline degrades gracefully when manifest is empty -- classpath empty, no crash`() = runTest {
         val clientRoot = makeClientRoot()
         // No libraries dir on disk; no manifest entries either.
         val emptyManifest = FileManifest(directories = emptyMap(), files = emptyMap())
@@ -189,7 +189,7 @@ class LaunchPipelineIntegrationTest {
         val classpath = ClasspathProvider(ManifestProcessorService(json))
             .buildClasspath(clientRoot, emptyManifest, emptyList())
 
-        // Empty is acceptable here — the LauncherController offline path catches
+        // Empty is acceptable here -- the LauncherController offline path catches
         // this and bails with a user-facing error before invoking GameCommandBuilder.
         // The point is that ClasspathProvider doesn't throw on an empty manifest.
         assertEquals("", classpath)

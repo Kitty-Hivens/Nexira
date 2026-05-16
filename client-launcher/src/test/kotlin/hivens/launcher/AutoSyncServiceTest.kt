@@ -36,7 +36,7 @@ class AutoSyncServiceTest {
         authService = mockk()
         downloadService = mockk()
         manifestProcessor = mockk()
-        // ManifestCache is a final class — relaxed mockk so the
+        // ManifestCache is a final class -- relaxed mockk so the
         // 2FA fallback path's loadManifest call returns null without
         // a per-test setup. Tests that exercise the cache-hit branch
         // can override per-test.

@@ -1,5 +1,6 @@
 package hivens.core.util
 
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.delay
 import org.slf4j.LoggerFactory
 
@@ -11,12 +12,12 @@ private val log = LoggerFactory.getLogger("RetryWithBackoff")
  * [shouldRetry]. The last exception bubbles up unmodified.
  *
  * Designed narrowly for the "transient HTTP/2 reset over SOCKS" case the
- * launcher hits in production — auth flow and chunk downloads on the
+ * launcher hits in production -- auth flow and chunk downloads on the
  * smartycraft channel periodically die mid-stream and a single retry
  * almost always succeeds. Not a general-purpose retry utility; resist
  * the urge to grow it.
  *
- * The [operation] string is for logs only — appears in the retry warning
+ * The [operation] string is for logs only -- appears in the retry warning
  * lines so a user log paste shows which call is flapping.
  */
 suspend fun <T> retryWithBackoff(
@@ -39,10 +40,10 @@ suspend fun <T> retryWithBackoff(
             if (i < attempts - 1) {
                 val wait = backoffMs.getOrElse(i) { backoffMs.last() }
                 log.warn(
-                    "{} attempt {}/{} failed: {} — retrying in {}ms",
+                    "{} attempt {}/{} failed: {} -- retrying in {}ms",
                     operation, i + 1, attempts, e.message ?: e::class.simpleName, wait,
                 )
-                delay(wait)
+                delay(wait.milliseconds)
             } else {
                 log.error(
                     "{} failed after {} attempts: {}",

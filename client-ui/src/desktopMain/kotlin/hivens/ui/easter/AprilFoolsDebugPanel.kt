@@ -21,7 +21,7 @@ import kotlinx.coroutines.launch
  * Developer-only debug panel for testing April Fools behavior.
  * Accessed by tapping the Diagnostics section header 5 times in Settings.
  *
- * Works from any screen — registers a synthetic "TEST" button into ChaosState
+ * Works from any screen -- registers a synthetic "TEST" button into ChaosState
  * so event triggers never require navigating to Dashboard first.
  */
 @Composable
@@ -104,7 +104,7 @@ fun AprilFoolsDebugPanel() {
             )
             Spacer(Modifier.weight(1f))
             Text(
-                text  = "DEV ONLY",
+                text  = "DEV ONLY (etc. clown)",
                 style = MaterialTheme.typography.labelSmall,
                 color = CelestiaTheme.colors.error.copy(alpha = 0.5f),
             )
@@ -219,7 +219,7 @@ fun AprilFoolsDebugPanel() {
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             TriggerButton("Ghost")    { b, c, w -> AprilFoolsEngine.triggerGhostClone(b, c, w) }
-            // Earthquake is screen-wide — testBtn is unused inside but required by signature
+            // Earthquake is screen-wide -- testBtn is unused inside but required by signature
             TriggerButton("Quake")    { b, c, w -> AprilFoolsEngine.triggerEarthquake(b, c, w) }
             TriggerButton("Mass!")    { b, c, w -> AprilFoolsEngine.triggerMassEscape(b, c, w) }
         }

@@ -14,7 +14,7 @@ open class AuthException(
 
 /**
  * Thrown by [hivens.core.api.interfaces.IAuthService.login] when the server
- * returns `TWOAUTH` — the account has TOTP 2FA configured. The UI catches
+ * returns `TWOAUTH` -- the account has TOTP 2FA configured. The UI catches
  * this, prompts for the 6-digit code, and follows up with
  * [hivens.core.api.interfaces.IAuthService.completeTwoFactor]. Carries the
  * `uid` the server issued in the TWOAUTH response (required to sign the

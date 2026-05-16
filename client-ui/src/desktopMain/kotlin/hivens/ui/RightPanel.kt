@@ -125,7 +125,7 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
     var sslWarning   by remember { mutableStateOf(false) }
 
     // 2FA flow state (#159). twoFactorPending is non-null while the
-    // ConfirmCodeDialog is open — it stores the originating credentials
+    // ConfirmCodeDialog is open -- it stores the originating credentials
     // plus the uid the server returned in the TWOAUTH login response so
     // completeTwoFactor() can sign the follow-up. Cleared on dismiss /
     // success / TWO_FACTOR_EXPIRED.
@@ -164,7 +164,7 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
                 hivens.core.diag.ActionRing.record("Login OK: user=$login")
                 onLogin(session)
             } catch (e: TwoFactorRequiredException) {
-                // Account has 2FA — open the code dialog instead of treating
+                // Account has 2FA -- open the code dialog instead of treating
                 // it as a hard error. uid may be null when the server omits
                 // it from the TWOAUTH response (spec quirk); surface clearly
                 // so user knows to retry the full login.
@@ -226,7 +226,7 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
                 when (e.status) {
                     AuthStatus.WRONG_CODE -> twoFactorError = s.auth2faInvalid
                     AuthStatus.TWO_FACTOR_EXPIRED -> {
-                        // Session is gone server-side — close the dialog and
+                        // Session is gone server-side -- close the dialog and
                         // surface in the main login form so the user retries
                         // from scratch.
                         twoFactorPending = null
@@ -241,13 +241,13 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
         }
     }
 
-    // 2FA prompt — renders only while we're awaiting a code. Decoupled
+    // 2FA prompt -- renders only while we're awaiting a code. Decoupled
     // from the login form below so the form retains its state (username,
     // password, rememberMe) for the resume path. Dismissal cancels the
     // 2FA flow without clearing the form, letting the user retry.
     twoFactorPending?.let {
         // Puppet: this dialog overrides the screen marker while open so
-        // /screen returns "Login_2FA" — drivers can detect the modal and
+        // /screen returns "Login_2FA" -- drivers can detect the modal and
         // pivot to the 2FA-specific element ids instead of the form ones.
         PuppetScreen("Login_2FA")
         ConfirmCodeDialog(
@@ -305,7 +305,7 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
                     color = CelestiaTheme.colors.textPrimary.copy(alpha = 0.85f)
                 )
                 // Trust-duration prompt + 3 grant buttons. Each click both
-                // grants the bypass for that duration AND retries login —
+                // grants the bypass for that duration AND retries login --
                 // single-click UX. Cancel button is on its own row above so
                 // the dangerous actions don't accidentally read as the same
                 // affordance as the safe one.
@@ -323,12 +323,12 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
                 )
                 val acceptColors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF59E0B))
                 fun acceptFor(unit: java.time.temporal.ChronoUnit, amount: Long, label: String) {
-                    // 100-year future for "always" — long enough that no user
+                    // 100-year future for "always" -- long enough that no user
                     // will outlive it, short enough to not overflow ISO-8601
                     // formatting that a far-future Instant.MAX would.
                     val until = java.time.Instant.now().plus(amount, unit)
                     hivens.core.diag.ActionRing.record(
-                        "SSL bypass accepted by user (login retry) — granted: $label",
+                        "SSL bypass accepted by user (login retry) -- granted: $label",
                     )
                     NetworkState.grantBypass(hivens.config.Network.SSL_BYPASS_HOST, until)
                     doLogin(insecureAuthService)
@@ -431,7 +431,7 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
         }
         PuppetToggle("login.rememberMe", rememberMe) { rememberMe = it }
 
-        // LOG IN — chaos target (only when not loading, loading state stays reliable)
+        // LOG IN -- chaos target (only when not loading, loading state stays reliable)
         if (isLoading) {
             Button(
                 onClick   = {},
@@ -462,7 +462,7 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
         }
         PuppetClick("login.submit", enabled = !isLoading) { doLogin() }
 
-        // REGISTER — chaos target (#105)
+        // REGISTER -- chaos target (#105)
         AprilFoolsButton(
             id      = "login_register_btn",
             text    = s.loginRegister,
@@ -555,7 +555,7 @@ fun AccountPanel(session: SessionData, onLogout: () -> Unit) {
             )
         }
 
-        // Logout is NOT chaos-wrapped — user must always be able to log out
+        // Logout is NOT chaos-wrapped -- user must always be able to log out
         TextButton(
             onClick  = onLogout,
             modifier = Modifier.height(30.dp)
@@ -568,7 +568,7 @@ fun AccountPanel(session: SessionData, onLogout: () -> Unit) {
         }
         // Puppet: secondary logout entry-point (the other is the sidebar
         // ExitToApp icon, which is `nav.logout`). Kept distinct because a
-        // regression could hit just one of them — e.g. a layout change
+        // regression could hit just one of them -- e.g. a layout change
         // that detaches the right-panel logout but leaves the sidebar.
         PuppetClick("account.logout") { onLogout() }
     }
@@ -749,7 +749,7 @@ private fun CompactNewsItem(item: NewsItem) {
             .fillMaxWidth()
             .clickable(enabled = canOpenUrl) {
                 // Build a best-effort URL from the image URL pattern:
-                // https://smartycraft.ru/images/news/mini/news1.jpg  →  https://smartycraft.ru/news{id}
+                // https://smartycraft.ru/images/news/mini/news1.jpg  ->  https://smartycraft.ru/news{id}
                 try {
                     val url = "${protocolConfig.baseUrl}/news${item.id}"
                     if (Desktop.isDesktopSupported() &&
