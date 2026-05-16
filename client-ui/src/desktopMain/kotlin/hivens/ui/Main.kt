@@ -275,10 +275,20 @@ fun main() {
             .warn("Failed to restore persisted forceProxyMode at startup", it)
     }
 
+    // Puppet mode: opt-in localhost HTTP control surface for automated
+    // UI driving (see hivens.ui.puppet.PuppetServer). Bind ONLY happens
+    // when -Daura.puppet.port=N is set; without the flag this is inert
+    // even though the classes are in the JAR. MUST run after Koin so
+    // PuppetRegistry-using Composables can resolve their dependencies,
+    // and before `application` so the server is listening when the
+    // first Composable registers itself.
+    hivens.ui.puppet.PuppetServer.startIfRequested()
+
     application {
         DisposableEffect(Unit) {
             onDispose {
                 TrayManager.shutdown()
+                hivens.ui.puppet.PuppetServer.stop()
                 stopKoin()
             }
         }

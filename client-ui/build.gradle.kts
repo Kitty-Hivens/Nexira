@@ -60,6 +60,17 @@ kotlin {
                 implementation(libs.logback.classic)
                 implementation(libs.libtray)
                 implementation(libs.ktor.client.core)
+
+                // Puppet mode (hivens.ui.puppet) — opt-in HTTP control surface
+                // for automated UI driving. Server only binds when the JVM is
+                // launched with -Daura.puppet.port=N; otherwise these classes
+                // are loaded but inert. CIO engine chosen over Netty for the
+                // smaller dep footprint (~2.5 MB vs ~9 MB) since we only need
+                // a half-dozen localhost endpoints.
+                implementation(libs.ktor.server.core)
+                implementation(libs.ktor.server.cio)
+                implementation(libs.ktor.server.content.negotiation)
+                implementation(libs.ktor.serialization.json)
             }
         }
     }
@@ -223,7 +234,17 @@ compose.desktop {
                 arrayOf("-Dawt.toolkit.name=WLToolkit")
             } else {
                 emptyArray()
-            })
+            }),
+
+            // Puppet mode (hivens.ui.puppet.PuppetServer) — opt-in HTTP
+            // control surface for CLI-driven UI testing. Activated when
+            // the launcher is run with `-PauraPuppetPort=N` (forwarded
+            // into the JVM as -Daura.puppet.port=N). Without the property
+            // the puppet server's startIfRequested() is a no-op.
+            *(project.findProperty("auraPuppetPort")
+                ?.toString()
+                ?.let { arrayOf("-Daura.puppet.port=$it") }
+                ?: emptyArray())
         )
     }
 }
