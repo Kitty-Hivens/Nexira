@@ -39,6 +39,10 @@ import hivens.ui.components.ModItemCard
 import hivens.ui.components.RamSelector
 import hivens.ui.debug.SkiaTracker
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.puppet.PuppetClick
+import hivens.ui.puppet.PuppetField
+import hivens.ui.puppet.PuppetScreen
+import hivens.ui.puppet.PuppetToggle
 import hivens.ui.theme.CelestiaTheme
 import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
@@ -148,6 +152,38 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
     }
 
     val borderColor = CelestiaTheme.colors.textSecondary.copy(alpha = 0.2f)
+
+    // Puppet ids prefixed with the server's assetDir so concurrent settings
+    // dialogs (theoretical — Aura keeps only one open at a time today) stay
+    // disambiguated, and tests can verify they're acting on the intended server.
+    val pkey = "serverSettings.${server.assetDir}"
+    PuppetScreen("ServerSettings.${server.assetDir}")
+    PuppetClick("$pkey.backAndSave") { saveProfile(); onBack() }
+    PuppetField("$pkey.javaPath", javaPath) { javaPath = it }
+    PuppetField("$pkey.jvmArgs", jvmArgs) { jvmArgs = it }
+    PuppetField("$pkey.winWidth", winWidth) { winWidth = it.filter { c -> c.isDigit() } }
+    PuppetField("$pkey.winHeight", winHeight) { winHeight = it.filter { c -> c.isDigit() } }
+    PuppetToggle("$pkey.fullScreen", fullScreen) { fullScreen = it }
+    PuppetToggle("$pkey.autoConnect", autoConnect) { autoConnect = it }
+    PuppetClick("$pkey.openFolder") {
+        val path = dataDirectory.resolve("clients").resolve(server.assetDir)
+        if (!path.toFile().exists()) path.toFile().mkdirs()
+        Desktop.getDesktop().open(path.toFile())
+    }
+    PuppetClick("$pkey.resetClient") {
+        val path = dataDirectory.resolve("clients").resolve(server.assetDir)
+        path.toFile().deleteRecursively()
+        saveProfile()
+        onBack()
+    }
+    PuppetClick("$pkey.openJvmBuilder", enabled = jvmBuilderEnabled) { showJvmBuilder = true }
+    // Per-mod toggle. Mods load asynchronously — registry mirrors what's
+    // currently composed, so puppet calls before modsLoaded return 404.
+    mods.forEach { mod ->
+        PuppetToggle("$pkey.mod.${mod.id}", modStates[mod.id] ?: mod.isDefault) {
+            modStates[mod.id] = it
+        }
+    }
 
     Column(Modifier.fillMaxSize().padding(24.dp)) {
         // ── Header ────────────────────────────────────────────────────────────

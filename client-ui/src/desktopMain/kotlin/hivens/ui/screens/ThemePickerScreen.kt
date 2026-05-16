@@ -26,6 +26,8 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.components.GlassCard
 import hivens.ui.easter.AprilFoolsButton
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.puppet.PuppetClick
+import hivens.ui.puppet.PuppetScreen
 import hivens.ui.theme.*
 
 @Composable
@@ -37,6 +39,17 @@ fun ThemePickerScreen(
     val s = LocalStrings.current
     var selectedTheme by remember { mutableStateOf(currentTheme) }
     val themes = remember { ThemePresets.getAll() }
+
+    PuppetScreen("ThemePicker")
+    PuppetClick("themePicker.back") { onBack() }
+    PuppetClick("themePicker.apply") { onThemeSelected(selectedTheme) }
+    // Per-theme select. Puppet driver names themes by their canonical
+    // theme.name (free text — Tea Sakura, Aurora, etc.). LazyVerticalGrid
+    // only composes visible rows; scroll the grid first if you target an
+    // off-screen theme. Aura's preset list fits in one viewport.
+    themes.forEach { theme ->
+        PuppetClick("themePicker.select.${theme.name}") { selectedTheme = theme }
+    }
 
     Column(
         modifier = Modifier

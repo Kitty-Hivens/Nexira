@@ -19,6 +19,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.puppet.PuppetClick
+import hivens.ui.puppet.PuppetField
 import hivens.ui.theme.CelestiaTheme
 
 /**
@@ -75,6 +77,9 @@ fun ConfirmCodeDialog(
                     color = CelestiaTheme.colors.textSecondary,
                 )
 
+                PuppetField("login.twoFactor.code", code, enabled = !isSubmitting) { raw ->
+                    code = raw.filter { it.isDigit() }.take(6)
+                }
                 OutlinedTextField(
                     value = code,
                     onValueChange = { raw ->
@@ -135,6 +140,7 @@ fun ConfirmCodeDialog(
                     TextButton(onClick = onDismiss, enabled = !isSubmitting) {
                         Text(s.auth2faCancel, color = CelestiaTheme.colors.textSecondary)
                     }
+                    PuppetClick("login.twoFactor.cancel", enabled = !isSubmitting) { onDismiss() }
                     Spacer(Modifier.width(8.dp))
                     Button(
                         onClick = { onSubmit(code) },
@@ -144,6 +150,9 @@ fun ConfirmCodeDialog(
                         ),
                     ) {
                         Text(s.auth2faSubmit)
+                    }
+                    PuppetClick("login.twoFactor.submit", enabled = code.length == 6 && !isSubmitting) {
+                        onSubmit(code)
                     }
                 }
             }

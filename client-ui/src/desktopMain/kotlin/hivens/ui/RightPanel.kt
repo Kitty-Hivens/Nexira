@@ -49,6 +49,10 @@ import hivens.launcher.network.ServerProtocolConfig
 import hivens.ui.components.ConfirmCodeDialog
 import hivens.ui.easter.AprilFoolsButton
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.puppet.PuppetClick
+import hivens.ui.puppet.PuppetField
+import hivens.ui.puppet.PuppetScreen
+import hivens.ui.puppet.PuppetToggle
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.utils.SkinManager
 import kotlinx.coroutines.Dispatchers
@@ -242,6 +246,10 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
     // password, rememberMe) for the resume path. Dismissal cancels the
     // 2FA flow without clearing the form, letting the user retry.
     twoFactorPending?.let {
+        // Puppet: this dialog overrides the screen marker while open so
+        // /screen returns "Login_2FA" — drivers can detect the modal and
+        // pivot to the 2FA-specific element ids instead of the form ones.
+        PuppetScreen("Login_2FA")
         ConfirmCodeDialog(
             onDismiss = {
                 twoFactorPending = null
@@ -260,6 +268,7 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
             .padding(horizontal = 16.dp, vertical = 20.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
+        PuppetScreen("Login")
         Text(
             text       = s.loginTitle,
             style      = MaterialTheme.typography.titleMedium,
@@ -378,6 +387,11 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
             shape          = RoundedCornerShape(8.dp),
             colors         = fieldColors
         )
+        PuppetField("login.username", login) {
+            login = it
+            errorMessage = null
+            sslWarning = false
+        }
 
         OutlinedTextField(
             value                = password,
@@ -394,6 +408,11 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
             shape   = RoundedCornerShape(8.dp),
             colors  = fieldColors
         )
+        PuppetField("login.password", password) {
+            password = it
+            errorMessage = null
+            sslWarning = false
+        }
 
         Row(verticalAlignment = Alignment.CenterVertically) {
             Checkbox(
@@ -410,6 +429,7 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
                 color = CelestiaTheme.colors.textSecondary
             )
         }
+        PuppetToggle("login.rememberMe", rememberMe) { rememberMe = it }
 
         // LOG IN — chaos target (only when not loading, loading state stays reliable)
         if (isLoading) {
@@ -440,6 +460,7 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
                 ),
             )
         }
+        PuppetClick("login.submit", enabled = !isLoading) { doLogin() }
 
         // REGISTER — chaos target (#105)
         AprilFoolsButton(
@@ -461,6 +482,16 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
                 contentColor   = CelestiaTheme.colors.primary,
             ),
         )
+        PuppetClick("login.register") {
+            runCatching {
+                val url = "${protocolConfig.baseUrl}/register"
+                if (Desktop.isDesktopSupported() &&
+                    Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)
+                ) {
+                    Desktop.getDesktop().browse(URI(url))
+                }
+            }
+        }
     }
 }
 
@@ -535,6 +566,11 @@ fun AccountPanel(session: SessionData, onLogout: () -> Unit) {
                 color = CelestiaTheme.colors.error.copy(alpha = 0.65f)
             )
         }
+        // Puppet: secondary logout entry-point (the other is the sidebar
+        // ExitToApp icon, which is `nav.logout`). Kept distinct because a
+        // regression could hit just one of them — e.g. a layout change
+        // that detaches the right-panel logout but leaves the sidebar.
+        PuppetClick("account.logout") { onLogout() }
     }
 }
 
