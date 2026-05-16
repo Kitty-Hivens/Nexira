@@ -23,6 +23,7 @@ import java.io.IOException
 import java.net.URLEncoder
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.attribute.BasicFileAttributes
 import java.security.MessageDigest
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
@@ -48,15 +49,6 @@ class FileDownloadService(
 
         private const val INDEX_FILENAME = ".extra_unpacked_index.json"
 
-        /**
-         * How many manifest entries to spot-check on disk before trusting
-         * the manifest-cache short-circuit (#184). Twenty is enough to
-         * catch the bulk-loss cases (data-dir-moved-without-files, manual
-         * `rm`, partial backup restore) without paying for a full walk —
-         * the existing per-file MD5 verification still runs when this
-         * gate fails.
-         */
-        private const val SANITY_SAMPLE_SIZE = 20
         private val indexJson = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
     }
 
@@ -87,19 +79,39 @@ class FileDownloadService(
         // mod stay loaded until the cache expires or the manifest changes
         // upstream. (Codex P2 on PR #128.)
         val manifestHash = manifestCache.hashOf(cacheKeyInputFor(manifest, ignoredFiles))
-        // Disk-sanity gate (#184): the cache file alone can't tell that the
-        // user moved their data dir leaving manifest-cache/ behind, deleted
-        // clients/<id>/ by hand, or restored from a partial backup. Sample
-        // the first SANITY_SAMPLE_SIZE manifest entries and require all of
-        // them on disk — if even one is missing, force a full integrity
-        // walk + redownload instead of trusting the cache and starting the
-        // game with an empty classpath (which is exactly what the original
-        // bug looked like to the user). The flatten is needed for both the
-        // sanity sample and the downstream download path; compute it once.
+        // Disk-sanity gate (#184 + #203): the manifest-cache file alone
+        // can't tell that the user moved their data dir leaving
+        // manifest-cache/ behind, deleted clients/<id>/ by hand, removed
+        // one mod, or restored from a partial backup. Walk EVERY manifest
+        // entry with a single stat() per file and require:
+        //   * the path exists,
+        //   * it's a regular file (not a dangling symlink or directory
+        //     squatting on the name),
+        //   * its byte size matches the manifest's recorded size.
+        // If anything fails, fall through to the full MD5 integrity walk
+        // + redownload.
+        //
+        // Cost: ~1 stat per file. A 1000-entry modpack walks in <10 ms on
+        // Linux/macOS, ~50 ms on Windows. Negligible vs the full MD5 walk
+        // (seconds for the same pack) and vs the user-perceived launch
+        // latency (~5+ s for non-cache paths).
+        //
+        // Pre-#203, this check sampled only the first 20 manifest entries.
+        // A user-caused deletion or truncation outside the top 20 (the
+        // normal case — Aura's modpacks have 50-1000+ entries, the affected
+        // file is rarely at the top of the alphabetical traversal) slipped
+        // past the gate, the cache was trusted, and Minecraft launched with
+        // a missing/corrupt mod and crashed with a downstream
+        // NoClassDefFoundError that the user couldn't map back to "the
+        // launcher silently skipped verifying my mod folder".
         val filesMap = flattenManifest(manifest)
         val cacheValid = manifestCache.isClean(serverId, manifestHash) {
-            filesMap.entries.take(SANITY_SAMPLE_SIZE).all { (rawPath, _) ->
-                Files.exists(targetDir.resolve(normalizePath(rawPath)))
+            filesMap.entries.all { (rawPath, fileData) ->
+                val path = targetDir.resolve(normalizePath(rawPath))
+                runCatching {
+                    val attrs = Files.readAttributes(path, BasicFileAttributes::class.java)
+                    attrs.isRegularFile && attrs.size() == fileData.size
+                }.getOrDefault(false)
             }
         }
         if (cacheValid) {
