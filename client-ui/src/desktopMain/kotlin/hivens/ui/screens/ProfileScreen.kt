@@ -20,6 +20,8 @@ import hivens.core.data.SessionData
 import hivens.ui.components.GlassCard
 import hivens.ui.easter.AprilFoolsButton
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.puppet.PuppetClick
+import hivens.ui.puppet.PuppetScreen
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.utils.SkinManager
 import io.github.vinceglb.filekit.FileKit
@@ -61,6 +63,21 @@ fun ProfileScreen(session: SessionData, skinRepository: SkinRepository) {
     }
 
     LaunchedEffect(Unit) { loadSkins() }
+
+    PuppetScreen("Profile")
+    PuppetClick("profile.refreshSkin") {
+        skinManager.invalidate(session.playerName); loadSkins()
+    }
+    PuppetClick("profile.topUp") {
+        runCatching {
+            val url = "http://smartycraft.ru/cabinet"
+            if (Desktop.isDesktopSupported() &&
+                Desktop.getDesktop().isSupported(Desktop.Action.BROWSE))
+                Desktop.getDesktop().browse(URI(url))
+        }
+    }
+    // Note: profile.uploadSkin triggers a native file picker — unreachable
+    // from puppet without supplying a path argument. Out of MVP scope.
 
     Column(Modifier.fillMaxSize().padding(24.dp)) {
         Text(s.profileTitle, style = MaterialTheme.typography.displaySmall, color = CelestiaTheme.colors.textPrimary)

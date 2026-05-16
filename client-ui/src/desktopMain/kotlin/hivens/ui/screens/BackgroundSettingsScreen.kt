@@ -26,6 +26,9 @@ import hivens.ui.background.CustomBackground
 import hivens.ui.background.ScaleMode
 import hivens.ui.components.GlassCard
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.puppet.PuppetClick
+import hivens.ui.puppet.PuppetScreen
+import hivens.ui.puppet.PuppetToggle
 import hivens.ui.theme.CelestiaTheme
 import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
@@ -49,6 +52,20 @@ fun BackgroundSettingsScreen(
         settings = settings.block()
         onSettingsChanged(settings)
     }
+
+    PuppetScreen("BackgroundSettings")
+    PuppetClick("background.back") { onBack() }
+    PuppetToggle("background.enabled", settings.enabled) { update { copy(enabled = it) } }
+    PuppetClick("background.clearImage", enabled = settings.imagePath != null) {
+        update { copy(imagePath = null, enabled = false) }
+    }
+    PuppetClick("background.reset") {
+        settings = BackgroundSettings(); onSettingsChanged(settings)
+    }
+    // Sliders are float-valued; PuppetField (string) doesn't fit naturally.
+    // Out of MVP scope — a numeric setter shape can be added later if needed.
+    // Note: scale-mode + tint-color buttons reachable from in-process state,
+    // but selecting them by enum/hex name belongs in a follow-up.
 
     Column(Modifier.fillMaxSize().padding(24.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {

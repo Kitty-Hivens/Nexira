@@ -26,6 +26,7 @@ import hivens.launcher.NetworkState
 import hivens.ui.background.BackgroundSettings
 import hivens.ui.easter.AprilFools
 import hivens.ui.i18n.AppLocale
+import hivens.ui.puppet.PuppetClick
 import hivens.ui.screens.*
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.CustomTheme
@@ -244,6 +245,22 @@ fun AppSidebar(
     val profileOffset = sin(bounceCycle + 1.1f) * bounceAmplitude
     val settingsOffset= sin(bounceCycle + 2.2f) * bounceAmplitude
     val aboutOffset   = sin(bounceCycle + 3.3f) * bounceAmplitude
+
+    // Puppet: sidebar navigation. Puppet driver bypasses the AprilFools
+    // chaos wrapper — those are user-facing pranks, not behaviour we want
+    // to test against. Direct onScreenChange calls keep test runs
+    // deterministic regardless of the calendar.
+    PuppetClick("nav.home")     { onScreenChange(Screen.Home) }
+    PuppetClick("nav.profile", enabled = isAuthenticated) { onScreenChange(Screen.Profile) }
+    PuppetClick("nav.settings") { onScreenChange(Screen.Settings) }
+    PuppetClick("nav.about")    { onScreenChange(Screen.About) }
+    PuppetClick("nav.console")  {
+        if (GameConsoleService.shouldShowConsole) GameConsoleService.hide()
+        else GameConsoleService.show()
+    }
+    if (isAuthenticated) {
+        PuppetClick("nav.logout") { onLogout() }
+    }
 
     NavigationRail(
         modifier       = Modifier.width(64.dp).fillMaxHeight(),

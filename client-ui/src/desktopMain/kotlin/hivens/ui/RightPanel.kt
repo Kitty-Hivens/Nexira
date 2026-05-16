@@ -566,6 +566,11 @@ fun AccountPanel(session: SessionData, onLogout: () -> Unit) {
                 color = CelestiaTheme.colors.error.copy(alpha = 0.65f)
             )
         }
+        // Puppet: secondary logout entry-point (the other is the sidebar
+        // ExitToApp icon, which is `nav.logout`). Kept distinct because a
+        // regression could hit just one of them — e.g. a layout change
+        // that detaches the right-panel logout but leaves the sidebar.
+        PuppetClick("account.logout") { onLogout() }
     }
 }
 
