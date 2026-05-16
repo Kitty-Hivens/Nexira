@@ -7,10 +7,21 @@
     The property value comes from PlatformPaths.logsDir, so AURA_DATA_DIR
     override and per-OS data-dir layout flow through automatically.
 
-    Falls back to CWD-relative `logs/` if the property is missing —
-    happens only when something logs before Main.main() ran (i.e. inside
-    a unit test that's somehow pulled the UI module's logback.xml; not
-    expected, but the fallback prevents NPEs).
+    Falls back to `${java.io.tmpdir}/aura-launcher-fallback-logs/` if the
+    property is missing. The /tmp location is deliberate -- previous
+    fallback was CWD-relative `logs/`, which silently polluted the project
+    tree (39 MB of `client-ui/logs/` accumulated across 2026-03 to 2026-05
+    before being noticed during audit chunk 1, item #5). /tmp is OS-managed
+    cleanup territory, so any future regression that bypasses Main.kt's
+    property setting at least won't accumulate in the source repository.
+
+    Fallback hits should be impossible in normal runs because Main.main()
+    sets the property as its first executable statement. If you see logs
+    appearing under /tmp/aura-launcher-fallback-logs/, something is loading
+    logback before Main.main() runs -- usually a static `private val log =
+    LoggerFactory.getLogger(...)` at file scope in a Kotlin file loaded by
+    JVM class init before main() (top-level file vals initialize on first
+    reference, which can be transitive through imports during JVM bootstrap).
 
     Channel layout:
       - launcher.log  — root, everything except routed channels
@@ -44,7 +55,7 @@
     <conversionRule conversionWord="rex"
                     converterClass="hivens.ui.logging.RedactingThrowableConverter"/>
 
-    <property name="LOGS_DIR"   value="${aura.logs.dir:-logs}"/>
+    <property name="LOGS_DIR"   value="${aura.logs.dir:-${java.io.tmpdir}/aura-launcher-fallback-logs}"/>
     <property name="SESSION_ID" value="${aura.sessionId:-?}"/>
 
     <!-- sessionId is process-wide (system property → logback variable interpolation
