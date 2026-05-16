@@ -74,11 +74,23 @@ kotlin {
     }
 }
 
+// BUILD_TIME = Unix epoch millis of last commit (`git log -1 --format=%ct
+// HEAD * 1000`). Matches the same derivation in client-config -- both
+// modules expose BUILD_TIME and must agree. System.currentTimeMillis()
+// would freeze in Gradle config cache; git timestamp invalidates only
+// when the commit graph changes, which is the right invalidation shape.
+// See client-config/build.gradle.kts for the long-form rationale.
+val gitCommitTimeMillis: Long = runCatching {
+    providers.exec {
+        commandLine("git", "log", "-1", "--format=%ct", "HEAD")
+    }.standardOutput.asText.get().trim().toLong() * 1000L
+}.getOrElse { System.currentTimeMillis() }
+
 buildConfig {
     packageName("hivens.ui")
-    buildConfigField("String", "FORK_VERSION",   "\"${project.version}\"")
-    buildConfigField("long",   "BUILD_TIME",     "${System.currentTimeMillis()}L")
-    buildConfigField("String", "APP_NAME",       "\"Aura Launcher\"")
+    buildConfigField("String", "FORK_VERSION",    "\"${project.version}\"")
+    buildConfigField("long",   "BUILD_TIME",      "${gitCommitTimeMillis}L")
+    buildConfigField("String", "APP_NAME",        "\"Aura Launcher\"")
     buildConfigField("String", "COMPOSE_VERSION", "\"${libs.versions.compose.get()}\"")
     buildConfigField("String", "KTOR_VERSION",    "\"${libs.versions.ktor.get()}\"")
     buildConfigField("String", "KOIN_VERSION",    "\"${libs.versions.koin.get()}\"")
