@@ -6,7 +6,6 @@ plugins {
     alias(libs.plugins.compose) apply false
     alias(libs.plugins.buildconfig) apply false
     alias(libs.plugins.versions)
-    id("java")
 }
 
 fun getGitVersion(providerFactory: ProviderFactory): String {
@@ -51,6 +50,19 @@ subprojects {
                 targetCompatibility = JavaVersion.VERSION_25
             }
         }
+        // Kotlin's compilerOptions.jvmTarget defaults to JVM_1_8 if a
+        // subproject's build script does not set it. A new module added
+        // without explicit kotlin { jvmToolchain(25) } / compilerOptions {
+        // jvmTarget = JVM_25 } would silently produce JVM 1.8 bytecode
+        // while loading Java 25 classes from dependencies -- an at-runtime
+        // LinkageError waiting to happen, invisible until a 9+-only API
+        // gets touched. Force-set on every Kotlin/JVM compile task so the
+        // bytecode floor always matches the Java target above.
+        tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile>().configureEach {
+            compilerOptions {
+                jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_25)
+            }
+        }
     }
 
     // ====================================================================
@@ -79,10 +91,16 @@ subprojects {
         // CI wants maximum throughput (free runners, ephemeral); local
         // dev wants the laptop to stay usable while tests run. Detect via
         // the `CI` env var that GH Actions / most CI providers set.
-        // Local cap of 2 forks × 512MB heap = ~1GB peak — leaves modern
+        //
+        // providers.environmentVariable() registers the env-var read with
+        // the configuration cache, so a flipped CI value invalidates the
+        // cache correctly. System.getenv() bypasses that wiring and silently
+        // bakes the value into the cache forever on first config-resolve.
+        //
+        // Local cap of 2 forks x 512MB heap = ~1GB peak -- leaves modern
         // dev machines (8+ cores) plenty of headroom for IDE/browser/etc.
         val cores = Runtime.getRuntime().availableProcessors()
-        val isCi  = System.getenv("CI") == "true"
+        val isCi = providers.environmentVariable("CI").map { it == "true" }.orElse(false).get()
         maxParallelForks = if (isCi) cores else minOf(2, cores)
 
         jvmArgs(
@@ -96,11 +114,14 @@ subprojects {
 // GRADLE DAEMON OPTIMIZATION
 // ========================================================================
 gradle.startParameter.apply {
+    // Same CI-vs-local split as the per-subproject Test config above --
+    // local builds shouldn't pin every CPU every time the daemon spins up.
+    // 4 workers is enough to parallelise most subproject compiles without
+    // thermal-throttling the laptop. See the Test block above for why
+    // providers.environmentVariable beats System.getenv here (config cache
+    // wiring).
     val cores = Runtime.getRuntime().availableProcessors()
-    val isCi  = System.getenv("CI") == "true"
-    // Same CI-vs-local split — local builds shouldn't pin every CPU
-    // every time the daemon spins up. 4 workers is enough to parallelise
-    // most subproject compiles without thermal-throttling the laptop.
+    val isCi = providers.environmentVariable("CI").map { it == "true" }.orElse(false).get()
     maxWorkerCount = if (isCi) cores else minOf(4, cores)
 }
 
