@@ -45,7 +45,7 @@ class UpdateService(
 
         /**
          * Meta-only poll cadence. Far tighter than [CHECK_INTERVAL_HOURS]
-         * because the meta endpoint is `update-channel.json` on raw GitHub —
+         * because the meta endpoint is `update-channel.json` on raw GitHub --
          * a few hundred bytes, no API rate limit (raw.githubusercontent.com
          * is throttled per-IP but not per-hour like the v3 API). At 5 min
          * the launcher hits 12 reqs/hour against raw, well below any
@@ -63,7 +63,7 @@ class UpdateService(
         private const val UPDATE_CHANNEL_META_URL =
             "https://raw.githubusercontent.com/$GITHUB_REPO/stable/meta/update-channel.json"
 
-        // How many releases to fetch when the user opts into prereleases —
+        // How many releases to fetch when the user opts into prereleases --
         // GitHub returns 30 per page by default; we never need that many to
         // find the most recently published non-draft entry.
         private const val PRERELEASE_PAGE_SIZE = 20
@@ -79,7 +79,7 @@ class UpdateService(
      * Checks availability of updates with caching.
      *
      * The selected channel (stable vs prerelease) and whether mandatory updates
-     * are honoured both come from [ISettingsService] — see the experimental
+     * are honoured both come from [ISettingsService] -- see the experimental
      * fields on `SettingsData`. The master `experimentalFeaturesEnabled` toggle
      * gates both children: if it's off, both sub-toggles are forced to false
      * regardless of their stored values.
@@ -109,10 +109,10 @@ class UpdateService(
             val currentVersion = Branding.VERSION.removePrefix("v")
             val latestVersion = release.tagName.removePrefix("v")
 
-            // Out-of-band channel meta — fetched even when "up to date" so a
+            // Out-of-band channel meta -- fetched even when "up to date" so a
             // mandatory floor can still trigger on the same version (e.g. user
             // is on 2.2.7, latest is 2.2.7, but mandatory_min got bumped to
-            // 2.2.7 — no-op; mandatory_min = 2.2.8 — needs latest, which IS
+            // 2.2.7 -- no-op; mandatory_min = 2.2.8 -- needs latest, which IS
             // newer, so the path below catches it).
             val channelMeta = tryFetchChannelMeta()
             val belowMandatoryFloor = mandatoryEnabled &&
@@ -133,7 +133,7 @@ class UpdateService(
             // release-manifest.json is mandatory: it pins the SHA-256 the auto-
             // updater verifies before launching the installer. Without a manifest
             // (or without an entry for this asset) we refuse to construct an
-            // update — auto-install of unverified bytes is a remote-code-execution
+            // update -- auto-install of unverified bytes is a remote-code-execution
             // path if the release page were ever tampered with. Releases ≥ 2.2.7-rc3
             // ship the manifest; older releases require manual reinstall.
             val manifest = tryFetchManifest(release)
@@ -179,9 +179,9 @@ class UpdateService(
     /**
      * Picks the update target.
      *
-     * - [includePrereleases] = false → hits `/releases/latest`, which by
+     * - [includePrereleases] = false -> hits `/releases/latest`, which by
      *   GitHub's contract excludes drafts and prereleases.
-     * - [includePrereleases] = true → lists the most recent
+     * - [includePrereleases] = true -> lists the most recent
      *   [PRERELEASE_PAGE_SIZE] releases and returns the first non-draft one.
      *   GitHub returns them by `published_at` descending, so this matches
      *   "newest published thing of either kind".
@@ -216,7 +216,7 @@ class UpdateService(
 
     /**
      * Fetches the out-of-band update-channel metadata. Returns null on any
-     * error (missing file, parse failure, network issue) — callers must
+     * error (missing file, parse failure, network issue) -- callers must
      * treat null as "no mandatory floor".
      */
     internal suspend fun tryFetchChannelMeta(): UpdateChannelMeta? = try {
@@ -307,7 +307,7 @@ class UpdateService(
         try {
             Files.list(updateDir).use { stream ->
                 stream
-                    // FIX: CI produces .exe (Inno Setup), not .msi — match actual artifact names
+                    // FIX: CI produces .exe (Inno Setup), not .msi -- match actual artifact names
                     .filter { it.fileName.toString().matches(Regex(".*\\.(exe|dmg|AppImage)$")) }
                     .forEach { file ->
                         runCatching { Files.delete(file) }
@@ -366,7 +366,7 @@ class UpdateService(
      * GitHub, no v3 API rate limit) at the [META_CHECK_INTERVAL_MINUTES]
      * cadence. When the published `mandatory_min_version` rises above the
      * installed version it bypasses [shouldCheck]'s 12 h cooldown to fetch
-     * the actual release immediately — by definition, a mandatory rollout
+     * the actual release immediately -- by definition, a mandatory rollout
      * needs to reach the user *now*, not on the next routine check.
      *
      * Returns null when:
@@ -416,7 +416,7 @@ class UpdateService(
     /**
      * Selects the correct installer asset for the current OS.
      *
-     * Windows: `.exe`  (Inno Setup — see setup.iss / build_release.yml)
+     * Windows: `.exe`  (Inno Setup -- see setup.iss / build_release.yml)
      * macOS:   `-aarch64.dmg` on Apple Silicon, `-x86_64.dmg` on Intel.
      *          Falls back to any `.dmg` for legacy pre-dual-arch releases
      *          (i.e. ≤ 2.2.12 which shipped a single ARM64-only DMG).
@@ -426,7 +426,7 @@ class UpdateService(
         val osName = System.getProperty("os.name").lowercase()
 
         return when {
-            // FIX: was .msi — CI builds .exe via Inno Setup, not MSI
+            // FIX: was .msi -- CI builds .exe via Inno Setup, not MSI
             osName.contains("windows") -> assets.find {
                 it.name.endsWith(".exe") && it.name.contains("Setup", ignoreCase = true)
             }
@@ -455,7 +455,7 @@ class UpdateService(
     /**
      * Looks for `release-manifest.json` among the release assets and parses it.
      * Returns null if the asset is absent (legacy release) or the body is not
-     * a valid manifest document — callers must handle null and fall back.
+     * a valid manifest document -- callers must handle null and fall back.
      */
     internal suspend fun tryFetchManifest(release: GitHubRelease): ReleaseManifest? {
         val asset = release.assets.find { it.name == MANIFEST_ASSET_NAME } ?: return null
@@ -477,7 +477,7 @@ class UpdateService(
     /**
      * Extracts SHA256 checksum for [fileName] from the GitHub release body.
      *
-     * No longer called by [checkForUpdate] — release-manifest.json is now the
+     * No longer called by [checkForUpdate] -- release-manifest.json is now the
      * single source of truth for verifiable hashes (see #186). Kept and tested
      * because the parser is generic and may be wired back in for an out-of-band
      * recovery flow (e.g. signed manifest fetch from a secondary mirror).
@@ -489,11 +489,11 @@ class UpdateService(
     internal fun extractChecksum(releaseBody: String?, fileName: String): String {
         if (releaseBody == null) return ""
 
-        // Format 1: Markdown table row  —  | `AuraLauncher-1.3.0-Setup.exe` | `abcdef...` |
+        // Format 1: Markdown table row  --  | `AuraLauncher-1.3.0-Setup.exe` | `abcdef...` |
         val tablePattern = """\|\s*`${Regex.escape(fileName)}`\s*\|\s*`([a-fA-F0-9]{64})`\s*\|""".toRegex()
         tablePattern.find(releaseBody)?.groupValues?.get(1)?.let { return it }
 
-        // Format 2: Plain text  —  SHA256: filename - hash
+        // Format 2: Plain text  --  SHA256: filename - hash
         val plainPattern = """SHA256:\s*${Regex.escape(fileName)}\s*-\s*([a-fA-F0-9]{64})""".toRegex()
         return plainPattern.find(releaseBody)?.groupValues?.get(1) ?: ""
     }
@@ -503,7 +503,7 @@ class UpdateService(
      * is treated as a verification failure, not "skip." The cold path in
      * [checkForUpdate] already refuses to construct an update without a
      * manifest-pinned hash, so empty here means a bug elsewhere (cached
-     * `LauncherUpdate` from before this fix, malformed deserialization, etc.) —
+     * `LauncherUpdate` from before this fix, malformed deserialization, etc.) --
      * fail closed instead of trusting unverified bytes.
      */
     internal fun verifyChecksum(file: Path, expectedChecksum: String): Boolean {
@@ -535,13 +535,13 @@ class UpdateService(
     /**
      * SemVer-ish comparison.
      *
-     * 1. Numeric base (`X.Y.Z`) compared element-wise — missing segments = 0.
+     * 1. Numeric base (`X.Y.Z`) compared element-wise -- missing segments = 0.
      * 2. If bases tie, the prerelease suffix decides:
-     *    - no suffix on either side → equal
-     *    - one side has no suffix → it wins (final > rc/beta/alpha)
-     *    - both have suffixes → lexicographic compare on the suffix string,
+     *    - no suffix on either side -> equal
+     *    - one side has no suffix -> it wins (final > rc/beta/alpha)
+     *    - both have suffixes -> lexicographic compare on the suffix string,
      *      which gives the desired `alpha < beta < rc1 < rc2 < rc10` *almost*
-     *      (note: lex says `rc10 < rc2` — the launcher's release cadence
+     *      (note: lex says `rc10 < rc2` -- the launcher's release cadence
      *      doesn't reach double-digit RCs, so this is acceptable; if it ever
      *      does, switch to natural-order comparison)
      */
@@ -557,13 +557,13 @@ class UpdateService(
             if (p1 != p2) return p1.compareTo(p2)
         }
 
-        // Bases equal — break the tie on prerelease suffix.
+        // Bases equal -- break the tie on prerelease suffix.
         val suffix1 = v1.substringAfter('-', missingDelimiterValue = "")
         val suffix2 = v2.substringAfter('-', missingDelimiterValue = "")
         return when {
             suffix1.isEmpty() && suffix2.isEmpty() -> 0
-            suffix1.isEmpty() -> 1   // v1 = final, v2 = prerelease → v1 wins
-            suffix2.isEmpty() -> -1  // v1 = prerelease, v2 = final → v2 wins
+            suffix1.isEmpty() -> 1   // v1 = final, v2 = prerelease -> v1 wins
+            suffix2.isEmpty() -> -1  // v1 = prerelease, v2 = final -> v2 wins
             else -> suffix1.compareTo(suffix2)
         }
     }

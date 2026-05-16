@@ -41,7 +41,7 @@ import kotlin.random.Random
  *   Box { CustomBackground(...); AprilFoolsWrapper(pixelCursorState, windowSize) { AppLayout(...) } }
  *
  * When [AprilFools.isActive] returns false, this composable is completely
- * transparent — it renders [content] with zero overhead.
+ * transparent -- it renders [content] with zero overhead.
  *
  * @param pixelCursorState  A [State<Offset>] updated every pointer move, in window pixels.
  * @param windowSize        Current window size in pixels.
@@ -95,7 +95,7 @@ fun AprilFoolsWrapper(
             ChaosOverlay()
         }
 
-        // Close dialog — rendered outside the tilted Box so it stays readable
+        // Close dialog -- rendered outside the tilted Box so it stays readable
         if (ChaosState.showCloseDialog) {
             AprilFoolsCloseDialog(
                 onConfirmClose = {
@@ -142,7 +142,7 @@ private fun ChaosOverlay() {
 
 /**
  * Renders a single escaped (or ghost) button in the overlay.
- * Reads animated properties from [FloatingButton] — recomposes automatically
+ * Reads animated properties from [FloatingButton] -- recomposes automatically
  * whenever those snapshot-state values change.
  */
 @Composable
@@ -205,7 +205,7 @@ private fun EscapedButtonRenderer(btn: FloatingButton, isGhost: Boolean) {
  * The legs alternate between forward and backward step using a sine wave on [cycle].
  *
  * @param widthPx Button width in layout pixels (used to position legs under button).
- * @param cycle   Walking cycle 0..1 — updated by the engine each frame.
+ * @param cycle   Walking cycle 0..1 -- updated by the engine each frame.
  */
 @Composable
 private fun LegsCanvas(widthPx: Float, cycle: Float) {
@@ -221,13 +221,13 @@ private fun LegsCanvas(widthPx: Float, cycle: Float) {
         val footLen   = size.width * 0.13f
         val maxSwing  = 18f   // px horizontal swing at the foot
 
-        // Left leg — phase 0
+        // Left leg -- phase 0
         val leftRootX = size.width * 0.32f
         val leftFootX = leftRootX + sin(cycle * 2f * PI.toFloat()) * maxSwing
         drawLine(legColor, Offset(leftRootX, topY),  Offset(leftFootX, botY), strokeWidth = strokeW)
         drawLine(legColor, Offset(leftFootX, botY),   Offset(leftFootX + footLen, botY), strokeWidth = strokeW)
 
-        // Right leg — 180° out of phase
+        // Right leg -- 180° out of phase
         val rightRootX = size.width * 0.68f
         val rightFootX = rightRootX + sin((cycle + 0.5f) * 2f * PI.toFloat()) * maxSwing
         drawLine(legColor, Offset(rightRootX, topY), Offset(rightFootX, botY), strokeWidth = strokeW)
@@ -247,7 +247,7 @@ private fun LegsCanvas(widthPx: Float, cycle: Float) {
  *  - Handles local FLEEING phase by offsetting itself on cursor hover.
  *  - Falls back to a normal Button when April Fools is not active.
  *
- * @param id     Stable unique string — must not change across recompositions.
+ * @param id     Stable unique string -- must not change across recompositions.
  * @param text   Localized label shown on the button.
  */
 @Composable
@@ -379,7 +379,7 @@ fun AprilFoolsCloseDialog(
         }
     }
 
-    // Non-dismissible dialog — clicking outside does nothing
+    // Non-dismissible dialog -- clicking outside does nothing
     Dialog(onDismissRequest = { /* intentionally empty */ }) {
         Surface(
             modifier       = Modifier.width(440.dp).wrapContentHeight(),
@@ -411,7 +411,7 @@ fun AprilFoolsCloseDialog(
 
                 Spacer(Modifier.height(16.dp))
 
-                // Button row — "Close" can escape, "Stay" cannot
+                // Button row -- "Close" can escape, "Stay" cannot
                 Box(
                     modifier          = Modifier.fillMaxWidth().height(80.dp),
                     contentAlignment  = Alignment.Center,

@@ -16,10 +16,10 @@ data class SettingsData(
     var memoryMB: Int = 6144,
     var isDarkTheme: Boolean = true,
     /** Hide launcher window to tray after the user clicks Play. Off by
-     *  default — most users want the launcher to stay visible after
+     *  default -- most users want the launcher to stay visible after
      *  launching the game (it's where they go back to switch servers,
-     *  open console, etc). Opt-in for users who specifically want the
-     *  out-of-sight behaviour. */
+     *  open console, etc.). Opt-in for users who specifically want the
+     *  out-of-sight behavior. */
     var closeAfterStart: Boolean = false,
     var saveCredentials: Boolean = true,
     var savedFileManifest: FileManifest? = null,
@@ -30,10 +30,10 @@ data class SettingsData(
 
     // ── Experimental features ─────────────────────────────────────────────────
     // Three knobs that opt the user into faster-but-less-stable update behavior.
-    // The master toggle gates both children — switching it off disables the
+    // The master toggle gates both children -- switching it off disables the
     // sub-toggles regardless of their stored values. Defaults are ON because
-    // the upstream protocol is currently a moving target and we need users to
-    // receive emergency updates promptly. Once the protocol stabilises the
+    // the upstream protocol is currently a moving target, and we need users to
+    // receive emergency updates promptly. Once the protocol stabilizes the
     // mandatory default should drop to OFF.
     /** Master switch for the entire "Experimental features" settings section. */
     var experimentalFeaturesEnabled: Boolean = true,
@@ -44,7 +44,7 @@ data class SettingsData(
     /**
      * Sync all installed server packs in the background on launcher startup.
      *
-     * "Installed" means there's a non-empty `clients/<server>/` directory —
+     * "Installed" means there's a non-empty `clients/<server>/` directory --
      * we never trigger a many-GB first-time pack download out of nowhere.
      * Sequential sync (one server at a time) to avoid bandwidth contention
      * and let the per-server status badges read clearly. ManifestCache (2.2.9)
@@ -61,14 +61,14 @@ data class SettingsData(
      * Reveals the visual JVM-args builder in the per-server constructor.
      *
      * The default jvm-args field in [hivens.core.data.InstanceProfile] is
-     * a free-text string — to hand-craft Aikar's flags or pick a GC the
+     * a free-text string -- to hand-craft Aikar's flags or pick a GC the
      * user has to know what `-XX:+UseG1GC -XX:MaxGCPauseMillis=200` means.
      * The builder dialog (`JvmArgsBuilderDialog`) presents a curated
      * preset picker, GC tabs, and per-knob explanations; the resulting
      * args still write to InstanceProfile.jvmArgs unchanged.
      *
-     * Off by default because the feature is power-user-grade and the free-
-     * text field is enough for users who already know what they want.
+     * Off by default because the feature is power-user-grade and the
+     * free-text field is enough for users who already know what they want.
      */
     var jvmBuilderEnabled: Boolean = false,
 
@@ -76,12 +76,12 @@ data class SettingsData(
      * Conduit Phase 2: skip the direct-channel attempt and route every
      * SmartyCraft request through the SOCKS5 proxy from the first call.
      *
-     * Default false — direct works for ~99% of users (`reference_smartycraft_proxy`).
+     * Default false -- direct works for ~99% of users (`reference_smartycraft_proxy`).
      * Enable when in censored regions or corporate firewalls where
      * `smartycraft.ru:443` is blocked but `proxy.smartycraft.ru:58613`
      * (despite the unusual port) gets through.
      *
-     * Persisted here so the toggle survives launcher restart — users in
+     * Persisted here so the toggle survives launcher restart -- users in
      * those networks need to set this once, not every session.
      */
     var forceProxyMode: Boolean = false,

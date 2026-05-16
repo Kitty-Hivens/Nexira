@@ -28,7 +28,7 @@ class ServerRepository(
 
     /**
      * Retrieves dashboard data from the upstream server. Launcher-hash
-     * UPDATE recovery is handled inside [IServerProtocol.loader] — this
+     * UPDATE recovery is handled inside [IServerProtocol.loader] -- this
      * method returns either a successful response or a final-failure
      * response (after the protocol's own retry attempts exhausted).
      */

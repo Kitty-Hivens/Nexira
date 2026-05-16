@@ -32,7 +32,7 @@ class ClasspathProvider(
     /**
      * The Maven-Central native classifier suffixes for OSes that AREN'T this
      * one. Used to filter out wrong-platform native JARs the server ships
-     * unconditionally — `*-natives-windows.jar` on Linux, `*-natives-linux.jar`
+     * unconditionally -- `*-natives-windows.jar` on Linux, `*-natives-linux.jar`
      * on macOS, etc. Both the modern (`macos`) and legacy LWJGL2 (`osx`)
      * macOS classifiers are listed; only the matching subset gets dropped.
      *
@@ -46,7 +46,7 @@ class ClasspathProvider(
             lower.contains("linux")   -> all - setOf("linux")
             lower.contains("windows") -> all - setOf("windows")
             lower.contains("mac") || lower.contains("darwin") -> all - setOf("macos", "osx")
-            else -> emptySet()  // Unknown OS — drop nothing rather than risk
+            else -> emptySet()  // Unknown OS -- drop nothing rather than risk
                                 // stripping the platform's own native and
                                 // crashing on launch with no recourse.
         }
@@ -74,7 +74,7 @@ class ClasspathProvider(
             val before = allJars.size
             runCatching {
                 if (!Files.exists(libDir)) {
-                    logger.warn("Empty manifest and no local libraries dir at {} — classpath will be empty", libDir)
+                    logger.warn("Empty manifest and no local libraries dir at {} -- classpath will be empty", libDir)
                 } else {
                     Files.walk(libDir).use { stream ->
                         stream.filter { path ->

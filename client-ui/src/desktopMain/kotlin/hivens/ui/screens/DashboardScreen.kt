@@ -28,6 +28,7 @@ import hivens.ui.logic.LaunchState
 import hivens.ui.logic.LauncherController
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.theme.CelestiaTheme
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -65,10 +66,10 @@ fun DashboardScreen(
     var favoriteTrigger     by remember { mutableStateOf(0) }
     val favorites = remember(favoriteTrigger) { profileManager.favoriteServers }
     var isLoadingServers    by remember { mutableStateOf(true) }
-    val sslBypass by produceState(initialValue = NetworkState.bypassFor(hivens.config.Network.SSL_BYPASS_HOST)) {
+    val sslBypass by produceState(initialValue = NetworkState.bypassFor(hivens.config.Network.SSL_BYPASS_HOST)) { // TODO: Deprecated
         while (true) {
-            value = NetworkState.bypassFor(hivens.config.Network.SSL_BYPASS_HOST)
-            delay(200)
+            value = NetworkState.bypassFor(hivens.config.Network.SSL_BYPASS_HOST) // TODO: Deprecated
+            delay(200.milliseconds)
         }
     }
 
@@ -259,7 +260,7 @@ fun DashboardScreen(
  * Compact strip above the launch panel showing AutoSyncService progress.
  * Renders only while a sync is in-flight; auto-hides when state transitions
  * to Idle / Done. Kept self-contained (no Koin deps) so it can be tested
- * with a fake [InProgress] state.
+ * with a fake `InProgress` state.
  */
 @Composable
 private fun AutoSyncProgressStrip(

@@ -6,17 +6,17 @@ import org.slf4j.LoggerFactory
 /**
  * Picks an [IKeyringStorage] impl for the current platform, probing for
  * runtime availability. Returns [NoOpKeyringStorage] when no native store
- * is reachable — `CredentialsManager` then falls back to its AES-GCM file.
+ * is reachable -- `CredentialsManager` then falls back to its AES-GCM file.
  *
  * Probing strategy: instantiate the candidate, call `isAvailable()`, accept
- * if true. The probe must NOT throw — `isAvailable()` is contractually
+ * if true. The probe must NOT throw -- `isAvailable()` is contractually
  * non-throwing, but we wrap in [runCatching] anyway because JNA library
  * loading inside the impl's constructor can throw `UnsatisfiedLinkError`
  * before `isAvailable()` is even reached.
  *
  * Selection is one-shot per JVM: once chosen, the same impl is used until
  * the launcher restarts. Re-probing on every call would mask "user logged
- * out of keyring mid-session" cases unhelpfully — by design, a mid-session
+ * out of keyring mid-session" cases unhelpfully -- by design, a mid-session
  * keyring outage just falls back to the file.
  */
 object KeyringStorageFactory {

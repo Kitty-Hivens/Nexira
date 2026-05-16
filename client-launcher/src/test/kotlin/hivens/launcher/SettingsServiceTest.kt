@@ -15,10 +15,9 @@ import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 /**
- * #189 — SettingsService is read by Compose UI threads (settings screen
+ * #189 -- SettingsService is read by Compose UI threads (settings screen
  * recomposition) and IO coroutines (startup load, Conduit force-proxy
  * restore). Without coordination two concurrent saves could race the file
  * write and the UI could observe a half-applied SettingsData.
@@ -58,13 +57,13 @@ class SettingsServiceTest {
     }
 
     @Test
-    fun `concurrent reads and writes never observe a torn SettingsData`() = runBlocking {
+    fun `concurrent reads and writes never observe a torn SettingsData`(): Unit = runBlocking {
         val svc = SettingsService(json, workDir / "settings.json")
 
         // Pound the cache with 200 concurrent get/save pairs across IO
         // threads. With the lock in place every getSettings() must return
         // a SettingsData that's internally consistent (every field reflects
-        // the same write); without it, two concurrent saves could race the
+        // the same write); without it, two concurrent saves could race to
         // write to the file leaving a partial JSON on disk that getSettings
         // would then attempt to parse on next reload.
         coroutineScope {
@@ -72,9 +71,9 @@ class SettingsServiceTest {
                 async(Dispatchers.IO) {
                     svc.saveSettings(SettingsData(memoryMB = i * 16))
                     val read = svc.getSettings()
-                    // memoryMB is the only thing varied — verify it's a value
+                    // memoryMB is the only thing varied -- verify it's a value
                     // we actually wrote (not a ghost composite of two writes).
-                    assertTrue(read.memoryMB % 16 == 0, "torn write detected: ${read.memoryMB}")
+                    assertEquals(read.memoryMB % 16, 0, "torn write detected: ${read.memoryMB}")
                 }
             }.awaitAll()
         }

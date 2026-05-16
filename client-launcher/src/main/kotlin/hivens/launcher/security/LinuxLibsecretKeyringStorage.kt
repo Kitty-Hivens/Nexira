@@ -14,14 +14,14 @@ import java.lang.invoke.MethodHandle
 /**
  * Linux-side [IKeyringStorage] backed by libsecret over the Freedesktop
  * Secret Service DBus protocol. Implemented with **Project Panama**
- * ([java.lang.foreign], JEP 454 finalized in Java 22) — no JNA, no
+ * ([java.lang.foreign], JEP 454 finalized in Java 22) -- no JNA, no
  * generated bindings, just the native foreign-function API that ships
  * with the JDK.
  *
  * Works on any compositor with a Secret Service provider running:
- *   - GNOME / Cinnamon / Budgie / generic GTK desktops → gnome-keyring
- *   - KDE Plasma → kwallet5/6 with kwallet-secret-service bridge
- *   - Hyprland / Sway / standalone → user-installed gnome-keyring or
+ *   - GNOME / Cinnamon / Budgie / generic GTK desktops -> gnome-keyring
+ *   - KDE Plasma -> kwallet5/6 with kwallet-secret-service bridge
+ *   - Hyprland / Sway / standalone -> user-installed gnome-keyring or
  *     kwalletd as a userspace service
  *
  * If `libsecret-1.so.0` is not loadable or no Secret Service daemon
@@ -48,7 +48,7 @@ import java.lang.invoke.MethodHandle
  *
  * Schema is built once at object construction in a global Arena (lives
  * for JVM lifetime). Per-call Arenas hold transient strings during one
- * libsecret round-trip. Both keep memory deterministic — no GC-tied
+ * libsecret round-trip. Both keep memory deterministic -- no GC-tied
  * native lifetime as JNA had.
  *
  * Concurrency: all three sync calls block the calling thread for the
@@ -67,7 +67,7 @@ internal class LinuxLibsecretKeyringStorage : IKeyringStorage {
     private val log = LoggerFactory.getLogger(LinuxLibsecretKeyringStorage::class.java)
 
     private companion object {
-        /** SECRET_SCHEMA_DONT_MATCH_NAME = 1<<1 — ignore schema name on lookup/clear. */
+        /** SECRET_SCHEMA_DONT_MATCH_NAME = 1<<1 -- ignore schema name on lookup/clear. */
         const val SCHEMA_FLAG_DONT_MATCH_NAME = 0x2
         /** SECRET_SCHEMA_ATTRIBUTE_STRING = 0. */
         const val ATTR_TYPE_STRING = 0
@@ -91,7 +91,7 @@ internal class LinuxLibsecretKeyringStorage : IKeyringStorage {
         //   SecretSchemaAttribute attributes[32];
         //   gint reserved;          // 4 bytes + 4 padding
         //   gpointer reserved1..7;  // 7 * 8 bytes
-        // } — total 8+8 + 32*16 + 8 + 7*8 = 592 bytes.
+        // } -- total 8+8 + 32*16 + 8 + 7*8 = 592 bytes.
         val SCHEMA_LAYOUT: MemoryLayout = MemoryLayout.structLayout(
             ValueLayout.ADDRESS.withName("name"),
             ValueLayout.JAVA_INT.withName("flags"),
@@ -117,7 +117,7 @@ internal class LinuxLibsecretKeyringStorage : IKeyringStorage {
     /**
      * Pre-built downcall handles for the three libsecret entry points
      * we need. FunctionDescriptors lock in exactly two attribute pairs
-     * + the trailing NULL sentinel — matches our IKeyringStorage shape.
+     * + the trailing NULL sentinel -- matches our IKeyringStorage shape.
      */
     private val storeHandle: MethodHandle? = lookup?.downcallOrNull(
         "secret_password_store_sync",
@@ -182,7 +182,7 @@ internal class LinuxLibsecretKeyringStorage : IKeyringStorage {
 
     override fun isAvailable(): Boolean {
         if (storeHandle == null || clearHandle == null || schemaPtr == null) return false
-        // Probe with a write+clear round-trip — only signal that
+        // Probe with a write+clear round-trip -- only signal that
         // distinguishes "daemon alive" from "daemon dead" without
         // GError introspection. libsecret_password_clear_sync returns
         // FALSE when nothing was matched, NOT "FALSE on dead daemon",
@@ -293,7 +293,7 @@ internal class LinuxLibsecretKeyringStorage : IKeyringStorage {
         s.set(ValueLayout.JAVA_INT, 24, ATTR_TYPE_STRING)
         s.set(ValueLayout.ADDRESS, 32, attrAccountName)
         s.set(ValueLayout.JAVA_INT, 40, ATTR_TYPE_STRING)
-        // remaining attributes[2..31] stay zero — Arena.allocate zero-fills
+        // remaining attributes[2..31] stay zero -- Arena.allocate zero-fills
         return s
     }
 }

@@ -20,7 +20,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * Backfill for #190 — ProfileManager had zero direct coverage. Tests cover:
+ * Backfill for #190 -- ProfileManager had zero direct coverage. Tests cover:
  *   - load/save round-trip preserves every field including optionalModsState
  *   - corrupt state.json falls back to empty without throwing
  *   - toggleFavorite is idempotent and atomic under contention (#190 race)
@@ -50,7 +50,7 @@ class ProfileManagerTest {
         val pm = ProfileManager(workDir, json)
         assertTrue(pm.favoriteServers.isEmpty())
         assertNull(pm.lastServerId)
-        // No file written until something is saved — the user shouldn't see
+        // No file written until something is saved -- the user shouldn't see
         // a stub profiles.json appear out of nowhere on first launch.
         assertFalse(Files.exists(profilesFile()), "no save() means no file")
     }
@@ -88,7 +88,7 @@ class ProfileManagerTest {
 
     @Test
     fun `corrupt profiles_json falls back to empty without throwing`() {
-        // Half-truncated JSON — the kind of thing a crash mid-write used to
+        // Half-truncated JSON -- the kind of thing a crash mid-write used to
         // leave on disk before the temp-file + atomic-move fix.
         Files.writeString(profilesFile(), """{"profiles":{"Industrial":{"serverId":"Industrial","mem""")
         val pm = ProfileManager(workDir, json)
@@ -113,10 +113,10 @@ class ProfileManagerTest {
         // contains=false, both call add(), then save races. With atomic
         // add() the net state for an even count of toggles is "absent",
         // for an odd count "present". Hard part is that the launcher
-        // intentionally favors latest-write-wins on the favorites file —
+        // intentionally favors latest-write-wins on the favorites file --
         // we're verifying the in-memory set ends up consistent.
         val pm = ProfileManager(workDir, json)
-        val toggleCount = 100  // even → final state must be "not favorite"
+        val toggleCount = 100  // even -> final state must be "not favorite"
         coroutineScope {
             (1..toggleCount).map { async(Dispatchers.IO) { pm.toggleFavorite("Industrial") } }.awaitAll()
         }
@@ -131,7 +131,7 @@ class ProfileManagerTest {
             servers.map { s -> async(Dispatchers.IO) { pm.toggleFavorite(s) } }.awaitAll()
         }
         assertEquals(servers.toSet(), pm.favoriteServers,
-            "every distinct toggle should land — pre-#190 the save() race could lose entries")
+            "every distinct toggle should land -- pre-#190 the save() race could lose entries")
     }
 
     // ── File-system atomicity ─────────────────────────────────────────────
@@ -140,13 +140,13 @@ class ProfileManagerTest {
     fun `save uses temp-file then atomic move so a crash never leaves torn JSON`() {
         // Strong invariant: at no point during save() should profiles.json
         // exist with non-parseable contents. We verify by parsing the file
-        // immediately after save returns — and crucially also that the temp
+        // immediately after save returns -- and crucially also that the temp
         // file (profiles.json.tmp) is gone, indicating the move succeeded.
         val pm = ProfileManager(workDir, json)
         pm.saveProfile(InstanceProfile(serverId = "Industrial", memoryMb = 8192))
 
         val text = Files.readString(profilesFile())
-        json.parseToJsonElement(text)  // must parse — throws if torn
+        json.parseToJsonElement(text)  // must parse -- throws if torn
 
         assertFalse(
             Files.exists(workDir / "${Storage.PROFILES_FILE}.tmp"),
@@ -155,7 +155,7 @@ class ProfileManagerTest {
     }
 
     @Test
-    fun `concurrent saves do not produce a torn profiles_json on disk`() = runBlocking {
+    fun `concurrent saves do not produce a torn profiles_json on disk`(): Unit = runBlocking {
         val pm = ProfileManager(workDir, json)
         coroutineScope {
             (1..50).map { i ->

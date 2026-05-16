@@ -109,7 +109,7 @@ fun RamSelector(
                     isCustomMode = true
                     customInput.toIntOrNull()?.takeIf { it in 512..32768 }?.let(onValueChanged)
                 },
-                // No fixed height — Material3 OutlinedTextField needs ~56 dp to lay out
+                // No fixed height -- Material3 OutlinedTextField needs ~56 dp to lay out
                 // its placeholder; forcing 48 dp clipped it past the bottom border so
                 // the digit visually "fell through" the field.
                 modifier = Modifier.weight(1f),

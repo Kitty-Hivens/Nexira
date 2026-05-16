@@ -22,8 +22,8 @@ enum class AppLocale(
 
         /** Detect best match from the JVM default locale. */
         fun detectSystem(): AppLocale {
-            val syslang = System.getProperty("user.language") ?: return RUSSIAN
-            return entries.firstOrNull { it.tag == syslang } ?: RUSSIAN
+            val sysLanguage = System.getProperty("user.language") ?: return RUSSIAN
+            return entries.firstOrNull { it.tag == sysLanguage } ?: RUSSIAN
         }
     }
 }
@@ -57,7 +57,7 @@ val LocalStrings: ProvidableCompositionLocal<AppStrings> =
 // ============================================================================
 
 /**
- * Use `I18n.s` anywhere outside of Compose to access translated strings.
+ * Use `I18n.s` anywhere outside Compose to access translated strings.
  *
  *   GameConsoleService.append(I18n.s.stateAuth, LogType.INFO)
  */
@@ -66,7 +66,7 @@ object I18n {
     private var _strings: AppStrings = stringsFor(_locale)
 
     val s: AppStrings get() = _strings
-    val locale: AppLocale get() = _locale
+    val locale: AppLocale get() = _locale // TODO: unused
 
     fun setLocale(locale: AppLocale) {
         _locale = locale

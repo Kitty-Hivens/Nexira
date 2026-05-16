@@ -46,7 +46,7 @@ class ChannelRouterTest {
         })
 
     @Test
-    fun `direct succeeds — returns direct response, proxy never invoked`() = runTest {
+    fun `direct succeeds -- returns direct response, proxy never invoked`() = runTest {
         val direct = mockClient("DIRECT")
         val proxy = mockClient("PROXY")
         val router = ChannelRouter(direct = direct, proxy = proxy)
@@ -56,7 +56,7 @@ class ChannelRouterTest {
     }
 
     @Test
-    fun `direct fails IOException — falls back to proxy, returns proxy response`() = runTest {
+    fun `direct fails IOException -- falls back to proxy, returns proxy response`() = runTest {
         val direct = mockClient("DIRECT", throws = IOException("connection reset"))
         val proxy = mockClient("PROXY")
         val router = ChannelRouter(direct = direct, proxy = proxy)
@@ -66,7 +66,7 @@ class ChannelRouterTest {
     }
 
     @Test
-    fun `direct fails SocketException — also falls back to proxy`() = runTest {
+    fun `direct fails SocketException -- also falls back to proxy`() = runTest {
         val direct = mockClient("DIRECT", throws = java.net.SocketException("broken pipe"))
         val proxy = mockClient("PROXY")
         val router = ChannelRouter(direct = direct, proxy = proxy)
@@ -76,7 +76,7 @@ class ChannelRouterTest {
     }
 
     @Test
-    fun `both channels fail — throws original direct exception`() = runTest {
+    fun `both channels fail -- throws original direct exception`() = runTest {
         val directException = IOException("direct down")
         val direct = mockClient("DIRECT", throws = directException)
         val proxy = mockClient("PROXY", throws = IOException("proxy also down"))
@@ -85,14 +85,14 @@ class ChannelRouterTest {
         val ex = assertFailsWith<IOException> {
             router.execute { client -> client.get("https://example.com/").bodyAsText() }
         }
-        // Original direct exception preserved (not the proxy one) — caller's
+        // Original direct exception preserved (not the proxy one) -- caller's
         // diagnostics see the first failure cause.
         assertEquals("direct down", ex.message)
     }
 
     @Test
     fun `non-fallbackable exception from direct propagates without fallback`() = runTest {
-        // RuntimeException is not IOException — semantic error, not network.
+        // RuntimeException is not IOException -- semantic error, not network.
         val direct = mockClient("DIRECT", throws = RuntimeException("logic bug"))
         val proxy = mockClient("PROXY")
         val router = ChannelRouter(direct = direct, proxy = proxy)
@@ -100,7 +100,7 @@ class ChannelRouterTest {
         assertFailsWith<RuntimeException> {
             router.execute { client -> client.get("https://example.com/").bodyAsText() }
         }
-        // Proxy not invoked — no way to assert directly without recording wrapper,
+        // Proxy not invoked -- no way to assert directly without recording wrapper,
         // but the test design (proxy returns RESPONSE_FROM_PROXY) means if we
         // reach here without that string in result, proxy wasn't called.
     }

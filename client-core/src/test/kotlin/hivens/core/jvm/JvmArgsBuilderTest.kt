@@ -86,7 +86,7 @@ class JvmArgsBuilderTest {
 
     @Test
     fun `Shenandoah adaptive heuristic does not emit a heuristics flag`() {
-        // Adaptive is the JVM default — no point passing it explicitly
+        // Adaptive is the JVM default -- no point passing it explicitly
         val args = ShenandoahTuning(mode = ShenandoahTuning.Heuristic.Adaptive).toArgs()
         assertFalse(args.any { it.startsWith("-XX:ShenandoahGCHeuristics=") })
     }
@@ -155,7 +155,7 @@ class JvmArgsBuilderTest {
         assertTrue("-XX:+DisableExplicitGC" in args)
         assertTrue("-XX:+HeapDumpOnOutOfMemoryError" in args)
         assertTrue("-XX:+ExitOnOutOfMemoryError" in args)
-        // Large pages off by default — needs OS setup
+        // Large pages off by default -- needs OS setup
         assertFalse("-XX:+UseLargePages" in args)
     }
 

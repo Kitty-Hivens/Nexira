@@ -21,6 +21,7 @@ import hivens.core.data.LauncherUpdate
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.theme.CelestiaTheme
+import kotlin.time.Duration.Companion.milliseconds
 
 @Composable
 fun UpdateNotification(
@@ -32,7 +33,7 @@ fun UpdateNotification(
     var isVisible by remember { mutableStateOf(true) }
 
     // Puppet: toast-style notification (above the main app). We do NOT
-    // override the current screen — the notification lives on top of
+    // override the current screen -- the notification lives on top of
     // whichever main screen is active.
     PuppetClick("updateNotification.details", enabled = isVisible) {
         isVisible = false; onOpenDialog()
@@ -136,7 +137,7 @@ fun UpdateNotification(
 
     if (!update.isCritical) {
         LaunchedEffect(Unit) {
-            kotlinx.coroutines.delay(15_000)
+            kotlinx.coroutines.delay(15_000.milliseconds)
             isVisible = false
             onDismiss()
         }

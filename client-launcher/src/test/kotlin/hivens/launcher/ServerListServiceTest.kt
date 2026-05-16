@@ -13,9 +13,10 @@ import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertSame
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * #189 — fetchDashboardData must single-flight: when N coroutines hit it
+ * #189 -- fetchDashboardData must single-flight: when N coroutines hit it
  * concurrently on a cold cache, only one underlying repo fetch should fire.
  * The pre-fix `@Volatile` stopgap allowed all N to slip past the null check
  * and each kick off their own future.
@@ -48,7 +49,7 @@ class ServerListServiceTest {
     @Test
     fun `cached result is shared across callers (identity)`() = runBlocking {
         val protocol = FakeServerProtocol().apply {
-            // Cache only memoizes a non-empty result — give it something to bite on.
+            // Cache only memorizes a non-empty result -- give it something to bite on.
             loaderResult = { LoaderResponse(status = "OK", servers = listOf(SmartyServer(id = "Industrial", ip = "127.0.0.1"))) }
         }
         val svc = ServerListService(ServerRepository(protocol))
@@ -63,7 +64,7 @@ class ServerListServiceTest {
     @Test
     fun `empty fetch is not cached so the next call still tries`() = runBlocking {
         // fetchDashboard returns empty servers when the repo errors. The cache
-        // should NOT memoize that empty state — otherwise a transient outage
+        // should NOT memoize that empty state -- otherwise a transient outage
         // freezes the dashboard at empty until launcher restart.
         val protocol = FakeServerProtocol().apply {
             loaderResult = { LoaderResponse(status = "ERROR") }
@@ -71,7 +72,7 @@ class ServerListServiceTest {
         val svc = ServerListService(ServerRepository(protocol))
 
         svc.fetchDashboardData().await()
-        delay(10)
+        delay(10.milliseconds)
         svc.fetchDashboardData().await()
 
         assertEquals(2, protocol.loaderCalls.size, "empty result must not be cached")

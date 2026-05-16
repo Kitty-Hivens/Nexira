@@ -20,7 +20,7 @@ import kotlin.test.assertEquals
  * having to construct the full collaborator graph or spawn a real process.
  *
  * Java-path resolution depends on [IJavaManager] which is now an interface
- * (Test-harness chunk) — the fake below replaces the real download path.
+ * (Test-harness chunk) -- the fake below replaces the real download path.
  */
 class LauncherServiceTest {
 

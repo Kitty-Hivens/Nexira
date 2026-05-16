@@ -383,7 +383,7 @@ interface AppStrings {
     // MaxGCPauseMillis, AlwaysPreTouch, etc.) are kept hardcoded — they
     // are not labels but actual flag names a user has to recognize. Only
     // the descriptive helpers, section headers, and button copy are
-    // localised.
+    // localized.
 
     val jvmTitle: String
     val jvmSubtitle: String

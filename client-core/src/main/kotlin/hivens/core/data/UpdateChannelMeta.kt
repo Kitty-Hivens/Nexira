@@ -5,7 +5,7 @@ import kotlinx.serialization.Serializable
 
 /**
  * Out-of-band update-channel metadata, fetched separately from the GitHub
- * Releases API so we can mark older releases as mandatory after the fact —
+ * Releases API so we can mark older releases as mandatory after the fact --
  * without re-publishing them. Lives at
  * `https://raw.githubusercontent.com/Kitty-Hivens/Aura-Launcher/stable/meta/update-channel.json`.
  *

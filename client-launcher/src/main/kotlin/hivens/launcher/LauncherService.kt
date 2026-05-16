@@ -20,7 +20,7 @@ import java.nio.file.Path
  * Implementation of the Minecraft client launch service.
  *
  * Acts as a facade, coordinating the work of [EnvironmentPreparer] (natives + assets),
- * [ClasspathProvider] (manifest → classpath), [GameCommandBuilder] (version-specific JVM
+ * [ClasspathProvider] (manifest -> classpath), [GameCommandBuilder] (version-specific JVM
  * command) and [ProcessLogHandler] (stdout/stderr interception). All collaborators are
  * supplied via constructor injection so that this service can be unit-tested in isolation.
  */

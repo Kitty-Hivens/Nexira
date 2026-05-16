@@ -33,7 +33,7 @@ import hivens.ui.theme.CelestiaTheme
  * arg string. [onApply] receives the composed args when the user clicks
  * Apply; [onDismiss] when they Cancel or click outside.
  *
- * The dialog is stateful — it holds a [JvmConfig] in remember and the
+ * The dialog is stateful -- it holds a [JvmConfig] in remember and the
  * widgets mutate it. Apply emits the composed args; nothing is written
  * to the launcher's storage from here.
  */
@@ -471,7 +471,7 @@ private fun PerfTabContent(config: JvmConfig, onChange: (JvmConfig) -> Unit) {
             label = "UseTransparentHugePages (Linux)",
             hint = s.jvmPerfTransparentHugePagesHint,
             checked = config.perf.useTransparentHugePages,
-        ) { onChange(config.perf.copy(useTransparentHugePages = it).let { config.copy(perf = it) }) }
+        ) { it -> onChange(config.perf.copy(useTransparentHugePages = it).let { config.copy(perf = it) }) }
         ToggleField(
             label = "UseNUMA",
             hint = s.jvmPerfNumaHint,

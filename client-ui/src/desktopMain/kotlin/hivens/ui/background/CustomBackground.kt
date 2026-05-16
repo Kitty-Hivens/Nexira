@@ -24,8 +24,6 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import hivens.ui.debug.SkiaTracker
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import org.jetbrains.skia.Codec
 import org.jetbrains.skia.Data
@@ -181,12 +179,10 @@ private fun rememberSkiaImage(file: File): ImageBitmap? {
 
                 codec.readPixels(bmp, 0)
                 val img = org.jetbrains.skia.Image.makeFromBitmap(bmp)
-                try {
+                img.use { img ->
                     bitmap = img.toComposeImageBitmap().also {
                         SkiaTracker.track("BG.static", it)
                     }
-                } finally {
-                    img.close()
                 }
 
             } catch (e: Exception) {

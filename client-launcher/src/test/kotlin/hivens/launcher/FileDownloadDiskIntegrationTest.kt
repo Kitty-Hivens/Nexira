@@ -34,7 +34,7 @@ import kotlin.test.assertTrue
  * End-to-end integration coverage for [FileDownloadService.processSession]
  * against a real on-disk sandbox. The unit tests in [FileDownloadServiceTest]
  * exercise pure-helper logic (path normalization, MD5, staleness predicate);
- * this harness covers the orchestration that ties them together — which has
+ * this harness covers the orchestration that ties them together -- which has
  * surface for regressions that no helper test could catch.
  *
  * Each test runs in a fresh tempdir. HTTP is mocked at the
@@ -42,10 +42,10 @@ import kotlin.test.assertTrue
  * AND assert how many requests were made (the cache short-circuit is
  * verified by call count, not by guessing through state).
  *
- * Per the user's explicit ask: "tests for managing builds — how files
+ * Per the user's explicit ask: "tests for managing builds -- how files
  * download, parse, what should happen in incorrect cases. Should run
  * exclusively on dev machine because files will be guaranteed broken."
- * Tempdir per test enforces that — broken-on-purpose state never escapes.
+ * Tempdir per test enforces that -- broken-on-purpose state never escapes.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class FileDownloadDiskIntegrationTest {
@@ -61,7 +61,7 @@ class FileDownloadDiskIntegrationTest {
         Files.createDirectories(clientDir)
         // FileDownloadService spawns a progress-UI ticker on Dispatchers.Main
         // unconditionally (the lambda check is null-safe but the launch isn't
-        // gated). Use Unconfined so the job runs inline on whatever thread —
+        // gated). Use Unconfined so the job runs inline on whatever thread --
         // a TestDispatcher would never auto-advance the monitor's delay() loop
         // and the production `coroutineScope { }` would block forever waiting
         // on the monitor cancellation.
@@ -141,13 +141,13 @@ class FileDownloadDiskIntegrationTest {
 
         assertEquals("the-correct-bytes", Files.readString(corrupt),
             "corrupt local file must be replaced from upstream")
-        assertEquals(1, requests.get(), "exactly one refetch — the only stale file")
+        assertEquals(1, requests.get(), "exactly one refetch -- the only stale file")
     }
 
     @Test
     fun `missing local file is downloaded`() = runBlocking {
         // config/* paths so the #169 mods-jar ZIP-validity scan doesn't
-        // trigger — focus of this test is the up-to-date-vs-missing
+        // trigger -- focus of this test is the up-to-date-vs-missing
         // dispatch, not jar integrity. Pre-existing file with matching
         // MD5 must NOT be re-fetched.
         val files = mapOf(
@@ -157,7 +157,7 @@ class FileDownloadDiskIntegrationTest {
         val manifest = manifestOf(files)
         val (svc, requests) = newService(files)
 
-        // Pre-populate one of two — the other is missing.
+        // Pre-populate one of two -- the other is missing.
         Files.createDirectories(clientDir.resolve("config"))
         Files.write(clientDir.resolve("config/foo.cfg"), "foo content".toByteArray())
 
@@ -165,14 +165,14 @@ class FileDownloadDiskIntegrationTest {
 
         assertEquals("bar content", Files.readString(clientDir.resolve("config/bar.cfg")))
         assertEquals(1, requests.get(),
-            "only the missing file should be fetched — the up-to-date one stays put")
+            "only the missing file should be fetched -- the up-to-date one stays put")
     }
 
     // ── ProtectedPaths preservation ───────────────────────────────────────
 
     @Test
     fun `user-edited options_txt is NOT overwritten even when manifest claims a different MD5`() = runBlocking {
-        // ProtectedPaths defaults gate options.txt — the user's hand-tuned
+        // ProtectedPaths defaults gate options.txt -- the user's hand-tuned
         // settings must survive a sync that wants to push a different version
         // (e.g. server admin shipped a new default). The unit test
         // `isFileMissingOrChanged respects ProtectedPaths` covers the
@@ -202,7 +202,7 @@ class FileDownloadDiskIntegrationTest {
         // marks Industrial clean), then the client dir is gone (data-dir
         // move that left manifest-cache/ behind, manual rm, etc.). Pre-fix
         // the second processSession trusted the cache and short-circuited,
-        // leaving an empty disk + a "clean" cache → game launched with
+        // leaving an empty disk + a "clean" cache -> game launched with
         // empty classpath. The disk-sanity gate must catch this.
         val files = mapOf(
             "mods/foo.jar" to "foo bytes".toByteArray(),
@@ -229,10 +229,10 @@ class FileDownloadDiskIntegrationTest {
             assertEquals(expectedBytes.toList(), Files.readAllBytes(onDisk).toList(),
                 "byte mismatch on re-sync for $relPath")
         }
-        // Re-sync should have re-downloaded each file — disk-sanity gate
+        // Re-sync should have re-downloaded each file -- disk-sanity gate
         // must invalidate the otherwise-clean cache.
         assertEquals(firstSyncRequests * 2, requests.get(),
-            "post-wipe sync must refetch — cache should NOT short-circuit on missing files")
+            "post-wipe sync must refetch -- cache should NOT short-circuit on missing files")
     }
 
     // ── #203: single-file changes must invalidate the cache ─────────────
@@ -244,7 +244,7 @@ class FileDownloadDiskIntegrationTest {
         // cache was trusted, and Minecraft launched with a missing mod.
         // Sized check is intentional: build a manifest with >20 entries and
         // delete one beyond the top-20 to prove the walk now covers all entries.
-        val files = buildMap<String, ByteArray> {
+        val files = buildMap {
             for (i in 1..30) put("mods/mod-$i.jar", "mod $i bytes".toByteArray())
         }
         val manifest = manifestOf(files)
@@ -254,7 +254,7 @@ class FileDownloadDiskIntegrationTest {
         val firstSyncRequests = requests.get()
 
         // Delete one file that previously sat outside the sample window. The
-        // exact name doesn't matter — alphabetical ordering of HashMap is not
+        // exact name doesn't matter -- alphabetical ordering of HashMap is not
         // guaranteed, but a 30-entry manifest with a single removal guarantees
         // the sample (any 20 of 30) misses one entry in roughly a third of
         // hash orderings. We pick one explicitly so the test is deterministic.
@@ -266,11 +266,11 @@ class FileDownloadDiskIntegrationTest {
 
         assertTrue(Files.exists(victim), "deleted file must be restored on re-sync")
         // The full integrity walk should have refetched the missing file (and
-        // re-verified the others via MD5). At minimum we expect more fetches
-        // than zero — pre-#203 this was zero because the cache short-circuit
+        // re-verified the others via MD5). At minimum, we expect more fetches
+        // than zero -- pre-#203 this was zero because the cache short-circuit
         // covered the deletion.
         assertTrue(requests.get() > firstSyncRequests,
-            "post-deletion sync must refetch — cache must NOT short-circuit when any manifest entry is missing")
+            "post-deletion sync must refetch -- cache must NOT short-circuit when any manifest entry is missing")
     }
 
     @Test
@@ -281,8 +281,8 @@ class FileDownloadDiskIntegrationTest {
         // Pre-#203 the file was present so exists() said true and the cache
         // was trusted; Minecraft loaded the truncated JAR and crashed with
         // NoClassDefFoundError.
-        val files = buildMap<String, ByteArray> {
-            for (i in 1..30) put("mods/mod-$i.jar", "mod $i contents — substantial bytes here".toByteArray())
+        val files = buildMap {
+            for (i in 1..30) put("mods/mod-$i.jar", "mod $i contents -- substantial bytes here".toByteArray())
         }
         val manifest = manifestOf(files)
         val (svc, requests) = newService(files)
@@ -302,7 +302,7 @@ class FileDownloadDiskIntegrationTest {
         assertEquals(originalSize, Files.size(victim),
             "truncated file must be restored to manifest size on re-sync")
         assertTrue(requests.get() > firstSyncRequests,
-            "post-truncation sync must refetch — cache must NOT short-circuit when size doesn't match manifest")
+            "post-truncation sync must refetch -- cache must NOT short-circuit when size doesn't match manifest")
     }
 
     // ── Network failure ───────────────────────────────────────────────────
@@ -320,7 +320,7 @@ class FileDownloadDiskIntegrationTest {
         assertFails {
             svc.processSession(sessionWith(manifest), "Industrial", clientDir, null, null, null, null)
         }
-        // Cache must NOT be marked clean — verify by checking no cache file landed.
+        // Cache must NOT be marked clean -- verify by checking no cache file landed.
         // ManifestCache writes under `manifest-cache/Industrial.json`; absence
         // means the next launch will try again, which is the correct behavior.
         val cacheFile = workDir / "manifest-cache" / "Industrial.json"
@@ -378,7 +378,7 @@ class FileDownloadDiskIntegrationTest {
     private fun service(provider: HttpClientProvider): FileDownloadService {
         val protectedPaths = ProtectedPaths(workDir / "protected-paths.json", json)
         val manifestCache = ManifestCache(workDir / "manifest-cache", json)
-        // Default config — clientFilesBase resolves to a fake URL but the
+        // Default config -- clientFilesBase resolves to a fake URL but the
         // MockEngine matches by path-suffix so the host is irrelevant.
         return FileDownloadService(provider, protectedPaths, manifestCache, ServerProtocolConfig())
     }
@@ -392,15 +392,15 @@ class FileDownloadDiskIntegrationTest {
     )
 
     /**
-     * Builds a flat FileManifest from a path → bytes map, computing each
+     * Builds a flat FileManifest from a path -> bytes map, computing each
      * entry's real MD5 so the integrity gate matches downloaded content.
      * Splits paths into directory components so the manifest mirrors what
      * the server returns (`{"directories": {"mods": {"files": {...}}}}`)
-     * — flat `files` would also work but the recursive shape catches more
+     * -- flat `files` would also work but the recursive shape catches more
      * regressions (the flatten code path).
      */
     private fun manifestOf(files: Map<String, ByteArray>): FileManifest {
-        // Group path → FileData into a tree keyed on the path components.
+        // Group path -> FileData into a tree keyed on the path components.
         data class Node(
             val files: MutableMap<String, FileData> = mutableMapOf(),
             val dirs: MutableMap<String, Node> = mutableMapOf(),

@@ -20,7 +20,7 @@ import java.util.stream.Collectors
  * The flow:
  *  1. UI calls [schedule] with the target path. It writes
  *     `data-dir-pending-source` + `data-dir-pending-target` into
- *     [BootstrapConf] (NOT yet `data-dir` — only after a successful
+ *     [BootstrapConf] (NOT yet `data-dir` -- only after a successful
  *     apply do we commit the new dir as the override).
  *  2. UI prompts the user to restart.
  *  3. On next startup, BEFORE [PlatformPaths] is consulted, the launcher
@@ -32,22 +32,22 @@ import java.util.stream.Collectors
  *     both exist until the apply completes (no destructive ordering).
  *
  * Failure modes handled:
- *  - Target doesn't exist → created
- *  - Target is the source → no-op, clears pending
- *  - Target already has launcher files → refused; pending cleared with
+ *  - Target doesn't exist -> created
+ *  - Target is the source -> no-op, clears pending
+ *  - Target already has launcher files -> refused; pending cleared with
  *    error log. User must pick an empty dir or merge manually.
- *  - Target is inside source → refused (would recurse during copy)
- *  - I/O failure mid-copy → target deleted, source intact, pending kept
+ *  - Target is inside source -> refused (would recurse during copy)
+ *  - I/O failure mid-copy -> target deleted, source intact, pending kept
  *    (retry on next start)
  */
 object DataDirMover {
-    // Lazy logger — DataDirMover is referenced from Main.kt's bootstrap
+    // Lazy logger -- DataDirMover is referenced from Main.kt's bootstrap
     // path BEFORE `aura.logs.dir` system property gets set. An eager
     // `LoggerFactory.getLogger(...)` field initialiser would trigger
     // logback's first init at the wrong moment, causing the rolling
     // file appender to open `./logs/launcher.log` (in the JVM's working
     // dir, e.g. `D:\Games\AuraLauncher\logs`) instead of
-    // `paths.logsDir`. Lazy delays init until the first log call —
+    // `paths.logsDir`. Lazy delays init until the first log call --
     // by which time Main.kt has set the property correctly.
     private val log by lazy { LoggerFactory.getLogger(DataDirMover::class.java) }
 
@@ -62,7 +62,7 @@ object DataDirMover {
                 return false
             }
             if (target.normalize().startsWith(source.normalize())) {
-                log.warn("schedule(): refusing to move into a subdirectory of source ({} → {})", source, target)
+                log.warn("schedule(): refusing to move into a subdirectory of source ({} -> {})", source, target)
                 return false
             }
             BootstrapConf.update(confFile) { conf ->
@@ -78,7 +78,7 @@ object DataDirMover {
 
     /**
      * Startup-side: if a pending move is recorded, execute it. Idempotent
-     * — calling multiple times is fine (a missing source is treated as
+     * -- calling multiple times is fine (a missing source is treated as
      * "already applied" and clears the markers).
      */
     fun applyPending(confFile: Path = BootstrapConf.defaultPath()) {
@@ -89,12 +89,12 @@ object DataDirMover {
         val source = java.nio.file.Paths.get(sourceStr)
         val target = java.nio.file.Paths.get(targetStr)
 
-        log.info("Applying pending data-dir move: {} → {}", source, target)
+        log.info("Applying pending data-dir move: {} -> {}", source, target)
 
         // Source missing: assume an earlier apply already moved it. Mark
         // the target as the new data-dir and clear pending.
         if (!Files.exists(source)) {
-            log.info("source missing — assuming earlier apply succeeded, committing target as new data-dir")
+            log.info("source missing -- assuming earlier apply succeeded, committing target as new data-dir")
             commit(targetStr, confFile)
             return
         }
@@ -102,7 +102,7 @@ object DataDirMover {
         // Target already populated (not just the dir, but contents): refuse.
         if (Files.exists(target) && hasContents(target)) {
             log.error(
-                "target {} already has contents — refusing to overwrite. " +
+                "target {} already has contents -- refusing to overwrite. " +
                     "Clearing pending markers; user must pick an empty dir or merge manually.",
                 target,
             )
@@ -113,18 +113,18 @@ object DataDirMover {
         try {
             if (!Files.exists(target)) Files.createDirectories(target)
             copyTree(source, target)
-            // Verify file count matches before deleting source — cheap sanity.
+            // Verify file count matches before deleting source -- cheap sanity.
             val srcCount = countFiles(source)
             val dstCount = countFiles(target)
             if (srcCount != dstCount) {
-                log.error("copy verification failed: source={} files, target={} — leaving both intact, retry next start", srcCount, dstCount)
+                log.error("copy verification failed: source={} files, target={} -- leaving both intact, retry next start", srcCount, dstCount)
                 return
             }
             deleteTree(source)
             commit(targetStr, confFile)
             log.info("Data-dir move complete: {} files relocated", srcCount)
         } catch (e: Exception) {
-            log.error("applyPending() failed mid-flight — pending markers retained for retry: {}", e.message, e)
+            log.error("applyPending() failed mid-flight -- pending markers retained for retry: {}", e.message, e)
         }
     }
 

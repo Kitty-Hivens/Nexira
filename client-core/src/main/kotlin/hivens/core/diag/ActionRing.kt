@@ -13,12 +13,12 @@ import java.time.Instant
  * [snapshot] is folded into the crash report and the diagnostic bundle so a
  * support reader can reconstruct what the user did just before things broke.
  *
- * Concurrent reads/writes are safe — actions can be recorded from any thread
- * (UI, IO, game-output piping) without external synchronisation.
+ * Concurrent reads/writes are safe -- actions can be recorded from any thread
+ * (UI, IO, game-output piping) without external synchronization.
  *
  * Implementation note: previous version used `ConcurrentLinkedDeque` and
  * `ring.size > CAPACITY` to trim. JDK documents that deque's `size()` is NOT
- * a constant-time, accurate snapshot under concurrent modification — racing
+ * a constant-time, accurate snapshot under concurrent modification -- racing
  * `record()` calls could leave the ring above CAPACITY, breaking the bounded
  * contract. Switched to a plain `ArrayDeque` guarded by a `synchronized`
  * block. `record` is invoked maybe a few hundred times per process lifetime;
@@ -54,14 +54,14 @@ object ActionRing {
     fun snapshot(): List<Entry> = synchronized(lock) { ring.toList() }
 
     /**
-     * Convenience for the most recent entry — covers the legacy
+     * Convenience for the most recent entry -- covers the legacy
      * `CrashReporter.lastAction` use case while richer crash reports
      * adopt [snapshot].
      */
     fun mostRecent(): Entry? = synchronized(lock) { ring.lastOrNull() }
 
     /**
-     * Test-only — never used in production. Public (rather than `internal`)
+     * Test-only -- never used in production. Public (rather than `internal`)
      * because tests live in `:client-launcher` while this class lives in
      * `:client-core`, and `internal` doesn't span module boundaries. Calling
      * this in production would erase the diagnostic trail right when it's

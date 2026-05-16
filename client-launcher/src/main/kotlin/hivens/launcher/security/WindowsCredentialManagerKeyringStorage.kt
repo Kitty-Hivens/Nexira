@@ -19,7 +19,7 @@ import java.lang.invoke.MethodHandle
  *
  * Under the hood Credential Manager stores each entry encrypted via
  * **DPAPI** (Data Protection API). The encryption key is derived from
- * the user's Windows login session — credentials are automatically
+ * the user's Windows login session -- credentials are automatically
  * available while the user is logged in, and copying `credentials.json`
  * to another machine doesn't yield anything readable because DPAPI is
  * machine-bound (and TPM-bound where available).
@@ -39,13 +39,13 @@ import java.lang.invoke.MethodHandle
  * after copying out the bytes.
  *
  * `TargetName` carries our `service/account` tuple as a slash-joined
- * string — Windows uses TargetName as the unique key, so encoding both
+ * string -- Windows uses TargetName as the unique key, so encoding both
  * parts there is the conventional approach (same as Git Credential
  * Manager's `git:https://github.com` pattern).
  *
- * Persistence: [CRED_PERSIST_LOCAL_MACHINE] (2) — survives reboots,
+ * Persistence: [CRED_PERSIST_LOCAL_MACHINE] (2) -- survives reboots,
  * tied to this Windows user on this machine. Not roaming (which would
- * sync via Active Directory across machines — undesirable for
+ * sync via Active Directory across machines -- undesirable for
  * launcher creds).
  */
 internal class WindowsCredentialManagerKeyringStorage : IKeyringStorage {
@@ -53,21 +53,21 @@ internal class WindowsCredentialManagerKeyringStorage : IKeyringStorage {
     private val log = LoggerFactory.getLogger(WindowsCredentialManagerKeyringStorage::class.java)
 
     private companion object {
-        /** CRED_TYPE_GENERIC from wincred.h — non-domain credential. */
+        /** CRED_TYPE_GENERIC from wincred.h -- non-domain credential. */
         const val CRED_TYPE_GENERIC: Int = 1
 
         /**
-         * CRED_PERSIST_LOCAL_MACHINE from wincred.h — credential survives
+         * CRED_PERSIST_LOCAL_MACHINE from wincred.h -- credential survives
          * reboots, tied to this user on this machine. Don't use
          * CRED_PERSIST_SESSION (gone on logoff) or CRED_PERSIST_ENTERPRISE
          * (roams via AD).
          */
         const val CRED_PERSIST_LOCAL_MACHINE: Int = 2
 
-        /** CRED_FLAGS_NONE — no special handling. */
+        /** CRED_FLAGS_NONE -- no special handling. */
         const val FLAGS_NONE: Int = 0
 
-        /** Library name. JDK resolves `Advapi32` → `Advapi32.dll` automatically on Windows. */
+        /** Library name. JDK resolves `Advapi32` -> `Advapi32.dll` automatically on Windows. */
         const val ADVAPI32 = "Advapi32"
     }
 
@@ -155,7 +155,7 @@ internal class WindowsCredentialManagerKeyringStorage : IKeyringStorage {
 
     override fun isAvailable(): Boolean {
         if (lookup == null || credWriteHandle == null || credDeleteHandle == null) return false
-        // Probe via write+delete on a tagged probe entry — same strategy
+        // Probe via write+delete on a tagged probe entry -- same strategy
         // as the libsecret peer. CredDeleteW returns FALSE for "no match"
         // (ERROR_NOT_FOUND), so a bare delete alone can't distinguish
         // "service alive" from "service dead".
@@ -173,7 +173,7 @@ internal class WindowsCredentialManagerKeyringStorage : IKeyringStorage {
             try {
                 val target = call.allocateUtf16LE(targetName(service, account))
                 val userName = call.allocateUtf16LE("") // empty for generic credentials
-                // CredentialBlob is raw bytes — we marshal the secret as UTF-16LE
+                // CredentialBlob is raw bytes -- we marshal the secret as UTF-16LE
                 // (without trailing null) and pass the byte length explicitly via
                 // CredentialBlobSize. This matches what other tools (Git CM, etc.)
                 // do for non-ASCII secrets.

@@ -23,7 +23,7 @@ class SingleInstanceTest {
 
     @AfterTest
     fun tearDown() {
-        // Always release between tests — SingleInstance is a static singleton
+        // Always release between tests -- SingleInstance is a static singleton
         // and would carry state across test methods otherwise.
         SingleInstance.release()
     }
@@ -32,7 +32,7 @@ class SingleInstanceTest {
     fun `acquire on a clean dir returns true and writes pid`() {
         assertTrue(SingleInstance.acquire(dataDir), "first acquire on a fresh dir must succeed")
 
-        // Lock file itself is held exclusively (mandatory on Windows) — read
+        // Lock file itself is held exclusively (mandatory on Windows) -- read
         // the diagnostic PID from the side-car .lock.pid file instead.
         assertTrue(Files.exists(dataDir.resolve(".lock")))
         val pidLine = Files.readString(dataDir.resolve(".lock.pid")).trim()
@@ -53,7 +53,7 @@ class SingleInstanceTest {
     @Test
     fun `acquire returns false and writes show signal when lock already held`() {
         // Simulate a foreign holder by opening the lock file ourselves and
-        // taking its FileLock in this process — SingleInstance.acquire then
+        // taking its FileLock in this process -- SingleInstance.acquire then
         // sees it from the same JVM and returns false.
         val lockFile = dataDir.resolve(".lock")
         val foreignChannel = FileChannel.open(
@@ -84,7 +84,7 @@ class SingleInstanceTest {
         SingleInstance.release()
         assertTrue(
             SingleInstance.acquire(dataDir),
-            "released lock must be reacquirable in the same process"
+            "released lock must be reacquire in the same process"
         )
     }
 }

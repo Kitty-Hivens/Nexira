@@ -10,15 +10,15 @@ import hivens.core.api.protocol.StatusOnlyResponse
  *
  * Encapsulates ALL communication with the upstream `*.smartycraft.ru`
  * endpoints. Repositories ([hivens.core.api.AuthService],
- * [hivens.core.api.ServerRepository], etc.) consume this interface — they
+ * [hivens.core.api.ServerRepository], etc.) consume this interface -- they
  * no longer know URL paths, `action=` strings, or signature schemes.
  *
  * Two implementations planned:
- * - `SmartycraftV1Protocol` (in `client-launcher`) — speaks the legacy
+ * - `SmartycraftV1Protocol` (in `client-launcher`) -- speaks the legacy
  *   PHP-based POST protocol at `/launcher2/index.php`. Default for the
  *   foreseeable future, current SmartyCraft production.
  * - `MirrorRestProtocol` (later, when [Project Mirror](https://github.com/Kitty-Hivens/Aura-Launcher/issues/172)
- *   produces an open-source server) — modern REST/JSON over `/api/v1/...`.
+ *   produces an open-source server) -- modern REST/JSON over `/api/v1/...`.
  *
  * Wire details for the V1 implementation are documented in
  * `docs/dev/smartycraft-v1-protocol.md`.
@@ -27,12 +27,12 @@ import hivens.core.api.protocol.StatusOnlyResponse
  *
  * - All methods MAY throw `IOException` (network failure, server unreachable).
  *   Callers should retry through fallback channel; the implementation does
- *   NOT do its own retry — that's [hivens.core.api.HttpClientProvider]'s
+ *   NOT do its own retry -- that's [hivens.core.api.HttpClientProvider]'s
  *   eventual job (see Conduit Phase 2 #155).
  * - All methods MAY throw `kotlinx.serialization.SerializationException`
  *   if server returns malformed JSON.
  * - Response objects carry the raw `status` string AND a parsed
- *   [hivens.core.api.protocol.ProtocolStatus] — callers should switch on
+ *   [hivens.core.api.protocol.ProtocolStatus] -- callers should switch on
  *   the parsed enum, not the string, so unknown future status values from
  *   server-side updates degrade gracefully to
  *   [hivens.core.api.protocol.ProtocolStatus.ERROR].
@@ -44,7 +44,7 @@ import hivens.core.api.protocol.StatusOnlyResponse
 interface IServerProtocol {
 
     /**
-     * Fetch the dashboard — server list, news, optional-mod manifest per
+     * Fetch the dashboard -- server list, news, optional-mod manifest per
      * server. Unsigned, unauthenticated (server only checks the launcher
      * version+hash for `UPDATE` gating).
      *
@@ -67,7 +67,7 @@ interface IServerProtocol {
 
     /**
      * Reset player's spawn point on the named server. Distinct from "start
-     * game session" — the in-game session is established by passing
+     * game session" -- the in-game session is established by passing
      * [LoginResponse.session] to the child JVM as `--accessToken`, no
      * separate server call.
      *
