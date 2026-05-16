@@ -30,9 +30,19 @@ kotlin {
                 implementation(libs.compose.material.icons.extended)
                 implementation(libs.multiplatform.markdown.m3)
 
-                // String coordinates here (instead of the catalog accessor) because
-                // KotlinDependencyHandler.implementation(provider) lacks a configuration-action
-                // overload — the exclude requires the String form.
+                // Coil pulls `org.jetbrains.skiko` transitively at its own
+                // version, which can ABI-mismatch with the Skiko that
+                // Compose-MP brings in. The exclude removes Coil's copy so
+                // Compose-MP stays the single source of truth.
+                //
+                // Catalog-accessor + configuration-action overload was
+                // re-tested 2026-05-17 against Gradle 9.4 + Kotlin
+                // Multiplatform 2.3.21 and the DSL still rejects it
+                // ("implementation(provider) { ... }" -> "function
+                // 'implementation' cannot be applied to these arguments").
+                // String coordinates remain the workable shape; the val
+                // pair below at least keeps the version pinned through the
+                // catalog so a bump in libs.versions.toml propagates here.
                 val coilCoord = "io.coil-kt.coil3"
                 val coilV     = libs.versions.coil.get()
                 implementation("$coilCoord:coil-compose:$coilV")        { exclude(group = "org.jetbrains.skiko") }
