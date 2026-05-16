@@ -68,13 +68,23 @@ kotlin {
                 implementation(libs.logback.classic)
                 implementation(libs.libtray)
                 implementation(libs.ktor.client.core)
+            }
+        }
 
-                // Puppet mode (hivens.ui.puppet) — opt-in HTTP control surface
-                // for automated UI driving. Server only binds when the JVM is
-                // launched with -Daura.puppet.port=N; otherwise these classes
-                // are loaded but inert. CIO engine chosen over Netty for the
-                // smaller dep footprint (~2.5 MB vs ~9 MB) since we only need
-                // a half-dozen localhost endpoints.
+        // Puppet HTTP control surface (hivens.ui.puppet.RealPuppetServer +
+        // META-INF/services descriptor). Source dir + Ktor server deps are
+        // added to the desktop compilation ONLY when `-PauraPuppetPort=N`
+        // is on the Gradle command line; default production builds do not
+        // contain RealPuppetServer or any of the Ktor server classes it
+        // requires. Discovery is via Java SPI -- see PuppetServerLifecycle
+        // and PuppetServerLoader in src/desktopMain for the rationale.
+        //
+        // CIO engine chosen over Netty for footprint (~2.5 MB vs ~9 MB);
+        // we only need a half-dozen localhost endpoints.
+        if (providers.gradleProperty("auraPuppetPort").isPresent) {
+            desktopMain.kotlin.srcDir("src/desktopPuppetMain/kotlin")
+            desktopMain.resources.srcDir("src/desktopPuppetMain/resources")
+            desktopMain.dependencies {
                 implementation(libs.ktor.server.core)
                 implementation(libs.ktor.server.cio)
                 implementation(libs.ktor.server.content.negotiation)
