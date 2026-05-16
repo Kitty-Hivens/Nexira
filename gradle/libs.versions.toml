@@ -37,7 +37,7 @@ proguard          = "7.8.2"
 # repositories chain) until libtray cuts its first Maven Central release;
 # pinned to a commit sha rather than a branch so upstream main-branch
 # changes don't silently land in our build.
-libtray           = "37a8789"
+libtray           = "ae96148"
 
 # ── Test ─────────────────────────────────────────────────────────────────────
 mockk             = "1.13.12"
