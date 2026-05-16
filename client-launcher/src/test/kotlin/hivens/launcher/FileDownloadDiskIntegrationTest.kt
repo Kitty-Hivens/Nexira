@@ -235,6 +235,76 @@ class FileDownloadDiskIntegrationTest {
             "post-wipe sync must refetch — cache should NOT short-circuit on missing files")
     }
 
+    // ── #203: single-file changes must invalidate the cache ─────────────
+
+    @Test
+    fun `single-file deletion outside top-20 forces re-download`() = runBlocking {
+        // Pre-#203 the sanity gate sampled only the first 20 manifest entries.
+        // A user-caused delete of file #25 (or beyond) passed the gate, the
+        // cache was trusted, and Minecraft launched with a missing mod.
+        // Sized check is intentional: build a manifest with >20 entries and
+        // delete one beyond the top-20 to prove the walk now covers all entries.
+        val files = buildMap<String, ByteArray> {
+            for (i in 1..30) put("mods/mod-$i.jar", "mod $i bytes".toByteArray())
+        }
+        val manifest = manifestOf(files)
+        val (svc, requests) = newService(files)
+
+        svc.processSession(sessionWith(manifest), "Industrial", clientDir, null, null, null, null)
+        val firstSyncRequests = requests.get()
+
+        // Delete one file that previously sat outside the sample window. The
+        // exact name doesn't matter — alphabetical ordering of HashMap is not
+        // guaranteed, but a 30-entry manifest with a single removal guarantees
+        // the sample (any 20 of 30) misses one entry in roughly a third of
+        // hash orderings. We pick one explicitly so the test is deterministic.
+        val victim = clientDir.resolve("mods/mod-25.jar")
+        assertTrue(Files.exists(victim), "victim must be on disk before deletion")
+        Files.delete(victim)
+
+        svc.processSession(sessionWith(manifest), "Industrial", clientDir, null, null, null, null)
+
+        assertTrue(Files.exists(victim), "deleted file must be restored on re-sync")
+        // The full integrity walk should have refetched the missing file (and
+        // re-verified the others via MD5). At minimum we expect more fetches
+        // than zero — pre-#203 this was zero because the cache short-circuit
+        // covered the deletion.
+        assertTrue(requests.get() > firstSyncRequests,
+            "post-deletion sync must refetch — cache must NOT short-circuit when any manifest entry is missing")
+    }
+
+    @Test
+    fun `single-file truncation outside top-20 forces re-download`() = runBlocking {
+        // Sibling to the deletion test: file present but corrupted (size
+        // mismatch). The sanity gate compares stat().size to manifest.size,
+        // so a truncated mod is detected without paying the MD5 walk cost.
+        // Pre-#203 the file was present so exists() said true and the cache
+        // was trusted; Minecraft loaded the truncated JAR and crashed with
+        // NoClassDefFoundError.
+        val files = buildMap<String, ByteArray> {
+            for (i in 1..30) put("mods/mod-$i.jar", "mod $i contents — substantial bytes here".toByteArray())
+        }
+        val manifest = manifestOf(files)
+        val (svc, requests) = newService(files)
+
+        svc.processSession(sessionWith(manifest), "Industrial", clientDir, null, null, null, null)
+        val firstSyncRequests = requests.get()
+
+        // Corrupt one file by truncating to zero bytes. File still exists,
+        // but its size no longer matches the manifest.
+        val victim = clientDir.resolve("mods/mod-25.jar")
+        val originalSize = Files.size(victim)
+        Files.write(victim, ByteArray(0))
+        assertTrue(Files.size(victim) < originalSize, "victim must be truncated")
+
+        svc.processSession(sessionWith(manifest), "Industrial", clientDir, null, null, null, null)
+
+        assertEquals(originalSize, Files.size(victim),
+            "truncated file must be restored to manifest size on re-sync")
+        assertTrue(requests.get() > firstSyncRequests,
+            "post-truncation sync must refetch — cache must NOT short-circuit when size doesn't match manifest")
+    }
+
     // ── Network failure ───────────────────────────────────────────────────
 
     @Test
