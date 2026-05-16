@@ -11,6 +11,7 @@ import androidx.compose.ui.unit.sp
 import hivens.core.api.model.ServerProfile
 import hivens.launcher.AutoSyncService
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.puppet.PuppetClick
 import hivens.ui.theme.CelestiaTheme
 
 /**
@@ -71,16 +72,31 @@ fun ServerGrid(
                     color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.5f), letterSpacing = 1.5.sp,
                     modifier = Modifier.padding(top = if (index > 0) 8.dp else 0.dp, bottom = 4.dp)
                 )
-                is GridItem.Server -> SquareServerCard(
-                    profile = item.profile, isSelected = item.profile == selectedServer,
-                    isFavorite = favorites.contains(item.profile.assetDir),
-                    onSelect = { if (isLaunchable) onSelect(item.profile) },
-                    onLaunch = { if (isLaunchable) onLaunch(item.profile) },
-                    onSettings = { onSettings(item.profile) },
-                    onDetails = { onDetails(item.profile) },
-                    onToggleFav = { onToggleFav(item.profile) },
-                    syncState = syncStates[item.profile.assetDir]
-                )
+                is GridItem.Server -> {
+                    SquareServerCard(
+                        profile = item.profile, isSelected = item.profile == selectedServer,
+                        isFavorite = favorites.contains(item.profile.assetDir),
+                        onSelect = { if (isLaunchable) onSelect(item.profile) },
+                        onLaunch = { if (isLaunchable) onLaunch(item.profile) },
+                        onSettings = { onSettings(item.profile) },
+                        onDetails = { onDetails(item.profile) },
+                        onToggleFav = { onToggleFav(item.profile) },
+                        syncState = syncStates[item.profile.assetDir]
+                    )
+                    // Puppet: per-card actions keyed by assetDir so drivers can
+                    // pick a specific server by name (e.g. "SkyBlock") instead
+                    // of having to know its grid index. Only registered while
+                    // the card is composed (LazyVerticalGrid only composes
+                    // visible items) — off-screen cards won't be reachable
+                    // until scrolled into view. Not a problem with Aura's
+                    // current 7-server inventory; document if it grows.
+                    val asset = item.profile.assetDir
+                    PuppetClick("server.select.$asset", enabled = isLaunchable) { onSelect(item.profile) }
+                    PuppetClick("server.launch.$asset", enabled = isLaunchable) { onLaunch(item.profile) }
+                    PuppetClick("server.details.$asset") { onDetails(item.profile) }
+                    PuppetClick("server.settings.$asset") { onSettings(item.profile) }
+                    PuppetClick("server.toggleFav.$asset") { onToggleFav(item.profile) }
+                }
             }
         }
     }

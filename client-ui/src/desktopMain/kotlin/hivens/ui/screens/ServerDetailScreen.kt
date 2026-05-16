@@ -26,6 +26,8 @@ import hivens.launcher.platform.PlatformPaths
 import hivens.ui.components.GlassCard
 import hivens.ui.debug.SkiaTracker
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.puppet.PuppetClick
+import hivens.ui.puppet.PuppetScreen
 import hivens.ui.theme.CelestiaTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -65,6 +67,9 @@ fun ServerDetailScreen(
             isLoading = false
         }
     }
+
+    PuppetScreen("ServerDetail")
+    PuppetClick("serverDetail.back") { onBack() }
 
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         Row(Modifier.fillMaxWidth().padding(bottom = 16.dp), verticalAlignment = Alignment.CenterVertically) {

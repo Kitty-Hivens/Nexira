@@ -30,6 +30,9 @@ import hivens.ui.easter.AprilFoolsButton
 import hivens.ui.easter.AprilFoolsDebugPanel
 import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.puppet.PuppetClick
+import hivens.ui.puppet.PuppetScreen
+import hivens.ui.puppet.PuppetToggle
 import hivens.ui.theme.CelestiaTheme
 import org.koin.compose.koinInject
 import java.awt.Desktop
@@ -45,6 +48,8 @@ fun SettingsScreen(
     onOpenBackgroundSettings: () -> Unit = {},
     onOpenAbout: () -> Unit = {}
 ) {
+    PuppetScreen("Settings")
+
     val settingsService: ISettingsService = koinInject()
     val paths: PlatformPaths              = koinInject()
     val s = LocalStrings.current
@@ -157,6 +162,14 @@ fun SettingsScreen(
                                         },
                                         onClick = { langDropdownExpanded = false; onLocaleChanged(locale) }
                                     )
+                                    // Puppet: per-locale direct click. Drivers can switch
+                                    // language without opening the dropdown first — the
+                                    // onLocaleChanged callback is what actually mutates
+                                    // state, the dropdown is presentation only.
+                                    PuppetClick("settings.language.${locale.name}") {
+                                        langDropdownExpanded = false
+                                        onLocaleChanged(locale)
+                                    }
                                 }
                             }
                         }
@@ -165,6 +178,7 @@ fun SettingsScreen(
                     Spacer(Modifier.height(16.dp))
 
                     // Theme picker shortcut
+                    PuppetClick("settings.openThemePicker") { onOpenThemePicker() }
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -189,6 +203,7 @@ fun SettingsScreen(
                     Spacer(Modifier.height(16.dp))
 
                     // Custom background shortcut
+                    PuppetClick("settings.openBackground") { onOpenBackgroundSettings() }
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -219,6 +234,9 @@ fun SettingsScreen(
                         checked         = themeSwitchState,
                         onCheckedChange = { isChecked -> themeSwitchState = isChecked; onToggleTheme() }
                     )
+                    PuppetToggle("settings.darkTheme", themeSwitchState) { isChecked ->
+                        themeSwitchState = isChecked; onToggleTheme()
+                    }
                 }
 
                 // ── Behavior ──────────────────────────────────────────────────
@@ -229,6 +247,7 @@ fun SettingsScreen(
                         checked         = closeAfterStart,
                         onCheckedChange = { closeAfterStart = it; save() }
                     )
+                    PuppetToggle("settings.closeAfterStart", closeAfterStart) { closeAfterStart = it; save() }
 
                     Spacer(Modifier.height(16.dp))
 
@@ -274,6 +293,7 @@ fun SettingsScreen(
                                 checkedTrackColor = CelestiaTheme.colors.error.copy(alpha = 0.5f)
                             )
                         )
+                        PuppetToggle("settings.offlineMode", isOfflineMode) { isOfflineMode = it; save() }
                     }
                 }
 
@@ -350,6 +370,14 @@ fun SettingsScreen(
                                     ) {
                                         Text(s.sslBypassRevoke, color = CelestiaTheme.colors.textSecondary)
                                     }
+                                    // Puppet: per-host revoke. Driver picks the host
+                                    // by its actual hostname string.
+                                    PuppetClick("settings.sslBypass.revoke.${entry.host}") {
+                                        hivens.core.diag.ActionRing.record(
+                                            "SSL bypass revoked by puppet driver: ${entry.host}",
+                                        )
+                                        hivens.launcher.NetworkState.revokeBypass(entry.host)
+                                    }
                                 }
                             }
                         }
@@ -378,6 +406,7 @@ fun SettingsScreen(
                                 onCheckedChange = { forceProxyMode = it; save() },
                             )
                         }
+                        PuppetToggle("settings.forceProxyMode", forceProxyMode) { forceProxyMode = it; save() }
                     }
                 }
 
@@ -395,6 +424,7 @@ fun SettingsScreen(
                         enabled        = true,
                         onCheckedChange = { experimentalEnabled = it; save() }
                     )
+                    PuppetToggle("settings.experimental", experimentalEnabled) { experimentalEnabled = it; save() }
 
                     Spacer(Modifier.height(16.dp))
 
@@ -407,6 +437,10 @@ fun SettingsScreen(
                         enabled        = experimentalEnabled,
                         onCheckedChange = { mandatoryUpdates = it; save() }
                     )
+                    // Mirror the UI's enabled-gating: master switch off => can't touch sub-toggles.
+                    PuppetToggle("settings.mandatoryUpdates", mandatoryUpdates, enabled = experimentalEnabled) {
+                        mandatoryUpdates = it; save()
+                    }
 
                     Spacer(Modifier.height(16.dp))
 
@@ -419,6 +453,9 @@ fun SettingsScreen(
                         enabled        = experimentalEnabled,
                         onCheckedChange = { prereleaseChannel = it; save() }
                     )
+                    PuppetToggle("settings.prereleaseChannel", prereleaseChannel, enabled = experimentalEnabled) {
+                        prereleaseChannel = it; save()
+                    }
 
                     Spacer(Modifier.height(16.dp))
 
@@ -431,6 +468,9 @@ fun SettingsScreen(
                         enabled        = experimentalEnabled,
                         onCheckedChange = { autoSyncAllPacks = it; save() }
                     )
+                    PuppetToggle("settings.autoSyncAllPacks", autoSyncAllPacks, enabled = experimentalEnabled) {
+                        autoSyncAllPacks = it; save()
+                    }
 
                     Spacer(Modifier.height(16.dp))
 
@@ -443,6 +483,9 @@ fun SettingsScreen(
                         enabled        = experimentalEnabled,
                         onCheckedChange = { jvmBuilderEnabled = it; save() }
                     )
+                    PuppetToggle("settings.jvmBuilder", jvmBuilderEnabled, enabled = experimentalEnabled) {
+                        jvmBuilderEnabled = it; save()
+                    }
                 }
 
                 // ── Data directory (move to a different drive / folder) ───────
@@ -604,6 +647,7 @@ fun SettingsScreen(
                                 contentColor   = CelestiaTheme.colors.textPrimary,
                             ),
                         )
+                        PuppetClick("settings.openLogsDir") { openFolder(paths.logsDir.toString()) }
                         // Open crash reports — chaos target
                         AprilFoolsButton(
                             id       = "settings_crash_reports_btn",
@@ -615,6 +659,7 @@ fun SettingsScreen(
                                 contentColor   = CelestiaTheme.colors.textPrimary,
                             ),
                         )
+                        PuppetClick("settings.openCrashReports") { openFolder(paths.crashDir.toString()) }
                     }
 
                     Spacer(Modifier.height(8.dp))
@@ -662,6 +707,16 @@ fun SettingsScreen(
                             ),
                             enabled  = !bundleBusy,
                         )
+                        PuppetClick("settings.createDiagBundle", enabled = !bundleBusy) {
+                            bundleBusy = true
+                            bundleScope.launch {
+                                val zip = withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                    runCatching { DiagnosticBundle.create(paths) }.getOrNull()
+                                }
+                                if (zip != null) lastBundlePath = zip
+                                bundleBusy = false
+                            }
+                        }
                         AprilFoolsButton(
                             id       = "settings_report_github_btn",
                             text     = s.settingsReportOnGithub,
@@ -688,6 +743,18 @@ fun SettingsScreen(
                             ),
                             enabled  = lastBundlePath != null,
                         )
+                        PuppetClick("settings.reportOnGithub", enabled = lastBundlePath != null) {
+                            val zip = lastBundlePath ?: return@PuppetClick
+                            runCatching {
+                                java.awt.Toolkit.getDefaultToolkit().systemClipboard
+                                    .setContents(java.awt.datatransfer.StringSelection(zip.toString()), null)
+                                if (Desktop.isDesktopSupported()) {
+                                    Desktop.getDesktop().browse(
+                                        java.net.URI(hivens.launcher.diag.IssueReporter.bundleIssueUrl(zip))
+                                    )
+                                }
+                            }
+                        }
                     }
                     Text(
                         text     = s.settingsDiagnosticBundleHint,
@@ -700,6 +767,7 @@ fun SettingsScreen(
                 // ── About ─────────────────────────────────────────────────────
                 item {
                     SettingsSectionTitle(s.settingsSectionAbout)
+                    PuppetClick("settings.openAbout") { onOpenAbout() }
 
                     Row(
                         modifier = Modifier

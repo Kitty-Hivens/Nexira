@@ -19,6 +19,7 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import hivens.core.data.LauncherUpdate
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.puppet.PuppetClick
 import hivens.ui.theme.CelestiaTheme
 
 @Composable
@@ -29,6 +30,16 @@ fun UpdateNotification(
 ) {
     val s = LocalStrings.current
     var isVisible by remember { mutableStateOf(true) }
+
+    // Puppet: toast-style notification (above the main app). We do NOT
+    // override the current screen — the notification lives on top of
+    // whichever main screen is active.
+    PuppetClick("updateNotification.details", enabled = isVisible) {
+        isVisible = false; onOpenDialog()
+    }
+    PuppetClick("updateNotification.later", enabled = isVisible && !update.isCritical) {
+        isVisible = false; onDismiss()
+    }
 
     AnimatedVisibility(
         visible = isVisible,

@@ -34,6 +34,8 @@ import hivens.ui.easter.AprilFoolsText.GibberishMode
 import hivens.ui.generated.resources.Res
 import hivens.ui.generated.resources.favicon
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.puppet.PuppetClick
+import hivens.ui.puppet.PuppetScreen
 import hivens.ui.theme.CelestiaTheme
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
@@ -82,6 +84,29 @@ fun AboutScreen(onBack: () -> Unit) {
             updateService = updateService,
             onDismiss     = { showUpdateDialog = false }
         )
+    }
+
+    PuppetScreen("About")
+    PuppetClick("about.back") { onBack() }
+    PuppetClick("about.checkUpdates", enabled = updateState is UpdateCheckState.Idle) {
+        updateState = UpdateCheckState.Checking
+        scope.launch {
+            updateState = try {
+                val update = updateService.checkForUpdate(force = true)
+                if (update != null) UpdateCheckState.Available(update)
+                else UpdateCheckState.UpToDate
+            } catch (e: Exception) {
+                UpdateCheckState.Error(e.message ?: s.updateErrorUnknown)
+            }
+        }
+    }
+    // Reset the check state back to Idle (works for UpToDate / Available / Error).
+    PuppetClick("about.checkAgain", enabled = updateState !is UpdateCheckState.Idle &&
+        updateState !is UpdateCheckState.Checking) {
+        updateState = UpdateCheckState.Idle
+    }
+    PuppetClick("about.openUpdateDialog", enabled = updateState is UpdateCheckState.Available) {
+        showUpdateDialog = true
     }
 
     Column(Modifier.fillMaxSize().padding(24.dp)) {

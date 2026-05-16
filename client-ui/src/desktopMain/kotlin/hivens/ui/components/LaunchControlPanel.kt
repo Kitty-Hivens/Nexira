@@ -13,6 +13,7 @@ import hivens.ui.easter.AprilFools
 import hivens.ui.easter.AprilFoolsButton
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.logic.LaunchState
+import hivens.ui.puppet.PuppetClick
 import hivens.ui.theme.CelestiaTheme
 import java.text.DecimalFormat
 
@@ -139,6 +140,17 @@ fun LaunchControlPanel(
                 },
                 modifier = Modifier.fillMaxWidth().height(50.dp)
             )
+        }
+        // Puppet: single action whose semantic depends on the current LaunchState.
+        // Same mapping as the CelestiaButton onClick above — driver doesn't need
+        // to know whether it's currently a Play / Abort / ClearError button, just
+        // "do the action attached to the launch control".
+        PuppetClick("dashboard.launch", enabled = state !is LaunchState.GameRunning) {
+            when (state) {
+                is LaunchState.Downloading, is LaunchState.Prepare -> onAbort()
+                is LaunchState.Error                               -> onClearError()
+                else                                               -> onLaunch()
+            }
         }
     }
 }

@@ -22,6 +22,8 @@ import hivens.core.api.interfaces.IUpdateApplicator
 import hivens.core.data.LauncherUpdate
 import hivens.launcher.update.UpdateService
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.puppet.PuppetClick
+import hivens.ui.puppet.PuppetScreen
 import hivens.ui.theme.CelestiaTheme
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
@@ -51,6 +53,56 @@ fun UpdateDialog(
     // for everything that's about non-dismissability, and keep `isMandatory`
     // separate for the visual + button changes.
     val isBlocking = update.isCritical || update.isMandatory
+
+    // Puppet: dialog action set. Marker screen helps drivers detect the
+    // dialog is open; ids map to the buttons rendered below.
+    PuppetScreen("UpdateDialog")
+    PuppetClick("update.viewOnGithub", enabled = downloadState !is DownloadState.Downloading) {
+        runCatching {
+            val desktop = java.awt.Desktop.getDesktop()
+            if (desktop.isSupported(java.awt.Desktop.Action.BROWSE)) {
+                desktop.browse(java.net.URI(update.releasePageUrl))
+            }
+        }
+    }
+    PuppetClick("update.dismiss", enabled = !isBlocking && downloadState !is DownloadState.Downloading) {
+        onDismiss()
+    }
+    PuppetClick("update.exitForMandatory", enabled = update.isMandatory && downloadState !is DownloadState.Downloading) {
+        exitProcess(0)
+    }
+    PuppetClick("update.download", enabled = downloadState is DownloadState.Idle) {
+        scope.launch {
+            downloadState = DownloadState.Downloading(0L, 0L, 0.0)
+            errorMessage  = null
+            try {
+                val path = updateService.downloadUpdate(update) { dl, total, speed ->
+                    downloadState = DownloadState.Downloading(dl, total, speed)
+                }
+                downloadState = DownloadState.Ready(path.toString())
+            } catch (e: Exception) {
+                logger.error("Download failed", e)
+                errorMessage  = e.message ?: s.updateErrorUnknown
+                downloadState = DownloadState.Failed
+            }
+        }
+    }
+    PuppetClick("update.install", enabled = downloadState is DownloadState.Ready) {
+        val path = (downloadState as? DownloadState.Ready)?.installerPath ?: return@PuppetClick
+        try {
+            updateApplicator.scheduleUpdate(java.nio.file.Paths.get(path))
+            logger.info("Update scheduled, exiting...")
+            exitProcess(0)
+        } catch (e: Exception) {
+            logger.error("Failed to schedule update", e)
+            errorMessage  = "${s.updateScheduleFailed}: ${e.message}"
+            downloadState = DownloadState.Failed
+        }
+    }
+    PuppetClick("update.retry", enabled = downloadState is DownloadState.Failed) {
+        errorMessage = null
+        downloadState = DownloadState.Idle
+    }
 
     BasicAlertDialog(
         onDismissRequest = { if (!isBlocking) onDismiss() }

@@ -55,6 +55,11 @@ ktor-client-content-negotiation = { group = "io.ktor", name = "ktor-client-conte
 ktor-serialization-json         = { group = "io.ktor", name = "ktor-serialization-kotlinx-json",  version.ref = "ktor" }
 ktor-client-mock                = { group = "io.ktor", name = "ktor-client-mock",                 version.ref = "ktor" }
 
+# Ktor server (puppet HTTP control surface in client-ui — see hivens.ui.puppet)
+ktor-server-core                = { group = "io.ktor", name = "ktor-server-core",                 version.ref = "ktor" }
+ktor-server-cio                 = { group = "io.ktor", name = "ktor-server-cio",                  version.ref = "ktor" }
+ktor-server-content-negotiation = { group = "io.ktor", name = "ktor-server-content-negotiation",  version.ref = "ktor" }
+
 # Kotlinx
 kotlinx-serialization-json      = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "serialization" }
 kotlinx-coroutines-test         = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test",    version.ref = "coroutines" }
