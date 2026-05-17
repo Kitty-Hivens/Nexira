@@ -57,6 +57,7 @@ fun AppLayout(
     onBackgroundSettingsChanged: (BackgroundSettings) -> Unit = {}
 ) {
     val skinRepository: SkinRepository = koinInject()
+    val protocolConfig: hivens.launcher.network.ServerProtocolConfig = koinInject()
 
     // Session can be refreshed by DashboardScreen on auth-retry
     var currentSession by remember(appState) {
@@ -68,9 +69,10 @@ fun AppLayout(
     val rowBackground = if (backgroundSettings.enabled) Color.Transparent
     else CelestiaTheme.colors.background
 
-    val sslBypass by produceState(initialValue = NetworkState.bypassFor(hivens.config.Network.SSL_BYPASS_HOST)) { // TODO: Deprecated
+    val bypassHost = protocolConfig.sslBypassHost
+    val sslBypass by produceState(initialValue = NetworkState.bypassFor(bypassHost), bypassHost) {
         while (true) {
-            value = NetworkState.bypassFor(hivens.config.Network.SSL_BYPASS_HOST) // TODO: deprecated
+            value = NetworkState.bypassFor(bypassHost)
             delay(200.milliseconds)
         }
     }

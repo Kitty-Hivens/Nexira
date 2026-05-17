@@ -330,7 +330,7 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
                     hivens.core.diag.ActionRing.record(
                         "SSL bypass accepted by user (login retry) -- granted: $label",
                     )
-                    NetworkState.grantBypass(hivens.config.Network.SSL_BYPASS_HOST, until)
+                    NetworkState.grantBypass(protocolConfig.sslBypassHost, until)
                     doLogin(insecureAuthService)
                 }
                 Row(

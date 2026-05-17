@@ -69,6 +69,19 @@ data class ServerProtocolConfig(
     /** Per-server client-file CDN root -- `FileDownloadService` appends `/<server>/<file>`. */
     val clientFilesBase: String get() = "$baseUrl/launcher/clients"
 
+    /**
+     * Hostname used as the key in [hivens.launcher.NetworkState]'s per-host
+     * SSL-bypass set. Extracted from [baseUrl]'s URI authority so a Mirror
+     * operator pointing the launcher at `https://mirror.example.com` keys
+     * bypasses against `mirror.example.com`, not the production smartycraft
+     * host. Falls back to the default-base-url host when [baseUrl] is
+     * malformed -- callers always get a usable host string instead of an
+     * empty match key.
+     */
+    val sslBypassHost: String get() =
+        runCatching { java.net.URI(baseUrl).host }.getOrNull()?.takeIf { it.isNotBlank() }
+            ?: runCatching { java.net.URI(DEFAULT_BASE_URL).host!! }.getOrThrow()
+
     companion object {
         const val DEFAULT_BASE_URL    = "https://www.smartycraft.ru"
         const val DEFAULT_PROXY_HOST  = "proxy.smartycraft.ru"
