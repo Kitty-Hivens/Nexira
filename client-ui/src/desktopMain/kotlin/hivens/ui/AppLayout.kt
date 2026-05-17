@@ -22,7 +22,7 @@ import androidx.compose.ui.unit.dp
 import hivens.core.api.SkinRepository
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.SessionData
-import hivens.launcher.NetworkState
+import hivens.launcher.network.NetworkState
 import hivens.ui.background.BackgroundSettings
 import hivens.ui.easter.AprilFools
 import hivens.ui.i18n.AppLocale

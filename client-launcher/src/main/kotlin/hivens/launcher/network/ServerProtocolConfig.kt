@@ -59,6 +59,16 @@ data class ServerProtocolConfig(
      * value, not a secret. See `feedback_secrets_vs_interop`.
      */
     val proxyPass: String = DEFAULT_PROXY_PASS,
+
+    /**
+     * OkHttp `connectTimeout`, applied to every client variant the launcher
+     * builds (direct, proxied, insecure). Bumpable for high-latency Mirror
+     * operators via `server-config.json`.
+     */
+    val connectTimeoutMs: Long = DEFAULT_CONNECT_TIMEOUT_MS,
+
+    /** OkHttp `readTimeout`, same per-Mirror override path as [connectTimeoutMs]. */
+    val readTimeoutMs: Long = DEFAULT_READ_TIMEOUT_MS,
 ) {
     /** POST endpoint for `action=login`/`action=loader`/etc. */
     val authUrl: String get() = "$baseUrl/launcher2/index.php"
@@ -70,7 +80,7 @@ data class ServerProtocolConfig(
     val clientFilesBase: String get() = "$baseUrl/launcher/clients"
 
     /**
-     * Hostname used as the key in [hivens.launcher.NetworkState]'s per-host
+     * Hostname used as the key in [hivens.launcher.network.NetworkState]'s per-host
      * SSL-bypass set. Extracted from [baseUrl]'s URI authority so a Mirror
      * operator pointing the launcher at `https://mirror.example.com` keys
      * bypasses against `mirror.example.com`, not the production smartycraft
@@ -88,6 +98,8 @@ data class ServerProtocolConfig(
         const val DEFAULT_PROXY_PORT  = 58613
         const val DEFAULT_PROXY_USER  = "smartycraftproxyuser"
         const val DEFAULT_PROXY_PASS  = "ngyxvpFfiUz4FB2OPx1nqEa4TEKigbKc"
+        const val DEFAULT_CONNECT_TIMEOUT_MS = 30_000L
+        const val DEFAULT_READ_TIMEOUT_MS    = 300_000L
 
         /** System-property name for the runtime base-URL override. */
         const val SYSTEM_PROP_BASE_URL = "aura.conduit.baseurl"

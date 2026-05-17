@@ -1,11 +1,11 @@
 package hivens.launcher.di
 
-import hivens.config.Network
 import hivens.config.Protocol
 import hivens.config.Storage
 import hivens.core.api.AuthService
 import hivens.core.api.interfaces.IServerProtocol
 import hivens.launcher.network.ChannelRouter
+import hivens.launcher.network.NetworkState
 import hivens.launcher.network.ServerProtocolConfig
 import hivens.launcher.network.ServerProtocolConfigLoader
 import hivens.launcher.protocol.LauncherHashCache
@@ -55,7 +55,7 @@ val networkModule = module {
 
     // ── Smartycraft channel ───────────────────────────────────────────────────
     // SOCKS-proxied. Required for everything on `*.smartycraft.ru`. See the
-    // routing taxonomy in `hivens.config.Network`.
+    // routing taxonomy in [HttpClientProvider]'s KDoc.
 
     /**
      * Smartycraft secure client. SSL verification on, SOCKS proxy always on.
@@ -82,8 +82,8 @@ val networkModule = module {
         })
 
         OkHttpClient.Builder()
-            .connectTimeout(Network.TIMEOUT_CONNECT, TimeUnit.MILLISECONDS)
-            .readTimeout(Network.TIMEOUT_READ, TimeUnit.MILLISECONDS)
+            .connectTimeout(cfg.connectTimeoutMs, TimeUnit.MILLISECONDS)
+            .readTimeout(cfg.readTimeoutMs, TimeUnit.MILLISECONDS)
             .proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress(cfg.proxyHost, cfg.proxyPort)))
             .build()
     }
@@ -110,8 +110,8 @@ val networkModule = module {
         val (socketFactory, trustManager) = buildTrustAllSsl()
 
         OkHttpClient.Builder()
-            .connectTimeout(Network.TIMEOUT_CONNECT, TimeUnit.MILLISECONDS)
-            .readTimeout(Network.TIMEOUT_READ, TimeUnit.MILLISECONDS)
+            .connectTimeout(cfg.connectTimeoutMs, TimeUnit.MILLISECONDS)
+            .readTimeout(cfg.readTimeoutMs, TimeUnit.MILLISECONDS)
             .sslSocketFactory(socketFactory, trustManager)
             .hostnameVerifier { _, _ -> true }
             .proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress(cfg.proxyHost, cfg.proxyPort)))
@@ -133,9 +133,10 @@ val networkModule = module {
      * would be a needless trust expansion.
      */
     single<OkHttpClient>(named("direct")) {
+        val cfg: ServerProtocolConfig = get()
         OkHttpClient.Builder()
-            .connectTimeout(Network.TIMEOUT_CONNECT, TimeUnit.MILLISECONDS)
-            .readTimeout(Network.TIMEOUT_READ, TimeUnit.MILLISECONDS)
+            .connectTimeout(cfg.connectTimeoutMs, TimeUnit.MILLISECONDS)
+            .readTimeout(cfg.readTimeoutMs, TimeUnit.MILLISECONDS)
             .build()
     }
 
@@ -174,7 +175,7 @@ val networkModule = module {
     /**
      * Direct-channel [HttpClientProvider]. Inject this (`named("direct")`)
      * for any outbound call that does NOT need to tunnel through the
-     * SMARTYcraft proxy -- see routing notes in `hivens.config.Network`.
+     * SMARTYcraft proxy -- see routing notes in [HttpClientProvider].
      */
     single<HttpClientProvider>(named("direct")) {
         val direct = buildHttpClient(get<OkHttpClient>(named("direct")), get())
@@ -206,10 +207,11 @@ val networkModule = module {
     single<ChannelRouter>(named("insecure")) {
         // Insecure direct + insecure proxy. Used when user has accepted SSL
         // bypass for the host; fallback still works, just without TLS check.
+        val cfg: ServerProtocolConfig = get()
         val (socketFactory, trustManager) = buildTrustAllSsl()
         val insecureDirect = OkHttpClient.Builder()
-            .connectTimeout(Network.TIMEOUT_CONNECT, TimeUnit.MILLISECONDS)
-            .readTimeout(Network.TIMEOUT_READ, TimeUnit.MILLISECONDS)
+            .connectTimeout(cfg.connectTimeoutMs, TimeUnit.MILLISECONDS)
+            .readTimeout(cfg.readTimeoutMs, TimeUnit.MILLISECONDS)
             .sslSocketFactory(socketFactory, trustManager)
             .hostnameVerifier { _, _ -> true }
             .build()

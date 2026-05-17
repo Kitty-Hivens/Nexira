@@ -1,4 +1,4 @@
-package hivens.launcher
+package hivens.launcher.network
 
 import hivens.core.security.SslBypassEntry
 import kotlinx.serialization.decodeFromString

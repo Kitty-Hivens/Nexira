@@ -10,7 +10,7 @@ import io.ktor.client.HttpClient
  * ── Per-channel registration ──────────────────────────────────────────────────
  *
  * `client-launcher/.../di/Modules.kt` registers two providers, one per outbound
- * routing channel (see `hivens.config.Network` for the full taxonomy):
+ * routing channel (see consumers in `client-launcher/.../di/Modules.kt` for the full taxonomy):
  *
  *   ◆ default      -- Smartycraft channel: SOCKS-proxied, SSL-bypass-aware.
  *                    Inject for any call to `*.smartycraft.ru`.

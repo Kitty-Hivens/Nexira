@@ -26,7 +26,7 @@ import hivens.core.data.SessionData
 import hivens.launcher.AutoSyncService
 import hivens.launcher.CrashReporter
 import hivens.launcher.CredentialsManager
-import hivens.launcher.NetworkState
+import hivens.launcher.network.NetworkState
 import hivens.launcher.ProfileManager
 import hivens.launcher.di.appModule
 import hivens.launcher.di.networkModule
