@@ -53,6 +53,7 @@ fun DashboardScreen(
     val profileManager: ProfileManager        = koinInject()
     val controller: LauncherController        = koinInject()
     val autoSyncService: AutoSyncService      = koinInject()
+    val protocolConfig: hivens.launcher.network.ServerProtocolConfig = koinInject()
     val s = LocalStrings.current
     val scope = rememberCoroutineScope()
 
@@ -66,9 +67,10 @@ fun DashboardScreen(
     var favoriteTrigger     by remember { mutableStateOf(0) }
     val favorites = remember(favoriteTrigger) { profileManager.favoriteServers }
     var isLoadingServers    by remember { mutableStateOf(true) }
-    val sslBypass by produceState(initialValue = NetworkState.bypassFor(hivens.config.Network.SSL_BYPASS_HOST)) { // TODO: Deprecated
+    val bypassHost = protocolConfig.sslBypassHost
+    val sslBypass by produceState(initialValue = NetworkState.bypassFor(bypassHost), bypassHost) {
         while (true) {
-            value = NetworkState.bypassFor(hivens.config.Network.SSL_BYPASS_HOST) // TODO: Deprecated
+            value = NetworkState.bypassFor(bypassHost)
             delay(200.milliseconds)
         }
     }

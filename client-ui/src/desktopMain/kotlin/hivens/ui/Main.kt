@@ -625,6 +625,7 @@ fun AppRoot(
     val json: Json                             = koinInject()
     val httpClient: OkHttpClient               = koinInject()
     val insecureAuthService: IAuthService      = koinInject(named("insecure"))
+    val protocolConfig: hivens.launcher.network.ServerProtocolConfig = koinInject()
 
     setSingletonImageLoaderFactory { context ->
         ImageLoader.Builder(context)
@@ -693,7 +694,7 @@ fun AppRoot(
                             // the cert issue resolves or 30 days, whichever comes first.
                             val until = java.time.Instant.now().plus(30, java.time.temporal.ChronoUnit.DAYS)
                             hivens.core.diag.ActionRing.record("SSL bypass auto-granted on cached-credential auto-login (cert error) -- 30 days")
-                            NetworkState.grantBypass(hivens.config.Network.SSL_BYPASS_HOST, until) // TODO: Deprecated
+                            NetworkState.grantBypass(protocolConfig.sslBypassHost, until)
                             try {
                                 val server  = profileManager.lastServerId ?: Protocol.DEFAULT_SERVER_ID
                                 val session = insecureAuthService.login(saved.playerName, saved.cachedPassword!!, server)

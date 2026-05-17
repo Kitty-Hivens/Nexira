@@ -149,14 +149,15 @@ val networkModule = module {
      * call without requiring Koin singleton recreation.
      */
     single {
+        val cfg: ServerProtocolConfig = get()
         val secure   = buildHttpClient(get<OkHttpClient>(),                get())
         val insecure = buildHttpClient(get<OkHttpClient>(named("insecure")), get())
         HttpClientProvider {
             // Per-host SSL bypass with expiry (Vault #2). Default channel
-            // talks only to *.smartycraft.ru, so the single host check is
-            // sufficient -- direct-channel hosts (GitHub, BellSoft, Maven
+            // talks only to whatever host ServerProtocolConfig.baseUrl
+            // resolves to -- direct-channel hosts (GitHub, BellSoft, Maven
             // Central) have their own provider and never bypass.
-            if (NetworkState.bypassFor(Network.SSL_BYPASS_HOST)) insecure else secure
+            if (NetworkState.bypassFor(cfg.sslBypassHost)) insecure else secure
         }
     }
 
