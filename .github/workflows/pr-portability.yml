@@ -1,0 +1,274 @@
+name: PR Portability
+
+# ── PR-time distro smoke ───────────────────────────────────────────────────
+#
+# Builds an AppImage from the PR's HEAD commit and runs the same
+# cross-distro verification matrix that the scheduled
+# `appimage-portability.yml` workflow runs against the last published
+# release. Catches regressions inside the PR itself instead of finding
+# them post-tag, after users have already downloaded the broken artefact.
+#
+# Two jobs:
+#   1. build       -- gradle uber-jar -> AppImage, uploaded as artifact
+#   2. portability -- matrix of Fedora / Arch / Debian / Fedora-no-libsecret
+#                     containers, each pulls the artifact and verifies init
+#
+# Triggers only on PRs that touch files which can plausibly affect the
+# AppImage build / launcher behaviour; doc-only PRs don't pay for a run.
+
+on:
+  pull_request:
+    paths:
+      - 'client-**'
+      - 'gradle/**'
+      - 'gradle.properties'
+      - 'settings.gradle.kts'
+      - 'build.gradle.kts'
+      - 'scripts/build-appimage.sh'
+      - 'resources/**'
+      - '.github/workflows/pr-portability.yml'
+
+# A force-push to the PR cancels the previous in-progress run. The older
+# artefact would be tested against stale code anyway.
+concurrency:
+  group: pr-portability-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  JAVA_VERSION: '25'
+  JAVA_DISTRIBUTION: 'jetbrains'
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────────
+  # Build AppImage from the PR's HEAD commit
+  # ─────────────────────────────────────────────────────────────────────────
+  build:
+    name: Build AppImage from PR HEAD
+    runs-on: ubuntu-22.04
+    outputs:
+      appimage_name: ${{ steps.appimage.outputs.name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: ${{ env.JAVA_DISTRIBUTION }}
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: 'gradle'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Same dynamic-key pattern as build_release.yml / trial-appimage.yml:
+      # cache invalidates automatically when upstream republishes the
+      # continuous appimagetool build.
+      - name: Resolve appimagetool cache key from upstream
+        id: appimagetool-key
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          updated=$(gh api repos/AppImage/appimagetool/releases/tags/continuous \
+            --jq '.assets[] | select(.name=="appimagetool-x86_64.AppImage") | .updated_at' 2>/dev/null \
+            | tr -d ':-T' || true)
+          if [ -z "$updated" ]; then
+            updated="fallback-$(date +%Y%m%d)"
+          fi
+          echo "key=appimagetool-continuous-x86_64-${updated}" >> "$GITHUB_OUTPUT"
+
+      - name: Cache appimagetool
+        uses: actions/cache@v4
+        with:
+          path: appimagetool
+          key: ${{ steps.appimagetool-key.outputs.key }}
+
+      - name: Install AppImage tools
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y fuse libfuse2 desktop-file-utils appstream xmlstarlet
+          if [ -f appimagetool ]; then
+            sudo install -m 0755 appimagetool /usr/local/bin/appimagetool
+          else
+            wget -qO appimagetool \
+              "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage"
+            chmod +x appimagetool
+            sudo install -m 0755 appimagetool /usr/local/bin/appimagetool
+          fi
+
+      # Synthetic version: visibly NOT a real release, ties the artefact to
+      # the exact PR commit so a force-push produces a distinct file name.
+      - name: Resolve PR version
+        id: version
+        run: |
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          echo "value=0.0.0-pr-${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Validate desktop entry
+        run: desktop-file-validate resources/aura-launcher.desktop
+
+      - name: Build JAR
+        env:
+          APP_VERSION: ${{ steps.version.outputs.value }}
+        run: ./gradlew :client-ui:packageReleaseUberJarForCurrentOS -PappVersion="$APP_VERSION"
+
+      - name: Build AppImage
+        id: appimage
+        env:
+          APP_VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          JAR=$(ls client-ui/build/compose/jars/*-release*.jar | head -1)
+          ./scripts/build-appimage.sh "$APP_VERSION" "$JAR"
+          NAME="AuraLauncher-${APP_VERSION}-x86_64.AppImage"
+          echo "name=${NAME}" >> "$GITHUB_OUTPUT"
+          ls -la "${NAME}"
+
+      - name: Upload AppImage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-appimage
+          path: ${{ steps.appimage.outputs.name }}
+          retention-days: 7
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Distro matrix -- pulls the freshly-built AppImage and verifies init
+  #
+  # Mirrors appimage-portability.yml's matrix shape (Fedora / Arch / Debian
+  # / Fedora-no-libsecret with matching expect_keyring values). The only
+  # delta is the source of the AppImage: scheduled workflow downloads from
+  # the GH release, this one downloads from the build job above. Verify
+  # logic is duplicated rather than extracted into a composite action --
+  # the duplication is bounded and keeps each workflow independently
+  # readable.
+  # ─────────────────────────────────────────────────────────────────────────
+  portability:
+    needs: build
+    name: ${{ matrix.distro_name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - distro_name: Fedora-latest
+            container: fedora:latest
+            expect_keyring: any
+            install_cmd: |
+              dnf install -y --setopt=install_weak_deps=False \
+                xorg-x11-server-Xvfb fuse-libs which findutils \
+                libsecret
+          - distro_name: Arch-latest
+            container: archlinux:latest
+            expect_keyring: any
+            install_cmd: |
+              pacman -Sy --noconfirm \
+                xorg-server-xvfb fuse2 which libsecret
+          - distro_name: Debian-stable
+            container: debian:stable
+            expect_keyring: any
+            install_cmd: |
+              apt-get update -qq
+              apt-get install -y --no-install-recommends \
+                xvfb libfuse2 libsecret-1-0
+          - distro_name: Fedora-no-libsecret
+            container: fedora:latest
+            expect_keyring: noop
+            # Deliberately no libsecret -- exercises KeyringStorageFactory's
+            # construction-time-exception fallback path.
+            install_cmd: |
+              dnf install -y --setopt=install_weak_deps=False \
+                xorg-x11-server-Xvfb fuse-libs which findutils
+    container: ${{ matrix.container }}
+    steps:
+      - name: Install runtime deps for ${{ matrix.distro_name }}
+        run: ${{ matrix.install_cmd }}
+
+      - name: Download AppImage from build job
+        uses: actions/download-artifact@v4
+        with:
+          name: pr-appimage
+          path: /tmp/aura
+
+      - name: Extract AppImage (skip FUSE -- not always available in containers)
+        working-directory: /tmp
+        run: |
+          chmod +x aura/*.AppImage
+          ./aura/*.AppImage --appimage-extract > /dev/null
+
+      - name: Launch with virtual display, capture init log
+        working-directory: /tmp
+        env:
+          AURA_DATA_DIR: /tmp/aura-data
+        run: |
+          # 8s wall budget -- launcher reaches splash within 3-4s in a
+          # fresh container. Killed via `timeout` after that; exit 124 is
+          # the expected signal (launcher alive at deadline). Anything
+          # else means the JVM died before we hit the budget.
+          set +e
+          timeout --kill-after=2s 8s xvfb-run -a \
+            squashfs-root/AppRun > /tmp/aura.stdout 2>&1
+          EXIT=$?
+          set -e
+          echo "── Launcher exit code: $EXIT (124 = timeout hit, expected; 0 = clean exit, unusual but ok)"
+          echo "── stdout tail:"
+          tail -30 /tmp/aura.stdout || true
+          if [[ "$EXIT" != "124" && "$EXIT" != "0" ]]; then
+            echo "::error title=PR-Portability::Launcher crashed before timeout (exit $EXIT) on ${{ matrix.distro_name }}"
+            exit 1
+          fi
+
+      - name: Verify init phase reached
+        run: |
+          if grep -q "Display: toolkit=" /tmp/aura.stdout; then
+            echo "::notice title=PR-Portability::${{ matrix.distro_name }} reached toolkit-detection -- distro is supported"
+          else
+            echo "::error title=PR-Portability::No 'Display: toolkit=' line on ${{ matrix.distro_name }}. JRE / native lib / PlatformPaths failed before logging init."
+            echo "── full stdout:"
+            cat /tmp/aura.stdout || true
+            exit 1
+          fi
+
+      - name: Verify launcher.log was written and clean
+        env:
+          AURA_DATA_DIR: /tmp/aura-data
+        run: |
+          LOG="$AURA_DATA_DIR/logs/launcher.log"
+          if [ ! -f "$LOG" ]; then
+            echo "::error title=PR-Portability::launcher.log not found at $LOG -- Pulse logback init failed on ${{ matrix.distro_name }}"
+            ls -la "$AURA_DATA_DIR/" 2>/dev/null || true
+            exit 1
+          fi
+          LOG_SIZE=$(stat -c%s "$LOG" 2>/dev/null || echo 0)
+          if [ "$LOG_SIZE" -lt 100 ]; then
+            echo "::error title=PR-Portability::launcher.log too small ($LOG_SIZE bytes) on ${{ matrix.distro_name }} -- logback opened the appender but never flushed"
+            cat "$LOG" || true
+            exit 1
+          fi
+          if grep -qE 'FATAL|NoClassDefFoundError|UnsatisfiedLinkError|java\.lang\.LinkageError' "$LOG"; then
+            echo "::error title=PR-Portability::Init-time class-load failures in launcher.log on ${{ matrix.distro_name }}:"
+            grep -nE 'FATAL|NoClassDefFoundError|UnsatisfiedLinkError|java\.lang\.LinkageError' "$LOG" | head -20
+            exit 1
+          fi
+          echo "::notice title=PR-Portability::launcher.log on ${{ matrix.distro_name }}: $LOG_SIZE bytes, no FATAL/Linkage/NoClassDef lines"
+
+      - name: Verify keyring fallback (no-libsecret matrix entry only)
+        if: matrix.expect_keyring == 'noop'
+        env:
+          AURA_DATA_DIR: /tmp/aura-data
+        run: |
+          LOG="$AURA_DATA_DIR/logs/launcher.log"
+          if grep -q "Keyring storage: NoOp" "$LOG"; then
+            echo "::notice title=PR-Portability::Keyring factory correctly fell back to NoOp on ${{ matrix.distro_name }}"
+          else
+            echo "::error title=PR-Portability::Expected 'Keyring storage: NoOp' on ${{ matrix.distro_name }} (libsecret absent) -- factory fallback regressed"
+            grep -i 'keyring' "$LOG" | head -20 || echo "(no keyring lines in log)"
+            exit 1
+          fi
+
+      - name: Upload stdout and log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-portability-stdout-${{ matrix.distro_name }}
+          path: |
+            /tmp/aura.stdout
+            /tmp/aura-data/logs/
+          retention-days: 7
