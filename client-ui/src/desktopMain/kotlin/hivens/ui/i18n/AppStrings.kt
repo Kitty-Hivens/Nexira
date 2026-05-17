@@ -315,6 +315,10 @@ interface AppStrings {
     val settingsAutoSyncAllPacksDesc: String
     val settingsJvmBuilder: String
     val settingsJvmBuilderDesc: String
+    val settingsMimicVersion: String
+    val settingsMimicVersionDesc: String
+    /** Placeholder shown inside the mimic-version text field when override is empty. Receives the built-in default version, e.g. `Default: 3.6.5`. */
+    fun settingsMimicVersionPlaceholder(default: String): String
 
     /** Auto-sync progress strip — `Syncing <name> (3/7)` */
     fun dashboardAutoSyncProgress(serverName: String, current: Int, total: Int): String
