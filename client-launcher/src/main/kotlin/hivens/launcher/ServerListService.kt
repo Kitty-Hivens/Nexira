@@ -84,18 +84,17 @@ class ServerListService(
         }
     }
 
-    private fun getProfile(srv: SmartyServer): ServerProfile {
-        return ServerProfile().apply {
-            name = srv.id
-            title = srv.title ?: srv.id
-            version = srv.version ?: "1.7.10"
-            ip = srv.ip
-            port = srv.port
-            assetDir = srv.assetDir
-            extraCheckSum = srv.extraCheckSum
-            optionalModsData = (srv.optionalMods as? JsonObject) ?: emptyMap()
-        }
-    }
+    private fun getProfile(srv: SmartyServer): ServerProfile =
+        ServerProfile(
+            name             = srv.id,
+            title            = srv.title ?: srv.id,
+            version          = srv.version ?: "1.7.10",
+            ip               = srv.ip,
+            port             = srv.port,
+            assetDir         = srv.assetDir,
+            extraCheckSum    = srv.extraCheckSum,
+            optionalModsData = (srv.optionalMods as? JsonObject) ?: emptyMap(),
+        )
 
     private fun formatTimestamp(ts: Long): String {
         return try {
