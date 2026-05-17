@@ -175,15 +175,19 @@ class SmartycraftV1Protocol(
         }
     }
 
+    /**
+     * Pre-Conduit this method caught Exception and returned "" so callers
+     * mapped network failures into ProtocolStatus.ERROR responses. That hid
+     * IOException from AuthService.retryWithBackoff's shouldRetry predicate,
+     * which made the auth-flow retry chain dead code for the very class of
+     * failure it was built for (SOCKS h2 resets). Now the exception
+     * propagates; each protocol method's own caller decides whether to retry
+     * or surface as an error response.
+     */
     private suspend fun postForm(actionName: String, params: Parameters): String =
-        try {
-            router.execute { client ->
-                val response = client.post(config.authUrl) { setBody(FormDataContent(params)) }
-                response.body<String>().trim()
-            }
-        } catch (e: Exception) {
-            logger.error("POST action=$actionName failed", e)
-            ""
+        router.execute { client ->
+            val response = client.post(config.authUrl) { setBody(FormDataContent(params)) }
+            response.body<String>().trim()
         }
 
     private inline fun <reified T> parseJsonTolerant(raw: String): T? {

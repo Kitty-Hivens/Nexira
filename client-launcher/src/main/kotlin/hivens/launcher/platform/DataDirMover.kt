@@ -2,6 +2,7 @@ package hivens.launcher.platform
 
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
+import java.nio.file.LinkOption
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.util.stream.Collectors
@@ -175,6 +176,18 @@ object DataDirMover {
         }
     }
 
+    /**
+     * NOFOLLOW_LINKS: must match what [copyTree] decided to materialise.
+     * [copyTree] skips symbolic links (the source tree should not contain
+     * any, but defensively). A default `Files::isRegularFile` follows
+     * symlinks and counts a link-to-file as one regular file, while the
+     * target gets nothing -- the resulting mismatch triggered the verify
+     * gate's "leaving both intact, retry next start" branch and the apply
+     * loop would never converge.
+     */
     private fun countFiles(root: Path): Long =
-        Files.walk(root).use { it.filter(Files::isRegularFile).collect(Collectors.counting()) }
+        Files.walk(root).use { stream ->
+            stream.filter { Files.isRegularFile(it, LinkOption.NOFOLLOW_LINKS) }
+                .collect(Collectors.counting())
+        }
 }
