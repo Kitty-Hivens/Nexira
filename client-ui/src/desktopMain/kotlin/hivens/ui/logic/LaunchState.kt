@@ -1,6 +1,6 @@
 package hivens.ui.logic
 
-sealed class LaunchState { // TODO: Translate to English
+sealed class LaunchState {
     data object Idle : LaunchState()
 
     data class Prepare(
@@ -14,8 +14,8 @@ sealed class LaunchState { // TODO: Translate to English
         val totalFiles: Int,
         val downloadedBytes: Long,
         val totalBytes: Long,
-        val speedStr: String, // например "2.5 MB/s"
-        val progress: Float // Общий прогресс (0.0 to 1.0)
+        val speedStr: String, // e.g. "2.5 MB/s"
+        val progress: Float   // overall 0.0..1.0
     ) : LaunchState()
 
     data class GameRunning(

@@ -367,10 +367,11 @@ fun main() {
             val themeManager  = remember { ThemeManager(dataDirectory) }
             var customTheme   by remember { mutableStateOf(themeManager.loadTheme()) }
 
-            // Tray needs a 64-px glyph; the window chrome and KDE overview want the
-            // detailed hi-res icon so they can be downscale cleanly to whatever the
-            // compositor demands.
-            val trayIcon   = painterResource(Res.drawable.favicon) // TODO: not used!
+            // Window chrome icon -- KDE overview / Hyprland switcher / macOS
+            // dock want the detailed hi-res asset so they can downscale
+            // cleanly to whatever the compositor demands. The tray builds
+            // its 64-px glyph from `drawable/favicon.png` separately via
+            // `Res.readBytes(...)` so it doesn't need a Painter here.
             val windowIcon = painterResource(Res.drawable.icon)
 
             // ── Tray init on background thread ────────────────────────────
