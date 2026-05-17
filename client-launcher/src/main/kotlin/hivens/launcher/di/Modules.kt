@@ -66,9 +66,19 @@ val networkModule = module {
     single<OkHttpClient> {
         val cfg: ServerProtocolConfig = get()
 
+        // Authenticator.setDefault is JVM-wide; SOCKS5 auth has no per-client
+        // hook (OkHttp delegates SOCKS connect to JDK SocksSocketImpl which
+        // only consults the global Authenticator). Scope the response so the
+        // creds never leak to a third-party HTTP/HTTPS proxy that an unrelated
+        // JVM caller might be talking to -- only this exact SOCKS host/port
+        // gets answered.
         java.net.Authenticator.setDefault(object : java.net.Authenticator() {
-            override fun getPasswordAuthentication(): java.net.PasswordAuthentication =
-                java.net.PasswordAuthentication(cfg.proxyUser, cfg.proxyPass.toCharArray())
+            override fun getPasswordAuthentication(): java.net.PasswordAuthentication? {
+                if (requestorType != RequestorType.PROXY) return null
+                if (requestingHost != cfg.proxyHost) return null
+                if (requestingPort != cfg.proxyPort) return null
+                return java.net.PasswordAuthentication(cfg.proxyUser, cfg.proxyPass.toCharArray())
+            }
         })
 
         OkHttpClient.Builder()

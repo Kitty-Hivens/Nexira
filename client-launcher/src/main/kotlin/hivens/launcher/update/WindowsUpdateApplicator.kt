@@ -22,6 +22,10 @@ class WindowsUpdateApplicator : IUpdateApplicator {
             val psScript = Files.createTempFile("aura_update", ".ps1")
             val launcherPath = resolveExecutable()
 
+            // Paths are passed via environment variables, not interpolated into
+            // the script body, so any character a Windows Path may legitimately
+            // contain (spaces, backticks, semicolons, etc.) cannot escape the
+            // PowerShell quoting and execute as a command.
             psScript.toFile().writeText("""
                 # Wait for launcher to exit
                 Start-Sleep -Seconds 2
@@ -31,35 +35,41 @@ class WindowsUpdateApplicator : IUpdateApplicator {
 
                 # Run installer silently (Inno Setup /SILENT flag)
                 Write-Host "Installing update..."
-                Start-Process -FilePath "$installerPath" -ArgumentList "/SILENT", "/NORESTART" -Wait
+                Start-Process -FilePath "${'$'}env:INSTALLER" -ArgumentList "/SILENT", "/NORESTART" -Wait
 
                 # Wait for installation
                 Start-Sleep -Seconds 3
 
                 # Launch new version
-                if (Test-Path "$launcherPath") {
+                if (Test-Path "${'$'}env:LAUNCHER") {
                     Write-Host "Launching updated launcher..."
-                    Start-Process "$launcherPath"
+                    Start-Process "${'$'}env:LAUNCHER"
                 } else {
-                    Write-Error "Launcher executable not found at $launcherPath"
+                    Write-Error "Launcher executable not found at ${'$'}env:LAUNCHER"
                 }
 
                 # Cleanup
                 Start-Sleep -Seconds 2
-                Remove-Item "$psScript" -Force -ErrorAction SilentlyContinue
-                Remove-Item "$installerPath" -Force -ErrorAction SilentlyContinue
+                Remove-Item "${'$'}env:SCRIPT" -Force -ErrorAction SilentlyContinue
+                Remove-Item "${'$'}env:INSTALLER" -Force -ErrorAction SilentlyContinue
             """.trimIndent())
 
             logger.info("Scheduled Windows update: {}", installerPath)
 
             Runtime.getRuntime().addShutdownHook(Thread {
                 try {
-                    ProcessBuilder(
+                    val pb = ProcessBuilder(
                         "powershell.exe",
                         "-ExecutionPolicy", "Bypass",
                         "-WindowStyle", "Hidden",
                         "-File", psScript.toString()
-                    ).start()
+                    )
+                    pb.environment().apply {
+                        put("INSTALLER", installerPath.toString())
+                        put("LAUNCHER", launcherPath.toString())
+                        put("SCRIPT", psScript.toString())
+                    }
+                    pb.start()
                 } catch (e: Exception) {
                     logger.error("Failed to execute update script", e)
                 }
