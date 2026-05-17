@@ -88,7 +88,11 @@ object TrayManager {
     // dispatch can recover the asset id on click.
 
     private const val ID_SERVERS = "_servers"
-    private const val ID_NOSERVERS = "_servers"
+    // Distinct from ID_SERVERS -- DBusMenu / NSMenu treat duplicate ids as
+    // pointing at the same node, so the disabled placeholder item and the
+    // submenu parent need separate identities even though both are
+    // non-clickable surfaces.
+    private const val ID_NOSERVERS = "_noservers"
     private const val ID_SHOW    = "show"
     private const val ID_CONSOLE = "console"
     private const val ID_EXIT    = "exit"

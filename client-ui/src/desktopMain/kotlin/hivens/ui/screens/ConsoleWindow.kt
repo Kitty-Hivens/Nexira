@@ -89,7 +89,6 @@ fun ConsoleWindow(isDarkTheme: Boolean, onClose: () -> Unit) {
         ) {
             Surface(modifier = Modifier.fillMaxSize(), color = bg) {
                 ConsoleContent(
-                    bg          = bg,
                     toolbarBg   = toolbarBg,
                     textColor   = textColor,
                     isDarkTheme = isDarkTheme
@@ -102,7 +101,6 @@ fun ConsoleWindow(isDarkTheme: Boolean, onClose: () -> Unit) {
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 private fun ConsoleContent(
-    bg: Color, // TODO: not used
     toolbarBg: Color,
     textColor: Color,
     isDarkTheme: Boolean

@@ -16,10 +16,12 @@ fun UpdateManager() {
     var showDialog by remember { mutableStateOf(false) }
     var showNotification by remember { mutableStateOf(false) }
 
-    // Проверка при запуске
+    // Startup check
     LaunchedEffect(Unit) {
         scope.launch {
-            // Очистка старых установщиков перед проверкой
+            // Drop stale installers before probing -- otherwise a partially-
+            // downloaded artefact from a previous session could shadow the
+            // new one in the updates dir.
             updateService.cleanupOldUpdates()
 
             val update = updateService.checkForUpdate(force = false)
@@ -58,7 +60,7 @@ fun UpdateManager() {
         }
     }
 
-    // Уведомление (справа сверху)
+    // Top-right corner notification
     if (showNotification && availableUpdate != null) {
         UpdateNotification(
             update = availableUpdate!!,
@@ -72,7 +74,7 @@ fun UpdateManager() {
         )
     }
 
-    // Диалог (модальный)
+    // Modal dialog
     if (showDialog && availableUpdate != null) {
         UpdateDialog(
             update = availableUpdate!!,
