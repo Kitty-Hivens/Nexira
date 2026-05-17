@@ -307,8 +307,9 @@ class UpdateService(
         try {
             Files.list(updateDir).use { stream ->
                 stream
-                    // FIX: CI produces .exe (Inno Setup), not .msi -- match actual artifact names
-                    .filter { it.fileName.toString().matches(Regex(".*\\.(exe|dmg|AppImage)$")) }
+                    // .exe = Inno Setup (Windows installer), .zip = Windows portable
+                    // distribution, .dmg = macOS, .AppImage = Linux.
+                    .filter { it.fileName.toString().matches(Regex(".*\\.(exe|zip|dmg|AppImage)$")) }
                     .forEach { file ->
                         runCatching { Files.delete(file) }
                             .onSuccess { logger.debug("Deleted old update: {}", file.fileName) }
