@@ -18,24 +18,24 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import hivens.core.api.SkinRepository
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.SessionData
 import hivens.launcher.network.NetworkState
+import hivens.launcher.network.ServerProtocolConfig
 import hivens.ui.background.BackgroundSettings
-import hivens.ui.easter.AprilFools
+import hivens.ui.easter.LocalAprilFools
 import hivens.ui.i18n.AppLocale
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.screens.*
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.CustomTheme
 import hivens.ui.utils.GameConsoleService
-import kotlinx.coroutines.delay
 import org.koin.compose.koinInject
 import kotlin.math.sin
 import kotlin.random.Random
-import kotlin.time.Duration.Companion.milliseconds
 
 // ─── Layout ──────────────────────────────────────────────────────────────────
 
@@ -57,7 +57,7 @@ fun AppLayout(
     onBackgroundSettingsChanged: (BackgroundSettings) -> Unit = {}
 ) {
     val skinRepository: SkinRepository = koinInject()
-    val protocolConfig: hivens.launcher.network.ServerProtocolConfig = koinInject()
+    val protocolConfig: ServerProtocolConfig = koinInject()
 
     // Session can be refreshed by DashboardScreen on auth-retry
     var currentSession by remember(appState) {
@@ -70,12 +70,8 @@ fun AppLayout(
     else CelestiaTheme.colors.background
 
     val bypassHost = protocolConfig.sslBypassHost
-    val sslBypass by produceState(initialValue = NetworkState.bypassFor(bypassHost), bypassHost) {
-        while (true) {
-            value = NetworkState.bypassFor(bypassHost)
-            delay(200.milliseconds)
-        }
-    }
+    val bypassesList by NetworkState.bypassesState.collectAsState()
+    val sslBypass = remember(bypassesList, bypassHost) { NetworkState.bypassFor(bypassHost) }
 
     Row(Modifier.fillMaxSize().background(rowBackground)) {
 
@@ -199,6 +195,9 @@ fun AppSidebar(
     onScreenChange: (Screen) -> Unit,
     onLogout: () -> Unit
 ) {
+    val gameConsole: GameConsoleService = koinInject()
+    val af = LocalAprilFools.current
+
     val homeActive = currentScreen is Screen.Home
             || currentScreen is Screen.ServerSettings
             || currentScreen is Screen.ServerDetails
@@ -212,7 +211,7 @@ fun AppSidebar(
     // The button doesn't move or react -- it just feels like the UI froze.
     // Logout is intentionally excluded so the user can always escape.
     fun chaosNavClick(originalClick: () -> Unit): () -> Unit {
-        if (!AprilFools.isActive()) return originalClick
+        if (!af.isActive()) return originalClick
         return {
             if (Random.nextFloat() > 0.30f) {
                 originalClick()
@@ -224,7 +223,7 @@ fun AppSidebar(
     // ── April Fools: bouncing nav buttons ────────────────────────────────────
     // Each item has a unique sine phase so they bounce out of sync.
     // Amplitude grows from 0px on day 1 to 18px on day 14.
-    val bounceAmplitude = if (AprilFools.isActive()) AprilFools.intensity() * 18f else 0f
+    val bounceAmplitude = if (af.isActive()) af.intensity() * 18f else 0f
 
     val bounceTransition = rememberInfiniteTransition(label = "navBounce")
     val bounceCycle by bounceTransition.animateFloat(
@@ -232,8 +231,8 @@ fun AppSidebar(
         targetValue   = (2f * Math.PI).toFloat(),
         animationSpec = infiniteRepeatable(
             animation = tween(
-                durationMillis = if (AprilFools.isActive())
-                    (2200 - AprilFools.intensity() * 1400).toInt().coerceAtLeast(600)
+                durationMillis = if (af.isActive())
+                    (2200 - af.intensity() * 1400).toInt().coerceAtLeast(600)
                 else
                     2200,
                 easing = LinearEasing
@@ -258,8 +257,8 @@ fun AppSidebar(
     PuppetClick("nav.settings") { onScreenChange(Screen.Settings) }
     PuppetClick("nav.about")    { onScreenChange(Screen.About) }
     PuppetClick("nav.console")  {
-        if (GameConsoleService.shouldShowConsole) GameConsoleService.hide()
-        else GameConsoleService.show()
+        if (gameConsole.shouldShowConsole) gameConsole.hide()
+        else gameConsole.show()
     }
     if (isAuthenticated) {
         PuppetClick("nav.logout") { onLogout() }
@@ -313,15 +312,15 @@ fun AppSidebar(
         // Console toggle -- not bouncing, user needs to be able to open it
         IconButton(
             onClick  = {
-                if (GameConsoleService.shouldShowConsole) GameConsoleService.hide()
-                else GameConsoleService.show()
+                if (gameConsole.shouldShowConsole) gameConsole.hide()
+                else gameConsole.show()
             },
             modifier = Modifier.size(48.dp)
         ) {
             Icon(
                 imageVector        = Icons.Default.Build,
                 contentDescription = null,
-                tint               = if (GameConsoleService.shouldShowConsole)
+                tint               = if (gameConsole.shouldShowConsole)
                     CelestiaTheme.colors.primary
                 else
                     CelestiaTheme.colors.textSecondary.copy(alpha = 0.55f),
@@ -413,7 +412,7 @@ private fun ContentLoginRequiredPlaceholder() {
                 text = s.dashboardLoginRequiredHint,
                 style = MaterialTheme.typography.bodySmall,
                 color = CelestiaTheme.colors.textSecondary,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                textAlign = TextAlign.Center,
                 modifier = Modifier.widthIn(max = 360.dp)
             )
         }

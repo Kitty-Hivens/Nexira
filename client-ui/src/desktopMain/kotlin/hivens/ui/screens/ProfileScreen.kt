@@ -18,7 +18,7 @@ import androidx.compose.ui.unit.dp
 import hivens.core.api.SkinRepository
 import hivens.core.data.SessionData
 import hivens.ui.components.GlassCard
-import hivens.ui.easter.AprilFoolsButton
+import hivens.ui.easter.LocalAprilFools
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
@@ -49,6 +49,7 @@ private sealed class UploadStatus {
 fun ProfileScreen(session: SessionData, skinRepository: SkinRepository) {
     val skinManager: SkinManager = koinInject()
     val s            = LocalStrings.current
+    val af           = LocalAprilFools.current
     var frontSkin    by remember { mutableStateOf<ImageBitmap?>(null) }
     var backSkin     by remember { mutableStateOf<ImageBitmap?>(null) }
     var uploadStatus by remember { mutableStateOf<UploadStatus>(UploadStatus.None) }
@@ -193,7 +194,7 @@ fun ProfileScreen(session: SessionData, skinRepository: SkinRepository) {
                         }
 
                         // Top up balance -- chaos target
-                        AprilFoolsButton(
+                        af.ChaosButton(
                             id      = "profile_topup_btn",
                             text    = s.profileTopUp,
                             onClick = {
@@ -213,7 +214,7 @@ fun ProfileScreen(session: SessionData, skinRepository: SkinRepository) {
                         Spacer(Modifier.height(16.dp))
 
                         // Upload skin -- chaos target
-                        AprilFoolsButton(
+                        af.ChaosButton(
                             id      = "profile_upload_skin_btn",
                             text    = s.profileUploadSkin,
                             onClick = {

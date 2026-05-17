@@ -10,6 +10,11 @@ dependencies {
     implementation(libs.commons.compress)
     implementation(libs.koin.core)
     implementation(libs.slf4j.api)
+    // MDCContext for tagging launch-flow coroutines with a stable launchId so
+    // a multi-launch log dump can be sliced per Play-click. Was a client-ui
+    // dependency until LauncherController moved here in B1 (sub-batch 11.3,
+    // 2026-05-17); the slf4j-MDC bridge needs to live with the producer.
+    implementation(libs.kotlinx.coroutines.slf4j)
     // No JNA in client-launcher: Vault keyring and other native bindings here
     // use Project Panama (java.lang.foreign.*, JEP 454, finalized Java 22).
     // The remaining JNA presence in the project is in client-ui, transitively
@@ -84,14 +89,14 @@ fun registerLiveProbeTask(taskName: String, tag: String, taskDescription: String
         shouldRunAfter(tasks.test)
     }
 
-@Suppress("unused") // gradle task wiring -- accessed via `./gradlew liveKeyringTest`
+@Suppress("unused") // Gradle task wiring -- accessed via `./gradlew liveKeyringTest`
 val liveKeyringTest = registerLiveProbeTask(
     taskName = "liveKeyringTest",
     tag = "live-keyring",
     taskDescription = "Runs the LinuxLibsecretKeyringStorage live probe against the local Secret Service daemon.",
 )
 
-@Suppress("unused") // gradle task wiring -- accessed via `./gradlew liveWindowsKeyringTest`
+@Suppress("unused") // Gradle task wiring -- accessed via `./gradlew liveWindowsKeyringTest`
 val liveWindowsKeyringTest = registerLiveProbeTask(
     taskName = "liveWindowsKeyringTest",
     tag = "live-windows-keyring",

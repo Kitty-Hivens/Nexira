@@ -23,6 +23,7 @@ import hivens.core.api.interfaces.IServerListService
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.SessionData
+import hivens.core.diag.ActionRing
 import hivens.launcher.AutoSyncService
 import hivens.launcher.CrashReporter
 import hivens.launcher.CredentialsManager
@@ -37,17 +38,16 @@ import hivens.launcher.platform.SingleInstance
 import hivens.ui.background.BackgroundManager
 import hivens.ui.background.CustomBackground
 import hivens.ui.components.UpdateManager
-import hivens.ui.easter.AprilFools
-import hivens.ui.easter.AprilFoolsWrapper
-import hivens.ui.easter.ChaosState
+import hivens.ui.easter.AprilFoolsLoader
+import hivens.ui.easter.LocalAprilFools
 import hivens.ui.generated.resources.Res
-import hivens.ui.generated.resources.favicon
 import hivens.ui.generated.resources.icon
 import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.i18n.LocaleProvider
-import hivens.ui.logic.LaunchState
-import hivens.ui.logic.LauncherController
+import hivens.launcher.launch.LaunchState
+import hivens.launcher.launch.LauncherController
+import hivens.launcher.network.ServerProtocolConfig
 import hivens.ui.screens.ConsoleWindow
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.CustomTheme
@@ -57,11 +57,11 @@ import hivens.ui.utils.GameConsoleService
 import hivens.ui.utils.SkinManager
 import java.awt.Toolkit
 import java.nio.file.Files
+import java.time.Instant
+import java.time.temporal.ChronoUnit
 import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -72,20 +72,18 @@ import org.jetbrains.compose.resources.painterResource
 import org.koin.compose.koinInject
 import org.koin.core.context.startKoin
 import org.koin.core.context.stopKoin
-import org.koin.core.module.dsl.singleOf
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
 import org.slf4j.LoggerFactory
 import javax.swing.SwingUtilities
 import kotlin.system.exitProcess
 import kotlin.time.Duration.Companion.milliseconds
-import org.koin.java.KoinJavaComponent
 
 // ─── DI ──────────────────────────────────────────────────────────────────────
 
 val uiModule = module {
-    singleOf(::LauncherController)
     single { SkinManager(get(), get()) }
+    single { GameConsoleService(get()) }
 }
 
 // ─── State ───────────────────────────────────────────────────────────────────
@@ -230,15 +228,21 @@ fun main() {
     logToolkitAndSession()
 
     Files.createDirectories(paths.dataDir)
-    CrashReporter.paths = paths
+
+    // Constructed here (pre-Koin) so the uncaught-exception handler below
+    // can capture an instance with the resolved PlatformPaths. A parallel
+    // Koin singleton wires the same shape for post-Koin consumers; they
+    // share no mutable state so the parallel instances are functionally
+    // identical.
+    val crashReporter = CrashReporter(paths)
 
     Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
         val logger = LoggerFactory.getLogger("CrashHandler")
         logger.error("Uncaught exception on thread '${thread.name}'", throwable)
         runCatching {
-            val report     = CrashReporter.generate(throwable, thread)
-            val reportFile = CrashReporter.saveToDisk(report)
-            SwingUtilities.invokeLater { CrashReporter.showCrashDialog(report, reportFile) }
+            val report     = crashReporter.generate(throwable, thread)
+            val reportFile = crashReporter.saveToDisk(report)
+            SwingUtilities.invokeLater { crashReporter.showCrashDialog(report, reportFile) }
         }
     }
 
@@ -251,30 +255,15 @@ fun main() {
 
     DataDirMigration.run(paths)
 
+    // Two createdAtStart hooks registered in appModule fire here:
+    //   - SettingsRestoreHook       -- replays persisted experimental overrides.
+    //   - AppCoroutineScopeHook     -- installs JVM shutdown hook that cancels
+    //                                   the shared process-lifetime scope.
+    // The shared CoroutineScope itself is also createdAtStart so the hook above
+    // has a real instance to wire up, and LauncherController + tray-launch flow
+    // share the same scope (previously two scopes, only one of which was
+    // canceled on shutdown -- see B2 in the 2026-05-17 audit).
     startKoin { modules(networkModule, appModule, uiModule) }
-
-    // Process-lifetime coroutine scope for fire-and-forget background work
-    // (tray-launch flow, AutoSync). SupervisorJob so a single failed child
-    // doesn't take down the rest. Shutdown hook cancels the scope on JVM
-    // exit so in-flight network sockets / file handles get released instead
-    // of being orphaned the way they were under GlobalScope (#191).
-    val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    Runtime.getRuntime().addShutdownHook(Thread { applicationScope.cancel() })
-
-    // Conduit Phase 2: restore persisted force-proxy preference into the
-    // in-memory NetworkState so ChannelRouter sees it on the very first
-    // network call. MUST run after startKoin -- the previous version called
-    // KoinJavaComponent.get() before bootstrap and silently failed via
-    // runCatching, leaving the toggle effectively non-persistent.
-    runCatching {
-        val persistedSettings = KoinJavaComponent.get<ISettingsService>(
-            ISettingsService::class.java
-        ).getSettings()
-        NetworkState.setForceProxyMode(persistedSettings.forceProxyMode)
-    }.onFailure {
-        LoggerFactory.getLogger("Main")
-            .warn("Failed to restore persisted forceProxyMode at startup", it)
-    }
 
     // Puppet mode: opt-in localhost HTTP control surface for automated
     // UI driving (see hivens.ui.puppet.PuppetServerLifecycle + Loader).
@@ -308,6 +297,11 @@ fun main() {
         val credentialsManager: CredentialsManager = koinInject()
         val authService: IAuthService              = koinInject()
         val profileManager: ProfileManager         = koinInject()
+        val gameConsole: GameConsoleService        = koinInject()
+        // Shared process-lifetime scope (createdAtStart in appModule; canceled
+        // by AppCoroutineScopeHook on JVM shutdown). Same instance backs
+        // LauncherController.appScope and any other fire-and-forget work.
+        val applicationScope: CoroutineScope        = koinInject()
 
         val settings = remember { settingsService.getSettings() }
 
@@ -323,6 +317,14 @@ fun main() {
         }
 
         val launchState by controller.state.collectAsState()
+
+        // Drains the controller's event channel into the console pane with
+        // localized text. Lives at this level (not Dashboard) so events fire
+        // regardless of which screen the user is currently viewing; the
+        // collector is the seam that lets LauncherController stay free of
+        // `client-ui` types (i18n, console). See `LaunchLogCollector` for the
+        // event-to-string mapping.
+        hivens.ui.logic.LaunchLogCollector(events = controller.events, gameConsole = gameConsole)
 
 
         // Bumped each time the .show signal fires; the Window content uses it
@@ -359,6 +361,16 @@ fun main() {
             }
         }
 
+        // April Fools subsystem: provide the resolved lifecycle (Real or NoOp,
+        // chosen by `AprilFoolsLoader`'s SPI scan) to every downstream
+        // Composable. Wrapping at this level means tray/window close handlers
+        // can capture `af` from the enclosing scope and still see the real
+        // chaos flag in dev builds, while production binaries (no service
+        // descriptor on the classpath) get NoOpAprilFools with zero chaos
+        // overhead.
+        val af = AprilFoolsLoader.instance
+
+        CompositionLocalProvider(LocalAprilFools provides af) {
         LocaleProvider(locale = currentLocale) {
             val s = LocalStrings.current
 
@@ -368,7 +380,7 @@ fun main() {
             var customTheme   by remember { mutableStateOf(themeManager.loadTheme()) }
 
             // Window chrome icon -- KDE overview / Hyprland switcher / macOS
-            // dock want the detailed hi-res asset so they can downscale
+            // dock want the detailed hi-res asset so they can be downscale
             // cleanly to whatever the compositor demands. The tray builds
             // its 64-px glyph from `drawable/favicon.png` separately via
             // `Res.readBytes(...)` so it doesn't need a Painter here.
@@ -434,19 +446,17 @@ fun main() {
 
                 TrayManager.onExit = {
                     SwingUtilities.invokeLater {
-                        if (AprilFools.isActive()) {
-                            // Show the torturous close dialog instead of quitting immediately
-                            ChaosState.showCloseDialog = true
-                            // Also make the window visible so the dialog is actually seen
-                            isWindowVisible = true
-                        } else {
-                            exitApplication()
-                        }
+                        // Real impl pops the chaos close-dialog (during April Fools
+                        // window); NoOp invokes onActualClose synchronously. The
+                        // visibility flip is unconditional during chaos so the
+                        // dialog isn't hidden behind a minimized window.
+                        if (af.isActive()) isWindowVisible = true
+                        af.requestCloseDialog { exitApplication() }
                     }
                 }
 
                 TrayManager.onShowConsole = {
-                    SwingUtilities.invokeLater { GameConsoleService.show() }
+                    SwingUtilities.invokeLater { gameConsole.show() }
                 }
 
                 TrayManager.onLaunchServer = { server ->
@@ -469,7 +479,7 @@ fun main() {
                                     credentials.copy(serverId = server.assetDir)
                                 }
                                 controller.launch(session, server)
-                                SwingUtilities.invokeLater { GameConsoleService.show() }
+                                SwingUtilities.invokeLater { gameConsole.show() }
                             } catch (e: Exception) {
                                 LoggerFactory.getLogger("Main").warn(
                                     "Tray-launched login failed for ${server.assetDir}", e
@@ -516,25 +526,28 @@ fun main() {
             }
 
             // ── Console window ─────────────────────────────────────────────
-            if (GameConsoleService.shouldShowConsole) {
-                ConsoleWindow(isDarkTheme = isDarkTheme, onClose = { GameConsoleService.hide() })
+            if (gameConsole.shouldShowConsole) {
+                ConsoleWindow(isDarkTheme = isDarkTheme, onClose = { gameConsole.hide() })
             }
 
             // ── Main window ────────────────────────────────────────────────
             Window(
                 onCloseRequest = {
-                    if (AprilFools.isActive()) {
-                        ChaosState.showCloseDialog = true
-                    } else if (TrayManager.canBeReady) {
-                        // canBeReady (not isSupported) so we don't kill the
-                        // launcher mid-init when dorkbox's GTK probe is
-                        // taking its time. If it ultimately fails, the user
-                        // can quit via tray (when it appears) or kill the
-                        // process -- strictly better than exiting on a close
-                        // request the user clearly meant as "minimize".
-                        isWindowVisible = false
-                    } else {
-                        exitApplication()
+                    // af.requestCloseDialog dispatches: chaos active -> pop the
+                    // torturous dialog; chaos inactive -> invoke the close path
+                    // we'd have taken anyway (tray-hide if available, else exit).
+                    af.requestCloseDialog {
+                        if (TrayManager.canBeReady) {
+                            // canBeReady (not isSupported) so we don't kill the
+                            // launcher mid-init when dorkbox's GTK probe is
+                            // taking its time. If it ultimately fails, the user
+                            // can quit via tray (when it appears) or kill the
+                            // process -- strictly better than exiting on a close
+                            // request the user clearly meant as "minimize".
+                            isWindowVisible = false
+                        } else {
+                            exitApplication()
+                        }
                     }
                 },
                 state     = windowState,
@@ -600,6 +613,7 @@ fun main() {
                 }
             }
         }
+        } // end CompositionLocalProvider(LocalAprilFools)
     }
 }
 
@@ -625,7 +639,8 @@ fun AppRoot(
     val json: Json                             = koinInject()
     val httpClient: OkHttpClient               = koinInject()
     val insecureAuthService: IAuthService      = koinInject(named("insecure"))
-    val protocolConfig: hivens.launcher.network.ServerProtocolConfig = koinInject()
+    val protocolConfig: ServerProtocolConfig   = koinInject()
+    val af = LocalAprilFools.current
 
     setSingletonImageLoaderFactory { context ->
         ImageLoader.Builder(context)
@@ -679,7 +694,7 @@ fun AppRoot(
                         // from the credentials form -- same recovery path
                         // as a server-side logout. Fix for the "double
                         // login on every launch with 2FA" report.
-                        hivens.core.diag.ActionRing.record(
+                        ActionRing.record(
                             "Auto-login: 2FA account, trusting cached accessToken (uid=${e.uid?.take(8) ?: "<missing>"})"
                         )
                         AppState.Authenticated(
@@ -692,8 +707,8 @@ fun AppRoot(
                             // user accepted the SSL bypass implicitly by saving credentials
                             // through a prior cert outage; we extend that consent until
                             // the cert issue resolves or 30 days, whichever comes first.
-                            val until = java.time.Instant.now().plus(30, java.time.temporal.ChronoUnit.DAYS)
-                            hivens.core.diag.ActionRing.record("SSL bypass auto-granted on cached-credential auto-login (cert error) -- 30 days")
+                            val until = Instant.now().plus(30, ChronoUnit.DAYS)
+                            ActionRing.record("SSL bypass auto-granted on cached-credential auto-login (cert error) -- 30 days")
                             NetworkState.grantBypass(protocolConfig.sslBypassHost, until)
                             try {
                                 val server  = profileManager.lastServerId ?: Protocol.DEFAULT_SERVER_ID
@@ -754,7 +769,7 @@ fun AppRoot(
         )
          */
 
-        AprilFoolsWrapper(
+        af.WrapContent(
             pixelCursorState = mousePxPos,
             windowSize       = windowSize,
             onRealClose      = onRealExit,

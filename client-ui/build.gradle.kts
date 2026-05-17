@@ -64,7 +64,6 @@ kotlin {
                 implementation(libs.koin.core)
                 implementation(libs.koin.compose)
                 implementation(libs.kotlinx.coroutines.swing)
-                implementation(libs.kotlinx.coroutines.slf4j)
                 implementation(libs.logback.classic)
                 implementation(libs.libtray)
                 implementation(libs.ktor.client.core)

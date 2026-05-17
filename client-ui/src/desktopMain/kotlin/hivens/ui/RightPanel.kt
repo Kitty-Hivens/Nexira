@@ -47,7 +47,7 @@ import hivens.launcher.network.NetworkState
 import hivens.launcher.ProfileManager
 import hivens.launcher.network.ServerProtocolConfig
 import hivens.ui.components.ConfirmCodeDialog
-import hivens.ui.easter.AprilFoolsButton
+import hivens.ui.easter.LocalAprilFools
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetField
@@ -114,6 +114,7 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
     val profileManager: ProfileManager         = koinInject()
     val protocolConfig: ServerProtocolConfig   = koinInject()
     val s            = LocalStrings.current
+    val af           = LocalAprilFools.current
     val scope        = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
 
@@ -450,7 +451,7 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
                 )
             }
         } else {
-            AprilFoolsButton(
+            af.ChaosButton(
                 id       = "login_submit_btn",
                 text     = s.loginButton,
                 onClick  = { doLogin() },
@@ -463,7 +464,7 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
         PuppetClick("login.submit", enabled = !isLoading) { doLogin() }
 
         // REGISTER -- chaos target (#105)
-        AprilFoolsButton(
+        af.ChaosButton(
             id      = "login_register_btn",
             text    = s.loginRegister,
             onClick = {
