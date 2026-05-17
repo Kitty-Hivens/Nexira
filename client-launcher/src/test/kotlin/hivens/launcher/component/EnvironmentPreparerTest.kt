@@ -239,7 +239,12 @@ class EnvironmentPreparerTest {
 
     // ── helpers ───────────────────────────────────────────────────────────
 
-    private inline fun <T> withSystemProp(key: String, value: String, block: () -> T): T { // TODO: key value always os.name
+    /**
+     * Run [block] with system property [key] temporarily set to [value],
+     * restoring the original on exit. Current callers all use `os.name`;
+     * generic signature kept for future-proofing.
+     */
+    private inline fun <T> withSystemProp(key: String, value: String, block: () -> T): T {
         val original = System.getProperty(key)
         try {
             System.setProperty(key, value)
