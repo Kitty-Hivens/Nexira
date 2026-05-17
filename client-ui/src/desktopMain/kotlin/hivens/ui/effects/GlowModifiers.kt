@@ -134,24 +134,3 @@ fun Modifier.neonBorder(
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Static neon glow (non-animated) -- useful for always-on accents
-// ─────────────────────────────────────────────────────────────────────────────
-
-fun Modifier.neonGlow( // TODO: unused
-    color: Color,
-    glowRadius: Dp   = 10.dp,
-    cornerRadius: Dp = 12.dp
-): Modifier = drawBehind {
-    val rPx = glowRadius.toPx()
-    val cPx = cornerRadius.toPx()
-    repeat(4) { i ->
-        val spread = rPx * (i + 1) / 4f
-        drawRoundRect(
-            color    = color.copy(alpha = 0.25f * (1f - i / 4f)),
-            topLeft  = Offset(-spread * 0.5f, -spread * 0.5f),
-            size     = Size(size.width + spread, size.height + spread),
-            cornerRadius = CornerRadius(cPx + spread * 0.3f)
-        )
-    }
-}
