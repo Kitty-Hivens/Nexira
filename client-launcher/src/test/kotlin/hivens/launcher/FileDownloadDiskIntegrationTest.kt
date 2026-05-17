@@ -12,11 +12,7 @@ import io.ktor.client.engine.mock.respondBadRequest
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import io.ktor.utils.io.ByteReadChannel
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.test.resetMain
-import kotlinx.coroutines.test.setMain
 import kotlinx.serialization.json.Json
 import java.nio.file.Files
 import java.nio.file.Path
@@ -47,7 +43,6 @@ import kotlin.test.assertTrue
  * exclusively on dev machine because files will be guaranteed broken."
  * Tempdir per test enforces that -- broken-on-purpose state never escapes.
  */
-@OptIn(ExperimentalCoroutinesApi::class)
 class FileDownloadDiskIntegrationTest {
 
     private val json = Json { ignoreUnknownKeys = true; isLenient = true; encodeDefaults = true }
@@ -59,18 +54,10 @@ class FileDownloadDiskIntegrationTest {
         workDir = Files.createTempDirectory("aura-fds-disk-")
         clientDir = workDir / "clients" / "Industrial"
         Files.createDirectories(clientDir)
-        // FileDownloadService spawns a progress-UI ticker on Dispatchers.Main
-        // unconditionally (the lambda check is null-safe but the launch isn't
-        // gated). Use Unconfined so the job runs inline on whatever thread --
-        // a TestDispatcher would never auto-advance the monitor's delay() loop
-        // and the production `coroutineScope { }` would block forever waiting
-        // on the monitor cancellation.
-        Dispatchers.setMain(Dispatchers.Unconfined)
     }
 
     @AfterTest
     fun teardown() {
-        Dispatchers.resetMain()
         Files.walk(workDir).sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }
     }
 

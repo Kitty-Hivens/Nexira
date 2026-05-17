@@ -641,7 +641,7 @@ class UpdateServiceTest {
     // ═══════════════════════════════════════════════════════════════════════════
 
     @Test
-    fun `cleanupOldUpdates removes exe dmg and AppImage files`() {
+    fun `cleanupOldUpdates removes exe zip dmg and AppImage files`() {
         val tempDir = Files.createTempDirectory("cleanup-test")
         tempDir.toFile().deleteOnExit()
         val updatesDir = tempDir.resolve("updates")
@@ -649,6 +649,7 @@ class UpdateServiceTest {
 
         // Create test files
         Files.writeString(updatesDir.resolve("AuraLauncher-1.0.0-Setup.exe"), "fake")
+        Files.writeString(updatesDir.resolve("AuraLauncher-1.0.0-Windows-Portable.zip"), "fake")
         Files.writeString(updatesDir.resolve("AuraLauncher-1.0.0.dmg"), "fake")
         Files.writeString(updatesDir.resolve("AuraLauncher-1.0.0-x86_64.AppImage"), "fake")
         Files.writeString(updatesDir.resolve(".last_check"), "123456")   // should survive
@@ -663,6 +664,7 @@ class UpdateServiceTest {
         svc.cleanupOldUpdates()
 
         assertFalse(Files.exists(updatesDir.resolve("AuraLauncher-1.0.0-Setup.exe")))
+        assertFalse(Files.exists(updatesDir.resolve("AuraLauncher-1.0.0-Windows-Portable.zip")))
         assertFalse(Files.exists(updatesDir.resolve("AuraLauncher-1.0.0.dmg")))
         assertFalse(Files.exists(updatesDir.resolve("AuraLauncher-1.0.0-x86_64.AppImage")))
         assertTrue(Files.exists(updatesDir.resolve(".last_check")), ".last_check should survive")
