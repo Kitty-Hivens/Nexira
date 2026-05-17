@@ -19,6 +19,7 @@ import hivens.core.api.SkinRepository
 import hivens.core.data.SessionData
 import hivens.ui.components.GlassCard
 import hivens.ui.easter.LocalAprilFools
+import hivens.ui.utils.SystemActions
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
@@ -33,9 +34,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
-import java.awt.Desktop
 import java.io.File
-import java.net.URI
 
 /** Tri-state for the skin upload status so color is not determined by string content. */
 private sealed class UploadStatus {
@@ -70,12 +69,7 @@ fun ProfileScreen(session: SessionData, skinRepository: SkinRepository) {
         skinManager.invalidate(session.playerName); loadSkins()
     }
     PuppetClick("profile.topUp") {
-        runCatching {
-            val url = "http://smartycraft.ru/cabinet"
-            if (Desktop.isDesktopSupported() &&
-                Desktop.getDesktop().isSupported(Desktop.Action.BROWSE))
-                Desktop.getDesktop().browse(URI(url))
-        }
+        SystemActions.openUrl("http://smartycraft.ru/cabinet")
     }
     // Note: profile.uploadSkin triggers a native file picker -- unreachable
     // from puppet without supplying a path argument. Out of MVP scope.
@@ -197,14 +191,7 @@ fun ProfileScreen(session: SessionData, skinRepository: SkinRepository) {
                         af.ChaosButton(
                             id      = "profile_topup_btn",
                             text    = s.profileTopUp,
-                            onClick = {
-                                runCatching {
-                                    val url = "http://smartycraft.ru/cabinet"
-                                    if (Desktop.isDesktopSupported() &&
-                                        Desktop.getDesktop().isSupported(Desktop.Action.BROWSE))
-                                        Desktop.getDesktop().browse(URI(url))
-                                }
-                            },
+                            onClick = { SystemActions.openUrl("http://smartycraft.ru/cabinet") },
                             modifier = Modifier.fillMaxWidth(),
                             colors   = ButtonDefaults.buttonColors(
                                 containerColor = CelestiaTheme.colors.primary,

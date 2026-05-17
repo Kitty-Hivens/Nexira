@@ -151,6 +151,7 @@ class LauncherControllerTest {
                 ignoredFiles = any(),
                 messageUI = any(),
                 progressUI = any(),
+                verifyUI = any(),
             )
         }
 
@@ -206,7 +207,7 @@ class LauncherControllerTest {
         assertEquals(LaunchError.OfflineNoClient, state.reason)
 
         coVerify(exactly = 0) {
-            downloadService.processSession(any(), any(), any(), any(), any(), any(), any())
+            downloadService.processSession(any(), any(), any(), any(), any(), any(), any(), any())
         }
     }
 
@@ -251,7 +252,7 @@ class LauncherControllerTest {
             fileManifest = FileManifest(),
         )
         coJustRun {
-            downloadService.processSession(any(), any(), any(), any(), any(), any(), any())
+            downloadService.processSession(any(), any(), any(), any(), any(), any(), any(), any())
         }
 
         val process = mockk<Process>()

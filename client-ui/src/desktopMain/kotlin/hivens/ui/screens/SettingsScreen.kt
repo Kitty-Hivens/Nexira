@@ -21,6 +21,7 @@ import hivens.launcher.diag.DiagnosticBundle
 import hivens.launcher.platform.PlatformPaths
 import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.PlatformFile
+import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
 import io.github.vinceglb.filekit.dialogs.openDirectoryPicker
 import io.github.vinceglb.filekit.path
 import kotlinx.coroutines.launch
@@ -35,7 +36,7 @@ import hivens.ui.puppet.PuppetField
 import hivens.ui.puppet.PuppetToggle
 import hivens.ui.theme.CelestiaTheme
 import org.koin.compose.koinInject
-import java.awt.Desktop
+import hivens.ui.utils.SystemActions
 import java.io.File
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -111,10 +112,7 @@ fun SettingsScreen(
         showSavedMessage = true
     }
 
-    fun openFolder(path: String) {
-        val dir = File(path).also { it.mkdirs() }
-        if (Desktop.isDesktopSupported()) Desktop.getDesktop().open(dir)
-    }
+    fun openFolder(path: String) = SystemActions.openFolder(path)
 
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         Text(
@@ -591,9 +589,17 @@ fun SettingsScreen(
                                     // (your native Hyprland / KDE / GNOME picker),
                                     // IFileDialog on Windows, NSOpenPanel on macOS.
                                     // No Metal LAF eyesore.
+                                    //
+                                    // dialogSettings(title=...) is the key bit -- without
+                                    // it FileKit hands the portal a blank-title request and
+                                    // some backends render a less-styled fallback chrome
+                                    // (no titlebar text, generic icon). ProfileScreen +
+                                    // ServerSettingsScreen all pass dialogSettings; this
+                                    // site used to be the odd one out.
                                     val pickedFile = runCatching {
                                         FileKit.openDirectoryPicker(
-                                            directory = PlatformFile(paths.dataDir.toFile()),
+                                            directory      = PlatformFile(paths.dataDir.toFile()),
+                                            dialogSettings = FileKitDialogSettings(title = s.settingsDataDirMove),
                                         )
                                     }.getOrNull() ?: return@launch
 
@@ -753,9 +759,7 @@ fun SettingsScreen(
                                     }
                                     if (zip != null) {
                                         lastBundlePath = zip
-                                        if (Desktop.isDesktopSupported()) {
-                                            runCatching { Desktop.getDesktop().open(zip.parent.toFile()) }
-                                        }
+                                        SystemActions.openFile(zip.parent.toFile())
                                     }
                                     bundleBusy = false
                                 }
@@ -789,11 +793,7 @@ fun SettingsScreen(
                                     // manager OR paste the path into a comment.
                                     java.awt.Toolkit.getDefaultToolkit().systemClipboard
                                         .setContents(java.awt.datatransfer.StringSelection(zip.toString()), null)
-                                    if (Desktop.isDesktopSupported()) {
-                                        Desktop.getDesktop().browse(
-                                            java.net.URI(hivens.launcher.diag.IssueReporter.bundleIssueUrl(zip))
-                                        )
-                                    }
+                                    SystemActions.openUrl(hivens.launcher.diag.IssueReporter.bundleIssueUrl(zip))
                                 }
                             },
                             modifier = Modifier.weight(1f),
@@ -810,11 +810,7 @@ fun SettingsScreen(
                             runCatching {
                                 java.awt.Toolkit.getDefaultToolkit().systemClipboard
                                     .setContents(java.awt.datatransfer.StringSelection(zip.toString()), null)
-                                if (Desktop.isDesktopSupported()) {
-                                    Desktop.getDesktop().browse(
-                                        java.net.URI(hivens.launcher.diag.IssueReporter.bundleIssueUrl(zip))
-                                    )
-                                }
+                                SystemActions.openUrl(hivens.launcher.diag.IssueReporter.bundleIssueUrl(zip))
                             }
                         }
                     }
