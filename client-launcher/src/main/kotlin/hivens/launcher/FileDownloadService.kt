@@ -8,6 +8,7 @@ import hivens.core.data.FileManifest
 import hivens.core.data.SessionData
 import hivens.core.util.ZipUtils
 import hivens.core.util.retryWithBackoff
+import hivens.launcher.util.ClientRootDirs
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -40,12 +41,6 @@ class FileDownloadService(
 
     companion object {
         private val logger = LoggerFactory.getLogger(FileDownloadService::class.java)
-
-        // Directories that cannot be "trimmed" during path normalization
-        private val ROOT_DIRS = setOf(
-            "mods", "config", "bin", "assets", "libraries", "resources",
-            "saves", "resourcepacks", "shaderpacks", "natives"
-        )
 
         private const val INDEX_FILENAME = ".extra_unpacked_index.json"
 
@@ -206,8 +201,13 @@ class FileDownloadService(
         val startTime = System.currentTimeMillis()
 
         coroutineScope {
-            // Ticker for UI
-            val monitorJob = launch(Dispatchers.Main) {
+            // Ticker for progress callbacks. Inherits the parent dispatcher
+            // (Dispatchers.IO from processSession's withContext) instead of
+            // hopping to Main, so this works in headless contexts (puppet
+            // mode, integration tests) where Dispatchers.Main isn't wired.
+            // progressUI lambdas marshal themselves to the right thread if
+            // they need to.
+            val monitorJob = launch {
                 while (isActive) {
                     val currentBytes = downloadedBytesGlobal.get()
                     val currentFiles = currentFileCounter.get()
@@ -421,7 +421,7 @@ class FileDownloadService(
 
     private fun isModsJar(relativePath: String): Boolean {
         val lower = relativePath.lowercase().replace('\\', '/')
-        return lower.endsWith(".jar") && (lower == "mods" || lower.contains("mods/"))
+        return lower.endsWith(".jar") && lower.contains("mods/")
     }
 
     /**
@@ -541,11 +541,10 @@ class FileDownloadService(
         val parts = rawPath.split("/")
         if (parts.size < 2) return rawPath
 
-        // If the first part of the path looks like a standard folder, leave it as is
+        // First segment is a known root dir -> leave as-is. Otherwise the
+        // first segment is a server-name prefix to strip.
         val root = parts[0]
-        if (ROOT_DIRS.any { root.startsWith(it) }) return rawPath
-
-        // Otherwise, cut off the first folder (this is the name of the server/build)
+        if (ClientRootDirs.isKnown(root)) return rawPath
         return rawPath.substring(root.length + 1)
     }
 
