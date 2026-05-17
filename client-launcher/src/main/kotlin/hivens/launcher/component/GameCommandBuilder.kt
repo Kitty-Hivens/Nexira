@@ -92,11 +92,16 @@ internal class GameCommandBuilder(
     ): List<String> {
         val version = serverProfile.version
         val config = getConfig(version)
+        val isModernEnvironment = config.mainClass.contains("BootstrapLauncher")
         val args = ArrayList<String>()
 
         // 1. JVM Binary
         args.add(javaExec)
-        args.add("-noverify")
+        // -noverify was deprecated in Java 13 and prints a warning on every
+        // launch under Java 17+. Legacy MC (1.7.10 / 1.12.2 on Java 8) still
+        // needs it for the broken bytecode some Forge mods ship; modern
+        // (1.21.1+, Java 21+) doesn't tolerate the warning gracefully.
+        if (!isModernEnvironment) args.add("-noverify")
 
         // 2. OS Specific Flags
         if (System.getProperty("os.name").lowercase().contains("mac")) {
@@ -114,9 +119,6 @@ internal class GameCommandBuilder(
         // 4. Natives Configuration
         val nativesPath = clientRoot.resolve(config.nativesDir)
         args.add("-Djava.library.path=" + nativesPath.toAbsolutePath())
-
-        // Determine if the environment requires modern module-based loading (e.g. NeoForge 1.20.6+)
-        val isModernEnvironment = config.mainClass.contains("BootstrapLauncher")
 
         // 5. NeoForge / Modern Environment
         if (isModernEnvironment) {

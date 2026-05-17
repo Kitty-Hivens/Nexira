@@ -324,11 +324,15 @@ class AuthService(
     }
 
     private fun generateRandomMac(): String {
+        // Colon separator to match the wire spec in
+        // `docs/dev/smartycraft-v1-protocol.md` and what smrt-deco emits.
+        // The server doesn't validate the content today, but doc/code drift
+        // surfaces as a mystery the next time someone reads either side.
         val rand = Random()
         val mac = ByteArray(6)
         rand.nextBytes(mac)
         mac[0] = (mac[0].toInt() and 254).toByte()
-        return mac.joinToString("-") { "%02X".format(it) }
+        return mac.joinToString(":") { "%02X".format(it) }
     }
 
     /**
