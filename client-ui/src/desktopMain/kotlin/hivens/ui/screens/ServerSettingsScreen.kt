@@ -54,7 +54,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
-import java.awt.Desktop
+import hivens.ui.utils.SystemActions
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
@@ -174,7 +174,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
     PuppetClick("$pkey.openFolder") {
         val path = dataDirectory.resolve("clients").resolve(server.assetDir)
         if (!path.toFile().exists()) path.toFile().mkdirs()
-        Desktop.getDesktop().open(path.toFile())
+        SystemActions.openFile(path.toFile())
     }
     PuppetClick("$pkey.resetClient") {
         val path = dataDirectory.resolve("clients").resolve(server.assetDir)
@@ -420,7 +420,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                         onClick  = {
                             val path = dataDirectory.resolve("clients").resolve(server.assetDir)
                             if (!path.toFile().exists()) path.toFile().mkdirs()
-                            Desktop.getDesktop().open(path.toFile())
+                            SystemActions.openFile(path.toFile())
                         },
                         modifier = Modifier.fillMaxWidth(),
                         primary  = false,

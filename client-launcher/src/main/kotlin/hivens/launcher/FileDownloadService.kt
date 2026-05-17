@@ -54,7 +54,8 @@ class FileDownloadService(
         extraCheckSum: String?,
         ignoredFiles: Set<String>?,
         messageUI: ((String) -> Unit)?,
-        progressUI: ((Int, Int, Long, Long, String) -> Unit)?
+        progressUI: ((Int, Int, Long, Long, String) -> Unit)?,
+        verifyUI: ((Int, Int) -> Unit)?,
     ) = withContext(Dispatchers.IO) {
         val manifest = session.fileManifest ?: throw IOException("File manifest is empty!")
         Files.createDirectories(targetDir)
@@ -124,7 +125,7 @@ class FileDownloadService(
         }
 
         // 3. Downloading
-        downloadMissingFiles(targetDir, filesMap, messageUI, progressUI)
+        downloadMissingFiles(targetDir, filesMap, messageUI, progressUI, verifyUI)
 
         // 4. Processing Extra.zip
         processExtraZip(targetDir, filesMap, extraCheckSum, messageUI)
@@ -170,15 +171,35 @@ class FileDownloadService(
         baseDir: Path,
         files: Map<String, FileData>,
         messageUI: ((String) -> Unit)?,
-        progressUI: ((Int, Int, Long, Long, String) -> Unit)?
+        progressUI: ((Int, Int, Long, Long, String) -> Unit)?,
+        verifyUI: ((Int, Int) -> Unit)?,
     ) {
         // STEP 1: Checking hashes
+        //
+        // MD5-walking a 1000-file modpack takes 5-30 seconds depending on
+        // disk speed. Emitting [verifyUI] every 25 files (or roughly once per
+        // 100ms on slow disks) gives the UI's progress bar something to
+        // advance against -- otherwise the user sees "Sync... 20%" silent
+        // for the entire integrity walk and assumes the launcher hung.
         messageUI?.invoke("Checking file integrity...")
+        val totalFiles = files.size
+        verifyUI?.invoke(0, totalFiles)
 
-        // Heavy operation (reading files from disk)
-        val filesToDownload = files.filter { (path, data) ->
-            val cleanPath = normalizePath(path)
-            isFileMissingOrChanged(baseDir.resolve(cleanPath), data.md5, cleanPath)
+        val filesToDownload = LinkedHashMap<String, FileData>()
+        var checked = 0
+        for ((rawPath, data) in files) {
+            val cleanPath = normalizePath(rawPath)
+            if (isFileMissingOrChanged(baseDir.resolve(cleanPath), data.md5, cleanPath)) {
+                filesToDownload[rawPath] = data
+            }
+            checked++
+            // Coarse-grained progress: avoid one callback per file on a
+            // 5000-file pack (would churn Compose state at thousands of
+            // updates per second). 25 is fine-enough on modern SSDs and
+            // coarse-enough on slow HDDs.
+            if (checked % 25 == 0 || checked == totalFiles) {
+                verifyUI?.invoke(checked, totalFiles)
+            }
         }
 
         val totalFilesCount = filesToDownload.size

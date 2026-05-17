@@ -61,8 +61,7 @@ import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 import org.koin.core.qualifier.named
 import org.slf4j.LoggerFactory
-import java.awt.Desktop
-import java.net.URI
+import hivens.ui.utils.SystemActions
 
 private val log = LoggerFactory.getLogger("RightPanel")
 
@@ -468,14 +467,7 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
             id      = "login_register_btn",
             text    = s.loginRegister,
             onClick = {
-                runCatching {
-                    val url = "${protocolConfig.baseUrl}/register"
-                    if (Desktop.isDesktopSupported() &&
-                        Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)
-                    ) {
-                        Desktop.getDesktop().browse(URI(url))
-                    }
-                }
+                SystemActions.openUrl("${protocolConfig.baseUrl}/register")
             },
             modifier = Modifier.fillMaxWidth().height(42.dp),
             colors   = ButtonDefaults.buttonColors(
@@ -484,14 +476,7 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
             ),
         )
         PuppetClick("login.register") {
-            runCatching {
-                val url = "${protocolConfig.baseUrl}/register"
-                if (Desktop.isDesktopSupported() &&
-                    Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)
-                ) {
-                    Desktop.getDesktop().browse(URI(url))
-                }
-            }
+            SystemActions.openUrl("${protocolConfig.baseUrl}/register")
         }
     }
 }
@@ -751,16 +736,7 @@ private fun CompactNewsItem(item: NewsItem) {
             .clickable(enabled = canOpenUrl) {
                 // Build a best-effort URL from the image URL pattern:
                 // https://smartycraft.ru/images/news/mini/news1.jpg  ->  https://smartycraft.ru/news{id}
-                try {
-                    val url = "${protocolConfig.baseUrl}/news${item.id}"
-                    if (Desktop.isDesktopSupported() &&
-                        Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)
-                    ) {
-                        Desktop.getDesktop().browse(URI(url))
-                    }
-                } catch (e: Exception) {
-                    log.warn("Could not open news link for item ${item.id}", e)
-                }
+                SystemActions.openUrl("${protocolConfig.baseUrl}/news${item.id}")
             }
             .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment     = Alignment.CenterVertically,

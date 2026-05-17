@@ -40,9 +40,8 @@ import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
 import org.koin.compose.koinInject
 import org.slf4j.LoggerFactory
-import java.awt.Desktop
+import hivens.ui.utils.SystemActions
 import java.lang.management.ManagementFactory
-import java.net.URI
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -536,12 +535,7 @@ private fun InfoRow(icon: ImageVector, label: String, value: String) {
 private fun LinkButton(label: String, url: String, icon: ImageVector) {
     OutlinedButton(
         onClick = {
-            try {
-                if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE))
-                    Desktop.getDesktop().browse(URI(url))
-            } catch (e: Exception) {
-                log.warn("Could not open external link {}", url, e)
-            }
+            SystemActions.openUrl(url)
         },
         modifier = Modifier.fillMaxWidth(),
         shape    = RoundedCornerShape(8.dp),

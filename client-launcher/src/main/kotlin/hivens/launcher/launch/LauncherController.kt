@@ -240,6 +240,16 @@ class LauncherController(
                                 speedBytesPerSec = parseSpeedString(speed),
                             )
                         },
+                        // Map integrity-walk progress onto the SYNC stage's 0.2..0.7
+                        // sub-range. The actual download progress takes over from
+                        // 0.7 upward via the Downloading state above. Without
+                        // this, the progress bar froze at 20% during the MD5
+                        // walk on 1000-file modpacks -- 5-30s of perceived hang.
+                        verifyUI = { verified, total ->
+                            if (!isActive) return@processSession
+                            val fraction = if (total > 0) verified.toFloat() / total else 0f
+                            setStage(PrepareStage.SYNC, 0.2f + 0.5f * fraction)
+                        },
                     )
                 }
 

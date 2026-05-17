@@ -128,8 +128,8 @@ class CrashReporter(
                 // Beacon "Report on GitHub": opens browser at a pre-filled new-Issue
                 // URL. Nothing leaves the user's machine until they click Submit on
                 // github.com -- the launcher itself never POSTs anything.
-                runCatching {
-                    if (Desktop.isDesktopSupported()) {
+                openOnDaemonThread("crash-report-browse") {
+                    if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
                         Desktop.getDesktop().browse(URI(IssueReporter.crashIssueUrl(report)))
                     }
                 }
@@ -139,10 +139,27 @@ class CrashReporter(
                 clipboard.setContents(StringSelection(reportFile.readText()), null)
             }
             2 -> {
-                if (Desktop.isDesktopSupported()) {
-                    Desktop.getDesktop().open(reportFile.parentFile)
+                openOnDaemonThread("crash-report-open-folder") {
+                    if (Desktop.isDesktopSupported()) {
+                        Desktop.getDesktop().open(reportFile.parentFile)
+                    }
                 }
             }
+        }
+    }
+
+    /**
+     * Fire-and-forget native Desktop call on a daemon thread. `Desktop.open` /
+     * `Desktop.browse` can stall for seconds on Linux/Wayland when the
+     * `xdg-desktop-portal` D-Bus is wedged; running them on the calling
+     * thread (which here is AWT EDT, since this is invoked from
+     * `JOptionPane.showOptionDialog`'s choice handler) freezes the UI.
+     * Daemon = true so a hung native call doesn't pin the JVM at exit.
+     */
+    private inline fun openOnDaemonThread(name: String, crossinline body: () -> Unit) {
+        Thread({ runCatching { body() } }, name).apply {
+            isDaemon = true
+            start()
         }
     }
 
