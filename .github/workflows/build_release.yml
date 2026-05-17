@@ -145,14 +145,15 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run unit tests
-        run: ./gradlew :client-core:test :client-launcher:test --continue
+        run: ./gradlew :client-config:test :client-core:test :client-launcher:test --continue
 
       - name: Upload test reports
-        if: always()   # we publish it even if it falls, so we can see what’s broken
+        if: always()   # we publish it even if it falls, so we can see what's broken
         uses: actions/upload-artifact@v4
         with:
           name: test-reports-${{ matrix.os }}
           path: |
+            client-config/build/reports/tests/
             client-core/build/reports/tests/
             client-launcher/build/reports/tests/
 

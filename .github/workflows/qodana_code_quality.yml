@@ -8,8 +8,10 @@ on:
   workflow_dispatch:
   pull_request:
   push:
+    # Default branch is `stable`; the prior `master` reference was a template
+    # default that never fired on this repo because no master branch exists.
     branches:
-      - master
+      - stable
 
 jobs:
   qodana:
