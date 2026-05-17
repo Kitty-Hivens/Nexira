@@ -215,6 +215,28 @@ class UpdateServiceTest {
     }
 
     @Test
+    fun `compareVersions orders double-digit RCs naturally`() {
+        val svc = createService("{}")
+        // The documented lex-compare bug: rc10 < rc2 under string ordering.
+        // Natural-order tokenisation ranks them numerically so rc10 > rc2.
+        assertTrue(svc.compareVersions("1.3.0-rc10", "1.3.0-rc2") > 0)
+        assertTrue(svc.compareVersions("1.3.0-rc2",  "1.3.0-rc10") < 0)
+    }
+
+    @Test
+    fun `compareVersions natural order ranks alpha less than alpha1`() {
+        val svc = createService("{}")
+        // Token count differs ("alpha" vs "alpha"+"1"); shorter sorts first.
+        assertTrue(svc.compareVersions("1.3.0-alpha", "1.3.0-alpha1") < 0)
+    }
+
+    @Test
+    fun `compareVersions natural order handles beta20 above beta3`() {
+        val svc = createService("{}")
+        assertTrue(svc.compareVersions("1.3.0-beta20", "1.3.0-beta3") > 0)
+    }
+
+    @Test
     fun `compareVersions handles versions with different segment counts`() {
         val svc = createService("{}")
         // 1.3 vs 1.3.0 -- missing segments treated as 0
