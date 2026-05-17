@@ -15,7 +15,26 @@ import java.util.*
 
 private val log = LoggerFactory.getLogger("GameConsoleService")
 
-object GameConsoleService {
+/**
+ * Holds the in-memory console buffer (snapshot-state list backing the
+ * `ConsoleWindow` composable), mirrors every entry to a per-session
+ * `game-output-*.log` file, and exposes `saveToFile` for one-off
+ * exports.
+ *
+ * Constructor-injected [paths] rather than a static `PlatformPaths.system()`
+ * call so the singleton honors a mid-session data-dir migration
+ * (`DataDirMover`) -- otherwise the in-memory writer would keep landing
+ * lines in the old directory while everything else writes to the new one.
+ *
+ * One instance is registered as a Koin singleton in the UI module and
+ * shared between composables (`AppLayout`, `ConsoleWindow`, application
+ * shell) and the launcher controller. The snapshot-state list and
+ * `mutableStateOf` flag survive recomposition naturally because Compose
+ * tracks the same instance everywhere.
+ */
+class GameConsoleService(
+    private val paths: PlatformPaths,
+) {
     val logs = mutableStateListOf<LogEntry>()
 
     var shouldShowConsole by mutableStateOf(false)
@@ -26,7 +45,7 @@ object GameConsoleService {
     private var sessionWriter: BufferedWriter? = null
     private val fileDateFmt = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss")
     /**
-     * Serialises every [sessionWriter] touch. ProcessLogHandler runs two
+     * Serializes every [sessionWriter] touch. ProcessLogHandler runs two
      * daemon threads (stdout + stderr pipes) which both call [append]
      * concurrently; without the lock their byte streams could interleave
      * inside a single line in `game-output-*.log` and produce garbled
@@ -37,7 +56,7 @@ object GameConsoleService {
     private val writerLock = Any()
 
     private fun logsDir(): File =
-        PlatformPaths.system().logsDir.toFile().also { it.mkdirs() }
+        paths.logsDir.toFile().also { it.mkdirs() }
 
     fun startSession() {
         // Close previous session writer and open the new one under the same
@@ -72,7 +91,7 @@ object GameConsoleService {
 
         // Auto-save to disk. BufferedWriter is NOT thread-safe -- two
         // ProcessLogHandler daemon threads (stdout + stderr) hammer this
-        // concurrently. Serialise on writerLock so a single line lands
+        // concurrently. Serialize on writerLock so a single line lands
         // atomically.
         synchronized(writerLock) {
             try {
