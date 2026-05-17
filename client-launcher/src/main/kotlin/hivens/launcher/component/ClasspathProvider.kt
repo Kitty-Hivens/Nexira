@@ -2,6 +2,7 @@ package hivens.launcher.component
 
 import hivens.core.api.interfaces.IManifestProcessorService
 import hivens.core.data.FileManifest
+import hivens.launcher.util.ClientRootDirs
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.nio.file.Files
@@ -171,15 +172,19 @@ class ClasspathProvider(
     /**
      * Resolves the path from the manifest relative to the client root.
      * Removes the prefix with the server name, if any (Legacy Smarty structure).
+     *
+     * The "is first segment a known root dir vs a server name" decision uses
+     * [ClientRootDirs] so it matches what `FileDownloadService.normalizePath`
+     * decides for the same path. Pre-fix the check enumerated only
+     * `libraries* / bin / mods`, which incorrectly stripped legitimate
+     * `config/foo.jar` and `assets/foo.jar` top-level prefixes -- the same
+     * paths the file-download side kept as-is.
      */
     private fun resolveSanitizedPath(root: Path, rawPath: String): Path {
         val pathPart = Paths.get(rawPath)
-
-        // Logic for removing the prefix (server name) if it is in the manifest path
-        // Example: "Nevermine/libraries/..." -> "libraries/..."
         if (pathPart.nameCount > 1) {
             val first = pathPart.getName(0).toString()
-            if (!first.startsWith("libraries") && first != "bin" && first != "mods") {
+            if (!ClientRootDirs.isKnown(first)) {
                 return root.resolve(pathPart.subpath(1, pathPart.nameCount))
             }
         }
