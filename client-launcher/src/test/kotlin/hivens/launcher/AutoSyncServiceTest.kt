@@ -87,7 +87,7 @@ class AutoSyncServiceTest {
 
         service.syncAll(listOf(makeServer("Industrial")))
 
-        val state = service.overallState.value
+        val state = service.snapshot.value.overall
         assertTrue(state is AutoSyncService.OverallState.Done)
         assertEquals(0, state.succeeded)
         assertEquals(1, state.skipped)  // skipped because no creds, not because no install
@@ -102,7 +102,7 @@ class AutoSyncServiceTest {
 
         service.syncAll(listOf(makeServer("Industrial")))
 
-        val state = service.overallState.value
+        val state = service.snapshot.value.overall
         assertTrue(state is AutoSyncService.OverallState.Done)
         assertEquals(1, state.skipped)
     }
@@ -131,7 +131,7 @@ class AutoSyncServiceTest {
 
         service.syncAll(listOf(s1, s2))
 
-        val state = service.overallState.value
+        val state = service.snapshot.value.overall
         assertTrue(state is AutoSyncService.OverallState.Done)
         assertEquals(1, state.succeeded)
         assertEquals(0, state.failed)
@@ -155,14 +155,14 @@ class AutoSyncServiceTest {
 
         service.syncAll(listOf(makeServer("Industrial"), makeServer("Galaxy"), makeServer("Create")))
 
-        val state = service.overallState.value
+        val state = service.snapshot.value.overall
         assertTrue(state is AutoSyncService.OverallState.Done)
         assertEquals(2, state.succeeded)
         assertEquals(1, state.failed)
         assertEquals(0, state.skipped)
 
         // Per-server states reflect the outcome
-        val states = service.serverStates.value
+        val states = service.snapshot.value.perServer
         assertEquals(AutoSyncService.ServerState.FAILED, states["Industrial"])
         assertEquals(AutoSyncService.ServerState.SYNCED, states["Galaxy"])
         assertEquals(AutoSyncService.ServerState.SYNCED, states["Create"])
@@ -196,7 +196,7 @@ class AutoSyncServiceTest {
 
         service.syncAll(listOf(makeServer("Industrial"), makeServer("Galaxy")))
 
-        val state = service.overallState.value
+        val state = service.snapshot.value.overall
         assertTrue(state is AutoSyncService.OverallState.Done)
         assertEquals(0, state.succeeded)
         assertEquals(0, state.failed)
