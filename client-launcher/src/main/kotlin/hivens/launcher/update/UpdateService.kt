@@ -136,26 +136,31 @@ class UpdateService(
             // update -- auto-install of unverified bytes is a remote-code-execution
             // path if the release page were ever tampered with. Releases ≥ 2.2.7-rc3
             // ship the manifest; older releases require manual reinstall.
-            val manifest = tryFetchManifest(release)
-            val checksum = manifest?.assets?.find { it.name == asset.name }?.sha256
-            if (checksum.isNullOrBlank()) {
+            val manifest = tryFetchManifest(release) ?: run {
                 logger.warn(
-                    "Refusing auto-update: release {} has no verifiable SHA-256 for {} " +
-                        "(manifest present: {}). User must reinstall manually.",
-                    release.tagName, asset.name, manifest != null,
+                    "Refusing auto-update: release {} ships no release-manifest.json " +
+                        "for {}. User must reinstall manually.",
+                    release.tagName, asset.name,
                 )
                 return@withContext null
             }
-            val highlights = manifest?.highlights?.takeIf { it.isNotBlank() }
+            val checksum = manifest.assets.find { it.name == asset.name }?.sha256
+            if (checksum.isNullOrBlank()) {
+                logger.warn(
+                    "Refusing auto-update: release {} manifest does not pin SHA-256 for {}. " +
+                        "User must reinstall manually.",
+                    release.tagName, asset.name,
+                )
+                return@withContext null
+            }
+            val highlights = manifest.highlights?.takeIf { it.isNotBlank() }
 
             val isCritical = release.name.contains("[CRITICAL]", ignoreCase = true) ||
                              release.body?.contains("CRITICAL", ignoreCase = true) == true
 
             logger.info(
-                "Update available: {} -> {} (manifest: {}, mandatory: {})",
-                currentVersion, latestVersion,
-                if (manifest != null) "yes" else "no",
-                belowMandatoryFloor
+                "Update available: {} -> {} (mandatory: {})",
+                currentVersion, latestVersion, belowMandatoryFloor,
             )
 
             return@withContext LauncherUpdate(
