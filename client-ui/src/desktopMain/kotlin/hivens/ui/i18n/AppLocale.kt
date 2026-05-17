@@ -66,7 +66,6 @@ object I18n {
     private var _strings: AppStrings = stringsFor(_locale)
 
     val s: AppStrings get() = _strings
-    val locale: AppLocale get() = _locale // TODO: unused
 
     fun setLocale(locale: AppLocale) {
         _locale = locale
