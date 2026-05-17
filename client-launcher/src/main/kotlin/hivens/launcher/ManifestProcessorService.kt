@@ -35,12 +35,15 @@ class ManifestProcessorService(
 
         rawMods.forEach { (modId, modData) ->
             try {
-                val mod = json.decodeFromJsonElement<OptionalMod>(modData)
-
-                // Fill in the blanks if they are not in the JSON
-                if (mod.id.isEmpty()) mod.id = modId
-                if (mod.jars.isEmpty()) mod.jars = mutableListOf("$modId.jar")
-
+                val decoded = json.decodeFromJsonElement<OptionalMod>(modData)
+                // Defaulting layer: upstream sometimes omits `id` and `jars`
+                // entirely, expecting the manifest key to stand in for them.
+                // We patch via copy() rather than mutating since OptionalMod
+                // fields are now `val`.
+                val mod = decoded.copy(
+                    id   = decoded.id.ifEmpty { modId },
+                    jars = decoded.jars.ifEmpty { listOf("$modId.jar") },
+                )
                 result.add(mod)
             } catch (e: Exception) {
                 log.error("Error parsing mod configuration '$modId': ${e.message}")
