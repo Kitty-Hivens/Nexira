@@ -43,13 +43,33 @@ class LauncherController : KoinComponent {
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var launchJob: Job? = null
+    /**
+     * Tracked separately from [launchJob] so [abort] can kill the live
+     * Process even after the coroutine completes the spawn step. Cleared
+     * after `process.waitFor()` returns so subsequent abort() calls don't
+     * try to destroy an already-finished process. Volatile so the abort
+     * thread sees the latest write done from the launch coroutine.
+     */
+    @Volatile private var runningProcess: Process? = null
+    private val launchLock = Any()
 
     fun launch(
         currentSession: SessionData,
         server: ServerProfile,
         onSessionRefreshed: ((SessionData) -> Unit)? = null
     ) {
-        if (_state.value is LaunchState.Prepare || _state.value is LaunchState.Downloading) return
+        // Re-entry guard must be atomic with the launchJob assignment.
+        // Without the lock two parallel callers (UI double-click, tray-
+        // launch racing dashboard-launch) could both observe Idle, both
+        // pass the gate, both assign launchJob, and produce two in-flight
+        // game spawns -- of which only the second is tracked for abort().
+        // Claim the state slot under the lock; the coroutine still runs
+        // outside the lock so the gate isn't held during the long flow.
+        synchronized(launchLock) {
+            if (_state.value !is LaunchState.Idle &&
+                _state.value !is LaunchState.Error) return
+            _state.value = LaunchState.Prepare("", 0.0f)
+        }
 
         // Tag every log line emitted during this launch attempt with a stable
         // launchId so a user dump can be sliced per-play-click via
@@ -135,8 +155,11 @@ class LauncherController : KoinComponent {
                 if (!Files.exists(clientDir)) Files.createDirectories(clientDir)
 
                 if (isOffline) {
-                    // In offline mode, skip file sync but verify client exists
-                    val hasClient = Files.exists(clientDir) && Files.list(clientDir).count() > 0
+                    // In offline mode, skip file sync but verify client exists.
+                    // .use{} closes the directory stream; without it the OS
+                    // file handle leaks until GC eventually collects the stream.
+                    val hasClient = Files.exists(clientDir) &&
+                        Files.list(clientDir).use { it.count() > 0 }
                     if (!hasClient) {
                         _state.value = LaunchState.Error(s.stateOfflineNoClient)
                         GameConsoleService.append(s.stateOfflineNoClient, LogType.ERROR)
@@ -215,9 +238,11 @@ class LauncherController : KoinComponent {
                     GameConsoleService.append(text, uiType)
                 }
 
+                runningProcess = process
                 _state.value = LaunchState.GameRunning(process)
 
                 val exitCode = process.waitFor()
+                runningProcess = null
                 ActionRing.record("Game exited: ${server.name} (code $exitCode)")
 
                 if (exitCode != 0) {
@@ -228,6 +253,7 @@ class LauncherController : KoinComponent {
                 }
 
             } catch (e: Exception) {
+                runningProcess = null
                 if (e !is CancellationException) {
                     logger.error("Launch flow failed for {}", server.name, e)
                     _state.value = LaunchState.Error(s.stateError(e.message ?: ""), e)
@@ -239,7 +265,17 @@ class LauncherController : KoinComponent {
         }
     }
 
+    /**
+     * Stops whatever launch flow is currently running. If the game process
+     * has already spawned, send SIGTERM via [Process.destroy] and reset state.
+     * Previously this cancelled the coroutine but left the spawned Process
+     * orphaned -- the launcher said Idle while the game kept running, and
+     * the next launch() click would happily try to spawn a second game.
+     */
     fun abort() {
+        val proc = runningProcess
+        runningProcess = null
+        runCatching { proc?.destroy() }
         launchJob?.cancel()
         _state.value = LaunchState.Idle
     }
