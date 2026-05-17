@@ -258,7 +258,10 @@ class JavaManagerService(
                                 Files.createDirectories(resolvedPath.parent)
                                 Files.copy(tai, resolvedPath, StandardCopyOption.REPLACE_EXISTING)
                                 // Restoring execution rights from an archive (for Linux/Mac)
-                                if (getOsName() != "win" && (entry.mode and 0b001_000_001) != 0) { // Checking the execute bit
+                                // 0o111 = any of owner / group / other execute. Earlier mask
+                                // 0o101 skipped the group bit; archives that ship 0o010-only
+                                // entries would land without +x.
+                                if (getOsName() != "win" && (entry.mode and 0b001_001_001) != 0) {
                                     setExecutablePermissions(resolvedPath)
                                 }
                             }

@@ -33,7 +33,15 @@ class PlayerRepository(
             logger.warn("resetSpawn called with blank uid -- refusing to send unsigned request")
             return false
         }
-        val response = protocol.spawn(uid = session.uid, login = session.playerName, server = serverId)
+        // Boolean return contract: any network failure folds into `false` so
+        // UI call sites never have to special-case IOException. Protocol layer
+        // now propagates rather than swallowing (Conduit Phase 1 follow-up).
+        val response = try {
+            protocol.spawn(uid = session.uid, login = session.playerName, server = serverId)
+        } catch (e: Exception) {
+            logger.error("resetSpawn network error for {}: {}", serverId, e.message)
+            return false
+        }
         logger.info("resetSpawn response for {}: {}", serverId, response.status)
         return response.parsedStatus == ProtocolStatus.OK
     }
