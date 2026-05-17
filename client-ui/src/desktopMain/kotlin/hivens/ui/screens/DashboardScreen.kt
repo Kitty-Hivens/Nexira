@@ -19,7 +19,7 @@ import hivens.core.api.interfaces.ISettingsService
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.SessionData
 import hivens.launcher.AutoSyncService
-import hivens.launcher.NetworkState
+import hivens.launcher.network.NetworkState
 import hivens.launcher.ProfileManager
 import hivens.ui.components.LaunchControlPanel
 import hivens.ui.components.ServerGrid

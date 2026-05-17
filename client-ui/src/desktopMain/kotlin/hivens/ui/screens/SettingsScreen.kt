@@ -88,7 +88,7 @@ fun SettingsScreen(
         )
         // Mirror to NetworkState so ChannelRouter sees it on the very next
         // request without waiting for launcher restart.
-        hivens.launcher.NetworkState.setForceProxyMode(forceProxyMode)
+        hivens.launcher.network.NetworkState.setForceProxyMode(forceProxyMode)
         showSavedMessage = true
     }
 
@@ -310,9 +310,9 @@ fun SettingsScreen(
                     // Live snapshot -- re-reads every 1s. Sufficient for a
                     // settings screen (no rapid-fire updates expected). Avoids
                     // setting up a Flow purely for this single read site.
-                    val bypasses = androidx.compose.runtime.produceState(initialValue = hivens.launcher.NetworkState.listBypasses()) {
+                    val bypasses = androidx.compose.runtime.produceState(initialValue = hivens.launcher.network.NetworkState.listBypasses()) {
                         while (true) {
-                            value = hivens.launcher.NetworkState.listBypasses()
+                            value = hivens.launcher.network.NetworkState.listBypasses()
                             kotlinx.coroutines.delay(1_000.milliseconds)
                         }
                     }.value
@@ -365,7 +365,7 @@ fun SettingsScreen(
                                             hivens.core.diag.ActionRing.record(
                                                 "SSL bypass revoked by user from Settings: ${entry.host}",
                                             )
-                                            hivens.launcher.NetworkState.revokeBypass(entry.host)
+                                            hivens.launcher.network.NetworkState.revokeBypass(entry.host)
                                         },
                                         shape = RoundedCornerShape(6.dp),
                                     ) {
@@ -377,7 +377,7 @@ fun SettingsScreen(
                                         hivens.core.diag.ActionRing.record(
                                             "SSL bypass revoked by puppet driver: ${entry.host}",
                                         )
-                                        hivens.launcher.NetworkState.revokeBypass(entry.host)
+                                        hivens.launcher.network.NetworkState.revokeBypass(entry.host)
                                     }
                                 }
                             }

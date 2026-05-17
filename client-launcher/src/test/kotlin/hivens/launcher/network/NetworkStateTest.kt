@@ -1,4 +1,4 @@
-package hivens.launcher
+package hivens.launcher.network
 
 import java.nio.file.Files
 import java.nio.file.Path

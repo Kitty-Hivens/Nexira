@@ -43,7 +43,7 @@ import hivens.core.api.interfaces.IServerListService
 import hivens.core.data.NewsItem
 import hivens.core.data.SessionData
 import hivens.launcher.CredentialsManager
-import hivens.launcher.NetworkState
+import hivens.launcher.network.NetworkState
 import hivens.launcher.ProfileManager
 import hivens.launcher.network.ServerProtocolConfig
 import hivens.ui.components.ConfirmCodeDialog
