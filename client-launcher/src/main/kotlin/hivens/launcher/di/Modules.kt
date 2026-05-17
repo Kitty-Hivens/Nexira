@@ -20,6 +20,7 @@ import hivens.launcher.component.ClasspathProvider
 import hivens.launcher.component.EnvironmentPreparer
 import hivens.launcher.component.GameCommandBuilder
 import hivens.launcher.component.ProcessLogHandler
+import hivens.launcher.launch.LauncherController
 import hivens.launcher.platform.PlatformPaths
 import hivens.launcher.update.UpdateApplicators
 import hivens.launcher.update.UpdateService
@@ -127,7 +128,7 @@ val networkModule = module {
      * Direct-channel client. No proxy, no SSL bypass. Backs the
      * [HttpClientProvider] qualified `named("direct")`.
      *
-     * SSL bypass is intentionally not honoured here: the third-party CDNs
+     * SSL bypass is intentionally not honored here: the third-party CDNs
      * we hit on this channel have rock-solid TLS, and silently widening the
      * bypass to them just because the user accepted it for smartycraft.ru
      * would be a needless trust expansion.
@@ -143,7 +144,7 @@ val networkModule = module {
     /**
      * Default (smartycraft) [HttpClientProvider] -- thin wrapper that resolves
      * the correct proxied [HttpClient] on every request via
-     * [NetworkState.sslBypassEnabled].
+     * `NetworkState.sslBypassEnabled`.
      *
      * Injected into all smartycraft.ru-bound repositories instead of [HttpClient]
      * directly, so that SSL bypass takes effect immediately on the next network
@@ -270,6 +271,15 @@ val appModule = module {
      */
     single<java.nio.file.Path>(createdAtStart = true) { get<PlatformPaths>().dataDir }
 
+    /**
+     * Crash report generator + dialog presenter. Main.kt constructs its
+     * own instance pre-Koin for the uncaught-exception handler; this
+     * registration covers post-Koin consumers (none today, but the
+     * dependency contract makes it injectable for future Composables
+     * that want to trigger a manual report).
+     */
+    single { CrashReporter(get()) }
+
     // Managers and services
     //
     // IKeyringStorage chosen at startup via KeyringStorageFactory.system()
@@ -286,6 +296,42 @@ val appModule = module {
         val dataDir: java.nio.file.Path = get()
         SettingsService(get(), dataDir.resolve(Storage.SETTINGS_FILE))
     }
+
+    // Replays persisted user-experimental overrides (forceProxyMode,
+    // mimicVersionOverride) into their respective global state holders
+    // on Koin start. `createdAtStart = true` makes this run during
+    // `startKoin { modules(...) }` so the values are live before the
+    // first protocol call -- previously done via a `KoinJavaComponent`
+    // escape hatch in `Main.kt`.
+    single(createdAtStart = true) { SettingsRestoreHook(get()) }
+
+    /**
+     * Process-lifetime coroutine scope for fire-and-forget background work
+     * (tray-launch flow, AutoSync, `LauncherController.launch`). SupervisorJob
+     * so a single failed child doesn't take down the rest. Previously two
+     * separate scopes existed (`Main.applicationScope` + LauncherController's
+     * own); unified so the JVM shutdown hook installed by
+     * [AppCoroutineScopeHook] cancels the same scope every coroutine lives on.
+     */
+    single<kotlinx.coroutines.CoroutineScope>(createdAtStart = true) {
+        kotlinx.coroutines.CoroutineScope(
+            kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO
+        )
+    }
+
+    // Installs the shutdown hook that cancels the scope above. Separated
+    // from the scope's own factory so the factory stays a one-liner and
+    // the hook can be tested independently if needed.
+    single(createdAtStart = true) { AppCoroutineScopeHook(get()) }
+
+    /**
+     * Launch-flow orchestrator. Used to live in `client-ui/logic/` while
+     * it still depended on UI types (i18n strings, console service);
+     * after the B1 decoupling (sub-batches 11.1-11.2) it consumes only
+     * `client-core` interfaces + the shared coroutine scope, so it now
+     * sits on the correct side of the module layering.
+     */
+    singleOf(::LauncherController)
 
     single {
         val dataDir: java.nio.file.Path = get()

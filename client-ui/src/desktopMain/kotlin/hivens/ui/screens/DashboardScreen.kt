@@ -19,18 +19,16 @@ import hivens.core.api.interfaces.ISettingsService
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.SessionData
 import hivens.launcher.AutoSyncService
+import hivens.launcher.launch.LaunchState
+import hivens.launcher.launch.LauncherController
 import hivens.launcher.network.NetworkState
 import hivens.launcher.ProfileManager
 import hivens.ui.components.LaunchControlPanel
 import hivens.ui.components.ServerGrid
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.logic.LaunchState
-import hivens.ui.logic.LauncherController
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.theme.CelestiaTheme
-import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
@@ -58,8 +56,9 @@ fun DashboardScreen(
     val scope = rememberCoroutineScope()
 
     val launchState by controller.state.collectAsState()
-    val syncStates by autoSyncService.serverStates.collectAsState()
-    val syncOverall by autoSyncService.overallState.collectAsState()
+    val syncSnapshot by autoSyncService.snapshot.collectAsState()
+    val syncStates  = syncSnapshot.perServer
+    val syncOverall = syncSnapshot.overall
     var hiddenForCurrentSession by remember { mutableStateOf(false) }
 
     var servers             by remember { mutableStateOf<List<ServerProfile>>(emptyList()) }
@@ -68,12 +67,8 @@ fun DashboardScreen(
     val favorites = remember(favoriteTrigger) { profileManager.favoriteServers }
     var isLoadingServers    by remember { mutableStateOf(true) }
     val bypassHost = protocolConfig.sslBypassHost
-    val sslBypass by produceState(initialValue = NetworkState.bypassFor(bypassHost), bypassHost) {
-        while (true) {
-            value = NetworkState.bypassFor(bypassHost)
-            delay(200.milliseconds)
-        }
-    }
+    val bypassesList by NetworkState.bypassesState.collectAsState()
+    val sslBypass = remember(bypassesList, bypassHost) { NetworkState.bypassFor(bypassHost) }
 
 
     fun fetchServers() {
@@ -220,14 +215,13 @@ fun DashboardScreen(
         // AutoSyncService is actively walking the queue. Stays out of the way
         // when auto-sync is disabled or has finished.
         if (syncOverall is AutoSyncService.OverallState.InProgress) {
-            val progress = syncOverall as AutoSyncService.OverallState.InProgress
             Spacer(Modifier.height(8.dp))
             AutoSyncProgressStrip(
-                serverName = progress.currentServer,
-                currentIdx = progress.currentIdx,
-                total      = progress.total,
-                bytesRead  = progress.bytesRead,
-                totalBytes = progress.totalBytes,
+                serverName = syncOverall.currentServer,
+                currentIdx = syncOverall.currentIdx,
+                total      = syncOverall.total,
+                bytesRead  = syncOverall.bytesRead,
+                totalBytes = syncOverall.totalBytes,
             )
         }
 

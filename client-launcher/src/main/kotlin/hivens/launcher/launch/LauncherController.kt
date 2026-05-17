@@ -1,47 +1,87 @@
-package hivens.ui.logic
+package hivens.launcher.launch
 
+import hivens.core.api.TwoFactorRequiredException
 import hivens.core.api.interfaces.*
 import hivens.core.api.model.ServerProfile
-import hivens.core.data.LauncherLogType
 import hivens.core.data.SessionData
 import hivens.core.diag.ActionRing
 import hivens.launcher.CredentialsManager
 import hivens.launcher.ManifestCache
 import hivens.launcher.ProfileManager
-import hivens.ui.easter.AprilFoolsProgress
-import hivens.ui.i18n.I18n
-import hivens.ui.utils.GameConsoleService
-import hivens.ui.utils.LogType
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
-import org.koin.core.component.KoinComponent
-import org.koin.core.component.inject
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.UUID
+import kotlinx.coroutines.slf4j.MDCContext
 
-class LauncherController : KoinComponent {
+/**
+ * Constructor injection (not `KoinComponent` + `by inject()`) so the
+ * controller is testable without bootstrapping Koin. `singleOf(::LauncherController)`
+ * in [hivens.launcher.di.appModule] resolves every parameter from the
+ * graph automatically; production wiring stays a one-liner.
+ *
+ * Note: [appScope] is the shared `single<CoroutineScope>(createdAtStart)`
+ * registered alongside [hivens.launcher.di.AppCoroutineScopeHook] -- the
+ * JVM shutdown hook cancels every in-flight launch on process exit. The
+ * prior dedicated `CoroutineScope(SupervisorJob() + IO)` here was
+ * unreachable from any shutdown hook, so a SIGTERM mid-launch could
+ * leave the spawned game process and its sockets hanging.
+ */
+class LauncherController(
+    private val authService: IAuthService,
+    private val credentialsManager: CredentialsManager,
+    private val settingsService: ISettingsService,
+    private val downloadService: IFileDownloadService,
+    private val javaManagerService: IJavaManager,
+    private val launcherService: ILauncherService,
+    private val manifestProcessor: IManifestProcessorService,
+    private val manifestCache: ManifestCache,
+    private val profileManager: ProfileManager,
+    private val dataDirectory: Path,
+    private val appScope: CoroutineScope,
+) {
 
     private val logger = LoggerFactory.getLogger(LauncherController::class.java)
-
-    private val authService: IAuthService by inject()
-    private val credentialsManager: CredentialsManager by inject()
-    private val settingsService: ISettingsService by inject()
-    private val downloadService: IFileDownloadService by inject()
-    private val javaManagerService: IJavaManager by inject()
-    private val launcherService: ILauncherService by inject()
-    private val manifestProcessor: IManifestProcessorService by inject()
-    private val manifestCache: ManifestCache by inject()
-    private val profileManager: ProfileManager by inject()
-    private val dataDirectory: Path by inject()
 
     private val _state = MutableStateFlow<LaunchState>(LaunchState.Idle)
     val state: StateFlow<LaunchState> = _state.asStateFlow()
 
-    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    /**
+     * Push-side log channel. UI subscribes (`LaunchLogCollector` in
+     * `Main.kt`'s application block) and routes each event to the
+     * console widget with localization done at the UI layer.
+     *
+     * Buffer: 256 entries, DROP_OLDEST on overflow. Forge / NeoForge
+     * startup can emit hundreds of stdout lines per second; suspending
+     * the launch coroutine on a full buffer would block the state
+     * machine. The in-memory console buffer in `GameConsoleService` is
+     * itself capped at 2000 lines, so lossy-under-pressure semantics
+     * stay consistent across the two layers.
+     */
+    private val _events = MutableSharedFlow<LaunchLogEvent>(
+        extraBufferCapacity = 256,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
+    val events: SharedFlow<LaunchLogEvent> = _events.asSharedFlow()
+
+    private fun emit(event: LaunchLogEvent) {
+        _events.tryEmit(event)
+    }
+
+    private fun fail(reason: LaunchError, cause: Throwable? = null) {
+        _state.value = LaunchState.Error(reason, cause)
+        emit(LaunchLogEvent.Error(reason))
+        emit(LaunchLogEvent.RequestConsoleVisible)
+    }
+
     private var launchJob: Job? = null
     /**
      * Tracked separately from [launchJob] so [abort] can kill the live
@@ -59,8 +99,8 @@ class LauncherController : KoinComponent {
         onSessionRefreshed: ((SessionData) -> Unit)? = null
     ) {
         // Re-entry guard must be atomic with the launchJob assignment.
-        // Without the lock two parallel callers (UI double-click, tray-
-        // launch racing dashboard-launch) could both observe Idle, both
+        // Without the lock two parallel callers (UI double-click,
+        // tray-launch racing dashboard-launch) could both observe Idle, both
         // pass the gate, both assign launchJob, and produce two in-flight
         // game spawns -- of which only the second is tracked for abort().
         // Claim the state slot under the lock; the coroutine still runs
@@ -68,7 +108,7 @@ class LauncherController : KoinComponent {
         synchronized(launchLock) {
             if (_state.value !is LaunchState.Idle &&
                 _state.value !is LaunchState.Error) return
-            _state.value = LaunchState.Prepare("", 0.0f)
+            _state.value = LaunchState.Prepare(PrepareStage.INIT, 0.0f)
         }
 
         // Tag every log line emitted during this launch attempt with a stable
@@ -79,29 +119,26 @@ class LauncherController : KoinComponent {
         // FileDownloadService coroutines and LauncherService.
         val launchId = UUID.randomUUID().toString().take(8)
 
-        launchJob = appScope.launch(kotlinx.coroutines.slf4j.MDCContext(mapOf("launchId" to launchId))) {
-            // Capture strings at launch time so the whole pipeline uses one locale
-            val s = I18n.s
+        launchJob = appScope.launch(MDCContext(mapOf("launchId" to launchId))) {
             val settings = settingsService.getSettings()
             val isOffline = settings.isOfflineMode
 
             try {
-                _state.value = LaunchState.Prepare(s.stateInit, 0.0f)
+                _state.value = LaunchState.Prepare(PrepareStage.INIT, 0.0f)
 
-                // Start new session -- adds divider and opens auto-save file
-                GameConsoleService.startSession()
-                GameConsoleService.append("${s.appName}...", LogType.INFO)
-                GameConsoleService.append("-> ${server.name}" + if (isOffline) " [OFFLINE]" else "", LogType.INFO)
+                emit(LaunchLogEvent.SessionStarted)
+                emit(LaunchLogEvent.AppBanner)
+                emit(LaunchLogEvent.TargetServer(server.name, isOffline))
 
                 ActionRing.record("Launching: ${server.name} (launchId=$launchId)")
 
                 // 1. Auth -- skip in offline mode
-                updateProgress(0.1f, s.stateAuth)
+                setStage(PrepareStage.AUTH, 0.1f)
                 var session = currentSession
                 val targetServerId = server.assetDir
 
                 if (isOffline) {
-                    GameConsoleService.append(s.stateOfflineSkipAuth, LogType.WARN)
+                    emit(LaunchLogEvent.OfflineSkipAuth)
                     // In offline mode, use whatever session we have (or a stub)
                     if (session.accessToken.isBlank()) {
                         session = session.copy(accessToken = "offline")
@@ -112,11 +149,11 @@ class LauncherController : KoinComponent {
                         if (!pass.isNullOrEmpty()) {
                             session = authService.login(session.playerName, pass, targetServerId)
                             onSessionRefreshed?.invoke(session)
-                            GameConsoleService.append(s.authSuccess(session.uuid), LogType.INFO)
+                            emit(LaunchLogEvent.AuthSucceeded(session.uuid))
                         } else {
-                            GameConsoleService.append(s.stateNoPassword, LogType.WARN)
+                            emit(LaunchLogEvent.NoPassword)
                         }
-                    } catch (_: hivens.core.api.TwoFactorRequiredException) {
+                    } catch (_: TwoFactorRequiredException) {
                         // 2FA account -- refusing to prompt the user for a code
                         // every time they click Play. The cached accessToken
                         // in `session` is from a previous successful 2FA flow
@@ -128,21 +165,23 @@ class LauncherController : KoinComponent {
                             session = session.copy(fileManifest = cached)
                             ActionRing.record("Launch: 2FA account, using cached manifest for $targetServerId")
                         } else {
-                            // No cached manifest and no fresh login. Continuing
-                            // hits "File manifest is empty!" deep in
-                            // processSession -- cryptic for the user. Throw
-                            // with the same string the 2FA dialog uses so the
-                            // outer LaunchState.Error renders an actionable
-                            // message ("re-login from the form"), not a
-                            // misleading internal one. Caught by the
-                            // top-level handler at the bottom of this fn.
+                            // No cached manifest and no fresh login -- bail
+                            // with the semantic TwoFactorExpired reason so
+                            // the UI can render an actionable "re-login from
+                            // the form" message. Pre-modular this threw an
+                            // IllegalStateException that got caught by the
+                            // outer catch as `Internal(message)`, which made
+                            // the UI render a misleading generic error.
                             ActionRing.record("Launch: 2FA + no cached manifest for $targetServerId -- re-login required")
-                            throw IllegalStateException(s.auth2faExpired)
+                            fail(LaunchError.TwoFactorExpired)
+                            return@launch
                         }
                     } catch (e: Exception) {
-                        GameConsoleService.append("${s.stateAuthFail}: ${e.message}", LogType.WARN)
-                        // If auth fails, and we're NOT in offline mode, we still try to continue
-                        // with the existing session (graceful degradation)
+                        // Non-2FA auth failure: log and continue with the
+                        // existing (possibly stale) session -- graceful
+                        // degradation, the game itself will reject if the
+                        // token has truly expired.
+                        emit(LaunchLogEvent.AuthFailed(e.message))
                     }
                 }
 
@@ -150,7 +189,7 @@ class LauncherController : KoinComponent {
                 val ignoredFiles = calculateIgnoredFiles(server)
 
                 // 3. Download -- skip in offline mode if client exists
-                updateProgress(0.2f, s.stateSync)
+                setStage(PrepareStage.SYNC, 0.2f)
                 val clientDir = dataDirectory.resolve("clients").resolve(targetServerId)
                 if (!Files.exists(clientDir)) Files.createDirectories(clientDir)
 
@@ -161,8 +200,7 @@ class LauncherController : KoinComponent {
                     val hasClient = Files.exists(clientDir) &&
                         Files.list(clientDir).use { it.count() > 0 }
                     if (!hasClient) {
-                        _state.value = LaunchState.Error(s.stateOfflineNoClient)
-                        GameConsoleService.append(s.stateOfflineNoClient, LogType.ERROR)
+                        fail(LaunchError.OfflineNoClient)
                         return@launch
                     }
                     // Recover the file manifest from the last successful online sync.
@@ -179,12 +217,11 @@ class LauncherController : KoinComponent {
                         if (cached != null) {
                             session = session.copy(fileManifest = cached)
                         } else {
-                            _state.value = LaunchState.Error(s.stateOfflineNoManifest)
-                            GameConsoleService.append(s.stateOfflineNoManifest, LogType.ERROR)
+                            fail(LaunchError.OfflineNoManifest)
                             return@launch
                         }
                     }
-                    GameConsoleService.append(s.stateOfflineSkipSync, LogType.INFO)
+                    emit(LaunchLogEvent.OfflineSkipSync)
                 } else {
                     downloadService.processSession(
                         session = session,
@@ -195,24 +232,19 @@ class LauncherController : KoinComponent {
                         messageUI = { /* log */ },
                         progressUI = { current, total, bytesRead, totalBytes, speed ->
                             if (!isActive) return@processSession
-                            // April Fools: display progress may regress, actual download is unaffected
-                            val displayProgress = AprilFoolsProgress.wrap(bytesRead, totalBytes)
                             _state.value = LaunchState.Downloading(
-                                fileName        = "${s.fileDownloading(total).substringBefore("(")}$current/$total",
-                                currentFileIdx  = current,
-                                totalFiles      = total,
-                                downloadedBytes = bytesRead,
-                                totalBytes      = totalBytes,
-                                speedStr        = speed,
-                                progress        = displayProgress
+                                currentFileIdx   = current,
+                                totalFiles       = total,
+                                downloadedBytes  = bytesRead,
+                                totalBytes       = totalBytes,
+                                speedBytesPerSec = parseSpeedString(speed),
                             )
                         },
                     )
-                    AprilFoolsProgress.reset()
                 }
 
                 // 4. Java
-                updateProgress(0.9f, s.stateJvm)
+                setStage(PrepareStage.JVM, 0.9f)
                 val javaPath = if (!settings.javaPath.isNullOrEmpty()) {
                     Path.of(settings.javaPath!!)
                 } else {
@@ -220,22 +252,18 @@ class LauncherController : KoinComponent {
                 }
 
                 // 5. Launch
+                setStage(PrepareStage.LAUNCH, 0.95f)
                 ActionRing.record("Game running: ${server.name}")
-                GameConsoleService.append(s.stateLaunching, LogType.INFO)
+                emit(LaunchLogEvent.Launching)
 
                 val process = launcherService.launchClientWithLogs(
                     sessionData = session,
                     serverProfile = server,
                     clientRootPath = clientDir,
                     javaExecutablePath = javaPath,
-                    allocatedMemoryMB = settings.memoryMB
+                    allocatedMemoryMB = settings.memoryMB,
                 ) { text, type ->
-                    val uiType = when (type) {
-                        LauncherLogType.INFO  -> LogType.INFO
-                        LauncherLogType.WARN  -> LogType.WARN
-                        LauncherLogType.ERROR -> LogType.ERROR
-                    }
-                    GameConsoleService.append(text, uiType)
+                    emit(LaunchLogEvent.ProcessOutput(text, type))
                 }
 
                 runningProcess = process
@@ -246,8 +274,7 @@ class LauncherController : KoinComponent {
                 ActionRing.record("Game exited: ${server.name} (code $exitCode)")
 
                 if (exitCode != 0) {
-                    _state.value = LaunchState.Error(s.stateExitCode(exitCode))
-                    GameConsoleService.show()
+                    fail(LaunchError.ExitCode(exitCode))
                 } else {
                     _state.value = LaunchState.Idle
                 }
@@ -256,8 +283,7 @@ class LauncherController : KoinComponent {
                 runningProcess = null
                 if (e !is CancellationException) {
                     logger.error("Launch flow failed for {}", server.name, e)
-                    _state.value = LaunchState.Error(s.stateError(e.message ?: ""), e)
-                    GameConsoleService.show()
+                    fail(LaunchError.Internal(e.message ?: ""), e)
                 } else {
                     _state.value = LaunchState.Idle
                 }
@@ -268,7 +294,7 @@ class LauncherController : KoinComponent {
     /**
      * Stops whatever launch flow is currently running. If the game process
      * has already spawned, send SIGTERM via [Process.destroy] and reset state.
-     * Previously this cancelled the coroutine but left the spawned Process
+     * Previously this canceled the coroutine but left the spawned Process
      * orphaned -- the launcher said Idle while the game kept running, and
      * the next launch() click would happily try to spawn a second game.
      */
@@ -284,12 +310,35 @@ class LauncherController : KoinComponent {
         _state.value = LaunchState.Idle
     }
 
-    private fun updateProgress(progress: Float, step: String) {
-        _state.value = LaunchState.Prepare(step, progress)
+    private fun setStage(stage: PrepareStage, progress: Float) {
+        _state.value = LaunchState.Prepare(stage, progress)
     }
 
     private fun calculateIgnoredFiles(server: ServerProfile): Set<String> {
         val userState = profileManager.getProfile(server.assetDir).optionalModsState
         return manifestProcessor.calculateIgnoredFiles(server, userState)
+    }
+
+    /**
+     * Best-effort parse of FileDownloadService's pre-formatted speed string
+     * (`"2.5 MB/s"`, `"812 KB/s"`, etc.) into bytes/second. The UI side
+     * formats freshly from this number so locale conventions stay correct;
+     * the raw string from FileDownloadService is in the launcher's locale
+     * which may not match the user's UI locale.
+     *
+     * Returns 0 on unparseable input -- the UI just shows no speed in that
+     * case rather than displaying a nonsensical figure.
+     */
+    private fun parseSpeedString(speed: String): Long {
+        val trimmed = speed.trim()
+        val match = Regex("""([\d.,]+)\s*([KMG]?)B?/s""", RegexOption.IGNORE_CASE).find(trimmed) ?: return 0L
+        val value = match.groupValues[1].replace(',', '.').toDoubleOrNull() ?: return 0L
+        val multiplier = when (match.groupValues[2].uppercase()) {
+            "K" -> 1_024L
+            "M" -> 1_048_576L
+            "G" -> 1_073_741_824L
+            else -> 1L
+        }
+        return (value * multiplier).toLong()
     }
 }

@@ -26,12 +26,12 @@ import io.github.vinceglb.filekit.path
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import hivens.ui.components.GlassCard
-import hivens.ui.easter.AprilFoolsButton
-import hivens.ui.easter.AprilFoolsDebugPanel
+import hivens.ui.easter.LocalAprilFools
 import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
+import hivens.ui.puppet.PuppetField
 import hivens.ui.puppet.PuppetToggle
 import hivens.ui.theme.CelestiaTheme
 import org.koin.compose.koinInject
@@ -54,6 +54,7 @@ fun SettingsScreen(
     val settingsService: ISettingsService = koinInject()
     val paths: PlatformPaths              = koinInject()
     val s = LocalStrings.current
+    val af = LocalAprilFools.current
 
     val initialSettings        = remember { settingsService.getSettings() }
     var closeAfterStart        by remember { mutableStateOf(initialSettings.closeAfterStart) } // TODO: Duplicate
@@ -64,6 +65,11 @@ fun SettingsScreen(
     var autoSyncAllPacks       by remember { mutableStateOf(initialSettings.autoSyncAllPacks) }
     var jvmBuilderEnabled      by remember { mutableStateOf(initialSettings.jvmBuilderEnabled) }
     var forceProxyMode         by remember { mutableStateOf(initialSettings.forceProxyMode) }
+    // Mimic-version override -- gated by experimentalEnabled. The toggle is
+    // derived from "is there a persisted non-blank override" so reopening
+    // Settings on the next launch reflects the actually-applied state.
+    var mimicOverrideEnabled   by remember { mutableStateOf(!initialSettings.mimicVersionOverride.isNullOrBlank()) }
+    var mimicVersionText       by remember { mutableStateOf(initialSettings.mimicVersionOverride ?: "") }
     var langDropdownExpanded   by remember { mutableStateOf(false) }
     var showSavedMessage       by remember { mutableStateOf(false) }
 
@@ -73,6 +79,12 @@ fun SettingsScreen(
     var showAprilDebug by remember { mutableStateOf(false) }
 
     fun save() {
+        // Normalise the override to null when disabled or blank -- the
+        // SettingsData contract is "null/blank means use default", so storing
+        // a stale value with the toggle off would silently re-arm on next
+        // launch via the Main.kt restore block.
+        val normalisedMimic = if (mimicOverrideEnabled) mimicVersionText.trim().ifBlank { null } else null
+
         val current = settingsService.getSettings()
         settingsService.saveSettings(
             current.copy(
@@ -83,12 +95,19 @@ fun SettingsScreen(
                 prereleaseChannelEnabled    = prereleaseChannel,
                 autoSyncAllPacks            = autoSyncAllPacks,
                 jvmBuilderEnabled           = jvmBuilderEnabled,
-                forceProxyMode              = forceProxyMode
+                forceProxyMode              = forceProxyMode,
+                mimicVersionOverride        = normalisedMimic,
             )
         )
         // Mirror to NetworkState so ChannelRouter sees it on the very next
         // request without waiting for launcher restart.
         hivens.launcher.network.NetworkState.setForceProxyMode(forceProxyMode)
+        // Apply the mimic-version override immediately so the next protocol
+        // handshake picks it up. Without this the user would have to restart
+        // for the change to take effect, even though the system property
+        // mechanism Protocol.MIMIC_LAUNCHER_VERSION reads is live.
+        @OptIn(hivens.config.ExperimentalProtocolOverride::class)
+        hivens.config.Protocol.setMimicLauncherVersion(normalisedMimic)
         showSavedMessage = true
     }
 
@@ -487,6 +506,48 @@ fun SettingsScreen(
                     PuppetToggle("settings.jvmBuilder", jvmBuilderEnabled, enabled = experimentalEnabled) {
                         jvmBuilderEnabled = it; save()
                     }
+
+                    Spacer(Modifier.height(16.dp))
+
+                    // ── Mimic launcher version override ───────────────────────
+                    // Toggle row + revealed text input. Doubly gated: master
+                    // experimental switch AND the row's own toggle. Saving an
+                    // empty/blank text falls back to the shipped default via
+                    // the normalisation in save().
+                    SettingsRowWithDescription(
+                        title          = s.settingsMimicVersion,
+                        description    = s.settingsMimicVersionDesc,
+                        icon           = Icons.Default.Tag,
+                        iconTint       = CelestiaTheme.colors.primary,
+                        checked        = experimentalEnabled && mimicOverrideEnabled,
+                        enabled        = experimentalEnabled,
+                        onCheckedChange = { mimicOverrideEnabled = it; save() }
+                    )
+                    PuppetToggle("settings.mimicVersion", mimicOverrideEnabled, enabled = experimentalEnabled) {
+                        mimicOverrideEnabled = it; save()
+                    }
+                    if (experimentalEnabled && mimicOverrideEnabled) {
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value           = mimicVersionText,
+                            onValueChange   = { mimicVersionText = it; save() },
+                            singleLine      = true,
+                            placeholder     = {
+                                Text(
+                                    s.settingsMimicVersionPlaceholder(
+                                        hivens.config.Protocol.DEFAULT_MIMIC_LAUNCHER_VERSION
+                                    ),
+                                    color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.55f),
+                                )
+                            },
+                            modifier        = Modifier
+                                .fillMaxWidth()
+                                .padding(start = 56.dp),
+                        )
+                        PuppetField("settings.mimicVersion.text", mimicVersionText) {
+                            mimicVersionText = it; save()
+                        }
+                    }
                 }
 
                 // ── Data directory (move to a different drive / folder) ───────
@@ -632,13 +693,13 @@ fun SettingsScreen(
                     // April Fools debug panel (hidden by default)
                     if (showAprilDebug) {
                         Spacer(Modifier.height(8.dp))
-                        AprilFoolsDebugPanel()
+                        af.DebugPanel()
                         Spacer(Modifier.height(8.dp))
                     }
 
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         // Open logs -- chaos target
-                        AprilFoolsButton(
+                        af.ChaosButton(
                             id       = "settings_open_logs_btn",
                             text     = s.settingsOpenLogs,
                             onClick  = { openFolder(paths.logsDir.toString()) },
@@ -650,7 +711,7 @@ fun SettingsScreen(
                         )
                         PuppetClick("settings.openLogsDir") { openFolder(paths.logsDir.toString()) }
                         // Open crash reports -- chaos target
-                        AprilFoolsButton(
+                        af.ChaosButton(
                             id       = "settings_crash_reports_btn",
                             text     = s.settingsOpenCrashReports,
                             onClick  = { openFolder(paths.crashDir.toString()) },
@@ -680,11 +741,11 @@ fun SettingsScreen(
                     val bundleScope    = rememberCoroutineScope()
 
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        AprilFoolsButton(
+                        af.ChaosButton(
                             id       = "settings_create_diag_bundle_btn",
                             text     = s.settingsCreateDiagnosticBundle,
                             onClick  = {
-                                if (bundleBusy) return@AprilFoolsButton
+                                if (bundleBusy) return@ChaosButton
                                 bundleBusy = true
                                 bundleScope.launch {
                                     val zip = withContext(kotlinx.coroutines.Dispatchers.IO) {
@@ -718,11 +779,11 @@ fun SettingsScreen(
                                 bundleBusy = false
                             }
                         }
-                        AprilFoolsButton(
+                        af.ChaosButton(
                             id       = "settings_report_github_btn",
                             text     = s.settingsReportOnGithub,
                             onClick  = {
-                                val zip = lastBundlePath ?: return@AprilFoolsButton
+                                val zip = lastBundlePath ?: return@ChaosButton
                                 runCatching {
                                     // Copy path so the user can drag-attach from the file
                                     // manager OR paste the path into a comment.
