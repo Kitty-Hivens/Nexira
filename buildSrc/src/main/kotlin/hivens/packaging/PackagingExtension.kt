@@ -1,6 +1,7 @@
 package hivens.packaging
 
 import org.gradle.api.Action
+import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.model.ObjectFactory
 import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.Property
@@ -33,11 +34,42 @@ abstract class PackagingExtension @Inject constructor(objects: ObjectFactory) {
     abstract val mainClass: Property<String>
 
     /**
+     * Application version handed to jpackage's `--app-version`. Must match
+     * `MAJOR.MINOR[.BUILD[.REVISION]]` digits-only (jpackage rejects
+     * pre-release suffixes; Compose Desktop's `packageVersion` and Inno
+     * Setup's `VersionInfoVersion` are similarly strict). Strip `-rc1`
+     * etc. on the consumer side before setting this.
+     */
+    abstract val appVersion: Property<String>
+
+    /**
      * JDK modules to include in the jlinked runtime. Order is preserved
      * because it ends up on the jlink `--add-modules` comma-separated list,
      * and a stable order keeps build-input hashing reproducible.
      */
     abstract val modules: ListProperty<String>
+
+    /**
+     * JVM arguments baked into the jpackage launcher script via repeated
+     * `--java-options` flags. Single source of truth for the runtime
+     * launch profile; mirrors what the AppImage AppRun also hands to
+     * java, with platform-conditional entries excluded by the consumer.
+     */
+    abstract val jvmArgs: ListProperty<String>
+
+    /** Icon for the Windows jpackage app image (`.ico`). */
+    abstract val windowsIcon: RegularFileProperty
+
+    /** Icon for the macOS jpackage app image (`.icns`). */
+    abstract val macosIcon: RegularFileProperty
+
+    /**
+     * macOS bundle identifier. Goes into jpackage's
+     * `--mac-package-identifier` and the resulting .app's
+     * `CFBundleIdentifier`. Reverse-DNS form derived from the
+     * `hivens.dev` apex, so "dev.hivens.auralauncher".
+     */
+    abstract val macosPackageIdentifier: Property<String>
 
     /**
      * Nested jlink-flag configuration. Defaults are seeded in

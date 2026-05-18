@@ -223,7 +223,10 @@ compose.desktop {
             // task is not invoked, so its iconFile is dead weight.
 
             macOS {
-                bundleID = "com.hivens.auralauncher"
+                // Reverse-DNS of the hivens.dev apex (was com.hivens.* by
+                // accident in earlier versions -- domain is hivens.dev, so
+                // the leftmost component must be `dev`).
+                bundleID = "dev.hivens.auralauncher"
                 dockName = "Aura Launcher"
                 // Without iconFile, jpackage falls back to the default
                 // Compose/Kotlin "K + folder" placeholder. Regenerate via
@@ -318,6 +321,17 @@ compose.resources {
 packaging {
     appName.set("AuraLauncher")
     mainClass.set("hivens.ui.MainKt")
+
+    // jpackage's `--app-version` is strict-digits (MAJOR.MINOR[.BUILD[.REVISION]],
+    // no pre-release suffix). Reuse Compose Desktop's `safeVersion` derivation
+    // immediately above so the two paths agree on what version string lands
+    // in the produced binary. Once Compose Desktop's nativeDistributions
+    // block is retired in B-3 the safeVersion lookup moves up here.
+    appVersion.set(provider {
+        val cleanVersion = project.version.toString().removePrefix("v").substringBefore("-")
+        if (cleanVersion.matches(Regex("\\d+\\.\\d+.*"))) cleanVersion else "1.0.0"
+    })
+
     modules.set(listOf(
         "java.base",
         "java.desktop",
@@ -329,6 +343,34 @@ packaging {
         "jdk.zipfs",
         "jdk.localedata",
     ))
+
+    // jvmArgs baked into the jpackage launcher script via repeated
+    // --java-options. Same set as compose.desktop.application.jvmArgs
+    // above (still authoritative until B-3 retires that block).
+    // AURA_WAYLAND_TRIAL flow is gone (Liberica swap commit e573318);
+    // -Dawt.appClassName is JBR-only honour, dropped in the same
+    // commit; jna.nosys was a dorkbox/JBR rudiment, also dropped.
+    jvmArgs.set(listOf(
+        "--add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED",
+        "--enable-native-access=ALL-UNNAMED",
+        "-Dawt.useSystemAAFontSettings=on",
+        "-Djdk.gtk.version=3",
+        "-D_JAVA_AWT_WM_NONREPARENTING=1",
+        "-Drobot.need_x11=false",
+        "-XX:+UseG1GC",
+        "-XX:+UseStringDeduplication",
+        "-XX:+OptimizeStringConcat",
+        "-XX:+UseCompressedOops",
+        "-Xms128m",
+        "-Xmx512m",
+        "-XX:MaxMetaspaceSize=256m",
+        "-XX:ReservedCodeCacheSize=128m",
+    ))
+
+    windowsIcon.set(rootProject.file("resources/icons/icon.ico"))
+    macosIcon.set(rootProject.file("resources/icons/icon.icns"))
+    macosPackageIdentifier.set("dev.hivens.auralauncher")
+
     jlink {
         compress.set("zip-9")
         vmKind.set("server")
