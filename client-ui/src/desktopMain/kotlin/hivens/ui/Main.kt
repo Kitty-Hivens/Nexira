@@ -642,10 +642,27 @@ fun AppRoot(
     val protocolConfig: ServerProtocolConfig   = koinInject()
     val af = LocalAprilFools.current
 
+    // Mirror the smartycraft HttpClientProvider's per-request channel choice
+    // for Coil's image fetcher -- news images are served from www.smartycraft.ru
+    // alongside skins, so they have to honour the same forceProxyMode +
+    // SSL-bypass decisions or the user's toggle does nothing for the
+    // news strip. Each `newCall` re-reads NetworkState so the toggle
+    // takes effect immediately.
+    val directHttpClient: OkHttpClient   = koinInject(named("direct"))
+    val insecureHttpClient: OkHttpClient = koinInject(named("insecure"))
+    val routingCallFactory = okhttp3.Call.Factory { request ->
+        val client = when {
+            NetworkState.bypassFor(protocolConfig.sslBypassHost) -> insecureHttpClient
+            NetworkState.forceProxyMode()                        -> httpClient
+            else                                                  -> directHttpClient
+        }
+        client.newCall(request)
+    }
+
     setSingletonImageLoaderFactory { context ->
         ImageLoader.Builder(context)
             .components {
-                add(OkHttpNetworkFetcherFactory(callFactory = { httpClient }))
+                add(OkHttpNetworkFetcherFactory(callFactory = { routingCallFactory }))
             }
             .build()
     }
