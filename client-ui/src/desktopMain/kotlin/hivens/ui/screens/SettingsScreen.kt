@@ -526,9 +526,20 @@ fun SettingsScreen(
                     }
                     if (experimentalEnabled && mimicOverrideEnabled) {
                         Spacer(Modifier.height(8.dp))
+                        // Debounce text-field writes: onValueChange fires per
+                        // keystroke and save() runs a synchronous file write
+                        // + applies the new value to live protocol traffic.
+                        // Calling save() on every keystroke would stutter the
+                        // UI on slow disks and push transient partial values
+                        // ("3", "3.", "3.6") to the next protocol call before
+                        // the user is done. The LaunchedEffect below waits
+                        // 400 ms after the last keystroke and then commits.
+                        // Toggle-flip persists immediately via its own
+                        // onCheckedChange (above) so the dependency between
+                        // the toggle and the field stays intuitive.
                         OutlinedTextField(
                             value           = mimicVersionText,
-                            onValueChange   = { mimicVersionText = it; save() },
+                            onValueChange   = { mimicVersionText = it },
                             singleLine      = true,
                             placeholder     = {
                                 Text(
@@ -543,7 +554,16 @@ fun SettingsScreen(
                                 .padding(start = 56.dp),
                         )
                         PuppetField("settings.mimicVersion.text", mimicVersionText) {
-                            mimicVersionText = it; save()
+                            mimicVersionText = it
+                        }
+                        LaunchedEffect(mimicVersionText) {
+                            // Skip the initial-composition fire when the
+                            // field equals the persisted value.
+                            if (mimicVersionText == (initialSettings.mimicVersionOverride ?: "")) {
+                                return@LaunchedEffect
+                            }
+                            kotlinx.coroutines.delay(400.milliseconds)
+                            save()
                         }
                     }
                 }
