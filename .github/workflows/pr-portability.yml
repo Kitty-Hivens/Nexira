@@ -176,6 +176,15 @@ jobs:
           - distro_name: Arch-latest
             container: archlinux:latest
             expect_keyring: any
+            # pacman -Syu (not -Sy): Arch's rolling-release model treats
+            # `-Sy` followed by package installs as a "partial upgrade",
+            # which is officially unsupported -- newly-installed packages
+            # link against the latest repo libs (e.g. xorg-server-xvfb
+            # vs. libnettle.so.9) while the container's stale system libs
+            # don't get refreshed, producing UnsatisfiedLink at runtime.
+            # The previous round's Xvfb smoke caught this:
+            #   Xvfb: error while loading shared libraries: libnettle.so.9
+            #
             # xorg-xkbcomp + xkeyboard-config: Xvfb shells out to `xkbcomp`
             # at startup to compile the keymap. xkeyboard-config ships only
             # the keymap source data; the binary lives in a separate package
@@ -184,7 +193,7 @@ jobs:
             # before opening :99, and AWT later fails with
             # "Can't connect to X11 window server using ':99'".
             install_cmd: |
-              pacman -Sy --noconfirm \
+              pacman -Syu --noconfirm \
                 xorg-server-xvfb fuse2 which libsecret \
                 libxi libxrender libxtst libxext libxcursor libxxf86vm \
                 fontconfig freetype2 libglvnd \
