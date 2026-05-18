@@ -14,6 +14,12 @@ import org.jetbrains.skia.ImageInfo
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.net.URLEncoder
+import org.jetbrains.skia.FilterMipmap
+import org.jetbrains.skia.FilterMode
+import org.jetbrains.skia.Image
+import org.jetbrains.skia.MipmapMode
+import org.jetbrains.skia.Paint
+import org.jetbrains.skia.Rect
 
 /**
  * Skin manager with persistent disk cache (#61).
@@ -25,7 +31,14 @@ import java.net.URLEncoder
  *
  * Cache is invalidated on explicit call or after [CACHE_TTL_MS].
  *
- * Note: encodeNickname() is used ONLY for URL construction, never for file paths.
+ * Two boundary transforms on the nickname:
+ *   - encodeNickname() -- URL encoding, used only when building the
+ *     skin/cloak HTTP request URL.
+ *   - safeCacheBase()  -- filesystem sanitization, used for every disk
+ *     cache filename so a nickname with `..`, `/`, `\`, or any reserved
+ *     Windows character cannot escape skinCacheDir or write outside it.
+ *     Memory-cache keys remain the raw nickname (JVM map; no filesystem
+ *     exposure).
  */
 class SkinManager(
     private val clientProvider: HttpClientProvider,
@@ -67,24 +80,25 @@ class SkinManager(
 
     // ── Skia rendering settings ────────────────────────────────────────────
 
-    private val samplingNearest = org.jetbrains.skia.FilterMipmap(
-        org.jetbrains.skia.FilterMode.NEAREST,
-        org.jetbrains.skia.MipmapMode.NONE
+    private val samplingNearest = FilterMipmap(
+        FilterMode.NEAREST,
+        MipmapMode.NONE
     )
-    private val samplingLinear = org.jetbrains.skia.FilterMipmap(
-        org.jetbrains.skia.FilterMode.LINEAR,
-        org.jetbrains.skia.MipmapMode.NONE
+    private val samplingLinear = FilterMipmap(
+        FilterMode.LINEAR,
+        MipmapMode.NONE
     )
-    private val paint = org.jetbrains.skia.Paint().apply { isAntiAlias = false }
+    private val paint = Paint().apply { isAntiAlias = false }
 
     // ── Public API ─────────────────────────────────────────────────────────
 
     fun invalidate(nickname: String) {
         frontCache.remove(nickname)
         backCache.remove(nickname)
+        val base = safeCacheBase(nickname)
         // Delete disk cache
         listOf("front", "back", "raw").forEach { prefix ->
-            File(cacheDir, "${prefix}_${nickname}.png").delete()
+            File(cacheDir, "${prefix}_${base}.png").delete()
         }
         logger.info("Cache invalidated for {}", nickname)
     }
@@ -94,10 +108,10 @@ class SkinManager(
         frontCache[nickname]?.let { return@withContext it }
 
         // 2. Disk cache
-        val diskFile = File(cacheDir, "front_${nickname}.png")
+        val diskFile = File(cacheDir, "front_${safeCacheBase(nickname)}.png")
         if (diskFile.exists() && !isExpired(diskFile)) {
             try {
-                val skiaImage = org.jetbrains.skia.Image.makeFromEncoded(diskFile.readBytes())
+                val skiaImage = Image.makeFromEncoded(diskFile.readBytes())
                 val result = skiaImage.use { skiaImage ->
                     skiaImage.toComposeImageBitmap()
                 }
@@ -114,7 +128,7 @@ class SkinManager(
         val rawSkin = getOrDownloadRawSkin(nickname) ?: return@withContext null
         val processed = assembleSkin(rawSkin, isFront = true, cloak = null)
         val result = run {
-            val img = org.jetbrains.skia.Image.makeFromBitmap(processed)
+            val img = Image.makeFromBitmap(processed)
             img.use { img ->
                 img.toComposeImageBitmap()
             }
@@ -130,11 +144,12 @@ class SkinManager(
     suspend fun getSkinBack(nickname: String, cloakHash: String? = null): ImageBitmap? = withContext(Dispatchers.IO) {
         backCache[nickname]?.let { return@withContext it }
 
-        // FIX: raw nickname for file path, not encoded -- must match invalidate()
-        val diskFile = File(cacheDir, "back_${nickname}.png")
+        // Sanitised nickname for file path -- must match invalidate(). Disk
+        // path sanitization is independent of URL encoding (see safeCacheBase).
+        val diskFile = File(cacheDir, "back_${safeCacheBase(nickname)}.png")
         if (diskFile.exists() && !isExpired(diskFile)) {
             try {
-                val skiaImage = org.jetbrains.skia.Image.makeFromEncoded(diskFile.readBytes())
+                val skiaImage = Image.makeFromEncoded(diskFile.readBytes())
                 val result = skiaImage.use { skiaImage ->
                     skiaImage.toComposeImageBitmap()
                 }
@@ -159,7 +174,7 @@ class SkinManager(
 
         val processed = assembleSkin(rawSkin, isFront = false, cloak = rawCloak)
         val result = run {
-            val img = org.jetbrains.skia.Image.makeFromBitmap(processed)
+            val img = Image.makeFromBitmap(processed)
             img.use { img ->
                 img.toComposeImageBitmap()
             }
@@ -177,14 +192,14 @@ class SkinManager(
         return System.currentTimeMillis() - file.lastModified() > CACHE_TTL_MS
     }
 
-    private suspend fun getOrDownloadRawSkin(nickname: String): org.jetbrains.skia.Image? {
-        // raw nickname for file path, encodeNickname only for URL
-        val rawFile = File(cacheDir, "raw_${nickname}.png")
+    private suspend fun getOrDownloadRawSkin(nickname: String): Image? {
+        // safeCacheBase for file path, encodeNickname only for URL
+        val rawFile = File(cacheDir, "raw_${safeCacheBase(nickname)}.png")
 
         // Try disk cache for raw texture
         if (rawFile.exists() && !isExpired(rawFile)) {
             try {
-                return org.jetbrains.skia.Image.makeFromEncoded(rawFile.readBytes())
+                return Image.makeFromEncoded(rawFile.readBytes())
             } catch (_: Exception) {
                 rawFile.delete()
             }
@@ -210,7 +225,7 @@ class SkinManager(
 
     private fun saveBitmapToDisk(bitmap: org.jetbrains.skia.Bitmap, file: File) {
         try {
-            val image = org.jetbrains.skia.Image.makeFromBitmap(bitmap)
+            val image = Image.makeFromBitmap(bitmap)
             val data = image.use { image ->
                 image.encodeToData(org.jetbrains.skia.EncodedImageFormat.PNG)
             }
@@ -225,14 +240,14 @@ class SkinManager(
 
     // ── Network ────────────────────────────────────────────────────────────
 
-    private suspend fun downloadTexture(url: String): org.jetbrains.skia.Image? {
+    private suspend fun downloadTexture(url: String): Image? {
         return try {
             val response = httpClient.get(url) {
                 header(HttpHeaders.UserAgent, "Mozilla/5.0")
             }
             if (!response.status.isSuccess()) return null
             val bytes = response.bodyAsBytes()
-            org.jetbrains.skia.Image.makeFromEncoded(bytes)
+            Image.makeFromEncoded(bytes)
         } catch (e: Exception) {
             logger.debug("Failed to download texture from {}: {}", url, e.message)
             null
@@ -242,9 +257,9 @@ class SkinManager(
     // ── Skin assembly (ported from original h.java) ────────────────────────
 
     private fun assembleSkin(
-        skin: org.jetbrains.skia.Image,
+        skin: Image,
         isFront: Boolean,
-        cloak: org.jetbrains.skia.Image?
+        cloak: Image?
     ): org.jetbrains.skia.Bitmap {
         val viewW = 160
         val viewH = 320
@@ -267,8 +282,8 @@ class SkinManager(
             dstX: Float, dstY: Float, dstW: Float, dstH: Float,
             mirror: Boolean = false
         ) {
-            val srcRect = org.jetbrains.skia.Rect.makeXYWH(srcX * k, srcY * k, srcW * k, srcH * k)
-            val dstRect = org.jetbrains.skia.Rect.makeXYWH(dstX * scale, dstY * scale, dstW * scale, dstH * scale)
+            val srcRect = Rect.makeXYWH(srcX * k, srcY * k, srcW * k, srcH * k)
+            val dstRect = Rect.makeXYWH(dstX * scale, dstY * scale, dstW * scale, dstH * scale)
 
             if (mirror) {
                 canvas.save()
@@ -347,8 +362,8 @@ class SkinManager(
             val kCloak = cloak.width.toFloat() / 64f
             val isCloakHD = cloak.width > 64
             val cloakSampling = if (isCloakHD) samplingLinear else samplingNearest
-            val cloakSrc = org.jetbrains.skia.Rect.makeXYWH(1f * kCloak, 1f * kCloak, 10f * kCloak, 16f * kCloak)
-            val cloakDst = org.jetbrains.skia.Rect.makeXYWH(3f * scale, 8f * scale, 10f * scale, 16f * scale)
+            val cloakSrc = Rect.makeXYWH(1f * kCloak, 1f * kCloak, 10f * kCloak, 16f * kCloak)
+            val cloakDst = Rect.makeXYWH(3f * scale, 8f * scale, 10f * scale, 16f * scale)
             canvas.drawImageRect(cloak, cloakSrc, cloakDst, cloakSampling, paint, true)
         }
 
@@ -358,4 +373,28 @@ class SkinManager(
     // ── URL encoding -- only for network requests, never for file paths ─────
     private fun encodeNickname(nickname: String): String =
         URLEncoder.encode(nickname, Charsets.UTF_8.name()).replace("+", "%20")
+
+    /**
+     * Maps a nickname to a filesystem-safe base name for the disk cache.
+     * Anything outside `[A-Za-z0-9_-]` becomes `_`; the result is capped
+     * at 64 chars so we don't blow past PATH_MAX on adversarial input.
+     *
+     * Used for every `File(cacheDir, "${prefix}_${...}.png")` call. Keeps
+     * the cache directory closed under path-traversal: `..`, `/`, `\`,
+     * NUL, and Windows reserved characters all collapse to `_` before
+     * the path is composed, so an attacker who can dictate the nickname
+     * cannot write to or read from a location outside skinCacheDir.
+     *
+     * Deterministic and idempotent so subsequent `invalidate()` and
+     * cache lookups for the same nickname find the same file. Collisions
+     * between two raw nicknames mapping to the same base are theoretical
+     * (SC nicknames are ASCII-letters/digits/underscore in practice) and
+     * would only manifest as one user briefly seeing the other's cached
+     * skin until the TTL expires -- a strictly smaller blast radius than
+     * the path-traversal risk it eliminates.
+     */
+    private fun safeCacheBase(nickname: String): String {
+        val cleaned = nickname.replace(Regex("[^A-Za-z0-9_-]"), "_")
+        return if (cleaned.length > 64) cleaned.take(64) else cleaned
+    }
 }

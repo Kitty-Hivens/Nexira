@@ -1,6 +1,6 @@
 package hivens.launcher.network
 
-import hivens.launcher.NetworkState
+import hivens.launcher.network.NetworkState
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond

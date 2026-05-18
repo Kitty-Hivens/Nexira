@@ -120,9 +120,17 @@ class GameCommandBuilderTest {
     }
 
     @Test
-    fun `build includes -noverify flag`() {
+    fun `build includes -noverify flag for legacy versions`() {
         val cmd = build("1.7.10")
-        assertTrue(cmd.contains("-noverify"), "Should include -noverify")
+        assertTrue(cmd.contains("-noverify"), "Should include -noverify on legacy")
+    }
+
+    @Test
+    fun `build omits -noverify flag for modern environments`() {
+        // -noverify was deprecated in Java 13 -- Java 21 (1.21.1) prints a
+        // warning per launch. Legacy MC on Java 8 still needs it for Forge.
+        val cmd = build("1.21.1")
+        assertFalse(cmd.contains("-noverify"), "Should NOT include -noverify on modern")
     }
 
     @Test

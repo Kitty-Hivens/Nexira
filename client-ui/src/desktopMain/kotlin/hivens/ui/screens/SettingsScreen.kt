@@ -21,21 +21,22 @@ import hivens.launcher.diag.DiagnosticBundle
 import hivens.launcher.platform.PlatformPaths
 import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.PlatformFile
+import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
 import io.github.vinceglb.filekit.dialogs.openDirectoryPicker
 import io.github.vinceglb.filekit.path
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import hivens.ui.components.GlassCard
-import hivens.ui.easter.AprilFoolsButton
-import hivens.ui.easter.AprilFoolsDebugPanel
+import hivens.ui.easter.LocalAprilFools
 import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
+import hivens.ui.puppet.PuppetField
 import hivens.ui.puppet.PuppetToggle
 import hivens.ui.theme.CelestiaTheme
 import org.koin.compose.koinInject
-import java.awt.Desktop
+import hivens.ui.utils.SystemActions
 import java.io.File
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -54,6 +55,7 @@ fun SettingsScreen(
     val settingsService: ISettingsService = koinInject()
     val paths: PlatformPaths              = koinInject()
     val s = LocalStrings.current
+    val af = LocalAprilFools.current
 
     val initialSettings        = remember { settingsService.getSettings() }
     var closeAfterStart        by remember { mutableStateOf(initialSettings.closeAfterStart) } // TODO: Duplicate
@@ -64,6 +66,11 @@ fun SettingsScreen(
     var autoSyncAllPacks       by remember { mutableStateOf(initialSettings.autoSyncAllPacks) }
     var jvmBuilderEnabled      by remember { mutableStateOf(initialSettings.jvmBuilderEnabled) }
     var forceProxyMode         by remember { mutableStateOf(initialSettings.forceProxyMode) }
+    // Mimic-version override -- gated by experimentalEnabled. The toggle is
+    // derived from "is there a persisted non-blank override" so reopening
+    // Settings on the next launch reflects the actually-applied state.
+    var mimicOverrideEnabled   by remember { mutableStateOf(!initialSettings.mimicVersionOverride.isNullOrBlank()) }
+    var mimicVersionText       by remember { mutableStateOf(initialSettings.mimicVersionOverride ?: "") }
     var langDropdownExpanded   by remember { mutableStateOf(false) }
     var showSavedMessage       by remember { mutableStateOf(false) }
 
@@ -73,6 +80,12 @@ fun SettingsScreen(
     var showAprilDebug by remember { mutableStateOf(false) }
 
     fun save() {
+        // Normalise the override to null when disabled or blank -- the
+        // SettingsData contract is "null/blank means use default", so storing
+        // a stale value with the toggle off would silently re-arm on next
+        // launch via the Main.kt restore block.
+        val normalisedMimic = if (mimicOverrideEnabled) mimicVersionText.trim().ifBlank { null } else null
+
         val current = settingsService.getSettings()
         settingsService.saveSettings(
             current.copy(
@@ -83,19 +96,23 @@ fun SettingsScreen(
                 prereleaseChannelEnabled    = prereleaseChannel,
                 autoSyncAllPacks            = autoSyncAllPacks,
                 jvmBuilderEnabled           = jvmBuilderEnabled,
-                forceProxyMode              = forceProxyMode
+                forceProxyMode              = forceProxyMode,
+                mimicVersionOverride        = normalisedMimic,
             )
         )
         // Mirror to NetworkState so ChannelRouter sees it on the very next
         // request without waiting for launcher restart.
-        hivens.launcher.NetworkState.setForceProxyMode(forceProxyMode)
+        hivens.launcher.network.NetworkState.setForceProxyMode(forceProxyMode)
+        // Apply the mimic-version override immediately so the next protocol
+        // handshake picks it up. Without this the user would have to restart
+        // for the change to take effect, even though the system property
+        // mechanism Protocol.MIMIC_LAUNCHER_VERSION reads is live.
+        @OptIn(hivens.config.ExperimentalProtocolOverride::class)
+        hivens.config.Protocol.setMimicLauncherVersion(normalisedMimic)
         showSavedMessage = true
     }
 
-    fun openFolder(path: String) {
-        val dir = File(path).also { it.mkdirs() }
-        if (Desktop.isDesktopSupported()) Desktop.getDesktop().open(dir)
-    }
+    fun openFolder(path: String) = SystemActions.openFolder(path)
 
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         Text(
@@ -310,9 +327,9 @@ fun SettingsScreen(
                     // Live snapshot -- re-reads every 1s. Sufficient for a
                     // settings screen (no rapid-fire updates expected). Avoids
                     // setting up a Flow purely for this single read site.
-                    val bypasses = androidx.compose.runtime.produceState(initialValue = hivens.launcher.NetworkState.listBypasses()) {
+                    val bypasses = androidx.compose.runtime.produceState(initialValue = hivens.launcher.network.NetworkState.listBypasses()) {
                         while (true) {
-                            value = hivens.launcher.NetworkState.listBypasses()
+                            value = hivens.launcher.network.NetworkState.listBypasses()
                             kotlinx.coroutines.delay(1_000.milliseconds)
                         }
                     }.value
@@ -365,7 +382,7 @@ fun SettingsScreen(
                                             hivens.core.diag.ActionRing.record(
                                                 "SSL bypass revoked by user from Settings: ${entry.host}",
                                             )
-                                            hivens.launcher.NetworkState.revokeBypass(entry.host)
+                                            hivens.launcher.network.NetworkState.revokeBypass(entry.host)
                                         },
                                         shape = RoundedCornerShape(6.dp),
                                     ) {
@@ -377,7 +394,7 @@ fun SettingsScreen(
                                         hivens.core.diag.ActionRing.record(
                                             "SSL bypass revoked by puppet driver: ${entry.host}",
                                         )
-                                        hivens.launcher.NetworkState.revokeBypass(entry.host)
+                                        hivens.launcher.network.NetworkState.revokeBypass(entry.host)
                                     }
                                 }
                             }
@@ -487,6 +504,68 @@ fun SettingsScreen(
                     PuppetToggle("settings.jvmBuilder", jvmBuilderEnabled, enabled = experimentalEnabled) {
                         jvmBuilderEnabled = it; save()
                     }
+
+                    Spacer(Modifier.height(16.dp))
+
+                    // ── Mimic launcher version override ───────────────────────
+                    // Toggle row + revealed text input. Doubly gated: master
+                    // experimental switch AND the row's own toggle. Saving an
+                    // empty/blank text falls back to the shipped default via
+                    // the normalisation in save().
+                    SettingsRowWithDescription(
+                        title          = s.settingsMimicVersion,
+                        description    = s.settingsMimicVersionDesc,
+                        icon           = Icons.Default.Tag,
+                        iconTint       = CelestiaTheme.colors.primary,
+                        checked        = experimentalEnabled && mimicOverrideEnabled,
+                        enabled        = experimentalEnabled,
+                        onCheckedChange = { mimicOverrideEnabled = it; save() }
+                    )
+                    PuppetToggle("settings.mimicVersion", mimicOverrideEnabled, enabled = experimentalEnabled) {
+                        mimicOverrideEnabled = it; save()
+                    }
+                    if (experimentalEnabled && mimicOverrideEnabled) {
+                        Spacer(Modifier.height(8.dp))
+                        // Debounce text-field writes: onValueChange fires per
+                        // keystroke and save() runs a synchronous file write
+                        // + applies the new value to live protocol traffic.
+                        // Calling save() on every keystroke would stutter the
+                        // UI on slow disks and push transient partial values
+                        // ("3", "3.", "3.6") to the next protocol call before
+                        // the user is done. The LaunchedEffect below waits
+                        // 400 ms after the last keystroke and then commits.
+                        // Toggle-flip persists immediately via its own
+                        // onCheckedChange (above) so the dependency between
+                        // the toggle and the field stays intuitive.
+                        OutlinedTextField(
+                            value           = mimicVersionText,
+                            onValueChange   = { mimicVersionText = it },
+                            singleLine      = true,
+                            placeholder     = {
+                                Text(
+                                    s.settingsMimicVersionPlaceholder(
+                                        hivens.config.Protocol.DEFAULT_MIMIC_LAUNCHER_VERSION
+                                    ),
+                                    color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.55f),
+                                )
+                            },
+                            modifier        = Modifier
+                                .fillMaxWidth()
+                                .padding(start = 56.dp),
+                        )
+                        PuppetField("settings.mimicVersion.text", mimicVersionText) {
+                            mimicVersionText = it
+                        }
+                        LaunchedEffect(mimicVersionText) {
+                            // Skip the initial-composition fire when the
+                            // field equals the persisted value.
+                            if (mimicVersionText == (initialSettings.mimicVersionOverride ?: "")) {
+                                return@LaunchedEffect
+                            }
+                            kotlinx.coroutines.delay(400.milliseconds)
+                            save()
+                        }
+                    }
                 }
 
                 // ── Data directory (move to a different drive / folder) ───────
@@ -530,9 +609,17 @@ fun SettingsScreen(
                                     // (your native Hyprland / KDE / GNOME picker),
                                     // IFileDialog on Windows, NSOpenPanel on macOS.
                                     // No Metal LAF eyesore.
+                                    //
+                                    // dialogSettings(title=...) is the key bit -- without
+                                    // it FileKit hands the portal a blank-title request and
+                                    // some backends render a less-styled fallback chrome
+                                    // (no titlebar text, generic icon). ProfileScreen +
+                                    // ServerSettingsScreen all pass dialogSettings; this
+                                    // site used to be the odd one out.
                                     val pickedFile = runCatching {
                                         FileKit.openDirectoryPicker(
-                                            directory = PlatformFile(paths.dataDir.toFile()),
+                                            directory      = PlatformFile(paths.dataDir.toFile()),
+                                            dialogSettings = FileKitDialogSettings(title = s.settingsDataDirMove),
                                         )
                                     }.getOrNull() ?: return@launch
 
@@ -632,13 +719,13 @@ fun SettingsScreen(
                     // April Fools debug panel (hidden by default)
                     if (showAprilDebug) {
                         Spacer(Modifier.height(8.dp))
-                        AprilFoolsDebugPanel()
+                        af.DebugPanel()
                         Spacer(Modifier.height(8.dp))
                     }
 
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         // Open logs -- chaos target
-                        AprilFoolsButton(
+                        af.ChaosButton(
                             id       = "settings_open_logs_btn",
                             text     = s.settingsOpenLogs,
                             onClick  = { openFolder(paths.logsDir.toString()) },
@@ -650,7 +737,7 @@ fun SettingsScreen(
                         )
                         PuppetClick("settings.openLogsDir") { openFolder(paths.logsDir.toString()) }
                         // Open crash reports -- chaos target
-                        AprilFoolsButton(
+                        af.ChaosButton(
                             id       = "settings_crash_reports_btn",
                             text     = s.settingsOpenCrashReports,
                             onClick  = { openFolder(paths.crashDir.toString()) },
@@ -680,11 +767,11 @@ fun SettingsScreen(
                     val bundleScope    = rememberCoroutineScope()
 
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        AprilFoolsButton(
+                        af.ChaosButton(
                             id       = "settings_create_diag_bundle_btn",
                             text     = s.settingsCreateDiagnosticBundle,
                             onClick  = {
-                                if (bundleBusy) return@AprilFoolsButton
+                                if (bundleBusy) return@ChaosButton
                                 bundleBusy = true
                                 bundleScope.launch {
                                     val zip = withContext(kotlinx.coroutines.Dispatchers.IO) {
@@ -692,9 +779,7 @@ fun SettingsScreen(
                                     }
                                     if (zip != null) {
                                         lastBundlePath = zip
-                                        if (Desktop.isDesktopSupported()) {
-                                            runCatching { Desktop.getDesktop().open(zip.parent.toFile()) }
-                                        }
+                                        SystemActions.openFile(zip.parent.toFile())
                                     }
                                     bundleBusy = false
                                 }
@@ -718,21 +803,17 @@ fun SettingsScreen(
                                 bundleBusy = false
                             }
                         }
-                        AprilFoolsButton(
+                        af.ChaosButton(
                             id       = "settings_report_github_btn",
                             text     = s.settingsReportOnGithub,
                             onClick  = {
-                                val zip = lastBundlePath ?: return@AprilFoolsButton
+                                val zip = lastBundlePath ?: return@ChaosButton
                                 runCatching {
                                     // Copy path so the user can drag-attach from the file
                                     // manager OR paste the path into a comment.
                                     java.awt.Toolkit.getDefaultToolkit().systemClipboard
                                         .setContents(java.awt.datatransfer.StringSelection(zip.toString()), null)
-                                    if (Desktop.isDesktopSupported()) {
-                                        Desktop.getDesktop().browse(
-                                            java.net.URI(hivens.launcher.diag.IssueReporter.bundleIssueUrl(zip))
-                                        )
-                                    }
+                                    SystemActions.openUrl(hivens.launcher.diag.IssueReporter.bundleIssueUrl(zip))
                                 }
                             },
                             modifier = Modifier.weight(1f),
@@ -749,11 +830,7 @@ fun SettingsScreen(
                             runCatching {
                                 java.awt.Toolkit.getDefaultToolkit().systemClipboard
                                     .setContents(java.awt.datatransfer.StringSelection(zip.toString()), null)
-                                if (Desktop.isDesktopSupported()) {
-                                    Desktop.getDesktop().browse(
-                                        java.net.URI(hivens.launcher.diag.IssueReporter.bundleIssueUrl(zip))
-                                    )
-                                }
+                                SystemActions.openUrl(hivens.launcher.diag.IssueReporter.bundleIssueUrl(zip))
                             }
                         }
                     }

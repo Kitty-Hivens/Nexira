@@ -11,6 +11,201 @@ below are for the GitHub release page and CHANGELOG readers.
 
 ## [Unreleased]
 
+## [2.2.15] - 2026-05-18
+
+Network plumbing + UI responsiveness release. The "Force proxy mode"
+toggle from 2.2.13 finally takes effect across every smartycraft.ru
+request, not just the auth handshake -- skins, news images and pack
+syncs now honour the user's choice and react to it without a
+relaunch. Several "the launcher froze when I clicked X" reports trace
+back to native `Desktop.open` / `Desktop.browse` calls running on the
+Compose UI thread; every such call now dispatches to a daemon thread
+so a wedged `xdg-desktop-portal` D-Bus can no longer hold up the
+window. The integrity walk that hashes every file in a modpack now
+emits progress while it works, so a cold launch on a 1000-file pack
+no longer looks frozen for tens of seconds. Plus an architectural
+sweep -- `LauncherController` moves to the right module, the chaos
+subsystem hides behind a CompositionLocal, several long-standing
+god-files and singleton patterns get cleaned up.
+
+### Highlights
+- **"Force proxy mode" actually does what it says** -- pre-fix the
+  toggle only affected the auth handshake. Skins, news images and
+  pack-file downloads stayed pinned to the SOCKS proxy regardless of
+  the setting, so users in networks where `proxy.smartycraft.ru:58613`
+  is unreachable saw login work but everything else silently fail.
+  Every smartycraft.ru request now reads the toggle freshly per call;
+  flipping it in Settings takes effect on the next request without a
+  restart.
+- **News strip can retry after network recovery** -- the news feed
+  used to fetch exactly once on startup; a single failure stuck it
+  in the empty state for the rest of the session. The empty state
+  now has a Retry button that bypasses the in-memory cache, and the
+  feed re-fetches automatically on a force-proxy or SSL-bypass
+  toggle.
+- **Click handlers don't freeze the launcher anymore** -- `Desktop.open`
+  and `Desktop.browse` (Open folder, View on GitHub, Report on GitHub,
+  news links, register button, ...) now dispatch to a daemon thread.
+  A stuck `xdg-desktop-portal` D-Bus or misconfigured `xdg-open`
+  on Linux can no longer hold up the EDT.
+- **Integrity walk shows progress** -- when the launcher hashes every
+  file in a 1000-file modpack before deciding what to download, the
+  progress bar now advances visibly through that phase instead of
+  freezing at 20% for tens of seconds.
+- **Custom upstream version pin** -- new opt-in field in Settings
+  (Experimental section) lets users override the version string the
+  launcher sends to the upstream handshake, in case the upstream pins
+  a newer version before the next Aura release ships. Persisted across
+  restarts; applied without one.
+
+### Added
+- `SettingsData.mimicVersionOverride` + Experimental row in Settings
+  with a toggle and revealed text field. `Main.kt` replays the persisted
+  value on Koin start through `SettingsRestoreHook`; the Settings UI
+  applies changes immediately via `Protocol.setMimicLauncherVersion`,
+  so the override takes effect on the next protocol call without a
+  relaunch. en / ru / de strings shipped.
+- `NetworkState.bypassesState: StateFlow<List<SslBypassEntry>>` and
+  `NetworkState.forceProxyState: StateFlow<Boolean>` -- UI sites
+  subscribe via `collectAsState` instead of polling. The prior
+  `produceState { ... delay(200ms) }` poll in `AppLayout` and
+  `DashboardScreen` is gone.
+- `LaunchLogEvent` + `LaunchError` + `PrepareStage` in
+  `hivens.launcher.launch` -- semantic event channel that the UI
+  drains into the console pane with localization at the UI layer.
+- `LauncherControllerTest` in `client-launcher` -- constructor-injected
+  controller is now testable without Koin; happy-path + offline + 2FA
+  + non-zero exit covered.
+- `SystemActions` helper -- `openFolder` / `openFile` / `openUrl`
+  helpers that dispatch every `java.awt.Desktop` call to a daemon
+  thread.
+- `IServerListService.refresh()` -- bypasses the in-memory cache for
+  user-driven retries (news strip + dashboard "Retry" button).
+- `IFileDownloadService.processSession` gains a `verifyUI: ((Int, Int) -> Unit)?`
+  callback for the integrity walk so the controller can map MD5 progress
+  onto the SYNC stage's 0.2..0.7 sub-range.
+- `ProcessLogHandlerTest` -- 12 cases covering the new prefix-aware
+  classifier.
+
+### Changed
+- `LauncherController` and `LaunchState` move from `client-ui/logic` to
+  `client-launcher/launch`. The controller is now constructor-injected
+  (no `KoinComponent`), depends only on `client-core` interfaces plus
+  the shared application scope, and emits semantic events instead of
+  reaching into `client-ui` for strings and console state. A new
+  `LaunchLogCollector` Composable in `client-ui` drains the event flow
+  into `GameConsoleService` with localization done at the UI layer.
+- April Fools subsystem hides behind `AprilFoolsLifecycle` (a
+  CompositionLocal-routed interface) with `NoOpAprilFools` as the
+  production fallback. Every consumer (14 files) now reads
+  `LocalAprilFools.current` instead of touching the calendar object,
+  `ChaosState`, or `FloatingButton` directly. Lays the groundwork for
+  a compile-time gate via SPI in a follow-up release.
+- `RightPanel.kt` god-file (809 LOC) splits into `LoginPanel.kt`,
+  `AccountPanel.kt`, `CompactNewsFeed.kt`. Pure file move; no
+  behaviour change.
+- Process-lifetime coroutine scope is now a single Koin-managed
+  `single<CoroutineScope>(createdAtStart = true)` cancelled by
+  `AppCoroutineScopeHook` on JVM shutdown. `LauncherController` and
+  tray-launch flow share the same scope -- pre-fix the controller
+  had its own scope that no shutdown hook could reach, so a SIGTERM
+  mid-launch could orphan the spawned game process.
+- `AutoSyncService.serverStates` + `overallState` collapse into a
+  single `Snapshot` StateFlow; consumers always wanted both together.
+- `object I18n { ... }` mutable global removed -- after the
+  controller move the only remaining consumer (`LaunchLogCollector`)
+  is `@Composable` and reads `LocalStrings.current` directly with
+  `rememberUpdatedState` for the non-Composable lambda inside its
+  collector.
+- `KoinJavaComponent.get<>()` escape hatch in `Main.kt` replaced by
+  `SettingsRestoreHook` (createdAtStart). Persisted force-proxy and
+  mimic-version values now restore through the DI graph instead of a
+  post-startKoin escape.
+- `CrashReporter` and `GameConsoleService` were singletons that read
+  `PlatformPaths.system()` directly; both are now regular classes
+  with `PlatformPaths` injected, so a mid-session data-dir migration
+  routes their writes to the new directory.
+- Data classes (`ServerProfile`, `InstanceProfile`, `OptionalMod`,
+  `SettingsData`) flip every `var` field to `val`; mutation sites
+  switch to `.copy(...)` or named-arg constructor calls.
+- `compareVersions` (UpdateService) ranks prerelease suffixes via
+  natural-order tokenisation -- `rc10 > rc2` is correct now, where
+  the prior lex-only compare ranked them backwards.
+- Process console classifier no longer false-positives on lines
+  containing "no warnings", "errorless", "swarming", etc. -- a
+  structured `[Thread/LEVEL]` prefix wins authoritatively when
+  present, with a word-boundary fallback for unframed lines.
+- Gradle wrapper bumped to 9.5.0.
+
+### Fixed
+- Force-proxy toggle was effectively a no-op for skins, news images
+  and pack-file downloads -- the proxy was baked into the OkHttp
+  client at Koin construction. The default smartycraft
+  `HttpClientProvider` and Coil's image fetcher now route per-request
+  based on `NetworkState`.
+- News strip would lock into the empty state after a first-fetch
+  failure for the rest of the session.
+- `Desktop.open` / `Desktop.browse` calls (open logs folder, open
+  crash reports, view release on GitHub, register link, news item
+  links, ...) could freeze the UI for seconds when the OS handler
+  (xdg-open, `xdg-desktop-portal`, Windows default-handler config)
+  was misbehaving.
+- "Move data directory" picker in Settings rendered without the
+  styled title on some Linux portal backends because the call was
+  missing `dialogSettings`; aligned with the picker call in Profile /
+  Server Settings.
+- `SkinManager` used to compose disk-cache filenames from the raw
+  nickname; `safeCacheBase` now sanitises so a hostile nickname can't
+  escape `skinCacheDir`.
+- 2FA-expired launches reported a generic "Error: re-login required"
+  through the `Internal` catch-all instead of the dedicated
+  `TwoFactorExpired` reason; UI now renders the correct, actionable
+  message.
+- `ManifestProcessorService` patched `mod.id` / `mod.jars` on a
+  data-class instance after deserialisation. After the `var -> val`
+  pass it builds a `decoded.copy(...)` defaulting layer instead.
+
+### Removed
+- `client-ui` dependency on `kotlinx-coroutines-slf4j` (the MDC
+  context now lives with the producer in `client-launcher`).
+- `AppLocale.detectSystem()` -- dead code after the `I18n` global
+  was dropped (SettingsData hard-codes the default locale, which
+  shadowed system detection anyway).
+
+## [2.2.14] - 2026-05-17
+
+Three boot-path hotfixes plus a settings cleanup. The launcher.log
+ended up next to the binary on first launch because LoggerFactory
+captured the working-directory default before `PlatformPaths` was
+resolved; on Linux distros without libsecret, ProGuard stripped the
+dbus-java service provider that `LinuxLibsecretKeyringStorage` walks
+to find a transport; and libtray's upcall stubs got renamed away by
+ProGuard rather than kept by name. Plus the long-broken
+`startInTray` setting is gone -- no in-launcher way to invoke it,
+no real use case, and it bricked first-time users into "where did my
+window go" support tickets.
+
+### Fixed
+- `launcher.log` now lands in the platform `logsDir`
+  (`%LOCALAPPDATA%\AuraLauncher\logs` / `~/Library/Application Support/.../logs`
+  / `$XDG_DATA_HOME/aura-launcher/logs`) on the very first init,
+  not in `./logs/` next to the binary. `PlatformPaths.system()` is
+  now resolved before the first `LoggerFactory.getLogger()` call so
+  logback's `${aura.logs.dir}` substitution sees the correct value.
+- libtray's `MethodHandles.Lookup` upcall stubs are explicitly
+  `-keep`'d in the ProGuard config so the tray daemon can call back
+  into Aura after R8 rename.
+- `org.freedesktop.dbus.**` classes are `-keep`'d so ServiceLoader
+  still finds `NativeTransportProvider` after shrinking. Linux
+  distros without libsecret fell back to D-Bus discovery and crashed
+  on `ServiceConfigurationError`; the keep gate lets discovery
+  succeed and the keyring fallback path activate normally.
+
+### Removed
+- `SettingsData.startInTray` and the corresponding Settings UI
+  toggle. The launcher always starts visible; tray remains the
+  dock-style fallback for close-while-game-running.
+
 ## [2.2.13] - 2026-05-15
 
 Security, concurrency, and platform-completion release. The auto-updater

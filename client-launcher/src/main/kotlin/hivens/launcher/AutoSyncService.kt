@@ -30,7 +30,7 @@ import java.nio.file.Path
  *   server before)
  *
  * Per-server failures don't abort the rest of the queue; they're logged
- * and surfaced via [serverStates] for the dashboard badges.
+ * and surfaced via `serverStates` for the dashboard badges.
  */
 class AutoSyncService(
     private val authService: IAuthService,
@@ -71,17 +71,38 @@ class AutoSyncService(
         data class Done(val succeeded: Int, val failed: Int, val skipped: Int) : OverallState()
     }
 
-    private val _serverStates = MutableStateFlow<Map<String, ServerState>>(emptyMap())
-    val serverStates: StateFlow<Map<String, ServerState>> = _serverStates.asStateFlow()
+    /**
+     * Single observable view -- per-server lifecycle map paired with the
+     * aggregate progress. Collapsed from two StateFlows into one because
+     * dashboard consumers always need both together (badges + progress
+     * strip), and the prior two-flow shape forced an extra `collectAsState`
+     * subscription with no separation-of-concerns benefit.
+     */
+    data class Snapshot(
+        val perServer: Map<String, ServerState>,
+        val overall: OverallState,
+    )
 
-    private val _overallState = MutableStateFlow<OverallState>(OverallState.Idle)
-    val overallState: StateFlow<OverallState> = _overallState.asStateFlow()
+    private val _snapshot = MutableStateFlow(Snapshot(emptyMap(), OverallState.Idle))
+    val snapshot: StateFlow<Snapshot> = _snapshot.asStateFlow()
+
+    private fun updateServerState(serverId: String, state: ServerState) {
+        _snapshot.update { it.copy(perServer = it.perServer + (serverId to state)) }
+    }
+
+    private fun setPerServer(map: Map<String, ServerState>) {
+        _snapshot.update { it.copy(perServer = map) }
+    }
+
+    private fun setOverall(state: OverallState) {
+        _snapshot.update { it.copy(overall = state) }
+    }
 
     /**
      * Sync every server in [allServers] that has a non-empty client directory.
      * Suspends until all servers processed. Caller decides on which dispatcher
      * to run -- typically `Dispatchers.IO` from the applicationScope in Main
-     * (process-lifetime SupervisorJob, cancelled on JVM exit so a half-done
+     * (process-lifetime SupervisorJob, canceled on JVM exit so a half-done
      * sync doesn't orphan sockets / file descriptors).
      */
     suspend fun syncAll(allServers: List<ServerProfile>) {
@@ -90,7 +111,7 @@ class AutoSyncService(
         if (creds == null || pass.isNullOrBlank()) {
             log.info("Auto-sync skipped: no cached credentials")
             ActionRing.record("Auto-sync skipped: no cached credentials")
-            _overallState.value = OverallState.Done(succeeded = 0, failed = 0, skipped = allServers.size)
+            setOverall(OverallState.Done(succeeded = 0, failed = 0, skipped = allServers.size))
             return
         }
 
@@ -100,27 +121,27 @@ class AutoSyncService(
         if (installed.isEmpty()) {
             log.info("Auto-sync skipped: no installed servers")
             ActionRing.record("Auto-sync skipped: no installed servers")
-            _overallState.value = OverallState.Done(succeeded = 0, failed = 0, skipped = skippedCount)
+            setOverall(OverallState.Done(succeeded = 0, failed = 0, skipped = skippedCount))
             return
         }
 
         ActionRing.record("Auto-sync started: ${installed.size} server(s) queued (${installed.joinToString { it.assetDir }})")
 
         // Mark everyone QUEUED upfront so the dashboard can show the queue ordering.
-        _serverStates.value = installed.associate { it.assetDir to ServerState.QUEUED }
+        setPerServer(installed.associate { it.assetDir to ServerState.QUEUED })
 
         var succeeded = 0
         var failed = 0
 
         for ((idx, server) in installed.withIndex()) {
-            _serverStates.update { it + (server.assetDir to ServerState.SYNCING) }
-            _overallState.value = OverallState.InProgress(
+            updateServerState(server.assetDir, ServerState.SYNCING)
+            setOverall(OverallState.InProgress(
                 currentServer = server.title ?: server.name,
                 currentIdx = idx + 1,
                 total = installed.size,
                 bytesRead = 0,
                 totalBytes = 0,
-            )
+            ))
 
             // Try to obtain a SessionData for this server. Four outcomes:
             //   * regular login -> use that session directly
@@ -130,7 +151,7 @@ class AutoSyncService(
             //     been through 2FA on this machine for this server yet, so
             //     we have nothing to sync against. Red FAILED would imply
             //     "server is broken"; SKIPPED reads as "awaiting user action".
-            //   * any other login throw (network, server reject, etc) ->
+            //   * any other login throw (network, server reject, etc.) ->
             //     mark FAILED for this server and continue. Pre-refactor
             //     the outer runCatching covered everything; the refactor
             //     split login + processSession, so non-2FA throws need
@@ -147,7 +168,7 @@ class AutoSyncService(
                         server.assetDir,
                     )
                     ActionRing.record("Auto-sync skipped: ${server.assetDir} needs manual 2FA login")
-                    _serverStates.update { it + (server.assetDir to ServerState.SKIPPED) }
+                    updateServerState(server.assetDir, ServerState.SKIPPED)
                     null
                 } else {
                     creds.copy(fileManifest = cached, serverId = server.assetDir)
@@ -159,7 +180,7 @@ class AutoSyncService(
             }
 
             if (sessionFailed) {
-                _serverStates.update { it + (server.assetDir to ServerState.FAILED) }
+                updateServerState(server.assetDir, ServerState.FAILED)
                 failed++
                 continue
             }
@@ -178,28 +199,28 @@ class AutoSyncService(
                     ignoredFiles = ignoredFiles,
                     messageUI = null,
                     progressUI = { _, _, bytesRead, totalBytes, _ ->
-                        _overallState.value = OverallState.InProgress(
+                        setOverall(OverallState.InProgress(
                             currentServer = server.title ?: server.name,
                             currentIdx = idx + 1,
                             total = installed.size,
                             bytesRead = bytesRead,
                             totalBytes = totalBytes,
-                        )
+                        ))
                     },
                 )
             }
 
             if (ok.isSuccess) {
-                _serverStates.update { it + (server.assetDir to ServerState.SYNCED) }
+                updateServerState(server.assetDir, ServerState.SYNCED)
                 succeeded++
             } else {
-                _serverStates.update { it + (server.assetDir to ServerState.FAILED) }
+                updateServerState(server.assetDir, ServerState.FAILED)
                 failed++
                 log.warn("Auto-sync failed for ${server.assetDir}: ${ok.exceptionOrNull()?.message}")
             }
         }
 
-        _overallState.value = OverallState.Done(succeeded = succeeded, failed = failed, skipped = skippedCount)
+        setOverall(OverallState.Done(succeeded = succeeded, failed = failed, skipped = skippedCount))
         log.info("Auto-sync complete: {} succeeded, {} failed, {} skipped", succeeded, failed, skippedCount)
         ActionRing.record("Auto-sync complete: $succeeded ok / $failed failed / $skippedCount skipped")
     }

@@ -44,10 +44,12 @@ object Protocol {
 
     /**
      * Programmatic override -- sets (or clears, if `version` is null/blank) the
-     * runtime mimic version. Settings UI hooks into this once the Settings-move
-     * chunk lands; for now it's reachable from tests and ad-hoc Kotlin scripts.
+     * runtime mimic version. Called by `Main.kt` on every startup with the
+     * persisted `SettingsData.mimicVersionOverride` (so the value survives
+     * launcher restart) and by `SettingsScreen` on save (so the change takes
+     * effect on the very next protocol call without waiting for restart).
      */
-    @ExperimentalProtocolOverride // TODO: Not used, review
+    @ExperimentalProtocolOverride
     fun setMimicLauncherVersion(version: String?) {
         if (version.isNullOrBlank()) {
             System.clearProperty(SYSTEM_PROP_MIMIC_VERSION)

@@ -19,30 +19,33 @@ import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 
 /**
- * Localhost HTTP server that exposes [PuppetRegistry] over a small JSON
- * API, allowing external scripts (curl, automated UI test harnesses)
- * to drive the Compose UI semantically -- querying the current screen,
- * clicking buttons, filling fields, toggling switches.
+ * Real [PuppetServerLifecycle] -- localhost HTTP server exposing
+ * [PuppetRegistry] over a small JSON API so external scripts (curl,
+ * automated UI test harnesses) can drive the Compose UI semantically.
  *
- * **Strictly opt-in.** Only binds when `-Daura.puppet.port=N` is set
- * at JVM launch. Without the flag, [start] is a no-op and no port is
- * occupied; production builds therefore cannot accidentally expose
- * the surface even with the classes present in the JAR.
+ * **Lives in the `desktopPuppetMain` source dir** which is only added
+ * to the desktop compilation when `-PauraPuppetPort=N` is on the
+ * Gradle command line. Production builds therefore do NOT contain
+ * this class or the Ktor server classes it depends on; the
+ * `META-INF/services/hivens.ui.puppet.PuppetServerLifecycle` descriptor
+ * that points ServiceLoader here is similarly only packaged for
+ * puppet-enabled builds. See [PuppetServerLifecycle] for the full
+ * security-boundary rationale.
+ *
+ * **Strictly opt-in at runtime too.** Even when this class IS on the
+ * classpath, [startIfRequested] only binds when `-Daura.puppet.port=N`
+ * is set at JVM launch. Without the system property, this is a no-op.
  *
  * Bind is hardcoded to `127.0.0.1` -- no remote access, no auth, the
- * threat model assumes a trusted developer workstation. If you need
- * authentication beyond "only local processes can connect", that's a
- * separate iteration.
+ * threat model assumes a trusted developer workstation.
  *
- * **Threading.** Ktor handlers run on Dispatchers.IO by default;
- * calls into [PuppetRegistry.click] / [setField] / [setToggle]
- * mutate Compose `mutableStateOf` values, which MUST happen on the
- * AWT EDT (Compose Desktop's UI thread). We hop via
- * `withContext(Dispatchers.Swing)` before invoking the registry's
- * mutating methods. Reads (snapshot, screen) are safe off-thread
- * because the registry is backed by [java.util.concurrent.ConcurrentHashMap]
- * and the values it reads (mutableState getters) tolerate concurrent
- * reads.
+ * **Threading.** Ktor handlers run on Dispatchers.IO by default; calls
+ * into [PuppetRegistry.click] / [setField] / [setToggle] mutate Compose
+ * `mutableStateOf` values, which MUST happen on the AWT EDT (Compose
+ * Desktop's UI thread). We hop via `withContext(Dispatchers.Swing)`
+ * before invoking the registry's mutating methods. Reads (snapshot,
+ * screen) are safe off-thread because the registry is backed by
+ * [java.util.concurrent.ConcurrentHashMap].
  *
  * Endpoints:
  *   * `GET  /screen`     -> { screen: String }
@@ -50,19 +53,19 @@ import org.slf4j.LoggerFactory
  *   * `POST /click`      <- { id: String }                  -> { ok: true } | 404
  *   * `POST /setField`   <- { id: String, value: String }   -> { ok: true } | 404
  *   * `POST /setToggle`  <- { id: String, value: Boolean }  -> { ok: true } | 404
+ *
+ * **Concrete class, public no-arg constructor**: ServiceLoader requires
+ * both. Singleton-by-convention via the [PuppetServerLoader.instance]
+ * lazy that caches the first SL-returned provider for the JVM lifetime.
  */
-internal object PuppetServer {
+class RealPuppetServer : PuppetServerLifecycle {
 
-    private val log = LoggerFactory.getLogger(PuppetServer::class.java)
+    private val log = LoggerFactory.getLogger(RealPuppetServer::class.java)
 
     @Volatile
     private var server: EmbeddedServer<CIOApplicationEngine, CIOApplicationEngine.Configuration>? = null
 
-    /**
-     * Start the puppet HTTP server if `-Daura.puppet.port=N` is set.
-     * Idempotent -- a second call when already running is a no-op.
-     */
-    fun startIfRequested() {
+    override fun startIfRequested() {
         if (server != null) return
         val portProp = System.getProperty("aura.puppet.port") ?: return
         val port = portProp.toIntOrNull() ?: run {
@@ -115,7 +118,7 @@ internal object PuppetServer {
         }
     }
 
-    fun stop() {
+    override fun stop() {
         server?.stop(gracePeriodMillis = 100, timeoutMillis = 500)
         server = null
     }

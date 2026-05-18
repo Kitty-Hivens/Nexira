@@ -92,8 +92,12 @@ Name: "desktopicon"; \
   Flags: unchecked
 
 [Files]
-; Entire app directory built by :client-ui:createReleaseDistributable
-; Добавлено AuraLauncher\* чтобы избежать вложенности папок AuraLauncher\AuraLauncher
+; Entire app directory built by :client-ui:createReleaseDistributable.
+; The trailing AuraLauncher\* (rather than the parent app\) is deliberate:
+; jpackage already emits an AuraLauncher\ subdirectory inside app\, so
+; pointing Source at app\ would nest the install as {app}\AuraLauncher\...
+; instead of {app}\... and silently break the [Run] / [Icons] entries
+; below that reference {app}\{#MyAppExeName} directly.
 Source: "client-ui\build\compose\binaries\main-release\app\AuraLauncher\*"; \
   DestDir: "{app}"; \
   Flags: ignoreversion recursesubdirs createallsubdirs

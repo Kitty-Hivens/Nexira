@@ -4,20 +4,22 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * Auth statuses the SmartyCraft server can send back on `action=login`
- * (and a couple of follow-ups). All values are wire-protocol -- even the
- * ones with no Kotlin reference must stay declared so kotlinx.serialization
- * can deserialize them. Removing one because "it's not used in Kotlin code"
- * means the launcher crashes with `SerializationException` the moment the
- * server returns that value.
+ * UX-layer auth statuses the launcher exposes to the UI. Derived from the
+ * wire `ProtocolStatus` via `AuthService.mapStatus`; unknown wire statuses
+ * fold into [INTERNAL_ERROR] (matching the upstream `bf.java` enum surface
+ * documented in `docs/dev/smartycraft-v1-protocol.md`).
  *
- * Coverage status (audit pending -- see issue tracker):
+ * @Serializable retained for compat with any consumer that may serialise
+ * `SessionData`; the launcher itself constructs `SessionData` with
+ * `status = null` in `CredentialsManager.load` so this enum is never read
+ * back from disk JSON in the normal flow.
+ *
+ * Coverage:
  *   * Wired into UI:   OK, NEED_2FA, WRONG_CODE, TWO_FACTOR_EXPIRED,
  *                      BAD_LOGIN, INTERNAL_ERROR, PASSWORD, ACTIVE.
- *   * Wire-only:       LOGIN, BANNED. Server emits them; UI swallows them
- *                      into a generic error path. Concrete UX (e.g. a
- *                      "you are banned, contact moderation" screen for
- *                      BANNED) is the work tracked separately.
+ *   * Wire-only echo:  LOGIN. Server emits it; UI funnels into a generic
+ *                      error path until a concrete "user not found" screen
+ *                      is in scope.
  */
 @Serializable
 enum class AuthStatus {
@@ -30,7 +32,6 @@ enum class AuthStatus {
     @SerialName("WRONG_CODE") WRONG_CODE,
     /** TWOAUTH session expired before code arrived -- UI must restart full login (#159). */
     @SerialName("TWO_FACTOR_EXPIRED") TWO_FACTOR_EXPIRED,
-    @SerialName("BANNED") BANNED,
     @SerialName("INTERNAL_ERROR") INTERNAL_ERROR,
     @SerialName("PASSWORD") PASSWORD
 }

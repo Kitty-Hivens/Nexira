@@ -17,12 +17,15 @@ class KeyringStorageFactoryTest {
     }
 
     @Test
-    fun `system() on non-Linux returns NoOp until those platforms are wired`() {
-        // Forward-looking: when Windows / macOS impls land in follow-up PRs,
-        // this assertion changes shape (we'll need OS detection in the test
-        // itself). Until then, document the current behavior explicitly.
+    fun `system() on unrecognised OS returns NoOp`() {
+        // Linux libsecret, macOS Keychain, Windows Credential Manager are
+        // all wired. Anything else (BSD without Secret Service, Plan9,
+        // exotic embedded) gets the NoOp fallback and CredentialsManager
+        // degrades to its AES-GCM file path.
         val osName = System.getProperty("os.name", "").lowercase()
-        if (!osName.contains("linux") && !osName.contains("mac") && !osName.contains("windows")) {
+        if (!osName.contains("linux") && !osName.contains("mac") &&
+            !osName.contains("darwin") && !osName.contains("windows") &&
+            !osName.contains("bsd")) {
             assertTrue(KeyringStorageFactory.system() is NoOpKeyringStorage)
         }
     }

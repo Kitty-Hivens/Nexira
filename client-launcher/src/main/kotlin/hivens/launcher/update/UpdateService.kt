@@ -136,26 +136,31 @@ class UpdateService(
             // update -- auto-install of unverified bytes is a remote-code-execution
             // path if the release page were ever tampered with. Releases ≥ 2.2.7-rc3
             // ship the manifest; older releases require manual reinstall.
-            val manifest = tryFetchManifest(release)
-            val checksum = manifest?.assets?.find { it.name == asset.name }?.sha256
-            if (checksum.isNullOrBlank()) {
+            val manifest = tryFetchManifest(release) ?: run {
                 logger.warn(
-                    "Refusing auto-update: release {} has no verifiable SHA-256 for {} " +
-                        "(manifest present: {}). User must reinstall manually.",
-                    release.tagName, asset.name, manifest != null,
+                    "Refusing auto-update: release {} ships no release-manifest.json " +
+                        "for {}. User must reinstall manually.",
+                    release.tagName, asset.name,
                 )
                 return@withContext null
             }
-            val highlights = manifest?.highlights?.takeIf { it.isNotBlank() }
+            val checksum = manifest.assets.find { it.name == asset.name }?.sha256
+            if (checksum.isNullOrBlank()) {
+                logger.warn(
+                    "Refusing auto-update: release {} manifest does not pin SHA-256 for {}. " +
+                        "User must reinstall manually.",
+                    release.tagName, asset.name,
+                )
+                return@withContext null
+            }
+            val highlights = manifest.highlights?.takeIf { it.isNotBlank() }
 
             val isCritical = release.name.contains("[CRITICAL]", ignoreCase = true) ||
                              release.body?.contains("CRITICAL", ignoreCase = true) == true
 
             logger.info(
-                "Update available: {} -> {} (manifest: {}, mandatory: {})",
-                currentVersion, latestVersion,
-                if (manifest != null) "yes" else "no",
-                belowMandatoryFloor
+                "Update available: {} -> {} (mandatory: {})",
+                currentVersion, latestVersion, belowMandatoryFloor,
             )
 
             return@withContext LauncherUpdate(
@@ -307,8 +312,9 @@ class UpdateService(
         try {
             Files.list(updateDir).use { stream ->
                 stream
-                    // FIX: CI produces .exe (Inno Setup), not .msi -- match actual artifact names
-                    .filter { it.fileName.toString().matches(Regex(".*\\.(exe|dmg|AppImage)$")) }
+                    // .exe = Inno Setup (Windows installer), .zip = Windows portable
+                    // distribution, .dmg = macOS, .AppImage = Linux.
+                    .filter { it.fileName.toString().matches(Regex(".*\\.(exe|zip|dmg|AppImage)$")) }
                     .forEach { file ->
                         runCatching { Files.delete(file) }
                             .onSuccess { logger.debug("Deleted old update: {}", file.fileName) }
@@ -539,11 +545,12 @@ class UpdateService(
      * 2. If bases tie, the prerelease suffix decides:
      *    - no suffix on either side -> equal
      *    - one side has no suffix -> it wins (final > rc/beta/alpha)
-     *    - both have suffixes -> lexicographic compare on the suffix string,
-     *      which gives the desired `alpha < beta < rc1 < rc2 < rc10` *almost*
-     *      (note: lex says `rc10 < rc2` -- the launcher's release cadence
-     *      doesn't reach double-digit RCs, so this is acceptable; if it ever
-     *      does, switch to natural-order comparison)
+     *    - both have suffixes -> **natural-order** compare token-by-token
+     *      (digit runs as numbers, non-digit runs as text), giving
+     *      `alpha < beta < rc1 < rc2 < rc10`. A previous version used pure
+     *      lex compare and would incorrectly rank `rc10 < rc2`; the launcher's
+     *      release cadence has not yet hit double-digit RCs but the fix is
+     *      cheap and the failure mode is silent.
      */
     internal fun compareVersions(v1: String, v2: String): Int {
         val base1 = v1.substringBefore('-')
@@ -564,8 +571,59 @@ class UpdateService(
             suffix1.isEmpty() && suffix2.isEmpty() -> 0
             suffix1.isEmpty() -> 1   // v1 = final, v2 = prerelease -> v1 wins
             suffix2.isEmpty() -> -1  // v1 = prerelease, v2 = final -> v2 wins
-            else -> suffix1.compareTo(suffix2)
+            else -> compareSuffixNatural(suffix1, suffix2)
         }
+    }
+
+    /**
+     * Natural-order comparison: tokenises into alternating text / digit runs
+     * and compares token-by-token. Digit tokens compare numerically (so 10 > 2),
+     * text tokens compare lexicographically (so beta < rc). When one side runs
+     * out of tokens first, the shorter side sorts first ("alpha" < "alpha1").
+     * On token-type mismatch at the same index, numeric tokens sort before
+     * text tokens -- arbitrary but deterministic; we don't expect to hit this
+     * case for any real Aura version string.
+     */
+    private fun compareSuffixNatural(s1: String, s2: String): Int {
+        val tokens1 = tokenizeSuffix(s1)
+        val tokens2 = tokenizeSuffix(s2)
+        val limit = maxOf(tokens1.size, tokens2.size)
+        for (i in 0 until limit) {
+            val t1 = tokens1.getOrNull(i) ?: return -1
+            val t2 = tokens2.getOrNull(i) ?: return 1
+            val cmp = compareTokens(t1, t2)
+            if (cmp != 0) return cmp
+        }
+        return 0
+    }
+
+    private sealed class SuffixToken {
+        data class Num(val value: Long) : SuffixToken()
+        data class Text(val value: String) : SuffixToken()
+    }
+
+    private fun tokenizeSuffix(s: String): List<SuffixToken> {
+        val tokens = mutableListOf<SuffixToken>()
+        var i = 0
+        while (i < s.length) {
+            val start = i
+            if (s[i].isDigit()) {
+                while (i < s.length && s[i].isDigit()) i++
+                tokens.add(SuffixToken.Num(s.substring(start, i).toLong()))
+            } else {
+                while (i < s.length && !s[i].isDigit()) i++
+                tokens.add(SuffixToken.Text(s.substring(start, i)))
+            }
+        }
+        return tokens
+    }
+
+    private fun compareTokens(a: SuffixToken, b: SuffixToken): Int = when {
+        a is SuffixToken.Num  && b is SuffixToken.Num  -> a.value.compareTo(b.value)
+        a is SuffixToken.Text && b is SuffixToken.Text -> a.value.compareTo(b.value)
+        a is SuffixToken.Num  && b is SuffixToken.Text -> -1
+        a is SuffixToken.Text && b is SuffixToken.Num  -> 1
+        else                                            -> 0
     }
 
     private suspend fun fetchChangelogBetween(

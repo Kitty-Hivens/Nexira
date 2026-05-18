@@ -24,7 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import hivens.ui.components.GlassCard
-import hivens.ui.easter.AprilFoolsButton
+import hivens.ui.easter.LocalAprilFools
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
@@ -37,6 +37,7 @@ fun ThemePickerScreen(
     onBack: () -> Unit
 ) {
     val s = LocalStrings.current
+    val af = LocalAprilFools.current
     var selectedTheme by remember { mutableStateOf(currentTheme) }
     val themes = remember { ThemePresets.getAll() }
 
@@ -79,7 +80,7 @@ fun ThemePickerScreen(
             }
 
             // Apply button -- chaos target
-            AprilFoolsButton(
+            af.ChaosButton(
                 id      = "theme_picker_apply_btn",
                 text    = s.themePickerApply,
                 onClick = { onThemeSelected(selectedTheme) },

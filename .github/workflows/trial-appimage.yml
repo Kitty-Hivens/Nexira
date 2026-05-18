@@ -59,12 +59,31 @@ jobs:
           SHORT_SHA=$(git rev-parse --short HEAD)
           echo "value=0.0.0-trial-${SHORT_SHA}" >> "$GITHUB_OUTPUT"
 
+      # Cache key tracks the upstream asset's `updated_at` from the GitHub
+       # API so it invalidates automatically when the continuous build is
+       # republished. Mirrors the resolution step in build_release.yml --
+       # the previous calendar-bucketed key required a manual annual bump
+       # and missing it meant building against stale appimagetool until
+       # cache eviction caught up.
+      - name: Resolve appimagetool cache key from upstream
+        id: appimagetool-key
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          updated=$(gh api repos/AppImage/appimagetool/releases/tags/continuous \
+            --jq '.assets[] | select(.name=="appimagetool-x86_64.AppImage") | .updated_at' 2>/dev/null \
+            | tr -d ':-T' || true)
+          if [ -z "$updated" ]; then
+            updated="fallback-$(date +%Y%m%d)"
+          fi
+          echo "key=appimagetool-continuous-x86_64-${updated}" >> "$GITHUB_OUTPUT"
+
       - name: Cache appimagetool
         id: cache-appimagetool
         uses: actions/cache@v4
         with:
           path: appimagetool
-          key: appimagetool-continuous-x86_64-2026-05
+          key: ${{ steps.appimagetool-key.outputs.key }}
 
       - name: Install AppImage tools
         run: |

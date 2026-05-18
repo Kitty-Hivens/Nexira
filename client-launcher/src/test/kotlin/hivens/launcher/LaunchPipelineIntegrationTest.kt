@@ -66,9 +66,11 @@ class LaunchPipelineIntegrationTest {
 
     /**
      * Pre-programmed protocol that returns an OK login carrying a manifest
-     * with one library jar.
+     * with a single library jar. Every test in this file points at the same
+     * canonical 1.12.2 LaunchWrapper entry -- the value of the test is in
+     * the orchestration, not the jar name.
      */
-    private fun protocolWithManifest(libRelPath: String): FakeServerProtocol = // TODO: Value of parameter 'libRelPath' is always '"launchwrapper-1.12.jar"'
+    private fun protocolWithLaunchwrapperManifest(): FakeServerProtocol =
         FakeServerProtocol().apply {
             loginResult = { _ ->
                 LoginResponse(
@@ -81,7 +83,7 @@ class LaunchPipelineIntegrationTest {
                     client = FileManifest(
                         directories = mapOf(
                             "libraries" to FileManifest(
-                                files = mapOf(libRelPath to FileData(md5 = "deadbeef", size = 100L))
+                                files = mapOf("launchwrapper-1.12.jar" to FileData(md5 = "deadbeef", size = 100L))
                             )
                         ),
                         files = emptyMap(),
@@ -92,7 +94,7 @@ class LaunchPipelineIntegrationTest {
 
     @Test
     fun `auth via fake protocol produces a SessionData with embedded manifest`() = runTest {
-        val protocol = protocolWithManifest("launchwrapper-1.12.jar")
+        val protocol = protocolWithLaunchwrapperManifest()
         val session = AuthService(protocol).login("user", "pass", "Industrial")
 
         assertEquals("TestPlayer", session.playerName)
@@ -111,7 +113,7 @@ class LaunchPipelineIntegrationTest {
         val libDir = (clientRoot / "libraries").also { Files.createDirectories(it) }
         Files.createFile(libDir / "launchwrapper-1.12.jar")
 
-        val protocol = protocolWithManifest("launchwrapper-1.12.jar")
+        val protocol = protocolWithLaunchwrapperManifest()
         val session = AuthService(protocol).login("user", "pass", "Industrial")
 
         val manifestProcessor = ManifestProcessorService(json)
@@ -128,7 +130,7 @@ class LaunchPipelineIntegrationTest {
         val libDir = (clientRoot / "libraries").also { Files.createDirectories(it) }
         Files.createFile(libDir / "launchwrapper-1.12.jar")
 
-        val protocol = protocolWithManifest("launchwrapper-1.12.jar")
+        val protocol = protocolWithLaunchwrapperManifest()
         val session = AuthService(protocol).login("user", "pass", "Industrial")
 
         val manifestProcessor = ManifestProcessorService(json)

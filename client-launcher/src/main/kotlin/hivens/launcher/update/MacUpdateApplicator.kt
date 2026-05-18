@@ -23,6 +23,11 @@ class MacUpdateApplicator : IUpdateApplicator {
             val currentAppBundle = currentBinary.parent?.parent?.parent ?: Paths.get("/Applications/AuraLauncher.app")
             val targetDir = currentAppBundle.parent ?: Paths.get("/Applications")
 
+            // Paths are passed via env vars, not string-interpolated into the
+            // script body, so any character a Path may legitimately contain
+            // (spaces, quotes, dollars) cannot escape the bash quoting and
+            // execute as a command. The "$VAR" form inside double quotes
+            // still expands the variable but treats its content as literal.
             scriptPath.toFile().writeText("""
                 #!/bin/bash
                 set -e
@@ -35,7 +40,7 @@ class MacUpdateApplicator : IUpdateApplicator {
 
                 # Mount DMG
                 echo "Mounting update image..."
-                hdiutil attach "$installerPath" -mountpoint /Volumes/AuraUpdate -nobrowse -quiet || exit 1
+                hdiutil attach "${'$'}INSTALLER" -mountpoint /Volumes/AuraUpdate -nobrowse -quiet || exit 1
 
                 if [ ! -d "/Volumes/AuraUpdate/AuraLauncher.app" ]; then
                     echo "Error: AuraLauncher.app not found in DMG"
@@ -45,24 +50,24 @@ class MacUpdateApplicator : IUpdateApplicator {
 
                 # Remove old version
                 echo "Removing old version..."
-                rm -rf "$currentAppBundle" || true
+                rm -rf "${'$'}BUNDLE" || true
 
                 # Copy new version
                 echo "Installing new version..."
-                cp -R /Volumes/AuraUpdate/AuraLauncher.app "$targetDir/"
+                cp -R /Volumes/AuraUpdate/AuraLauncher.app "${'$'}TARGET/"
 
                 # Unmount DMG
                 echo "Cleaning up..."
                 hdiutil detach /Volumes/AuraUpdate -quiet
-                rm -f "$installerPath"
+                rm -f "${'$'}INSTALLER"
 
                 # Relaunch
                 echo "Launching updated version..."
                 sleep 1
-                open "$targetDir/AuraLauncher.app"
+                open "${'$'}TARGET/AuraLauncher.app"
 
                 # Cleanup script
-                rm -f "$scriptPath"
+                rm -f "${'$'}SCRIPT"
             """.trimIndent())
 
             scriptPath.toFile().setExecutable(true)
@@ -70,7 +75,14 @@ class MacUpdateApplicator : IUpdateApplicator {
 
             Runtime.getRuntime().addShutdownHook(Thread {
                 try {
-                    ProcessBuilder("bash", scriptPath.toString()).start()
+                    val pb = ProcessBuilder("bash", scriptPath.toString())
+                    pb.environment().apply {
+                        put("INSTALLER", installerPath.toString())
+                        put("BUNDLE", currentAppBundle.toString())
+                        put("TARGET", targetDir.toString())
+                        put("SCRIPT", scriptPath.toString())
+                    }
+                    pb.start()
                 } catch (e: Exception) {
                     logger.error("Failed to execute update script", e)
                 }

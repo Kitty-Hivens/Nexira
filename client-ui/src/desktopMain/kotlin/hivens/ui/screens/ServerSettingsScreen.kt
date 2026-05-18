@@ -54,7 +54,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
-import java.awt.Desktop
+import hivens.ui.utils.SystemActions
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
@@ -131,15 +131,20 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
 
     fun saveProfile() {
         profile?.let { p ->
-            p.javaPath = javaPath.ifBlank { null }
-            p.memoryMb = memory
-            p.jvmArgs = jvmArgs.ifBlank { null }
-            p.windowWidth = winWidth.toIntOrNull() ?: 925
-            p.windowHeight = winHeight.toIntOrNull() ?: 530
-            p.fullScreen = fullScreen
-            p.autoConnect = autoConnect
-            modStates.forEach { (id, state) -> p.optionalModsState[id] = state }
-            profileManager.saveProfile(p)
+            val updated = p.copy(
+                javaPath     = javaPath.ifBlank { null },
+                memoryMb     = memory,
+                jvmArgs      = jvmArgs.ifBlank { null },
+                windowWidth  = winWidth.toIntOrNull() ?: 925,
+                windowHeight = winHeight.toIntOrNull() ?: 530,
+                fullScreen   = fullScreen,
+                autoConnect  = autoConnect,
+            )
+            // optionalModsState is a MutableMap. `copy()` shares its reference,
+            // so mutating either instance updates the same backing storage --
+            // we touch the new instance for clarity.
+            modStates.forEach { (id, state) -> updated.optionalModsState[id] = state }
+            profileManager.saveProfile(updated)
         }
     }
 
@@ -169,7 +174,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
     PuppetClick("$pkey.openFolder") {
         val path = dataDirectory.resolve("clients").resolve(server.assetDir)
         if (!path.toFile().exists()) path.toFile().mkdirs()
-        Desktop.getDesktop().open(path.toFile())
+        SystemActions.openFile(path.toFile())
     }
     PuppetClick("$pkey.resetClient") {
         val path = dataDirectory.resolve("clients").resolve(server.assetDir)
@@ -415,7 +420,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                         onClick  = {
                             val path = dataDirectory.resolve("clients").resolve(server.assetDir)
                             if (!path.toFile().exists()) path.toFile().mkdirs()
-                            Desktop.getDesktop().open(path.toFile())
+                            SystemActions.openFile(path.toFile())
                         },
                         modifier = Modifier.fillMaxWidth(),
                         primary  = false,

@@ -5,18 +5,16 @@ import kotlinx.serialization.json.JsonElement
 
 @Serializable
 data class ServerProfile(
-    var name: String = "",
-    var title: String? = null,
-    var version: String = "",
-    var ip: String = "",
-    var port: Int = 0,
-    var assetDir: String = "",
-    var extraCheckSum: String? = null,
-    var optionalModsData: Map<String, JsonElement>? = null,
-    var neoForgeArgs: Map<String, String>? = null,
-    var ignoreModulesList: String? = null
+    val name: String = "",
+    val title: String? = null,
+    val version: String = "",
+    val ip: String = "",
+    val port: Int = 0,
+    val assetDir: String = "",
+    val extraCheckSum: String? = null,
+    val optionalModsData: Map<String, JsonElement>? = null,
+    val neoForgeArgs: Map<String, String>? = null,
+    val ignoreModulesList: String? = null,
 ) {
-    override fun toString(): String {
-        return title ?: name
-    }
+    override fun toString(): String = title ?: name
 }
