@@ -75,7 +75,7 @@ tasks.test {
 // assumeTrue() when the required external resource is unavailable -- so
 // running on the wrong OS or without the daemon installed is a green skip,
 // not a failure.
-fun registerLiveProbeTask(taskName: String, tag: String, taskDescription: String) =
+fun registerLiveProbeTask(taskName: String, tag: String, taskDescription: String): TaskProvider<Test> =
     tasks.register<Test>(taskName) {
         description = taskDescription
         group = "verification"
@@ -90,14 +90,14 @@ fun registerLiveProbeTask(taskName: String, tag: String, taskDescription: String
     }
 
 @Suppress("unused") // Gradle task wiring -- accessed via `./gradlew liveKeyringTest`
-val liveKeyringTest = registerLiveProbeTask(
+val liveKeyringTest: TaskProvider<Test> = registerLiveProbeTask(
     taskName = "liveKeyringTest",
     tag = "live-keyring",
     taskDescription = "Runs the LinuxLibsecretKeyringStorage live probe against the local Secret Service daemon.",
 )
 
 @Suppress("unused") // Gradle task wiring -- accessed via `./gradlew liveWindowsKeyringTest`
-val liveWindowsKeyringTest = registerLiveProbeTask(
+val liveWindowsKeyringTest: TaskProvider<Test> = registerLiveProbeTask(
     taskName = "liveWindowsKeyringTest",
     tag = "live-windows-keyring",
     taskDescription = "Runs WindowsCredentialManagerKeyringStorage live probe against the local Credential Manager service.",

@@ -119,7 +119,7 @@ class ProfileManager(
      * Serialised by [writeLock] so two concurrent saves don't race the
      * temp-file -> final rename.
      */
-    fun save() = synchronized(writeLock) {
+    fun save(): Unit = synchronized(writeLock) {
         val file = workDir.resolve(fileName)
         val tmp = workDir.resolve("$fileName.tmp")
         try {
