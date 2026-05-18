@@ -2,6 +2,9 @@ package hivens.packaging
 
 import org.gradle.api.Plugin
 import org.gradle.api.Project
+import org.gradle.internal.os.OperatingSystem
+import org.gradle.jvm.tasks.Jar
+import org.gradle.kotlin.dsl.named
 import org.gradle.kotlin.dsl.register
 
 /**
@@ -89,6 +92,53 @@ class PackagingPlugin : Plugin<Project> {
             outputFile.convention(
                 project.layout.buildDirectory.file("generated/packaging/packaging-profile.sh")
             )
+        }
+
+        // Pick the platform-appropriate icon at config time. Linux falls
+        // through to "no icon" -- jpackage is fine without one for
+        // app-image type, and the Linux distributable is AppImage which
+        // handles icons separately via .desktop entry.
+        val osIcon = when {
+            OperatingSystem.current().isWindows -> ext.windowsIcon
+            OperatingSystem.current().isMacOsX -> ext.macosIcon
+            else -> null
+        }
+
+        val customRuntime = project.tasks.named<CustomRuntimeTask>("customRuntime")
+
+        // Register the task at apply time so other parts of the build can
+        // reference it. The mainJar convention has to wait for Compose
+        // Desktop's packageReleaseUberJarForCurrentOS to be registered --
+        // Compose-MP defers that registration into its own afterEvaluate
+        // block once the `kotlin { jvm("desktop") }` target is processed,
+        // so we wire below in our own afterEvaluate.
+        val customJpackageImage = project.tasks.register<CustomJpackageImageTask>("customJpackageImage") {
+            group = "packaging"
+            description = "Builds a jpackage app-image from the custom runtime and Compose Desktop's uber jar."
+
+            appName.convention(ext.appName)
+            mainClass.convention(ext.mainClass)
+            appVersion.convention(ext.appVersion)
+            jvmArgs.convention(ext.jvmArgs)
+            macPackageIdentifier.convention(ext.macosPackageIdentifier)
+
+            runtimeImage.convention(customRuntime.flatMap { it.outputDir })
+
+            osIcon?.let { iconFile.convention(it) }
+
+            javaHome.convention(resolvedJavaHome)
+            outputDir.convention(project.layout.buildDirectory.dir("customJpackageImage"))
+        }
+
+        project.afterEvaluate {
+            // packageReleaseUberJarForCurrentOS extends Jar, so flatMap
+            // through its archiveFile gives us a Provider<RegularFile>
+            // that doubles as an implicit task-dependency on the producer.
+            // No explicit dependsOn needed.
+            val composeReleaseUberJar = project.tasks.named<Jar>("packageReleaseUberJarForCurrentOS")
+            customJpackageImage.configure {
+                mainJar.convention(composeReleaseUberJar.flatMap { it.archiveFile })
+            }
         }
     }
 }
