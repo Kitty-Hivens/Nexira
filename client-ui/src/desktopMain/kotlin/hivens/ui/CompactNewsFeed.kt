@@ -24,6 +24,7 @@ import coil3.request.ImageRequest
 import coil3.request.crossfade
 import hivens.core.api.interfaces.IServerListService
 import hivens.core.data.NewsItem
+import hivens.launcher.network.NetworkState
 import hivens.launcher.network.ServerProtocolConfig
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
@@ -39,34 +40,40 @@ private val log = LoggerFactory.getLogger("CompactNewsFeed")
 @Composable
 fun CompactNewsFeed(
     sslBypass: Boolean = false,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val serverListService: IServerListService = koinInject()
     val s       = LocalStrings.current
 
     var news    by remember { mutableStateOf<List<NewsItem>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
+    // Bumped by the retry button to re-trigger the fetch effect. Pre-fix the
+    // feed had a single LaunchedEffect(Unit) -- a first-call failure stuck
+    // the strip at "no news" forever even after the user fixed their proxy
+    // toggle / network. Now: refetch fires on (a) initial composition,
+    // (b) force-proxy toggle change, (c) SSL bypass grant for the host,
+    // (d) explicit retry click. Each is keyed via this counter.
+    var retryTick by remember { mutableStateOf(0) }
 
-    LaunchedEffect(Unit) {
+    val forceProxy by NetworkState.forceProxyState.collectAsState()
+
+    suspend fun fetch() {
+        loading = true
         try {
             val data = withContext(Dispatchers.IO) { serverListService.fetchDashboardData().get() }
             news = data.news
         } catch (e: Exception) {
-            log.warn("Initial news fetch failed", e)
+            log.warn("News fetch failed", e)
         }
         loading = false
     }
 
-    LaunchedEffect(sslBypass) {
-        if (sslBypass && news.isEmpty()) {
-            try {
-                val data = withContext(Dispatchers.IO) { serverListService.fetchDashboardData().get() }
-                news = data.news
-            } catch (e: Exception) {
-                log.warn("News fetch after SSL bypass failed", e)
-            }
-            loading = false
-        }
+    LaunchedEffect(retryTick, forceProxy, sslBypass) {
+        // Refetch on initial composition + when the user explicitly retries.
+        // For toggle / bypass changes we only refetch if news is empty --
+        // a working strip shouldn't flicker just because Settings flipped.
+        val explicit = retryTick > 0
+        if (explicit || news.isEmpty()) fetch()
     }
 
     Column(modifier = modifier) {
@@ -86,13 +93,24 @@ fun CompactNewsFeed(
 
             news.isEmpty() -> Box(
                 Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
+                contentAlignment = Alignment.Center,
             ) {
-                Text(
-                    text  = s.newsEmpty,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = CelestiaTheme.colors.textSecondary
-                )
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        text  = s.newsEmpty,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = CelestiaTheme.colors.textSecondary,
+                    )
+                    // Explicit retry covers the "network came back but no
+                    // toggle was touched" path -- the LaunchedEffect above
+                    // only re-runs on toggle / bypass changes.
+                    TextButton(onClick = { retryTick++ }) {
+                        Text(s.updateRetry, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
             }
 
             else -> LazyColumn(contentPadding = PaddingValues(vertical = 4.dp)) {
