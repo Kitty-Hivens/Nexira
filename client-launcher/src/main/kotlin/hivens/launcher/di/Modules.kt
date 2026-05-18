@@ -143,23 +143,34 @@ val networkModule = module {
 
     /**
      * Default (smartycraft) [HttpClientProvider] -- thin wrapper that resolves
-     * the correct proxied [HttpClient] on every request via
-     * `NetworkState.sslBypassEnabled`.
+     * the correct channel + cert mode on every request.
      *
-     * Injected into all smartycraft.ru-bound repositories instead of [HttpClient]
-     * directly, so that SSL bypass takes effect immediately on the next network
-     * call without requiring Koin singleton recreation.
+     * Per-request decision (mirrors [ChannelRouter] for AuthService):
+     *   - SSL bypass active for the smartycraft host -> insecure (proxy + no TLS check)
+     *   - forceProxyMode toggle on -> secure proxy
+     *   - default -> direct (no proxy)
+     *
+     * Pre-fix the provider always returned a proxy-only client regardless of
+     * the user's force-proxy toggle, so `SkinManager` and `FileDownloadService`
+     * never honoured the setting -- the Settings switch only affected auth
+     * routing via ChannelRouter, while skin and client-file traffic stayed
+     * pinned to the SOCKS hop. Users whose network couldn't reach
+     * `proxy.smartycraft.ru:58613` saw login work (direct-first via
+     * ChannelRouter) but skins / news images / pack syncs fail silently.
+     * Now every smartycraft.ru request reads [NetworkState] freshly, so the
+     * Settings toggle takes effect on the next call without a relaunch.
      */
     single {
         val cfg: ServerProtocolConfig = get()
-        val secure   = buildHttpClient(get<OkHttpClient>(),                get())
+        val direct   = buildHttpClient(get<OkHttpClient>(named("direct")),   get())
+        val secure   = buildHttpClient(get<OkHttpClient>(),                  get())
         val insecure = buildHttpClient(get<OkHttpClient>(named("insecure")), get())
         HttpClientProvider {
-            // Per-host SSL bypass with expiry (Vault #2). Default channel
-            // talks only to whatever host ServerProtocolConfig.baseUrl
-            // resolves to -- direct-channel hosts (GitHub, BellSoft, Maven
-            // Central) have their own provider and never bypass.
-            if (NetworkState.bypassFor(cfg.sslBypassHost)) insecure else secure
+            when {
+                NetworkState.bypassFor(cfg.sslBypassHost) -> insecure
+                NetworkState.forceProxyMode()             -> secure
+                else                                      -> direct
+            }
         }
     }
 
