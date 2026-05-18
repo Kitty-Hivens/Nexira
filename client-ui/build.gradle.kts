@@ -8,6 +8,14 @@ plugins {
     alias(libs.plugins.kotlin.compose.compiler)
     alias(libs.plugins.buildconfig)
     alias(libs.plugins.kotlin.serialization)
+    // aura.packaging: convention plugin from buildSrc/ that owns the
+    // jlink + jpackage tasks for distribution builds. Currently registers
+    // `:client-ui:customRuntime` only -- the jpackage path lands in a
+    // follow-up commit. Source of truth for jlink flags lives in the
+    // `packaging { jlink { ... } }` block below; AppImage shell script
+    // consumes the same values via a generated profile fragment (also
+    // follow-up).
+    id("aura.packaging")
 }
 
 group = "hivens"
@@ -300,6 +308,34 @@ compose.resources {
     publicResClass = true
     packageOfResClass = "hivens.ui.generated.resources"
     generateResClass = always
+}
+
+// Aura's distribution-build profile. Single source of truth: the gradle
+// `customRuntime` task consumes these values, and (in a follow-up commit)
+// the AppImage shell script will read them from a generated profile
+// fragment. Mirror of what scripts/build-appimage.sh currently hardcodes;
+// once the emitter task lands, the hardcode goes away.
+packaging {
+    appName.set("AuraLauncher")
+    mainClass.set("hivens.ui.MainKt")
+    modules.set(listOf(
+        "java.base",
+        "java.desktop",
+        "java.logging",
+        "java.management",
+        "java.prefs",
+        "jdk.crypto.ec",
+        "jdk.unsupported",
+        "jdk.zipfs",
+        "jdk.localedata",
+    ))
+    jlink {
+        compress.set("zip-9")
+        vmKind.set("server")
+        includeLocales.set("en,ru,de")
+        // stripDebug / noHeaderFiles / noManPages default to true via
+        // PackagingPlugin's conventions -- omitted intentionally.
+    }
 }
 
 // Kotlin compiler options for every JVM compile task in client-ui.
