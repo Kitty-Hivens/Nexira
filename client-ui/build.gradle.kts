@@ -171,17 +171,28 @@ compose.desktop {
             vendor = "Hivens"
 
             // ====================================================================
-            // CUSTOM MINIMAL JRE (saves ~120MB)
+            // CUSTOM MINIMAL JRE
             // ====================================================================
+            // Modules verified used via bytecode scan over the uber jar
+            // (every `java/sql/`, `java/net/http/`, `javax/naming/` reference
+            // counted across all 31k bundled classes). The three modules
+            // removed in this trim:
+            //   - java.sql      0 references in the bundle
+            //   - java.naming   only ch.qos.logback.* code paths (SMTP
+            //                   appender, <insertFromJNDI>, servlet
+            //                   container integration) -- none of which our
+            //                   logback.xml exercises
+            //   - java.net.http 0 references (Ktor is configured with the
+            //                   OkHttp engine; java HttpClient unused)
+            // java.prefs stays even though we don't use it directly, because
+            // java.desktop already requires it transitively -- listing it
+            // explicitly is redundant but documents intent.
             modules(
                 "java.base",
                 "java.desktop",
                 "java.logging",
                 "java.management",
-                "java.naming",
-                "java.net.http",
                 "java.prefs",
-                "java.sql",
                 "jdk.crypto.ec",
                 "jdk.unsupported",
                 "jdk.zipfs"
