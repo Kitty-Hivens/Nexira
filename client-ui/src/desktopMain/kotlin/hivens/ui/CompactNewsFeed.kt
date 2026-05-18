@@ -57,10 +57,13 @@ fun CompactNewsFeed(
 
     val forceProxy by NetworkState.forceProxyState.collectAsState()
 
-    suspend fun fetch() {
+    suspend fun fetch(forceRefresh: Boolean) {
         loading = true
         try {
-            val data = withContext(Dispatchers.IO) { serverListService.fetchDashboardData().get() }
+            val data = withContext(Dispatchers.IO) {
+                if (forceRefresh) serverListService.refresh().get()
+                else              serverListService.fetchDashboardData().get()
+            }
             news = data.news
         } catch (e: Exception) {
             log.warn("News fetch failed", e)
@@ -69,11 +72,16 @@ fun CompactNewsFeed(
     }
 
     LaunchedEffect(retryTick, forceProxy, sslBypass) {
-        // Refetch on initial composition + when the user explicitly retries.
-        // For toggle / bypass changes we only refetch if news is empty --
-        // a working strip shouldn't flicker just because Settings flipped.
+        // Initial composition + toggle/bypass changes: use the cache-aware
+        // path, since the first call has nothing cached and toggle-driven
+        // retries only make sense when news is empty anyway (working strips
+        // shouldn't flicker on Settings flips). Explicit retry skips the
+        // cache so a user clicking Retry after network recovery actually
+        // hits upstream, even if a successful fetch had already cached an
+        // empty news list earlier in the session.
         val explicit = retryTick > 0
-        if (explicit || news.isEmpty()) fetch()
+        if (explicit) fetch(forceRefresh = true)
+        else if (news.isEmpty()) fetch(forceRefresh = false)
     }
 
     Column(modifier = modifier) {

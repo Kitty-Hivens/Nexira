@@ -41,6 +41,11 @@ class ServerListService(
         .ofPattern("dd MMM yyyy", Locale.of("ru"))
         .withZone(ZoneId.systemDefault())
 
+    override fun refresh(): CompletableFuture<DashboardData> {
+        synchronized(lock) { cachedData = null }
+        return fetchDashboardData()
+    }
+
     override fun fetchDashboardData(): CompletableFuture<DashboardData> {
         cachedData?.let { return CompletableFuture.completedFuture(it) }
 
