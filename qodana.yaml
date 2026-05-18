@@ -8,20 +8,6 @@ version: "1.0"
 profile:
   name: qodana.starter
 
-# Compose Multiplatform IDE plugin (xmlId from plugins.jetbrains.com/api/plugins/16541).
-# Probe added 2026-05-18 to see if it suppresses the 21
-# `AssignedValueIsNeverRead` false positives on Compose state writes
-# (`var x by remember { mutableStateOf(...) }` where the write happens
-# inside a LaunchedEffect / onClick / lambda scope while the reads sit
-# in the outer @Composable scope -- core Qodana JVM Community inspection
-# misses the cross-closure read). Plugin is officially in maintenance
-# upstream (replaced by the Kotlin Multiplatform plugin for new
-# projects), but still ships Compose-aware inspections for desktop.
-# Keep if the next PR run shows the AssignedValue count drop; remove
-# and fall back to @Suppress per-site if not.
-plugins:
-  - id: org.jetbrains.compose.desktop.ide
-
 #Enable inspections
 #include:
 #  - name: <SomeEnabledInspectionId>
