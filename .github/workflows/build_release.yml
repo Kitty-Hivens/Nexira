@@ -251,7 +251,12 @@ jobs:
       - name: Create Portable ZIP
         shell: pwsh
         run: |
-          $src = "client-ui\build\compose\binaries\main-release\app"
+          # B-3 follow-up: source dir moves with the packaging swap.
+          # customJpackageImage produces AuraLauncher\ directly (no
+          # intermediate app\ layer like Compose Desktop did), so the
+          # AuraLauncher\bin\..., AuraLauncher\lib\runtime\... shape
+          # inside the zip stays identical from the user's perspective.
+          $src = "client-ui\build\customJpackageImage"
           Compress-Archive -Path "$src\*" `
             -DestinationPath "AuraLauncher-$env:APP_VERSION-Windows-Portable.zip"
 
