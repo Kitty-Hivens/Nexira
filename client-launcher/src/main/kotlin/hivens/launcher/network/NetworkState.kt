@@ -82,15 +82,23 @@ object NetworkState {
      * persistence -- the UI restores the saved value on each launch and calls
      * [setForceProxyMode] to re-arm.
      */
-    @Volatile
-    private var forceProxy: Boolean = false
+    private val _forceProxyState = MutableStateFlow(false)
+
+    /**
+     * Push-side view of [forceProxyMode]. Emits on every [setForceProxyMode]
+     * call so UI sites that want to react to a toggle change (e.g. retry
+     * `CompactNewsFeed` after the user flips proxy mode and the upstream
+     * becomes reachable again) can `collectAsState()` instead of capturing
+     * the value once.
+     */
+    val forceProxyState: StateFlow<Boolean> = _forceProxyState.asStateFlow()
 
     /** True when the user has opted into proxy-only mode. */
-    fun forceProxyMode(): Boolean = forceProxy
+    fun forceProxyMode(): Boolean = _forceProxyState.value
 
     /** Set the force-proxy toggle. Settings UI calls this on toggle change. */
     fun setForceProxyMode(value: Boolean) {
-        forceProxy = value
+        _forceProxyState.value = value
         log.info("Force proxy mode: {}", if (value) "ENABLED -- skipping direct attempt" else "disabled (default)")
     }
 
