@@ -35,13 +35,28 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # ── 1. Minimal JRE via jlink ────────────────────────────────────────────────
 # jlink refuses to write into an existing directory, so it has to run before
 # any of the mkdir steps below.
+# --vm=server: drop client + minimal HotSpot variants (saves ~22 MB on
+#   the bundled runtime; the launcher is a long-running Compose app, the
+#   client VM's faster-startup-slower-steady-state trade-off was always
+#   the wrong shape for us).
+# --include-locales=en,ru,de + jdk.localedata: keep locale-aware
+#   formatting paths (DateTimeFormatter, NumberFormat, Collator) working
+#   for the three locales Aura's i18n actually ships
+#   (EnglishStrings / RussianStrings / GermanStrings). Without the
+#   restriction, --add-modules jdk.localedata would pull in the full
+#   ~50 MB locale dataset; without jdk.localedata at all, anything not
+#   in java.base's en_US fallback silently degrades.
+# --compress=zip-9: modern syntax (the old `--compress=2` form is
+#   deprecated in JDK 21+ and emits a warning on every build).
 jlink \
     --output "$APPDIR/usr" \
-    --add-modules java.base,java.desktop,java.logging,java.management,java.prefs,jdk.crypto.ec,jdk.unsupported,jdk.zipfs \
+    --add-modules java.base,java.desktop,java.logging,java.management,java.prefs,jdk.crypto.ec,jdk.unsupported,jdk.zipfs,jdk.localedata \
+    --vm=server \
+    --include-locales=en,ru,de \
     --no-header-files \
     --no-man-pages \
     --strip-debug \
-    --compress=2
+    --compress=zip-9
 
 # ── 2. Remaining subdirs (usr/bin already exists from jlink) ────────────────
 mkdir -p \
@@ -52,34 +67,21 @@ mkdir -p \
     "$APPDIR/usr/share/metainfo"
 
 # ── 3. AppRun entry-point ───────────────────────────────────────────────────
-# WM_CLASS hygiene: -Dawt.appClassName works on JBR; on stock OpenJDK (which
-# is what jlink builds the AppImage's runtime from) Main.kt reflects into
-# sun.awt.X11.XToolkit.awtAppClassName, which JPMS guards behind --add-opens.
-# Both must be present for Hyprland/KDE/GNOME to match the live window
-# against StartupWMClass=AuraLauncher and pick up the hicolor icon at the
-# correct size. Mirrors client-ui/build.gradle.kts — the fat jar bypasses the
-# Compose-generated launcher script, so its jvmArgs do not flow through here.
-#
-# Wayland-Native trial: when AURA_WAYLAND_TRIAL=1 is set in the build env,
-# bake `-Dawt.toolkit.name=WLToolkit` into the AppRun so the AppImage runtime
-# selects JBR's native Wayland toolkit instead of XToolkit/XWayland fallback.
-# The gradle-side `compose.desktop.application.jvmArgs` does NOT propagate
-# into AppImage builds (jpackage path is for Win/macOS distributables) — the
-# AppRun script is the only place where flags actually reach runtime.
-WAYLAND_TRIAL_FLAG=""
-if [ "${AURA_WAYLAND_TRIAL:-}" = "1" ]; then
-    WAYLAND_TRIAL_FLAG="-Dawt.toolkit.name=WLToolkit"
-    echo "AppRun: AURA_WAYLAND_TRIAL=1 — baking -Dawt.toolkit.name=WLToolkit"
-fi
-
+# WM_CLASS hygiene: Main.kt reflects into sun.awt.X11.XToolkit.awtAppClassName
+# before the first window is created so the X11 WM_CLASS hint matches
+# StartupWMClass=AuraLauncher in resources/aura-launcher.desktop. The
+# reflection is JPMS-guarded behind --add-opens=java.desktop/sun.awt.X11.
+# Stock OpenJDK derives WM_CLASS from argv[0] by default; without the
+# reflection the launcher would show up as "java" in the taskbar. The fat
+# jar bypasses the Compose-generated launcher script, so the jvmArgs in
+# client-ui/build.gradle.kts do not flow through here -- the AppRun is the
+# only place where flags actually reach the AppImage runtime.
 cat > "$APPDIR/AppRun" << EOF
 #!/bin/sh
 HERE="\$(dirname "\$(readlink -f "\$0")")"
 exec "\$HERE/usr/bin/java" \\
-     -Dawt.appClassName=AuraLauncher \\
      --add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED \\
      --enable-native-access=ALL-UNNAMED \\
-     ${WAYLAND_TRIAL_FLAG} \\
      -jar "\$HERE/usr/lib/aura-launcher.jar" \\
      "\$@"
 EOF
