@@ -37,7 +37,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # any of the mkdir steps below.
 jlink \
     --output "$APPDIR/usr" \
-    --add-modules java.base,java.desktop,java.logging,java.management,java.naming,java.net.http,java.prefs,java.sql,jdk.crypto.ec,jdk.unsupported,jdk.zipfs \
+    --add-modules java.base,java.desktop,java.logging,java.management,java.prefs,jdk.crypto.ec,jdk.unsupported,jdk.zipfs \
     --no-header-files \
     --no-man-pages \
     --strip-debug \
