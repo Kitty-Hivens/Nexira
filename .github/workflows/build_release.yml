@@ -322,8 +322,16 @@ jobs:
             sudo install -m 0755 appimagetool /usr/local/bin/appimagetool
           fi
 
-      - name: Build JAR
-        run: ./gradlew :client-ui:packageReleaseUberJarForCurrentOS -PappVersion="$APP_VERSION"
+      - name: Build JAR + emit packaging profile
+        # emitAppImageProfile writes the shell-sourceable flag set that
+        # build-appimage.sh below picks up via PACKAGING_PROFILE -- single
+        # source of truth between gradle (CustomRuntimeTask) and the
+        # AppImage path (jlink call). See PackagingExtension KDoc.
+        run: |
+          ./gradlew \
+            :client-ui:packageReleaseUberJarForCurrentOS \
+            :client-ui:emitAppImageProfile \
+            -PappVersion="$APP_VERSION"
 
       - name: Validate desktop entry
         run: desktop-file-validate resources/aura-launcher.desktop

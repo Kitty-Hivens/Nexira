@@ -70,5 +70,25 @@ class PackagingPlugin : Plugin<Project> {
                 project.layout.buildDirectory.dir("customRuntime")
             )
         }
+
+        project.tasks.register<EmitAppImageProfileTask>("emitAppImageProfile") {
+            group = "packaging"
+            description =
+                "Writes a shell-sourceable file with the jlink modules and flags, " +
+                "so scripts/build-appimage.sh stays in lockstep with the gradle-side " +
+                "PackagingExtension."
+
+            modules.convention(ext.modules)
+            stripDebug.convention(ext.jlink.stripDebug)
+            noHeaderFiles.convention(ext.jlink.noHeaderFiles)
+            noManPages.convention(ext.jlink.noManPages)
+            compress.convention(ext.jlink.compress)
+            vmKind.convention(ext.jlink.vmKind)
+            includeLocales.convention(ext.jlink.includeLocales)
+
+            outputFile.convention(
+                project.layout.buildDirectory.file("generated/packaging/packaging-profile.sh")
+            )
+        }
     }
 }
