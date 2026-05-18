@@ -57,26 +57,38 @@ jobs:
         #           Catches a regression where the construction-time crash
         #           is no longer caught by the factory.
         include:
+          # X11 client libs (libXi / libXrender / libXtst / libXext /
+          # libXcursor / libXxf86vm) + xauth: see the same block in
+          # pr-portability.yml for the long rationale. Short version:
+          # `libawt_xawt.so` inside jlink's bundled JRE links to system
+          # X libs at runtime, minimal distro containers don't pull
+          # them in by default but real desktop installs do.
           - distro_name: Fedora-latest
             container: fedora:latest
             expect_keyring: any
             install_cmd: |
               dnf install -y --setopt=install_weak_deps=False \
                 xorg-x11-server-Xvfb fuse-libs which findutils \
-                libsecret gh
+                libsecret gh \
+                libXi libXrender libXtst libXext libXcursor libXxf86vm \
+                xorg-x11-xauth
           - distro_name: Arch-latest
             container: archlinux:latest
             expect_keyring: any
             install_cmd: |
               pacman -Sy --noconfirm \
-                xorg-server-xvfb fuse2 which libsecret github-cli
+                xorg-server-xvfb fuse2 which libsecret github-cli \
+                libxi libxrender libxtst libxext libxcursor libxxf86vm \
+                xorg-xauth
           - distro_name: Debian-stable
             container: debian:stable
             expect_keyring: any
             install_cmd: |
               apt-get update -qq
               apt-get install -y --no-install-recommends \
-                xvfb libfuse2 libsecret-1-0 gh
+                xvfb libfuse2 libsecret-1-0 gh \
+                libxi6 libxrender1 libxtst6 libxext6 libxcursor1 libxxf86vm1 \
+                xauth
           - distro_name: Fedora-no-libsecret
             container: fedora:latest
             expect_keyring: noop
@@ -88,7 +100,9 @@ jobs:
             # bootstrapped distro" not just "test scaffold quirk".
             install_cmd: |
               dnf install -y --setopt=install_weak_deps=False \
-                xorg-x11-server-Xvfb fuse-libs which findutils gh
+                xorg-x11-server-Xvfb fuse-libs which findutils gh \
+                libXi libXrender libXtst libXext libXcursor libXxf86vm \
+                xorg-x11-xauth
     container: ${{ matrix.container }}
     steps:
       - name: Install runtime deps for ${{ matrix.distro_name }}
