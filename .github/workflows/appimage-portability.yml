@@ -76,13 +76,16 @@ jobs:
           - distro_name: Arch-latest
             container: archlinux:latest
             expect_keyring: any
+            # pacman -Syu (not -Sy): partial-upgrade trap -- newly-installed
+            # packages link against latest repo libs (xorg-server-xvfb vs.
+            # libnettle.so.9 most recently) while stale system libs in the
+            # container go unrefreshed, breaking Xvfb at runtime. -Syu is
+            # the canonical Arch container pattern.
             # xorg-xkbcomp: Xvfb shells out to `xkbcomp` at startup to compile
             # the keymap; xkeyboard-config provides only the keymap source.
-            # On Arch the binary is a separate package -- without it, Xvfb
-            # exits before opening :99 and the downstream AWT error is the
-            # misleading "Can't connect to X11 window server using ':99'".
+            # On Arch the binary is a separate package.
             install_cmd: |
-              pacman -Sy --noconfirm \
+              pacman -Syu --noconfirm \
                 xorg-server-xvfb fuse2 which libsecret github-cli \
                 libxi libxrender libxtst libxext libxcursor libxxf86vm \
                 fontconfig freetype2 libglvnd \
