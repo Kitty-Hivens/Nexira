@@ -232,7 +232,13 @@ jobs:
 
       - name: Build distributable
         shell: bash
-        run: ./gradlew :client-ui:createReleaseDistributable -PappVersion="$APP_VERSION"
+        # customJpackageImage produces the same app-image layout that
+        # createReleaseDistributable used to (AuraLauncher\bin\,
+        # AuraLauncher\lib\runtime\, AuraLauncher\lib\app\), now with
+        # the full jlink + jpackage flag surface from the
+        # aura.packaging convention plugin. Inno Setup's Source: path
+        # in setup.iss tracks the new output dir (B-3 commit).
+        run: ./gradlew :client-ui:customJpackageImage -PappVersion="$APP_VERSION"
 
       - name: Compile Inno Setup EXE
         shell: pwsh
@@ -391,11 +397,19 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build DMG
-        run: ./gradlew :client-ui:packageReleaseDmg -PappVersion="$APP_VERSION"
+        # customDmg wraps the .app bundle that customJpackageImage
+        # produces, into a DMG via `jpackage --type dmg --app-image`.
+        # Replaces Compose Desktop's packageReleaseDmg so the macOS
+        # leg benefits from the same jlink + jpackage flag set as
+        # Windows + Linux (--vm=server, --strip-debug,
+        # --include-locales=en,ru,de, etc.). customDmg dependsOn
+        # customJpackageImage transitively, so the single gradle
+        # invocation here pulls the whole chain.
+        run: ./gradlew :client-ui:customDmg -PappVersion="$APP_VERSION"
 
       - name: Rename DMG with architecture suffix
         run: |
-          mv client-ui/build/compose/binaries/main-release/dmg/*.dmg \
+          mv client-ui/build/customDmg/*.dmg \
              "AuraLauncher-$APP_VERSION-aarch64.dmg"
 
       - uses: actions/upload-artifact@v4

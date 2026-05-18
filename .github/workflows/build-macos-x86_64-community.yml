@@ -58,11 +58,16 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build DMG
-        run: ./gradlew :client-ui:packageReleaseDmg -PappVersion="${{ steps.ver.outputs.version }}"
+        # Same swap to customDmg as the main build_release.yml macOS
+        # leg -- see that file's comment for the why. Keeps tier-1
+        # (aarch64) and community-tier (x86_64) macOS builds on the
+        # same packaging path; otherwise the two could drift on flag
+        # surface across releases.
+        run: ./gradlew :client-ui:customDmg -PappVersion="${{ steps.ver.outputs.version }}"
 
       - name: Rename with -x86_64-community suffix
         run: |
-          src=$(ls client-ui/build/compose/binaries/main-release/dmg/*.dmg | head -n 1)
+          src=$(ls client-ui/build/customDmg/*.dmg | head -n 1)
           mv "$src" "AuraLauncher-${{ steps.ver.outputs.version }}-x86_64-community.dmg"
 
       - name: Upload to existing release
