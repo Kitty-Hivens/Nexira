@@ -110,14 +110,10 @@ sealed class Screen {
 // ─── Entry Point ─────────────────────────────────────────────────────────────
 
 /**
- * Single startup line summarizing which AWT toolkit JBR/JDK picked and what
- * Linux display-server environment we're in. The Wayland-Native investigation
- * (docs/dev/wayland-investigation.md) needs every log we get back from a real
- * user to triangulate the toolkit-vs-session matrix; this line makes it
- * trivial to grep across `launcher.log` files attached to bundles.
- *
- * Always-on (not gated by AURA_WAYLAND_TRIAL) -- the diagnostic value applies
- * to every Linux user, not just trial participants.
+ * Single startup line summarizing which AWT toolkit the JDK picked and what
+ * Linux display-server environment we're in. Diagnostic value applies to
+ * every Linux user; trivial to grep across `launcher.log` files attached to
+ * bundles when a display issue gets reported.
  */
 private fun logToolkitAndSession() {
     if (!System.getProperty("os.name").lowercase().contains("linux")) return
@@ -214,11 +210,13 @@ fun main() {
     // initialize hadn't run yet.)
     NetworkState.initialize(paths.dataDir.resolve("ssl-bypasses.json"))
 
-    System.setProperty("jna.nosys", "true")
     System.setProperty("skiko.fps.limit", "60")
-    // X11 WM_CLASS = "AuraLauncher". -Dawt.appClassName covers JBR; for stock
-    // OpenJDK we reflect into sun.awt.X11.XToolkit.awtAppClassName before the
-    // first window is created. See jvmArgs in client-ui/build.gradle.kts.
+    // X11 WM_CLASS = "AuraLauncher". Stock OpenJDK derives WM_CLASS from
+    // argv[0] and exposes no public knob to override it, so we reflect into
+    // the package-private sun.awt.X11.XToolkit.awtAppClassName field before
+    // the first window is created. See jvmArgs --add-opens in
+    // client-ui/build.gradle.kts and the function doc on
+    // setLinuxXToolkitAppClassName for the cross-vendor details.
     setLinuxXToolkitAppClassName(Branding.WM_CLASS)
 
     // Capture toolkit + session-type as soon as the toolkit has been triggered

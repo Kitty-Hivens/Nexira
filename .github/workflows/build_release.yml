@@ -21,7 +21,7 @@ concurrency:
 
 env:
   JAVA_VERSION: '25'
-  JAVA_DISTRIBUTION: 'jetbrains'
+  JAVA_DISTRIBUTION: 'liberica'
   # Every setup-java step below uses `cache: 'gradle'` -- reuses
   # ~/.gradle/caches + ~/.gradle/wrapper across runs (keyed on *.gradle*,
   # gradle-wrapper.properties, gradle/libs.versions.toml). Saves 30-90s

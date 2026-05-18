@@ -218,18 +218,15 @@ compose.desktop {
         // JVM ARGUMENTS OPTIMIZATION
         // ====================================================================
         jvmArgs(
-            // Linux window-manager identity. Two-pronged because the canonical
-            // "set X11 WM_CLASS from a JVM" knob is JDK-vendor-specific:
-            //   - JBR honours -Dawt.appClassName=...  natively at toolkit init.
-            //   - Stock OpenJDK (Liberica, Temurin, etc.) ignores that property
-            //     and derives WM_CLASS from the launcher's argv[0]. Main.kt
-            //     reflects into sun.awt.X11.XToolkit.awtAppClassName before the
-            //     first window is created, which needs the --add-opens below.
-            // Result: matches StartupWMClass=AuraLauncher in
-            // resources/aura-launcher.desktop on every JDK, so KDE/Hyprland/GNOME
-            // associate the live window with the .desktop entry and pick up the
-            // hicolor icon at the size the compositor actually wants.
-            "-Dawt.appClassName=AuraLauncher",
+            // Linux window-manager identity. Main.kt reflects into
+            // sun.awt.X11.XToolkit.awtAppClassName before the first window is
+            // created so the X11 WM_CLASS hint matches StartupWMClass=AuraLauncher
+            // in resources/aura-launcher.desktop. KDE / Hyprland / GNOME associate
+            // the live window with the .desktop entry on that match and pick up
+            // the hicolor icon at the size the compositor actually wants. The
+            // --add-opens below is what allows the reflection. Stock OpenJDK
+            // derives WM_CLASS from argv[0] by default; without the reflection
+            // the launcher would show up as "java" in the taskbar.
             "--add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED",
 
             // X11/Linux desktop tuning. macOS/Windows JVMs silently ignore
@@ -269,24 +266,6 @@ compose.desktop {
             // memory + downcall stubs. Same flag also enables the
             // macOS keyring + libsecret bindings shipped in 2.2.13.
             "--enable-native-access=ALL-UNNAMED",
-
-            // ── Wayland-Native trial flag ─────────────────────────────────
-            //
-            // Force JBR's WLToolkit instead of XToolkit when AURA_WAYLAND_TRIAL=1
-            // is set in the build environment. JBR 25 ships sun.awt.wl.WLToolkit
-            // but defaults to XToolkit even on Wayland sessions; we have to opt in
-            // explicitly. Trial-only because the toolkit-aware fallback paths
-            // (WM_CLASS, raise pulse, jlink jetbrains.api module) are not yet in
-            // place — see docs/dev/wayland-investigation.md for the chunk plan.
-            //
-            // `providers.environmentVariable(...).orNull` is configuration-cache
-            // safe (vs. raw System.getenv); evaluation deferred to the proper
-            // gradle stage.
-            *(if (providers.environmentVariable("AURA_WAYLAND_TRIAL").orNull == "1") {
-                arrayOf("-Dawt.toolkit.name=WLToolkit")
-            } else {
-                emptyArray()
-            }),
 
             // Puppet mode (hivens.ui.puppet.PuppetServer) -- opt-in HTTP
             // control surface for CLI-driven UI testing. Activated when
