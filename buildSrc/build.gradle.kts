@@ -29,3 +29,18 @@ repositories {
     gradlePluginPortal()
     mavenCentral()
 }
+
+// Convention plugins declared here become consumable from project
+// build.gradle.kts files via `plugins { id("aura.packaging") }`. The
+// `kotlin-dsl` plugin pulls in the `java-gradle-plugin` capability that
+// provides this `gradlePlugin` extension; explicit registration (rather
+// than relying on auto-discovery via META-INF/gradle-plugins resources)
+// keeps the wiring readable in one place.
+gradlePlugin {
+    plugins {
+        register("packaging") {
+            id = "aura.packaging"
+            implementationClass = "hivens.packaging.PackagingPlugin"
+        }
+    }
+}
