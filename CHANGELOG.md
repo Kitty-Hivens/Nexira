@@ -11,6 +11,101 @@ below are for the GitHub release page and CHANGELOG readers.
 
 ## [Unreleased]
 
+## [2.2.16] - 2026-05-19
+
+Bug-fix + size-cut release. The headline is a UI-freeze fix that bit
+every user on every "Play" click — the tray library was making
+blocking D-Bus calls on the EDT during launch state transitions,
+holding up the whole window for seconds at a time. Alongside that,
+the distribution size drops by ~one-third thanks to a custom jlink +
+jpackage pipeline that finally lands the flags
+(`--vm=server`, `--strip-debug`, `--compress=zip-9`,
+`--include-locales=en,ru,de`) that Compose Desktop's built-in
+`nativeDistributions` block never exposed. Internal: the build
+toolchain swaps from JetBrains Runtime to BellSoft Liberica, and the
+packaging infrastructure moves into a `buildSrc/` convention plugin
+so the AppImage shell script and the Windows / macOS jpackage path
+share one configuration source.
+
+### Highlights
+- **No more freeze on Play click** — clicking "Play" used to lock the
+  launcher window for several seconds while the system-tray library
+  made blocking D-Bus calls on the UI thread. Tray status updates are
+  now off the EDT entirely; the window stays responsive through the
+  whole launch flow. Affects every Linux user under
+  KDE / Hyprland / GNOME / Cinnamon.
+- **~34% smaller download** — the release distributable shrinks from
+  ~214 MB to ~141 MB. Custom jlink runtime drops the unused HotSpot
+  VM variants (client + minimal, ~22 MB), restricts locale data to
+  en/ru/de, strips debug info, and uses zip-9 compression. The
+  embedded runtime alone is ~61 MB instead of ~115 MB.
+- **/diag endpoints for puppet** (developer-facing) — the puppet HTTP
+  control surface gains read-only diagnostic endpoints
+  (`/diag/threads`, `/diag/jvm`, `/diag/actions`, `/diag/snapshot`)
+  for automated profiling and freeze diagnosis. Off
+  `Dispatchers.Swing` by design so they do not perturb what they
+  measure. Available only in puppet builds (`-PauraPuppetPort=N`).
+
+### Added
+- `aura.packaging` convention plugin in `buildSrc/` — typed Gradle
+  tasks (`customRuntime`, `emitAppImageProfile`,
+  `customJpackageImage`, `customDmg`) consume a single source of
+  truth in `client-ui/build.gradle.kts` for the jlink + jpackage flag
+  set. Replaces the badass-runtime-plugin path (evaluated, rejected:
+  plugin-apply conflict with Compose Multiplatform's `run` task plus
+  `Task.project` usage that breaks the strict configuration-cache
+  policy).
+- Puppet `/diag/*` endpoints plus matching `dev-tools/puppet/diag-*.sh`
+  CLI wrappers.
+
+### Changed
+- Build toolchain: JetBrains Runtime 25 → BellSoft Liberica 25. CI
+  pins `JAVA_DISTRIBUTION=liberica` for reproducibility; local
+  toolchain policy is vendor-loose so any JDK 25 on PATH works.
+  Foojay-resolver-convention plugin in `settings.gradle.kts`
+  auto-provisions a JDK 25 if missing.
+- AppImage `jlink` invocation gains `--vm=server`,
+  `--include-locales=en,ru,de` (with `jdk.localedata` added to the
+  module set), modernised `--compress=zip-9` (replaces deprecated
+  `--compress=2`).
+- Windows EXE and macOS DMG production switch from Compose Desktop's
+  `createReleaseDistributable` / `packageReleaseDmg` to
+  `aura.packaging`'s `customJpackageImage` + `customDmg`. Layout
+  unchanged from Inno Setup's and DMG-host's perspective.
+- `scripts/build-appimage.sh` reads jlink modules + flags from a
+  generated `packaging-profile.sh` shell fragment
+  (`emitAppImageProfile` task) so the same source of truth feeds
+  every distribution surface.
+- macOS bundle identifier corrected to `dev.hivens.auralauncher`.
+  Apex domain is `hivens.dev`, so reverse-DNS leftmost component is
+  `dev`, not `com`.
+
+### Fixed
+- **UI freeze during launch state transitions** — the system-tray
+  library's D-Bus signal emission (used to update the tray menu /
+  tooltip when launch state changes from Idle → Prepare → Sync →
+  GameRunning) ran on the EDT via a synchronous
+  `dbus_connection_flush`, blocking the AWT event queue for the
+  duration of every native send. Moved to a dedicated sender thread
+  in libtray `e5e6b5f`. The window now repaints, accepts clicks, and
+  redraws correctly through every state transition.
+- Three unused JDK modules trimmed from the runtime image (`java.sql`,
+  `java.net.http`, `java.naming`); verified via bytecode scan that no
+  code path in the bundle references them.
+
+### Removed
+- `AURA_WAYLAND_TRIAL` workflow (`trial-appimage.yml`) and the
+  env-gated `-Dawt.toolkit.name=WLToolkit` jvmArg block. JBR-only
+  experiment; Liberica does not ship `sun.awt.wl.WLToolkit`. Wayland
+  sessions continue to work via XWayland.
+- `-Dawt.appClassName=AuraLauncher` jvmArg + matching AppRun line.
+  JBR-only honour; on stock OpenJDK the `Main.kt` reflection into
+  `sun.awt.X11.XToolkit.awtAppClassName` is the real WM_CLASS path
+  and works regardless of the jvmArg.
+- `System.setProperty("jna.nosys", "true")` from `Main.kt` —
+  dorkbox/JBR-era artifact, no longer relevant after the libtray and
+  Liberica swaps.
+
 ## [2.2.15] - 2026-05-18
 
 Network plumbing + UI responsiveness release. The "Force proxy mode"
