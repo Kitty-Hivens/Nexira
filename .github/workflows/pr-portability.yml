@@ -180,7 +180,7 @@ jobs:
               pacman -Sy --noconfirm \
                 xorg-server-xvfb fuse2 which libsecret \
                 libxi libxrender libxtst libxext libxcursor libxxf86vm \
-                fontconfig freetype2 libglvnd-glx \
+                fontconfig freetype2 libglvnd \
                 xorg-xauth
           - distro_name: Debian-stable
             container: debian:stable
