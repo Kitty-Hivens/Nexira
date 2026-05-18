@@ -148,26 +148,47 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # X11 client libs (libXi / libXrender / libXtst / libXext /
+          # libXcursor / libXxf86vm) come from the system, not from
+          # jlink's bundled JRE -- `libawt_xawt.so` inside the jmod is
+          # dynamically linked against them. Minimal distro containers
+          # don't include them by default, but real desktop Linux
+          # installs do (any X11 session or Xwayland setup pulls them
+          # in transitively). Install them explicitly in CI so the
+          # test environment matches a real desktop, not a stripped
+          # container -- otherwise the bundled JRE fails at AWT toolkit
+          # init with "libXi.so.6: cannot open shared object file"
+          # before the launcher has a chance to log anything.
+          #
+          # `xauth` for Debian: xvfb-run requires it to provision the
+          # virtual display's MIT-MAGIC-COOKIE; absent on debian:stable
+          # by default and not pulled in by `xvfb` alone.
           - distro_name: Fedora-latest
             container: fedora:latest
             expect_keyring: any
             install_cmd: |
               dnf install -y --setopt=install_weak_deps=False \
                 xorg-x11-server-Xvfb fuse-libs which findutils \
-                libsecret
+                libsecret \
+                libXi libXrender libXtst libXext libXcursor libXxf86vm \
+                xorg-x11-xauth
           - distro_name: Arch-latest
             container: archlinux:latest
             expect_keyring: any
             install_cmd: |
               pacman -Sy --noconfirm \
-                xorg-server-xvfb fuse2 which libsecret
+                xorg-server-xvfb fuse2 which libsecret \
+                libxi libxrender libxtst libxext libxcursor libxxf86vm \
+                xorg-xauth
           - distro_name: Debian-stable
             container: debian:stable
             expect_keyring: any
             install_cmd: |
               apt-get update -qq
               apt-get install -y --no-install-recommends \
-                xvfb libfuse2 libsecret-1-0
+                xvfb libfuse2 libsecret-1-0 \
+                libxi6 libxrender1 libxtst6 libxext6 libxcursor1 libxxf86vm1 \
+                xauth
           - distro_name: Fedora-no-libsecret
             container: fedora:latest
             expect_keyring: noop
@@ -175,7 +196,9 @@ jobs:
             # construction-time-exception fallback path.
             install_cmd: |
               dnf install -y --setopt=install_weak_deps=False \
-                xorg-x11-server-Xvfb fuse-libs which findutils
+                xorg-x11-server-Xvfb fuse-libs which findutils \
+                libXi libXrender libXtst libXext libXcursor libXxf86vm \
+                xorg-x11-xauth
     container: ${{ matrix.container }}
     steps:
       - name: Install runtime deps for ${{ matrix.distro_name }}
