@@ -12,12 +12,22 @@
 #   ARCH=x86_64           appimagetool architecture
 #   OUTPUT=<derived>      final .AppImage path; defaults to
 #                         AuraLauncher-<version>-<arch>.AppImage in CWD
+#   PACKAGING_PROFILE     override path to the generated packaging
+#                         profile (defaults to the standard
+#                         client-ui/build/generated/packaging/
+#                         packaging-profile.sh, produced by the
+#                         `:client-ui:emitAppImageProfile` gradle task)
 #
 # Requires on PATH: jlink (from JDK), appimagetool (continuous build).
 #
 # Why this lives in a script: the inline yaml in build_release.yml grew to
 # ~50 lines with a heredoc, three mkdir trees, four cp blocks and an
 # appimagetool invocation — testable locally as a script, opaque inline.
+#
+# jlink module list + flag set live in the packaging profile, NOT inline
+# here. Single source of truth is the `packaging { ... }` block in
+# client-ui/build.gradle.kts; the gradle `emitAppImageProfile` task
+# materializes it into the shell-sourceable file we consume below.
 # ─────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
@@ -32,31 +42,31 @@ OUTPUT="${OUTPUT:-AuraLauncher-${APP_VERSION}-${ARCH}.AppImage}"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
+# ── Packaging profile (single source of truth for jlink flags) ──────────────
+PACKAGING_PROFILE="${PACKAGING_PROFILE:-$ROOT/client-ui/build/generated/packaging/packaging-profile.sh}"
+if [ ! -f "$PACKAGING_PROFILE" ]; then
+    echo "error: packaging profile not found at $PACKAGING_PROFILE" >&2
+    echo "       run \`./gradlew :client-ui:emitAppImageProfile\` first," >&2
+    echo "       or set PACKAGING_PROFILE=<path> to override." >&2
+    exit 1
+fi
+# Populates AURA_JLINK_MODULES (comma-joined string) and AURA_JLINK_OPTIONS
+# (bash array). See buildSrc/.../EmitAppImageProfileTask.kt for the writer.
+source "$PACKAGING_PROFILE"
+
 # ── 1. Minimal JRE via jlink ────────────────────────────────────────────────
 # jlink refuses to write into an existing directory, so it has to run before
 # any of the mkdir steps below.
-# --vm=server: drop client + minimal HotSpot variants (saves ~22 MB on
-#   the bundled runtime; the launcher is a long-running Compose app, the
-#   client VM's faster-startup-slower-steady-state trade-off was always
-#   the wrong shape for us).
-# --include-locales=en,ru,de + jdk.localedata: keep locale-aware
-#   formatting paths (DateTimeFormatter, NumberFormat, Collator) working
-#   for the three locales Aura's i18n actually ships
-#   (EnglishStrings / RussianStrings / GermanStrings). Without the
-#   restriction, --add-modules jdk.localedata would pull in the full
-#   ~50 MB locale dataset; without jdk.localedata at all, anything not
-#   in java.base's en_US fallback silently degrades.
-# --compress=zip-9: modern syntax (the old `--compress=2` form is
-#   deprecated in JDK 21+ and emits a warning on every build).
+# Module list and flag set come from the sourced packaging profile above.
+# Rationale per flag lives in the PackagingExtension KDoc + the per-flag
+# comments in client-ui/build.gradle.kts. Headline: --vm=server (-22 MB),
+# --include-locales=en,ru,de + jdk.localedata (keeps i18n-relevant locale
+# data, prunes the rest), --compress=zip-9 (modern syntax), --strip-debug
+# / --no-header-files / --no-man-pages (size hygiene).
 jlink \
     --output "$APPDIR/usr" \
-    --add-modules java.base,java.desktop,java.logging,java.management,java.prefs,jdk.crypto.ec,jdk.unsupported,jdk.zipfs,jdk.localedata \
-    --vm=server \
-    --include-locales=en,ru,de \
-    --no-header-files \
-    --no-man-pages \
-    --strip-debug \
-    --compress=zip-9
+    --add-modules "$AURA_JLINK_MODULES" \
+    "${AURA_JLINK_OPTIONS[@]}"
 
 # ── 2. Remaining subdirs (usr/bin already exists from jlink) ────────────────
 mkdir -p \
