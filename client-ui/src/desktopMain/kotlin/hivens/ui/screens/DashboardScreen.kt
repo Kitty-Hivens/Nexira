@@ -71,11 +71,12 @@ fun DashboardScreen(
     val sslBypass = remember(bypassesList, bypassHost) { NetworkState.bypassFor(bypassHost) }
 
 
-    fun fetchServers() {
+    fun fetchServers(forceRefresh: Boolean = false) {
         isLoadingServers = true
         scope.launch(Dispatchers.IO) {
             try {
-                val data = serverListService.fetchDashboardData().get()
+                val data = if (forceRefresh) serverListService.refresh().get()
+                           else              serverListService.fetchDashboardData().get()
                 withContext(Dispatchers.Main) {
                     servers = data.servers
                     if (selectedServerState == null && servers.isNotEmpty()) {
@@ -170,7 +171,7 @@ fun DashboardScreen(
                         )
                         Spacer(Modifier.height(16.dp))
                         OutlinedButton(
-                            onClick = { fetchServers() },
+                            onClick = { fetchServers(forceRefresh = true) },
                             colors  = ButtonDefaults.outlinedButtonColors(
                                 contentColor = CelestiaTheme.colors.primary
                             )
