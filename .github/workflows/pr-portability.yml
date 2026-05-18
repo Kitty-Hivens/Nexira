@@ -176,12 +176,19 @@ jobs:
           - distro_name: Arch-latest
             container: archlinux:latest
             expect_keyring: any
+            # xorg-xkbcomp + xkeyboard-config: Xvfb shells out to `xkbcomp`
+            # at startup to compile the keymap. xkeyboard-config ships only
+            # the keymap source data; the binary lives in a separate package
+            # on Arch (unlike Fedora/Debian where it's bundled with the
+            # Xvfb dependency chain). Without xkbcomp present, Xvfb exits
+            # before opening :99, and AWT later fails with
+            # "Can't connect to X11 window server using ':99'".
             install_cmd: |
               pacman -Sy --noconfirm \
                 xorg-server-xvfb fuse2 which libsecret \
                 libxi libxrender libxtst libxext libxcursor libxxf86vm \
                 fontconfig freetype2 libglvnd \
-                xorg-xauth xkeyboard-config
+                xorg-xauth xkeyboard-config xorg-xkbcomp
           - distro_name: Debian-stable
             container: debian:stable
             expect_keyring: any
@@ -219,6 +226,28 @@ jobs:
         run: |
           chmod +x aura/*.AppImage
           ./aura/*.AppImage --appimage-extract > /dev/null
+
+      # Xvfb smoke: if Xvfb itself can't start (missing xkbcomp, fonts,
+      # whatever), the launcher fails downstream with a misleading
+      # "Can't connect to X11 window server" -- which makes it look like
+      # an AWT problem when the real cause is the virtual display never
+      # opened. This step lets a future failure point at the right layer.
+      - name: Xvfb smoke (diagnostic)
+        run: |
+          set +e
+          Xvfb :98 -screen 0 1024x768x24 > /tmp/xvfb.log 2>&1 &
+          XPID=$!
+          sleep 1
+          if kill -0 "$XPID" 2>/dev/null; then
+            echo "Xvfb :98 alive (pid=$XPID)"
+            kill "$XPID" 2>/dev/null || true
+            wait "$XPID" 2>/dev/null || true
+          else
+            echo "::warning title=Xvfb-smoke::Xvfb :98 died on ${{ matrix.distro_name }}"
+            echo "── Xvfb log:"
+            cat /tmp/xvfb.log || true
+          fi
+          set -e
 
       - name: Launch with virtual display, capture init log
         working-directory: /tmp

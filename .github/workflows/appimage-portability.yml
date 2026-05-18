@@ -76,12 +76,17 @@ jobs:
           - distro_name: Arch-latest
             container: archlinux:latest
             expect_keyring: any
+            # xorg-xkbcomp: Xvfb shells out to `xkbcomp` at startup to compile
+            # the keymap; xkeyboard-config provides only the keymap source.
+            # On Arch the binary is a separate package -- without it, Xvfb
+            # exits before opening :99 and the downstream AWT error is the
+            # misleading "Can't connect to X11 window server using ':99'".
             install_cmd: |
               pacman -Sy --noconfirm \
                 xorg-server-xvfb fuse2 which libsecret github-cli \
                 libxi libxrender libxtst libxext libxcursor libxxf86vm \
                 fontconfig freetype2 libglvnd \
-                xorg-xauth xkeyboard-config
+                xorg-xauth xkeyboard-config xorg-xkbcomp
           - distro_name: Debian-stable
             container: debian:stable
             expect_keyring: any
