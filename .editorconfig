@@ -19,7 +19,14 @@ ij_kotlin_continuation_indent_size       = 4
 ij_kotlin_allow_trailing_comma           = true
 ij_kotlin_allow_trailing_comma_on_call_site = true
 ij_kotlin_imports_layout                 = *
-# We use ※ ◆ ❖ ── ━━ in code comments; don't normalise these.
+# Decorative Unicode in code comments stays (visual hierarchy):
+#   ※ ◆ ❖ ── ━━ ─ 『 』 「 」  -- structural / ornamental
+# Prose Unicode in code comments is normalised to ASCII (since 2026-05-16):
+#   —  (em-dash, U+2014)  -> --
+#   →  (right arrow)      -> ->
+#   ←  (left arrow)       -> <-
+# i18n strings (client-ui/src/.../i18n/*Strings.kt) are exempt -- user-facing
+# UI text renders Unicode correctly and prose Unicode is appropriate there.
 ij_visual_guides                         = 120
 
 # YAML / JSON / TOML — 2 spaces is the community default

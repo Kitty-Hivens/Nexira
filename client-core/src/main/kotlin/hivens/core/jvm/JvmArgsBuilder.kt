@@ -1,6 +1,9 @@
 package hivens.core.jvm
 
 import kotlinx.serialization.Serializable
+import org.slf4j.LoggerFactory
+
+private val cdsLog = LoggerFactory.getLogger("hivens.core.jvm.CdsConfig")
 
 /**
  * Pure-data model for the experimental "JVM args builder" UI.
@@ -228,8 +231,13 @@ data class CdsConfig(
     fun toArgs(): List<String> = when (mode) {
         Mode.Disabled -> emptyList()
         Mode.AutoArchive -> listOf("-XX:+AutoSharedArchiveAtExit")
-        Mode.ArchiveAtExit -> archivePath?.let { listOf("-XX:ArchiveClassesAtExit=$it") } ?: emptyList()
-        Mode.UseArchive -> archivePath?.let { listOf("-XX:SharedArchiveFile=$it") } ?: emptyList()
+        // archivePath-less paths silently produce no flag; warn so a
+        // misconfigured preset doesn't pretend CDS is on. Validation
+        // belongs in the UI dialog, but a runtime safety net is cheap.
+        Mode.ArchiveAtExit -> archivePath?.let { listOf("-XX:ArchiveClassesAtExit=$it") }
+            ?: emptyList<String>().also { cdsLog.warn("CDS mode=ArchiveAtExit without archivePath -- producing no -XX flag") }
+        Mode.UseArchive -> archivePath?.let { listOf("-XX:SharedArchiveFile=$it") }
+            ?: emptyList<String>().also { cdsLog.warn("CDS mode=UseArchive without archivePath -- producing no -XX flag") }
     }
 
     companion object {

@@ -13,8 +13,8 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$REPO_ROOT"
 
-echo "── pre-push: running :client-core:test :client-launcher:test"
-if ! ./gradlew --quiet :client-core:test :client-launcher:test; then
+echo "── pre-push: running :client-config:test :client-core:test :client-launcher:test"
+if ! ./gradlew --quiet :client-config:test :client-core:test :client-launcher:test; then
     echo
     echo "── pre-push: FAILED. Push aborted."
     echo "   Fix the failing tests, or push with --no-verify if you truly mean to."

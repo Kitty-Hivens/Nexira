@@ -1,13 +1,26 @@
 package hivens.launcher
 
+import hivens.core.api.HttpClientProvider
 import hivens.test.buildMockClient
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.engine.mock.respond
+import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.headersOf
+import io.ktor.utils.io.ByteReadChannel
+import kotlinx.coroutines.runBlocking
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream
 import org.apache.commons.compress.archivers.zip.UnixStat
 import org.apache.commons.compress.archivers.zip.ZipArchiveEntry
 import org.apache.commons.compress.archivers.zip.ZipArchiveOutputStream
 import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream
+import org.junit.jupiter.api.condition.EnabledOnOs
+import org.junit.jupiter.api.condition.OS
+import java.io.ByteArrayOutputStream
 import java.io.FileOutputStream
+import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.zip.ZipEntry
@@ -21,6 +34,7 @@ import kotlin.test.assertFails
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class JavaManagerServiceTest {
 
@@ -421,7 +435,175 @@ class JavaManagerServiceTest {
         assertEquals("hello", Files.readString(symlink.toRealPath()))
     }
 
+    // ── getJavaPath: orchestrator (find -> download -> find -> +x) ────────
+
+    @Test
+    fun `getJavaPath returns existing executable without triggering download`() {
+        // Pre-place a valid-looking java binary in the version-specific
+        // runtime dir. The dead-HttpClient provider catches a regression
+        // where the early-return gate fails and the orchestrator falls
+        // through to downloadAndUnpack.
+        val runtimesRoot = workDir
+        withSystemProp("os.name", "Linux") {
+            withSystemProp("os.arch", "amd64") {
+                val folderName = "java-21-linux-x64"  // matches getJavaPath naming
+                val targetDir = runtimesRoot / "runtimes" / folderName
+                val binDir = (targetDir / "bin").also { Files.createDirectories(it) }
+                Files.writeString(binDir / "java", "#!/bin/sh\necho fake")
+                binDir.resolve("java").toFile().setExecutable(true)
+
+                val resolved = runBlocking {
+                    JavaManagerService(runtimesRoot, deadHttpClientProvider())
+                        .getJavaPath("1.21.1")
+                }
+                assertEquals("java", resolved.fileName.toString())
+                assertTrue(Files.exists(resolved))
+            }
+        }
+    }
+
+    @Test
+    @EnabledOnOs(OS.LINUX, OS.MAC)
+    fun `getJavaPath downloads tar-gz and locates java executable when missing`() {
+        // Synthesise a JDK tarball with the canonical jdk-XX/bin/java
+        // layout. The tar entry's mode (0o755) marks the binary executable,
+        // and untargz's per-entry mode check sets +x post-extraction so
+        // findJavaExecutable's Files.isExecutable gate passes.
+        //
+        // Linux/Mac only: POSIX-permissions plumbing doesn't apply on
+        // Windows. The orchestrator is exercised on the other paths via
+        // [getJavaPath returns existing executable...] above.
+        val runtimesRoot = workDir
+        val tarGz = synthesiseJdkTarGz("jdk-21.0.9+15/bin/java")
+        val provider = mockClientWithBytes(tarGz)
+
+        withSystemProp("os.name", "Linux") {
+            withSystemProp("os.arch", "amd64") {
+                val resolved = runBlocking {
+                    JavaManagerService(runtimesRoot, provider).getJavaPath("1.21.1")
+                }
+                assertEquals("java", resolved.fileName.toString())
+                assertTrue(Files.isExecutable(resolved),
+                    "post-download +x must be applied on non-Windows so isExecutable passes")
+            }
+        }
+    }
+
+    @Test
+    fun `getJavaPath throws when no BellSoft URL exists for the os arch combo`() {
+        // Linux/i386 + Java 21 is not in the BellSoft URL matrix --
+        // getDownloadUrl returns null and downloadAndUnpack throws
+        // IOException("no Java build for this system..."). Test pins os.arch
+        // to a value getArchName maps to "x32" so the lookup misses.
+        val runtimesRoot = workDir
+        withSystemProp("os.name", "Linux") {
+            withSystemProp("os.arch", "i386") {
+                val ex = assertFails {
+                    runBlocking {
+                        JavaManagerService(runtimesRoot, buildMockClient(""))
+                            .getJavaPath("1.21.1")
+                    }
+                }
+                assertTrue(
+                    ex is IOException &&
+                        ex.message?.contains("no Java build", ignoreCase = true) == true,
+                    "expected an IOException about missing Java build, got ${ex::class.simpleName}: ${ex.message}",
+                )
+            }
+        }
+    }
+
+    @Test
+    @EnabledOnOs(OS.LINUX, OS.MAC)
+    fun `getJavaPath throws when downloaded archive lacks a java executable`() {
+        // Server returns a syntactically valid tarball that has zero
+        // recognisable java binaries. downloadAndUnpack succeeds, the
+        // second findJavaExecutable returns null, and getJavaPath throws
+        // a clear IOException so the calling pipeline surfaces a meaningful
+        // error instead of dying later with a missing-binary message.
+        val runtimesRoot = workDir
+        val tarGz = synthesiseJdkTarGz("garbage/bin/not-java")
+        val provider = mockClientWithBytes(tarGz)
+
+        withSystemProp("os.name", "Linux") {
+            withSystemProp("os.arch", "amd64") {
+                val ex = assertFails {
+                    runBlocking {
+                        JavaManagerService(runtimesRoot, provider).getJavaPath("1.21.1")
+                    }
+                }
+                assertTrue(
+                    ex is IOException &&
+                        ex.message?.contains("executable file was not found", ignoreCase = true) == true,
+                    "expected an IOException about missing java binary, got ${ex::class.simpleName}: ${ex.message}",
+                )
+            }
+        }
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────
+
+    /**
+     * Build a minimal in-memory `.tar.gz` containing a single regular-file
+     * entry at [path] with execute-bit-set mode. Bytes are the literal
+     * "fake-jdk-binary" -- enough for findJavaExecutable to treat the file
+     * as a real binary candidate after extraction.
+     */
+    private fun synthesiseJdkTarGz(path: String): ByteArray {
+        val payload = "fake-jdk-binary".toByteArray()
+        val out = ByteArrayOutputStream()
+        GzipCompressorOutputStream(out).use { gz ->
+            TarArchiveOutputStream(gz).use { tar ->
+                val entry = TarArchiveEntry(path)
+                entry.mode = 0b111_101_101  // 0o755 = rwxr-xr-x
+                entry.size = payload.size.toLong()
+                tar.putArchiveEntry(entry)
+                tar.write(payload)
+                tar.closeArchiveEntry()
+            }
+        }
+        return out.toByteArray()
+    }
+
+    /**
+     * MockEngine-backed provider that returns the same [bytes] for any
+     * URL. JavaManagerService only ever issues one GET per getJavaPath
+     * call, so URL matching isn't necessary -- the test just needs the
+     * download step to consume well-formed archive bytes.
+     */
+    private fun mockClientWithBytes(bytes: ByteArray): HttpClientProvider {
+        val client = HttpClient(MockEngine) {
+            engine {
+                addHandler {
+                    respond(
+                        content = ByteReadChannel(bytes),
+                        status = HttpStatusCode.OK,
+                        headers = headersOf(HttpHeaders.ContentType, "application/octet-stream"),
+                    )
+                }
+            }
+        }
+        return HttpClientProvider { client }
+    }
+
+    /**
+     * Provider whose HttpClient errors on any request. Used in tests that
+     * expect getJavaPath to short-circuit (existing executable on disk) so
+     * a regression where the early-return fails throws loudly instead of
+     * silently exercising the download path against a real BellSoft URL.
+     */
+    private fun deadHttpClientProvider(): HttpClientProvider {
+        val client = HttpClient(MockEngine) {
+            engine {
+                addHandler {
+                    error("unexpected HTTP call -- getJavaPath should have short-circuited on the pre-existing binary")
+                }
+            }
+        }
+        return HttpClientProvider { client }
+    }
+
+    // ── original helpers ──────────────────────────────────────────────────
 
     private inline fun <T> withSystemProp(key: String, value: String, block: () -> T): T {
         val original = System.getProperty(key)

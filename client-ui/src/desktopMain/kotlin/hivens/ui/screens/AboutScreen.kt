@@ -28,9 +28,8 @@ import hivens.launcher.update.UpdateService
 import hivens.ui.BuildConfig
 import hivens.ui.components.GlassCard
 import hivens.ui.components.UpdateDialog
-import hivens.ui.easter.AprilFoolsButton
-import hivens.ui.easter.AprilFoolsText
-import hivens.ui.easter.AprilFoolsText.GibberishMode
+import hivens.ui.easter.GibberishMode
+import hivens.ui.easter.LocalAprilFools
 import hivens.ui.generated.resources.Res
 import hivens.ui.generated.resources.favicon
 import hivens.ui.i18n.LocalStrings
@@ -41,9 +40,8 @@ import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
 import org.koin.compose.koinInject
 import org.slf4j.LoggerFactory
-import java.awt.Desktop
+import hivens.ui.utils.SystemActions
 import java.lang.management.ManagementFactory
-import java.net.URI
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -52,6 +50,7 @@ private val log = LoggerFactory.getLogger("AboutScreen")
 @Composable
 fun AboutScreen(onBack: () -> Unit) {
     val s = LocalStrings.current
+    val af = LocalAprilFools.current
     val updateService: UpdateService = koinInject()
     val scope = rememberCoroutineScope()
 
@@ -151,7 +150,7 @@ fun AboutScreen(onBack: () -> Unit) {
 
                         // App title -- low probability corruption
                         Text(
-                            AprilFoolsText.maybeGibberish(Branding.TITLE, probability = 0.15f),
+                            af.maybeGibberish(Branding.TITLE, probability = 0.15f),
                             style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.Black,
                             color = CelestiaTheme.colors.textPrimary
@@ -165,7 +164,7 @@ fun AboutScreen(onBack: () -> Unit) {
                                 .padding(horizontal = 10.dp, vertical = 4.dp)
                         ) {
                             Text(
-                                AprilFoolsText.maybeGibberish(
+                                af.maybeGibberish(
                                     "v${Branding.VERSION.removePrefix("v")}",
                                     probability = 0.30f,
                                     mode = GibberishMode.FAKE_VER
@@ -185,7 +184,7 @@ fun AboutScreen(onBack: () -> Unit) {
 
                         // Build date -- may corrupt to lorem or reversed
                         Text(
-                            AprilFoolsText.maybeGibberish(s.aboutBuildDate(buildDate), probability = 0.25f),
+                            af.maybeGibberish(s.aboutBuildDate(buildDate), probability = 0.25f),
                             style = MaterialTheme.typography.bodySmall,
                             color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.6f)
                         )
@@ -193,7 +192,7 @@ fun AboutScreen(onBack: () -> Unit) {
 
                         // Description -- may become jargon
                         Text(
-                            AprilFoolsText.maybeGibberish(
+                            af.maybeGibberish(
                                 s.aboutDescription(Branding.UPSTREAM_NAME),
                                 probability = 0.20f
                             ),
@@ -226,7 +225,7 @@ fun AboutScreen(onBack: () -> Unit) {
                                 )
                                 // Role -- scrambled on April Fools
                                 Text(
-                                    AprilFoolsText.maybeGibberish(
+                                    af.maybeGibberish(
                                         "Architect & Developer",
                                         probability = 0.35f,
                                         mode = GibberishMode.SCRAMBLED
@@ -256,7 +255,7 @@ fun AboutScreen(onBack: () -> Unit) {
                                 Spacer(Modifier.width(8.dp))
                                 // Tech name -- may zalgo-ify
                                 Text(
-                                    AprilFoolsText.maybeGibberish(name, probability = 0.20f, mode = GibberishMode.ZALGO),
+                                    af.maybeGibberish(name, probability = 0.20f, mode = GibberishMode.ZALGO),
                                     fontWeight = FontWeight.Medium,
                                     color = CelestiaTheme.colors.textPrimary,
                                     fontSize = 13.sp
@@ -264,7 +263,7 @@ fun AboutScreen(onBack: () -> Unit) {
                                 Spacer(Modifier.width(6.dp))
                                 // Description -- may become jargon
                                 Text(
-                                    "-- ${AprilFoolsText.maybeGibberish(desc, probability = 0.40f, mode = GibberishMode.JARGON)}",
+                                    "-- ${af.maybeGibberish(desc, probability = 0.40f, mode = GibberishMode.JARGON)}",
                                     color = CelestiaTheme.colors.textSecondary,
                                     fontSize = 13.sp
                                 )
@@ -277,7 +276,7 @@ fun AboutScreen(onBack: () -> Unit) {
 
                         // License text -- high probability lorem ipsum
                         Text(
-                            AprilFoolsText.maybeGibberish(
+                            af.maybeGibberish(
                                 s.aboutLicenseText,
                                 probability = 0.45f,
                                 mode = GibberishMode.LOREM
@@ -309,7 +308,7 @@ fun AboutScreen(onBack: () -> Unit) {
                         when (val state = updateState) {
                             // ── Idle: check button -- chaos target ─────────────
                             UpdateCheckState.Idle -> {
-                                AprilFoolsButton(
+                                af.ChaosButton(
                                     id      = "about_check_updates_btn",
                                     text    = s.aboutCheckUpdates,
                                     onClick = {
@@ -536,12 +535,7 @@ private fun InfoRow(icon: ImageVector, label: String, value: String) {
 private fun LinkButton(label: String, url: String, icon: ImageVector) {
     OutlinedButton(
         onClick = {
-            try {
-                if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE))
-                    Desktop.getDesktop().browse(URI(url))
-            } catch (e: Exception) {
-                log.warn("Could not open external link {}", url, e)
-            }
+            SystemActions.openUrl(url)
         },
         modifier = Modifier.fillMaxWidth(),
         shape    = RoundedCornerShape(8.dp),

@@ -43,13 +43,7 @@ internal class ProcessLogHandler {
             BufferedReader(InputStreamReader(stream)).use { reader ->
                 try {
                     reader.lineSequence().forEach { text ->
-                        val finalType = when {
-                            type == LauncherLogType.ERROR -> LauncherLogType.ERROR
-                            text.contains("WARN", ignoreCase = true) -> LauncherLogType.WARN
-                            text.contains("ERROR", ignoreCase = true) || text.contains("Exception", ignoreCase = true) -> LauncherLogType.ERROR
-                            else -> LauncherLogType.INFO
-                        }
-
+                        val finalType = classify(text, type)
                         onLog(text, finalType)
 
                         when (finalType) {
@@ -61,6 +55,74 @@ internal class ProcessLogHandler {
                 } catch (_: Exception) {
                     // Ignore EOF when terminating the process
                 }
+            }
+        }
+    }
+
+    companion object {
+        /**
+         * Matches a log4j/logback-style level marker that some logging
+         * framework -- Forge/NeoForge's log4j config, vanilla MC's slf4j
+         * setup, modlauncher -- emits near the start of each line:
+         *
+         *   `[19:42:13] [main/INFO]: Initializing...`
+         *   `[Server thread/WARN]: Something deprecated`
+         *   `[FATAL]: Couldn't load X`
+         *
+         * The pre-bracket portion (optional thread / source / timestamp) is
+         * ignored; only the trailing `LEVEL]` is captured. When a line has no
+         * such prefix (stack-trace bodies, plain stdout) we fall back to a
+         * word-boundary substring scan below.
+         */
+        internal val LEVEL_PREFIX_RE: Regex =
+            Regex("""\[(?:[^\]]*?[/ ])?(INFO|WARN|WARNING|ERROR|FATAL|SEVERE|DEBUG|TRACE)\]""")
+
+        /**
+         * Fallback for log lines without a structured prefix -- typically
+         * stack traces (`at java.lang...`), JVM diagnostic spam, or
+         * unframed game-side prints. `\b` anchors fix the prior bug where
+         * `text.contains("WARN")` matched "no warnings" / `text.contains("ERROR")`
+         * matched "errorless".
+         *
+         * The `\w*Exception\b` branch matches any throwable class name
+         * ending in `Exception` (e.g. `NullPointerException`, `IOException`),
+         * because plain `\bException\b` won't fire inside CamelCase --
+         * `r` and `E` are both word chars so no boundary sits between
+         * them. The suffix anchor stays restrictive enough that
+         * `ExceptionLess`-style text doesn't false-positive (no word
+         * boundary after the trailing `n`).
+         */
+        internal val FALLBACK_ERROR_RE: Regex =
+            Regex("""\b(?:ERROR|FATAL|SEVERE|Caused\s+by)\b|\w*Exception\b""", RegexOption.IGNORE_CASE)
+
+        internal val FALLBACK_WARN_RE: Regex =
+            Regex("""\b(?:WARN|WARNING|Deprecated)\b""", RegexOption.IGNORE_CASE)
+
+        /**
+         * Stream type ERROR (stderr) always wins as ERROR -- log4j configs
+         * occasionally route INFO lines to stderr by mistake, but treating
+         * everything on stderr as at-least-ERROR matches what the user
+         * actually wants surfaced in the console pane.
+         *
+         * Otherwise: structured prefix wins; then word-boundary substring;
+         * default INFO.
+         */
+        internal fun classify(text: String, streamType: LauncherLogType): LauncherLogType {
+            if (streamType == LauncherLogType.ERROR) return LauncherLogType.ERROR
+
+            val prefixed = LEVEL_PREFIX_RE.find(text)?.groupValues?.get(1)?.let { lvl ->
+                when (lvl.uppercase()) {
+                    "FATAL", "SEVERE", "ERROR" -> LauncherLogType.ERROR
+                    "WARN", "WARNING"          -> LauncherLogType.WARN
+                    else                        -> LauncherLogType.INFO
+                }
+            }
+            if (prefixed != null) return prefixed
+
+            return when {
+                FALLBACK_ERROR_RE.containsMatchIn(text) -> LauncherLogType.ERROR
+                FALLBACK_WARN_RE.containsMatchIn(text)  -> LauncherLogType.WARN
+                else                                    -> LauncherLogType.INFO
             }
         }
     }

@@ -1,8 +1,10 @@
-package hivens.launcher
+package hivens.launcher.network
 
 import hivens.core.security.SslBypassEntry
-import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.encodeToString
+import hivens.launcher.SettingsService
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
@@ -17,8 +19,8 @@ import java.time.Instant
  * call until process exit) with a list of [SslBypassEntry] each
  * carrying its own expiry. Practical effect: accepting a one-off cert
  * outage on `smartycraft.ru` no longer silently weakens TLS for
- * unrelated hosts, and stale acceptances stop applying after the user-
- * set expiry instead of surviving forever in process memory.
+ * unrelated hosts, and stale acceptances stop applying after
+ * the user-set expiry instead of surviving forever in process memory.
  *
  * Persistence: when [initialize] is called with a path, all grants /
  * revokes write the current state to that JSON file. On launcher
@@ -27,7 +29,7 @@ import java.time.Instant
  * re-arm itself. If [initialize] is never called (test mode), the state
  * is in-memory only.
  *
- * Thread-safety: all public methods synchronise on a shared lock. The
+ * Thread-safety: all public methods synchronize on a shared lock. The
  * surface is small (4 methods) and contention is rare (UI accept,
  * occasional `bypassFor` check on each HTTP call) so a single lock is
  * the right shape.
@@ -49,6 +51,26 @@ object NetworkState {
     private var persistenceFile: Path? = null
 
     /**
+     * Push-side view of [bypasses]. Emits a fresh snapshot after every
+     * grant / revoke / load so UI callers can `collectAsState()` instead
+     * of polling `bypassFor(host)` on a 200ms timer (the prior
+     * `produceState { while(true) … delay(200ms) }` pattern in
+     * `AppLayout`/`DashboardScreen` -- five recompositions per second
+     * for state that mutates on the scale of minutes-to-days).
+     *
+     * Time-based expiry is not auto-ticked here: a 30-day bypass entry
+     * stays in the list until process restart or explicit revoke. UI is
+     * about "did the user just accept / revoke" -- the polling never
+     * meaningfully observed expiry crossings either.
+     */
+    private val _bypassesState = MutableStateFlow<List<SslBypassEntry>>(emptyList())
+    val bypassesState: StateFlow<List<SslBypassEntry>> = _bypassesState.asStateFlow()
+
+    private fun publishBypasses() {
+        _bypassesState.value = bypasses.toList()
+    }
+
+    /**
      * User opt-in: skip the direct-channel attempt and route every smartycraft
      * request through the SOCKS5 proxy from the first call. For users in
      * censored regions / corporate firewalls where direct connections are
@@ -60,15 +82,23 @@ object NetworkState {
      * persistence -- the UI restores the saved value on each launch and calls
      * [setForceProxyMode] to re-arm.
      */
-    @Volatile
-    private var forceProxy: Boolean = false
+    private val _forceProxyState = MutableStateFlow(false)
+
+    /**
+     * Push-side view of [forceProxyMode]. Emits on every [setForceProxyMode]
+     * call so UI sites that want to react to a toggle change (e.g. retry
+     * `CompactNewsFeed` after the user flips proxy mode and the upstream
+     * becomes reachable again) can `collectAsState()` instead of capturing
+     * the value once.
+     */
+    val forceProxyState: StateFlow<Boolean> = _forceProxyState.asStateFlow()
 
     /** True when the user has opted into proxy-only mode. */
-    fun forceProxyMode(): Boolean = forceProxy
+    fun forceProxyMode(): Boolean = _forceProxyState.value
 
     /** Set the force-proxy toggle. Settings UI calls this on toggle change. */
     fun setForceProxyMode(value: Boolean) {
-        forceProxy = value
+        _forceProxyState.value = value
         log.info("Force proxy mode: {}", if (value) "ENABLED -- skipping direct attempt" else "disabled (default)")
     }
 
@@ -83,6 +113,7 @@ object NetworkState {
             persistenceFile = file
             bypasses.clear()
             load()
+            publishBypasses()
         }
     }
 
@@ -103,6 +134,7 @@ object NetworkState {
             bypasses.removeAll { it.host == host }
             bypasses.add(SslBypassEntry(host, until.toString()))
             save()
+            publishBypasses()
         }
         log.info("SSL bypass granted for {} until {}", host, until)
     }
@@ -111,7 +143,10 @@ object NetworkState {
     fun revokeBypass(host: String) {
         synchronized(lock) {
             val removed = bypasses.removeAll { it.host == host }
-            if (removed) save()
+            if (removed) {
+                save()
+                publishBypasses()
+            }
         }
     }
 
@@ -127,6 +162,7 @@ object NetworkState {
         synchronized(lock) {
             bypasses.clear()
             persistenceFile = null
+            publishBypasses()
         }
     }
 

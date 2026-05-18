@@ -8,6 +8,7 @@ import hivens.core.data.FileManifest
 import hivens.core.data.SessionData
 import hivens.core.util.ZipUtils
 import hivens.core.util.retryWithBackoff
+import hivens.launcher.util.ClientRootDirs
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -41,12 +42,6 @@ class FileDownloadService(
     companion object {
         private val logger = LoggerFactory.getLogger(FileDownloadService::class.java)
 
-        // Directories that cannot be "trimmed" during path normalization
-        private val ROOT_DIRS = setOf(
-            "mods", "config", "bin", "assets", "libraries", "resources",
-            "saves", "resourcepacks", "shaderpacks", "natives"
-        )
-
         private const val INDEX_FILENAME = ".extra_unpacked_index.json"
 
         private val indexJson = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
@@ -59,7 +54,8 @@ class FileDownloadService(
         extraCheckSum: String?,
         ignoredFiles: Set<String>?,
         messageUI: ((String) -> Unit)?,
-        progressUI: ((Int, Int, Long, Long, String) -> Unit)?
+        progressUI: ((Int, Int, Long, Long, String) -> Unit)?,
+        verifyUI: ((Int, Int) -> Unit)?,
     ) = withContext(Dispatchers.IO) {
         val manifest = session.fileManifest ?: throw IOException("File manifest is empty!")
         Files.createDirectories(targetDir)
@@ -129,7 +125,7 @@ class FileDownloadService(
         }
 
         // 3. Downloading
-        downloadMissingFiles(targetDir, filesMap, messageUI, progressUI)
+        downloadMissingFiles(targetDir, filesMap, messageUI, progressUI, verifyUI)
 
         // 4. Processing Extra.zip
         processExtraZip(targetDir, filesMap, extraCheckSum, messageUI)
@@ -175,15 +171,35 @@ class FileDownloadService(
         baseDir: Path,
         files: Map<String, FileData>,
         messageUI: ((String) -> Unit)?,
-        progressUI: ((Int, Int, Long, Long, String) -> Unit)?
+        progressUI: ((Int, Int, Long, Long, String) -> Unit)?,
+        verifyUI: ((Int, Int) -> Unit)?,
     ) {
         // STEP 1: Checking hashes
+        //
+        // MD5-walking a 1000-file modpack takes 5-30 seconds depending on
+        // disk speed. Emitting [verifyUI] every 25 files (or roughly once per
+        // 100ms on slow disks) gives the UI's progress bar something to
+        // advance against -- otherwise the user sees "Sync... 20%" silent
+        // for the entire integrity walk and assumes the launcher hung.
         messageUI?.invoke("Checking file integrity...")
+        val totalFiles = files.size
+        verifyUI?.invoke(0, totalFiles)
 
-        // Heavy operation (reading files from disk)
-        val filesToDownload = files.filter { (path, data) ->
-            val cleanPath = normalizePath(path)
-            isFileMissingOrChanged(baseDir.resolve(cleanPath), data.md5, cleanPath)
+        val filesToDownload = LinkedHashMap<String, FileData>()
+        var checked = 0
+        for ((rawPath, data) in files) {
+            val cleanPath = normalizePath(rawPath)
+            if (isFileMissingOrChanged(baseDir.resolve(cleanPath), data.md5, cleanPath)) {
+                filesToDownload[rawPath] = data
+            }
+            checked++
+            // Coarse-grained progress: avoid one callback per file on a
+            // 5000-file pack (would churn Compose state at thousands of
+            // updates per second). 25 is fine-enough on modern SSDs and
+            // coarse-enough on slow HDDs.
+            if (checked % 25 == 0 || checked == totalFiles) {
+                verifyUI?.invoke(checked, totalFiles)
+            }
         }
 
         val totalFilesCount = filesToDownload.size
@@ -206,8 +222,13 @@ class FileDownloadService(
         val startTime = System.currentTimeMillis()
 
         coroutineScope {
-            // Ticker for UI
-            val monitorJob = launch(Dispatchers.Main) {
+            // Ticker for progress callbacks. Inherits the parent dispatcher
+            // (Dispatchers.IO from processSession's withContext) instead of
+            // hopping to Main, so this works in headless contexts (puppet
+            // mode, integration tests) where Dispatchers.Main isn't wired.
+            // progressUI lambdas marshal themselves to the right thread if
+            // they need to.
+            val monitorJob = launch {
                 while (isActive) {
                     val currentBytes = downloadedBytesGlobal.get()
                     val currentFiles = currentFileCounter.get()
@@ -421,7 +442,7 @@ class FileDownloadService(
 
     private fun isModsJar(relativePath: String): Boolean {
         val lower = relativePath.lowercase().replace('\\', '/')
-        return lower.endsWith(".jar") && (lower == "mods" || lower.contains("mods/"))
+        return lower.endsWith(".jar") && lower.contains("mods/")
     }
 
     /**
@@ -541,11 +562,10 @@ class FileDownloadService(
         val parts = rawPath.split("/")
         if (parts.size < 2) return rawPath
 
-        // If the first part of the path looks like a standard folder, leave it as is
+        // First segment is a known root dir -> leave as-is. Otherwise the
+        // first segment is a server-name prefix to strip.
         val root = parts[0]
-        if (ROOT_DIRS.any { root.startsWith(it) }) return rawPath
-
-        // Otherwise, cut off the first folder (this is the name of the server/build)
+        if (ClientRootDirs.isKnown(root)) return rawPath
         return rawPath.substring(root.length + 1)
     }
 

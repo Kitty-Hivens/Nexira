@@ -44,6 +44,7 @@ import hivens.ui.utils.GameConsoleService
 import hivens.ui.utils.LogEntry
 import hivens.ui.utils.LogType
 import kotlinx.coroutines.launch
+import org.koin.compose.koinInject
 import java.awt.datatransfer.StringSelection
 
 // ── Keyword highlight rules ──────────────────────────────────────────────────
@@ -89,7 +90,6 @@ fun ConsoleWindow(isDarkTheme: Boolean, onClose: () -> Unit) {
         ) {
             Surface(modifier = Modifier.fillMaxSize(), color = bg) {
                 ConsoleContent(
-                    bg          = bg,
                     toolbarBg   = toolbarBg,
                     textColor   = textColor,
                     isDarkTheme = isDarkTheme
@@ -102,7 +102,6 @@ fun ConsoleWindow(isDarkTheme: Boolean, onClose: () -> Unit) {
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 private fun ConsoleContent(
-    bg: Color, // TODO: not used
     toolbarBg: Color,
     textColor: Color,
     isDarkTheme: Boolean
@@ -110,6 +109,7 @@ private fun ConsoleContent(
     val s = LocalStrings.current
     val clipboard = LocalClipboard.current
     val scope     = rememberCoroutineScope()
+    val gameConsole: GameConsoleService = koinInject()
 
     // ── State ──────────────────────────────────────────────────────────────
     var searchQuery  by remember { mutableStateOf("") }
@@ -121,8 +121,8 @@ private fun ConsoleContent(
     var filterWarn   by remember { mutableStateOf(true) }
     var filterError  by remember { mutableStateOf(true) }
 
-    val logsCopy = remember(GameConsoleService.logs.size, GameConsoleService.logs.lastOrNull()) {
-        GameConsoleService.logs.toList()
+    val logsCopy = remember(gameConsole.logs.size, gameConsole.logs.lastOrNull()) {
+        gameConsole.logs.toList()
     }
 
     // When regex mode is on, compile once per query change. An invalid pattern
@@ -184,14 +184,14 @@ private fun ConsoleContent(
     PuppetToggle("console.regexMode", regexMode)     { regexMode = it }
     PuppetField("console.search", searchQuery)       { searchQuery = it }
     PuppetClick("console.clearSearch", enabled = searchQuery.isNotEmpty()) { searchQuery = "" }
-    PuppetClick("console.saveToFile") { GameConsoleService.saveToFile() }
+    PuppetClick("console.saveToFile") { gameConsole.saveToFile() }
     PuppetClick("console.copyAll") {
         val text = logsCopy.joinToString("\n") { e ->
             if (e.type == LogType.DIVIDER) e.text else "[${e.timestamp}] ${e.text}"
         }
         scope.launch { clipboard.setClipEntry(ClipEntry(StringSelection(text))) }
     }
-    PuppetClick("console.clear") { GameConsoleService.clear() }
+    PuppetClick("console.clear") { gameConsole.clear() }
     PuppetClick("console.jumpToBottom", enabled = filtered.isNotEmpty()) {
         scope.launch { listState.scrollToItem(filtered.lastIndex) }
     }
@@ -260,7 +260,7 @@ private fun ConsoleContent(
                     }
 
                     // Save to file
-                    IconButton(onClick = { GameConsoleService.saveToFile() }) {
+                    IconButton(onClick = { gameConsole.saveToFile() }) {
                         Icon(Icons.Default.Save, s.consoleSaveToFile, tint = textColor.copy(alpha = 0.7f))
                     }
 
@@ -277,7 +277,7 @@ private fun ConsoleContent(
                     }
 
                     // Clear
-                    IconButton(onClick = { GameConsoleService.clear() }) {
+                    IconButton(onClick = { gameConsole.clear() }) {
                         Icon(Icons.Default.Delete, s.consoleClear, tint = textColor.copy(alpha = 0.7f))
                     }
                 }

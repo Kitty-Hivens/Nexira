@@ -19,12 +19,6 @@ enum class AppLocale(
     companion object {
         fun fromTag(tag: String): AppLocale =
             entries.firstOrNull { it.tag == tag } ?: RUSSIAN
-
-        /** Detect best match from the JVM default locale. */
-        fun detectSystem(): AppLocale {
-            val sysLanguage = System.getProperty("user.language") ?: return RUSSIAN
-            return entries.firstOrNull { it.tag == sysLanguage } ?: RUSSIAN
-        }
     }
 }
 
@@ -53,41 +47,24 @@ val LocalStrings: ProvidableCompositionLocal<AppStrings> =
  */
 
 // ============================================================================
-// Global singleton for non-Composable code (LauncherController, services, etc.)
+// LocaleProvider -- wrap the whole app with this to propagate locale
 // ============================================================================
-
-/**
- * Use `I18n.s` anywhere outside Compose to access translated strings.
- *
- *   GameConsoleService.append(I18n.s.stateAuth, LogType.INFO)
- */
-object I18n {
-    private var _locale: AppLocale = AppLocale.detectSystem()
-    private var _strings: AppStrings = stringsFor(_locale)
-
-    val s: AppStrings get() = _strings
-    val locale: AppLocale get() = _locale // TODO: unused
-
-    fun setLocale(locale: AppLocale) {
-        _locale = locale
-        _strings = stringsFor(locale)
-    }
-}
-
-// ============================================================================
-// LocaleProvider — wrap the whole app with this to propagate locale
-// ============================================================================
+//
+// `LocalStrings` (above) is the single source of truth for UI text. The B9
+// cleanup (2026-05-17) removed the prior `object I18n` mutable-global escape
+// hatch -- it had no thread-safety guarantees and was only needed because
+// LauncherController (now in `client-launcher`, pre-B1) read i18n outside
+// Compose. After B1 every consumer is @Composable; non-Composable lambdas
+// inside them use `rememberUpdatedState(LocalStrings.current)` to capture
+// a live snapshot. See `LaunchLogCollector` for the pattern.
 
 @Composable
 fun LocaleProvider(
     locale: AppLocale,
-    content: @Composable () -> Unit
+    content: @Composable () -> Unit,
 ) {
-    // Keep I18n global in sync with Compose state
-    SideEffect { I18n.setLocale(locale) }
-
     CompositionLocalProvider(
         LocalStrings provides stringsFor(locale),
-        content = content
+        content = content,
     )
 }

@@ -22,6 +22,11 @@ concurrency:
 env:
   JAVA_VERSION: '25'
   JAVA_DISTRIBUTION: 'jetbrains'
+  # Every setup-java step below uses `cache: 'gradle'` -- reuses
+  # ~/.gradle/caches + ~/.gradle/wrapper across runs (keyed on *.gradle*,
+  # gradle-wrapper.properties, gradle/libs.versions.toml). Saves 30-90s
+  # per OS per job depending on cache freshness; particularly noticeable
+  # on Windows runners where the Gradle distribution download is slow.
 
 jobs:
   # ─────────────────────────────────────────────────────────────────────────
@@ -135,18 +140,20 @@ jobs:
         with:
           distribution: ${{ env.JAVA_DISTRIBUTION }}
           java-version: ${{ env.JAVA_VERSION }}
+          cache: 'gradle'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run unit tests
-        run: ./gradlew :client-core:test :client-launcher:test --continue
+        run: ./gradlew :client-config:test :client-core:test :client-launcher:test --continue
 
       - name: Upload test reports
-        if: always()   # we publish it even if it falls, so we can see what’s broken
+        if: always()   # we publish it even if it falls, so we can see what's broken
         uses: actions/upload-artifact@v4
         with:
           name: test-reports-${{ matrix.os }}
           path: |
+            client-config/build/reports/tests/
             client-core/build/reports/tests/
             client-launcher/build/reports/tests/
 
@@ -219,6 +226,7 @@ jobs:
         with:
           distribution: ${{ env.JAVA_DISTRIBUTION }}
           java-version: ${{ env.JAVA_VERSION }}
+          cache: 'gradle'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -264,20 +272,42 @@ jobs:
         with:
           distribution: ${{ env.JAVA_DISTRIBUTION }}
           java-version: ${{ env.JAVA_VERSION }}
+          cache: 'gradle'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # appimagetool is the heaviest single download in the Linux build leg
-      # (~30 MB from a `continuous` release tag that doesn't change between
-      # most of our builds). Cache hit makes the assembly leg ~20s faster
-      # and survives upstream availability blips. Bump the key suffix when
-      # you want to force a refresh against a new continuous build.
+      # (~30 MB from a `continuous` release tag, republished whenever the
+      # upstream main branch rebuilds). Cache hit makes the assembly leg
+      # ~20s faster and survives upstream availability blips.
+      #
+      # Cache key tracks the upstream asset's `updated_at` from the GitHub
+      # API -- the timestamp ticks automatically when the continuous build
+      # republishes, so cache invalidates without manual rotation. Previous
+      # iteration used a calendar suffix (`-2026-05`) that someone had to
+      # remember to bump; missing the bump meant building against stale
+      # appimagetool until cache eviction caught up.
+      - name: Resolve appimagetool cache key from upstream
+        id: appimagetool-key
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Falls back to a date-bucketed key if the GH API hiccups so the
+          # build proceeds (worst case: cache miss + redownload for that run).
+          updated=$(gh api repos/AppImage/appimagetool/releases/tags/continuous \
+            --jq '.assets[] | select(.name=="appimagetool-x86_64.AppImage") | .updated_at' 2>/dev/null \
+            | tr -d ':-T' || true)
+          if [ -z "$updated" ]; then
+            updated="fallback-$(date +%Y%m%d)"
+          fi
+          echo "key=appimagetool-continuous-x86_64-${updated}" >> "$GITHUB_OUTPUT"
+
       - name: Cache appimagetool
         id: cache-appimagetool
         uses: actions/cache@v4
         with:
           path: appimagetool
-          key: appimagetool-continuous-x86_64-2026-05
+          key: ${{ steps.appimagetool-key.outputs.key }}
 
       - name: Install AppImage tools
         run: |
@@ -348,6 +378,7 @@ jobs:
         with:
           distribution: ${{ env.JAVA_DISTRIBUTION }}
           java-version: ${{ env.JAVA_VERSION }}
+          cache: 'gradle'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -465,5 +496,12 @@ jobs:
           body: ${{ steps.body.outputs.body }}
           files: dist/*
           draft: false
-          generate_release_notes: false
+          # Appends GitHub's auto-generated "What's Changed" section (PR list
+          # since the previous tag) BELOW our curated body. Additive, not
+          # replacement -- the CHANGELOG extraction in the body still wins
+          # for highlights. Fallback for when someone forgets the CHANGELOG
+          # entry and the extracted body falls back to the "No changelog
+          # entry for v${VERSION}" placeholder: at least the user gets the
+          # raw merged-PR list instead of an empty release page.
+          generate_release_notes: true
           prerelease: ${{ contains(needs.changelog.outputs.version, '-') }}

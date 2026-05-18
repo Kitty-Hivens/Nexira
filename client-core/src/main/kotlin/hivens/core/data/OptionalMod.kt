@@ -8,18 +8,18 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 data class OptionalMod(
-    var id: String = "",
-    var name: String = "",
-    var description: String? = null,
-    var category: String? = null,
-    var infoFile: String? = null,
-    var jars: List<String> = emptyList(),
-    var excludings: List<String> = emptyList(),
-    var incompatibleIds: List<String> = emptyList(),
+    val id: String = "",
+    val name: String = "",
+    val description: String? = null,
+    val category: String? = null,
+    val infoFile: String? = null,
+    val jars: List<String> = emptyList(),
+    val excludings: List<String> = emptyList(),
+    val incompatibleIds: List<String> = emptyList(),
     @SerialName("selected")
     private val _isSelected: Boolean? = null,
     @SerialName("default")
-    private val _isDefault: Boolean? = null
+    private val _isDefault: Boolean? = null,
 ) {
     val isDefault: Boolean
         get() = _isSelected ?: _isDefault ?: false

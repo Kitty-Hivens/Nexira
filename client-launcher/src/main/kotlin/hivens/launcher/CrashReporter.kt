@@ -14,20 +14,26 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import javax.swing.JOptionPane
 
-object CrashReporter {
-
-    private val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH-mm-ss")
-        .withZone(ZoneId.systemDefault())
-    private val entryTimeFmt = DateTimeFormatter.ofPattern("HH:mm:ss.SSS")
-        .withZone(ZoneId.systemDefault())
-
-    /**
-     * Resolved at process start by [hivens.ui.MainKt]. Default to the system-derived
-     * paths so a crash before init still lands in a sensible location.
-     */
-    @Volatile
-    var paths: PlatformPaths = PlatformPaths.system()
-
+/**
+ * Builds and persists crash reports, and surfaces the post-crash dialog
+ * that lets the user open the report in their file manager, copy it,
+ * or pre-fill a GitHub Issue with it.
+ *
+ * Constructor-injected [paths] (rather than a mutable static field
+ * resolved from `PlatformPaths.system()`) so all the other Koin-wired
+ * components and this one share one `PlatformPaths` instance --
+ * a mid-session migration via [hivens.launcher.platform.DataDirMover] would
+ * otherwise leave crash reports landing in the old directory while
+ * everything else writes to the new one.
+ *
+ * The default uncaught-exception handler in `Main.kt` constructs an
+ * instance directly because it runs before Koin starts; the same type
+ * is also registered as a Koin singleton so future components can
+ * inject it through DI.
+ */
+class CrashReporter(
+    private val paths: PlatformPaths,
+) {
     data class CrashReport(
         val timestamp: String,
         val version: String,
@@ -40,7 +46,7 @@ object CrashReporter {
         /** Snapshot of [ActionRing] at crash time, oldest-first. */
         val actions: List<ActionRing.Entry>,
         val thread: String,
-        val stackTrace: String
+        val stackTrace: String,
     )
 
     fun generate(throwable: Throwable, thread: Thread): CrashReport {
@@ -56,7 +62,7 @@ object CrashReporter {
             maxMemoryMb = rt.maxMemory() / 1_000_000,
             actions = ActionRing.snapshot(),
             thread = thread.name,
-            stackTrace = throwable.stackTraceToString()
+            stackTrace = throwable.stackTraceToString(),
         )
     }
 
@@ -64,7 +70,7 @@ object CrashReporter {
         val crashDir = paths.crashDir.toFile()
         crashDir.mkdirs()
 
-        val ts = formatter.format(Instant.parse(report.timestamp))
+        val ts = FILENAME_FMT.format(Instant.parse(report.timestamp))
         val file = File(crashDir, "crash-$ts.txt")
 
         file.writeText(buildString {
@@ -83,7 +89,7 @@ object CrashReporter {
                 appendLine("   (none recorded)")
             } else {
                 report.actions.forEach { entry ->
-                    appendLine("   [${entryTimeFmt.format(entry.timestamp)}] ${entry.text}")
+                    appendLine("   [${ENTRY_TIME_FMT.format(entry.timestamp)}] ${entry.text}")
                 }
             }
             appendLine()
@@ -98,10 +104,10 @@ object CrashReporter {
     fun showCrashDialog(report: CrashReport, reportFile: File) {
         val message = """
             Aura Launcher quit unexpectedly.
-            
+
             Report saved:
             ${reportFile.absolutePath}
-            
+
             Please send this file to the developers.
         """.trimIndent()
 
@@ -114,7 +120,7 @@ object CrashReporter {
             JOptionPane.ERROR_MESSAGE,
             null,
             options,
-            options[0]
+            options[0],
         )
 
         when (choice) {
@@ -122,8 +128,8 @@ object CrashReporter {
                 // Beacon "Report on GitHub": opens browser at a pre-filled new-Issue
                 // URL. Nothing leaves the user's machine until they click Submit on
                 // github.com -- the launcher itself never POSTs anything.
-                runCatching {
-                    if (Desktop.isDesktopSupported()) {
+                openOnDaemonThread("crash-report-browse") {
+                    if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
                         Desktop.getDesktop().browse(URI(IssueReporter.crashIssueUrl(report)))
                     }
                 }
@@ -133,10 +139,34 @@ object CrashReporter {
                 clipboard.setContents(StringSelection(reportFile.readText()), null)
             }
             2 -> {
-                if (Desktop.isDesktopSupported()) {
-                    Desktop.getDesktop().open(reportFile.parentFile)
+                openOnDaemonThread("crash-report-open-folder") {
+                    if (Desktop.isDesktopSupported()) {
+                        Desktop.getDesktop().open(reportFile.parentFile)
+                    }
                 }
             }
         }
+    }
+
+    /**
+     * Fire-and-forget native Desktop call on a daemon thread. `Desktop.open` /
+     * `Desktop.browse` can stall for seconds on Linux/Wayland when the
+     * `xdg-desktop-portal` D-Bus is wedged; running them on the calling
+     * thread (which here is AWT EDT, since this is invoked from
+     * `JOptionPane.showOptionDialog`'s choice handler) freezes the UI.
+     * Daemon = true so a hung native call doesn't pin the JVM at exit.
+     */
+    private inline fun openOnDaemonThread(name: String, crossinline body: () -> Unit) {
+        Thread({ runCatching { body() } }, name).apply {
+            isDaemon = true
+            start()
+        }
+    }
+
+    companion object {
+        private val FILENAME_FMT: DateTimeFormatter =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH-mm-ss").withZone(ZoneId.systemDefault())
+        private val ENTRY_TIME_FMT: DateTimeFormatter =
+            DateTimeFormatter.ofPattern("HH:mm:ss.SSS").withZone(ZoneId.systemDefault())
     }
 }

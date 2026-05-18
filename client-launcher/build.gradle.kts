@@ -10,10 +10,17 @@ dependencies {
     implementation(libs.commons.compress)
     implementation(libs.koin.core)
     implementation(libs.slf4j.api)
-    // No JNA here on purpose — Vault keyring + future native bindings use
-    // Project Panama (java.lang.foreign.*, JEP 454, finalized Java 22).
-    // dorkbox/SystemTray's JNA dependency (in client-ui) is the only
-    // remaining JNA user; that goes away when dorkbox-replace lands.
+    // MDCContext for tagging launch-flow coroutines with a stable launchId so
+    // a multi-launch log dump can be sliced per Play-click. Was a client-ui
+    // dependency until LauncherController moved here in B1 (sub-batch 11.3,
+    // 2026-05-17); the slf4j-MDC bridge needs to live with the producer.
+    implementation(libs.kotlinx.coroutines.slf4j)
+    // No JNA in client-launcher: Vault keyring and other native bindings here
+    // use Project Panama (java.lang.foreign.*, JEP 454, finalized Java 22).
+    // The remaining JNA presence in the project is in client-ui, transitively
+    // via filekit (Win32 IFileDialog + GTK fallback). dorkbox/SystemTray was
+    // dropped in 2.2.14 along with the dorkbox-specific JNA pin; what JNA we
+    // still ship is filekit's responsibility, not ours.
 
     // Ktor Client & Serialization
     implementation(libs.ktor.client.core)
@@ -32,60 +39,67 @@ dependencies {
     testImplementation(testFixtures(project(":client-core")))
 }
 
-tasks.test {
-    useJUnitPlatform {
-        // Dev / maintenance only — none of these belong in the regular
-        // unit-test set. `smoke` hits real smartycraft.ru;
-        // `live-keyring` hits the developer's Secret Service daemon
-        // (Linux); `live-windows-keyring` hits real Windows Credential
-        // Manager (Windows only).
-        excludeTags("smoke", "live-keyring", "live-windows-keyring")
-    }
-}
-
-// Local-only task for live keyring probe against the developer's Secret
-// Service daemon. Skipped automatically (via assumeTrue) when the daemon
-// isn't reachable; never wired into CI because GitHub-hosted runners
-// don't have a desktop session.
+// Tags that the regular `tasks.test` set must NEVER run. The dev/maintenance
+// probes attached to these tags hit real external systems (smartycraft.ru
+// for `smoke`, the developer's Secret Service daemon for `live-keyring`,
+// real Windows Credential Manager for `live-windows-keyring`) and need
+// explicit operator intent before they fire. Each entry corresponds to a
+// dedicated registering Test task below; adding a new live-probe should
+// add its tag here AND its registering call -- the registerLiveProbeTask
+// helper keeps that link visible.
 //
-// `--enable-native-access=ALL-UNNAMED` is mandatory for Project Panama
-// (java.lang.foreign.*) — without it Linker.nativeLinker().downcallHandle
-// throws IllegalCallerException on JDK 22+. The same flag is baked into
-// the AppImage AppRun via scripts/build-appimage.sh, so production runs
-// have it too.
-val liveKeyringTest by tasks.registering(Test::class) {
-    description = "Runs the LinuxLibsecretKeyringStorage live probe against the local Secret Service daemon."
-    group = "verification"
-    testClassesDirs = sourceSets.test.get().output.classesDirs
-    classpath = sourceSets.test.get().runtimeClasspath
-    useJUnitPlatform {
-        includeTags("live-keyring")
-    }
-    jvmArgs("--enable-native-access=ALL-UNNAMED")
-    outputs.upToDateWhen { false }
-    shouldRunAfter(tasks.test)
-}
+// Note: JUnit Jupiter tag expressions support `|`, `&`, `!` but NOT glob
+// wildcards. If the live-probe list grows large enough that the literal
+// enumeration becomes maintenance load, the right next step is to re-tag
+// every probe with a shared `live` tag (plus its specific subtag) so this
+// list collapses to `excludeTags("smoke", "live")` -- not worth doing
+// pre-emptively at two entries.
+val excludedTestTags = listOf("smoke", "live-keyring", "live-windows-keyring")
 
-// Same flag for the regular test task — Vault unit tests construct
-// LinuxLibsecretKeyringStorage even when isAvailable() ends up false,
-// and Panama symbol lookup happens at construction time.
 tasks.test {
+    useJUnitPlatform {
+        excludeTags(*excludedTestTags.toTypedArray())
+    }
+    // Vault unit tests construct LinuxLibsecretKeyringStorage even when
+    // isAvailable() ends up false, and Panama symbol lookup happens at
+    // construction time. Without this flag, Linker.nativeLinker().downcallHandle
+    // throws IllegalCallerException on JDK 22+. The same flag is baked into the
+    // AppImage AppRun via scripts/build-appimage.sh so production runs have it.
     jvmArgs("--enable-native-access=ALL-UNNAMED")
 }
 
-// Windows-only live probe against real Credential Manager via Panama
-// bindings to advapi32. Same opt-in shape as liveKeyringTest: skips
-// gracefully when not on Windows or when advapi32 isn't loadable.
-val liveWindowsKeyringTest by tasks.registering(Test::class) {
-    description = "Runs WindowsCredentialManagerKeyringStorage live probe against the local Credential Manager service."
-    group = "verification"
-    testClassesDirs = sourceSets.test.get().output.classesDirs
-    classpath = sourceSets.test.get().runtimeClasspath
-    useJUnitPlatform {
-        includeTags("live-windows-keyring")
+// Registers a live-probe Test task. All live probes share the same shape
+// (single tag include, Panama --enable-native-access, always-run output
+// policy, post-:test ordering); the helper exists to keep that shape in
+// one place. Probes themselves are skipped at the @BeforeAll level via
+// assumeTrue() when the required external resource is unavailable -- so
+// running on the wrong OS or without the daemon installed is a green skip,
+// not a failure.
+fun registerLiveProbeTask(taskName: String, tag: String, taskDescription: String): TaskProvider<Test> =
+    tasks.register<Test>(taskName) {
+        description = taskDescription
+        group = "verification"
+        testClassesDirs = sourceSets.test.get().output.classesDirs
+        classpath = sourceSets.test.get().runtimeClasspath
+        useJUnitPlatform {
+            includeTags(tag)
+        }
+        jvmArgs("--enable-native-access=ALL-UNNAMED")
+        outputs.upToDateWhen { false }
+        shouldRunAfter(tasks.test)
     }
-    jvmArgs("--enable-native-access=ALL-UNNAMED")
-    outputs.upToDateWhen { false }
-    shouldRunAfter(tasks.test)
-}
+
+@Suppress("unused") // Gradle task wiring -- accessed via `./gradlew liveKeyringTest`
+val liveKeyringTest: TaskProvider<Test> = registerLiveProbeTask(
+    taskName = "liveKeyringTest",
+    tag = "live-keyring",
+    taskDescription = "Runs the LinuxLibsecretKeyringStorage live probe against the local Secret Service daemon.",
+)
+
+@Suppress("unused") // Gradle task wiring -- accessed via `./gradlew liveWindowsKeyringTest`
+val liveWindowsKeyringTest: TaskProvider<Test> = registerLiveProbeTask(
+    taskName = "liveWindowsKeyringTest",
+    tag = "live-windows-keyring",
+    taskDescription = "Runs WindowsCredentialManagerKeyringStorage live probe against the local Credential Manager service.",
+)
 

@@ -44,24 +44,77 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # `expect_keyring`:
+        #   any  -- factory may pick the native backend or fall back to NoOp.
+        #           In container hosts without a running DBus session, the
+        #           libsecret probe fails internally and the launcher falls
+        #           back via isAvailable()=false; that's NoOp anyway in
+        #           practice, but the assertion stays loose because we don't
+        #           want false positives if a future CI image adds DBus.
+        #   noop -- factory MUST select NoOp (libsecret absent from the
+        #           image at all; LinuxLibsecretKeyringStorage construction
+        #           throws on SymbolLookup, runCatching swallows, NoOp wins).
+        #           Catches a regression where the construction-time crash
+        #           is no longer caught by the factory.
         include:
+          # X11 client libs (libXi / libXrender / libXtst / libXext /
+          # libXcursor / libXxf86vm) + xauth: see the same block in
+          # pr-portability.yml for the long rationale. Short version:
+          # `libawt_xawt.so` inside jlink's bundled JRE links to system
+          # X libs at runtime, minimal distro containers don't pull
+          # them in by default but real desktop installs do.
           - distro_name: Fedora-latest
             container: fedora:latest
+            expect_keyring: any
             install_cmd: |
               dnf install -y --setopt=install_weak_deps=False \
                 xorg-x11-server-Xvfb fuse-libs which findutils \
-                libsecret gh
+                libsecret gh \
+                libXi libXrender libXtst libXext libXcursor libXxf86vm \
+                fontconfig freetype mesa-libGL \
+                xorg-x11-xauth
           - distro_name: Arch-latest
             container: archlinux:latest
+            expect_keyring: any
+            # pacman -Syu (not -Sy): partial-upgrade trap -- newly-installed
+            # packages link against latest repo libs (xorg-server-xvfb vs.
+            # libnettle.so.9 most recently) while stale system libs in the
+            # container go unrefreshed, breaking Xvfb at runtime. -Syu is
+            # the canonical Arch container pattern.
+            # xorg-xkbcomp: Xvfb shells out to `xkbcomp` at startup to compile
+            # the keymap; xkeyboard-config provides only the keymap source.
+            # On Arch the binary is a separate package.
             install_cmd: |
-              pacman -Sy --noconfirm \
-                xorg-server-xvfb fuse2 which libsecret github-cli
+              pacman -Syu --noconfirm \
+                xorg-server-xvfb fuse2 which libsecret github-cli \
+                libxi libxrender libxtst libxext libxcursor libxxf86vm \
+                fontconfig freetype2 libglvnd \
+                xorg-xauth xkeyboard-config xorg-xkbcomp
           - distro_name: Debian-stable
             container: debian:stable
+            expect_keyring: any
             install_cmd: |
               apt-get update -qq
               apt-get install -y --no-install-recommends \
-                xvfb libfuse2 libsecret-1-0 gh
+                xvfb libfuse2 libsecret-1-0 gh \
+                libxi6 libxrender1 libxtst6 libxext6 libxcursor1 libxxf86vm1 \
+                libfontconfig1 libfreetype6 libgl1 \
+                xauth
+          - distro_name: Fedora-no-libsecret
+            container: fedora:latest
+            expect_keyring: noop
+            # Deliberately no libsecret -- exercises the keyring factory's
+            # construction-time-exception fallback path (LinuxLibsecret
+            # SymbolLookup throws on the missing .so, runCatching swallows,
+            # NoOp wins). A real-world minimal Fedora install ships no
+            # libsecret either, so this also covers "user on a freshly
+            # bootstrapped distro" not just "test scaffold quirk".
+            install_cmd: |
+              dnf install -y --setopt=install_weak_deps=False \
+                xorg-x11-server-Xvfb fuse-libs which findutils gh \
+                libXi libXrender libXtst libXext libXcursor libXxf86vm \
+                fontconfig freetype mesa-libGL \
+                xorg-x11-xauth
     container: ${{ matrix.container }}
     steps:
       - name: Install runtime deps for ${{ matrix.distro_name }}
@@ -123,10 +176,69 @@ jobs:
             exit 1
           fi
 
-      - name: Upload stdout on failure
+      - name: Verify launcher.log was written and clean
+        env:
+          AURA_DATA_DIR: /tmp/aura-data
+        run: |
+          # Until now the test asserted only the stdout marker. stdout buffering
+          # under xvfb-run + container terminations can make stdout assertions
+          # flaky; the disk-side launcher.log written by Pulse is the durable
+          # source of truth. Verify:
+          #   1. The log exists where PlatformPaths would put it (under
+          #      $AURA_DATA_DIR/logs/, since the env var overrides every
+          #      per-OS default). Missing -> logback never initialised ->
+          #      Pulse pipeline broken or path resolution failed.
+          #   2. The log is non-trivial in size. Empty file = appender opened
+          #      but never flushed before JVM died.
+          #   3. The log contains no FATAL / NoClassDefFoundError /
+          #      UnsatisfiedLinkError lines. Those are init-time class-load
+          #      failures that previously only surfaced through stdout greps.
+          LOG="$AURA_DATA_DIR/logs/launcher.log"
+          if [ ! -f "$LOG" ]; then
+            echo "::error title=Portability::launcher.log not found at $LOG -- Pulse logback init failed on ${{ matrix.distro_name }}"
+            ls -la "$AURA_DATA_DIR/" 2>/dev/null || true
+            exit 1
+          fi
+          LOG_SIZE=$(stat -c%s "$LOG" 2>/dev/null || echo 0)
+          if [ "$LOG_SIZE" -lt 100 ]; then
+            echo "::error title=Portability::launcher.log too small ($LOG_SIZE bytes) on ${{ matrix.distro_name }} -- logback opened the appender but never flushed"
+            cat "$LOG" || true
+            exit 1
+          fi
+          if grep -qE 'FATAL|NoClassDefFoundError|UnsatisfiedLinkError|java\.lang\.LinkageError' "$LOG"; then
+            echo "::error title=Portability::Init-time class-load failures in launcher.log on ${{ matrix.distro_name }}:"
+            grep -nE 'FATAL|NoClassDefFoundError|UnsatisfiedLinkError|java\.lang\.LinkageError' "$LOG" | head -20
+            exit 1
+          fi
+          echo "::notice title=Portability::launcher.log on ${{ matrix.distro_name }}: $LOG_SIZE bytes, no FATAL/Linkage/NoClassDef lines"
+
+      - name: Verify keyring fallback (no-libsecret matrix entry only)
+        if: matrix.expect_keyring == 'noop'
+        env:
+          AURA_DATA_DIR: /tmp/aura-data
+        run: |
+          # KeyringStorageFactory logs the chosen backend at INFO level on
+          # startup. Without libsecret on the host, the construction call
+          # for LinuxLibsecretKeyringStorage throws on SymbolLookup; the
+          # factory's runCatching swallows and selects NoOpKeyringStorage.
+          # If a future refactor stops catching the construction-time
+          # exception, the launcher would crash before reaching this log;
+          # absence of "Keyring storage: NoOp" is the failure signal.
+          LOG="$AURA_DATA_DIR/logs/launcher.log"
+          if grep -q "Keyring storage: NoOp" "$LOG"; then
+            echo "::notice title=Portability::Keyring factory correctly fell back to NoOp on ${{ matrix.distro_name }}"
+          else
+            echo "::error title=Portability::Expected 'Keyring storage: NoOp' on ${{ matrix.distro_name }} (libsecret absent) -- factory fallback regressed or did not log"
+            grep -i 'keyring' "$LOG" | head -20 || echo "(no keyring lines in log)"
+            exit 1
+          fi
+
+      - name: Upload stdout and log on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: portability-stdout-${{ matrix.distro_name }}
-          path: /tmp/aura.stdout
+          path: |
+            /tmp/aura.stdout
+            /tmp/aura-data/logs/
           retention-days: 7

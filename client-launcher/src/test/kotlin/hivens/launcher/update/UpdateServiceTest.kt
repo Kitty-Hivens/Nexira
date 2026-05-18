@@ -215,6 +215,28 @@ class UpdateServiceTest {
     }
 
     @Test
+    fun `compareVersions orders double-digit RCs naturally`() {
+        val svc = createService("{}")
+        // The documented lex-compare bug: rc10 < rc2 under string ordering.
+        // Natural-order tokenisation ranks them numerically so rc10 > rc2.
+        assertTrue(svc.compareVersions("1.3.0-rc10", "1.3.0-rc2") > 0)
+        assertTrue(svc.compareVersions("1.3.0-rc2",  "1.3.0-rc10") < 0)
+    }
+
+    @Test
+    fun `compareVersions natural order ranks alpha less than alpha1`() {
+        val svc = createService("{}")
+        // Token count differs ("alpha" vs "alpha"+"1"); shorter sorts first.
+        assertTrue(svc.compareVersions("1.3.0-alpha", "1.3.0-alpha1") < 0)
+    }
+
+    @Test
+    fun `compareVersions natural order handles beta20 above beta3`() {
+        val svc = createService("{}")
+        assertTrue(svc.compareVersions("1.3.0-beta20", "1.3.0-beta3") > 0)
+    }
+
+    @Test
     fun `compareVersions handles versions with different segment counts`() {
         val svc = createService("{}")
         // 1.3 vs 1.3.0 -- missing segments treated as 0
@@ -641,7 +663,7 @@ class UpdateServiceTest {
     // ═══════════════════════════════════════════════════════════════════════════
 
     @Test
-    fun `cleanupOldUpdates removes exe dmg and AppImage files`() {
+    fun `cleanupOldUpdates removes exe zip dmg and AppImage files`() {
         val tempDir = Files.createTempDirectory("cleanup-test")
         tempDir.toFile().deleteOnExit()
         val updatesDir = tempDir.resolve("updates")
@@ -649,6 +671,7 @@ class UpdateServiceTest {
 
         // Create test files
         Files.writeString(updatesDir.resolve("AuraLauncher-1.0.0-Setup.exe"), "fake")
+        Files.writeString(updatesDir.resolve("AuraLauncher-1.0.0-Windows-Portable.zip"), "fake")
         Files.writeString(updatesDir.resolve("AuraLauncher-1.0.0.dmg"), "fake")
         Files.writeString(updatesDir.resolve("AuraLauncher-1.0.0-x86_64.AppImage"), "fake")
         Files.writeString(updatesDir.resolve(".last_check"), "123456")   // should survive
@@ -663,6 +686,7 @@ class UpdateServiceTest {
         svc.cleanupOldUpdates()
 
         assertFalse(Files.exists(updatesDir.resolve("AuraLauncher-1.0.0-Setup.exe")))
+        assertFalse(Files.exists(updatesDir.resolve("AuraLauncher-1.0.0-Windows-Portable.zip")))
         assertFalse(Files.exists(updatesDir.resolve("AuraLauncher-1.0.0.dmg")))
         assertFalse(Files.exists(updatesDir.resolve("AuraLauncher-1.0.0-x86_64.AppImage")))
         assertTrue(Files.exists(updatesDir.resolve(".last_check")), ".last_check should survive")

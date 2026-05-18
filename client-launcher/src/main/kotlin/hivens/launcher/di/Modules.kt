@@ -1,11 +1,11 @@
 package hivens.launcher.di
 
-import hivens.config.Network
 import hivens.config.Protocol
 import hivens.config.Storage
 import hivens.core.api.AuthService
 import hivens.core.api.interfaces.IServerProtocol
 import hivens.launcher.network.ChannelRouter
+import hivens.launcher.network.NetworkState
 import hivens.launcher.network.ServerProtocolConfig
 import hivens.launcher.network.ServerProtocolConfigLoader
 import hivens.launcher.protocol.LauncherHashCache
@@ -20,6 +20,7 @@ import hivens.launcher.component.ClasspathProvider
 import hivens.launcher.component.EnvironmentPreparer
 import hivens.launcher.component.GameCommandBuilder
 import hivens.launcher.component.ProcessLogHandler
+import hivens.launcher.launch.LauncherController
 import hivens.launcher.platform.PlatformPaths
 import hivens.launcher.update.UpdateApplicators
 import hivens.launcher.update.UpdateService
@@ -55,7 +56,7 @@ val networkModule = module {
 
     // ── Smartycraft channel ───────────────────────────────────────────────────
     // SOCKS-proxied. Required for everything on `*.smartycraft.ru`. See the
-    // routing taxonomy in `hivens.config.Network`.
+    // routing taxonomy in [HttpClientProvider]'s KDoc.
 
     /**
      * Smartycraft secure client. SSL verification on, SOCKS proxy always on.
@@ -66,14 +67,24 @@ val networkModule = module {
     single<OkHttpClient> {
         val cfg: ServerProtocolConfig = get()
 
+        // Authenticator.setDefault is JVM-wide; SOCKS5 auth has no per-client
+        // hook (OkHttp delegates SOCKS connect to JDK SocksSocketImpl which
+        // only consults the global Authenticator). Scope the response so the
+        // creds never leak to a third-party HTTP/HTTPS proxy that an unrelated
+        // JVM caller might be talking to -- only this exact SOCKS host/port
+        // gets answered.
         java.net.Authenticator.setDefault(object : java.net.Authenticator() {
-            override fun getPasswordAuthentication(): java.net.PasswordAuthentication =
-                java.net.PasswordAuthentication(cfg.proxyUser, cfg.proxyPass.toCharArray())
+            override fun getPasswordAuthentication(): java.net.PasswordAuthentication? {
+                if (requestorType != RequestorType.PROXY) return null
+                if (requestingHost != cfg.proxyHost) return null
+                if (requestingPort != cfg.proxyPort) return null
+                return java.net.PasswordAuthentication(cfg.proxyUser, cfg.proxyPass.toCharArray())
+            }
         })
 
         OkHttpClient.Builder()
-            .connectTimeout(Network.TIMEOUT_CONNECT, TimeUnit.MILLISECONDS)
-            .readTimeout(Network.TIMEOUT_READ, TimeUnit.MILLISECONDS)
+            .connectTimeout(cfg.connectTimeoutMs, TimeUnit.MILLISECONDS)
+            .readTimeout(cfg.readTimeoutMs, TimeUnit.MILLISECONDS)
             .proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress(cfg.proxyHost, cfg.proxyPort)))
             .build()
     }
@@ -100,8 +111,8 @@ val networkModule = module {
         val (socketFactory, trustManager) = buildTrustAllSsl()
 
         OkHttpClient.Builder()
-            .connectTimeout(Network.TIMEOUT_CONNECT, TimeUnit.MILLISECONDS)
-            .readTimeout(Network.TIMEOUT_READ, TimeUnit.MILLISECONDS)
+            .connectTimeout(cfg.connectTimeoutMs, TimeUnit.MILLISECONDS)
+            .readTimeout(cfg.readTimeoutMs, TimeUnit.MILLISECONDS)
             .sslSocketFactory(socketFactory, trustManager)
             .hostnameVerifier { _, _ -> true }
             .proxy(Proxy(Proxy.Type.SOCKS, InetSocketAddress(cfg.proxyHost, cfg.proxyPort)))
@@ -117,36 +128,49 @@ val networkModule = module {
      * Direct-channel client. No proxy, no SSL bypass. Backs the
      * [HttpClientProvider] qualified `named("direct")`.
      *
-     * SSL bypass is intentionally not honoured here: the third-party CDNs
+     * SSL bypass is intentionally not honored here: the third-party CDNs
      * we hit on this channel have rock-solid TLS, and silently widening the
      * bypass to them just because the user accepted it for smartycraft.ru
      * would be a needless trust expansion.
      */
     single<OkHttpClient>(named("direct")) {
+        val cfg: ServerProtocolConfig = get()
         OkHttpClient.Builder()
-            .connectTimeout(Network.TIMEOUT_CONNECT, TimeUnit.MILLISECONDS)
-            .readTimeout(Network.TIMEOUT_READ, TimeUnit.MILLISECONDS)
+            .connectTimeout(cfg.connectTimeoutMs, TimeUnit.MILLISECONDS)
+            .readTimeout(cfg.readTimeoutMs, TimeUnit.MILLISECONDS)
             .build()
     }
 
     /**
      * Default (smartycraft) [HttpClientProvider] -- thin wrapper that resolves
-     * the correct proxied [HttpClient] on every request via
-     * [NetworkState.sslBypassEnabled].
+     * the correct channel + cert mode on every request.
      *
-     * Injected into all smartycraft.ru-bound repositories instead of [HttpClient]
-     * directly, so that SSL bypass takes effect immediately on the next network
-     * call without requiring Koin singleton recreation.
+     * Per-request decision (mirrors [ChannelRouter] for AuthService):
+     *   - SSL bypass active for the smartycraft host -> insecure (proxy + no TLS check)
+     *   - forceProxyMode toggle on -> secure proxy
+     *   - default -> direct (no proxy)
+     *
+     * Pre-fix the provider always returned a proxy-only client regardless of
+     * the user's force-proxy toggle, so `SkinManager` and `FileDownloadService`
+     * never honoured the setting -- the Settings switch only affected auth
+     * routing via ChannelRouter, while skin and client-file traffic stayed
+     * pinned to the SOCKS hop. Users whose network couldn't reach
+     * `proxy.smartycraft.ru:58613` saw login work (direct-first via
+     * ChannelRouter) but skins / news images / pack syncs fail silently.
+     * Now every smartycraft.ru request reads [NetworkState] freshly, so the
+     * Settings toggle takes effect on the next call without a relaunch.
      */
     single {
-        val secure   = buildHttpClient(get<OkHttpClient>(),                get())
+        val cfg: ServerProtocolConfig = get()
+        val direct   = buildHttpClient(get<OkHttpClient>(named("direct")),   get())
+        val secure   = buildHttpClient(get<OkHttpClient>(),                  get())
         val insecure = buildHttpClient(get<OkHttpClient>(named("insecure")), get())
         HttpClientProvider {
-            // Per-host SSL bypass with expiry (Vault #2). Default channel
-            // talks only to *.smartycraft.ru, so the single host check is
-            // sufficient -- direct-channel hosts (GitHub, BellSoft, Maven
-            // Central) have their own provider and never bypass.
-            if (NetworkState.bypassFor(Network.SSL_BYPASS_HOST)) insecure else secure
+            when {
+                NetworkState.bypassFor(cfg.sslBypassHost) -> insecure
+                NetworkState.forceProxyMode()             -> secure
+                else                                      -> direct
+            }
         }
     }
 
@@ -163,7 +187,7 @@ val networkModule = module {
     /**
      * Direct-channel [HttpClientProvider]. Inject this (`named("direct")`)
      * for any outbound call that does NOT need to tunnel through the
-     * SMARTYcraft proxy -- see routing notes in `hivens.config.Network`.
+     * SMARTYcraft proxy -- see routing notes in [HttpClientProvider].
      */
     single<HttpClientProvider>(named("direct")) {
         val direct = buildHttpClient(get<OkHttpClient>(named("direct")), get())
@@ -195,10 +219,11 @@ val networkModule = module {
     single<ChannelRouter>(named("insecure")) {
         // Insecure direct + insecure proxy. Used when user has accepted SSL
         // bypass for the host; fallback still works, just without TLS check.
+        val cfg: ServerProtocolConfig = get()
         val (socketFactory, trustManager) = buildTrustAllSsl()
         val insecureDirect = OkHttpClient.Builder()
-            .connectTimeout(Network.TIMEOUT_CONNECT, TimeUnit.MILLISECONDS)
-            .readTimeout(Network.TIMEOUT_READ, TimeUnit.MILLISECONDS)
+            .connectTimeout(cfg.connectTimeoutMs, TimeUnit.MILLISECONDS)
+            .readTimeout(cfg.readTimeoutMs, TimeUnit.MILLISECONDS)
             .sslSocketFactory(socketFactory, trustManager)
             .hostnameVerifier { _, _ -> true }
             .build()
@@ -257,6 +282,15 @@ val appModule = module {
      */
     single<java.nio.file.Path>(createdAtStart = true) { get<PlatformPaths>().dataDir }
 
+    /**
+     * Crash report generator + dialog presenter. Main.kt constructs its
+     * own instance pre-Koin for the uncaught-exception handler; this
+     * registration covers post-Koin consumers (none today, but the
+     * dependency contract makes it injectable for future Composables
+     * that want to trigger a manual report).
+     */
+    single { CrashReporter(get()) }
+
     // Managers and services
     //
     // IKeyringStorage chosen at startup via KeyringStorageFactory.system()
@@ -273,6 +307,42 @@ val appModule = module {
         val dataDir: java.nio.file.Path = get()
         SettingsService(get(), dataDir.resolve(Storage.SETTINGS_FILE))
     }
+
+    // Replays persisted user-experimental overrides (forceProxyMode,
+    // mimicVersionOverride) into their respective global state holders
+    // on Koin start. `createdAtStart = true` makes this run during
+    // `startKoin { modules(...) }` so the values are live before the
+    // first protocol call -- previously done via a `KoinJavaComponent`
+    // escape hatch in `Main.kt`.
+    single(createdAtStart = true) { SettingsRestoreHook(get()) }
+
+    /**
+     * Process-lifetime coroutine scope for fire-and-forget background work
+     * (tray-launch flow, AutoSync, `LauncherController.launch`). SupervisorJob
+     * so a single failed child doesn't take down the rest. Previously two
+     * separate scopes existed (`Main.applicationScope` + LauncherController's
+     * own); unified so the JVM shutdown hook installed by
+     * [AppCoroutineScopeHook] cancels the same scope every coroutine lives on.
+     */
+    single<kotlinx.coroutines.CoroutineScope>(createdAtStart = true) {
+        kotlinx.coroutines.CoroutineScope(
+            kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO
+        )
+    }
+
+    // Installs the shutdown hook that cancels the scope above. Separated
+    // from the scope's own factory so the factory stays a one-liner and
+    // the hook can be tested independently if needed.
+    single(createdAtStart = true) { AppCoroutineScopeHook(get()) }
+
+    /**
+     * Launch-flow orchestrator. Used to live in `client-ui/logic/` while
+     * it still depended on UI types (i18n strings, console service);
+     * after the B1 decoupling (sub-batches 11.1-11.2) it consumes only
+     * `client-core` interfaces + the shared coroutine scope, so it now
+     * sits on the correct side of the module layering.
+     */
+    singleOf(::LauncherController)
 
     single {
         val dataDir: java.nio.file.Path = get()

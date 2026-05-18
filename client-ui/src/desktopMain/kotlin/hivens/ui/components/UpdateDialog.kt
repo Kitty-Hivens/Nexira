@@ -25,6 +25,7 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.theme.CelestiaTheme
+import hivens.ui.utils.SystemActions
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import org.slf4j.LoggerFactory
@@ -58,12 +59,7 @@ fun UpdateDialog(
     // dialog is open; ids map to the buttons rendered below.
     PuppetScreen("UpdateDialog")
     PuppetClick("update.viewOnGithub", enabled = downloadState !is DownloadState.Downloading) {
-        runCatching {
-            val desktop = java.awt.Desktop.getDesktop()
-            if (desktop.isSupported(java.awt.Desktop.Action.BROWSE)) {
-                desktop.browse(java.net.URI(update.releasePageUrl))
-            }
-        }
+        SystemActions.openUrl(update.releasePageUrl)
     }
     PuppetClick("update.dismiss", enabled = !isBlocking && downloadState !is DownloadState.Downloading) {
         onDismiss()
@@ -248,14 +244,7 @@ fun UpdateDialog(
                     // primary install button on the right. Hidden during download so the
                     // user can't accidentally yank focus mid-progress.
                     if (downloadState !is DownloadState.Downloading) {
-                        TextButton(onClick = {
-                            runCatching {
-                                val desktop = java.awt.Desktop.getDesktop()
-                                if (desktop.isSupported(java.awt.Desktop.Action.BROWSE)) {
-                                    desktop.browse(java.net.URI(update.releasePageUrl))
-                                }
-                            }
-                        }) {
+                        TextButton(onClick = { SystemActions.openUrl(update.releasePageUrl) }) {
                             Icon(
                                 imageVector        = Icons.AutoMirrored.Filled.OpenInNew,
                                 contentDescription = null,

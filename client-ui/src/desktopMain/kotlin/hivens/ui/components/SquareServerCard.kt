@@ -49,9 +49,7 @@ import hivens.core.api.model.ServerProfile
 import hivens.launcher.AutoSyncService
 import hivens.launcher.platform.PlatformPaths
 import hivens.ui.debug.SkiaTracker
-import hivens.ui.easter.AprilFools
-import hivens.ui.easter.ChaosState
-import hivens.ui.easter.FloatingButton
+import hivens.ui.easter.LocalAprilFools
 import hivens.ui.effects.neonBorder
 import hivens.ui.effects.shimmerOverlay
 import hivens.ui.theme.CelestiaTheme
@@ -99,6 +97,7 @@ fun SquareServerCard(
 
     var serverIcon by remember { mutableStateOf<ImageBitmap?>(null) }
     val paths: PlatformPaths = koinInject()
+    val af = LocalAprilFools.current
 
     // Load icon from disk
     LaunchedEffect(profile) {
@@ -115,26 +114,28 @@ fun SquareServerCard(
     }
 
     // ── April Fools: register card as a chaos target ──────────────────────────
-    // The card is a Box, not a Button, so we register it manually as a FloatingButton.
-    // The engine can then yank it out of the grid and send it flying.
+    // The card is a Box, not a Button, so we acquire a tracker from the chaos
+    // lifecycle and let it decide whether to actually register with the engine.
+    // NoOp impl returns a stub tracker -- `originalVisible` is permanently
+    // true, mutators no-op -- so production builds never touch chaos state.
     val chaosId = "server_card_${profile.assetDir}"
-    val chaosBtn = remember(profile.assetDir) {
-        ChaosState.find(chaosId) ?: FloatingButton(
+    val tracker = remember(profile.assetDir) {
+        af.acquireCardTracker(
             id       = chaosId,
             label    = profile.title ?: profile.name,
             widthPx  = 200f,
             heightPx = 200f,
             onClick  = onSelect,
-        ).also { btn -> if (AprilFools.isActive()) ChaosState.register(btn) }
+        )
     }
 
-    // Keep onClick in sync (server list can refresh)
+    // Keep onClick in sync (server list can refresh).
     LaunchedEffect(onSelect) {
-        if (AprilFools.isActive()) chaosBtn.onClick = onSelect
+        tracker.setOnClick(onSelect)
     }
 
     DisposableEffect(profile.assetDir) {
-        onDispose { if (AprilFools.isActive()) ChaosState.unregister(chaosId) }
+        onDispose { tracker.release() }
     }
 
     val showActions = isHovered || isFocused
@@ -153,7 +154,7 @@ fun SquareServerCard(
 
     // When the chaos engine has taken control, the original card is invisible
     // and the clone lives in ChaosOverlay -- block all pointer events on the ghost.
-    val isChaosEscaped = AprilFools.isActive() && !chaosBtn.originalVisible
+    val isChaosEscaped = af.isActive() && !tracker.originalVisible
     val chaosBlocker: Modifier = if (isChaosEscaped) {
         Modifier.pointerInput(Unit) {
             awaitPointerEventScope {
@@ -192,9 +193,10 @@ fun SquareServerCard(
             }
             // Shimmer on hover (not when already glowing with neon)
             .shimmerOverlay(enabled = isHovered && !isSelected)
-            // Track position for chaos engine
+            // Track position for chaos engine. Tracker setter is a no-op
+            // in production builds (NoOp impl), so no `if active` guard.
             .onGloballyPositioned { coords ->
-                if (AprilFools.isActive()) chaosBtn.originPx = coords.positionInWindow()
+                tracker.setOrigin(coords.positionInWindow())
             }
             // Hide original when chaos engine has taken control
             .graphicsLayer {

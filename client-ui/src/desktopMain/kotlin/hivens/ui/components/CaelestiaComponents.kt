@@ -20,7 +20,7 @@ import hivens.ui.theme.CelestiaTheme
  * a light gray border is used in light theme, and dark gray in dark theme.
  */
 @Composable
-fun GlassCard( // TODO: translate to English!
+fun GlassCard(
     modifier: Modifier = Modifier,
     shape: Shape = MaterialTheme.shapes.medium,
     backgroundColor: Color = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
@@ -45,10 +45,10 @@ fun GlassCard( // TODO: translate to English!
 }
 
 /**
- * Кнопка Celestia.
+ * Celestia button.
  *
- * [glowing] = true включает пульсирующий неоновый эффект --
- * идеально для кнопки PLAY в состоянии Idle.
+ * [glowing] = true enables a pulsing neon halo -- meant for the PLAY
+ * button while it sits idle.
  */
 @Composable
 fun CelestiaButton(

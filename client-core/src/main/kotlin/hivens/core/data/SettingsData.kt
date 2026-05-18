@@ -4,7 +4,7 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class SettingsData(
-    var javaPath: String? = null,
+    val javaPath: String? = null,
     /**
      * Default heap size in MB used as a fallback when an InstanceProfile
      * doesn't specify its own. 6 GB is the saner-for-modded-MC baseline:
@@ -13,20 +13,20 @@ data class SettingsData(
      * at 75% of detected system RAM, so this default also gracefully
      * scales down on low-RAM systems.
      */
-    var memoryMB: Int = 6144,
-    var isDarkTheme: Boolean = true,
+    val memoryMB: Int = 6144,
+    val isDarkTheme: Boolean = true,
     /** Hide launcher window to tray after the user clicks Play. Off by
      *  default -- most users want the launcher to stay visible after
      *  launching the game (it's where they go back to switch servers,
      *  open console, etc.). Opt-in for users who specifically want the
      *  out-of-sight behavior. */
-    var closeAfterStart: Boolean = false,
-    var saveCredentials: Boolean = true,
-    var savedFileManifest: FileManifest? = null,
+    val closeAfterStart: Boolean = false,
+    val saveCredentials: Boolean = true,
+    val savedFileManifest: FileManifest? = null,
     /** BCP-47 language tag: "ru", "en", "de" */
-    var locale: String = "en",
+    val locale: String = "en",
     /** Offline Mode: skip authentication, use cached session */
-    var isOfflineMode: Boolean = false,
+    val isOfflineMode: Boolean = false,
 
     // ── Experimental features ─────────────────────────────────────────────────
     // Three knobs that opt the user into faster-but-less-stable update behavior.
@@ -36,11 +36,11 @@ data class SettingsData(
     // receive emergency updates promptly. Once the protocol stabilizes the
     // mandatory default should drop to OFF.
     /** Master switch for the entire "Experimental features" settings section. */
-    var experimentalFeaturesEnabled: Boolean = true,
+    val experimentalFeaturesEnabled: Boolean = true,
     /** Block startup when installed < `mandatory_min_version` from `meta/update-channel.json`. */
-    var mandatoryUpdatesEnabled: Boolean = true,
+    val mandatoryUpdatesEnabled: Boolean = true,
     /** Include GitHub prereleases (RC/beta) when picking the update target. */
-    var prereleaseChannelEnabled: Boolean = true,
+    val prereleaseChannelEnabled: Boolean = true,
     /**
      * Sync all installed server packs in the background on launcher startup.
      *
@@ -55,7 +55,7 @@ data class SettingsData(
      * servers; primarily a maintainer-grade convenience for users with many
      * servers installed who want fresh state without clicking each one.
      */
-    var autoSyncAllPacks: Boolean = false,
+    val autoSyncAllPacks: Boolean = false,
 
     /**
      * Reveals the visual JVM-args builder in the per-server constructor.
@@ -70,7 +70,7 @@ data class SettingsData(
      * Off by default because the feature is power-user-grade and the
      * free-text field is enough for users who already know what they want.
      */
-    var jvmBuilderEnabled: Boolean = false,
+    val jvmBuilderEnabled: Boolean = false,
 
     /**
      * Conduit Phase 2: skip the direct-channel attempt and route every
@@ -84,5 +84,19 @@ data class SettingsData(
      * Persisted here so the toggle survives launcher restart -- users in
      * those networks need to set this once, not every session.
      */
-    var forceProxyMode: Boolean = false,
+    val forceProxyMode: Boolean = false,
+
+    /**
+     * Optional override for the version string sent to upstream in the
+     * dashboard handshake, User-Agent, and the child JVM's
+     * `-Dminecraft.launcher.version`. Null / blank means use the
+     * built-in `Protocol.DEFAULT_MIMIC_LAUNCHER_VERSION`.
+     *
+     * Aimed at users who need to react to an upstream version pin faster
+     * than the Aura release cycle -- previously only reachable via the
+     * `-Dsmrt.mimic.version=X.Y.Z` JVM flag. Persisting here means the
+     * override survives restart instead of having to be re-passed on
+     * every launch.
+     */
+    val mimicVersionOverride: String? = null,
 )

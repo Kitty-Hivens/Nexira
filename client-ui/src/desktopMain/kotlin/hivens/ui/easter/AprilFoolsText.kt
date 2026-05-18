@@ -96,8 +96,4 @@ object AprilFoolsText {
             }
         }
     }
-
-    enum class GibberishMode {
-        LOREM, ZALGO, FAKE_VER, JARGON, REVERSED, SCRAMBLED
-    }
 }
