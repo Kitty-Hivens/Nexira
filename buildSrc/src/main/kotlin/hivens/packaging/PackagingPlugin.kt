@@ -140,5 +140,33 @@ class PackagingPlugin : Plugin<Project> {
                 mainJar.convention(composeReleaseUberJar.flatMap { it.archiveFile })
             }
         }
+
+        // DMG wrap -- macOS-only, consumes the .app bundle from
+        // customJpackageImage. Registered unconditionally so the task
+        // surface is consistent across hosts; the task body self-skips
+        // when not on macOS.
+        project.tasks.register<CustomDmgTask>("customDmg") {
+            group = "packaging"
+            description = "Wraps the macOS .app bundle from customJpackageImage into a DMG."
+
+            appName.convention(ext.appName)
+            appVersion.convention(ext.appVersion)
+            macPackageIdentifier.convention(ext.macosPackageIdentifier)
+            // macOS DMG-volume icon shares the .icns we set on the bundle.
+            iconFile.convention(ext.macosIcon)
+
+            // jpackage --type app-image on macOS lands the bundle at
+            // <outputDir>/<appName>.app. The provider chain resolves
+            // lazily and carries the implicit dependency on
+            // customJpackageImage.
+            appImage.convention(
+                ext.appName.flatMap { name ->
+                    customJpackageImage.flatMap { it.outputDir.dir("$name.app") }
+                }
+            )
+
+            javaHome.convention(resolvedJavaHome)
+            outputDir.convention(project.layout.buildDirectory.dir("customDmg"))
+        }
     }
 }
