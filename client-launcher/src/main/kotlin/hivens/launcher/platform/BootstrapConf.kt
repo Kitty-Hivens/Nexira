@@ -9,12 +9,19 @@ import java.nio.file.Paths
  * Flat key=value config that lives outside the data directory so the
  * launcher can find user-specific overrides before it knows where the
  * data directory is. Used by [PlatformPaths] to honour a user-chosen
- * data dir without requiring `AURA_DATA_DIR` on every launch, and by
+ * data dir without requiring `NEXIRA_DATA_DIR` on every launch, and by
  * [DataDirMover] to schedule pending moves that apply at next startup.
  *
- * Path: `<user.home>/.aura-launcher.conf`. Same flat location on every
+ * Path: `<user.home>/.nexira.conf`. Same flat location on every
  * platform -- debuggable by `cat` / Notepad, no XDG hunting, no
  * Preferences API quirks.
+ *
+ * Aura compatibility: when `.nexira.conf` does not exist but
+ * `.aura-launcher.conf` does, [read] transparently falls back to the
+ * legacy file so an Aura-era custom data-dir keeps working without
+ * any user action. The first [write] / [update] lands in the new
+ * file; the legacy is left in place so a downgrade to Aura doesn't
+ * lose the override.
  *
  * Recognized keys:
  *   - `data-dir`                -- absolute path of user-chosen data dir
@@ -42,12 +49,19 @@ object BootstrapConf {
     const val KEY_PENDING_TARGET = "data-dir-pending-target"
 
     /** Default location -- overridable in tests via [read] / [write] / [update] params. */
-    fun defaultPath(): Path = Paths.get(System.getProperty("user.home", "."), ".aura-launcher.conf")
+    fun defaultPath(): Path = Paths.get(System.getProperty("user.home", "."), ".nexira.conf")
+
+    /** Aura-era location read as a transparent fallback when the modern path is absent. */
+    private fun legacyDefaultPath(): Path = Paths.get(System.getProperty("user.home", "."), ".aura-launcher.conf")
 
     fun read(file: Path = defaultPath()): Map<String, String> {
-        if (!Files.exists(file)) return emptyMap()
+        val effective = when {
+            Files.exists(file) -> file
+            file == defaultPath() && Files.exists(legacyDefaultPath()) -> legacyDefaultPath()
+            else -> return emptyMap()
+        }
         return try {
-            Files.readAllLines(file)
+            Files.readAllLines(effective)
                 .mapNotNull { line ->
                     val trimmed = line.trim()
                     if (trimmed.isEmpty() || trimmed.startsWith("#")) return@mapNotNull null
@@ -57,7 +71,7 @@ object BootstrapConf {
                 }
                 .toMap()
         } catch (e: Exception) {
-            log.warn("Failed to read bootstrap conf {}: {}", file, e.message)
+            log.warn("Failed to read bootstrap conf {}: {}", effective, e.message)
             emptyMap()
         }
     }
