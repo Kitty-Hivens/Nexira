@@ -89,8 +89,6 @@ internal class MacOSKeychainStorage : IKeyringStorage {
         log.info("CoreFoundation not loadable: {}", it.message ?: it.javaClass.simpleName)
     }.getOrNull()
 
-    private val linker: Linker = Linker.nativeLinker()
-
     // ── SecItem* function handles ─────────────────────────────────────────
     private val secItemAddHandle: MethodHandle? = securityLookup?.downcall(
         "SecItemAdd",

@@ -28,7 +28,8 @@ class MacUpdateApplicator : IUpdateApplicator {
             // (spaces, quotes, dollars) cannot escape the bash quoting and
             // execute as a command. The "$VAR" form inside double quotes
             // still expands the variable but treats its content as literal.
-            scriptPath.toFile().writeText("""
+            scriptPath.toFile().writeText(
+                $$"""
                 #!/bin/bash
                 set -e
 
@@ -40,7 +41,7 @@ class MacUpdateApplicator : IUpdateApplicator {
 
                 # Mount DMG
                 echo "Mounting update image..."
-                hdiutil attach "${'$'}INSTALLER" -mountpoint /Volumes/AuraUpdate -nobrowse -quiet || exit 1
+                hdiutil attach "$INSTALLER" -mountpoint /Volumes/AuraUpdate -nobrowse -quiet || exit 1
 
                 if [ ! -d "/Volumes/AuraUpdate/AuraLauncher.app" ]; then
                     echo "Error: AuraLauncher.app not found in DMG"
@@ -50,24 +51,24 @@ class MacUpdateApplicator : IUpdateApplicator {
 
                 # Remove old version
                 echo "Removing old version..."
-                rm -rf "${'$'}BUNDLE" || true
+                rm -rf "$BUNDLE" || true
 
                 # Copy new version
                 echo "Installing new version..."
-                cp -R /Volumes/AuraUpdate/AuraLauncher.app "${'$'}TARGET/"
+                cp -R /Volumes/AuraUpdate/AuraLauncher.app "$TARGET/"
 
                 # Unmount DMG
                 echo "Cleaning up..."
                 hdiutil detach /Volumes/AuraUpdate -quiet
-                rm -f "${'$'}INSTALLER"
+                rm -f "$INSTALLER"
 
                 # Relaunch
                 echo "Launching updated version..."
                 sleep 1
-                open "${'$'}TARGET/AuraLauncher.app"
+                open "$TARGET/AuraLauncher.app"
 
                 # Cleanup script
-                rm -f "${'$'}SCRIPT"
+                rm -f "$SCRIPT"
             """.trimIndent())
 
             scriptPath.toFile().setExecutable(true)

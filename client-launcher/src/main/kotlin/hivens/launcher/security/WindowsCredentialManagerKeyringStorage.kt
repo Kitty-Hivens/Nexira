@@ -79,8 +79,6 @@ internal class WindowsCredentialManagerKeyringStorage : IKeyringStorage {
         log.info("Advapi32 not loadable on this system: {}", it.message ?: it.javaClass.simpleName)
     }.getOrNull()
 
-    private val linker: Linker = Linker.nativeLinker()
-
     /**
      * CREDENTIALW layout per Win SDK wincred.h. Field offsets (x86_64):
      *

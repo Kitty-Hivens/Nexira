@@ -45,8 +45,6 @@ import java.lang.management.ManagementFactory
 import java.text.SimpleDateFormat
 import java.util.*
 
-private val log = LoggerFactory.getLogger("AboutScreen")
-
 @Composable
 fun AboutScreen(onBack: () -> Unit) {
     val s = LocalStrings.current
@@ -86,10 +84,13 @@ fun AboutScreen(onBack: () -> Unit) {
         )
     }
 
-    PuppetScreen("About")
-    PuppetClick("about.back") { onBack() }
-    PuppetClick("about.checkUpdates", enabled = updateState is UpdateCheckState.Idle) {
-        updateState = UpdateCheckState.Checking // TODO: move to method
+    // Two call sites for the same flow: the puppet-routed
+    // `about.checkUpdates` action and the ChaosButton onClick further down.
+    // Local function captures `updateState`, `scope`, `updateService`, `s`
+    // from the enclosing composable so each call site shrinks to a
+    // one-liner.
+    fun triggerUpdateCheck() {
+        updateState = UpdateCheckState.Checking
         scope.launch {
             updateState = try {
                 val update = updateService.checkForUpdate(force = true)
@@ -99,6 +100,12 @@ fun AboutScreen(onBack: () -> Unit) {
                 UpdateCheckState.Error(e.message ?: s.updateErrorUnknown)
             }
         }
+    }
+
+    PuppetScreen("About")
+    PuppetClick("about.back") { onBack() }
+    PuppetClick("about.checkUpdates", enabled = updateState is UpdateCheckState.Idle) {
+        triggerUpdateCheck()
     }
     // Reset the check state back to Idle (works for UpToDate / Available / Error).
     PuppetClick("about.checkAgain", enabled = updateState !is UpdateCheckState.Idle &&
@@ -311,18 +318,7 @@ fun AboutScreen(onBack: () -> Unit) {
                                 af.ChaosButton(
                                     id      = "about_check_updates_btn",
                                     text    = s.aboutCheckUpdates,
-                                    onClick = {
-                                        updateState = UpdateCheckState.Checking // TODO: move to method
-                                        scope.launch {
-                                            updateState = try {
-                                                val update = updateService.checkForUpdate(force = true)
-                                                if (update != null) UpdateCheckState.Available(update)
-                                                else UpdateCheckState.UpToDate
-                                            } catch (e: Exception) {
-                                                UpdateCheckState.Error(e.message ?: s.updateErrorUnknown)
-                                            }
-                                        }
-                                    },
+                                    onClick = { triggerUpdateCheck() },
                                     modifier = Modifier.fillMaxWidth(),
                                     colors   = ButtonDefaults.buttonColors(
                                         containerColor = CelestiaTheme.colors.primary,

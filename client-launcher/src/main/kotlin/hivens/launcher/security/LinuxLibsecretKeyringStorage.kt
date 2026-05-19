@@ -112,8 +112,6 @@ internal class LinuxLibsecretKeyringStorage : IKeyringStorage {
         log.info("libsecret not loadable: {}", it.message ?: it.javaClass.simpleName)
     }.getOrNull()
 
-    private val linker: Linker = Linker.nativeLinker()
-
     /**
      * Pre-built downcall handles for the three libsecret entry points
      * we need. FunctionDescriptors lock in exactly two attribute pairs

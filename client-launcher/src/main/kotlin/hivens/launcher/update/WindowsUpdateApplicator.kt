@@ -26,7 +26,8 @@ class WindowsUpdateApplicator : IUpdateApplicator {
             // the script body, so any character a Windows Path may legitimately
             // contain (spaces, backticks, semicolons, etc.) cannot escape the
             // PowerShell quoting and execute as a command.
-            psScript.toFile().writeText("""
+            psScript.toFile().writeText(
+                $$"""
                 # Wait for launcher to exit
                 Start-Sleep -Seconds 2
 
@@ -35,23 +36,23 @@ class WindowsUpdateApplicator : IUpdateApplicator {
 
                 # Run installer silently (Inno Setup /SILENT flag)
                 Write-Host "Installing update..."
-                Start-Process -FilePath "${'$'}env:INSTALLER" -ArgumentList "/SILENT", "/NORESTART" -Wait
+                Start-Process -FilePath "$env:INSTALLER" -ArgumentList "/SILENT", "/NORESTART" -Wait
 
                 # Wait for installation
                 Start-Sleep -Seconds 3
 
                 # Launch new version
-                if (Test-Path "${'$'}env:LAUNCHER") {
+                if (Test-Path "$env:LAUNCHER") {
                     Write-Host "Launching updated launcher..."
-                    Start-Process "${'$'}env:LAUNCHER"
+                    Start-Process "$env:LAUNCHER"
                 } else {
-                    Write-Error "Launcher executable not found at ${'$'}env:LAUNCHER"
+                    Write-Error "Launcher executable not found at $env:LAUNCHER"
                 }
 
                 # Cleanup
                 Start-Sleep -Seconds 2
-                Remove-Item "${'$'}env:SCRIPT" -Force -ErrorAction SilentlyContinue
-                Remove-Item "${'$'}env:INSTALLER" -Force -ErrorAction SilentlyContinue
+                Remove-Item "$env:SCRIPT" -Force -ErrorAction SilentlyContinue
+                Remove-Item "$env:INSTALLER" -Force -ErrorAction SilentlyContinue
             """.trimIndent())
 
             logger.info("Scheduled Windows update: {}", installerPath)

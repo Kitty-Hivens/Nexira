@@ -21,15 +21,31 @@ exclude:
   # not a typo source worth catching.
   - name: KDocUnresolvedReference
   #
+  # Compose state delegated via `var x by remember { mutableStateOf(...) }`
+  # consistently trips this rule -- Qodana 2025.2's flow analysis does not
+  # connect the property-delegate setter (the `x = ...` line) to the
+  # corresponding getter calls in surrounding composables, so every state
+  # mutation in an event handler / coroutine / when-branch gets flagged
+  # even when the value is obviously read elsewhere in the same file
+  # (e.g. `if (!hiddenForCurrentSession) { hiddenForCurrentSession = true }`).
+  # The previous removal of this exclusion 2026-05-17 was premature -- the
+  # 2.2.16 release PR triggered 21 such false positives across 8 Compose
+  # files. The rule is genuinely useful for plain Kotlin code, but the
+  # signal-to-noise on Compose-heavy modules is wrong. If a per-site
+  # @Suppress at every flagged location surfaces in the diff during a
+  # refactor, that's the cleaner pattern; this blanket exclusion is the
+  # pragmatic floor.
+  - name: AssignedValueIsNeverRead
+  #
   # Historically also excluded: UnusedAssignment, UnusedSymbol,
-  # AssignedValueIsNeverRead, HasPlatformType. Removed 2026-05-17 -- they
-  # were originally muted because an older Qodana JVM Community release
-  # mis-flagged Compose composables and Kotlin DSL builder receivers as
-  # "unused". Current linter (2025.2) handles both cases correctly, so the
-  # blanket exclusion now hides real findings (e.g. it would have caught
-  # the `// TODO: NOT USED` regressions in AuthStatus 2026-05-15). If a
-  # specific composable still trips the inspection, suppress at the call
-  # site (@Suppress("UnusedSymbol")) rather than file-wide here.
+  # HasPlatformType. Removed 2026-05-17 -- they were muted because an
+  # older Qodana JVM Community release mis-flagged Compose composables
+  # and Kotlin DSL builder receivers as "unused". Current linter (2025.2)
+  # handles both cases correctly, so the blanket exclusion would now hide
+  # real findings (e.g. it would have caught the `// TODO: NOT USED`
+  # regressions in AuthStatus 2026-05-15). If a specific composable still
+  # trips one of those inspections, suppress at the call site
+  # (`@Suppress("UnusedSymbol")`) rather than file-wide here.
 
 projectJDK: "25" #(Applied in CI/CD pipeline -- must track gradle.properties / build.gradle.kts toolchain.)
 

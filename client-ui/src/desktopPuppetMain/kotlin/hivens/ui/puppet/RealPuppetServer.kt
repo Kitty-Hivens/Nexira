@@ -48,11 +48,17 @@ import org.slf4j.LoggerFactory
  * [java.util.concurrent.ConcurrentHashMap].
  *
  * Endpoints:
- *   * `GET  /screen`     -> { screen: String }
- *   * `GET  /elements`   -> { screen: String, elements: [PuppetElement] }
- *   * `POST /click`      <- { id: String }                  -> { ok: true } | 404
- *   * `POST /setField`   <- { id: String, value: String }   -> { ok: true } | 404
- *   * `POST /setToggle`  <- { id: String, value: Boolean }  -> { ok: true } | 404
+ *   * `GET  /screen`         -> { screen: String }
+ *   * `GET  /elements`       -> { screen: String, elements: [PuppetElement] }
+ *   * `POST /click`          <- { id: String }                  -> { ok: true } | 404
+ *   * `POST /setField`       <- { id: String, value: String }   -> { ok: true } | 404
+ *   * `POST /setToggle`      <- { id: String, value: Boolean }  -> { ok: true } | 404
+ *   * `GET  /diag/threads`   -> ThreadMXBean dump + locks + deadlocks
+ *   * `GET  /diag/jvm`       -> memory / GC / runtime / OS load
+ *   * `GET  /diag/actions`   -> ActionRing snapshot
+ *   * `GET  /diag/snapshot`  -> all of the above + UI snapshot in one round-trip
+ *
+ * The `/diag/...` family is documented in detail in [DiagRoutes.kt].
  *
  * **Concrete class, public no-arg constructor**: ServiceLoader requires
  * both. Singleton-by-convention via the [PuppetServerLoader.instance]
@@ -104,6 +110,11 @@ class RealPuppetServer : PuppetServerLifecycle {
                         }
                         replyResult(result)
                     }
+                    // Diagnostic surface. Deliberately registered last so the
+                    // UI-driving endpoints above stay grouped; they're the
+                    // common case, /diag/... is the "something is wrong, dump
+                    // everything" case.
+                    diagRoutes()
                 }
             }
             s.start(wait = false)

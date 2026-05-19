@@ -21,7 +21,7 @@ concurrency:
 
 env:
   JAVA_VERSION: '25'
-  JAVA_DISTRIBUTION: 'jetbrains'
+  JAVA_DISTRIBUTION: 'liberica'
   # Every setup-java step below uses `cache: 'gradle'` -- reuses
   # ~/.gradle/caches + ~/.gradle/wrapper across runs (keyed on *.gradle*,
   # gradle-wrapper.properties, gradle/libs.versions.toml). Saves 30-90s
@@ -232,7 +232,13 @@ jobs:
 
       - name: Build distributable
         shell: bash
-        run: ./gradlew :client-ui:createReleaseDistributable -PappVersion="$APP_VERSION"
+        # customJpackageImage produces the same app-image layout that
+        # createReleaseDistributable used to (AuraLauncher\bin\,
+        # AuraLauncher\lib\runtime\, AuraLauncher\lib\app\), now with
+        # the full jlink + jpackage flag surface from the
+        # aura.packaging convention plugin. Inno Setup's Source: path
+        # in setup.iss tracks the new output dir (B-3 commit).
+        run: ./gradlew :client-ui:customJpackageImage -PappVersion="$APP_VERSION"
 
       - name: Compile Inno Setup EXE
         shell: pwsh
@@ -245,7 +251,12 @@ jobs:
       - name: Create Portable ZIP
         shell: pwsh
         run: |
-          $src = "client-ui\build\compose\binaries\main-release\app"
+          # B-3 follow-up: source dir moves with the packaging swap.
+          # customJpackageImage produces AuraLauncher\ directly (no
+          # intermediate app\ layer like Compose Desktop did), so the
+          # AuraLauncher\bin\..., AuraLauncher\lib\runtime\... shape
+          # inside the zip stays identical from the user's perspective.
+          $src = "client-ui\build\customJpackageImage"
           Compress-Archive -Path "$src\*" `
             -DestinationPath "AuraLauncher-$env:APP_VERSION-Windows-Portable.zip"
 
@@ -322,8 +333,16 @@ jobs:
             sudo install -m 0755 appimagetool /usr/local/bin/appimagetool
           fi
 
-      - name: Build JAR
-        run: ./gradlew :client-ui:packageReleaseUberJarForCurrentOS -PappVersion="$APP_VERSION"
+      - name: Build JAR + emit packaging profile
+        # emitAppImageProfile writes the shell-sourceable flag set that
+        # build-appimage.sh below picks up via PACKAGING_PROFILE -- single
+        # source of truth between gradle (CustomRuntimeTask) and the
+        # AppImage path (jlink call). See PackagingExtension KDoc.
+        run: |
+          ./gradlew \
+            :client-ui:packageReleaseUberJarForCurrentOS \
+            :client-ui:emitAppImageProfile \
+            -PappVersion="$APP_VERSION"
 
       - name: Validate desktop entry
         run: desktop-file-validate resources/aura-launcher.desktop
@@ -383,11 +402,19 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build DMG
-        run: ./gradlew :client-ui:packageReleaseDmg -PappVersion="$APP_VERSION"
+        # customDmg wraps the .app bundle that customJpackageImage
+        # produces, into a DMG via `jpackage --type dmg --app-image`.
+        # Replaces Compose Desktop's packageReleaseDmg so the macOS
+        # leg benefits from the same jlink + jpackage flag set as
+        # Windows + Linux (--vm=server, --strip-debug,
+        # --include-locales=en,ru,de, etc.). customDmg dependsOn
+        # customJpackageImage transitively, so the single gradle
+        # invocation here pulls the whole chain.
+        run: ./gradlew :client-ui:customDmg -PappVersion="$APP_VERSION"
 
       - name: Rename DMG with architecture suffix
         run: |
-          mv client-ui/build/compose/binaries/main-release/dmg/*.dmg \
+          mv client-ui/build/customDmg/*.dmg \
              "AuraLauncher-$APP_VERSION-aarch64.dmg"
 
       - uses: actions/upload-artifact@v4

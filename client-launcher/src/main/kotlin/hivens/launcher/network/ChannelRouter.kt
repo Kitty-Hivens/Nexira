@@ -1,7 +1,6 @@
 package hivens.launcher.network
 
 import hivens.core.diag.ActionRing
-import hivens.launcher.network.NetworkState
 import io.ktor.client.HttpClient
 import org.slf4j.LoggerFactory
 import java.io.IOException
