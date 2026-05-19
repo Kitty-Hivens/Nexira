@@ -426,11 +426,11 @@ fun main() {
                 // stuck with no reachable UI. The scenario is:
                 //   - the user clicked the close button during the
                 //     INITIALIZING window (the close handler at the bottom
-                //     of this file uses canBeReady, not isSupported,
-                //      not isSupported, to avoid killing the launcher
-                //      mid-init). Same outcome -- window hidden, no tray
-                //      either. Without this restore the process keeps
-                //      running with no UI and the user has to kill it.
+                //     of this file uses canBeReady, not isSupported, to
+                //     avoid killing the launcher mid-init). Same outcome
+                //     -- window hidden, no tray either. Without this
+                //     restore the process keeps running with no UI and
+                //     the user has to kill it.
                 //   (Codex P1 from PR #131 -- the canBeReady-during-INIT
                 //   path needs this failure-path unhide.)
                 if (!TrayManager.isSupported && !isWindowVisible) {
@@ -536,11 +536,12 @@ fun main() {
                     // we'd have taken anyway (tray-hide if available, else exit).
                     af.requestCloseDialog {
                         if (TrayManager.canBeReady) {
-                            // canBeReady (not isSupported) so we don't kill the
-                            // launcher mid-init when dorkbox's GTK probe is
-                            // taking its time. If it ultimately fails, the user
-                            // can quit via tray (when it appears) or kill the
-                            // process -- strictly better than exiting on a close
+                            // canBeReady (not isSupported) so we don't kill
+                            // the launcher mid-init while the tray library
+                            // is still settling D-Bus / SNI handshake. If
+                            // it ultimately fails, the user can quit via
+                            // tray (when it appears) or kill the process --
+                            // strictly better than exiting on a close
                             // request the user clearly meant as "minimize".
                             isWindowVisible = false
                         } else {
