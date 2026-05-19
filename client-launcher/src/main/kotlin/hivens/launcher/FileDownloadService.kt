@@ -12,7 +12,6 @@ import hivens.launcher.util.ClientRootDirs
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
-import io.ktor.network.sockets.SocketTimeoutException
 import io.ktor.utils.io.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.CancellationException
@@ -23,6 +22,7 @@ import java.io.FileOutputStream
 import java.io.IOException
 import java.net.ConnectException
 import java.net.SocketException
+import java.net.SocketTimeoutException
 import java.net.URLEncoder
 import java.nio.file.Files
 import java.nio.file.Path
