@@ -3,24 +3,13 @@ package hivens.core.api
 import io.ktor.client.HttpClient
 
 /**
- * Delegates to the appropriate [HttpClient] on every request.
- * The selection logic is provided by the caller via [selector] lambda,
- * keeping this class free of any launcher-specific dependencies.
+ * Delegates to the appropriate [HttpClient] on every request. [selector]
+ * returns a fresh client per access so the SSL-bypass toggle takes effect
+ * on the next request without rebuilding the singleton.
  *
- * ── Per-channel registration ──────────────────────────────────────────────────
- *
- * `client-launcher/.../di/Modules.kt` registers two providers, one per outbound
- * routing channel (see consumers in `client-launcher/.../di/Modules.kt` for the full taxonomy):
- *
- *   ◆ default      -- Smartycraft channel: SOCKS-proxied, SSL-bypass-aware.
- *                    Inject for any call to `*.smartycraft.ru`.
- *
- *   ❖ named("direct") -- Direct channel: no proxy, strict TLS.
- *                       Inject for third-party CDNs (GitHub, BellSoft, Maven
- *                       Central). Stays online when the upstream proxy doesn't.
- *
- * The provider returns a *fresh* [current] on every access so the SSL-bypass
- * toggle takes effect on the next request without rebuilding the singleton.
+ * Two providers registered in `client-launcher/.../di/Modules.kt`:
+ *   - default          -- Smartycraft channel (SOCKS-proxied, SSL-bypass-aware)
+ *   - named("direct")  -- third-party CDNs (GitHub, BellSoft, Maven Central; no proxy, strict TLS)
  */
 class HttpClientProvider(private val selector: () -> HttpClient) {
     val current: HttpClient get() = selector()
