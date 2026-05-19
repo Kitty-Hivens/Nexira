@@ -225,7 +225,7 @@ class FileDownloadServiceTest {
         )
     }
 
-    // ── ZIP-structure scan for mods/*.jar (#169) ─────────────────────────
+    // ── ZIP-structure scan for mods/*.jar ───────────────────────────────────
 
     @Test
     fun `isFileMissingOrChanged returns true for corrupt mods jar even when MD5 matches`() {

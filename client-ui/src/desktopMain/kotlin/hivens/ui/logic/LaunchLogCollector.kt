@@ -21,14 +21,11 @@ import kotlinx.coroutines.flow.SharedFlow
  *
  * Strings come from [LocalStrings] (the Compose CompositionLocal) wrapped
  * in [rememberUpdatedState] so a runtime locale switch reaches the
- * (non-Composable) `collect` lambda without restarting the LaunchedEffect.
- * Pre-B9 this read a mutable global `I18n.s` which had no thread-safety
- * guarantees; the local-state seam keeps the semantics ("latest locale
- * wins at read time") without the global.
+ * (non-Composable) `collect` lambda without restarting the LaunchedEffect:
+ * latest locale wins at read time.
  *
- * Severity mapping mirrors what the controller used to do inline for
- * `ProcessOutput` -- `LauncherLogType` is the wire enum from
- * `client-core`, `LogType` is the UI enum the console renders.
+ * Severity mapping: `LauncherLogType` is the wire enum from `client-core`,
+ * `LogType` is the UI enum the console renders.
  */
 @Composable
 fun LaunchLogCollector(
@@ -72,11 +69,10 @@ fun LaunchLogCollector(
 }
 
 /**
- * Mirrors `localizeError` in `LaunchControlPanel`. Kept here as a private
+ * Mirrors `localizeError` in `LaunchControlPanel`. Kept as a private
  * helper rather than shared so the two consumers (status row + console
- * pane) stay independent -- one may want a shorter form than the other
- * in the future. Strings are passed in (not read from a global) so the
- * caller controls which locale snapshot is used.
+ * pane) can diverge independently. Strings are passed in (not read from
+ * a global) so the caller controls which locale snapshot is used.
  */
 private fun localizeError(error: LaunchError, s: AppStrings): String = when (error) {
     is LaunchError.ExitCode          -> s.stateExitCode(error.code)

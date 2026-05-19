@@ -15,17 +15,15 @@ import androidx.compose.ui.unit.IntSize
  * UI-side surface to the April Fools easter-egg subsystem. Always present in
  * every build; the real chaos implementation (`RealAprilFools`) lives in the
  * `desktopAprilFoolsMain/` source dir which is only added to the desktop
- * compilation when `-PauraAprilFools=true` is on the Gradle command line
- * (added in B3 sub-batch 12.2). Default production builds resolve to
- * [NoOpAprilFools] via SPI -- `ServiceLoader.firstOrNull()` returns null
- * and the loader falls back -- so no chaos code lands on the classpath.
+ * compilation when `-PauraAprilFools=true` is on the Gradle command line.
+ * Default production builds resolve to [NoOpAprilFools] via SPI --
+ * `ServiceLoader.firstOrNull()` returns null and the loader falls back --
+ * so no chaos code lands on the classpath.
  *
- * Replaces the prior pattern of reading `AprilFools.isActive()` directly
- * from Composables. UI code now reads [LocalAprilFools].current and goes
- * through this interface; the global singletons (`AprilFools`,
- * `AprilFoolsProgress`, `AprilFoolsText`, `ChaosState`) become internal
- * implementation details of `RealAprilFools` and are no longer referenced
- * from `desktopMain` consumers.
+ * UI code consumes the easter-egg surface exclusively through
+ * [LocalAprilFools].current; the chaos singletons (`AprilFools`,
+ * `AprilFoolsProgress`, `AprilFoolsText`, `ChaosState`) are implementation
+ * details of `RealAprilFools` and are not referenced from `desktopMain`.
  *
  * Severity / shape parallels [hivens.ui.puppet.PuppetServerLifecycle] --
  * same SPI gating pattern, same NoOp fallback semantics.

@@ -259,8 +259,9 @@ fun main() {
     //                                   the shared process-lifetime scope.
     // The shared CoroutineScope itself is also createdAtStart so the hook above
     // has a real instance to wire up, and LauncherController + tray-launch flow
-    // share the same scope (previously two scopes, only one of which was
-    // canceled on shutdown -- see B2 in the 2026-05-17 audit).
+    // share the same scope -- otherwise a tray-launched process can outlive
+    // the JVM shutdown signal because its launching coroutine isn't joined to
+    // the canceled scope.
     startKoin { modules(networkModule, appModule, uiModule) }
 
     // Puppet mode: opt-in localhost HTTP control surface for automated
@@ -505,13 +506,12 @@ fun main() {
                 // Fire-and-forget background sync of every installed pack.
                 // Gated by experimentalFeaturesEnabled master + autoSyncAllPacks
                 // child to match the rest of the experimental opt-ins. Runs on
-                // applicationScope so it survives composition resets but DOES
-                // get cancelled on JVM exit -- under the prior GlobalScope a
-                // user closing the launcher mid-sync left network/file handles
-                // open until the process truly died (#191). The service itself
-                // is a singleton and idempotent (will no-op on subsequent calls
-                // if already running -- TODO: enforce via in-flight flag once we
-                // add UI re-trigger).
+                // applicationScope so it survives composition resets but does
+                // get cancelled on JVM exit -- the alternative (GlobalScope)
+                // leaks network/file handles past window close until the
+                // process actually exits. The service itself is a singleton
+                // and idempotent (no-ops on subsequent calls while already
+                // running).
                 if (settings.experimentalFeaturesEnabled
                     && settings.autoSyncAllPacks
                     && dashboardServers.isNotEmpty()
@@ -660,7 +660,7 @@ fun AppRoot(
     val backgroundManager = remember { BackgroundManager(dataDirectory, json) }
     var backgroundSettings by remember { mutableStateOf(backgroundManager.load()) }
 
-    // ── Auto-login with offline mode support (#63) ────────────────────────
+    // ── Auto-login with offline mode support ──────────────────────────────
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
             val settings = settingsService.getSettings()

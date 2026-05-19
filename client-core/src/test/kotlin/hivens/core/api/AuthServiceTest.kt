@@ -100,7 +100,7 @@ class AuthServiceTest {
         assertEquals(null, ex.uid)
     }
 
-    // ── completeTwoFactor (#159) ──────────────────────────────────────────
+    // ── completeTwoFactor ───────────────────────────────────────────────────
 
     @Test
     fun `completeTwoFactor uses cached TWOAUTH response when complete (no re-login)`() = runTest {

@@ -88,8 +88,8 @@ fun ServerGrid(
                     // of having to know its grid index. Only registered while
                     // the card is composed (LazyVerticalGrid only composes
                     // visible items) -- off-screen cards won't be reachable
-                    // until scrolled into view. Not a problem with Aura's
-                    // current 7-server inventory; document if it grows.
+                    // until scrolled into view. Fine while the server inventory
+                    // fits on one screen; revisit if it grows past that.
                     val asset = item.profile.assetDir
                     PuppetClick("server.select.$asset", enabled = isLaunchable) { onSelect(item.profile) }
                     PuppetClick("server.launch.$asset", enabled = isLaunchable) { onLaunch(item.profile) }

@@ -129,9 +129,8 @@ object TrayManager {
             tray = t
             unsubscribe = t.onEvent { event ->
                 when (event) {
-                    // Left click -> restore window. Matches the previous
-                    // dorkbox default and what every other tray-icon app
-                    // does on every desktop.
+                    // Left click -> restore window. Standard tray-icon
+                    // behaviour on every desktop.
                     is TrayEvent.Activated -> onShowWindow?.invoke()
                     is TrayEvent.MenuItemSelected -> dispatchMenu(event.id)
                     else -> Unit
@@ -194,10 +193,9 @@ object TrayManager {
     ): TrayMenu {
         val items = mutableListOf<TrayMenuItem>()
 
-        // Status used to live as the first (disabled) menu entry too, but
-        // the same string is already in the SNI tooltip -- the menu line
-        // was pure duplication. Removed; running/serverName params are
-        // kept on the signature so callers don't have to change shape.
+        // Game status surfaces only in the SNI tooltip; a duplicate disabled
+        // menu entry would just clutter the menu. running/serverName params
+        // stay on the signature so callers don't have to change shape.
         items += TrayMenuItem.Standard(id = ID_SHOW,    label = s.show)
         items += TrayMenuItem.Standard(id = ID_CONSOLE, label = s.console)
         items += TrayMenuItem.Separator

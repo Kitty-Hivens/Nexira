@@ -71,8 +71,8 @@ fun ProfileScreen(session: SessionData, skinRepository: SkinRepository) {
     PuppetClick("profile.topUp") {
         SystemActions.openUrl("http://smartycraft.ru/cabinet")
     }
-    // Note: profile.uploadSkin triggers a native file picker -- unreachable
-    // from puppet without supplying a path argument. Out of MVP scope.
+    // profile.uploadSkin triggers a native file picker -- unreachable from
+    // puppet without a path-argument shape, which the puppet API doesn't have.
 
     Column(Modifier.fillMaxSize().padding(24.dp)) {
         Text(s.profileTitle, style = MaterialTheme.typography.displaySmall, color = CelestiaTheme.colors.textPrimary)
@@ -217,7 +217,6 @@ fun ProfileScreen(session: SessionData, skinRepository: SkinRepository) {
                                             val uploadResult = withContext(Dispatchers.IO) {
                                                 skinRepository.uploadSkin(file, false, session)
                                             }
-                                            // FIX: Check the result instead of assuming success.
                                             // SkinRepository returns "OK" on success, error string otherwise.
                                             if (uploadResult == "OK") {
                                                 uploadStatus = UploadStatus.Success(s.profileUploadSuccess)
