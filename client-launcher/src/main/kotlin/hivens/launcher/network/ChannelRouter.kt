@@ -6,43 +6,33 @@ import org.slf4j.LoggerFactory
 import java.io.IOException
 
 /**
- * Routes smartycraft network calls through the right channel with automatic
- * IOException-fallback to the SOCKS proxy.
+ * Routes smartycraft network calls through the right channel with
+ * automatic IOException-fallback to the SOCKS proxy.
  *
- * ## Behavior
- *
- * Default mode (forceProxyMode=false, the typical user):
- * 1. Try via [direct] (no proxy, normal HTTPS to www.smartycraft.ru)
+ * Default mode (forceProxyMode = false; typical user):
+ * 1. Try via [direct] (no proxy; normal HTTPS to www.smartycraft.ru)
  * 2. On any [IOException] (or wrapping cause), retry via [proxy]
- * 3. If proxy also fails, propagate the original exception
+ * 3. If proxy also fails, propagate the original direct exception
  *
- * Force-proxy mode (user opt-in via Settings -> Network -> "Force proxy mode"):
+ * Force-proxy mode (user opt-in via Settings → Network):
  * - Skip direct entirely; first and only attempt is via [proxy]
  *
- * ## Why this shape
+ * The official launcher uses direct-as-default with proxy as
+ * IOException fallback (smrt-deco's retry chain in `aq.java`); we
+ * mirror that, simplified -- the official's no-SSL middle state is
+ * unnecessary because direct HTTPS works fine on the smartycraft
+ * endpoint. Each fallback hop is recorded into [ActionRing] so the
+ * diagnostic bundle reflects "this user's network forced proxy use".
  *
- * Pre-Conduit, every call went through the proxy unconditionally -- wasted
- * ~500 ms per request (verified empirically 2026-05-14, see
- * `reference_smartycraft_proxy`). The official launcher uses direct as
- * default with proxy as IOException fallback (smrt-deco's three-state
- * retry chain in `aq.java`). Conduit Phase 2 mirrors that, simplified to
- * two states (we don't need the no-SSL middle state -- direct HTTPS works
- * fine on the smartycraft endpoint).
- *
- * Each fallback hop is recorded into [ActionRing] so the diagnostic
- * bundle reflects "this user's network forced proxy use" -- useful when
- * triaging support requests from regions where direct doesn't work.
- *
- * ## Out of scope
- *
- * - Per-host channel selection (today smartycraft is the only host using
- *   this router; GitHub/BellSoft/Maven all use a separate `direct`
- *   HttpClient that doesn't go through this).
- * - Adaptive learning (remembering "last 3 requests via proxy succeeded
- *   so try proxy first"). Current shape always tries direct first because
- *   network conditions can change between sessions.
- * - SSL bypass routing -- that's NetworkState.bypassFor(host) territory,
- *   handled at the OkHttpClient level.
+ * Out of scope:
+ * - Per-host channel selection (smartycraft is the only host using
+ *   this router; GitHub / BellSoft / Maven use a separate `direct`
+ *   HttpClient).
+ * - Adaptive learning (remember "last N requests via proxy succeeded").
+ *   Always tries direct first since network conditions change between
+ *   sessions.
+ * - SSL-bypass routing -- handled at the OkHttpClient level via
+ *   `NetworkState.bypassFor(host)`.
  */
 class ChannelRouter(
     private val direct: HttpClient,
@@ -52,10 +42,9 @@ class ChannelRouter(
 
     /**
      * Execute [call] through the appropriate channel with fallback.
-     *
-     * The lambda receives an [HttpClient] and should perform whatever HTTP
-     * work it needs to do, returning the result. The router decides which
-     * client to pass on the first call and whether/how to retry.
+     * The lambda receives an [HttpClient] and performs HTTP work; the
+     * router decides which client to pass on the first call and
+     * whether / how to retry.
      */
     suspend fun <T> execute(call: suspend (HttpClient) -> T): T {
         if (NetworkState.forceProxyMode()) {
@@ -67,8 +56,10 @@ class ChannelRouter(
             call(direct)
         } catch (direct_e: Exception) {
             if (!isFallbackable(direct_e)) throw direct_e
-            log.info("Direct channel failed ({}: {}) -- retrying via proxy",
-                direct_e.javaClass.simpleName, direct_e.message)
+            log.info(
+                "Direct channel failed ({}: {}) -- retrying via proxy",
+                direct_e.javaClass.simpleName, direct_e.message,
+            )
             ActionRing.record("Direct connection failed (${direct_e.javaClass.simpleName}), retrying via proxy")
             try {
                 call(proxy)
@@ -80,21 +71,18 @@ class ChannelRouter(
     }
 
     /**
-     * True if [t] looks like a transient network failure worth retrying via
-     * the proxy. Excludes deliberate server-side rejections (HTTP 4xx
-     * surface as response status, not exception, so they don't reach here
-     * -- but defensive guard for non-HTTP exceptions).
+     * True if [t] looks like a transient network failure worth
+     * retrying via the proxy. HTTP 4xx surface as response status, not
+     * exception, so they don't reach here -- this is the defensive
+     * guard for non-HTTP exceptions only.
      */
     private fun isFallbackable(t: Throwable): Boolean {
         var cause: Throwable? = t
         while (cause != null) {
-            // SocketException / SocketTimeoutException / ConnectException all
-            // descend from IOException, and ClosedByteChannelException does
-            // too -- the original `when` enumerated them explicitly for
-            // documentation but Qodana correctly flagged the subclass arms
-            // as unreachable. Single `is IOException` is the load-bearing
-            // check; the comment block above the function still names the
-            // concrete cases for the reader.
+            // SocketException / SocketTimeoutException / ConnectException
+            // and ClosedByteChannelException all descend from IOException.
+            // The single `is IOException` check is sufficient; the comment
+            // names the concrete cases for the reader.
             if (cause is IOException) return true
             cause = cause.cause
         }
