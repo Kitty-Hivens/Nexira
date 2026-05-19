@@ -1,4 +1,7 @@
-# SmartycraftV1Protocol — wire spec
+---
+title: SmartycraftV1Protocol -- wire spec
+description: Empirically captured wire spec of the SmartyCraft launcher protocol that Nexira speaks.
+---
 
 Empirically captured 2026-05-14 against live `https://www.smartycraft.ru`
 using user account NoLikeHumans + analysis of smrt-deco source.

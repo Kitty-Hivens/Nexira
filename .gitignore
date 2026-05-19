@@ -89,3 +89,7 @@ GEMINI.md
 # SpecStory / Qodo / misc agent caches
 .specstory/
 .qodo/
+
+# Astro docs site generated cache + build output
+/docs/.astro/
+/docs/dist/

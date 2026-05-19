@@ -6,9 +6,9 @@ export default defineConfig({
     starlight({
       title: 'Nexira',
       description: 'An unofficial launcher for SMARTYcraft',
-      social: {
-        github: 'https://github.com/Kitty-Hivens/Nexira',
-      },
+      social: [
+        { icon: 'github', label: 'GitHub', href: 'https://github.com/Kitty-Hivens/Nexira' },
+      ],
       editLink: {
         baseUrl: 'https://github.com/Kitty-Hivens/Nexira/edit/stable/docs/',
       },
