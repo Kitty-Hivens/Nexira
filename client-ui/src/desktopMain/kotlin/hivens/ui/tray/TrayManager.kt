@@ -119,7 +119,7 @@ object TrayManager {
                 title = appName,
                 iconBytes = iconBytes,
                 tooltip = "$appName | ${strings.statusIdle}",
-                menu = buildMenu(strings, servers, gameRunning, gameServerName),
+                menu = buildMenu(strings, servers),
             )
             val t = Tray.create(builder) ?: run {
                 logger.warn("libtray Tray.create returned null -- no tray host reachable on this session")
@@ -185,14 +185,12 @@ object TrayManager {
 
     private fun rebuildMenu() {
         val s = strings ?: return
-        tray?.setMenu(buildMenu(s, servers, gameRunning, gameServerName))
+        tray?.setMenu(buildMenu(s, servers))
     }
 
     private fun buildMenu(
         s: Strings,
         servers: List<ServerProfile>,
-        @Suppress("UNUSED_PARAMETER") running: Boolean,
-        @Suppress("UNUSED_PARAMETER") serverName: String?,
     ): TrayMenu {
         val items = mutableListOf<TrayMenuItem>()
 

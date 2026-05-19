@@ -15,13 +15,18 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.unit.TextUnitType
 import hivens.config.Branding
 import hivens.config.ExperimentalProtocolOverride
 import hivens.config.Protocol
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.data.SettingsData
+import hivens.core.diag.ActionRing
 import hivens.launcher.diag.DiagnosticBundle
+import hivens.launcher.diag.IssueReporter
 import hivens.launcher.network.NetworkState
+import hivens.launcher.platform.DataDirMover
 import hivens.launcher.platform.PlatformPaths
 import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.PlatformFile
@@ -41,7 +46,17 @@ import hivens.ui.puppet.PuppetToggle
 import hivens.ui.theme.CelestiaTheme
 import org.koin.compose.koinInject
 import hivens.ui.utils.SystemActions
+import java.awt.Toolkit
+import java.awt.datatransfer.StringSelection
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.Paths
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
+import kotlin.system.exitProcess
 import kotlin.time.Duration.Companion.milliseconds
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 
 @Composable
 fun SettingsScreen(
@@ -300,14 +315,14 @@ fun SettingsScreen(
                     // Live snapshot -- re-reads every 1s. Sufficient for a
                     // settings screen (no rapid-fire updates expected). Avoids
                     // setting up a Flow purely for this single read site.
-                    val bypasses = androidx.compose.runtime.produceState(initialValue = hivens.launcher.network.NetworkState.listBypasses()) {
+                    val bypasses = produceState(initialValue = NetworkState.listBypasses()) {
                         while (true) {
-                            value = hivens.launcher.network.NetworkState.listBypasses()
-                            kotlinx.coroutines.delay(1_000.milliseconds)
+                            value = NetworkState.listBypasses()
+                            delay(1_000.milliseconds)
                         }
                     }.value
-                    val dateFormatter = java.time.format.DateTimeFormatter
-                        .ofLocalizedDateTime(java.time.format.FormatStyle.MEDIUM)
+                    val dateFormatter = DateTimeFormatter
+                        .ofLocalizedDateTime(FormatStyle.MEDIUM)
                         .withZone(java.time.ZoneId.systemDefault())
 
                     Column(
@@ -352,10 +367,10 @@ fun SettingsScreen(
                                     }
                                     OutlinedButton(
                                         onClick = {
-                                            hivens.core.diag.ActionRing.record(
+                                            ActionRing.record(
                                                 "SSL bypass revoked by user from Settings: ${entry.host}",
                                             )
-                                            hivens.launcher.network.NetworkState.revokeBypass(entry.host)
+                                            NetworkState.revokeBypass(entry.host)
                                         },
                                         shape = RoundedCornerShape(6.dp),
                                     ) {
@@ -364,10 +379,10 @@ fun SettingsScreen(
                                     // Puppet: per-host revoke. Driver picks the host
                                     // by its actual hostname string.
                                     PuppetClick("settings.sslBypass.revoke.${entry.host}") {
-                                        hivens.core.diag.ActionRing.record(
+                                        ActionRing.record(
                                             "SSL bypass revoked by puppet driver: ${entry.host}",
                                         )
-                                        hivens.launcher.network.NetworkState.revokeBypass(entry.host)
+                                        NetworkState.revokeBypass(entry.host)
                                     }
                                 }
                             }
@@ -517,7 +532,7 @@ fun SettingsScreen(
                             placeholder     = {
                                 Text(
                                     s.settingsMimicVersionPlaceholder(
-                                        hivens.config.Protocol.DEFAULT_MIMIC_LAUNCHER_VERSION
+                                        Protocol.DEFAULT_MIMIC_LAUNCHER_VERSION
                                     ),
                                     color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.55f),
                                 )
@@ -535,7 +550,7 @@ fun SettingsScreen(
                             if (form.mimicVersionText == (initialSettings.mimicVersionOverride ?: "")) {
                                 return@LaunchedEffect
                             }
-                            kotlinx.coroutines.delay(400.milliseconds)
+                            delay(400.milliseconds)
                             save()
                         }
                     }
@@ -551,7 +566,7 @@ fun SettingsScreen(
                 item {
                     SettingsSectionTitle(s.settingsSectionDataDir)
 
-                    var pendingTarget by remember { mutableStateOf<java.nio.file.Path?>(null) }
+                    var pendingTarget by remember { mutableStateOf<Path?>(null) }
                     var showError     by remember { mutableStateOf<String?>(null) }
                     val moveScope     = rememberCoroutineScope()
 
@@ -596,16 +611,16 @@ fun SettingsScreen(
                                         )
                                     }.getOrNull() ?: return@launch
 
-                                    val picked = java.nio.file.Paths.get(pickedFile.path)
+                                    val picked = Paths.get(pickedFile.path)
 
                                     if (picked.toAbsolutePath().normalize() == paths.dataDir.toAbsolutePath().normalize()) {
                                         showError = s.settingsDataDirErrorSamePath
                                         return@launch
                                     }
-                                    val populated = withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                    val populated = withContext(Dispatchers.IO) {
                                         runCatching {
-                                            java.nio.file.Files.exists(picked) &&
-                                                java.nio.file.Files.list(picked).use { it.findAny().isPresent }
+                                            Files.exists(picked) &&
+                                                Files.list(picked).use { it.findAny().isPresent }
                                         }.getOrDefault(false)
                                     }
                                     if (populated) {
@@ -641,12 +656,12 @@ fun SettingsScreen(
                             },
                             confirmButton = {
                                 Button(onClick = {
-                                    val ok = hivens.launcher.platform.DataDirMover.schedule(
+                                    val ok = DataDirMover.schedule(
                                         source = paths.dataDir,
                                         target = target,
                                     )
                                     if (ok) {
-                                        hivens.core.diag.ActionRing.record(
+                                        ActionRing.record(
                                             "Data-dir move scheduled: ${paths.dataDir} -> $target -- quitting for restart",
                                         )
                                         // Hard exit -- user explicitly clicked "Quit now". Avoids the
@@ -654,7 +669,7 @@ fun SettingsScreen(
                                         // is mid-launch. The pending move only applies AFTER the
                                         // launcher restarts, so a clean process termination is the
                                         // right move.
-                                        kotlin.system.exitProcess(0)
+                                        exitProcess(0)
                                     } else {
                                         // Schedule was refused (target validations failed at the
                                         // mover layer -- e.g., race with another process touching
@@ -735,7 +750,7 @@ fun SettingsScreen(
                     // enough to freeze Settings for a noticeable beat. While
                     // generating, the button is disabled so a double click
                     // doesn't fire two parallel writes to the same data dir.
-                    var lastBundlePath by remember { mutableStateOf<java.nio.file.Path?>(null) }
+                    var lastBundlePath by remember { mutableStateOf<Path?>(null) }
                     var bundleBusy     by remember { mutableStateOf(false) }
                     val bundleScope    = rememberCoroutineScope()
 
@@ -747,7 +762,7 @@ fun SettingsScreen(
                                 if (bundleBusy) return@ChaosButton
                                 bundleBusy = true
                                 bundleScope.launch {
-                                    val zip = withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                    val zip = withContext(Dispatchers.IO) {
                                         runCatching { DiagnosticBundle.create(paths) }.getOrNull()
                                     }
                                     if (zip != null) {
@@ -769,7 +784,7 @@ fun SettingsScreen(
                         PuppetClick("settings.createDiagBundle", enabled = !bundleBusy) {
                             bundleBusy = true
                             bundleScope.launch {
-                                val zip = withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                val zip = withContext(Dispatchers.IO) {
                                     runCatching { DiagnosticBundle.create(paths) }.getOrNull()
                                 }
                                 if (zip != null) lastBundlePath = zip
@@ -784,9 +799,9 @@ fun SettingsScreen(
                                 runCatching {
                                     // Copy path so the user can drag-attach from the file
                                     // manager OR paste the path into a comment.
-                                    java.awt.Toolkit.getDefaultToolkit().systemClipboard
-                                        .setContents(java.awt.datatransfer.StringSelection(zip.toString()), null)
-                                    SystemActions.openUrl(hivens.launcher.diag.IssueReporter.bundleIssueUrl(zip))
+                                    Toolkit.getDefaultToolkit().systemClipboard
+                                        .setContents(StringSelection(zip.toString()), null)
+                                    SystemActions.openUrl(IssueReporter.bundleIssueUrl(zip))
                                 }
                             },
                             modifier = Modifier.weight(1f),
@@ -801,16 +816,16 @@ fun SettingsScreen(
                         PuppetClick("settings.reportOnGithub", enabled = lastBundlePath != null) {
                             val zip = lastBundlePath ?: return@PuppetClick
                             runCatching {
-                                java.awt.Toolkit.getDefaultToolkit().systemClipboard
-                                    .setContents(java.awt.datatransfer.StringSelection(zip.toString()), null)
-                                SystemActions.openUrl(hivens.launcher.diag.IssueReporter.bundleIssueUrl(zip))
+                                Toolkit.getDefaultToolkit().systemClipboard
+                                    .setContents(StringSelection(zip.toString()), null)
+                                SystemActions.openUrl(IssueReporter.bundleIssueUrl(zip))
                             }
                         }
                     }
                     Text(
                         text     = s.settingsDiagnosticBundleHint,
                         color    = CelestiaTheme.colors.textSecondary,
-                        fontSize = androidx.compose.ui.unit.TextUnit(11f, androidx.compose.ui.unit.TextUnitType.Sp),
+                        fontSize = TextUnit(11f, TextUnitType.Sp),
                         modifier = Modifier.padding(start = 8.dp, top = 2.dp)
                     )
                 }
@@ -854,7 +869,7 @@ fun SettingsScreen(
                 Text(s.settingsSaved, color = CelestiaTheme.colors.success, style = MaterialTheme.typography.bodySmall)
             }
             LaunchedEffect(showSavedMessage) {
-                if (showSavedMessage) { kotlinx.coroutines.delay(2000.milliseconds); showSavedMessage = false }
+                if (showSavedMessage) { delay(2000.milliseconds); showSavedMessage = false }
             }
         }
     }
@@ -866,7 +881,7 @@ fun SettingsScreen(
  * One field per editable setting; each field is its own [mutableStateOf]
  * so Compose recomposition stays granular (flipping a single toggle only
  * invalidates the rows that read that one field). The class is a thin
- * namespace -- it does not centralize behaviour, only the ten or so
+ * namespace -- it does not centralize behavior, only the ten or so
  * `var x by mutableStateOf(initial.x)` declarations that otherwise sit
  * inline in the composable.
  *
@@ -897,7 +912,7 @@ private class SettingsFormState(initial: SettingsData) {
      * form's editable fields onto [current] (a freshly-read snapshot, so
      * non-screen fields like server-specific knobs are not clobbered).
      *
-     * The mimic-version override is normalised here: empty toggle OR
+     * The mimic-version override is normalized here: empty toggle OR
      * blank text both collapse to null, which is the contract
      * [SettingsData.mimicVersionOverride] expects for "use the shipped
      * default" semantics. Storing a stale non-null value with the toggle
