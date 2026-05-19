@@ -1,0 +1,35 @@
+name: comment-lint
+
+on:
+  pull_request:
+    branches: [stable, Project-Void]
+    paths:
+      - "**/*.kt"
+      - "**/*.kts"
+      - "**/*.java"
+      - "scripts/check-comments.py"
+      - ".github/workflows/comment-lint.yml"
+  push:
+    branches: [stable]
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    name: Style-D anti-patterns
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # warn-only on PRs (does not block merge) -- catches NEW additions
+      # of banned patterns without forcing a full backlog cleanup before
+      # the first scan lands. Switch to --strict once existing baseline
+      # hits are zeroed via the audit pass.
+      - name: Scan for Style-D anti-patterns
+        run: python3 scripts/check-comments.py
