@@ -49,6 +49,7 @@ import hivens.launcher.launch.LaunchState
 import hivens.launcher.launch.LauncherController
 import hivens.launcher.network.ServerProtocolConfig
 import hivens.ui.screens.ConsoleWindow
+import hivens.ui.screens.MigrationScreen
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.CustomTheme
 import hivens.ui.theme.ThemeManager
@@ -244,14 +245,18 @@ fun main() {
         }
     }
 
-    // Single-instance lock acquired BEFORE migration. Two launchers started
-    // close together would otherwise both reach DataDirMigration.run() and
-    // race on REPLACE_EXISTING file copies. DataDirMigration's emptiness
-    // check is taught to ignore .lock / .show / .migrated so its first-run
-    // trigger still fires.
+    // Single-instance lock acquired BEFORE migration is consulted. Two
+    // launchers started close together would otherwise both render the
+    // MigrationScreen and race on file copies. DataDirMigration's
+    // emptiness check is taught to ignore .lock / .show / .migrated so
+    // its first-run trigger still fires.
     if (!SingleInstance.acquire(paths.dataDir)) exitProcess(0)
 
-    DataDirMigration.run(paths)
+    // Migration runs INSIDE Compose now, as a mandatory full-screen UI
+    // shown before AppRoot. The detection is read here once so the
+    // result is stable across recompositions; the actual copy and
+    // progress reporting happens in MigrationScreen.
+    val pendingMigration = DataDirMigration.detect(paths)
 
     // Two createdAtStart hooks registered in appModule fire here:
     //   - SettingsRestoreHook       -- replays persisted experimental overrides.
@@ -573,41 +578,53 @@ fun main() {
                 }
 
                 CelestiaTheme(useDarkTheme = isDarkTheme, customTheme = customTheme) {
-                    AppRoot(
-                        onCloseApp = {
-                            val gameRunning = launchState is LaunchState.GameRunning
-                            if (gameRunning && TrayManager.canBeReady) {
-                                // Same canBeReady reasoning as the Window
-                                // onCloseRequest: don't pull the rug from
-                                // under a running game just because tray
-                                // init is still mid-flight.
-                                isWindowVisible = false
-                            } else {
-                                exitApplication()
+                    if (pendingMigration != null) {
+                        // Migration is mandatory: the screen does not return
+                        // to AppRoot on completion. The user clicks Quit and
+                        // relaunches; the next process sees the .migrated
+                        // marker and skips this branch.
+                        MigrationScreen(
+                            source = pendingMigration,
+                            target = paths.dataDir,
+                            onQuit = { exitApplication() },
+                        )
+                    } else {
+                        AppRoot(
+                            onCloseApp = {
+                                val gameRunning = launchState is LaunchState.GameRunning
+                                if (gameRunning && TrayManager.canBeReady) {
+                                    // Same canBeReady reasoning as the Window
+                                    // onCloseRequest: don't pull the rug from
+                                    // under a running game just because tray
+                                    // init is still mid-flight.
+                                    isWindowVisible = false
+                                } else {
+                                    exitApplication()
+                                }
+                            },
+                            onRealExit   = { exitApplication() },
+                            onHideToTray = if (TrayManager.canBeReady) {{ isWindowVisible = false }}
+                            else null,
+                            isDarkTheme          = isDarkTheme,
+                            onToggleDarkTheme    = {
+                                isDarkTheme = !isDarkTheme
+                                val current = settingsService.getSettings()
+                                settingsService.saveSettings(current.copy(isDarkTheme = isDarkTheme))
+                            },
+                            customTheme          = customTheme,
+                            onCustomThemeChanged = { newTheme ->
+                                customTheme = newTheme
+                                themeManager.saveTheme(newTheme)
+                            },
+                            currentLocale   = currentLocale,
+                            onLocaleChanged = { newLocale ->
+                                currentLocale = newLocale
+                                val current = settingsService.getSettings()
+                                settingsService.saveSettings(current.copy(locale = newLocale.tag))
                             }
-                        },
-                        onRealExit   = { exitApplication() },
-                        onHideToTray = if (TrayManager.canBeReady) {{ isWindowVisible = false }}
-                        else null,
-                        isDarkTheme          = isDarkTheme,
-                        onToggleDarkTheme    = {
-                            isDarkTheme = !isDarkTheme
-                            val current = settingsService.getSettings()
-                            settingsService.saveSettings(current.copy(isDarkTheme = isDarkTheme))
-                        },
-                        customTheme          = customTheme,
-                        onCustomThemeChanged = { newTheme ->
-                            customTheme = newTheme
-                            themeManager.saveTheme(newTheme)
-                        },
-                        currentLocale   = currentLocale,
-                        onLocaleChanged = { newLocale ->
-                            currentLocale = newLocale
-                            val current = settingsService.getSettings()
-                            settingsService.saveSettings(current.copy(locale = newLocale.tag))
-                        }
-                    )
-                    UpdateManager()
+                        )
+                        UpdateManager()
+                    }
                 }
             }
         }

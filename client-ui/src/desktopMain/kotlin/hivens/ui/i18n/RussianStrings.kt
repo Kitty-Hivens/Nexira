@@ -455,4 +455,21 @@ object RussianStrings : AppStrings {
     override val jvmCustomHeader = "Свои флаги"
     override val jvmCustomIntro  = "Дополнительные флаги добавляются как есть. Для одноразовых экспериментов или vendor-флагов которые мы ещё не вывели в UI. Через пробел."
     override val jvmCustomLabel  = "Дополнительные аргументы"
+
+    // --- Data dir migration UI ---
+    override val migrationWelcome      = "Добро пожаловать в Nexira"
+    override val migrationDescription  = "Aura теперь называется Nexira. Перед запуском лаунчера нужно перенести существующие данные в новое расположение. Старая папка остаётся нетронутой как резервная копия; удалите её вручную когда убедитесь что всё работает."
+    override val migrationFromHeader   = "Откуда"
+    override val migrationToHeader     = "Куда"
+    override fun migrationSize(megabytes: Int, files: Int) = "$megabytes МБ, $files файлов"
+    override val migrationStart        = "Перенести данные"
+    override val migrationInProgress   = "Перенос в Nexira"
+    override fun migrationCurrentFile(file: String) = "Копируется $file"
+    override fun migrationProgressBytes(doneMb: Int, totalMb: Int) = "$doneMb МБ из $totalMb МБ"
+    override val migrationCompletedTitle = "Перенос завершён"
+    override val migrationCompletedBody  = "Перезапустите Nexira чтобы начать пользоваться перенесёнными данными."
+    override val migrationFailedTitle    = "Перенос не удался"
+    override fun migrationFailedBody(error: String) = "Некоторые файлы не удалось скопировать: $error"
+    override val migrationRetry = "Повторить"
+    override val migrationQuit  = "Закрыть Nexira"
 }

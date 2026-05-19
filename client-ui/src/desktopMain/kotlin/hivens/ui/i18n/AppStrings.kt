@@ -468,4 +468,25 @@ interface AppStrings {
     val jvmCustomHeader: String
     val jvmCustomIntro: String
     val jvmCustomLabel: String
+
+    // --- Data dir migration UI (mandatory first-launch flow after Aura -> Nexira rebrand) ---
+    val migrationWelcome: String
+    val migrationDescription: String
+    val migrationFromHeader: String
+    val migrationToHeader: String
+    /** Templated: total size in MB and total file count. */
+    fun migrationSize(megabytes: Int, files: Int): String
+    val migrationStart: String
+    val migrationInProgress: String
+    /** Templated: filename currently being copied, relative to the legacy root. */
+    fun migrationCurrentFile(file: String): String
+    /** Templated: bytes-done in MB and total in MB. */
+    fun migrationProgressBytes(doneMb: Int, totalMb: Int): String
+    val migrationCompletedTitle: String
+    val migrationCompletedBody: String
+    val migrationFailedTitle: String
+    /** Templated: human-readable error message. */
+    fun migrationFailedBody(error: String): String
+    val migrationRetry: String
+    val migrationQuit: String
 }

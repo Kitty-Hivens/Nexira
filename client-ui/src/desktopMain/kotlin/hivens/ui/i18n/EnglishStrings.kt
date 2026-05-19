@@ -454,4 +454,21 @@ object EnglishStrings : AppStrings {
     override val jvmCustomHeader = "Custom passthrough"
     override val jvmCustomIntro  = "Extra flags appended verbatim. Use for one-off experiments or vendor-specific knobs not surfaced in the UI yet. Space-separated."
     override val jvmCustomLabel  = "Extra args"
+
+    // --- Data dir migration UI ---
+    override val migrationWelcome      = "Welcome to Nexira"
+    override val migrationDescription  = "Aura is now Nexira. Your existing data needs to be copied to the new location before the launcher can start. Your old folder is left untouched as a backup; you can delete it manually once everything works."
+    override val migrationFromHeader   = "From"
+    override val migrationToHeader     = "To"
+    override fun migrationSize(megabytes: Int, files: Int) = "$megabytes MB across $files files"
+    override val migrationStart        = "Migrate now"
+    override val migrationInProgress   = "Migrating to Nexira"
+    override fun migrationCurrentFile(file: String) = "Copying $file"
+    override fun migrationProgressBytes(doneMb: Int, totalMb: Int) = "$doneMb MB of $totalMb MB"
+    override val migrationCompletedTitle = "Migration complete"
+    override val migrationCompletedBody  = "Restart Nexira to begin using your migrated data."
+    override val migrationFailedTitle    = "Migration failed"
+    override fun migrationFailedBody(error: String) = "Some files could not be copied: $error"
+    override val migrationRetry = "Retry"
+    override val migrationQuit  = "Quit Nexira"
 }
