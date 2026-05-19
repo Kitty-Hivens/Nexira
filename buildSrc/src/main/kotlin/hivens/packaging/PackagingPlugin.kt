@@ -18,9 +18,9 @@ import org.gradle.kotlin.dsl.register
  *     mainClass.set("hivens.ui.MainKt")
  *     modules.set(listOf("java.base", "java.desktop", ...))
  *     jlink {
- *         compress.set("zip-9")
  *         vmKind.set("server")
  *         includeLocales.set("en,ru,de")
+ *         // compress left unset on purpose -- see PackagingExtension.
  *     }
  * }
  * ```

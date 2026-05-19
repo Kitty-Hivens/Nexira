@@ -61,8 +61,9 @@ source "$PACKAGING_PROFILE"
 # Rationale per flag lives in the PackagingExtension KDoc + the per-flag
 # comments in client-ui/build.gradle.kts. Headline: --vm=server (-22 MB),
 # --include-locales=en,ru,de + jdk.localedata (keeps i18n-relevant locale
-# data, prunes the rest), --compress=zip-9 (modern syntax), --strip-debug
-# / --no-header-files / --no-man-pages (size hygiene).
+# data, prunes the rest), --strip-debug / --no-header-files / --no-man-pages
+# (size hygiene). No inner --compress: the outer squashfs-zstd compressor
+# squeezes a non-zip-9 runtime image harder than it can a pre-compressed one.
 jlink \
     --output "$APPDIR/usr" \
     --add-modules "$AURA_JLINK_MODULES" \

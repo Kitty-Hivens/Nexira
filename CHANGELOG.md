@@ -17,9 +17,9 @@ Bug-fix + size-cut release. The headline is a UI-freeze fix that bit
 every user on every "Play" click — the tray library was making
 blocking D-Bus calls on the EDT during launch state transitions,
 holding up the whole window for seconds at a time. Alongside that,
-the distribution size drops by ~one-third thanks to a custom jlink +
-jpackage pipeline that finally lands the flags
-(`--vm=server`, `--strip-debug`, `--compress=zip-9`,
+the distribution size drops noticeably (~10% on AppImage / DMG,
+similar on the Windows installer) thanks to a custom jlink + jpackage
+pipeline that finally lands the flags (`--vm=server`, `--strip-debug`,
 `--include-locales=en,ru,de`) that Compose Desktop's built-in
 `nativeDistributions` block never exposed. Internal: the build
 toolchain swaps from JetBrains Runtime to BellSoft Liberica, and the
@@ -34,11 +34,16 @@ share one configuration source.
   now off the EDT entirely; the window stays responsive through the
   whole launch flow. Affects every Linux user under
   KDE / Hyprland / GNOME / Cinnamon.
-- **~34% smaller download** — the release distributable shrinks from
-  ~214 MB to ~141 MB. Custom jlink runtime drops the unused HotSpot
-  VM variants (client + minimal, ~22 MB), restricts locale data to
-  en/ru/de, strips debug info, and uses zip-9 compression. The
-  embedded runtime alone is ~61 MB instead of ~115 MB.
+- **Smaller download across every platform.** The custom jlink runtime
+  drops the unused HotSpot VM variants (client + minimal, ~22 MB),
+  trims three unused JDK modules (`java.sql`, `java.naming`,
+  `java.net.http`), restricts locale data to en/ru/de, and strips
+  debug info. Compared to 2.2.15: AppImage and DMG drop by ~10 MB,
+  the Windows installer by a similar amount. Inner jlink compression
+  intentionally not applied; outer LZMA (Inno Setup) and squashfs-zstd
+  (AppImage) compress a raw runtime image more tightly than they can
+  a pre-compressed one (measured locally: a zip-9 inner pass costs
+  8 MB on the AppImage path and ~13 MB on the LZMA path).
 - **/diag endpoints for puppet** (developer-facing) — the puppet HTTP
   control surface gains read-only diagnostic endpoints
   (`/diag/threads`, `/diag/jvm`, `/diag/actions`, `/diag/snapshot`)
@@ -64,10 +69,12 @@ share one configuration source.
   toolchain policy is vendor-loose so any JDK 25 on PATH works.
   Foojay-resolver-convention plugin in `settings.gradle.kts`
   auto-provisions a JDK 25 if missing.
-- AppImage `jlink` invocation gains `--vm=server`,
+- AppImage `jlink` invocation gains `--vm=server` and
   `--include-locales=en,ru,de` (with `jdk.localedata` added to the
-  module set), modernised `--compress=zip-9` (replaces deprecated
-  `--compress=2`).
+  module set). Drops the previous `--compress=2`: the outer
+  squashfs-zstd (AppImage) and LZMA2 (Inno Setup) compressors
+  produce smaller artifacts when the inner runtime image is left
+  uncompressed.
 - Windows EXE and macOS DMG production switch from Compose Desktop's
   `createReleaseDistributable` / `packageReleaseDmg` to
   `aura.packaging`'s `customJpackageImage` + `customDmg`. Layout
