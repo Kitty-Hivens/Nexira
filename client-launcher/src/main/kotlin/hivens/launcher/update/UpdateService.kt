@@ -6,7 +6,6 @@ import hivens.core.api.interfaces.ISettingsService
 import hivens.core.data.LauncherUpdate
 import hivens.core.data.ReleaseManifest
 import hivens.core.data.UpdateChannelMeta
-import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.contentLength
@@ -268,11 +267,11 @@ class UpdateService(
 
                 FileOutputStream(targetFile.toFile()).use { output ->
                     val buffer = ByteArray(8192)
-                    
+
                     while (!channel.isClosedForRead) {
                         val read = channel.readAvailable(buffer)
                         if (read <= 0) break
-                        
+
                         output.write(buffer, 0, read)
                         downloadedBytes += read
 
@@ -281,9 +280,9 @@ class UpdateService(
                             val deltaBytes = downloadedBytes - lastDownloadedBytes
                             val deltaTime = (currentTime - lastUpdateTime) / 1000.0
                             val speed = if (deltaTime > 0) deltaBytes / deltaTime else 0.0
-                            
+
                             onProgress(downloadedBytes, totalBytes, speed)
-                            
+
                             lastUpdateTime = currentTime
                             lastDownloadedBytes = downloadedBytes
                         }
@@ -301,7 +300,7 @@ class UpdateService(
 
             logger.info("Checksum verified successfully")
             targetFile
-            
+
         } catch (e: Exception) {
             Files.deleteIfExists(targetFile)
             throw e
@@ -521,7 +520,7 @@ class UpdateService(
         return runCatching {
             val digest = MessageDigest.getInstance("SHA-256")
             val buffer = ByteArray(8192)
-            
+
             Files.newInputStream(file).use { input ->
                 var read: Int
                 while (input.read(buffer).also { read = it } != -1) {
@@ -618,12 +617,12 @@ class UpdateService(
         return tokens
     }
 
-    private fun compareTokens(a: SuffixToken, b: SuffixToken): Int = when {
-        a is SuffixToken.Num  && b is SuffixToken.Num  -> a.value.compareTo(b.value)
-        a is SuffixToken.Text && b is SuffixToken.Text -> a.value.compareTo(b.value)
-        a is SuffixToken.Num  && b is SuffixToken.Text -> -1
-        a is SuffixToken.Text && b is SuffixToken.Num  -> 1
-        else                                            -> 0
+    private fun compareTokens(a: SuffixToken, b: SuffixToken): Int = when (a) {
+        is SuffixToken.Num if b is SuffixToken.Num -> a.value.compareTo(b.value)
+        is SuffixToken.Text if b is SuffixToken.Text -> a.value.compareTo(b.value)
+        is SuffixToken.Num if b is SuffixToken.Text -> -1
+        is SuffixToken.Text if b is SuffixToken.Num -> 1
+        else -> 0
     }
 
     private suspend fun fetchChangelogBetween(

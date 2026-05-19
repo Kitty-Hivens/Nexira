@@ -197,7 +197,7 @@ fun main() {
 
     // Beacon: the very first entry in the action ring -- handy when reading a
     // bundle to confirm what process / version / OS produced it.
-    hivens.core.diag.ActionRing.record(
+    ActionRing.record(
         "Launcher started (v${Branding.VERSION}, sessionId=$sessionId, os=${System.getProperty("os.name")})"
     )
 

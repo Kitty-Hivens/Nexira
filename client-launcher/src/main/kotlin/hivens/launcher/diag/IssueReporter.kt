@@ -1,7 +1,6 @@
 package hivens.launcher.diag
 
 import hivens.config.Branding
-import hivens.core.diag.ActionRing
 import hivens.core.logging.Redactor
 import hivens.launcher.CrashReporter
 import java.net.URLEncoder
@@ -112,7 +111,7 @@ object IssueReporter {
         // logs. The user's clipboard already has the full path (set by the
         // caller in SettingsScreen.onClick), so they have what they need to
         // locate the file locally.
-        val bundleName = bundlePath.fileName?.toString() ?: "diagnostic-bundle.zip"
+        val bundleName = bundlePath.fileName?.toString() ?: "diagnostic-bundle.zip" // TODO: Not translated?
         appendLine("## Описание")
         appendLine("<!-- Опишите проблему. -->")
         appendLine()

@@ -16,8 +16,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
 import hivens.config.Branding
+import hivens.config.ExperimentalProtocolOverride
+import hivens.config.Protocol
 import hivens.core.api.interfaces.ISettingsService
 import hivens.launcher.diag.DiagnosticBundle
+import hivens.launcher.network.NetworkState
 import hivens.launcher.platform.PlatformPaths
 import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.PlatformFile
@@ -37,7 +40,6 @@ import hivens.ui.puppet.PuppetToggle
 import hivens.ui.theme.CelestiaTheme
 import org.koin.compose.koinInject
 import hivens.ui.utils.SystemActions
-import java.io.File
 import kotlin.time.Duration.Companion.milliseconds
 
 @Composable
@@ -102,13 +104,13 @@ fun SettingsScreen(
         )
         // Mirror to NetworkState so ChannelRouter sees it on the very next
         // request without waiting for launcher restart.
-        hivens.launcher.network.NetworkState.setForceProxyMode(forceProxyMode)
+        NetworkState.setForceProxyMode(forceProxyMode)
         // Apply the mimic-version override immediately so the next protocol
         // handshake picks it up. Without this the user would have to restart
         // for the change to take effect, even though the system property
         // mechanism Protocol.MIMIC_LAUNCHER_VERSION reads is live.
-        @OptIn(hivens.config.ExperimentalProtocolOverride::class)
-        hivens.config.Protocol.setMimicLauncherVersion(normalisedMimic)
+        @OptIn(ExperimentalProtocolOverride::class)
+        Protocol.setMimicLauncherVersion(normalisedMimic)
         showSavedMessage = true
     }
 
