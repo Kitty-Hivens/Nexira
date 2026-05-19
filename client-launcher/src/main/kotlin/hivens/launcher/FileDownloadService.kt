@@ -72,11 +72,11 @@ class FileDownloadService(
         // TTL inside ManifestCache is the safety valve for "what if a
         // file got corrupted on disk?" scenarios.
         //
-        // ignoredFiles is part of the cache input because cleanupIgnoredFiles
-        // (which physically deletes disabled mod jars) lives below this
-        // gate -- caching only on manifest hash would let a freshly-disabled
-        // mod stay loaded until the cache expires or the manifest changes
-        // upstream. (Codex P2 on PR #128.)
+        // ignoredFiles is part of the cache input because
+        // cleanupIgnoredFiles (which physically deletes disabled mod
+        // jars) lives below this gate -- caching only on manifest hash
+        // would let a freshly-disabled mod stay loaded until the cache
+        // expires or the manifest changes upstream.
         val manifestHash = manifestCache.hashOf(cacheKeyInputFor(manifest, ignoredFiles))
         // Disk-sanity gate (#184 + #203): the manifest-cache file alone
         // can't tell that the user moved their data dir leaving
@@ -367,13 +367,12 @@ class FileDownloadService(
     }
 
     /**
-     * Sentinel for "we deliberately threw to trigger a retry after fixing
-     * local state". Currently the only thrower is the 416 branch in
-     * [downloadFileInternal], which deletes the bad partial before
-     * raising this so the next retry fetches from byte 0. Adding a
-     * subclass instead of pattern-matching the message keeps the contract
-     * explicit -- string matching on `cause.message` was the bug Codex
-     * caught on PR #128.
+     * Sentinel for "we deliberately threw to trigger a retry after
+     * fixing local state". Currently the only thrower is the 416
+     * branch in [downloadFileInternal], which deletes the bad partial
+     * before raising this so the next retry fetches from byte 0.
+     * Subclass over string-matching `cause.message` keeps the contract
+     * explicit.
      */
     private class RetryableHttpException(message: String) : IOException(message)
 
