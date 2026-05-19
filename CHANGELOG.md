@@ -1,15 +1,69 @@
 # Changelog
 
-All notable changes to Aura Launcher will be documented in this file.
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+All notable changes to Nexira (formerly Aura Launcher) will be
+documented in this file. The format is based on
+[Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-※ Each released entry opens with a short `### Highlights` block —
+※ Each released entry opens with a short `### Highlights` block --
 2-5 plain-English bullets summarizing what the user actually notices.
 The launcher's in-app update dialog renders just the Highlights; the
 detailed `### Added`/`### Changed`/`### Fixed`/`### Removed` sections
 below are for the GitHub release page and CHANGELOG readers.
 
 ## [Unreleased]
+
+## [2.3.0] - 2026-05-20
+
+Rebrand release. The launcher is now called **Nexira**; the underlying
+service it targets (SMARTYcraft) is unchanged, and so is the wire
+protocol, the auth flow, and the file-sync semantics. Existing Aura
+data is preserved through a mandatory migration UI on first Nexira
+launch.
+
+### Highlights
+- **Aura is now Nexira.** Window title, executable, install dir, data
+  dir, AppStream id, .desktop entry, GitHub repo and docs URL all
+  change. SmartyCraft compatibility is byte-identical to 2.2.16.
+- **Mandatory data migration on first launch.** When Nexira detects an
+  Aura-era data directory it shows a full-screen modal with size /
+  file count and a single "Migrate now" button. The copy runs with a
+  determinate progress bar; on completion the launcher asks for a
+  restart. The old Aura folder is left in place as a backup -- delete
+  manually once you've confirmed Nexira loads your settings.
+- **2FA accounts now cleanly rejected.** SMARTYcraft's two-factor
+  flow is not part of the documented protocol and was never working
+  reliably here. Nexira surfaces the limitation up-front instead of
+  failing at game launch.
+
+### Changed
+- Window title / WM_CLASS / app bundle id all renamed:
+  `AuraLauncher` -> `Nexira` (Windows / macOS install + dock name),
+  `aura-launcher` -> `nexira` (Linux binary + .desktop slug).
+- Default per-OS data directory:
+  `%LOCALAPPDATA%\AuraLauncher` -> `%LOCALAPPDATA%\Nexira` (Windows),
+  `~/Library/Application Support/AuraLauncher` -> `~/Library/Application Support/Nexira` (macOS),
+  `$XDG_DATA_HOME/aura-launcher` -> `$XDG_DATA_HOME/nexira` (Linux).
+- Environment-variable override: `AURA_DATA_DIR` -> `NEXIRA_DATA_DIR`
+  (no fallback; the old name is no longer recognized).
+- Bootstrap config moves from `~/.aura-launcher.conf` to `~/.nexira.conf`.
+  Reads transparently fall back to the legacy file until the first
+  write, so a user with a custom data-dir setting keeps working.
+- AppStream id: `io.github.kitty_hivens.auralauncher` -> `dev.hivens.nexira`.
+- GitHub repository: `Kitty-Hivens/Aura-Launcher` -> `Kitty-Hivens/Nexira`.
+- Logback system properties: `aura.logs.dir` / `aura.sessionId` ->
+  `nexira.logs.dir` / `nexira.sessionId`. Gradle puppet-mode prop
+  `-PauraPuppetPort` -> `-PnexiraPuppetPort`; runtime system prop
+  `-Daura.puppet.port` -> `-Dnexira.puppet.port`.
+- Convention plugin id in `buildSrc`: `aura.packaging` -> `nexira.packaging`.
+
+### Kept verbatim (compat / data preservation)
+- `CredentialsManager.SALT` = `"Aura_v2_salt"` and `KEYRING_SERVICE` =
+  `"io.github.kitty_hivens.AuraLauncher"`. Rotating these would
+  invalidate every existing user's saved-credentials envelope and OS
+  keyring entry; the underlying secret is the same, the brand is
+  cosmetic.
+- `PlatformPaths.legacyDataDirs` continues to point at the Aura-era
+  and pre-2.3 directories so the migration UI can find old data.
 
 ## [2.2.16] - 2026-05-19
 

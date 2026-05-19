@@ -18,8 +18,10 @@ _What happened? What did you expect?_
 
 ## Crash report
 
-If the launcher crashed, attach the report from `~/.aura/crash-reports/`.  
-You can also open it directly from the crash dialog → **Open folder**.
+If the launcher crashed, attach the report from `<data dir>/crash-reports/`
+(see the Installation docs for the per-OS data-dir path). Or use
+**Settings -> Diagnostics -> Create diagnostic bundle** to get a redacted
+ZIP of logs + crash reports + system info in one go.
 
 <details>
 <summary>Crash report</summary>

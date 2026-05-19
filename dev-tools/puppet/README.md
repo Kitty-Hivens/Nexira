@@ -1,8 +1,8 @@
-# puppet — CLI driver for Aura's in-process control surface
+# puppet — CLI driver for Nexira's in-process control surface
 
-Aura's UI exposes a small HTTP control surface (see
+Nexira's UI exposes a small HTTP control surface (see
 `client-ui/src/desktopMain/kotlin/hivens/ui/puppet/`) when launched with
-`-Daura.puppet.port=N`. These scripts are thin curl wrappers around
+`-Dnexira.puppet.port=N`. These scripts are thin curl wrappers around
 that surface, intended for ad-hoc UX debugging and automated regression
 scenarios.
 
@@ -11,7 +11,7 @@ scenarios.
 ```sh
 ./gradlew :client-ui:run \
     -Pkotlin.jvm.target.validation.mode=ignore \
-    -Daura.puppet.port=58000
+    -Dnexira.puppet.port=58000
 ```
 
 Without the system property, the server never binds — release builds
@@ -44,7 +44,7 @@ to inspect. Pipe through `jq` for human-readable form.
 * `diag-threads.sh`   — ThreadMXBean dump (state, stack, locks held,
                         deadlock detection)
 * `diag-jvm.sh`       — memory, GC, runtime, OS load
-* `diag-actions.sh`   — last 64 `ActionRing` entries (Aura's in-process
+* `diag-actions.sh`   — last 64 `ActionRing` entries (Nexira's in-process
                         breadcrumb log)
 * `diag-snapshot.sh`  — all of the above + the UI snapshot in one
                         round-trip; the "something is wrong, give me
