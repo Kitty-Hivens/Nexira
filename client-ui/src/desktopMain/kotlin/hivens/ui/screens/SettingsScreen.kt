@@ -19,6 +19,7 @@ import hivens.config.Branding
 import hivens.config.ExperimentalProtocolOverride
 import hivens.config.Protocol
 import hivens.core.api.interfaces.ISettingsService
+import hivens.core.data.SettingsData
 import hivens.launcher.diag.DiagnosticBundle
 import hivens.launcher.network.NetworkState
 import hivens.launcher.platform.PlatformPaths
@@ -60,19 +61,7 @@ fun SettingsScreen(
     val af = LocalAprilFools.current
 
     val initialSettings        = remember { settingsService.getSettings() }
-    var closeAfterStart        by remember { mutableStateOf(initialSettings.closeAfterStart) } // TODO: Duplicate
-    var isOfflineMode          by remember { mutableStateOf(initialSettings.isOfflineMode) }
-    var experimentalEnabled    by remember { mutableStateOf(initialSettings.experimentalFeaturesEnabled) }
-    var mandatoryUpdates       by remember { mutableStateOf(initialSettings.mandatoryUpdatesEnabled) }
-    var prereleaseChannel      by remember { mutableStateOf(initialSettings.prereleaseChannelEnabled) } // TODO: Duplicate
-    var autoSyncAllPacks       by remember { mutableStateOf(initialSettings.autoSyncAllPacks) }
-    var jvmBuilderEnabled      by remember { mutableStateOf(initialSettings.jvmBuilderEnabled) }
-    var forceProxyMode         by remember { mutableStateOf(initialSettings.forceProxyMode) }
-    // Mimic-version override -- gated by experimentalEnabled. The toggle is
-    // derived from "is there a persisted non-blank override" so reopening
-    // Settings on the next launch reflects the actually-applied state.
-    var mimicOverrideEnabled   by remember { mutableStateOf(!initialSettings.mimicVersionOverride.isNullOrBlank()) }
-    var mimicVersionText       by remember { mutableStateOf(initialSettings.mimicVersionOverride ?: "") }
+    val form                   = remember { SettingsFormState(initialSettings) }
     var langDropdownExpanded   by remember { mutableStateOf(false) }
     var showSavedMessage       by remember { mutableStateOf(false) }
 
@@ -82,35 +71,17 @@ fun SettingsScreen(
     var showAprilDebug by remember { mutableStateOf(false) }
 
     fun save() {
-        // Normalise the override to null when disabled or blank -- the
-        // SettingsData contract is "null/blank means use default", so storing
-        // a stale value with the toggle off would silently re-arm on next
-        // launch via the Main.kt restore block.
-        val normalisedMimic = if (mimicOverrideEnabled) mimicVersionText.trim().ifBlank { null } else null
-
-        val current = settingsService.getSettings()
-        settingsService.saveSettings(
-            current.copy(
-                closeAfterStart             = closeAfterStart,
-                isOfflineMode               = isOfflineMode,
-                experimentalFeaturesEnabled = experimentalEnabled,
-                mandatoryUpdatesEnabled     = mandatoryUpdates,
-                prereleaseChannelEnabled    = prereleaseChannel,
-                autoSyncAllPacks            = autoSyncAllPacks,
-                jvmBuilderEnabled           = jvmBuilderEnabled,
-                forceProxyMode              = forceProxyMode,
-                mimicVersionOverride        = normalisedMimic,
-            )
-        )
+        val toPersist = form.mergeInto(settingsService.getSettings())
+        settingsService.saveSettings(toPersist)
         // Mirror to NetworkState so ChannelRouter sees it on the very next
         // request without waiting for launcher restart.
-        NetworkState.setForceProxyMode(forceProxyMode)
+        NetworkState.setForceProxyMode(form.forceProxyMode)
         // Apply the mimic-version override immediately so the next protocol
         // handshake picks it up. Without this the user would have to restart
         // for the change to take effect, even though the system property
         // mechanism Protocol.MIMIC_LAUNCHER_VERSION reads is live.
         @OptIn(ExperimentalProtocolOverride::class)
-        Protocol.setMimicLauncherVersion(normalisedMimic)
+        Protocol.setMimicLauncherVersion(toPersist.mimicVersionOverride)
         showSavedMessage = true
     }
 
@@ -264,10 +235,10 @@ fun SettingsScreen(
                     SettingsSectionTitle(s.settingsSectionBehavior)
                     SettingsSwitchRow(
                         title           = s.settingsCloseAfterLaunch,
-                        checked         = closeAfterStart,
-                        onCheckedChange = { closeAfterStart = it; save() }
+                        checked         = form.closeAfterStart,
+                        onCheckedChange = { form.closeAfterStart = it; save() }
                     )
-                    PuppetToggle("settings.closeAfterStart", closeAfterStart) { closeAfterStart = it; save() }
+                    PuppetToggle("settings.closeAfterStart", form.closeAfterStart) { form.closeAfterStart = it; save() }
 
                     Spacer(Modifier.height(16.dp))
 
@@ -277,7 +248,7 @@ fun SettingsScreen(
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(12.dp))
                             .background(
-                                if (isOfflineMode) CelestiaTheme.colors.error.copy(alpha = 0.08f)
+                                if (form.isOfflineMode) CelestiaTheme.colors.error.copy(alpha = 0.08f)
                                 else CelestiaTheme.colors.background.copy(alpha = 0.4f)
                             )
                             .padding(16.dp),
@@ -288,7 +259,7 @@ fun SettingsScreen(
                             Icon(
                                 Icons.Default.WifiOff,
                                 null,
-                                tint = if (isOfflineMode) CelestiaTheme.colors.error else CelestiaTheme.colors.textSecondary,
+                                tint = if (form.isOfflineMode) CelestiaTheme.colors.error else CelestiaTheme.colors.textSecondary,
                                 modifier = Modifier.size(24.dp)
                             )
                             Spacer(Modifier.width(16.dp))
@@ -306,14 +277,14 @@ fun SettingsScreen(
                             }
                         }
                         Switch(
-                            checked = isOfflineMode,
-                            onCheckedChange = { isOfflineMode = it; save() },
+                            checked = form.isOfflineMode,
+                            onCheckedChange = { form.isOfflineMode = it; save() },
                             colors = SwitchDefaults.colors(
                                 checkedThumbColor = CelestiaTheme.colors.error,
                                 checkedTrackColor = CelestiaTheme.colors.error.copy(alpha = 0.5f)
                             )
                         )
-                        PuppetToggle("settings.offlineMode", isOfflineMode) { isOfflineMode = it; save() }
+                        PuppetToggle("settings.offlineMode", form.isOfflineMode) { form.isOfflineMode = it; save() }
                     }
                 }
 
@@ -422,11 +393,11 @@ fun SettingsScreen(
                                 )
                             }
                             Switch(
-                                checked         = forceProxyMode,
-                                onCheckedChange = { forceProxyMode = it; save() },
+                                checked         = form.forceProxyMode,
+                                onCheckedChange = { form.forceProxyMode = it; save() },
                             )
                         }
-                        PuppetToggle("settings.forceProxyMode", forceProxyMode) { forceProxyMode = it; save() }
+                        PuppetToggle("settings.forceProxyMode", form.forceProxyMode) { form.forceProxyMode = it; save() }
                     }
                 }
 
@@ -440,11 +411,11 @@ fun SettingsScreen(
                         description    = s.settingsExperimentalMasterDesc,
                         icon           = Icons.Default.Science,
                         iconTint       = CelestiaTheme.colors.primary,
-                        checked        = experimentalEnabled,
+                        checked        = form.experimentalEnabled,
                         enabled        = true,
-                        onCheckedChange = { experimentalEnabled = it; save() }
+                        onCheckedChange = { form.experimentalEnabled = it; save() }
                     )
-                    PuppetToggle("settings.experimental", experimentalEnabled) { experimentalEnabled = it; save() }
+                    PuppetToggle("settings.experimental", form.experimentalEnabled) { form.experimentalEnabled = it; save() }
 
                     Spacer(Modifier.height(16.dp))
 
@@ -453,13 +424,13 @@ fun SettingsScreen(
                         description    = s.settingsMandatoryUpdatesDesc,
                         icon           = Icons.Default.Update,
                         iconTint       = CelestiaTheme.colors.primary,
-                        checked        = experimentalEnabled && mandatoryUpdates,
-                        enabled        = experimentalEnabled,
-                        onCheckedChange = { mandatoryUpdates = it; save() }
+                        checked        = form.experimentalEnabled && form.mandatoryUpdates,
+                        enabled        = form.experimentalEnabled,
+                        onCheckedChange = { form.mandatoryUpdates = it; save() }
                     )
                     // Mirror the UI's enabled-gating: master switch off => can't touch sub-toggles.
-                    PuppetToggle("settings.mandatoryUpdates", mandatoryUpdates, enabled = experimentalEnabled) {
-                        mandatoryUpdates = it; save()
+                    PuppetToggle("settings.mandatoryUpdates", form.mandatoryUpdates, enabled = form.experimentalEnabled) {
+                        form.mandatoryUpdates = it; save()
                     }
 
                     Spacer(Modifier.height(16.dp))
@@ -469,12 +440,12 @@ fun SettingsScreen(
                         description    = s.settingsPrereleaseChannelDesc,
                         icon           = Icons.Default.NewReleases,
                         iconTint       = CelestiaTheme.colors.primary,
-                        checked        = experimentalEnabled && prereleaseChannel,
-                        enabled        = experimentalEnabled,
-                        onCheckedChange = { prereleaseChannel = it; save() }
+                        checked        = form.experimentalEnabled && form.prereleaseChannel,
+                        enabled        = form.experimentalEnabled,
+                        onCheckedChange = { form.prereleaseChannel = it; save() }
                     )
-                    PuppetToggle("settings.prereleaseChannel", prereleaseChannel, enabled = experimentalEnabled) {
-                        prereleaseChannel = it; save()
+                    PuppetToggle("settings.prereleaseChannel", form.prereleaseChannel, enabled = form.experimentalEnabled) {
+                        form.prereleaseChannel = it; save()
                     }
 
                     Spacer(Modifier.height(16.dp))
@@ -484,12 +455,12 @@ fun SettingsScreen(
                         description    = s.settingsAutoSyncAllPacksDesc,
                         icon           = Icons.Default.Sync,
                         iconTint       = CelestiaTheme.colors.primary,
-                        checked        = experimentalEnabled && autoSyncAllPacks,
-                        enabled        = experimentalEnabled,
-                        onCheckedChange = { autoSyncAllPacks = it; save() }
+                        checked        = form.experimentalEnabled && form.autoSyncAllPacks,
+                        enabled        = form.experimentalEnabled,
+                        onCheckedChange = { form.autoSyncAllPacks = it; save() }
                     )
-                    PuppetToggle("settings.autoSyncAllPacks", autoSyncAllPacks, enabled = experimentalEnabled) {
-                        autoSyncAllPacks = it; save()
+                    PuppetToggle("settings.autoSyncAllPacks", form.autoSyncAllPacks, enabled = form.experimentalEnabled) {
+                        form.autoSyncAllPacks = it; save()
                     }
 
                     Spacer(Modifier.height(16.dp))
@@ -499,12 +470,12 @@ fun SettingsScreen(
                         description    = s.settingsJvmBuilderDesc,
                         icon           = Icons.Default.Tune,
                         iconTint       = CelestiaTheme.colors.primary,
-                        checked        = experimentalEnabled && jvmBuilderEnabled,
-                        enabled        = experimentalEnabled,
-                        onCheckedChange = { jvmBuilderEnabled = it; save() }
+                        checked        = form.experimentalEnabled && form.jvmBuilderEnabled,
+                        enabled        = form.experimentalEnabled,
+                        onCheckedChange = { form.jvmBuilderEnabled = it; save() }
                     )
-                    PuppetToggle("settings.jvmBuilder", jvmBuilderEnabled, enabled = experimentalEnabled) {
-                        jvmBuilderEnabled = it; save()
+                    PuppetToggle("settings.jvmBuilder", form.jvmBuilderEnabled, enabled = form.experimentalEnabled) {
+                        form.jvmBuilderEnabled = it; save()
                     }
 
                     Spacer(Modifier.height(16.dp))
@@ -519,14 +490,14 @@ fun SettingsScreen(
                         description    = s.settingsMimicVersionDesc,
                         icon           = Icons.Default.Tag,
                         iconTint       = CelestiaTheme.colors.primary,
-                        checked        = experimentalEnabled && mimicOverrideEnabled,
-                        enabled        = experimentalEnabled,
-                        onCheckedChange = { mimicOverrideEnabled = it; save() }
+                        checked        = form.experimentalEnabled && form.mimicOverrideEnabled,
+                        enabled        = form.experimentalEnabled,
+                        onCheckedChange = { form.mimicOverrideEnabled = it; save() }
                     )
-                    PuppetToggle("settings.mimicVersion", mimicOverrideEnabled, enabled = experimentalEnabled) {
-                        mimicOverrideEnabled = it; save()
+                    PuppetToggle("settings.mimicVersion", form.mimicOverrideEnabled, enabled = form.experimentalEnabled) {
+                        form.mimicOverrideEnabled = it; save()
                     }
-                    if (experimentalEnabled && mimicOverrideEnabled) {
+                    if (form.experimentalEnabled && form.mimicOverrideEnabled) {
                         Spacer(Modifier.height(8.dp))
                         // Debounce text-field writes: onValueChange fires per
                         // keystroke and save() runs a synchronous file write
@@ -540,8 +511,8 @@ fun SettingsScreen(
                         // onCheckedChange (above) so the dependency between
                         // the toggle and the field stays intuitive.
                         OutlinedTextField(
-                            value           = mimicVersionText,
-                            onValueChange   = { mimicVersionText = it },
+                            value           = form.mimicVersionText,
+                            onValueChange   = { form.mimicVersionText = it },
                             singleLine      = true,
                             placeholder     = {
                                 Text(
@@ -555,13 +526,13 @@ fun SettingsScreen(
                                 .fillMaxWidth()
                                 .padding(start = 56.dp),
                         )
-                        PuppetField("settings.mimicVersion.text", mimicVersionText) {
-                            mimicVersionText = it
+                        PuppetField("settings.mimicVersion.text", form.mimicVersionText) {
+                            form.mimicVersionText = it
                         }
-                        LaunchedEffect(mimicVersionText) {
+                        LaunchedEffect(form.mimicVersionText) {
                             // Skip the initial-composition fire when the
                             // field equals the persisted value.
-                            if (mimicVersionText == (initialSettings.mimicVersionOverride ?: "")) {
+                            if (form.mimicVersionText == (initialSettings.mimicVersionOverride ?: "")) {
                                 return@LaunchedEffect
                             }
                             kotlinx.coroutines.delay(400.milliseconds)
@@ -886,6 +857,66 @@ fun SettingsScreen(
                 if (showSavedMessage) { kotlinx.coroutines.delay(2000.milliseconds); showSavedMessage = false }
             }
         }
+    }
+}
+
+/**
+ * Mutable form-state holder for the editable surface of [SettingsScreen].
+ *
+ * One field per editable setting; each field is its own [mutableStateOf]
+ * so Compose recomposition stays granular (flipping a single toggle only
+ * invalidates the rows that read that one field). The class is a thin
+ * namespace -- it does not centralize behaviour, only the ten or so
+ * `var x by mutableStateOf(initial.x)` declarations that otherwise sit
+ * inline in the composable.
+ *
+ * [mimicOverrideEnabled] / [mimicVersionText] are UI-only state, not
+ * 1:1-mapped to [SettingsData]:
+ *   - `mimicOverrideEnabled` is derived from whether the persisted
+ *     override is non-blank at composition time, then maintained
+ *     independently so a user can toggle off, edit the text, toggle on
+ *     without losing what they typed.
+ *   - `mimicVersionText` is the live edit value; `mergeInto` normalises
+ *     it (trim + blank-to-null) before writing to [SettingsData].
+ */
+@Stable
+private class SettingsFormState(initial: SettingsData) {
+    var closeAfterStart        by mutableStateOf(initial.closeAfterStart)
+    var isOfflineMode          by mutableStateOf(initial.isOfflineMode)
+    var experimentalEnabled    by mutableStateOf(initial.experimentalFeaturesEnabled)
+    var mandatoryUpdates       by mutableStateOf(initial.mandatoryUpdatesEnabled)
+    var prereleaseChannel      by mutableStateOf(initial.prereleaseChannelEnabled)
+    var autoSyncAllPacks       by mutableStateOf(initial.autoSyncAllPacks)
+    var jvmBuilderEnabled      by mutableStateOf(initial.jvmBuilderEnabled)
+    var forceProxyMode         by mutableStateOf(initial.forceProxyMode)
+    var mimicOverrideEnabled   by mutableStateOf(!initial.mimicVersionOverride.isNullOrBlank())
+    var mimicVersionText       by mutableStateOf(initial.mimicVersionOverride ?: "")
+
+    /**
+     * Build a [SettingsData] suitable for persistence by overlaying this
+     * form's editable fields onto [current] (a freshly-read snapshot, so
+     * non-screen fields like server-specific knobs are not clobbered).
+     *
+     * The mimic-version override is normalised here: empty toggle OR
+     * blank text both collapse to null, which is the contract
+     * [SettingsData.mimicVersionOverride] expects for "use the shipped
+     * default" semantics. Storing a stale non-null value with the toggle
+     * off would silently re-arm on next launch via the Main.kt restore
+     * block.
+     */
+    fun mergeInto(current: SettingsData): SettingsData {
+        val normalisedMimic = if (mimicOverrideEnabled) mimicVersionText.trim().ifBlank { null } else null
+        return current.copy(
+            closeAfterStart             = closeAfterStart,
+            isOfflineMode               = isOfflineMode,
+            experimentalFeaturesEnabled = experimentalEnabled,
+            mandatoryUpdatesEnabled     = mandatoryUpdates,
+            prereleaseChannelEnabled    = prereleaseChannel,
+            autoSyncAllPacks            = autoSyncAllPacks,
+            jvmBuilderEnabled           = jvmBuilderEnabled,
+            forceProxyMode              = forceProxyMode,
+            mimicVersionOverride        = normalisedMimic,
+        )
     }
 }
 
