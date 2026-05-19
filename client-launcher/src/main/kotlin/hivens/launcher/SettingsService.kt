@@ -9,16 +9,15 @@ import java.nio.file.Files
 import java.nio.file.Path
 
 /**
- * Read+write to the settings cache happens from both Compose UI threads
- * (settings screen recomposition) and IO coroutines (startup load,
- * Conduit Phase 2 force-proxy restore). Without coordination two
- * concurrent saves could race the file write, and the UI could observe a
- * half-applied SettingsData. All cache access goes through the same
- * monitor lock (#189).
+ * Reads and writes settings from both Compose UI threads (settings
+ * screen recomposition) and IO coroutines (startup load, force-proxy
+ * restore). Without coordination two concurrent saves could race the
+ * file write and the UI could observe a half-applied SettingsData; all
+ * cache access goes through the same monitor lock.
  */
 class SettingsService(
     private val json: Json,
-    private val settingsFile: Path
+    private val settingsFile: Path,
 ) : ISettingsService {
 
     private val log = LoggerFactory.getLogger(SettingsService::class.java)
