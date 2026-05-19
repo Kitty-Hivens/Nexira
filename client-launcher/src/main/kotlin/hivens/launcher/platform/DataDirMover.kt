@@ -150,11 +150,11 @@ object DataDirMover {
     private fun copyTree(source: Path, target: Path) {
         Files.walk(source).use { stream ->
             stream.forEach { src ->
-                // Reject symlinks (consistent with #187 ZIP/TAR hardening).
-                // A symlink in the source tree pointing outside the data dir
-                // would either leak its target into the move (escape boundary)
-                // or break post-move (dangling link). Skip with a log line
-                // so the user has a record if migration looks incomplete.
+                // Skip symlinks: a link pointing outside the data dir
+                // would either leak its target into the move (escape
+                // boundary) or break post-move (dangling link). Log
+                // each skip so the user has a record if migration
+                // looks incomplete.
                 if (Files.isSymbolicLink(src)) {
                     log.warn("Skipping symlink during data-dir copy: {}", src)
                     return@forEach

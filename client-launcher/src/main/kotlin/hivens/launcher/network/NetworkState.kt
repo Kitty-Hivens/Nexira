@@ -12,35 +12,26 @@ import java.nio.file.Path
 import java.time.Instant
 
 /**
- * Global network policy state -- currently the per-host SSL-bypass set.
+ * Global network policy state -- per-host SSL-bypass set + force-proxy
+ * toggle. Each bypass entry carries its own expiry, so accepting a
+ * one-off cert outage on `smartycraft.ru` does not silently weaken TLS
+ * for unrelated hosts.
  *
- * Replaced the prior `var sslBypassEnabled: Boolean` (a single global
- * toggle that, once accepted, opened TLS verification for every HTTPS
- * call until process exit) with a list of [SslBypassEntry] each
- * carrying its own expiry. Practical effect: accepting a one-off cert
- * outage on `smartycraft.ru` no longer silently weakens TLS for
- * unrelated hosts, and stale acceptances stop applying after
- * the user-set expiry instead of surviving forever in process memory.
+ * Persistence: when [initialize] is called with a path, grants /
+ * revokes write the current state to that JSON file. On restart the
+ * file is re-read and **expired entries are dropped during the load**
+ * so a 30-day grant from a month ago doesn't quietly re-arm itself.
+ * If [initialize] is never called (test mode), state is in-memory only.
  *
- * Persistence: when [initialize] is called with a path, all grants /
- * revokes write the current state to that JSON file. On launcher
- * restart the same file is re-read and **expired entries are dropped
- * during the load**, so a 30-day grant from a month ago doesn't quietly
- * re-arm itself. If [initialize] is never called (test mode), the state
- * is in-memory only.
+ * Thread-safety: all public methods synchronize on a shared lock.
+ * Surface is small (UI accept + occasional `bypassFor` check on each
+ * HTTP call) so a single lock is the right shape.
  *
- * Thread-safety: all public methods synchronize on a shared lock. The
- * surface is small (4 methods) and contention is rare (UI accept,
- * occasional `bypassFor` check on each HTTP call) so a single lock is
- * the right shape.
- *
- * Singleton chosen deliberately -- the previous boolean was also an
- * `object`, callers throughout `client-ui` (composables) and
- * `client-launcher` (DI selector) reach it without injection. Turning
- * it into a Koin-injected class would have rippled into every
- * @Composable that reads bypass state, for marginal testability gain
- * that's already covered by extracting [SslBypassEntry] logic into
- * its own data type with isolated tests.
+ * Singleton (not Koin-injected) deliberately -- callers throughout
+ * `client-ui` (composables) and `client-launcher` (DI selectors) reach
+ * it without injection. DI'ing would ripple into every @Composable
+ * that reads bypass state for marginal testability gain that's
+ * already covered by isolated tests on [SslBypassEntry].
  */
 object NetworkState {
     private val log = LoggerFactory.getLogger(NetworkState::class.java)
@@ -52,16 +43,12 @@ object NetworkState {
 
     /**
      * Push-side view of [bypasses]. Emits a fresh snapshot after every
-     * grant / revoke / load so UI callers can `collectAsState()` instead
-     * of polling `bypassFor(host)` on a 200ms timer (the prior
-     * `produceState { while(true) … delay(200ms) }` pattern in
-     * `AppLayout`/`DashboardScreen` -- five recompositions per second
-     * for state that mutates on the scale of minutes-to-days).
+     * grant / revoke / load so UI callers `collectAsState()` instead of
+     * polling on a timer for state that mutates on the scale of
+     * minutes-to-days.
      *
      * Time-based expiry is not auto-ticked here: a 30-day bypass entry
-     * stays in the list until process restart or explicit revoke. UI is
-     * about "did the user just accept / revoke" -- the polling never
-     * meaningfully observed expiry crossings either.
+     * stays in the list until process restart or explicit revoke.
      */
     private val _bypassesState = MutableStateFlow<List<SslBypassEntry>>(emptyList())
     val bypassesState: StateFlow<List<SslBypassEntry>> = _bypassesState.asStateFlow()
@@ -71,16 +58,16 @@ object NetworkState {
     }
 
     /**
-     * User opt-in: skip the direct-channel attempt and route every smartycraft
-     * request through the SOCKS5 proxy from the first call. For users in
-     * censored regions / corporate firewalls where direct connections are
-     * known to fail. Default false -- direct works for ~99% of users
-     * (see `reference_smartycraft_proxy` for empirical data).
+     * User opt-in: skip the direct-channel attempt and route every
+     * smartycraft request through the SOCKS5 proxy from the first
+     * call. For users in censored regions / corporate firewalls where
+     * direct connections are blocked. Default false -- direct works
+     * for ~99% of users.
      *
-     * Persisted in-memory only for now. UI binding (Settings -> Network ->
-     * "Force proxy mode") wires through here. Survives via [SettingsService]
-     * persistence -- the UI restores the saved value on each launch and calls
-     * [setForceProxyMode] to re-arm.
+     * In-memory here; cross-restart persistence lives in
+     * [SettingsService] (`forceProxyMode` field). UI binding (Settings
+     * → Network → "Force proxy mode") calls [setForceProxyMode] on
+     * toggle change; `SettingsRestoreHook` re-arms the value at startup.
      */
     private val _forceProxyState = MutableStateFlow(false)
 
