@@ -21,9 +21,10 @@ import java.nio.file.Paths
  *   - `data-dir-pending-source` -- set by UI when scheduling a move
  *   - `data-dir-pending-target` -- set by UI when scheduling a move
  *
- * Lines that don't match `key=value` are ignored on read; the writer
- * preserves only known keys. No comment support (simpler than dealing
- * with `#` semantics across edits).
+ * Lines that don't match `key=value` are ignored on read; lines
+ * starting with `#` are also dropped on read. The writer preserves
+ * only known keys (no comment passthrough), so a hand-added `#`-line
+ * survives until the next launcher-side write and then disappears.
  *
  * Concurrency: every operation is file-system-atomic (`Files.writeString`
  * is atomic on POSIX, atomic-on-rename on Windows). The launcher only
