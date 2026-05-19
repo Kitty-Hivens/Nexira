@@ -1,11 +1,11 @@
 <div align="center">
-  <h1>Aura Launcher</h1>
+  <h1>Nexira</h1>
 </div>
 
 <div align="center">
 
-[![Last Release](https://img.shields.io/github/v/release/Kitty-Hivens/Aura-Launcher?style=for-the-badge&color=BB86FC&logo=github&logoColor=D9E0EE&labelColor=1E202B)](https://github.com/Kitty-Hivens/Aura-Launcher/releases/latest)
-[![Docs](https://img.shields.io/badge/docs-online-BB86FC?style=for-the-badge&logo=astro&logoColor=D9E0EE&labelColor=1E202B)](https://kitty-hivens.github.io/Aura-Launcher/)
+[![Last Release](https://img.shields.io/github/v/release/Kitty-Hivens/Nexira?style=for-the-badge&color=BB86FC&logo=github&logoColor=D9E0EE&labelColor=1E202B)](https://github.com/Kitty-Hivens/Nexira/releases/latest)
+[![Docs](https://img.shields.io/badge/docs-online-BB86FC?style=for-the-badge&logo=astro&logoColor=D9E0EE&labelColor=1E202B)](https://kitty-hivens.github.io/Nexira/)
 [![License](https://img.shields.io/badge/license-GPLv3-86dbd7?style=for-the-badge&logoColor=D9E0EE&labelColor=1E202B)](LICENSE)
 [![Platform](https://img.shields.io/badge/Windows%20%7C%20Linux%20%7C%20macOS-supported-86dbce?style=for-the-badge&logoColor=D9E0EE&labelColor=1E202B)](#)
 
@@ -35,21 +35,21 @@
 
 | Platform | Tier | File |
   |---|---|---|
-| Windows | tier-1 | `AuraLauncher-*-Setup.exe` |
-| Windows (portable) | tier-1 | `AuraLauncher-*-Windows-Portable.zip` |
-| Linux | tier-1 | `AuraLauncher-*-x86_64.AppImage` |
-| macOS Apple Silicon | tier-1 | `AuraLauncher-*-aarch64.dmg` |
-| macOS Intel | community | `AuraLauncher-*-x86_64-community.dmg` |
+| Windows | tier-1 | `Nexira-*-Setup.exe` |
+| Windows (portable) | tier-1 | `Nexira-*-Windows-Portable.zip` |
+| Linux | tier-1 | `Nexira-*-x86_64.AppImage` |
+| macOS Apple Silicon | tier-1 | `Nexira-*-aarch64.dmg` |
+| macOS Intel | community | `Nexira-*-x86_64-community.dmg` |
 
-→ [**Latest Release**](https://github.com/Kitty-Hivens/Aura-Launcher/releases/latest)
+→ [**Latest Release**](https://github.com/Kitty-Hivens/Nexira/releases/latest)
 
-For detailed instructions see the [documentation](https://kitty-hivens.github.io/Aura-Launcher/).
+For detailed instructions see the [documentation](https://kitty-hivens.github.io/Nexira/).
 </details>
 
 <details>
   <summary>Platform support tiers</summary>
 
-Aura is built and validated by a single maintainer on the platforms below.
+Nexira is built and validated by a single maintainer on the platforms below.
 Tier choice reflects how confidently each release is exercised before publish,
 not the quality of the code path itself.
 
