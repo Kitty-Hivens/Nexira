@@ -303,10 +303,11 @@ fun main() {
 
         val settings = remember { settingsService.getSettings() }
 
-        // Window starts visible -- `startInTray` was retired in 2.2.14:
-        // it confused users (launcher invisible after first run) and
-        // had no clear use case. Tray is the dock-style fallback for
-        // close-while-game-running, not a launcher hide-by-default mode.
+        // Window starts visible. Tray is the dock-style fallback for
+        // close-while-game-running, not a launcher hide-by-default
+        // mode -- a start-in-tray toggle was tried and dropped; it
+        // confused users (launcher invisible after first run) without
+        // a clear use case.
         var isWindowVisible by remember { mutableStateOf(true) }
 
         var isDarkTheme   by remember { mutableStateOf(settings.isDarkTheme) }
@@ -425,14 +426,12 @@ fun main() {
                 // Tray failed to init -- restore the window so the user isn't
                 // stuck with no reachable UI. The scenario is:
                 //   - the user clicked the close button during the
-                //     INITIALIZING window (the close handler at the bottom
-                //     of this file uses canBeReady, not isSupported, to
-                //     avoid killing the launcher mid-init). Same outcome
-                //     -- window hidden, no tray either. Without this
-                //     restore the process keeps running with no UI and
-                //     the user has to kill it.
-                //   (Codex P1 from PR #131 -- the canBeReady-during-INIT
-                //   path needs this failure-path unhide.)
+                //     INITIALIZING window (the close handler at the
+                //     bottom of this file uses canBeReady, not
+                //     isSupported, to avoid killing the launcher
+                //     mid-init). Same outcome: window hidden, no tray
+                //     either. Without this restore the process keeps
+                //     running with no UI and the user has to kill it.
                 if (!TrayManager.isSupported && !isWindowVisible) {
                     isWindowVisible = true
                 }
