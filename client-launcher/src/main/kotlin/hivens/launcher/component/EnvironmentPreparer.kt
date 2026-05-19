@@ -181,18 +181,19 @@ class EnvironmentPreparer(private val clientProvider: HttpClientProvider) {
     }
 
     /**
-     * The natives directory is "valid" only when the actual lwjgl native is
-     * present, not just *any* file with the platform's extension (#185).
-     * Pre-fix the check accepted a directory containing only `libjinput-*.so`
-     * as valid because jinput is a `.so` file -- which let `prepareNatives`
-     * short-circuit on a half-populated dir, and the game then died with
+     * The natives directory is "valid" only when an actual lwjgl
+     * native is present, not just *any* file with the platform's
+     * extension. Catching only the extension treats a directory
+     * containing only `libjinput-*.so` as valid (jinput is a `.so`
+     * too), letting [prepareNatives] short-circuit on a half-populated
+     * dir; the game then dies with
      * `UnsatisfiedLinkError: no lwjgl64 in java.library.path`.
      *
-     * Substring match on `lwjgl` keeps the gate version-agnostic: catches
-     * LWJGL 2 (`liblwjgl.so` + `liblwjgl64.so`) and LWJGL 3 (`liblwjgl.so`,
-     * `liblwjgl-glfw.so`, …) and the missing `lib` prefix on the older
-     * Windows naming (`lwjgl.dll`) -- without enumerating module names that
-     * could drift between versions.
+     * Substring match on `lwjgl` keeps the gate version-agnostic: it
+     * catches LWJGL 2 (`liblwjgl.so` + `liblwjgl64.so`) and LWJGL 3
+     * (`liblwjgl.so`, `liblwjgl-glfw.so`, …) plus the missing-`lib`-
+     * prefix Windows naming (`lwjgl.dll`) without enumerating module
+     * names that could drift across versions.
      */
     internal fun isFolderValidForOs(dir: Path, os: String): Boolean {
         if (!Files.exists(dir)) return false
