@@ -1,3 +1,13 @@
+// `RepositoriesMode.FAIL_ON_PROJECT_REPOS` and the corresponding
+// `repositoriesMode.set(...)` setter are `@Incubating` in Gradle as of
+// 9.x. We accept that risk deliberately (the policy of single-source-of-
+// truth for repositories is worth the API churn cost), but Qodana would
+// otherwise repeatedly flag the four call sites every PR. Suppress at the
+// file level rather than at every line; if the @Incubating annotation
+// gets removed in a future Gradle release, this annotation becomes a
+// no-op rather than masking a different issue.
+@file:Suppress("UnstableApiUsage")
+
 // Plugin resolution: explicit Plugin Portal pin lets a reader trace any
 // plugin id below back to a known repository without guessing. Default
 // gradlePluginPortal() resolution is the same source but implicit; spelling
