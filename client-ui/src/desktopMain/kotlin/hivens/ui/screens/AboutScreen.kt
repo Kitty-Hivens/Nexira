@@ -470,11 +470,11 @@ fun AboutScreen(onBack: () -> Unit) {
                     Column(Modifier.padding(20.dp)) {
                         SectionLabel(s.aboutSectionLinks)
                         Spacer(Modifier.height(12.dp))
-                        LinkButton(s.aboutLinkGithub,    "https://github.com/Kitty-Hivens/Aura-Launcher",         Icons.Default.Code)
+                        LinkButton(s.aboutLinkGithub,    "https://github.com/Kitty-Hivens/Nexira",         Icons.Default.Code)
                         Spacer(Modifier.height(8.dp))
-                        LinkButton(s.aboutLinkBugReport, "https://github.com/Kitty-Hivens/Aura-Launcher/issues",  Icons.Default.BugReport)
+                        LinkButton(s.aboutLinkBugReport, "https://github.com/Kitty-Hivens/Nexira/issues",  Icons.Default.BugReport)
                         Spacer(Modifier.height(8.dp))
-                        LinkButton(s.aboutLinkReleases,  "https://github.com/Kitty-Hivens/Aura-Launcher/releases",Icons.Default.Download)
+                        LinkButton(s.aboutLinkReleases,  "https://github.com/Kitty-Hivens/Nexira/releases",Icons.Default.Download)
                     }
                 }
             }

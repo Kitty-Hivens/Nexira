@@ -96,7 +96,7 @@ class FileDownloadService(
         // user-perceived launch latency (~5+ s for non-cache paths).
         //
         // Sampling only the top N manifest entries would miss
-        // deletions or truncations elsewhere -- Aura packs run
+        // deletions or truncations elsewhere -- Nexira packs run
         // 50-1000+ entries and the affected file is rarely at the top
         // of an alphabetical traversal. The walk MUST cover every
         // entry or the cache silently masks a missing mod and the

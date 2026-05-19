@@ -469,7 +469,7 @@ interface AppStrings {
     val jvmCustomIntro: String
     val jvmCustomLabel: String
 
-    // --- Data dir migration UI (mandatory first-launch flow after Aura -> Nexira rebrand) ---
+    // --- Data dir migration UI (mandatory first-launch flow after Nexira -> Nexira rebrand) ---
     val migrationWelcome: String
     val migrationDescription: String
     val migrationFromHeader: String

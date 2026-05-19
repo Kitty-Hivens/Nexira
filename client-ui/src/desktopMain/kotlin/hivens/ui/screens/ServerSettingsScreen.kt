@@ -160,7 +160,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
     val borderColor = CelestiaTheme.colors.textSecondary.copy(alpha = 0.2f)
 
     // Puppet ids prefixed with the server's assetDir so concurrent settings
-    // dialogs (theoretical -- Aura keeps only one open at a time today) stay
+    // dialogs (theoretical -- Nexira keeps only one open at a time today) stay
     // disambiguated, and tests can verify they're acting on the intended server.
     val pkey = "serverSettings.${server.assetDir}"
     PuppetScreen("ServerSettings.${server.assetDir}")

@@ -108,7 +108,7 @@ object DiagnosticBundle {
     private fun buildSystemInfo(paths: PlatformPaths): String = buildString {
         val rt = Runtime.getRuntime()
         appendLine("==============================")
-        appendLine(" Aura Launcher diagnostic bundle")
+        appendLine(" Nexira diagnostic bundle")
         appendLine("==============================")
         appendLine(" Generated  : ${isoFmt.format(Instant.now())}")
         appendLine(" Version    : ${Branding.VERSION}")

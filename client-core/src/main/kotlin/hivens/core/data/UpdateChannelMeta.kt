@@ -7,7 +7,7 @@ import kotlinx.serialization.Serializable
  * Out-of-band update-channel metadata, fetched separately from the GitHub
  * Releases API so we can mark older releases as mandatory after the fact --
  * without re-publishing them. Lives at
- * `https://raw.githubusercontent.com/Kitty-Hivens/Aura-Launcher/stable/meta/update-channel.json`.
+ * `https://raw.githubusercontent.com/Kitty-Hivens/Nexira/stable/meta/update-channel.json`.
  *
  * Both fields are optional; an absent file or absent fields mean "no floor",
  * which is the safe default for `UpdateService` to treat as a normal

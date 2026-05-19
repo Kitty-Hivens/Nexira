@@ -158,8 +158,8 @@ internal class WindowsCredentialManagerKeyringStorage : IKeyringStorage {
         // (ERROR_NOT_FOUND), so a bare delete alone can't distinguish
         // "service alive" from "service dead".
         return runCatching {
-            val ok = store("io.github.kitty_hivens.AuraLauncher.probe", "isAvailable", "ok")
-            if (ok) clear("io.github.kitty_hivens.AuraLauncher.probe", "isAvailable")
+            val ok = store("io.github.kitty_hivens.Nexira.probe", "isAvailable", "ok")
+            if (ok) clear("io.github.kitty_hivens.Nexira.probe", "isAvailable")
             ok
         }.getOrDefault(false)
     }

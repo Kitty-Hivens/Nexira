@@ -3,10 +3,10 @@ package hivens.ui.i18n
 object GermanStrings : AppStrings {
 
     // App
-    override val appName = "Aura Launcher"
+    override val appName = "Nexira"
 
     // Login
-    override val loginTitle        = "Aura Launcher"
+    override val loginTitle        = "Nexira"
     override val loginUsername     = "Benutzername"
     override val loginPassword     = "Passwort"
     override val loginRemember     = "Passwort speichern"
@@ -303,7 +303,7 @@ object GermanStrings : AppStrings {
     override val settingsJvmBuilder             = "Visueller JVM-Argument-Builder"
     override val settingsJvmBuilderDesc         = "Zeigt einen „Argumente bauen“-Button in den Server-Einstellungen. Wähle Garbage Collector, justiere Heap-Regionen, aktiviere AppCDS oder JFR — ohne Flags auswendig zu lernen. Vorgaben: Aikar's Rezept, GTNH-Klasse, ZGC für große Heaps und mehr."
     override val settingsMimicVersion           = "Launcher-Version-Override"
-    override val settingsMimicVersionDesc       = "Fixiert den Versions-String, der an den Upstream im Handshake und User-Agent gesendet wird. Leer lassen für den eingebauten Standard — nur setzen, wenn der Upstream seine Versions-Anforderung schneller anhebt als Auras Release-Zyklus. Wirkt beim nächsten Protokoll-Aufruf nach Speichern, kein Neustart nötig."
+    override val settingsMimicVersionDesc       = "Fixiert den Versions-String, der an den Upstream im Handshake und User-Agent gesendet wird. Leer lassen für den eingebauten Standard — nur setzen, wenn der Upstream seine Versions-Anforderung schneller anhebt als Nexiras Release-Zyklus. Wirkt beim nächsten Protokoll-Aufruf nach Speichern, kein Neustart nötig."
     override fun settingsMimicVersionPlaceholder(default: String) = "Standard: $default"
     override fun dashboardAutoSyncProgress(serverName: String, current: Int, total: Int) =
         "Synchronisiere $serverName ($current/$total)"
@@ -364,11 +364,11 @@ object GermanStrings : AppStrings {
     override val settingsSectionDataDir       = "Datenverzeichnis"
     override val settingsDataDirCurrent       = "Aktueller Pfad:"
     override val settingsDataDirMove          = "Verschieben..."
-    override val settingsDataDirPickerTitle   = "Neuen Speicherort für Aura-Daten wählen"
+    override val settingsDataDirPickerTitle   = "Neuen Speicherort für Nexira-Daten wählen"
     override val settingsDataDirConfirmTitle  = "Datenverzeichnis verschieben?"
     override fun settingsDataDirConfirmBody(source: String, target: String) =
-        "Aura wird die Daten verschieben:\nvon: $source\nnach: $target\n\nDie Verschiebung wird beim nächsten Start angewendet."
-    override val settingsDataDirRestartRequired = "Neustart erforderlich — Aura wendet die Verschiebung beim nächsten Start an"
+        "Nexira wird die Daten verschieben:\nvon: $source\nnach: $target\n\nDie Verschiebung wird beim nächsten Start angewendet."
+    override val settingsDataDirRestartRequired = "Neustart erforderlich — Nexira wendet die Verschiebung beim nächsten Start an"
     override val settingsDataDirQuitNow         = "Jetzt beenden"
     override val settingsDataDirErrorSamePath   = "Das ist bereits das aktuelle Verzeichnis — wähle einen anderen Ordner"
     override val settingsDataDirErrorNotEmpty   = "Zielordner ist nicht leer — wähle einen leeren Ordner oder lösche dessen Inhalt"
@@ -457,7 +457,7 @@ object GermanStrings : AppStrings {
 
     // --- Data dir migration UI ---
     override val migrationWelcome      = "Willkommen bei Nexira"
-    override val migrationDescription  = "Aura heißt jetzt Nexira. Vor dem Start müssen deine vorhandenen Daten an den neuen Ort kopiert werden. Der alte Ordner bleibt als Sicherung unberührt; lösche ihn manuell, sobald alles funktioniert."
+    override val migrationDescription  = "Nexira heißt jetzt Nexira. Vor dem Start müssen deine vorhandenen Daten an den neuen Ort kopiert werden. Der alte Ordner bleibt als Sicherung unberührt; lösche ihn manuell, sobald alles funktioniert."
     override val migrationFromHeader   = "Von"
     override val migrationToHeader     = "Nach"
     override fun migrationSize(megabytes: Int, files: Int) = "$megabytes MB, $files Dateien"

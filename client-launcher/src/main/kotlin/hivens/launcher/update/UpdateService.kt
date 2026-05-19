@@ -36,7 +36,7 @@ class UpdateService(
     private val lastMetaCheckFile = updateDir.resolve(".last_meta_check")
 
     companion object {
-        private const val GITHUB_REPO          = "Kitty-Hivens/Aura-Launcher"
+        private const val GITHUB_REPO          = "Kitty-Hivens/Nexira"
         private const val GITHUB_API_LATEST    = "https://api.github.com/repos/$GITHUB_REPO/releases/latest"
         private const val GITHUB_API_RELEASES  = "https://api.github.com/repos/$GITHUB_REPO/releases"
         private const val GITHUB_RELEASE_PAGE  = "https://github.com/$GITHUB_REPO/releases/tag"
@@ -495,7 +495,7 @@ class UpdateService(
     internal fun extractChecksum(releaseBody: String?, fileName: String): String {
         if (releaseBody == null) return ""
 
-        // Format 1: Markdown table row  --  | `AuraLauncher-1.3.0-Setup.exe` | `abcdef...` |
+        // Format 1: Markdown table row  --  | `Nexira-1.3.0-Setup.exe` | `abcdef...` |
         val tablePattern = """\|\s*`${Regex.escape(fileName)}`\s*\|\s*`([a-fA-F0-9]{64})`\s*\|""".toRegex()
         tablePattern.find(releaseBody)?.groupValues?.get(1)?.let { return it }
 
@@ -582,7 +582,7 @@ class UpdateService(
      * out of tokens first, the shorter side sorts first ("alpha" < "alpha1").
      * On token-type mismatch at the same index, numeric tokens sort before
      * text tokens -- arbitrary but deterministic; we don't expect to hit this
-     * case for any real Aura version string.
+     * case for any real Nexira version string.
      */
     private fun compareSuffixNatural(s1: String, s2: String): Int {
         val tokens1 = tokenizeSuffix(s1)

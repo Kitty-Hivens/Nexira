@@ -7,7 +7,7 @@ import kotlinx.serialization.Serializable
 /**
  * Resolved configuration for talking to a SmartyCraft-compatible
  * backend. All fields default to production SmartyCraft values; a
- * vanilla Aura install with no config file behaves like the baseline.
+ * vanilla Nexira install with no config file behaves like the baseline.
  *
  * Override paths (opt-in via [ExperimentalConduitOverride]):
  * 1. Config file at `<dataDir>/server-config.json` -- the full data

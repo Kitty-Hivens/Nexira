@@ -14,7 +14,7 @@ data class StatusOnlyResponse(
 /**
  * Request body for `action=spawn` (NOT `tospawn` -- upstream has both;
  * `spawn` resets the player's spawn point in-game, `tospawn` starts a
- * game session). Aura uses `spawn` only; sessions are established by
+ * game session). Nexira uses `spawn` only; sessions are established by
  * passing the access token to the child JVM directly.
  *
  * Signed: `check = md5(time/10 | uid | login | server)`. 1.12.2-only.

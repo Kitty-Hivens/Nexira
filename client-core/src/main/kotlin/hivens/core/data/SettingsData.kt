@@ -81,7 +81,7 @@ data class SettingsData(
      * blank uses `Protocol.DEFAULT_MIMIC_LAUNCHER_VERSION`. Persisted
      * (rather than relying on the `-Dsmrt.mimic.version` CLI flag) so
      * the override survives launcher restart; aimed at reacting to an
-     * upstream version pin faster than the Aura release cycle.
+     * upstream version pin faster than the Nexira release cycle.
      */
     val mimicVersionOverride: String? = null,
 )

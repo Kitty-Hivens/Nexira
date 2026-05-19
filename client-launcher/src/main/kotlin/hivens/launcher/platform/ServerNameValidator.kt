@@ -12,7 +12,7 @@ package hivens.launcher.platform
  *
  * Allowed characters: ASCII letters, digits, `_`, `-`, `.`. This matches every
  * SmartyCraft server id that has ever shipped (`Industrial`, `RPG`, `SkyBlock`,
- * `MagicRPG`, `Aura.v2`, etc.) and rules out path separators (`/`, `\`),
+ * `MagicRPG`, `Nexira.v2`, etc.) and rules out path separators (`/`, `\`),
  * traversal sequences (`..`), whitespace, NULs, and anything else that could
  * trip OS-specific path parsing on Windows or macOS.
  *

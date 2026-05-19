@@ -75,7 +75,7 @@ class CrashReporter(
 
         file.writeText(buildString {
             appendLine("===================================")
-            appendLine(" Aura Launcher Crash Report")
+            appendLine(" Nexira Crash Report")
             appendLine("===================================")
             appendLine(" Generated : ${report.timestamp}")
             appendLine(" Version   : ${report.version}")
@@ -103,7 +103,7 @@ class CrashReporter(
 
     fun showCrashDialog(report: CrashReport, reportFile: File) {
         val message = """
-            Aura Launcher quit unexpectedly.
+            Nexira quit unexpectedly.
 
             Report saved:
             ${reportFile.absolutePath}
