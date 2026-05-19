@@ -526,8 +526,22 @@ fun SettingsScreen(
                         // onCheckedChange (above) so the dependency between
                         // the toggle and the field stays intuitive.
                         OutlinedTextField(
+                            // Filter at every keystroke -- the value propagates
+                            // into a User-Agent header, a JVM system property,
+                            // and the spawned game's -Dminecraft.launcher.version
+                            // argv, all of which reject non-ASCII. A user with
+                            // a Cyrillic keyboard layout accidentally typing
+                            // here used to break login with an opaque "Network
+                            // Error". Protocol.setMimicLauncherVersion repeats
+                            // the same check as defense for hand-edited or
+                            // older-version persistence files.
                             value           = form.mimicVersionText,
-                            onValueChange   = { form.mimicVersionText = it },
+                            onValueChange   = { newValue ->
+                                form.mimicVersionText = newValue.filter {
+                                    @OptIn(ExperimentalProtocolOverride::class)
+                                    it in Protocol.MIMIC_VERSION_ALLOWED_CHARS
+                                }
+                            },
                             singleLine      = true,
                             placeholder     = {
                                 Text(
@@ -541,8 +555,11 @@ fun SettingsScreen(
                                 .fillMaxWidth()
                                 .padding(start = 56.dp),
                         )
-                        PuppetField("settings.mimicVersion.text", form.mimicVersionText) {
-                            form.mimicVersionText = it
+                        PuppetField("settings.mimicVersion.text", form.mimicVersionText) { newValue ->
+                            form.mimicVersionText = newValue.filter {
+                                @OptIn(ExperimentalProtocolOverride::class)
+                                it in Protocol.MIMIC_VERSION_ALLOWED_CHARS
+                            }
                         }
                         LaunchedEffect(form.mimicVersionText) {
                             // Skip the initial-composition fire when the

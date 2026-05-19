@@ -43,18 +43,40 @@ object Protocol {
     const val SYSTEM_PROP_MIMIC_VERSION = "smrt.mimic.version"
 
     /**
+     * Characters permitted in the mimic launcher version override. The value
+     * propagates to the HTTP `User-Agent` header (RFC 7230 token chars only),
+     * the JVM system property [SYSTEM_PROP_MIMIC_VERSION], and the child game
+     * process's `-Dminecraft.launcher.version=...` argv. Any of those rejects
+     * non-ASCII; OkHttp specifically throws `IllegalArgumentException:
+     * "Unexpected char 0xNNN in User-Agent value"` and the user sees it as
+     * "Network Error: ..." on the dashboard. Restricting the charset at the
+     * boundary keeps a user accidentally typing in a Cyrillic keyboard layout
+     * (or pasting a string with hidden Unicode) from breaking login.
+     */
+    @ExperimentalProtocolOverride
+    val MIMIC_VERSION_ALLOWED_CHARS: Set<Char> =
+        ('A'..'Z').toSet() + ('a'..'z').toSet() + ('0'..'9').toSet() + setOf('.', '-', '_')
+
+    /**
      * Programmatic override -- sets (or clears, if `version` is null/blank) the
      * runtime mimic version. Called by `Main.kt` on every startup with the
      * persisted `SettingsData.mimicVersionOverride` (so the value survives
      * launcher restart) and by `SettingsScreen` on save (so the change takes
      * effect on the very next protocol call without waiting for restart).
+     *
+     * Defensively rejects values containing characters outside
+     * [MIMIC_VERSION_ALLOWED_CHARS] by clearing the override (falling back to
+     * [DEFAULT_MIMIC_LAUNCHER_VERSION]); the UI surface filters input on the
+     * way in, but a hand-edited or older-version-corrupted persistence file
+     * could still feed us garbage on cold start.
      */
     @ExperimentalProtocolOverride
     fun setMimicLauncherVersion(version: String?) {
-        if (version.isNullOrBlank()) {
+        val safe = version?.takeIf { it.isNotBlank() && it.all { c -> c in MIMIC_VERSION_ALLOWED_CHARS } }
+        if (safe == null) {
             System.clearProperty(SYSTEM_PROP_MIMIC_VERSION)
         } else {
-            System.setProperty(SYSTEM_PROP_MIMIC_VERSION, version)
+            System.setProperty(SYSTEM_PROP_MIMIC_VERSION, safe)
         }
     }
 
