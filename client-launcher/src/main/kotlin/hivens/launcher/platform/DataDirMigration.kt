@@ -7,16 +7,22 @@ import java.nio.file.StandardCopyOption
 import java.time.Instant
 
 /**
- * One-shot migration of user data from ~/.aura/ to the platform-correct directory.
+ * Data-dir migration from an Aura-era location to the current Nexira
+ * location. Walks [PlatformPaths.legacyDataDirs] in priority order and
+ * imports from the first non-empty candidate that is not already marked
+ * as migrated.
  *
- * Copies (does not move) -- the legacy directory is left in place so the user can
- * verify the migration before deleting it manually. A marker file is written into
- * the legacy directory to prevent re-running.
+ * Copy semantics: source files are copied (not moved). The legacy
+ * directory is left in place with a `.migrated` marker so a re-run on
+ * the same installation skips it. Users can manually delete the legacy
+ * directory once they've verified the migration.
  *
- * Skipped when:
- * - the legacy directory does not exist (clean install);
+ * Skipped per-candidate when:
+ * - the legacy directory does not exist (not relevant for this user);
  * - the marker file is already present (already migrated);
- * - the target directory exists and is non-empty (defensive -- never overwrite).
+ * - the legacy directory contains nothing beyond housekeeping markers;
+ * - the target directory exists and is non-empty (defensive -- never
+ *   overwrite, write marker on legacy to stop revisiting).
  */
 object DataDirMigration {
     private val log = LoggerFactory.getLogger(DataDirMigration::class.java)
@@ -27,8 +33,8 @@ object DataDirMigration {
      * (SingleInstance.acquire grabs the lock before
      * DataDirMigration.run, by design -- see Main.kt). Their presence
      * MUST NOT make the target look "already populated", otherwise
-     * first-run migration silently skips and the legacy `.aura/`
-     * payload is lost.
+     * first-run migration silently skips and the legacy payload is
+     * lost.
      *
      * Add new entries here whenever startup gains another
      * pre-migration housekeeping file.
@@ -36,23 +42,26 @@ object DataDirMigration {
     private val HOUSEKEEPING = setOf(".lock", ".lock.pid", ".show", MARKER)
 
     fun run(paths: PlatformPaths) {
-        val legacy = paths.legacyDataDir
         val target = paths.dataDir
-        val marker = legacy.resolve(MARKER)
+        for (legacy in paths.legacyDataDirs) {
+            val marker = legacy.resolve(MARKER)
 
-        if (!Files.isDirectory(legacy)) return
-        if (Files.exists(marker)) return
-        if (Files.isDirectory(target) && target.hasUserData()) {
-            log.info("Target data directory {} already populated; skipping legacy import", target)
+            if (!Files.isDirectory(legacy)) continue
+            if (Files.exists(marker)) continue
+            if (!legacy.hasUserData()) continue
+            if (Files.isDirectory(target) && target.hasUserData()) {
+                log.info("Target data directory {} already populated; skipping legacy import from {}", target, legacy)
+                writeMarker(marker, target)
+                continue
+            }
+
+            log.info("Migrating user data: {} -> {}", legacy, target)
+            Files.createDirectories(target)
+            copyTree(legacy, target)
             writeMarker(marker, target)
+            log.info("Migration completed; legacy directory left in place at {}", legacy)
             return
         }
-
-        log.info("Migrating user data: {} -> {}", legacy, target)
-        Files.createDirectories(target)
-        copyTree(legacy, target)
-        writeMarker(marker, target)
-        log.info("Migration completed; legacy directory left in place at {}", legacy)
     }
 
     private fun copyTree(source: Path, dest: Path) {
