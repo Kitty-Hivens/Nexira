@@ -166,13 +166,11 @@ class LauncherController(
                             session = session.copy(fileManifest = cached)
                             ActionRing.record("Launch: 2FA account, using cached manifest for $targetServerId")
                         } else {
-                            // No cached manifest and no fresh login -- bail
-                            // with the semantic TwoFactorExpired reason so
-                            // the UI can render an actionable "re-login from
-                            // the form" message. Pre-modular this threw an
-                            // IllegalStateException that got caught by the
-                            // outer catch as `Internal(message)`, which made
-                            // the UI render a misleading generic error.
+                            // No cached manifest and no fresh login --
+                            // bail with the semantic TwoFactorExpired
+                            // reason so the UI renders an actionable
+                            // "re-login from the form" message instead
+                            // of a generic internal-error path.
                             ActionRing.record("Launch: 2FA + no cached manifest for $targetServerId -- re-login required")
                             fail(LaunchError.TwoFactorExpired)
                             return@launch
@@ -303,11 +301,11 @@ class LauncherController(
     }
 
     /**
-     * Stops whatever launch flow is currently running. If the game process
-     * has already spawned, send SIGTERM via [Process.destroy] and reset state.
-     * Previously this canceled the coroutine but left the spawned Process
-     * orphaned -- the launcher said Idle while the game kept running, and
-     * the next launch() click would happily try to spawn a second game.
+     * Stops the in-flight launch. If the game process has already
+     * spawned, sends SIGTERM via [Process.destroy] before resetting
+     * state -- canceling the coroutine alone would orphan the
+     * spawned Process and the next [launch] click would happily
+     * spawn a second game.
      */
     fun abort() {
         val proc = runningProcess
