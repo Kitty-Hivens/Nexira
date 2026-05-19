@@ -43,7 +43,7 @@ import java.util.stream.Collectors
  */
 object DataDirMover {
     // Lazy logger -- DataDirMover is referenced from Main.kt's bootstrap
-    // path BEFORE `aura.logs.dir` system property gets set. An eager
+    // path BEFORE `nexira.logs.dir` system property gets set. An eager
     // `LoggerFactory.getLogger(...)` field initialiser would trigger
     // logback's first init at the wrong moment, causing the rolling
     // file appender to open `./logs/launcher.log` (in the JVM's working

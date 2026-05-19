@@ -79,7 +79,7 @@ echo "[puppet] click login.submit"
 
 # Success detection: account.logout appears in the registry once
 # AppState transitions to Authenticated (the right-panel AccountPanel
-# renders). We do NOT rely on /screen — Aura preserves the previously-
+# renders). We do NOT rely on /screen — Nexira preserves the previously-
 # selected Screen across logout, so after login we may land back on
 # Settings instead of Dashboard, and the screen marker can lag because
 # PuppetScreen uses last-writer-wins (see PR #201 known limitations).

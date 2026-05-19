@@ -51,7 +51,7 @@ jobs:
   # Failure modes this catches:
   #   1. Direct/force push to stable bypassing PR (no merging PR for SHA).
   #   2. PR merged but BOTH Codex AND Qodana failed to engage — both rate-
-  #      limited or both bots disabled. See [[aura-release-protection-model]]
+  #      limited or both bots disabled. See [[release_protection_model]]
   #      memory for the why-not-tighter explanation.
   #   3. Compromised maintainer account opens a PR + self-merges without
   #      bots wired up. Branch protection on stable handles the merge
@@ -233,10 +233,10 @@ jobs:
       - name: Build distributable
         shell: bash
         # customJpackageImage produces the same app-image layout that
-        # createReleaseDistributable used to (AuraLauncher\bin\,
-        # AuraLauncher\lib\runtime\, AuraLauncher\lib\app\), now with
+        # createReleaseDistributable used to (Nexira\bin\,
+        # Nexira\lib\runtime\, Nexira\lib\app\), now with
         # the full jlink + jpackage flag surface from the
-        # aura.packaging convention plugin. Inno Setup's Source: path
+        # nexira.packaging convention plugin. Inno Setup's Source: path
         # in setup.iss tracks the new output dir (B-3 commit).
         run: ./gradlew :client-ui:customJpackageImage -PappVersion="$APP_VERSION"
 
@@ -245,27 +245,27 @@ jobs:
         run: |
           iscc `
             /DAppVersion="$env:APP_VERSION" `
-            /F"AuraLauncher-$env:APP_VERSION-Setup" `
+            /F"Nexira-$env:APP_VERSION-Setup" `
             setup.iss
 
       - name: Create Portable ZIP
         shell: pwsh
         run: |
           # B-3 follow-up: source dir moves with the packaging swap.
-          # customJpackageImage produces AuraLauncher\ directly (no
+          # customJpackageImage produces Nexira\ directly (no
           # intermediate app\ layer like Compose Desktop did), so the
-          # AuraLauncher\bin\..., AuraLauncher\lib\runtime\... shape
+          # Nexira\bin\..., Nexira\lib\runtime\... shape
           # inside the zip stays identical from the user's perspective.
           $src = "client-ui\build\customJpackageImage"
           Compress-Archive -Path "$src\*" `
-            -DestinationPath "AuraLauncher-$env:APP_VERSION-Windows-Portable.zip"
+            -DestinationPath "Nexira-$env:APP_VERSION-Windows-Portable.zip"
 
       - uses: actions/upload-artifact@v4
         with:
           name: windows-artifacts
           path: |
-            AuraLauncher-${{ env.APP_VERSION }}-Setup.exe
-            AuraLauncher-${{ env.APP_VERSION }}-Windows-Portable.zip
+            Nexira-${{ env.APP_VERSION }}-Setup.exe
+            Nexira-${{ env.APP_VERSION }}-Windows-Portable.zip
 
   # ─────────────────────────────────────────────────────────────────────────
   # LINUX — AppImage only
@@ -345,10 +345,10 @@ jobs:
             -PappVersion="$APP_VERSION"
 
       - name: Validate desktop entry
-        run: desktop-file-validate resources/aura-launcher.desktop
+        run: desktop-file-validate resources/nexira.desktop
 
       - name: Validate AppStream metainfo
-        run: appstreamcli validate --pedantic resources/io.github.kitty_hivens.auralauncher.metainfo.xml
+        run: appstreamcli validate --pedantic resources/io.github.kitty_hivens.nexira.metainfo.xml
 
       - name: Inject release entry into metainfo
         run: ./scripts/inject-metainfo-release.sh "$APP_VERSION"
@@ -361,7 +361,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: linux-artifacts
-          path: AuraLauncher-${{ env.APP_VERSION }}-x86_64.AppImage
+          path: Nexira-${{ env.APP_VERSION }}-x86_64.AppImage
 
   # ─────────────────────────────────────────────────────────────────────────
   # MACOS — DMG (Apple Silicon only in the release pipeline)
@@ -415,12 +415,12 @@ jobs:
       - name: Rename DMG with architecture suffix
         run: |
           mv client-ui/build/customDmg/*.dmg \
-             "AuraLauncher-$APP_VERSION-aarch64.dmg"
+             "Nexira-$APP_VERSION-aarch64.dmg"
 
       - uses: actions/upload-artifact@v4
         with:
           name: macos-artifacts-aarch64
-          path: AuraLauncher-${{ env.APP_VERSION }}-aarch64.dmg
+          path: Nexira-${{ env.APP_VERSION }}-aarch64.dmg
 
   # ─────────────────────────────────────────────────────────────────────────
   # RELEASE — collect artifacts, publish with proper changelog body
@@ -519,7 +519,7 @@ jobs:
 
       - uses: softprops/action-gh-release@v2
         with:
-          name: Aura Launcher v${{ env.APP_VERSION }}
+          name: Nexira v${{ env.APP_VERSION }}
           body: ${{ steps.body.outputs.body }}
           files: dist/*
           draft: false
