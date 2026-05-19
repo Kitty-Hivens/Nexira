@@ -29,6 +29,7 @@ import hivens.ui.utils.SystemActions
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import org.slf4j.LoggerFactory
+import java.nio.file.Paths
 import kotlin.math.roundToInt
 import kotlin.system.exitProcess
 
@@ -55,20 +56,12 @@ fun UpdateDialog(
     // separate for the visual + button changes.
     val isBlocking = update.isCritical || update.isMandatory
 
-    // Puppet: dialog action set. Marker screen helps drivers detect the
-    // dialog is open; ids map to the buttons rendered below.
-    PuppetScreen("UpdateDialog")
-    PuppetClick("update.viewOnGithub", enabled = downloadState !is DownloadState.Downloading) {
-        SystemActions.openUrl(update.releasePageUrl)
-    }
-    PuppetClick("update.dismiss", enabled = !isBlocking && downloadState !is DownloadState.Downloading) {
-        onDismiss()
-    }
-    PuppetClick("update.exitForMandatory", enabled = update.isMandatory && downloadState !is DownloadState.Downloading) {
-        exitProcess(0)
-    }
-    PuppetClick("update.download", enabled = downloadState is DownloadState.Idle) {
-        scope.launch { // TODO: move to method
+    // Both PuppetClick("update.download") and the Idle-state Button onClick
+    // run the exact same coroutine flow. Local function captures the state
+    // delegates from the enclosing composable so each call site shrinks to
+    // a one-liner.
+    fun launchDownload() {
+        scope.launch {
             downloadState = DownloadState.Downloading(0L, 0L, 0.0)
             errorMessage  = null
             try {
@@ -83,10 +76,12 @@ fun UpdateDialog(
             }
         }
     }
-    PuppetClick("update.install", enabled = downloadState is DownloadState.Ready) {
-        val path = (downloadState as? DownloadState.Ready)?.installerPath ?: return@PuppetClick
-        try { // TODO: move to method
-            updateApplicator.scheduleUpdate(java.nio.file.Paths.get(path))
+
+    // Same shape as launchDownload: PuppetClick("update.install") and the
+    // Ready-state Button onClick both schedule + exit identically.
+    fun installUpdate(installerPath: String) {
+        try {
+            updateApplicator.scheduleUpdate(Paths.get(installerPath))
             logger.info("Update scheduled, exiting...")
             exitProcess(0)
         } catch (e: Exception) {
@@ -94,6 +89,26 @@ fun UpdateDialog(
             errorMessage  = "${s.updateScheduleFailed}: ${e.message}"
             downloadState = DownloadState.Failed
         }
+    }
+
+    // Puppet: dialog action set. Marker screen helps drivers detect the
+    // dialog is open; ids map to the buttons rendered below.
+    PuppetScreen("UpdateDialog")
+    PuppetClick("update.viewOnGithub", enabled = downloadState !is DownloadState.Downloading) {
+        SystemActions.openUrl(update.releasePageUrl)
+    }
+    PuppetClick("update.dismiss", enabled = !isBlocking && downloadState !is DownloadState.Downloading) {
+        onDismiss()
+    }
+    PuppetClick("update.exitForMandatory", enabled = update.isMandatory && downloadState !is DownloadState.Downloading) {
+        exitProcess(0)
+    }
+    PuppetClick("update.download", enabled = downloadState is DownloadState.Idle) {
+        launchDownload()
+    }
+    PuppetClick("update.install", enabled = downloadState is DownloadState.Ready) {
+        val path = (downloadState as? DownloadState.Ready)?.installerPath ?: return@PuppetClick
+        installUpdate(path)
     }
     PuppetClick("update.retry", enabled = downloadState is DownloadState.Failed) {
         errorMessage = null
@@ -279,22 +294,7 @@ fun UpdateDialog(
                     when (downloadState) {
                         is DownloadState.Idle -> {
                             Button(
-                                onClick = {
-                                    scope.launch { // TODO: move to method
-                                        downloadState = DownloadState.Downloading(0L, 0L, 0.0)
-                                        errorMessage  = null
-                                        try {
-                                            val path = updateService.downloadUpdate(update) { dl, total, speed ->
-                                                downloadState = DownloadState.Downloading(dl, total, speed)
-                                            }
-                                            downloadState = DownloadState.Ready(path.toString())
-                                        } catch (e: Exception) {
-                                            logger.error("Download failed", e)
-                                            errorMessage  = e.message ?: s.updateErrorUnknown
-                                            downloadState = DownloadState.Failed
-                                        }
-                                    }
-                                },
+                                onClick = { launchDownload() },
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = if (isBlocking) CelestiaTheme.colors.error else CelestiaTheme.colors.primary
                                 ),
@@ -330,17 +330,7 @@ fun UpdateDialog(
                         is DownloadState.Ready -> {
                             val path = (downloadState as DownloadState.Ready).installerPath
                             Button(
-                                onClick = {
-                                    try { // TODO: move to method
-                                        updateApplicator.scheduleUpdate(java.nio.file.Paths.get(path))
-                                        logger.info("Update scheduled, exiting...")
-                                        exitProcess(0)
-                                    } catch (e: Exception) {
-                                        logger.error("Failed to schedule update", e)
-                                        errorMessage  = "${s.updateScheduleFailed}: ${e.message}"
-                                        downloadState = DownloadState.Failed
-                                    }
-                                },
+                                onClick = { installUpdate(path) },
                                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
                                 shape  = RoundedCornerShape(8.dp)
                             ) {

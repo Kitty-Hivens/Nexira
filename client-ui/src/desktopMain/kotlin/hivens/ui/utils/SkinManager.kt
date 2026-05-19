@@ -62,14 +62,14 @@ class SkinManager(
     // to OOM crashes during long sessions. Cap at SKIN_CACHE_MAX entries
     // per cache; eldest gets evicted on overflow. Access-order (3rd ctor
     // arg = true) so freshly-viewed skins survive evictions.
-    private val frontCache = lruCache(SKIN_CACHE_MAX)
-    private val backCache  = lruCache(SKIN_CACHE_MAX)
+    private val frontCache = lruCache()
+    private val backCache  = lruCache()
 
-    private fun lruCache(maxEntries: Int): MutableMap<String, ImageBitmap> = // TODO: Value of parameter 'maxEntries' is always 'SkinManager.SKIN_CACHE_MAX'
+    private fun lruCache(): MutableMap<String, ImageBitmap> =
         java.util.Collections.synchronizedMap(
-            object : java.util.LinkedHashMap<String, ImageBitmap>(maxEntries, 0.75f, true) {
+            object : java.util.LinkedHashMap<String, ImageBitmap>(SKIN_CACHE_MAX, 0.75f, true) {
                 override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, ImageBitmap>?): Boolean =
-                    size > maxEntries
+                    size > SKIN_CACHE_MAX
             },
         )
 

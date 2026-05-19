@@ -85,6 +85,14 @@ object AprilFoolsEngine {
 
     // ─── Event pool ───────────────────────────────────────────────────────────
 
+    // Uniform event signature -- every `eventX` below conforms to the
+    // [Event] typealias so [pickEvent] can return any of them
+    // interchangeably. Some events use only a subset of the args
+    // (e.g. [eventDrunkWobble] is button-only, [eventEarthquake]
+    // shakes the global screen state without per-button positioning).
+    // Affected functions carry @Suppress("UNUSED_PARAMETER") at the
+    // declaration; do not "fix" them by dropping the param, the
+    // typealias contract is what keeps the dispatch loop generic.
     private typealias Event = suspend (FloatingButton, () -> Offset, () -> IntSize) -> Unit
 
     private fun pickEvent(): Event {
@@ -154,10 +162,11 @@ object AprilFoolsEngine {
     // ─── EVENT: Drunk wobble ──────────────────────────────────────────────────
     // Button stays roughly in place but sways drunkenly with compound sine motion.
 
+    @Suppress("UNUSED_PARAMETER")
     private suspend fun eventDrunkWobble(
         btn: FloatingButton,
-        cursor: () -> Offset, // TODO: unused
-        ws: () -> IntSize,    // TODO: unused
+        cursor: () -> Offset,
+        ws: () -> IntSize,
     ) {
         btn.snapToOrigin()
         btn.phase = ChaosPhase.DRUNK_WOBBLE
@@ -232,9 +241,10 @@ object AprilFoolsEngine {
     // ─── EVENT: Spin and fly ──────────────────────────────────────────────────
     // Spins N rotations in place, then rockets to a corner.
 
+    @Suppress("UNUSED_PARAMETER")
     private suspend fun eventSpinAndFly(
         btn: FloatingButton,
-        cursor: () -> Offset, // TODO: unused
+        cursor: () -> Offset,
         ws: () -> IntSize,
     ) {
         btn.snapToOrigin()
@@ -272,9 +282,10 @@ object AprilFoolsEngine {
     // ─── EVENT: Teleport ─────────────────────────────────────────────────────
     // Shrinks to nothing, reappears somewhere random at the wrong size.
 
+    @Suppress("UNUSED_PARAMETER")
     private suspend fun eventTeleport(
         btn: FloatingButton,
-        cursor: () -> Offset, // TODO: unused
+        cursor: () -> Offset,
         ws: () -> IntSize,
     ) {
         btn.snapToOrigin()
@@ -314,10 +325,11 @@ object AprilFoolsEngine {
     // ─── EVENT: Ghost clone ───────────────────────────────────────────────────
     // A semi-transparent ghost copy floats upward and fades -- original stays put.
 
+    @Suppress("UNUSED_PARAMETER")
     private suspend fun eventGhostClone(
         btn: FloatingButton,
-        cursor: () -> Offset, // TODO: unused
-        ws: () -> IntSize,    // TODO: unused
+        cursor: () -> Offset,
+        ws: () -> IntSize,
     ) {
         val ghost = FloatingButton(
             id      = "ghost_${btn.id}_${System.currentTimeMillis()}",
@@ -364,9 +376,10 @@ object AprilFoolsEngine {
     // ─── EVENT: Legs walk ─────────────────────────────────────────────────────
     // Pixel stick-legs sprout and the button walks across the screen.
 
+    @Suppress("UNUSED_PARAMETER")
     private suspend fun eventLegsWalk(
         btn: FloatingButton,
-        cursor: () -> Offset, // TODO: unused
+        cursor: () -> Offset,
         ws: () -> IntSize,
     ) {
         btn.snapToOrigin()
@@ -403,10 +416,11 @@ object AprilFoolsEngine {
     // ─── EVENT: Earthquake ────────────────────────────────────────────────────
     // Entire UI shakes violently for under a second.
 
+    @Suppress("UNUSED_PARAMETER")
     private suspend fun eventEarthquake(
-        btn: FloatingButton,          // TODO: unused
-        cursor: () -> Offset,         // TODO: unused
-        ws: () -> IntSize,            // TODO: unused
+        btn: FloatingButton,
+        cursor: () -> Offset,
+        ws: () -> IntSize,
     ) {
         val amplitude = AprilFools.intensity() * 20f + 5f
         val duration  = Random.nextLong(350L, 800L)
@@ -425,8 +439,9 @@ object AprilFoolsEngine {
     // ─── EVENT: Mass escape ───────────────────────────────────────────────────
     // Every idle button escapes simultaneously (only fires on high intensity days).
 
+    @Suppress("UNUSED_PARAMETER")
     private suspend fun eventMassEscape(
-        btn: FloatingButton, // TODO: unused
+        btn: FloatingButton,
         cursor: () -> Offset,
         ws: () -> IntSize,
     ) {
