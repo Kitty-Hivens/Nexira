@@ -34,6 +34,7 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import java.net.Authenticator
 import kotlinx.serialization.json.Json
+import okhttp3.Call
 import okhttp3.OkHttpClient
 import org.koin.core.module.dsl.singleOf
 import org.koin.core.qualifier.named
@@ -194,6 +195,33 @@ val networkModule = module {
     single<HttpClientProvider>(named("direct")) {
         val direct = buildHttpClient(get<OkHttpClient>(named("direct")), get())
         HttpClientProvider { direct }
+    }
+
+    /**
+     * Smartycraft-routed `okhttp3.Call.Factory` for callers that consume the
+     * OkHttp call API directly (Coil's image fetcher today; no Ktor [HttpClient]
+     * adapter on its side). Mirrors the per-request channel decision the
+     * default smartycraft [HttpClientProvider] makes; both must agree, or
+     * Aura's news strip and skin images would route differently from the
+     * auth / protocol traffic that uses [HttpClientProvider].
+     *
+     * Keeping the two implementations in one file makes the divergence
+     * surface concrete: any future change to the routing rule touches both
+     * adjacent registrations under one diff.
+     */
+    single<Call.Factory> {
+        val cfg: ServerProtocolConfig = get()
+        val direct   = get<OkHttpClient>(named("direct"))
+        val secure   = get<OkHttpClient>()
+        val insecure = get<OkHttpClient>(named("insecure"))
+        Call.Factory { request ->
+            val client = when {
+                NetworkState.bypassFor(cfg.sslBypassHost) -> insecure
+                NetworkState.forceProxyMode()             -> secure
+                else                                      -> direct
+            }
+            client.newCall(request)
+        }
     }
 
     // ── Conduit (network refactor) ──────────────────────────────────────────

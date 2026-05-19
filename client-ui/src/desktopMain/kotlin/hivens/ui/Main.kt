@@ -66,7 +66,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
-import okhttp3.OkHttpClient
+import okhttp3.Call
 import org.jetbrains.compose.resources.ExperimentalResourceApi
 import org.jetbrains.compose.resources.painterResource
 import org.koin.compose.koinInject
@@ -636,27 +636,15 @@ fun AppRoot(
     val settingsService: ISettingsService      = koinInject()
     val dataDirectory: java.nio.file.Path      = koinInject()
     val json: Json                             = koinInject()
-    val httpClient: OkHttpClient               = koinInject()
     val insecureAuthService: IAuthService      = koinInject(named("insecure"))
     val protocolConfig: ServerProtocolConfig   = koinInject()
+    // Smartycraft-routed Call.Factory for Coil's image fetcher. The
+    // bypass / forceProxy / direct routing rule lives in Modules.kt
+    // alongside the same rule for the Ktor HttpClientProvider; both
+    // must agree or news / skin images would diverge from auth and
+    // protocol traffic on the same host.
+    val routingCallFactory: Call.Factory       = koinInject()
     val af = LocalAprilFools.current
-
-    // Mirror the smartycraft HttpClientProvider's per-request channel choice
-    // for Coil's image fetcher -- news images are served from www.smartycraft.ru
-    // alongside skins, so they have to honour the same forceProxyMode +
-    // SSL-bypass decisions or the user's toggle does nothing for the
-    // news strip. Each `newCall` re-reads NetworkState so the toggle
-    // takes effect immediately.
-    val directHttpClient: OkHttpClient   = koinInject(named("direct"))
-    val insecureHttpClient: OkHttpClient = koinInject(named("insecure"))
-    val routingCallFactory = okhttp3.Call.Factory { request ->
-        val client = when {
-            NetworkState.bypassFor(protocolConfig.sslBypassHost) -> insecureHttpClient
-            NetworkState.forceProxyMode()                        -> httpClient
-            else                                                  -> directHttpClient
-        }
-        client.newCall(request)
-    }
 
     setSingletonImageLoaderFactory { context ->
         ImageLoader.Builder(context)
