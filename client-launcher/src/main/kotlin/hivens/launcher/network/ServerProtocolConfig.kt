@@ -5,37 +5,20 @@ import java.net.URI
 import kotlinx.serialization.Serializable
 
 /**
- * Resolved configuration for talking to a SmartyCraft-compatible backend.
+ * Resolved configuration for talking to a SmartyCraft-compatible
+ * backend. All fields default to production SmartyCraft values; a
+ * vanilla Aura install with no config file behaves like the baseline.
  *
- * Replaces the mix of `Network.BASE_URL`, `Network.AUTH_URL`,
- * `Network.OFFICIAL_JAR_URL`, and `Network.Proxy.*` constants that used to
- * be `const val` baked at build time. Conduit Phase 3 pulls them into a
- * single config object so:
- *
- *   - The launcher can be pointed at a Mirror (Project Mirror, post-Void)
- *     without recompiling -- drop a `<dataDir>/server-config.json` with the
- *     mirror's URL, restart.
- *   - Per-server differences (test/staging environments, regional mirrors)
- *     are first-class data, not tribal knowledge in scattered constants.
- *   - Tests can spin up a mock SmartycraftV1Protocol pointed at a
- *     local fixture server.
- *
- * ## Defaults
- *
- * All fields default to the production SmartyCraft values inherited from
- * `Network` constants. A vanilla Aura install with no config file behaves
- * identically to the pre-Conduit baseline.
- *
- * ## Override paths (opt-in via [ExperimentalConduitOverride])
- *
- * 1. **Config file** at `<dataDir>/server-config.json` -- full data class
- *    serialised. Loader merges with defaults so partial files are fine.
- * 2. **System property** `aura.conduit.baseurl` -- overrides just the
+ * Override paths (opt-in via [ExperimentalConduitOverride]):
+ * 1. Config file at `<dataDir>/server-config.json` -- the full data
+ *    class serialized; loader merges with defaults so partial files
+ *    are fine.
+ * 2. System property `aura.conduit.baseurl` -- overrides just the
  *    base URL, leaves everything else at config-file or default.
  *    Useful for one-off "test against mirror right now" CLI workflows.
  *
- * Both override paths are guarded by [ExperimentalConduitOverride] --
- * normal launcher behavior reads through to the data class fields directly.
+ * Normal launcher behavior reads through to the data class fields
+ * directly; both override paths are opt-in.
  */
 @Serializable
 data class ServerProtocolConfig(
@@ -56,8 +39,8 @@ data class ServerProtocolConfig(
     val proxyUser: String = DEFAULT_PROXY_USER,
 
     /**
-     * SOCKS5 proxy password. Recovered from smrt-deco -- public per-protocol
-     * value, not a secret. See `feedback_secrets_vs_interop`.
+     * SOCKS5 proxy password. Recovered from smrt-deco -- public
+     * per-protocol value, not a secret.
      */
     val proxyPass: String = DEFAULT_PROXY_PASS,
 

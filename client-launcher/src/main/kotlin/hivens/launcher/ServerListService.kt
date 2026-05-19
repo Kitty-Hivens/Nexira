@@ -29,10 +29,10 @@ class ServerListService(
     @Volatile
     private var cachedData: DashboardData? = null
     /**
-     * Single in-flight fetch -- if dashboard load is already running when a
-     * second caller arrives (auto-sync + dashboard composition + tray-launch
-     * can overlap on cold start) they share the same future instead of each
-     * firing their own request and racing to populate [cachedData] (#189).
+     * Single in-flight fetch. If a load is already running when a second
+     * caller arrives (auto-sync + dashboard composition + tray-launch
+     * can overlap on cold start), they share the same future rather than
+     * each firing their own request and racing to populate [cachedData].
      */
     @Volatile
     private var inFlight: CompletableFuture<DashboardData>? = null
