@@ -9,21 +9,18 @@ import kotlin.io.path.isDirectory
 import kotlin.io.path.name
 
 /**
- * Auto-detection of NeoForge `--fml.*` argument values from a populated
+ * Auto-detects NeoForge `--fml.*` argument values from a populated
  * `libraries-{mcVersion}/` directory.
  *
- * The official launcher's hardcoded q.java constants drift every time the
- * upstream bumps NeoForge/FML on the server. We mirror those constants
- * from `smrt-deco` syncs and have already shipped 21.1.506 / 4.0.42 by
- * hand -- once. The version values are right there in the manifest sync
- * output: directory names under `net/neoforged/neoforge/` and
- * `net/neoforged/fancymodloader/loader/`, plus the embedded
- * `Implementation-Version` inside the universal jar's `MANIFEST.MF`.
+ * The official launcher's hardcoded `q.java` constants drift every
+ * time upstream bumps NeoForge / FML on the server -- mirroring them
+ * by hand is a class of bug. The values are right there in the
+ * manifest-sync output: directory names under `net/neoforged/neoforge/`
+ * and `net/neoforged/fancymodloader/loader/`, plus the embedded
+ * `Implementation-Version` in the universal jar's `MANIFEST.MF`.
  *
- * Reading them directly removes the manual bump as a class of bug.
- *
- * Returns null on any unrecoverable layout surprise; caller falls back
- * to baked-in defaults.
+ * Returns null on any unrecoverable layout surprise; caller falls
+ * back to baked-in defaults.
  */
 internal class NeoForgeVersionDetector {
     private val log = LoggerFactory.getLogger(NeoForgeVersionDetector::class.java)
