@@ -141,7 +141,7 @@ private fun logToolkitAndSession() {
  * No-op on macOS/Windows. Failures are logged but never fatal -- a wrong icon
  * is annoying, not crash-worthy.
  */
-private fun setLinuxXToolkitAppClassName(name: String) { // TODO: Value of parameter 'name' is always 'Branding.WM_CLASS'
+private fun setLinuxXToolkitAppClassName() {
     if (!System.getProperty("os.name").lowercase().contains("linux")) return
     runCatching {
         // Triggers XToolkit class load + initial awtAppClassName assignment.
@@ -149,12 +149,12 @@ private fun setLinuxXToolkitAppClassName(name: String) { // TODO: Value of param
         val cls = Class.forName("sun.awt.X11.XToolkit")
         val field = cls.getDeclaredField("awtAppClassName")
         field.isAccessible = true
-        field.set(null, name)
+        field.set(null, Branding.WM_CLASS)
     }.onFailure {
         LoggerFactory.getLogger("Main").warn(
             "Could not override XToolkit.awtAppClassName ({}); " +
             "compositors may show a generic icon. Cause: {}",
-            name, it.toString()
+            Branding.WM_CLASS, it.toString()
         )
     }
 }
@@ -217,7 +217,7 @@ fun main() {
     // the first window is created. See jvmArgs --add-opens in
     // client-ui/build.gradle.kts and the function doc on
     // setLinuxXToolkitAppClassName for the cross-vendor details.
-    setLinuxXToolkitAppClassName(Branding.WM_CLASS)
+    setLinuxXToolkitAppClassName()
 
     // Capture toolkit + session-type as soon as the toolkit has been triggered
     // by setLinuxXToolkitAppClassName above. One INFO line per launch -- gives
