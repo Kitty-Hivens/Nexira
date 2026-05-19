@@ -7,20 +7,20 @@ import java.nio.file.Paths
  * Resolves the per-OS application data directory.
  *
  * Resolution order:
- * 1. `AURA_DATA_DIR` environment variable (if set and non-blank) -- universal override
- *    that lets a user move data to any drive without touching settings. Equivalent in
- *    spirit to Linux's `XDG_DATA_HOME` but works on every platform.
- * 2. [BootstrapConf] `data-dir` key -- user-chosen override persisted via the
- *    "Move data directory" Settings UI. Bootstrap conf lives outside the data
- *    dir so the launcher can find the override before it even knows where the
- *    data dir is.
+ * 1. `AURA_DATA_DIR` env var (if set and non-blank) -- universal
+ *    override; spiritual equivalent of `XDG_DATA_HOME` across platforms.
+ * 2. [BootstrapConf] `data-dir` key -- user-chosen override persisted
+ *    via the "Move data directory" Settings UI. Bootstrap conf lives
+ *    outside the data dir so the launcher can find the override before
+ *    it knows where the data dir is.
  * 3. Per-OS default:
- *    - Windows: `%LOCALAPPDATA%\AuraLauncher` (kept separate from the install dir under `%APPDATA%`)
+ *    - Windows: `%LOCALAPPDATA%\AuraLauncher` (separate from install dir under `%APPDATA%`)
  *    - macOS:   `~/Library/Application Support/AuraLauncher`
  *    - Linux:   `$XDG_DATA_HOME/aura-launcher` (default `~/.local/share/aura-launcher`)
  *
- * The pre-2.3 directory `~/.aura/` is exposed via [legacyDataDir] and is read only
- * by the migration path; production code should use [dataDir] and its derivatives.
+ * The pre-2.3 `~/.aura/` is exposed via [legacyDataDir] and only the
+ * migration path should read it; production code uses [dataDir] and
+ * its derivatives.
  */
 class PlatformPaths(
     osName: String,
@@ -60,22 +60,23 @@ class PlatformPaths(
     val clientsDir: Path get() = dataDir.resolve("clients")
 
     /**
-     * @throws IllegalArgumentException when [assetDir] contains path-separator
-     *         or traversal characters (#188). The validator pins the allowed
-     *         set to ASCII alnum + `._-`; anything else is treated as a hostile
-     *         or malformed manifest and refused before [Path.resolve].
+     * @throws IllegalArgumentException when [assetDir] contains
+     *         path-separator or traversal characters. Allowed charset
+     *         is ASCII alnum + `._-`; anything else is treated as a
+     *         hostile or malformed manifest and refused before
+     *         [Path.resolve].
      */
     fun clientDir(assetDir: String): Path =
         clientsDir.resolve(ServerNameValidator.require(assetDir))
 
-    /** Pre-2.3 data directory; only the migration path should read this. */
+    /** Pre-2.3 data directory; only the migration path reads this. */
     val legacyDataDir: Path = home.resolve(".aura")
 
     companion object {
         fun system(): PlatformPaths = PlatformPaths(
             osName = System.getProperty("os.name", ""),
             home = Paths.get(System.getProperty("user.home", ".")),
-            env = { System.getenv(it) }
+            env = { System.getenv(it) },
         )
     }
 }
