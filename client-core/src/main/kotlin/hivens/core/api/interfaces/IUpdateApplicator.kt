@@ -3,30 +3,21 @@ package hivens.core.api.interfaces
 import java.nio.file.Path
 
 /**
- * Schedules a downloaded update installer to be applied when the launcher
- * exits. Implementations are platform-specific -- they all run their work
- * via a [Runtime.addShutdownHook] so the user-visible `exitProcess(0)`
- * call from `UpdateDialog` triggers the install.
- *
- * Wired through Koin: a factory in `client-launcher/.../di/Modules.kt`
- * picks the right [IUpdateApplicator] implementation by [hivens.launcher.platform.OS].
- *
- * Lives in `client-core` so `UpdateDialog` (in `client-ui`) can inject the
- * interface without depending on the concrete platform classes -- keeps
- * the layering one-way (config <- core <- launcher <- ui).
+ * Schedules a downloaded update installer to apply at JVM exit via
+ * [Runtime.addShutdownHook]. Wired through Koin in
+ * `client-launcher/.../di/Modules.kt`, implementation picked per
+ * [hivens.launcher.platform.OS]. Lives in `client-core` so UI can
+ * inject without seeing platform-specific classes.
  */
 interface IUpdateApplicator {
     /**
-     * Schedules [installerPath] to be installed right after the JVM exits.
-     * The implementation is responsible for:
-     *   - resolving where the current launcher binary lives,
-     *   - backing it up before overwrite,
-     *   - relaunching the new version,
-     *   - rolling back on failure where it can.
+     * Schedules [installerPath] to install right after JVM exit. The
+     * implementation backs up the current binary, relaunches the new
+     * version, and rolls back on failure where it can.
      *
-     * Throws [UnsupportedOperationException] from the no-op implementation
-     * registered on unrecognized platforms; callers should treat that as
-     * "ask the user to download and install manually".
+     * Throws [UnsupportedOperationException] from the no-op fallback on
+     * unrecognized platforms; callers treat that as "ask user to install
+     * manually".
      */
     fun scheduleUpdate(installerPath: Path)
 }
