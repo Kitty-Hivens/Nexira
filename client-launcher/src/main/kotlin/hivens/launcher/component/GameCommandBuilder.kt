@@ -10,18 +10,12 @@ import org.slf4j.LoggerFactory
 import java.io.File
 import java.nio.file.Path
 
-/**
- * Process Command Factory.
- */
 internal class GameCommandBuilder(
     private val protocolConfig: ServerProtocolConfig = ServerProtocolConfig(),
 ) {
     private val logger = LoggerFactory.getLogger(GameCommandBuilder::class.java)
     private val neoForgeDetector = NeoForgeVersionDetector()
 
-    /**
-     * Immutable version configuration.
-     */
     private data class VersionConfig(
         val mainClass: String,
         val tweakClass: String?,
@@ -174,16 +168,14 @@ internal class GameCommandBuilder(
             }
 
             if (validModules.isEmpty()) {
-                // Fail-loud at command-build time instead of letting the JVM
-                // limp into BootstrapLauncher without `-p`. The downstream
-                // failure mode is a cryptic Java module-resolution error at
-                // game startup ("module not found: cpw.mods.bootstraplauncher")
-                // that surfaces in the game console long after the user has
-                // committed to a launch -- diagnosed in audit pass on the
-                // 2.2.13 batch as a real silent-failure path. The exception
-                // propagates through LauncherService into the existing
-                // LauncherController error-dialog flow so the user sees a
-                // launcher-side message about the missing libraries instead.
+                // Fail loud at command-build time rather than let the
+                // JVM limp into BootstrapLauncher without `-p`. The
+                // downstream failure ("module not found:
+                // cpw.mods.bootstraplauncher") surfaces in the game
+                // console long after the user committed to a launch.
+                // Exception propagates through LauncherService into
+                // LauncherController's error dialog so the user sees
+                // a launcher-side message instead.
                 throw IllegalStateException(
                     "Cannot launch ${config.mainClass}: no NeoForge boot modules " +
                         "(securejarhandler, bootstraplauncher, ow2/asm, jarjar) found " +
@@ -248,14 +240,13 @@ internal class GameCommandBuilder(
         args.add("--userType"); args.add("mojang")
 
         if (isModernEnvironment) {
-            // NeoForge needs --fml.{neoForgeVersion,fmlVersion,mcVersion,neoFormVersion}.
-            // Auto-detect from libraries-{mcVersion}/ first -- the values live in directory
-            // names and the universal jar's MANIFEST.MF, so a manifest sync always brings
-            // matching versions and we never drift. Fall back to baked-in defaults if the
-            // directory layout is unexpected.
-            //
-            // The fallback values mirror smrt-deco 3.6.5 (synced 2026-05-10) and exist
-            // purely as a safety net.
+            // NeoForge needs `--fml.{neoForgeVersion,fmlVersion,mcVersion,neoFormVersion}`.
+            // Auto-detect from `libraries-{mcVersion}/` first -- the
+            // values live in directory names and the universal jar's
+            // MANIFEST.MF, so a manifest sync always brings matching
+            // versions and we never drift. Fall back to baked-in
+            // defaults (mirror smrt-deco) only if the layout is
+            // unexpected.
             val detected = neoForgeDetector.detect(root, assetIndex)?.toMap()
             val defaultFmlArgs = detected ?: run {
                 logger.warn("NeoForge auto-detect failed; using baked-in defaults")
