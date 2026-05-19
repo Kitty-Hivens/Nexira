@@ -23,7 +23,8 @@ import javax.crypto.spec.SecretKeySpec
  *
  * Per-secret storage hierarchy (most-to-least preferred):
  *
- *  1. **OS keyring** (libsecret on Linux, follow-ups for Win/Mac).
+ *  1. **OS keyring** (libsecret on Linux, Credential Manager / DPAPI
+ *     on Windows, Keychain on macOS -- all three via Project Panama).
  *     The plaintext lives here when [IKeyringStorage.isAvailable] and
  *     `store()` succeed. The credentials JSON file then carries
  *     `keyringHasX=true` and a null `encryptedX` field -- keyring is

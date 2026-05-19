@@ -162,13 +162,14 @@ class JavaManagerService(
     }
 
     internal fun unzip(zip: File, dest: Path) {
-        // ZipFile (random-access central-directory reader) over the streaming
-        // ZipInputStream -- only the central directory carries unix-mode
-        // external-attributes, so the streaming variant can't see the
-        // symbolic-link bit (#187). A plain Zip Slip check (`startsWith(dest)`)
-        // catches `../` traversal but misses a symlink entry whose linked
-        // target sits outside [dest]; the next extraction would write
-        // attacker bytes to that target.
+        // ZipFile (random-access central-directory reader) over the
+        // streaming ZipInputStream because only the central directory
+        // carries unix-mode external-attributes -- the streaming
+        // variant can't see the symbolic-link bit. A plain Zip Slip
+        // check (`startsWith(dest)`) catches `../` traversal but
+        // misses a symlink entry whose linked target sits outside
+        // [dest]; the next extraction would write attacker bytes to
+        // that target.
         ZipFile.builder().setFile(zip).get().use { zf ->
             for (entry in zf.entries) {
                 // Protection against Zip Slip vulnerabilities
@@ -231,17 +232,15 @@ class JavaManagerService(
                             }
 
                             if (entry.isSymbolicLink) {
-                                // BellSoft Linux/macOS JDK tarballs include
-                                // legitimate intra-package symlinks (e.g.
-                                // jre/lib/.../libjsig.so -> libjsig.so.0).
-                                // Allow the link when its target, resolved
-                                // relative to the symlink's parent, stays
-                                // within [dest]; reject when it would escape,
-                                // so a tampered upstream can't redirect the
+                                // BellSoft Linux / macOS JDK tarballs
+                                // include legitimate intra-package
+                                // symlinks (e.g. `jre/lib/.../libjsig.so
+                                // -> libjsig.so.0`). Allow the link when
+                                // its target -- resolved relative to the
+                                // symlink's parent -- stays within
+                                // [dest]; reject when it would escape so
+                                // a tampered upstream can't redirect the
                                 // next write outside our extraction root.
-                                // (#202 -- was blanket-rejected before, which
-                                // broke fresh Linux installs since every
-                                // BellSoft Linux JDK ships symlinks.)
                                 val linkTarget = entry.linkName ?: ""
                                 val resolvedTarget = resolvedPath.parent.resolve(linkTarget).normalize()
                                 if (!resolvedTarget.startsWith(dest)) {
@@ -257,10 +256,11 @@ class JavaManagerService(
                             } else {
                                 Files.createDirectories(resolvedPath.parent)
                                 Files.copy(tai, resolvedPath, StandardCopyOption.REPLACE_EXISTING)
-                                // Restoring execution rights from an archive (for Linux/Mac)
-                                // 0o111 = any of owner / group / other execute. Earlier mask
-                                // 0o101 skipped the group bit; archives that ship 0o010-only
-                                // entries would land without +x.
+                                // Restore execute bits on Linux / mac:
+                                // 0o111 mask = any of owner / group /
+                                // other execute. Stricter masks miss
+                                // archives that ship group-only-exec
+                                // (`0o010`) entries.
                                 if (getOsName() != "win" && (entry.mode and 0b001_001_001) != 0) {
                                     setExecutablePermissions(resolvedPath)
                                 }
