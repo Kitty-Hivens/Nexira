@@ -110,8 +110,9 @@ splash sizing decision so the impact is cosmetic, not functional.
 
 ## ── Probe results — 2026-05-12, Hyprland Wayland ───────────────────────────
 
-`scripts/wayland-probe.sh` captured the following on the user's machine
-(Arch + Hyprland Wayland session):
+An investigative probe script (removed in the 2.2.16 JBR drop --
+its sole purpose was peeking at JBR's bundled WLToolkit) captured
+the following on the user's machine (Arch + Hyprland Wayland session):
 
 **System Liberica JDK 25** (`/usr/bin/java`, OpenJDK 25.0.3):
 
@@ -188,8 +189,9 @@ Two-step verification before committing to a Wayland-native chunk:
    visible error — anything else is unexpected and goes on the
    investigation worksheet.
 
-A test script for step 1+3 lives at `scripts/wayland-probe.sh` (to be
-added alongside this doc).
+A test script for step 1+3 used to live at `scripts/wayland-probe.sh`;
+it was removed in the 2.2.16 JBR drop (the script's only purpose was
+peeking at JBR's bundled WLToolkit, which no longer ships).
 
 ## ── Trial result — 2026-05-13 (BLOCKED on upstream Skiko) ─────────────────
 

@@ -46,6 +46,7 @@ import java.nio.file.Path
 import java.security.SecureRandom
 import java.security.cert.X509Certificate
 import java.util.concurrent.TimeUnit
+import javax.net.ssl.SSLContext
 import javax.net.ssl.SSLSocketFactory
 import javax.net.ssl.X509TrustManager
 import kotlinx.coroutines.CoroutineScope
@@ -164,7 +165,7 @@ val networkModule = module {
      *
      * Pre-fix the provider always returned a proxy-only client regardless of
      * the user's force-proxy toggle, so `SkinManager` and `FileDownloadService`
-     * never honoured the setting -- the Settings switch only affected auth
+     * never honored the setting -- the Settings switch only affected auth
      * routing via ChannelRouter, while skin and client-file traffic stayed
      * pinned to the SOCKS hop. Users whose network couldn't reach
      * `proxy.smartycraft.ru:58613` saw login work (direct-first via
@@ -479,7 +480,7 @@ private fun buildTrustAllSsl(): Pair<SSLSocketFactory, X509TrustManager> {
         ) = Unit
         override fun getAcceptedIssuers(): Array<X509Certificate> = emptyArray()
     }
-    val ctx = javax.net.ssl.SSLContext.getInstance("TLS")
+    val ctx = SSLContext.getInstance("TLS")
     ctx.init(null, arrayOf(trustManager), SecureRandom())
     return ctx.socketFactory to trustManager
 }
