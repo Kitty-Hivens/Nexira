@@ -8,6 +8,7 @@ import hivens.core.diag.ActionRing
 import hivens.launcher.CredentialsManager
 import hivens.launcher.ManifestCache
 import hivens.launcher.ProfileManager
+import hivens.launcher.di.AppCoroutineScopeHook
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -29,7 +30,7 @@ import kotlinx.coroutines.slf4j.MDCContext
  * graph automatically; production wiring stays a one-liner.
  *
  * Note: [appScope] is the shared `single<CoroutineScope>(createdAtStart)`
- * registered alongside [hivens.launcher.di.AppCoroutineScopeHook] -- the
+ * registered alongside [AppCoroutineScopeHook] -- the
  * JVM shutdown hook cancels every in-flight launch on process exit. The
  * prior dedicated `CoroutineScope(SupervisorJob() + IO)` here was
  * unreachable from any shutdown hook, so a SIGTERM mid-launch could

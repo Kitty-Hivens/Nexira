@@ -15,6 +15,7 @@ import hivens.core.api.PlayerRepository
 import hivens.core.api.ServerRepository
 import hivens.core.api.SkinRepository
 import hivens.core.api.interfaces.*
+import hivens.core.security.IKeyringStorage
 import hivens.launcher.*
 import hivens.launcher.component.ClasspathProvider
 import hivens.launcher.component.EnvironmentPreparer
@@ -22,6 +23,7 @@ import hivens.launcher.component.GameCommandBuilder
 import hivens.launcher.component.ProcessLogHandler
 import hivens.launcher.launch.LauncherController
 import hivens.launcher.platform.PlatformPaths
+import hivens.launcher.security.KeyringStorageFactory
 import hivens.launcher.update.UpdateApplicators
 import hivens.launcher.update.UpdateService
 import io.ktor.client.*
@@ -31,14 +33,24 @@ import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
+import java.net.Authenticator
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import org.koin.core.module.dsl.singleOf
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
 import java.net.InetSocketAddress
+import java.net.PasswordAuthentication
 import java.net.Proxy
+import java.nio.file.Path
+import java.security.SecureRandom
+import java.security.cert.X509Certificate
 import java.util.concurrent.TimeUnit
+import javax.net.ssl.SSLSocketFactory
+import javax.net.ssl.X509TrustManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 
 /**
  * Module responsible for network interaction.
@@ -73,12 +85,12 @@ val networkModule = module {
         // creds never leak to a third-party HTTP/HTTPS proxy that an unrelated
         // JVM caller might be talking to -- only this exact SOCKS host/port
         // gets answered.
-        java.net.Authenticator.setDefault(object : java.net.Authenticator() {
-            override fun getPasswordAuthentication(): java.net.PasswordAuthentication? {
+        Authenticator.setDefault(object : Authenticator() {
+            override fun getPasswordAuthentication(): PasswordAuthentication? {
                 if (requestorType != RequestorType.PROXY) return null
                 if (requestingHost != cfg.proxyHost) return null
                 if (requestingPort != cfg.proxyPort) return null
-                return java.net.PasswordAuthentication(cfg.proxyUser, cfg.proxyPass.toCharArray())
+                return PasswordAuthentication(cfg.proxyUser, cfg.proxyPass.toCharArray())
             }
         })
 
@@ -239,11 +251,11 @@ val networkModule = module {
     // base URL change for Mirror development / test environments (gated by
     // ExperimentalConduitOverride opt-in inside the loader).
     single<ServerProtocolConfig> {
-        ServerProtocolConfigLoader(get()).load(get<java.nio.file.Path>())
+        ServerProtocolConfigLoader(get()).load(get<Path>())
     }
 
     single { LauncherHashCache(
-        dataDir = get<java.nio.file.Path>().toFile(),
+        dataDir = get<Path>().toFile(),
         router  = get<ChannelRouter>(),
         config  = get<ServerProtocolConfig>(),
     ) }
@@ -280,7 +292,7 @@ val appModule = module {
      * subsystems (settings, profiles, credentials, downloaded clients,
      * skin cache, logs, crash reports) share one platform-correct root.
      */
-    single<java.nio.file.Path>(createdAtStart = true) { get<PlatformPaths>().dataDir }
+    single<Path>(createdAtStart = true) { get<PlatformPaths>().dataDir }
 
     /**
      * Crash report generator + dialog presenter. Main.kt constructs its
@@ -298,13 +310,13 @@ val appModule = module {
     // the daemon is unreachable. CredentialsManager handles the file-fallback
     // path internally when keyring.store() returns false, so this single
     // line wires both the happy path and the degraded path.
-    single<hivens.core.security.IKeyringStorage> {
-        hivens.launcher.security.KeyringStorageFactory.system()
+    single<IKeyringStorage> {
+        KeyringStorageFactory.system()
     }
     single { CredentialsManager(get(), get(), get()) }
 
     single<ISettingsService> {
-        val dataDir: java.nio.file.Path = get()
+        val dataDir: Path = get()
         SettingsService(get(), dataDir.resolve(Storage.SETTINGS_FILE))
     }
 
@@ -324,9 +336,9 @@ val appModule = module {
      * own); unified so the JVM shutdown hook installed by
      * [AppCoroutineScopeHook] cancels the same scope every coroutine lives on.
      */
-    single<kotlinx.coroutines.CoroutineScope>(createdAtStart = true) {
-        kotlinx.coroutines.CoroutineScope(
-            kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO
+    single<CoroutineScope>(createdAtStart = true) {
+        CoroutineScope(
+            SupervisorJob() + Dispatchers.IO
         )
     }
 
@@ -345,11 +357,11 @@ val appModule = module {
     singleOf(::LauncherController)
 
     single {
-        val dataDir: java.nio.file.Path = get()
+        val dataDir: Path = get()
         ProtectedPaths(dataDir.resolve(Storage.PROTECTED_PATHS_FILE), get())
     }
     single {
-        val dataDir: java.nio.file.Path = get()
+        val dataDir: Path = get()
         ManifestCache(dataDir.resolve("manifest-cache"), get())
     }
     single<IFileDownloadService> { FileDownloadService(get(), get(), get(), get<ServerProtocolConfig>()) }
@@ -380,7 +392,7 @@ val appModule = module {
     single<IServerListService> { ServerListService(get(), get()) }
 
     single {
-        val dataDir: java.nio.file.Path = get()
+        val dataDir: Path = get()
         val profiles: ProfileManager = get()
         val credentials: CredentialsManager = get()
         AutoSyncService(
@@ -457,17 +469,17 @@ private fun buildHttpClient(okHttpInstance: OkHttpClient, json: Json): HttpClien
  * Allows connecting to servers with expired certificates
  * when the user explicitly accepts the risk.
  */
-private fun buildTrustAllSsl(): Pair<javax.net.ssl.SSLSocketFactory, javax.net.ssl.X509TrustManager> {
-    val trustManager = object : javax.net.ssl.X509TrustManager {
+private fun buildTrustAllSsl(): Pair<SSLSocketFactory, X509TrustManager> {
+    val trustManager = object : X509TrustManager {
         override fun checkClientTrusted(
-            chain: Array<java.security.cert.X509Certificate>, authType: String
+            chain: Array<X509Certificate>, authType: String
         ) = Unit
         override fun checkServerTrusted(
-            chain: Array<java.security.cert.X509Certificate>, authType: String
+            chain: Array<X509Certificate>, authType: String
         ) = Unit
-        override fun getAcceptedIssuers(): Array<java.security.cert.X509Certificate> = emptyArray()
+        override fun getAcceptedIssuers(): Array<X509Certificate> = emptyArray()
     }
     val ctx = javax.net.ssl.SSLContext.getInstance("TLS")
-    ctx.init(null, arrayOf(trustManager), java.security.SecureRandom())
+    ctx.init(null, arrayOf(trustManager), SecureRandom())
     return ctx.socketFactory to trustManager
 }
