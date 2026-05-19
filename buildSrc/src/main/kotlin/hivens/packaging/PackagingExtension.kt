@@ -104,7 +104,9 @@ abstract class JlinkOptionsExtension {
     /**
      * `--compress=<value>`. JDK 21+ syntax is `zip-N` (N=0..9); JDK 20 and
      * older used `0|1|2`. Leave unset to skip the flag entirely (jlink
-     * default = no compression). Set to "zip-9" for our release profile.
+     * default = no compression). Aura's release profile leaves it unset:
+     * the outer LZMA (Inno Setup) and squashfs-zstd (AppImage) compress
+     * a raw runtime image harder than they can a pre-compressed one.
      */
     abstract val compress: Property<String>
 

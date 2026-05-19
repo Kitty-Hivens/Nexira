@@ -372,7 +372,10 @@ packaging {
     macosPackageIdentifier.set("dev.hivens.auralauncher")
 
     jlink {
-        compress.set("zip-9")
+        // compress unset: inner zip-9 leaves outer compressors less to work
+        // with. Measured locally on a 2.2.16 customJpackageImage: dropping
+        // zip-9 cut squashfs-zstd-22 output by 8 MB (AppImage path) and
+        // xz -9e output by 13 MB (Inno Setup LZMA2/ultra64 proxy).
         vmKind.set("server")
         includeLocales.set("en,ru,de")
         // stripDebug / noHeaderFiles / noManPages default to true via
