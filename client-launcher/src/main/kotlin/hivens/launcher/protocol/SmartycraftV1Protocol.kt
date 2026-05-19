@@ -14,33 +14,26 @@ import org.slf4j.LoggerFactory
 
 /**
  * V1 (legacy PHP-era) implementation of [IServerProtocol] talking to
- * the SmartyCraft `/launcher2/index.php` backend.
+ * the SmartyCraft `/launcher2/index.php` backend. Wire spec:
+ * `docs/dev/smartycraft-v1-protocol.md`. Requests are `POST` with
+ * `Content-Type: application/x-www-form-urlencoded` (or multipart for
+ * uploads); responses are always JSON despite server claiming
+ * `text/html`.
  *
- * Wire spec: `docs/dev/smartycraft-v1-protocol.md`. All requests are
- * `POST /launcher2/index.php` with `Content-Type: application/x-www-form-urlencoded`
- * (or multipart for uploads). Response always JSON despite server claiming
- * `text/html` Content-Type.
+ * Quirks deliberately preserved:
+ * - Field name `cheksum` (not `checksum`) -- typo originated upstream;
+ *   server expects exactly that, so we mirror.
+ * - Login requests need `classPath` and `rtCheckSum` fields even though
+ *   server doesn't validate their content (HTTP 500 if absent).
+ *   Cargo-cult, kept for compatibility.
+ * - Loader UPDATE recovery is handled here transparently: first
+ *   attempt uses cached hash, on UPDATE [LauncherHashCache] refreshes,
+ *   second attempt uses the fresh hash. Caller sees a single
+ *   successful `loader()`.
  *
- * ## Quirks deliberately preserved
- *
- * - Field name `cheksum` (not `checksum`) -- matches what server expects;
- *   typo originated upstream, we mirror.
- * - All login requests need `classPath` and `rtCheckSum` fields even
- *   though server doesn't validate their content (HTTP 500 if absent).
- *   Cargo-cult cargo, kept for compatibility.
- * - Loader UPDATE recovery is handled here transparently -- first attempt
- *   uses cached hash, on UPDATE we ask [LauncherHashCache] to refresh,
- *   second attempt uses fresh hash. Caller sees a single successful
- *   `loader()` call.
- *
- * ## Out of scope
- *
- * - HTTP retry / channel switching -- that's [HttpClientProvider]'s job
- *   (becomes ChannelRouter in Conduit Phase 2 #155).
- * - Response caching -- repositories cache their own session/dashboard
- *   results when appropriate.
- * - Crash report submission (`action=report`) -- Aura uses Beacon for
- *   local-only crash flow per privacy stance, not server-side notification.
+ * Out of scope: HTTP retry / channel switching (handled by
+ * [ChannelRouter]), response caching (repositories cache themselves),
+ * crash-report submission (Aura uses Beacon, not server-side).
  */
 class SmartycraftV1Protocol(
     private val router: ChannelRouter,
@@ -162,13 +155,11 @@ class SmartycraftV1Protocol(
     }
 
     /**
-     * Pre-Conduit this method caught Exception and returned "" so callers
-     * mapped network failures into ProtocolStatus.ERROR responses. That hid
-     * IOException from AuthService.retryWithBackoff's shouldRetry predicate,
-     * which made the auth-flow retry chain dead code for the very class of
-     * failure it was built for (SOCKS h2 resets). Now the exception
-     * propagates; each protocol method's own caller decides whether to retry
-     * or surface as an error response.
+     * Network failures propagate as exceptions; each caller decides
+     * whether to retry (auth flow via [hivens.core.util.retryWithBackoff])
+     * or surface as an ERROR-status response. Swallowing here would hide
+     * IOException from the shouldRetry predicate and make the SOCKS h2
+     * reset retry chain dead code.
      */
     private suspend fun postForm(actionName: String, params: Parameters): String =
         router.execute { client ->
