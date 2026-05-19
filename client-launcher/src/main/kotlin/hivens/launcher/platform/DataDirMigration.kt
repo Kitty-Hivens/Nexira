@@ -23,15 +23,15 @@ object DataDirMigration {
     private const val MARKER = ".migrated"
 
     /**
-     * Files the launcher writes to its dataDir BEFORE migration runs (because
-     * SingleInstance.acquire grabs the lock before DataDirMigration.run, by
-     * design -- see Main.kt). Their presence MUST NOT make the target look
-     * "already populated" or first-run migration silently skips and the
-     * legacy `.aura/` payload is lost.
+     * Files the launcher writes to its dataDir BEFORE migration runs
+     * (SingleInstance.acquire grabs the lock before
+     * DataDirMigration.run, by design -- see Main.kt). Their presence
+     * MUST NOT make the target look "already populated", otherwise
+     * first-run migration silently skips and the legacy `.aura/`
+     * payload is lost.
      *
-     * Add new entries here whenever startup gains another pre-migration
-     * housekeeping file. Codex caught the .lock.pid regression on PR #129
-     * exactly this way.
+     * Add new entries here whenever startup gains another
+     * pre-migration housekeeping file.
      */
     private val HOUSEKEEPING = setOf(".lock", ".lock.pid", ".show", MARKER)
 

@@ -98,11 +98,11 @@ class DataDirMigrationTest {
 
     @Test
     fun `target containing only housekeeping files still triggers migration`() {
-        // Main.kt now acquires the single-instance lock BEFORE running
-        // migration, which means .lock / .lock.pid / .show may already
-        // exist in the (otherwise empty) target on a true first launch.
-        // Migration must still see the directory as "no user data here,
-        // proceed". Codex caught the .lock.pid regression on PR #129.
+        // Main.kt acquires the single-instance lock BEFORE running
+        // migration, so .lock / .lock.pid / .show may already exist
+        // in the (otherwise empty) target on a true first launch.
+        // Migration must still see the directory as "no user data
+        // here, proceed".
         Files.createDirectories(paths.legacyDataDir)
         Files.writeString(paths.legacyDataDir.resolve("legacy.json"), "legacy")
 
