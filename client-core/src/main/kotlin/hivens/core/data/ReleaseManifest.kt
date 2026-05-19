@@ -5,13 +5,13 @@ import kotlinx.serialization.Serializable
 
 /**
  * Machine-readable description of a GitHub release. Published by CI as
- * `release-manifest.json` alongside the binaries; the launcher REQUIRES it
- * -- `UpdateService` refuses to auto-install when the manifest is missing or
- * doesn't list the selected asset (#186 hardening: empty checksum was
- * previously a silent skip).
+ * `release-manifest.json` alongside the binaries; `UpdateService`
+ * REQUIRES it -- refuses to auto-install when the manifest is missing
+ * or does not list the selected asset, and treats an empty checksum as
+ * a hard error rather than a silent skip.
  *
- * Older releases (pre-2.2.7-rc3) that ship without a manifest can no longer
- * be auto-updated to and require manual reinstallation.
+ * Releases without a manifest cannot be auto-updated to and require
+ * manual reinstallation.
  */
 @Serializable
 data class ReleaseManifest(
@@ -26,21 +26,21 @@ data class ReleaseManifest(
 
     /**
      * User-facing one-paragraph summary extracted from the `### Highlights`
-     * subsection of the version's CHANGELOG entry. Null when the entry has no
-     * Highlights block -- clients should fall back to the full changelog.
+     * subsection of the CHANGELOG entry. Null when no Highlights block
+     * exists; clients fall back to the full changelog.
      */
     @SerialName("highlights") val highlights: String? = null,
 
-    @SerialName("assets") val assets: List<ReleaseAsset>
+    @SerialName("assets") val assets: List<ReleaseAsset>,
 )
 
 @Serializable
 data class ReleaseAsset(
     @SerialName("name") val name: String,
-    /** "windows" | "macos" | "linux" -- coarse platform tag. */
+    /** Coarse platform tag: "windows" | "macos" | "linux". */
     @SerialName("platform") val platform: String,
-    /** "installer" | "portable" | "appimage" | "dmg" -- distribution kind. */
+    /** Distribution kind: "installer" | "portable" | "appimage" | "dmg". */
     @SerialName("kind") val kind: String,
     @SerialName("sha256") val sha256: String,
-    @SerialName("size") val size: Long
+    @SerialName("size") val size: Long,
 )
