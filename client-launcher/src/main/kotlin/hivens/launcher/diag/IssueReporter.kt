@@ -15,9 +15,9 @@ import java.time.format.DateTimeFormatter
  * could autofill already in place -- they review, edit, submit. Nothing leaves
  * the machine until the user clicks the GitHub "Submit" button on github.com.
  *
- * This is the principled alternative to telemetry (see [[user_privacy_stance]]):
- * convenience for both sides without a phone-home codepath in the binary. The
- * launcher never POSTs anything; the browser does, with the user reviewing.
+ * This is the principled alternative to telemetry: convenience for both
+ * sides without a phone-home codepath in the binary. The launcher
+ * never POSTs anything; the browser does, with the user reviewing.
  *
  * URL length budget: ~8 KB is the practical cap before browsers (Chrome/Firefox)
  * start truncating GET URLs. We aim for ≤ 6500 chars total so title + body URL-
@@ -74,9 +74,10 @@ object IssueReporter {
         val truncatedStack = report.stackTrace.take(STACK_TRACE_LIMIT) +
             if (report.stackTrace.length > STACK_TRACE_LIMIT) "\n... (truncated; full trace in crash file)" else ""
 
-        // All free-form fields routed through Redactor -- defense in depth.
-        // CrashReporter doesn't generate report.lastAction-style sensitive fields
-        // anymore, but stack traces can include URL params with tokens.
+        // All free-form fields routed through Redactor -- defense in
+        // depth. Stack traces can include URL params with tokens,
+        // which is the realistic leak surface the body redaction
+        // catches.
         return Redactor.redact(buildString {
             appendLine("## Описание")
             appendLine("<!-- Опишите что вы делали когда лаунчер упал. -->")

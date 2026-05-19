@@ -290,15 +290,12 @@ val networkModule = module {
         )
     }
 
-    // Repositories -- thin adapters over IServerProtocol post-Conduit Phase 1.
+    // Repositories -- thin adapters over IServerProtocol.
     single { ServerRepository(get<IServerProtocol>()) }
     single { SkinRepository(get<IServerProtocol>()) }
     single { PlayerRepository(get<IServerProtocol>()) }
 }
 
-/**
- * Module of the main components of the application.
- */
 val appModule = module {
     /**
      * Per-OS application paths. See [PlatformPaths] for layout.
@@ -321,13 +318,12 @@ val appModule = module {
      */
     single { CrashReporter(get()) }
 
-    // Managers and services
-    //
-    // IKeyringStorage chosen at startup via KeyringStorageFactory.system()
-    // -- Linux libsecret on this platform, NoOp fallback elsewhere or when
-    // the daemon is unreachable. CredentialsManager handles the file-fallback
-    // path internally when keyring.store() returns false, so this single
-    // line wires both the happy path and the degraded path.
+    // IKeyringStorage picked at startup via KeyringStorageFactory.system()
+    // -- libsecret on Linux, Credential Manager / DPAPI on Windows,
+    // Keychain on macOS, NoOp fallback when no daemon is reachable.
+    // CredentialsManager handles the file-fallback path internally when
+    // keyring.store() returns false, so this single line wires both
+    // the happy and the degraded path.
     single<IKeyringStorage> {
         KeyringStorageFactory.system()
     }
@@ -342,17 +338,16 @@ val appModule = module {
     // mimicVersionOverride) into their respective global state holders
     // on Koin start. `createdAtStart = true` makes this run during
     // `startKoin { modules(...) }` so the values are live before the
-    // first protocol call -- previously done via a `KoinJavaComponent`
-    // escape hatch in `Main.kt`.
+    // first protocol call.
     single(createdAtStart = true) { SettingsRestoreHook(get()) }
 
     /**
-     * Process-lifetime coroutine scope for fire-and-forget background work
-     * (tray-launch flow, AutoSync, `LauncherController.launch`). SupervisorJob
-     * so a single failed child doesn't take down the rest. Previously two
-     * separate scopes existed (`Main.applicationScope` + LauncherController's
-     * own); unified so the JVM shutdown hook installed by
-     * [AppCoroutineScopeHook] cancels the same scope every coroutine lives on.
+     * Process-lifetime coroutine scope for fire-and-forget background
+     * work (tray-launch flow, AutoSync, `LauncherController.launch`).
+     * SupervisorJob so a single failed child doesn't take down the
+     * rest. Single shared scope across the whole launcher so the JVM
+     * shutdown hook installed by [AppCoroutineScopeHook] cancels every
+     * coroutine on process exit.
      */
     single<CoroutineScope>(createdAtStart = true) {
         CoroutineScope(
@@ -366,11 +361,10 @@ val appModule = module {
     single(createdAtStart = true) { AppCoroutineScopeHook(get()) }
 
     /**
-     * Launch-flow orchestrator. Used to live in `client-ui/logic/` while
-     * it still depended on UI types (i18n strings, console service);
-     * after the B1 decoupling (sub-batches 11.1-11.2) it consumes only
-     * `client-core` interfaces + the shared coroutine scope, so it now
-     * sits on the correct side of the module layering.
+     * Launch-flow orchestrator. Consumes only `client-core` interfaces
+     * + the shared coroutine scope, so it sits cleanly on the
+     * client-launcher side of the module layering -- no UI types
+     * (i18n strings, console service) leak in.
      */
     singleOf(::LauncherController)
 
@@ -460,10 +454,7 @@ val appModule = module {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/**
- * Builds an [HttpClient] backed by the given [OkHttpClient].
- * Extracted to eliminate duplication between secure and insecure variants.
- */
+/** Wraps the given [OkHttpClient] in a Ktor [HttpClient] with our shared timeouts, headers, and JSON content-negotiation. */
 private fun buildHttpClient(okHttpInstance: OkHttpClient, json: Json): HttpClient =
     HttpClient(OkHttp) {
         engine { preconfigured = okHttpInstance }
