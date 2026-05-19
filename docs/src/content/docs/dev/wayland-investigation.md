@@ -1,11 +1,11 @@
 ---
 title: Wayland-Native — investigation notes
-description: Current state of Wayland support in Aura Launcher and a roadmap for going from "XWayland-fallback" to "Wayland-native".
+description: Current state of Wayland support in Nexira and a roadmap for going from "XWayland-fallback" to "Wayland-native".
 ---
 
 ## ── Status as of 2026-05-12 ─────────────────────────────────────────────────
 
-Aura Launcher ships today as an **XWayland client**, not a native Wayland
+Nexira ships today as an **XWayland client**, not a native Wayland
 client. Everywhere we set "WM_CLASS" or reach into the JDK toolkit, we
 assume `XToolkit` (the X11 backend). On a pure Wayland session the JDK
 silently falls back to XWayland; visually nothing breaks, but we lose:
@@ -54,7 +54,7 @@ Selection mechanism (per JBR docs / OpenJDK upstream):
 - The classic `awt.toolkit` system property still works for binary class
   names but is the legacy path.
 
-## ── Where Aura currently breaks the abstraction ────────────────────────────
+## ── Where Nexira currently breaks the abstraction ────────────────────────────
 
 Inventory of X11-specific assumptions in our code:
 
@@ -69,7 +69,7 @@ Inventory of X11-specific assumptions in our code:
 
 | Line | Flag | Wayland relevance |
 |------|------|-------------------|
-| 179 | `-Dawt.appClassName=AuraLauncher` | JBR-only; ignored under `WLToolkit`. JBR sets `app_id` differently for Wayland — likely needs a new mechanism. |
+| 179 | `-Dawt.appClassName=Nexira` | JBR-only; ignored under `WLToolkit`. JBR sets `app_id` differently for Wayland — likely needs a new mechanism. |
 | 180 | `--add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED` | Harmless no-op on Wayland (the package exists but our reflection target doesn't apply). |
 | 184 | `-D_JAVA_AWT_WM_NONREPARENTING=1` | X11-specific Mutter workaround. Harmless under Wayland. |
 | 185 | `-Drobot.need_x11=false` | Hint for `Robot` class init under headless / X11. Wayland Robot uses its own portal-based path. Harmless. |
@@ -283,7 +283,7 @@ versions than in years.
 - Skiko 0.145+ ships any class matching `*Wayland*Redrawer` or
   `LinuxVulkanRedrawer`, OR
 - Compose Desktop changelog mentions Wayland surface support, OR
-- A non-Aura Compose project demonstrably runs on WLToolkit on a
+- A non-Nexira Compose project demonstrably runs on WLToolkit on a
   pure Wayland session.
 
 When any of these land, re-fire `trial-appimage.yml`, re-test on
@@ -315,7 +315,7 @@ Smallest reversible change that exposes the truth at Compose level:
 3. Build the trial AppImage in CI behind `workflow_dispatch` (not on
    release tags) and have the user run it on Hyprland + KDE Plasma 6
    Wayland sessions.
-4. Capture failure modes per [[Where Aura currently breaks]] inventory
+4. Capture failure modes per [[Where Nexira currently breaks]] inventory
    above: WM_CLASS reflection (expected silent fail), raise pulse
    (expected to refuse), tray (expected to survive via DBus), clipboard,
    Desktop.browse, screen size.
