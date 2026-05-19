@@ -40,6 +40,13 @@ RULES: list[Rule] = [
         explanation="PR number reference in comment (Style D: git blame carries this).",
     ),
     Rule(
+        name="issue-ref-paren",
+        # `(#123)` style GitHub issue/PR references. All-digits inside the
+        # parens distinguishes from hex color literals like `(#FFFFFF)`.
+        pattern=re.compile(rf"{COMMENT_PREFIX}.*\(#\d+\)"),
+        explanation="Parenthesized issue/PR ref in comment (Style D: PR body carries this).",
+    ),
+    Rule(
         name="codex-marker",
         pattern=re.compile(rf"{COMMENT_PREFIX}.*\bCodex P\d+\b"),
         explanation="Codex review marker in comment (session metadata, not code documentation).",
