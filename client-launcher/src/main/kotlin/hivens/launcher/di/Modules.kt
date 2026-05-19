@@ -3,7 +3,6 @@ package hivens.launcher.di
 import hivens.config.Protocol
 import hivens.config.Storage
 import hivens.core.api.AuthService
-import hivens.core.api.interfaces.IServerProtocol
 import hivens.launcher.network.ChannelRouter
 import hivens.launcher.network.NetworkState
 import hivens.launcher.network.ServerProtocolConfig
@@ -185,16 +184,6 @@ val networkModule = module {
                 else                                      -> direct
             }
         }
-    }
-
-    /**
-     * Named insecure [HttpClientProvider] for [AuthService] -- always uses
-     * the insecure smartycraft client regardless of [NetworkState], because it
-     * is injected specifically for the "connect anyway" login retry path.
-     */
-    single<HttpClientProvider>(named("insecure")) {
-        val insecure = buildHttpClient(get<OkHttpClient>(named("insecure")), get())
-        HttpClientProvider { insecure }
     }
 
     /**
