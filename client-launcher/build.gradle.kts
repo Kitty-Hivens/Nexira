@@ -12,15 +12,14 @@ dependencies {
     implementation(libs.slf4j.api)
     // MDCContext for tagging launch-flow coroutines with a stable launchId so
     // a multi-launch log dump can be sliced per Play-click. Was a client-ui
-    // dependency until LauncherController moved here in B1 (sub-batch 11.3,
-    // 2026-05-17); the slf4j-MDC bridge needs to live with the producer.
+    // slf4j-MDC bridge for kotlinx-coroutines lives with the producer of
+    // launch-scoped MDC values (LauncherController).
     implementation(libs.kotlinx.coroutines.slf4j)
-    // No JNA in client-launcher: Vault keyring and other native bindings here
-    // use Project Panama (java.lang.foreign.*, JEP 454, finalized Java 22).
-    // The remaining JNA presence in the project is in client-ui, transitively
-    // via filekit (Win32 IFileDialog + GTK fallback). dorkbox/SystemTray was
-    // dropped in 2.2.14 along with the dorkbox-specific JNA pin; what JNA we
-    // still ship is filekit's responsibility, not ours.
+    // No JNA in client-launcher: Vault keyring and other native bindings
+    // here use Project Panama (`java.lang.foreign.*`, JEP 454). The
+    // remaining JNA presence in the project lives in client-ui,
+    // transitively via filekit (Win32 IFileDialog + GTK fallback); not
+    // our dependency to track.
 
     // Ktor Client & Serialization
     implementation(libs.ktor.client.core)

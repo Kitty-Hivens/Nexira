@@ -160,8 +160,8 @@ compose.desktop {
 
             // jpackage expects a strictly numeric VersionInfoVersion: MAJOR.MINOR
             // [.BUILD[.REVISION]], digits only, no pre-release suffix. Our git
-            // tags follow `v<semver>[-<suffix>]` convention (e.g. v2.2.14-rc1,
-            // v2.2.14), so:
+            // tags follow `v<semver>[-<suffix>]` convention (e.g. `v2.4.0-rc1`,
+            // `v2.4.0`), so:
             //   1. Strip the leading "v" if present (tag invocation forces it,
             //      manual -PappVersion overrides may or may not).
             //   2. Drop everything from the first "-" (rc / beta / dirty suffix).
@@ -284,9 +284,9 @@ compose.desktop {
             "-XX:MaxMetaspaceSize=256m",
             "-XX:ReservedCodeCacheSize=128m",
 
-            // Security — libtray's Panama bindings need access to native
-            // memory + downcall stubs. Same flag also enables the
-            // macOS keyring + libsecret bindings shipped in 2.2.13.
+            // Security — libtray's Panama bindings need native memory +
+            // downcall stubs. Same flag also enables the macOS keyring
+            // and Linux libsecret bindings.
             "--enable-native-access=ALL-UNNAMED",
 
             // Puppet mode (hivens.ui.puppet.PuppetServer) -- opt-in HTTP
@@ -384,26 +384,25 @@ packaging {
 }
 
 // Kotlin compiler options for every JVM compile task in client-ui.
+// freeCompilerArgs split into "always on" and "opt-in" groups.
 //
-// freeCompilerArgs are split into "always on" and "opt-in" groups.
+// Flags explicitly NOT set (worth recording so they don't creep back in):
 //
-// Removed 2026-05-17 (audit chunk 2 item #26) and worth recording why so
-// they do not creep back in:
+//   * `-Xinline-classes` -- deprecated since value classes stabilized
+//     (Kotlin 1.5+). Today the compiler treats it as no-op-or-warning.
 //
-//   * -Xinline-classes : deprecated since the value-classes language feature
-//     stabilized (Kotlin 1.5+). Compiler treats it as no-op-or-warning today.
+//   * `-Xno-param-assertions / -Xno-call-assertions / -Xno-receiver-assertions`
+//     -- strip Kotlin's generated nullability runtime checks. Trades
+//     a handful of microseconds per call for a deep-stack NPE whenever
+//     a non-null contract is violated, instead of an
+//     IllegalArgumentException pointing at the boundary. Launcher
+//     workloads aren't hot enough for the microseconds to matter and
+//     contract-violation triage suffers a lot from the masked failure
+//     mode; throw-on-boundary wins.
 //
-//   * -Xno-param-assertions / -Xno-call-assertions / -Xno-receiver-assertions :
-//     strip Kotlin's generated nullability runtime checks. Trades a handful
-//     of microseconds per call for a deep-stack NullPointerException whenever
-//     a non-null contract is violated, instead of an IllegalArgumentException
-//     pointing at the boundary. Launcher workloads are nowhere near hot enough
-//     for the micros to matter and contract-violation triage suffers a lot
-//     from the masked failure mode; the throw-on-boundary side wins.
-//
-// The Compose-compiler metrics + reports flags are now opt-in via
+// Compose-compiler metrics + reports are opt-in via
 // `-PauraComposeMetrics=true`. They write per-compile files into
-// build/compose_metrics and build/compose_reports, which is useful for
+// `build/compose_metrics` and `build/compose_reports`, useful for
 // recomposition audits but wasted IO on every regular compile.
 tasks.withType<KotlinJvmCompile>().configureEach {
     compilerOptions {
@@ -445,14 +444,13 @@ tasks.withType<KotlinJvmCompile>().configureEach {
 
 // Jar packaging.
 //
-// Removed 2026-05-17 (audit chunk 2 item #27):
-//   exclude("**/*.kotlin_metadata"), exclude("**/*.kotlin_builtins").
-//   Stripping those breaks reflection on our own classes -- kotlin-reflect
-//   (which is on the runtime classpath at 3 MB), sealed-class enumeration,
-//   KClass.members, and kotlinx.serialization runtime fallback paths all
-//   read .kotlin_metadata for type information. The size win was kilobytes
-//   per jar against the risk of silent runtime reflection breakage that
-//   would only show up in production -- not a trade worth making.
+// We do NOT exclude `**/*.kotlin_metadata` / `**/*.kotlin_builtins` --
+// stripping those breaks reflection on our own classes: kotlin-reflect
+// (3 MB on the runtime classpath), sealed-class enumeration,
+// `KClass.members`, and kotlinx.serialization runtime fallback paths
+// all read `.kotlin_metadata` for type information. Saves kilobytes
+// per jar at the cost of silent runtime reflection breakage in
+// production -- not a trade worth making.
 tasks.withType<Jar>().configureEach {
     // Signed-JAR manifest metadata: not relevant; we ship unsigned and
     // jpackage / Inno Setup handle authenticode on their own envelope.

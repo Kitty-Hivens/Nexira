@@ -199,10 +199,9 @@ private fun localizeError(error: LaunchError, s: hivens.ui.i18n.AppStrings): Str
 }
 
 /**
- * Bytes/second to the unit the UI shows. Mirrors the format the controller
- * previously baked into `LaunchState.Downloading.speedStr` -- now that
- * `speedBytesPerSec` is raw, formatting lives here so the user's UI locale
- * (not the controller's snapshot locale) wins.
+ * Bytes/second to the unit the UI shows. Formatting lives here (not
+ * upstream in the controller) so the user's UI locale wins over the
+ * controller's snapshot locale.
  */
 private fun formatSpeed(bytesPerSec: Long, fmt: DecimalFormat): String {
     if (bytesPerSec <= 0) return "-- KB/s"
