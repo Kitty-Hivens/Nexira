@@ -6,21 +6,10 @@ import hivens.core.data.SessionData
 import java.io.IOException
 import java.nio.file.Path
 
-/**
- * Contract for the Minecraft client launch service.
- */
 interface ILauncherService {
-
     /**
-     * Collects and executes the Minecraft client launch command.
-     *
-     * @param sessionData Session data (accessToken, uuid, playerName).
-     * @param serverProfile Data about the selected server (version, name).
-     * @param clientRootPath The absolute path to the client root.
-     * @param javaExecutablePath The absolute path to the java executable.
-     * @param allocatedMemoryMB The amount of allocated memory in MB (e.g., 4096).
-     * @return The running process (Process) to monitor.
-     * @throws IOException if there is an I/O error at startup.
+     * Assembles and spawns the Minecraft launch process; returns the
+     * running [Process] for monitoring.
      */
     @Throws(IOException::class)
     suspend fun launchClient(
@@ -28,9 +17,10 @@ interface ILauncherService {
         serverProfile: ServerProfile,
         clientRootPath: Path,
         javaExecutablePath: Path,
-        allocatedMemoryMB: Int
+        allocatedMemoryMB: Int,
     ): Process
 
+    /** Same as [launchClient], plus streams stdout / stderr through [onLog]. */
     @Throws(IOException::class)
     suspend fun launchClientWithLogs(
         sessionData: SessionData,
@@ -38,6 +28,6 @@ interface ILauncherService {
         clientRootPath: Path,
         javaExecutablePath: Path,
         allocatedMemoryMB: Int,
-        onLog: (String, LauncherLogType) -> Unit
+        onLog: (String, LauncherLogType) -> Unit,
     ): Process
 }
