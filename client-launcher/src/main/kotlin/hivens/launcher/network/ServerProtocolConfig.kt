@@ -1,6 +1,7 @@
 package hivens.launcher.network
 
 import hivens.config.ExperimentalConduitOverride
+import java.net.URI
 import kotlinx.serialization.Serializable
 
 /**
@@ -89,8 +90,8 @@ data class ServerProtocolConfig(
      * empty match key.
      */
     val sslBypassHost: String get() =
-        runCatching { java.net.URI(baseUrl).host }.getOrNull()?.takeIf { it.isNotBlank() }
-            ?: runCatching { java.net.URI(DEFAULT_BASE_URL).host!! }.getOrThrow()
+        runCatching { URI(baseUrl).host }.getOrNull()?.takeIf { it.isNotBlank() }
+            ?: run { URI(DEFAULT_BASE_URL).host!! }
 
     companion object {
         const val DEFAULT_BASE_URL    = "https://www.smartycraft.ru"

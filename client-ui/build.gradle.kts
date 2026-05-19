@@ -8,6 +8,14 @@ plugins {
     alias(libs.plugins.kotlin.compose.compiler)
     alias(libs.plugins.buildconfig)
     alias(libs.plugins.kotlin.serialization)
+    // aura.packaging: convention plugin from buildSrc/ that owns the
+    // jlink + jpackage tasks for distribution builds. Currently registers
+    // `:client-ui:customRuntime` only -- the jpackage path lands in a
+    // follow-up commit. Source of truth for jlink flags lives in the
+    // `packaging { jlink { ... } }` block below; AppImage shell script
+    // consumes the same values via a generated profile fragment (also
+    // follow-up).
+    id("aura.packaging")
 }
 
 group = "hivens"
@@ -171,17 +179,28 @@ compose.desktop {
             vendor = "Hivens"
 
             // ====================================================================
-            // CUSTOM MINIMAL JRE (saves ~120MB)
+            // CUSTOM MINIMAL JRE
             // ====================================================================
+            // Modules verified used via bytecode scan over the uber jar
+            // (every `java/sql/`, `java/net/http/`, `javax/naming/` reference
+            // counted across all 31k bundled classes). The three modules
+            // removed in this trim:
+            //   - java.sql      0 references in the bundle
+            //   - java.naming   only ch.qos.logback.* code paths (SMTP
+            //                   appender, <insertFromJNDI>, servlet
+            //                   container integration) -- none of which our
+            //                   logback.xml exercises
+            //   - java.net.http 0 references (Ktor is configured with the
+            //                   OkHttp engine; java HttpClient unused)
+            // java.prefs stays even though we don't use it directly, because
+            // java.desktop already requires it transitively -- listing it
+            // explicitly is redundant but documents intent.
             modules(
                 "java.base",
                 "java.desktop",
                 "java.logging",
                 "java.management",
-                "java.naming",
-                "java.net.http",
                 "java.prefs",
-                "java.sql",
                 "jdk.crypto.ec",
                 "jdk.unsupported",
                 "jdk.zipfs"
@@ -204,7 +223,10 @@ compose.desktop {
             // task is not invoked, so its iconFile is dead weight.
 
             macOS {
-                bundleID = "com.hivens.auralauncher"
+                // Reverse-DNS of the hivens.dev apex (was com.hivens.* by
+                // accident in earlier versions -- domain is hivens.dev, so
+                // the leftmost component must be `dev`).
+                bundleID = "dev.hivens.auralauncher"
                 dockName = "Aura Launcher"
                 // Without iconFile, jpackage falls back to the default
                 // Compose/Kotlin "K + folder" placeholder. Regenerate via
@@ -218,18 +240,15 @@ compose.desktop {
         // JVM ARGUMENTS OPTIMIZATION
         // ====================================================================
         jvmArgs(
-            // Linux window-manager identity. Two-pronged because the canonical
-            // "set X11 WM_CLASS from a JVM" knob is JDK-vendor-specific:
-            //   - JBR honours -Dawt.appClassName=...  natively at toolkit init.
-            //   - Stock OpenJDK (Liberica, Temurin, etc.) ignores that property
-            //     and derives WM_CLASS from the launcher's argv[0]. Main.kt
-            //     reflects into sun.awt.X11.XToolkit.awtAppClassName before the
-            //     first window is created, which needs the --add-opens below.
-            // Result: matches StartupWMClass=AuraLauncher in
-            // resources/aura-launcher.desktop on every JDK, so KDE/Hyprland/GNOME
-            // associate the live window with the .desktop entry and pick up the
-            // hicolor icon at the size the compositor actually wants.
-            "-Dawt.appClassName=AuraLauncher",
+            // Linux window-manager identity. Main.kt reflects into
+            // sun.awt.X11.XToolkit.awtAppClassName before the first window is
+            // created so the X11 WM_CLASS hint matches StartupWMClass=AuraLauncher
+            // in resources/aura-launcher.desktop. KDE / Hyprland / GNOME associate
+            // the live window with the .desktop entry on that match and pick up
+            // the hicolor icon at the size the compositor actually wants. The
+            // --add-opens below is what allows the reflection. Stock OpenJDK
+            // derives WM_CLASS from argv[0] by default; without the reflection
+            // the launcher would show up as "java" in the taskbar.
             "--add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED",
 
             // X11/Linux desktop tuning. macOS/Windows JVMs silently ignore
@@ -270,24 +289,6 @@ compose.desktop {
             // macOS keyring + libsecret bindings shipped in 2.2.13.
             "--enable-native-access=ALL-UNNAMED",
 
-            // ── Wayland-Native trial flag ─────────────────────────────────
-            //
-            // Force JBR's WLToolkit instead of XToolkit when AURA_WAYLAND_TRIAL=1
-            // is set in the build environment. JBR 25 ships sun.awt.wl.WLToolkit
-            // but defaults to XToolkit even on Wayland sessions; we have to opt in
-            // explicitly. Trial-only because the toolkit-aware fallback paths
-            // (WM_CLASS, raise pulse, jlink jetbrains.api module) are not yet in
-            // place — see docs/dev/wayland-investigation.md for the chunk plan.
-            //
-            // `providers.environmentVariable(...).orNull` is configuration-cache
-            // safe (vs. raw System.getenv); evaluation deferred to the proper
-            // gradle stage.
-            *(if (providers.environmentVariable("AURA_WAYLAND_TRIAL").orNull == "1") {
-                arrayOf("-Dawt.toolkit.name=WLToolkit")
-            } else {
-                emptyArray()
-            }),
-
             // Puppet mode (hivens.ui.puppet.PuppetServer) -- opt-in HTTP
             // control surface for CLI-driven UI testing. Activated when
             // the launcher is run with `-PauraPuppetPort=N` (forwarded
@@ -310,6 +311,76 @@ compose.resources {
     publicResClass = true
     packageOfResClass = "hivens.ui.generated.resources"
     generateResClass = always
+}
+
+// Aura's distribution-build profile. Single source of truth: the gradle
+// `customRuntime` task consumes these values, and (in a follow-up commit)
+// the AppImage shell script will read them from a generated profile
+// fragment. Mirror of what scripts/build-appimage.sh currently hardcodes;
+// once the emitter task lands, the hardcode goes away.
+packaging {
+    appName.set("AuraLauncher")
+    mainClass.set("hivens.ui.MainKt")
+
+    // jpackage's `--app-version` is strict-digits (MAJOR.MINOR[.BUILD[.REVISION]],
+    // no pre-release suffix). Reuse Compose Desktop's `safeVersion` derivation
+    // immediately above so the two paths agree on what version string lands
+    // in the produced binary. Once Compose Desktop's nativeDistributions
+    // block is retired in B-3 the safeVersion lookup moves up here.
+    appVersion.set(provider {
+        val cleanVersion = project.version.toString().removePrefix("v").substringBefore("-")
+        if (cleanVersion.matches(Regex("\\d+\\.\\d+.*"))) cleanVersion else "1.0.0"
+    })
+
+    modules.set(listOf(
+        "java.base",
+        "java.desktop",
+        "java.logging",
+        "java.management",
+        "java.prefs",
+        "jdk.crypto.ec",
+        "jdk.unsupported",
+        "jdk.zipfs",
+        "jdk.localedata",
+    ))
+
+    // jvmArgs baked into the jpackage launcher script via repeated
+    // --java-options. Same set as compose.desktop.application.jvmArgs
+    // above (still authoritative until B-3 retires that block).
+    // AURA_WAYLAND_TRIAL flow is gone (Liberica swap commit e573318);
+    // -Dawt.appClassName is JBR-only honour, dropped in the same
+    // commit; jna.nosys was a dorkbox/JBR rudiment, also dropped.
+    jvmArgs.set(listOf(
+        "--add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED",
+        "--enable-native-access=ALL-UNNAMED",
+        "-Dawt.useSystemAAFontSettings=on",
+        "-Djdk.gtk.version=3",
+        "-D_JAVA_AWT_WM_NONREPARENTING=1",
+        "-Drobot.need_x11=false",
+        "-XX:+UseG1GC",
+        "-XX:+UseStringDeduplication",
+        "-XX:+OptimizeStringConcat",
+        "-XX:+UseCompressedOops",
+        "-Xms128m",
+        "-Xmx512m",
+        "-XX:MaxMetaspaceSize=256m",
+        "-XX:ReservedCodeCacheSize=128m",
+    ))
+
+    windowsIcon.set(rootProject.file("resources/icons/icon.ico"))
+    macosIcon.set(rootProject.file("resources/icons/icon.icns"))
+    macosPackageIdentifier.set("dev.hivens.auralauncher")
+
+    jlink {
+        // compress unset: inner zip-9 leaves outer compressors less to work
+        // with. Measured locally on a 2.2.16 customJpackageImage: dropping
+        // zip-9 cut squashfs-zstd-22 output by 8 MB (AppImage path) and
+        // xz -9e output by 13 MB (Inno Setup LZMA2/ultra64 proxy).
+        vmKind.set("server")
+        includeLocales.set("en,ru,de")
+        // stripDebug / noHeaderFiles / noManPages default to true via
+        // PackagingPlugin's conventions -- omitted intentionally.
+    }
 }
 
 // Kotlin compiler options for every JVM compile task in client-ui.

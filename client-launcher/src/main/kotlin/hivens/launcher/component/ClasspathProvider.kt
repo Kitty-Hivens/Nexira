@@ -102,9 +102,7 @@ class ClasspathProvider(
                 validateLibrary(path, modsDir, absoluteExcludedNames)
             }
             // Sorting is important! If the order is different, the hash will be different.
-            .sortedWith(::compareLibraries)
-            .map { it.toString() }
-            .joinToString(File.pathSeparator)
+            .sortedWith(::compareLibraries).joinToString(File.pathSeparator) { it.toString() }
     }
 
     /**

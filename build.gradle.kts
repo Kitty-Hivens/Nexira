@@ -41,6 +41,19 @@ subprojects {
             configure<JavaPluginExtension> {
                 sourceCompatibility = JavaVersion.VERSION_25
                 targetCompatibility = JavaVersion.VERSION_25
+                // Vendor-loose toolchain pin: any JDK 25 distribution works
+                // (Liberica is the project's documented choice and what CI
+                // pulls via JAVA_DISTRIBUTION=liberica, but Temurin / Zulu /
+                // Microsoft / etc. are all fine locally). Pinning the
+                // languageVersion is what makes new contributors with
+                // JDK <25 on PATH auto-download a 25 via the
+                // foojay-resolver-convention plugin in settings.gradle.kts
+                // instead of failing with cryptic "no matching toolchain"
+                // errors. Game-side JRE is provisioned separately by
+                // JavaManagerService (Liberica) and is independent of this.
+                toolchain {
+                    languageVersion.set(JavaLanguageVersion.of(25))
+                }
             }
         }
         // Kotlin's compilerOptions.jvmTarget defaults to JVM_1_8 if a
@@ -119,7 +132,8 @@ gradle.startParameter.apply {
 }
 
 // JNA pin removed alongside dorkbox/SystemTray (replaced by libtray, the
-// pure-Panama tray library at github.com/Kitty-Hivens/libtray). The
-// pin existed only to satisfy dorkbox's hardcoded JNA version check;
-// libtray uses java.lang.foreign and never pulls in net.java.dev.jna.
-// JBR 25's bundled JNA 7.x can resolve naturally now.
+// pure-Panama tray library at github.com/Kitty-Hivens/libtray). The pin
+// existed only to satisfy dorkbox's hardcoded JNA version check; libtray
+// uses java.lang.foreign and never pulls in net.java.dev.jna. JNA still
+// enters the graph transitively via filekit (only on Windows), pinned at
+// 5.18.1 in client-ui/build.gradle.kts; no root-level pin needed.

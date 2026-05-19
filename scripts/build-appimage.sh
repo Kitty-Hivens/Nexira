@@ -12,12 +12,22 @@
 #   ARCH=x86_64           appimagetool architecture
 #   OUTPUT=<derived>      final .AppImage path; defaults to
 #                         AuraLauncher-<version>-<arch>.AppImage in CWD
+#   PACKAGING_PROFILE     override path to the generated packaging
+#                         profile (defaults to the standard
+#                         client-ui/build/generated/packaging/
+#                         packaging-profile.sh, produced by the
+#                         `:client-ui:emitAppImageProfile` gradle task)
 #
 # Requires on PATH: jlink (from JDK), appimagetool (continuous build).
 #
 # Why this lives in a script: the inline yaml in build_release.yml grew to
 # ~50 lines with a heredoc, three mkdir trees, four cp blocks and an
 # appimagetool invocation — testable locally as a script, opaque inline.
+#
+# jlink module list + flag set live in the packaging profile, NOT inline
+# here. Single source of truth is the `packaging { ... }` block in
+# client-ui/build.gradle.kts; the gradle `emitAppImageProfile` task
+# materializes it into the shell-sourceable file we consume below.
 # ─────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
@@ -32,16 +42,32 @@ OUTPUT="${OUTPUT:-AuraLauncher-${APP_VERSION}-${ARCH}.AppImage}"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
+# ── Packaging profile (single source of truth for jlink flags) ──────────────
+PACKAGING_PROFILE="${PACKAGING_PROFILE:-$ROOT/client-ui/build/generated/packaging/packaging-profile.sh}"
+if [ ! -f "$PACKAGING_PROFILE" ]; then
+    echo "error: packaging profile not found at $PACKAGING_PROFILE" >&2
+    echo "       run \`./gradlew :client-ui:emitAppImageProfile\` first," >&2
+    echo "       or set PACKAGING_PROFILE=<path> to override." >&2
+    exit 1
+fi
+# Populates AURA_JLINK_MODULES (comma-joined string) and AURA_JLINK_OPTIONS
+# (bash array). See buildSrc/.../EmitAppImageProfileTask.kt for the writer.
+source "$PACKAGING_PROFILE"
+
 # ── 1. Minimal JRE via jlink ────────────────────────────────────────────────
 # jlink refuses to write into an existing directory, so it has to run before
 # any of the mkdir steps below.
+# Module list and flag set come from the sourced packaging profile above.
+# Rationale per flag lives in the PackagingExtension KDoc + the per-flag
+# comments in client-ui/build.gradle.kts. Headline: --vm=server (-22 MB),
+# --include-locales=en,ru,de + jdk.localedata (keeps i18n-relevant locale
+# data, prunes the rest), --strip-debug / --no-header-files / --no-man-pages
+# (size hygiene). No inner --compress: the outer squashfs-zstd compressor
+# squeezes a non-zip-9 runtime image harder than it can a pre-compressed one.
 jlink \
     --output "$APPDIR/usr" \
-    --add-modules java.base,java.desktop,java.logging,java.management,java.naming,java.net.http,java.prefs,java.sql,jdk.crypto.ec,jdk.unsupported,jdk.zipfs \
-    --no-header-files \
-    --no-man-pages \
-    --strip-debug \
-    --compress=2
+    --add-modules "$AURA_JLINK_MODULES" \
+    "${AURA_JLINK_OPTIONS[@]}"
 
 # ── 2. Remaining subdirs (usr/bin already exists from jlink) ────────────────
 mkdir -p \
@@ -52,34 +78,21 @@ mkdir -p \
     "$APPDIR/usr/share/metainfo"
 
 # ── 3. AppRun entry-point ───────────────────────────────────────────────────
-# WM_CLASS hygiene: -Dawt.appClassName works on JBR; on stock OpenJDK (which
-# is what jlink builds the AppImage's runtime from) Main.kt reflects into
-# sun.awt.X11.XToolkit.awtAppClassName, which JPMS guards behind --add-opens.
-# Both must be present for Hyprland/KDE/GNOME to match the live window
-# against StartupWMClass=AuraLauncher and pick up the hicolor icon at the
-# correct size. Mirrors client-ui/build.gradle.kts — the fat jar bypasses the
-# Compose-generated launcher script, so its jvmArgs do not flow through here.
-#
-# Wayland-Native trial: when AURA_WAYLAND_TRIAL=1 is set in the build env,
-# bake `-Dawt.toolkit.name=WLToolkit` into the AppRun so the AppImage runtime
-# selects JBR's native Wayland toolkit instead of XToolkit/XWayland fallback.
-# The gradle-side `compose.desktop.application.jvmArgs` does NOT propagate
-# into AppImage builds (jpackage path is for Win/macOS distributables) — the
-# AppRun script is the only place where flags actually reach runtime.
-WAYLAND_TRIAL_FLAG=""
-if [ "${AURA_WAYLAND_TRIAL:-}" = "1" ]; then
-    WAYLAND_TRIAL_FLAG="-Dawt.toolkit.name=WLToolkit"
-    echo "AppRun: AURA_WAYLAND_TRIAL=1 — baking -Dawt.toolkit.name=WLToolkit"
-fi
-
+# WM_CLASS hygiene: Main.kt reflects into sun.awt.X11.XToolkit.awtAppClassName
+# before the first window is created so the X11 WM_CLASS hint matches
+# StartupWMClass=AuraLauncher in resources/aura-launcher.desktop. The
+# reflection is JPMS-guarded behind --add-opens=java.desktop/sun.awt.X11.
+# Stock OpenJDK derives WM_CLASS from argv[0] by default; without the
+# reflection the launcher would show up as "java" in the taskbar. The fat
+# jar bypasses the Compose-generated launcher script, so the jvmArgs in
+# client-ui/build.gradle.kts do not flow through here -- the AppRun is the
+# only place where flags actually reach the AppImage runtime.
 cat > "$APPDIR/AppRun" << EOF
 #!/bin/sh
 HERE="\$(dirname "\$(readlink -f "\$0")")"
 exec "\$HERE/usr/bin/java" \\
-     -Dawt.appClassName=AuraLauncher \\
      --add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED \\
      --enable-native-access=ALL-UNNAMED \\
-     ${WAYLAND_TRIAL_FLAG} \\
      -jar "\$HERE/usr/lib/aura-launcher.jar" \\
      "\$@"
 EOF

@@ -25,7 +25,6 @@ import kotlinx.serialization.Serializable
 enum class AuthStatus {
     @SerialName("OK") OK,
     @SerialName("ACTIVE") ACTIVE,
-    @SerialName("LOGIN") LOGIN,
     @SerialName("BAD_LOGIN") BAD_LOGIN,
     @SerialName("NEED_2FA") NEED_2FA,
     /** Wrong 2FA code on `action=twoauth` follow-up. UI re-prompts for code (#159). */

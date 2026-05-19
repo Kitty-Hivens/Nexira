@@ -36,7 +36,7 @@ concurrency:
 
 env:
   JAVA_VERSION: '25'
-  JAVA_DISTRIBUTION: 'jetbrains'
+  JAVA_DISTRIBUTION: 'liberica'
 
 jobs:
   # ─────────────────────────────────────────────────────────────────────────
@@ -106,10 +106,21 @@ jobs:
       - name: Validate desktop entry
         run: desktop-file-validate resources/aura-launcher.desktop
 
-      - name: Build JAR
+      - name: Build JAR + emit packaging profile
+        # emitAppImageProfile writes the shell-sourceable flag set that
+        # build-appimage.sh below picks up via PACKAGING_PROFILE -- same
+        # source of truth between gradle (CustomRuntimeTask) and the
+        # AppImage path (jlink call). build_release.yml's Windows + macOS
+        # legs got this in B-1.5 (commit 811f2f1); pr-portability's
+        # AppImage build was missed and started failing immediately on
+        # the same commit.
         env:
           APP_VERSION: ${{ steps.version.outputs.value }}
-        run: ./gradlew :client-ui:packageReleaseUberJarForCurrentOS -PappVersion="$APP_VERSION"
+        run: |
+          ./gradlew \
+            :client-ui:packageReleaseUberJarForCurrentOS \
+            :client-ui:emitAppImageProfile \
+            -PappVersion="$APP_VERSION"
 
       - name: Build AppImage
         id: appimage

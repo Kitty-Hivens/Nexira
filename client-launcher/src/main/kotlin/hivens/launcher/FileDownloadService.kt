@@ -9,7 +9,6 @@ import hivens.core.data.SessionData
 import hivens.core.util.ZipUtils
 import hivens.core.util.retryWithBackoff
 import hivens.launcher.util.ClientRootDirs
-import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
@@ -21,6 +20,9 @@ import kotlinx.coroutines.sync.withPermit
 import org.slf4j.LoggerFactory
 import java.io.FileOutputStream
 import java.io.IOException
+import java.net.ConnectException
+import java.net.SocketException
+import java.net.SocketTimeoutException
 import java.net.URLEncoder
 import java.nio.file.Files
 import java.nio.file.Path
@@ -29,6 +31,7 @@ import java.security.MessageDigest
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.roundToInt
+import kotlin.time.Duration.Companion.milliseconds
 
 
 class FileDownloadService(
@@ -245,7 +248,7 @@ class FileDownloadService(
                         speed
                     )
 
-                    delay(100)
+                    delay(100.milliseconds)
                     if (currentFiles >= totalFilesCount && currentBytes >= totalBytesToDownload) break
                 }
             }
@@ -352,7 +355,7 @@ class FileDownloadService(
         onBytesRead: ((Int) -> Unit)?,
     ) {
         val channel = response.bodyAsChannel()
-        FileOutputStream(localPath.toFile(), append).use { output ->
+        FileOutputStream(localPath.toFile(), append).use { output -> // TODO: Possibly blocking call in non-blocking context could lead to thread starvation
             val buffer = ByteArray(8192)
             while (!channel.isClosedForRead) {
                 val read = channel.readAvailable(buffer, 0, buffer.size)
@@ -382,10 +385,10 @@ class FileDownloadService(
         var cause: Throwable? = t
         while (cause != null) {
             if (cause is RetryableHttpException) return true
-            if (cause is java.net.ConnectException ||
-                cause is java.net.SocketException ||
-                cause is io.ktor.utils.io.ClosedByteChannelException ||
-                cause is java.net.SocketTimeoutException
+            if (cause is ConnectException ||
+                cause is SocketException ||
+                cause is ClosedByteChannelException ||
+                cause is SocketTimeoutException
             ) return true
             if (cause is IOException &&
                 cause.message?.contains("Connection reset", ignoreCase = true) == true
