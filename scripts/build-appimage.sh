@@ -11,7 +11,7 @@
 #   APPDIR=AppDir         scratch directory for AppImage contents
 #   ARCH=x86_64           appimagetool architecture
 #   OUTPUT=<derived>      final .AppImage path; defaults to
-#                         AuraLauncher-<version>-<arch>.AppImage in CWD
+#                         Nexira-<version>-<arch>.AppImage in CWD
 #   PACKAGING_PROFILE     override path to the generated packaging
 #                         profile (defaults to the standard
 #                         client-ui/build/generated/packaging/
@@ -35,7 +35,7 @@ APP_VERSION="${1:?usage: $0 <version> <jar-path>}"
 JAR="${2:?usage: $0 <version> <jar-path>}"
 APPDIR="${APPDIR:-AppDir}"
 ARCH="${ARCH:-x86_64}"
-OUTPUT="${OUTPUT:-AuraLauncher-${APP_VERSION}-${ARCH}.AppImage}"
+OUTPUT="${OUTPUT:-Nexira-${APP_VERSION}-${ARCH}.AppImage}"
 
 [ -f "$JAR" ] || { echo "error: jar not found: $JAR" >&2; exit 1; }
 [ -d "$APPDIR" ] && { echo "error: $APPDIR already exists; refusing to overwrite" >&2; exit 1; }
@@ -80,7 +80,7 @@ mkdir -p \
 # ── 3. AppRun entry-point ───────────────────────────────────────────────────
 # WM_CLASS hygiene: Main.kt reflects into sun.awt.X11.XToolkit.awtAppClassName
 # before the first window is created so the X11 WM_CLASS hint matches
-# StartupWMClass=AuraLauncher in resources/aura-launcher.desktop. The
+# StartupWMClass=Nexira in resources/nexira.desktop. The
 # reflection is JPMS-guarded behind --add-opens=java.desktop/sun.awt.X11.
 # Stock OpenJDK derives WM_CLASS from argv[0] by default; without the
 # reflection the launcher would show up as "java" in the taskbar. The fat
@@ -93,24 +93,24 @@ HERE="\$(dirname "\$(readlink -f "\$0")")"
 exec "\$HERE/usr/bin/java" \\
      --add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED \\
      --enable-native-access=ALL-UNNAMED \\
-     -jar "\$HERE/usr/lib/aura-launcher.jar" \\
+     -jar "\$HERE/usr/lib/nexira.jar" \\
      "\$@"
 EOF
 chmod +x "$APPDIR/AppRun"
 
 # ── 4. Copy assets ──────────────────────────────────────────────────────────
-cp "$JAR" "$APPDIR/usr/lib/aura-launcher.jar"
-cp "$ROOT/resources/aura-launcher.desktop" "$APPDIR/usr/share/applications/"
-cp "$ROOT/resources/aura-launcher.desktop" "$APPDIR/"
-cp "$ROOT/resources/icons/256x256.png" "$APPDIR/usr/share/icons/hicolor/256x256/apps/aura-launcher.png"
-cp "$ROOT/resources/icons/512x512.png" "$APPDIR/usr/share/icons/hicolor/512x512/apps/aura-launcher.png"
-cp "$ROOT/resources/icons/256x256.png" "$APPDIR/aura-launcher.png"
+cp "$JAR" "$APPDIR/usr/lib/nexira.jar"
+cp "$ROOT/resources/nexira.desktop" "$APPDIR/usr/share/applications/"
+cp "$ROOT/resources/nexira.desktop" "$APPDIR/"
+cp "$ROOT/resources/icons/256x256.png" "$APPDIR/usr/share/icons/hicolor/256x256/apps/nexira.png"
+cp "$ROOT/resources/icons/512x512.png" "$APPDIR/usr/share/icons/hicolor/512x512/apps/nexira.png"
+cp "$ROOT/resources/icons/256x256.png" "$APPDIR/nexira.png"
 # Provide both filenames so appimagetool finds the AppStream metadata under
 # either of the two names it has historically searched.
-cp "$ROOT/resources/io.github.kitty_hivens.auralauncher.metainfo.xml" \
-   "$APPDIR/usr/share/metainfo/io.github.kitty_hivens.auralauncher.metainfo.xml"
-cp "$ROOT/resources/io.github.kitty_hivens.auralauncher.metainfo.xml" \
-   "$APPDIR/usr/share/metainfo/io.github.kitty_hivens.auralauncher.appdata.xml"
+cp "$ROOT/resources/io.github.kitty_hivens.nexira.metainfo.xml" \
+   "$APPDIR/usr/share/metainfo/io.github.kitty_hivens.nexira.metainfo.xml"
+cp "$ROOT/resources/io.github.kitty_hivens.nexira.metainfo.xml" \
+   "$APPDIR/usr/share/metainfo/io.github.kitty_hivens.nexira.appdata.xml"
 
 # ── 5. Build AppImage ───────────────────────────────────────────────────────
 ARCH="$ARCH" appimagetool "$APPDIR" "$OUTPUT"

@@ -1,4 +1,4 @@
-// buildSrc is Aura's home for build-logic Kotlin: typed task classes, a
+// buildSrc is Nexira's home for build-logic Kotlin: typed task classes, a
 // convention plugin, and any cross-cutting helpers we end up writing for the
 // packaging path. The `kotlin-dsl` plugin gives us:
 //   - Kotlin compilation of files under src/main/kotlin/, automatically
@@ -31,7 +31,7 @@ repositories {
 }
 
 // Convention plugins declared here become consumable from project
-// build.gradle.kts files via `plugins { id("aura.packaging") }`. The
+// build.gradle.kts files via `plugins { id("nexira.packaging") }`. The
 // `kotlin-dsl` plugin pulls in the `java-gradle-plugin` capability that
 // provides this `gradlePlugin` extension; explicit registration (rather
 // than relying on auto-discovery via META-INF/gradle-plugins resources)
@@ -39,7 +39,7 @@ repositories {
 gradlePlugin {
     plugins {
         register("packaging") {
-            id = "aura.packaging"
+            id = "nexira.packaging"
             implementationClass = "hivens.packaging.PackagingPlugin"
         }
     }

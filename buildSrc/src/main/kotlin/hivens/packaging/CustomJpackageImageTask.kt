@@ -23,10 +23,10 @@ import javax.inject.Inject
  * Produces a `--type app-image` directory via `jpackage`, consuming the
  * pre-built runtime image from [CustomRuntimeTask] and the uber jar from
  * Compose Desktop's `packageReleaseUberJarForCurrentOS`. Output is the
- * platform-native app image (e.g. `AuraLauncher/` with `bin/AuraLauncher`
- * on Linux / Windows, `AuraLauncher.app/` bundle on macOS).
+ * platform-native app image (e.g. `Nexira/` with `bin/Nexira`
+ * on Linux / Windows, `Nexira.app/` bundle on macOS).
  *
- * For Aura's release pipeline this is the input to two further wrapping
+ * For Nexira's release pipeline this is the input to two further wrapping
  * steps that B-3 wires up:
  *   - Windows: Inno Setup (`setup.iss`) packs the app-image dir into the
  *     installer EXE.

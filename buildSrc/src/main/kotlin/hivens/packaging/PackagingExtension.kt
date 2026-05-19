@@ -8,7 +8,7 @@ import org.gradle.api.provider.Property
 import javax.inject.Inject
 
 /**
- * Public DSL for the `aura.packaging` convention plugin. Configured from a
+ * Public DSL for the `nexira.packaging` convention plugin. Configured from a
  * consumer's `build.gradle.kts` via the `packaging { ... }` block.
  *
  * Single source of truth for everything that flows into either:
@@ -27,7 +27,7 @@ import javax.inject.Inject
  */
 abstract class PackagingExtension @Inject constructor(objects: ObjectFactory) {
 
-    /** Display name and base file name (e.g. "AuraLauncher"). */
+    /** Display name and base file name (e.g. "Nexira"). */
     abstract val appName: Property<String>
 
     /** Fully-qualified main class (e.g. "hivens.ui.MainKt"). */
@@ -67,7 +67,7 @@ abstract class PackagingExtension @Inject constructor(objects: ObjectFactory) {
      * macOS bundle identifier. Goes into jpackage's
      * `--mac-package-identifier` and the resulting .app's
      * `CFBundleIdentifier`. Reverse-DNS form derived from the
-     * `hivens.dev` apex, so "dev.hivens.auralauncher".
+     * `hivens.dev` apex, so "dev.hivens.nexira".
      */
     abstract val macosPackageIdentifier: Property<String>
 
@@ -104,7 +104,7 @@ abstract class JlinkOptionsExtension {
     /**
      * `--compress=<value>`. JDK 21+ syntax is `zip-N` (N=0..9); JDK 20 and
      * older used `0|1|2`. Leave unset to skip the flag entirely (jlink
-     * default = no compression). Aura's release profile leaves it unset:
+     * default = no compression). Nexira's release profile leaves it unset:
      * the outer LZMA (Inno Setup) and squashfs-zstd (AppImage) compress
      * a raw runtime image harder than they can a pre-compressed one.
      */
@@ -112,7 +112,7 @@ abstract class JlinkOptionsExtension {
 
     /**
      * `--vm=<kind>`. Drops sibling HotSpot variants. Values: "server",
-     * "client", "minimal", "all". Aura's release profile pins to "server"
+     * "client", "minimal", "all". Nexira's release profile pins to "server"
      * (saves ~22 MB by dropping client + minimal native libraries).
      * Leave unset to keep all variants.
      */
@@ -123,7 +123,7 @@ abstract class JlinkOptionsExtension {
      * given BCP 47 language tags. Without this flag, including
      * `jdk.localedata` in [PackagingExtension.modules] would pull in the
      * full ~50 MB locale dataset; without `jdk.localedata` at all, only
-     * `java.base`'s en_US fallback is available. Aura's release profile
+     * `java.base`'s en_US fallback is available. Nexira's release profile
      * sets "en,ru,de" matching the shipped i18n bundles.
      */
     abstract val includeLocales: Property<String>

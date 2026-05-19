@@ -33,7 +33,7 @@ import org.slf4j.LoggerFactory
  * security-boundary rationale.
  *
  * **Strictly opt-in at runtime too.** Even when this class IS on the
- * classpath, [startIfRequested] only binds when `-Daura.puppet.port=N`
+ * classpath, [startIfRequested] only binds when `-Dnexira.puppet.port=N`
  * is set at JVM launch. Without the system property, this is a no-op.
  *
  * Bind is hardcoded to `127.0.0.1` -- no remote access, no auth, the
@@ -73,9 +73,9 @@ class RealPuppetServer : PuppetServerLifecycle {
 
     override fun startIfRequested() {
         if (server != null) return
-        val portProp = System.getProperty("aura.puppet.port") ?: return
+        val portProp = System.getProperty("nexira.puppet.port") ?: return
         val port = portProp.toIntOrNull() ?: run {
-            log.warn("aura.puppet.port='{}' is not an integer -- puppet mode disabled", portProp)
+            log.warn("nexira.puppet.port='{}' is not an integer -- puppet mode disabled", portProp)
             return
         }
 

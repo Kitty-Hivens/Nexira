@@ -53,7 +53,7 @@ object DiagnosticBundle {
      * upload, etc.).
      */
     fun create(paths: PlatformPaths): Path {
-        val sessionId = System.getProperty("aura.sessionId", "unknown")
+        val sessionId = System.getProperty("nexira.sessionId", "unknown")
         val timestamp = tsFmt.format(Instant.now())
         val output = paths.dataDir.resolve("aura-diagnostic-$sessionId-$timestamp.zip")
 
@@ -112,7 +112,7 @@ object DiagnosticBundle {
         appendLine("==============================")
         appendLine(" Generated  : ${isoFmt.format(Instant.now())}")
         appendLine(" Version    : ${Branding.VERSION}")
-        appendLine(" SessionId  : ${System.getProperty("aura.sessionId", "unknown")}")
+        appendLine(" SessionId  : ${System.getProperty("nexira.sessionId", "unknown")}")
         appendLine()
         appendLine(" OS         : ${System.getProperty("os.name")} ${System.getProperty("os.version")} (${System.getProperty("os.arch")})")
         appendLine(" JVM        : ${System.getProperty("java.version")} (${System.getProperty("java.vendor")})")

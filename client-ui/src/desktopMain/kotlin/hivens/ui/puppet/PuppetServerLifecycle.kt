@@ -10,7 +10,7 @@ package hivens.ui.puppet
  * Production jars therefore do NOT carry the Ktor server classes the real
  * implementation needs -- ServiceLoader returns nothing, the loader falls
  * back to [NoOpPuppetServer], and `startIfRequested()` is a no-op even if
- * a malicious caller manages to set the `aura.puppet.port` system property
+ * a malicious caller manages to set the `nexira.puppet.port` system property
  * at runtime. This is the security boundary that makes the puppet surface
  * impossible to enable in distributed binaries by any means short of
  * dropping a custom jar on the classpath.
@@ -23,7 +23,7 @@ package hivens.ui.puppet
  */
 interface PuppetServerLifecycle {
     /**
-     * Start the puppet HTTP server if the `aura.puppet.port` system property
+     * Start the puppet HTTP server if the `nexira.puppet.port` system property
      * is set and parses as an integer. Idempotent across repeated calls.
      * No-op in [NoOpPuppetServer]; real binding behaviour in [RealPuppetServer].
      */

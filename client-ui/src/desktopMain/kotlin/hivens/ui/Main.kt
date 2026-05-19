@@ -163,7 +163,7 @@ private fun setLinuxXToolkitAppClassName() {
 @OptIn(ExperimentalResourceApi::class)
 fun main() {
     // Resolve logs dir BEFORE any LoggerFactory.getLogger() call so
-    // logback.xml (which reads `${aura.logs.dir}` for its rolling-file
+    // logback.xml (which reads `${nexira.logs.dir}` for its rolling-file
     // appenders) sees the platform-correct path on its very first init.
     // PlatformPaths.system() is pure computation -- no logger init --
     // safe to call before the property is set. DataDirMover and
@@ -171,7 +171,7 @@ fun main() {
     // ordering works without their applyPending() / read() touching
     // logback first; see those files for the long-form rationale.
     val paths = PlatformPaths.system()
-    System.setProperty("aura.logs.dir", paths.logsDir.toString())
+    System.setProperty("nexira.logs.dir", paths.logsDir.toString())
 
     // NOW safe to apply any pending data-dir move scheduled from the
     // Settings UI. If user clicked "Move data directory" -> picker ->
@@ -192,9 +192,9 @@ fun main() {
     // so a multi-launch user dump can be sliced per process invocation
     // (`grep sessionId=abc12345 *.log`). System property (not MDC) because
     // MDC is thread-local, and we want this on every line from every thread --
-    // the logback pattern reads the property via `${aura.sessionId}`.
+    // the logback pattern reads the property via `${nexira.sessionId}`.
     val sessionId = UUID.randomUUID().toString().take(8)
-    System.setProperty("aura.sessionId", sessionId)
+    System.setProperty("nexira.sessionId", sessionId)
 
     // Beacon: the very first entry in the action ring -- handy when reading a
     // bundle to confirm what process / version / OS produced it.
@@ -278,7 +278,7 @@ fun main() {
     //      not contain the implementation at all -- ServiceLoader returns
     //      nothing, the loader falls back to NoOpPuppetServer.
     //   2. Runtime: even when the real impl IS on the classpath,
-    //      `startIfRequested()` only binds when `-Daura.puppet.port=N`
+    //      `startIfRequested()` only binds when `-Dnexira.puppet.port=N`
     //      is set as a JVM system property.
     // MUST run after Koin so PuppetRegistry-using Composables can resolve
     // their dependencies, and before `application` so the server is

@@ -2,7 +2,7 @@ name: AppImage Portability
 
 # ── Cross-distro AppImage smoke ────────────────────────────────────────────
 #
-# Aura is built on ubuntu-latest (Debian-family, recent glibc). Users run
+# Nexira is built on ubuntu-latest (Debian-family, recent glibc). Users run
 # it on a long tail: Fedora, Arch, openSUSE, Void, downstream Debian forks.
 # An AppImage that builds clean on Ubuntu can still fail on those distros
 # because of:
@@ -124,22 +124,22 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          mkdir -p /tmp/aura
+          mkdir -p /tmp/nexira
           gh release download --repo ${{ github.repository }} \
             --pattern "*x86_64.AppImage" \
-            --dir /tmp/aura
-          chmod +x /tmp/aura/*.AppImage
+            --dir /tmp/nexira
+          chmod +x /tmp/nexira/*.AppImage
           echo "Downloaded:"
-          ls -la /tmp/aura/
+          ls -la /tmp/nexira/
 
       - name: Extract AppImage (skip FUSE — not always available in containers)
         working-directory: /tmp
-        run: ./aura/*.AppImage --appimage-extract > /dev/null
+        run: ./nexira/*.AppImage --appimage-extract > /dev/null
 
       - name: Launch with virtual display, capture init log
         working-directory: /tmp
         env:
-          AURA_DATA_DIR: /tmp/aura-data
+          NEXIRA_DATA_DIR: /tmp/nexira-data
         run: |
           # 8s wall budget: launcher gets to splash within 3-4s on a fresh
           # container, logging the Display line on the way. Killed via
@@ -148,13 +148,13 @@ jobs:
           # Anything else means it crashed before we reached deadline.
           set +e
           timeout --kill-after=2s 8s xvfb-run -a \
-            squashfs-root/AppRun > /tmp/aura.stdout 2>&1
+            squashfs-root/AppRun > /tmp/nexira.stdout 2>&1
           EXIT=$?
           set -e
 
           echo "── Launcher exit code: $EXIT (124 = timeout hit, expected; 0 = clean exit, unusual but ok)"
           echo "── stdout tail:"
-          tail -30 /tmp/aura.stdout || true
+          tail -30 /tmp/nexira.stdout || true
 
           if [[ "$EXIT" != "124" && "$EXIT" != "0" ]]; then
             echo "::error title=Portability::Launcher crashed before timeout (exit $EXIT) on ${{ matrix.distro_name }}"
@@ -167,25 +167,25 @@ jobs:
           # If it's NOT in stdout, JVM died before logback's CONSOLE appender
           # got to flush — meaning the AppImage's bundled JRE failed to load
           # or PlatformPaths blew up before any logger was created.
-          if grep -q "Display: toolkit=" /tmp/aura.stdout; then
+          if grep -q "Display: toolkit=" /tmp/nexira.stdout; then
             echo "::notice title=Portability::${{ matrix.distro_name }} reached toolkit-detection — distro is supported"
           else
             echo "::error title=Portability::No 'Display: toolkit=' line on ${{ matrix.distro_name }}. JRE / native lib / PlatformPaths failed before logging init."
             echo "── full stdout:"
-            cat /tmp/aura.stdout || true
+            cat /tmp/nexira.stdout || true
             exit 1
           fi
 
       - name: Verify launcher.log was written and clean
         env:
-          AURA_DATA_DIR: /tmp/aura-data
+          NEXIRA_DATA_DIR: /tmp/nexira-data
         run: |
           # Until now the test asserted only the stdout marker. stdout buffering
           # under xvfb-run + container terminations can make stdout assertions
           # flaky; the disk-side launcher.log written by Pulse is the durable
           # source of truth. Verify:
           #   1. The log exists where PlatformPaths would put it (under
-          #      $AURA_DATA_DIR/logs/, since the env var overrides every
+          #      $NEXIRA_DATA_DIR/logs/, since the env var overrides every
           #      per-OS default). Missing -> logback never initialised ->
           #      Pulse pipeline broken or path resolution failed.
           #   2. The log is non-trivial in size. Empty file = appender opened
@@ -193,10 +193,10 @@ jobs:
           #   3. The log contains no FATAL / NoClassDefFoundError /
           #      UnsatisfiedLinkError lines. Those are init-time class-load
           #      failures that previously only surfaced through stdout greps.
-          LOG="$AURA_DATA_DIR/logs/launcher.log"
+          LOG="$NEXIRA_DATA_DIR/logs/launcher.log"
           if [ ! -f "$LOG" ]; then
             echo "::error title=Portability::launcher.log not found at $LOG -- Pulse logback init failed on ${{ matrix.distro_name }}"
-            ls -la "$AURA_DATA_DIR/" 2>/dev/null || true
+            ls -la "$NEXIRA_DATA_DIR/" 2>/dev/null || true
             exit 1
           fi
           LOG_SIZE=$(stat -c%s "$LOG" 2>/dev/null || echo 0)
@@ -215,7 +215,7 @@ jobs:
       - name: Verify keyring fallback (no-libsecret matrix entry only)
         if: matrix.expect_keyring == 'noop'
         env:
-          AURA_DATA_DIR: /tmp/aura-data
+          NEXIRA_DATA_DIR: /tmp/nexira-data
         run: |
           # KeyringStorageFactory logs the chosen backend at INFO level on
           # startup. Without libsecret on the host, the construction call
@@ -224,7 +224,7 @@ jobs:
           # If a future refactor stops catching the construction-time
           # exception, the launcher would crash before reaching this log;
           # absence of "Keyring storage: NoOp" is the failure signal.
-          LOG="$AURA_DATA_DIR/logs/launcher.log"
+          LOG="$NEXIRA_DATA_DIR/logs/launcher.log"
           if grep -q "Keyring storage: NoOp" "$LOG"; then
             echo "::notice title=Portability::Keyring factory correctly fell back to NoOp on ${{ matrix.distro_name }}"
           else
@@ -239,6 +239,6 @@ jobs:
         with:
           name: portability-stdout-${{ matrix.distro_name }}
           path: |
-            /tmp/aura.stdout
-            /tmp/aura-data/logs/
+            /tmp/nexira.stdout
+            /tmp/nexira-data/logs/
           retention-days: 7

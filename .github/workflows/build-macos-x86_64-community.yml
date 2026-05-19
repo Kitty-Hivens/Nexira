@@ -68,7 +68,7 @@ jobs:
       - name: Rename with -x86_64-community suffix
         run: |
           src=$(ls client-ui/build/customDmg/*.dmg | head -n 1)
-          mv "$src" "AuraLauncher-${{ steps.ver.outputs.version }}-x86_64-community.dmg"
+          mv "$src" "Nexira-${{ steps.ver.outputs.version }}-x86_64-community.dmg"
 
       - name: Upload to existing release
         env:
@@ -79,5 +79,5 @@ jobs:
           # erroring out — the manual nature of this workflow means
           # retries are common.
           gh release upload "${{ inputs.tag }}" \
-            "AuraLauncher-${{ steps.ver.outputs.version }}-x86_64-community.dmg" \
+            "Nexira-${{ steps.ver.outputs.version }}-x86_64-community.dmg" \
             --repo "${{ github.repository }}" --clobber
