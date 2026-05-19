@@ -45,8 +45,6 @@ import java.lang.management.ManagementFactory
 import java.text.SimpleDateFormat
 import java.util.*
 
-private val log = LoggerFactory.getLogger("AboutScreen")
-
 @Composable
 fun AboutScreen(onBack: () -> Unit) {
     val s = LocalStrings.current
