@@ -3,35 +3,25 @@ package hivens.core.diag
 import java.time.Instant
 
 /**
- * Bounded thread-safe ring buffer of the last [CAPACITY] user-visible / lifecycle
- * actions, with timestamps. Replaces the prior single-mutable-string
- * `CrashReporter.lastAction` which only remembered the most recent action and
- * therefore lost the sequence leading up to a crash.
+ * Bounded thread-safe ring buffer of the last [CAPACITY] user-visible /
+ * lifecycle actions with timestamps. [snapshot] is folded into crash
+ * reports and the diagnostic bundle so a support reader can reconstruct
+ * what the user did just before things broke.
  *
- * Usage: `ActionRing.record("Launching: Industrial")` at every action boundary
- * (Play click, auth result, manifest sync start, game exit, etc.). On crash,
- * [snapshot] is folded into the crash report and the diagnostic bundle so a
- * support reader can reconstruct what the user did just before things broke.
+ * Usage: `ActionRing.record("Launching: Industrial")` at every action
+ * boundary (Play click, auth result, manifest sync start, game exit).
+ * Safe to call from any thread.
  *
- * Concurrent reads/writes are safe -- actions can be recorded from any thread
- * (UI, IO, game-output piping) without external synchronization.
- *
- * Implementation note: previous version used `ConcurrentLinkedDeque` and
- * `ring.size > CAPACITY` to trim. JDK documents that deque's `size()` is NOT
- * a constant-time, accurate snapshot under concurrent modification -- racing
- * `record()` calls could leave the ring above CAPACITY, breaking the bounded
- * contract. Switched to a plain `ArrayDeque` guarded by a `synchronized`
- * block. `record` is invoked maybe a few hundred times per process lifetime;
- * lock contention is irrelevant compared to the correctness gain.
+ * Implementation: `ArrayDeque` under a `synchronized` block (not
+ * `ConcurrentLinkedDeque`). The JDK documents that deque's `size()` is
+ * not a constant-time accurate snapshot under concurrent modification
+ * -- racing `record()` calls could leave the ring above CAPACITY,
+ * breaking the bounded contract. `record` runs maybe a few hundred
+ * times per process lifetime; lock contention is irrelevant.
  */
 object ActionRing {
 
-    /**
-     * Last 64 actions: enough to span one full launch attempt plus several
-     * mid-flow events (auth, manifest, sync, JVM prepare, launch, exit) plus
-     * earlier failed attempts that often provide the context the user
-     * forgot to mention in the bug report.
-     */
+    /** Last 64 actions: covers one launch attempt plus earlier failed attempts. */
     const val CAPACITY: Int = 64
 
     data class Entry(
@@ -50,22 +40,17 @@ object ActionRing {
         }
     }
 
-    /** Returns the current snapshot oldest-first. Cheap defensive copy. */
+    /** Current snapshot, oldest-first. Cheap defensive copy. */
     fun snapshot(): List<Entry> = synchronized(lock) { ring.toList() }
 
-    /**
-     * Convenience for the most recent entry -- covers the legacy
-     * `CrashReporter.lastAction` use case while richer crash reports
-     * adopt [snapshot].
-     */
+    /** Most recent entry, or null when empty. */
     fun mostRecent(): Entry? = synchronized(lock) { ring.lastOrNull() }
 
     /**
-     * Test-only -- never used in production. Public (rather than `internal`)
-     * because tests live in `:client-launcher` while this class lives in
-     * `:client-core`, and `internal` doesn't span module boundaries. Calling
-     * this in production would erase the diagnostic trail right when it's
-     * most useful, so don't.
+     * Test-only. Public (not `internal`) because tests live in
+     * `:client-launcher` while this class lives in `:client-core`, and
+     * `internal` does not span module boundaries. Calling this in
+     * production erases the diagnostic trail when it is most useful.
      */
     fun clear() = synchronized(lock) { ring.clear() }
 }
