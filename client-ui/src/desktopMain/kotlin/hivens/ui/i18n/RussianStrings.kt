@@ -3,10 +3,10 @@ package hivens.ui.i18n
 object RussianStrings : AppStrings {
 
     // App
-    override val appName = "Aura Launcher"
+    override val appName = "Nexira"
 
     // Login
-    override val loginTitle        = "Aura Launcher"
+    override val loginTitle        = "Nexira"
     override val loginUsername     = "Логин"
     override val loginPassword     = "Пароль"
     override val loginRemember     = "Запомнить пароль"
@@ -304,7 +304,7 @@ object RussianStrings : AppStrings {
     override val settingsJvmBuilder             = "Визуальный конструктор JVM-аргументов"
     override val settingsJvmBuilderDesc         = "Показывает кнопку «Собрать аргументы» в настройках сервера. Выбираешь сборщик мусора, настраиваешь регионы хипа, включаешь AppCDS или JFR — без необходимости помнить флаги. Готовые пресеты: Aikar's recipe, GTNH-класс, ZGC для больших хипов и другие."
     override val settingsMimicVersion           = "Подмена версии лаунчера"
-    override val settingsMimicVersionDesc       = "Зафиксировать строку версии, которая отправляется в рукопожатии и User-Agent. Оставь пустым для стандартного значения — заполни только если апстрим успел поднять свою версию быстрее цикла релизов Aura. Применяется на следующем запросе к протоколу после сохранения, перезапуск не требуется."
+    override val settingsMimicVersionDesc       = "Зафиксировать строку версии, которая отправляется в рукопожатии и User-Agent. Оставь пустым для стандартного значения — заполни только если апстрим успел поднять свою версию быстрее цикла релизов Nexira. Применяется на следующем запросе к протоколу после сохранения, перезапуск не требуется."
     override fun settingsMimicVersionPlaceholder(default: String) = "По умолчанию: $default"
     override fun dashboardAutoSyncProgress(serverName: String, current: Int, total: Int) =
         "Синхронизация $serverName ($current/$total)"
@@ -365,11 +365,11 @@ object RussianStrings : AppStrings {
     override val settingsSectionDataDir       = "Каталог данных"
     override val settingsDataDirCurrent       = "Текущий путь:"
     override val settingsDataDirMove          = "Переместить..."
-    override val settingsDataDirPickerTitle   = "Выбери новое место для данных Aura"
+    override val settingsDataDirPickerTitle   = "Выбери новое место для данных Nexira"
     override val settingsDataDirConfirmTitle  = "Переместить каталог данных?"
     override fun settingsDataDirConfirmBody(source: String, target: String) =
-        "Aura перенесёт данные:\nиз: $source\nв:  $target\n\nПеремещение применится при перезапуске лаунчера."
-    override val settingsDataDirRestartRequired = "Требуется перезапуск — Aura применит перемещение при следующем старте"
+        "Nexira перенесёт данные:\nиз: $source\nв:  $target\n\nПеремещение применится при перезапуске лаунчера."
+    override val settingsDataDirRestartRequired = "Требуется перезапуск — Nexira применит перемещение при следующем старте"
     override val settingsDataDirQuitNow         = "Выйти сейчас"
     override val settingsDataDirErrorSamePath   = "Это и есть текущий каталог — выбери другую папку"
     override val settingsDataDirErrorNotEmpty   = "Целевая папка не пуста — выбери пустую папку или удали её содержимое"
@@ -458,7 +458,7 @@ object RussianStrings : AppStrings {
 
     // --- Data dir migration UI ---
     override val migrationWelcome      = "Добро пожаловать в Nexira"
-    override val migrationDescription  = "Aura теперь называется Nexira. Перед запуском лаунчера нужно перенести существующие данные в новое расположение. Старая папка остаётся нетронутой как резервная копия; удалите её вручную когда убедитесь что всё работает."
+    override val migrationDescription  = "Nexira теперь называется Nexira. Перед запуском лаунчера нужно перенести существующие данные в новое расположение. Старая папка остаётся нетронутой как резервная копия; удалите её вручную когда убедитесь что всё работает."
     override val migrationFromHeader   = "Откуда"
     override val migrationToHeader     = "Куда"
     override fun migrationSize(megabytes: Int, files: Int) = "$megabytes МБ, $files файлов"

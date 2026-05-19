@@ -212,7 +212,7 @@ fun main() {
     NetworkState.initialize(paths.dataDir.resolve("ssl-bypasses.json"))
 
     System.setProperty("skiko.fps.limit", "60")
-    // X11 WM_CLASS = "AuraLauncher". Stock OpenJDK derives WM_CLASS from
+    // X11 WM_CLASS = "Nexira". Stock OpenJDK derives WM_CLASS from
     // argv[0] and exposes no public knob to override it, so we reflect into
     // the package-private sun.awt.X11.XToolkit.awtAppClassName field before
     // the first window is created. See jvmArgs --add-opens in

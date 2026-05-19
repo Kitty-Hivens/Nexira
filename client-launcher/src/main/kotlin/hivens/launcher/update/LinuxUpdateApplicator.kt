@@ -14,8 +14,8 @@ import java.nio.file.attribute.PosixFilePermission
  * AppImage is a single executable; we back the current one up, copy the
  * downloaded version into place, set +x, relaunch, and on rollback restore
  * the backup. Desktop-shortcut paths are rewritten if the AppImage filename
- * changed (because a new version moved from `AuraLauncher-2.2.8-x86_64.AppImage`
- * to `AuraLauncher-2.2.9-x86_64.AppImage`).
+ * changed (because a new version moved from `Nexira-2.3.0-x86_64.AppImage`
+ * to `Nexira-2.3.1-x86_64.AppImage`).
  *
  * The complexity here vs Windows / macOS comes from rollback: the old
  * AppImage is preserved as `<exe>.backup` until the new one proves it
@@ -28,7 +28,7 @@ class LinuxUpdateApplicator : IUpdateApplicator {
         try {
             val currentExe = resolveExecutable()
             val downloadedFileName = installerPath.fileName.toString()
-            val targetExe = if (downloadedFileName.contains("AuraLauncher", ignoreCase = true) &&
+            val targetExe = if (downloadedFileName.contains("Nexira", ignoreCase = true) &&
                 downloadedFileName.endsWith(".AppImage", ignoreCase = true)
             ) {
                 currentExe.resolveSibling(downloadedFileName)
@@ -153,7 +153,7 @@ class LinuxUpdateApplicator : IUpdateApplicator {
         // to the real path of the .AppImage file on disk.
         //
         // DO NOT use /proc/self/exe naively -- under AppImage it resolves to the
-        // temporary FUSE mount point (/tmp/.mount_AuraLaXXXXX/usr/bin/AuraLauncher)
+        // temporary FUSE mount point (/tmp/.mount_NexirXXXXX/usr/bin/Nexira)
         // which is gone the moment the process exits.
         val appImageEnv = System.getenv("APPIMAGE")
         if (!appImageEnv.isNullOrBlank()) return Paths.get(appImageEnv)

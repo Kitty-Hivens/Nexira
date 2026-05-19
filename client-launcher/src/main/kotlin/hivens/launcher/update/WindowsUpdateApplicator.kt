@@ -10,7 +10,7 @@ import java.nio.file.Paths
  * Windows update flow.
  *
  * Inno Setup installer (`.exe`, `/SILENT`) replaces the install in-place;
- * a PowerShell script wakes ~2s after we exit, kills any AuraLauncher
+ * a PowerShell script wakes ~2s after we exit, kills any Nexira
  * survivors, runs the silent installer, then relaunches the freshly
  * installed binary. Script + installer self-delete on success.
  */
@@ -32,7 +32,7 @@ class WindowsUpdateApplicator : IUpdateApplicator {
                 Start-Sleep -Seconds 2
 
                 # Ensure all processes are closed
-                Get-Process -Name "AuraLauncher" -ErrorAction SilentlyContinue | Stop-Process -Force
+                Get-Process -Name "Nexira" -ErrorAction SilentlyContinue | Stop-Process -Force
 
                 # Run installer silently (Inno Setup /SILENT flag)
                 Write-Host "Installing update..."
@@ -87,6 +87,6 @@ class WindowsUpdateApplicator : IUpdateApplicator {
         val jarPath = Paths.get(classPath.split(";").first()).toAbsolutePath()
         val installRoot = jarPath.parent?.parent
             ?: error("Cannot resolve Windows install root from $jarPath; expected lib/<jar>.jar inside install dir")
-        return installRoot.resolve("AuraLauncher.exe")
+        return installRoot.resolve("Nexira.exe")
     }
 }

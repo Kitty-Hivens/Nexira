@@ -47,7 +47,7 @@ object DataDirMover {
     // `LoggerFactory.getLogger(...)` field initialiser would trigger
     // logback's first init at the wrong moment, causing the rolling
     // file appender to open `./logs/launcher.log` (in the JVM's working
-    // dir, e.g. `D:\Games\AuraLauncher\logs`) instead of
+    // dir, e.g. `D:\Games\Nexira\logs`) instead of
     // `paths.logsDir`. Lazy delays init until the first log call --
     // by which time Main.kt has set the property correctly.
     private val log by lazy { LoggerFactory.getLogger(DataDirMover::class.java) }

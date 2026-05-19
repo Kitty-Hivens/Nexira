@@ -20,7 +20,7 @@ import java.nio.file.StandardOpenOption
  *     the JVM still cleans up on exit but we lose the audit trail when
  *     diagnosing "two instances running" complaints.
  *   - the lock file carries the holder's PID so a stuck process can be
- *     identified by inspection (`cat ~/.local/share/aura-launcher/.lock`).
+ *     identified by inspection (`cat ~/.local/share/nexira/.lock`).
  *
  * Failure mode is **fail-open**: if lock acquisition itself crashes for
  * an unexpected reason (FS oddities, permissions), we log the warning
@@ -120,7 +120,7 @@ object SingleInstance {
      * IOException. Linux and macOS use advisory locks where reads work
      * fine, but cross-platform consistency wins. `.lock` stays empty and
      * sole-purpose; `.lock.pid` is informational and freely readable for
-     * `cat ~/.local/share/aura-launcher/.lock.pid` debugging.
+     * `cat ~/.local/share/nexira/.lock.pid` debugging.
      */
     private fun writePid(dataDir: Path) {
         runCatching {

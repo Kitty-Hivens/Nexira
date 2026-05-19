@@ -305,7 +305,7 @@ fun SettingsScreen(
 
                 // ── Network ───────────────────────────────────────────────────
                 //
-                // Single section grouping for "things that affect how Aura
+                // Single section grouping for "things that affect how Nexira
                 // talks to the network" (SSL bypasses, proxy toggles, etc.) so
                 // users have one place to look.
                 item {

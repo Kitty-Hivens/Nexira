@@ -8,7 +8,7 @@ import org.slf4j.LoggerFactory
 /**
  * Player-specific server actions over the authenticated channel. Today
  * only [resetSpawn] (1.12.2 gameplay action); future home for any
- * player-state operations Aura adds on the protocol's auth channel.
+ * player-state operations Nexira adds on the protocol's auth channel.
  */
 class PlayerRepository(
     private val protocol: IServerProtocol,

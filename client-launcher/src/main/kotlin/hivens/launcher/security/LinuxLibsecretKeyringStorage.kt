@@ -71,7 +71,7 @@ internal class LinuxLibsecretKeyringStorage : IKeyringStorage {
         const val SCHEMA_FLAG_DONT_MATCH_NAME = 0x2
         /** SECRET_SCHEMA_ATTRIBUTE_STRING = 0. */
         const val ATTR_TYPE_STRING = 0
-        const val SCHEMA_NAME = "io.github.kitty_hivens.AuraLauncher"
+        const val SCHEMA_NAME = "io.github.kitty_hivens.Nexira"
         const val ATTR_SERVICE = "service"
         const val ATTR_ACCOUNT = "account"
         const val LIBSECRET_SONAME = "libsecret-1.so.0"
@@ -201,7 +201,7 @@ internal class LinuxLibsecretKeyringStorage : IKeyringStorage {
                 handle.invokeExact(
                     schema,
                     MemorySegment.NULL,
-                    call.allocateUtf8("Aura: $service/$account"),
+                    call.allocateUtf8("Nexira: $service/$account"),
                     call.allocateUtf8(secret),
                     MemorySegment.NULL,
                     call.allocate(ValueLayout.ADDRESS), // GError**, zero-init
@@ -279,7 +279,7 @@ internal class LinuxLibsecretKeyringStorage : IKeyringStorage {
 
     private fun buildSchema(): MemorySegment {
         val s = arena.allocate(SCHEMA_LAYOUT)
-        // name (offset 0): pointer to "io.github.kitty_hivens.AuraLauncher"
+        // name (offset 0): pointer to "io.github.kitty_hivens.Nexira"
         val schemaName = arena.allocateUtf8(SCHEMA_NAME)
         s.set(ValueLayout.ADDRESS, 0, schemaName)
         // flags (offset 8): SECRET_SCHEMA_DONT_MATCH_NAME

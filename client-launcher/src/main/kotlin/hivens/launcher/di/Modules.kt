@@ -202,7 +202,7 @@ val networkModule = module {
      * OkHttp call API directly (Coil's image fetcher today; no Ktor [HttpClient]
      * adapter on its side). Mirrors the per-request channel decision the
      * default smartycraft [HttpClientProvider] makes; both must agree, or
-     * Aura's news strip and skin images would route differently from the
+     * Nexira's news strip and skin images would route differently from the
      * auth / protocol traffic that uses [HttpClientProvider].
      *
      * Keeping the two implementations in one file makes the divergence

@@ -33,7 +33,7 @@ import org.slf4j.LoggerFactory
  *
  * Out of scope: HTTP retry / channel switching (handled by
  * [ChannelRouter]), response caching (repositories cache themselves),
- * crash-report submission (Aura uses Beacon, not server-side).
+ * crash-report submission (Nexira uses Beacon, not server-side).
  */
 class SmartycraftV1Protocol(
     private val router: ChannelRouter,

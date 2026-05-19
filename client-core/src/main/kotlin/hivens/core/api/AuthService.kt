@@ -25,7 +25,7 @@ import javax.crypto.spec.SecretKeySpec
  * retry-with-backoff.
  *
  * Status-mapping nuance: the server returns [ProtocolStatus]; this
- * class exposes [AuthStatus] (Aura's UX-facing enum, slightly different
+ * class exposes [AuthStatus] (Nexira's UX-facing enum, slightly different
  * shape). Mapping lives in [mapStatus] -- keep aligned when adding values.
  */
 class AuthService(

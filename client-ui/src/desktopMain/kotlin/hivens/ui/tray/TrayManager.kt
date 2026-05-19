@@ -46,7 +46,7 @@ object TrayManager {
 
     private var tray: Tray? = null
     private var strings: Strings? = null
-    private var appName: String = "Aura Launcher"
+    private var appName: String = "Nexira"
     private var unsubscribe: (() -> Unit)? = null
 
     @Volatile private var servers: List<ServerProfile> = emptyList()
