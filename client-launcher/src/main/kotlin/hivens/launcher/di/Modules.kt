@@ -105,19 +105,19 @@ val networkModule = module {
     /**
      * Smartycraft insecure client (SSL verification disabled).
      * Registered only for the explicit "connect anyway" user flow.
-     * Never injected by default -- must be requested by named("insecure").
+     * Never injected by default -- must be requested by `named("insecure")`.
      *
-     * **Conduit Phase 4 audit (#157):** the default `HttpClientProvider`
-     * already returns this insecure client when `NetworkState.bypassFor()`
-     * is true (see the smartycraft `single<HttpClientProvider>` below),
-     * so a caller that has just granted bypass via `NetworkState.grantBypass()`
-     * can switch back to the regular `authService` and reach the same
-     * underlying transport. The named("insecure") chain (this client +
-     * its dependent ChannelRouter / IServerProtocol / IAuthService) is
-     * therefore redundant for the standard "Connect anyway" flow and is
-     * planned for removal in 2.2.14 once the UI call sites have been
-     * migrated. Until then it stays -- it remains useful as a one-shot
-     * insecure transport that doesn't require touching `NetworkState`.
+     * The default `HttpClientProvider` already returns this insecure
+     * client when `NetworkState.bypassFor()` is true (see
+     * `single<HttpClientProvider>` below), so a caller that has just
+     * granted bypass via `NetworkState.grantBypass()` can switch back
+     * to the regular `authService` and reach the same transport. The
+     * `named("insecure")` chain (this client + dependent ChannelRouter
+     * / IServerProtocol / IAuthService) is therefore redundant for the
+     * standard "Connect anyway" flow and is slated for removal once
+     * the UI call sites are migrated. Until then it stays -- still
+     * useful as a one-shot insecure transport that doesn't require
+     * touching `NetworkState`.
      */
     single<OkHttpClient>(named("insecure")) {
         val cfg: ServerProtocolConfig = get()
