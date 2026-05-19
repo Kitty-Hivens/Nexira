@@ -132,7 +132,7 @@ Response on success:
 ```
 
 Error responses:
-- `{"status":"PASSWORD"}` — wrong password (NOT plaintext "Bad login" — Aura's text-search check is stale)
+- `{"status":"PASSWORD"}` — wrong password (NOT plaintext "Bad login" — Nexira's text-search check is stale)
 - `{"status":"LOGIN"}` — username not found
 - `{"status":"ACTIVE"}` — account not activated
 - `{"status":"VIRTUAL"}` — virtual account (??)
@@ -204,7 +204,7 @@ race condition / cache stale on the server-side PHP. Trust server's call.
 
 ## Action: `report` — crash report
 
-**Signed.** Sends crash log to the upstream. Aura doesn't currently submit
+**Signed.** Sends crash log to the upstream. Nexira doesn't currently submit
 these; could opt-in for future Beacon integration. Smrt-deco class `ae`.
 
 ## Cross-cutting observations
@@ -252,8 +252,8 @@ Empirical RTT for `action=loader` from German residential IP (~470ms baseline RT
 
 - **Switch default channel to direct** saves ~500 ms per request (~10-20 calls per session = 5-10 s lifetime savings).
 - **`FORCE_HTTP1_FOR_SMARTYCRAFT` workaround in `Network.kt` is obsolete as of 2026-05-14** — HTTP/2 negotiation works on both direct and proxied paths. Remove and rely on okhttp's ALPN default. Document removal in Conduit Phase 4 cleanup. (If issue resurfaces in future upstream server reconfig, add back with concrete reproduction case.)
-- **No need for the no-SSL fallback** that smrt-deco has (`ck.q = false`) — direct HTTPS works for typical user. Skip that intermediate state in Aura's retry chain. Just direct → proxy on IOException, two states not three.
-- **Proxy is functionally fine** when our creds are correct. Initial assumption "creds rotated" was a transcription error on my side — Aura's hardcoded `Network.Proxy.PASS = "ngyxvpFfiUz4FB2OPx1nqEa4TEKigbKc"` matches the URL-safe-Base64-decoded value from smrt-deco line 83. Don't propose rotating these unless the actual proxy stops accepting them.
+- **No need for the no-SSL fallback** that smrt-deco has (`ck.q = false`) — direct HTTPS works for typical user. Skip that intermediate state in Nexira's retry chain. Just direct → proxy on IOException, two states not three.
+- **Proxy is functionally fine** when our creds are correct. Initial assumption "creds rotated" was a transcription error on my side — Nexira's hardcoded `Network.Proxy.PASS = "ngyxvpFfiUz4FB2OPx1nqEa4TEKigbKc"` matches the URL-safe-Base64-decoded value from smrt-deco line 83. Don't propose rotating these unless the actual proxy stops accepting them.
 - **Server validation surface is permissive**: User-Agent not checked, HTTP version not pinned, even `Host:` header doesn't have to be precise. So we don't need to obsess about mimicry headers — only the form-data shape matters.
 
 ### What ABOUT bypassing censorship for specific users

@@ -4,13 +4,13 @@ import starlight from '@astrojs/starlight';
 export default defineConfig({
   integrations: [
     starlight({
-      title: 'Aura Launcher',
+      title: 'Nexira',
       description: 'An unofficial launcher for SMARTYcraft',
       social: {
-        github: 'https://github.com/Kitty-Hivens/Aura-Launcher',
+        github: 'https://github.com/Kitty-Hivens/Nexira',
       },
       editLink: {
-        baseUrl: 'https://github.com/Kitty-Hivens/Aura-Launcher/edit/stable/docs/',
+        baseUrl: 'https://github.com/Kitty-Hivens/Nexira/edit/stable/docs/',
       },
       customCss: ['./src/styles/custom.css'],
       defaultLocale: 'root',
@@ -39,5 +39,5 @@ export default defineConfig({
     }),
   ],
   site: 'https://kitty-hivens.github.io',
-  base: '/Aura-Launcher',
+  base: '/Nexira',
 });
