@@ -7,15 +7,10 @@ import org.slf4j.LoggerFactory
 import java.io.File
 
 /**
- * Skin / cape (cloak) upload adapter.
- *
- * Pre-Conduit: built the multipart request directly. Post-Conduit Phase 1:
- * just delegates to [IServerProtocol.uploadSkin] / [IServerProtocol.uploadCloak].
- *
- * Returns a human-friendly result string (preserved from pre-Conduit shape so
- * UI consumers don't need to change). When Atelier (#173) eventually polishes
- * the upload UX (see #181), this whole class likely gets reshaped to return
- * a typed result; for now we keep the string contract.
+ * Skin / cape (cloak) upload adapter over [IServerProtocol]. Returns a
+ * human-friendly result string (preserved from the pre-Conduit shape so
+ * UI consumers don't have to change); will be reshaped to a typed
+ * result when Atelier polishes the upload UX.
  */
 class SkinRepository(
     private val protocol: IServerProtocol,
