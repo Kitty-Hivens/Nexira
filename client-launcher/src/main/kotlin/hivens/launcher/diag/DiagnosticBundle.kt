@@ -90,10 +90,10 @@ object DiagnosticBundle {
             val crashDir = paths.crashDir
             if (Files.exists(crashDir)) {
                 Files.list(crashDir).use { stream ->
-                    // NOFOLLOW_LINKS so a symlink dropped into crash-reports/
-                    // (deliberately or by tooling) doesn't leak its target's
-                    // contents into a bundle that's about to be sent to
-                    // maintainers. Same family as #187 ZIP/TAR hardening.
+                    // NOFOLLOW_LINKS so a symlink dropped into
+                    // crash-reports/ (deliberately or by tooling)
+                    // doesn't leak its target's contents into a
+                    // bundle that's about to be sent to maintainers.
                     stream.filter { Files.isRegularFile(it, java.nio.file.LinkOption.NOFOLLOW_LINKS) }.forEach { f ->
                         copyTextRedacted(zip, "crash-reports/${f.fileName}", f)
                     }
@@ -127,10 +127,6 @@ object DiagnosticBundle {
         appendLine()
         appendLine(" user.home  : ${System.getProperty("user.home")}")
         appendLine(" user.dir   : ${System.getProperty("user.dir")}")
-        // Path-based, not string-slicing: prior version did
-        // `aura.logs.dir.substringBeforeLast("/logs", "(unknown)")` which fell
-        // back to "(unknown)" on Windows because the path separator is `\`,
-        // dropping a support-critical signal exactly for Windows users.
         appendLine(" data.dir   : ${paths.dataDir.toAbsolutePath()}")
         appendLine(" logs.dir   : ${paths.logsDir.toAbsolutePath()}")
     }
