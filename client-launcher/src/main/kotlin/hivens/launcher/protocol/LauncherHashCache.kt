@@ -12,28 +12,25 @@ import java.security.MessageDigest
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * Caches the MD5 of the official `smartycraft.jar` that the server expects
- * in the `cheksum` field of `action=loader` requests.
+ * Caches the MD5 of the official `smartycraft.jar` that the server
+ * expects in the `cheksum` field of `action=loader` requests.
  *
- * Background: server gates the dashboard fetch behind a launcher-version
- * check -- the request body must include the MD5 of the official launcher
- * binary corresponding to [Protocol.MIMIC_LAUNCHER_VERSION]. When the
- * upstream binary is bumped, the hash changes and previously-baked
+ * The server gates the dashboard fetch behind a launcher-version check:
+ * the request body must include the MD5 of the official launcher
+ * binary corresponding to [Protocol.MIMIC_LAUNCHER_VERSION]. When
+ * upstream bumps the binary, the hash changes and
  * [Protocol.DEFAULT_LAUNCHER_HASH] becomes stale -- server returns
- * `{"status":"UPDATE"}` until the launcher refreshes its cache.
+ * `{"status":"UPDATE"}` until the launcher refreshes.
  *
- * Self-fetch flow (Option B per Conduit planning, locked 2026-05-14):
- * 1. On startup, load cached hash from `<dataDir>/launcher-hash.txt` if
- *    file exists, else fall back to [Protocol.DEFAULT_LAUNCHER_HASH].
+ * Self-fetch flow:
+ * 1. On startup, load cached hash from `<dataDir>/launcher-hash.txt`
+ *    if it exists; else fall back to [Protocol.DEFAULT_LAUNCHER_HASH].
  * 2. Use that hash in `action=loader` requests.
- * 3. If server returns UPDATE: download [config.officialJarUrl], MD5 it,
- *    write to cache file, update in-memory value, signal caller to retry.
- * 4. Cap at [MAX_REFRESH_ATTEMPTS_PER_SESSION] refreshes per launcher session
- *    to prevent loops if the upstream server is misconfigured (returning
- *    UPDATE for any hash we send).
- *
- * Lifted out of `ServerRepository` as part of Conduit Phase 1 so the
- * concern is separated from "make HTTP request" logic.
+ * 3. On UPDATE: download [ServerProtocolConfig.officialJarUrl], MD5
+ *    it, write to cache, update in-memory value, signal caller to retry.
+ * 4. Cap at [MAX_REFRESH_ATTEMPTS_PER_SESSION] per session to prevent
+ *    loops if the upstream is misconfigured (returning UPDATE for any
+ *    hash we send).
  */
 class LauncherHashCache(
     dataDir: File,
@@ -46,11 +43,11 @@ class LauncherHashCache(
     @Volatile
     private var current: String = readCachedOrDefault()
     /**
-     * Refresh-attempt counter is read+modified from any coroutine that ends
-     * up suspended on [refresh] -- a user double-clicking Play could trip
-     * two parallel calls, both observing `< MAX` and both incrementing,
-     * producing 3+ downloads against the cap of 2 (#189). AtomicInteger +
-     * CAS makes the cap check exact even under contention.
+     * Refresh-attempt counter, read + modified from any coroutine that
+     * ends up suspended on [refresh] -- a user double-clicking Play
+     * could trip two parallel calls, both observing `< MAX` and both
+     * incrementing, producing 3+ downloads against the cap of 2.
+     * AtomicInteger + CAS makes the cap check exact under contention.
      */
     private val refreshAttempts = AtomicInteger(0)
 
