@@ -5,9 +5,6 @@ import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
 
-/**
- * Manages loading/saving of [BackgroundSettings] to disk.
- */
 class BackgroundManager(
     configPath: Path,
     private val json: Json

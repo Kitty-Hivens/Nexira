@@ -305,10 +305,9 @@ fun SettingsScreen(
 
                 // ── Network ───────────────────────────────────────────────────
                 //
-                // Currently surfaces just the SSL-bypass list (Vault #2 followup).
-                // Future: proxy override, channel routing toggles, etc. live
-                // here under one section so users have a single place to look
-                // for "things that affect how Aura talks to the network".
+                // Single section grouping for "things that affect how Aura
+                // talks to the network" (SSL bypasses, proxy toggles, etc.) so
+                // users have one place to look.
                 item {
                     SettingsSectionTitle(s.settingsSectionNetwork)
 
@@ -388,7 +387,7 @@ fun SettingsScreen(
                             }
                         }
 
-                        // ── Force proxy mode (Conduit Phase 2) ────────────────
+                        // ── Force proxy mode ──────────────────────────────────
                         Spacer(Modifier.height(12.dp))
                         Row(
                             modifier              = Modifier.fillMaxWidth(),
@@ -618,9 +617,8 @@ fun SettingsScreen(
                                     // dialogSettings(title=...) is the key bit -- without
                                     // it FileKit hands the portal a blank-title request and
                                     // some backends render a less-styled fallback chrome
-                                    // (no titlebar text, generic icon). ProfileScreen +
-                                    // ServerSettingsScreen all pass dialogSettings; this
-                                    // site used to be the odd one out.
+                                    // (no titlebar text, generic icon). Match what
+                                    // ProfileScreen + ServerSettingsScreen pass here.
                                     val pickedFile = runCatching {
                                         FileKit.openDirectoryPicker(
                                             directory      = PlatformFile(paths.dataDir.toFile()),

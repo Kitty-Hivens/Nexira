@@ -62,7 +62,7 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var sslWarning   by remember { mutableStateOf(false) }
 
-    // 2FA flow state (#159). twoFactorPending is non-null while the
+    // 2FA flow state. twoFactorPending is non-null while the
     // ConfirmCodeDialog is open -- it stores the originating credentials
     // plus the uid the server returned in the TWOAUTH login response so
     // completeTwoFactor() can sign the follow-up. Cleared on dismiss /
@@ -400,7 +400,7 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
         }
         PuppetClick("login.submit", enabled = !isLoading) { doLogin() }
 
-        // REGISTER -- chaos target (#105)
+        // REGISTER -- chaos target
         af.ChaosButton(
             id      = "login_register_btn",
             text    = s.loginRegister,

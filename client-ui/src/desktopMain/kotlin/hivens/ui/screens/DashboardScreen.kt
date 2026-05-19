@@ -150,7 +150,7 @@ fun DashboardScreen(
 
         Spacer(Modifier.height(16.dp))
 
-        // ── Server grid (replaces raw LazyVerticalGrid) ───────────────────
+        // ── Server grid ────────────────────────────────────────────────────
         Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
             when {
                 isLoadingServers -> {

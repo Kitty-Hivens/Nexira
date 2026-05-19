@@ -19,9 +19,9 @@ import java.util.ServiceLoader
  * tables) out of the default classpath. `RealAprilFools` + its
  * supporting files land in `desktopAprilFoolsMain/` and are added to
  * the compilation only when `-PauraAprilFools=true` is on the Gradle
- * command line (B3 sub-batch 12.2). Production builds therefore cannot
- * accidentally activate chaos behaviour even if the calendar date hits
- * April 1 -- no implementation exists to render it. Same pattern as
+ * command line. Production builds therefore cannot accidentally
+ * activate chaos behaviour even if the calendar date hits April 1 --
+ * no implementation exists to render it. Same pattern as
  * `PuppetServerLoader`.
  */
 internal object AprilFoolsLoader {
