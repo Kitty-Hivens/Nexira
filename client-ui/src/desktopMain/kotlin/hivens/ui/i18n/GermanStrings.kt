@@ -342,6 +342,10 @@ object GermanStrings : AppStrings {
     override val auth2faInvalid         = "Falscher Code. Bitte erneut versuchen."
     override val auth2faExpired         = "Die 2FA-Sitzung ist abgelaufen. Bitte erneut anmelden."
 
+    override val auth2faUnsupportedTitle   = "Leider funktioniert 2FA hier nicht"
+    override val auth2faUnsupportedBody    = "Wir können 2FA leider nicht unterstützen. Unsere Protokolle weichen stark von denen ab, die Smartycraft nutzt. 2FA ist bei uns technisch dabei, aber sobald du spielen willst, kommen einfach Fehler. Bitte deaktiviere 2FA in deinem Konto auf der Website."
+    override val auth2faUnsupportedDismiss = "Verstanden"
+
     // --- SSL Warning ---
     override val sslWarningTitle        = "Serverzertifikat abgelaufen"
     override val sslWarningBody         = "Das SSL-Zertifikat des Servers ist abgelaufen. Die Verbindung ist möglicherweise unsicher — die Identität des Servers kann nicht verifiziert werden. Auf eigenes Risiko fortfahren?"

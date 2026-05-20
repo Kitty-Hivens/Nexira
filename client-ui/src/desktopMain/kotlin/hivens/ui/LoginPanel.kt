@@ -62,15 +62,17 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var sslWarning   by remember { mutableStateOf(false) }
 
-    // 2FA flow state. twoFactorPending is non-null while the
-    // ConfirmCodeDialog is open -- it stores the originating credentials
-    // plus the uid the server returned in the TWOAUTH login response so
-    // completeTwoFactor() can sign the follow-up. Cleared on dismiss /
-    // success / TWO_FACTOR_EXPIRED.
+    // 2FA flow state. The current SmartyCraft provider does not support
+    // 2FA -- when the server demands a code we surface
+    // [twoFactorUnsupported] instead of opening the dialog. The
+    // [twoFactorPending] / completeTwoFactor / ConfirmCodeDialog path
+    // remains as dead-code scaffolding for future auth providers that
+    // DO support 2FA (see [[project_client_auth_extraction]]).
     data class TwoFactorPending(val uid: String, val username: String, val password: String, val serverId: String)
-    var twoFactorPending  by remember { mutableStateOf<TwoFactorPending?>(null) }
-    var twoFactorError    by remember { mutableStateOf<String?>(null) }
-    var twoFactorBusy     by remember { mutableStateOf(false) }
+    var twoFactorPending      by remember { mutableStateOf<TwoFactorPending?>(null) }
+    var twoFactorError        by remember { mutableStateOf<String?>(null) }
+    var twoFactorBusy         by remember { mutableStateOf(false) }
+    var twoFactorUnsupported  by remember { mutableStateOf(false) }
 
     val fieldColors = OutlinedTextFieldDefaults.colors(
         focusedTextColor        = CelestiaTheme.colors.textPrimary,
@@ -87,9 +89,10 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
     fun doLogin(service: IAuthService = authService) {
         if (login.isBlank() || password.isBlank()) { errorMessage = s.loginErrorEmpty; return }
         focusManager.clearFocus()
-        isLoading    = true
-        sslWarning   = false
-        errorMessage = null
+        isLoading             = true
+        sslWarning            = false
+        errorMessage          = null
+        twoFactorUnsupported  = false
         hivens.core.diag.ActionRing.record("Login attempt: user=$login")
         scope.launch {
             try {
@@ -102,22 +105,17 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
                 hivens.core.diag.ActionRing.record("Login OK: user=$login")
                 onLogin(session)
             } catch (e: TwoFactorRequiredException) {
-                // Account has 2FA -- open the code dialog instead of treating
-                // it as a hard error. uid may be null when the server omits
-                // it from the TWOAUTH response (spec quirk); surface clearly
-                // so user knows to retry the full login.
+                // SmartyCraft demands a 2FA code. We don't support it -- the
+                // wire-side completion path through completeTwoFactor() works
+                // for the login itself, but the issued accessToken breaks
+                // every game-side authenticated call after that. Rather than
+                // shipping a half-functional flow, the banner explains and
+                // asks the user to disable 2FA on the site.
                 isLoading = false
-                hivens.core.diag.ActionRing.record("Login: 2FA required, user=$login uid=${e.uid?.take(8) ?: "<missing>"}")
-                val pendingUid = e.uid
-                if (pendingUid.isNullOrBlank()) {
-                    errorMessage = s.auth2faExpired
-                } else {
-                    val lastServer = profileManager.lastServerId ?: Protocol.DEFAULT_SERVER_ID
-                    twoFactorError = null
-                    twoFactorPending = TwoFactorPending(
-                        uid = pendingUid, username = login, password = password, serverId = lastServer,
-                    )
-                }
+                hivens.core.diag.ActionRing.record(
+                    "Login: 2FA detected, rejected (unsupported on SmartyCraft provider)"
+                )
+                twoFactorUnsupported = true
             } catch (e: AuthException) {
                 isLoading = false
                 hivens.core.diag.ActionRing.record(
@@ -297,6 +295,44 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
             }
         }
 
+        // ── 2FA unsupported banner ────────────────────────────────────────
+        if (twoFactorUnsupported) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        color = Color(0xFFF59E0B).copy(alpha = 0.12f),
+                        shape = RoundedCornerShape(8.dp)
+                    )
+                    .border(
+                        width = 1.dp,
+                        color = Color(0xFFF59E0B).copy(alpha = 0.5f),
+                        shape = RoundedCornerShape(8.dp)
+                    )
+                    .padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text       = s.auth2faUnsupportedTitle,
+                    style      = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color      = Color(0xFFF59E0B)
+                )
+                Text(
+                    text  = s.auth2faUnsupportedBody,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = CelestiaTheme.colors.textPrimary.copy(alpha = 0.85f)
+                )
+                OutlinedButton(
+                    onClick  = { twoFactorUnsupported = false },
+                    modifier = Modifier.align(Alignment.End),
+                    shape    = RoundedCornerShape(6.dp),
+                ) {
+                    Text(s.auth2faUnsupportedDismiss, color = CelestiaTheme.colors.textSecondary)
+                }
+            }
+        }
+
         // ── Regular error ─────────────────────────────────────────────────
         if (errorMessage != null) {
             Text(
@@ -316,7 +352,7 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
         // ── Fields ────────────────────────────────────────────────────────
         OutlinedTextField(
             value         = login,
-            onValueChange = { login = it; errorMessage = null; sslWarning = false },
+            onValueChange = { login = it; errorMessage = null; sslWarning = false; twoFactorUnsupported = false },
             label         = { Text(s.loginUsername) },
             modifier      = Modifier.fillMaxWidth(),
             singleLine    = true,
@@ -333,7 +369,7 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
 
         OutlinedTextField(
             value                = password,
-            onValueChange        = { password = it; errorMessage = null; sslWarning = false },
+            onValueChange        = { password = it; errorMessage = null; sslWarning = false; twoFactorUnsupported = false },
             label                = { Text(s.loginPassword) },
             modifier             = Modifier.fillMaxWidth(),
             singleLine           = true,
