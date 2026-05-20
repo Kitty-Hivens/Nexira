@@ -1,12 +1,12 @@
 ---
 title: Архитектура
-description: Структура модулей и ключевые архитектурные решения Aura Launcher.
+description: Структура модулей и ключевые архитектурные решения Nexira.
 ---
 
 ## Структура модулей
 
 ```
-aura-launcher/
+nexira/
 ├── client-config      # Константы, AppConfig, BuildConfig
 ├── client-core        # Доменные модели, API-сервисы, интерфейсы
 ├── client-launcher    # DI, загрузка файлов, обновления, запуск
@@ -75,11 +75,11 @@ dorkbox/SystemTray 4.4 выполняет жёстко заданную пров
 
 | ОС      | Путь                                              |
 |---------|---------------------------------------------------|
-| Windows | `%LOCALAPPDATA%\AuraLauncher\`                    |
-| macOS   | `~/Library/Application Support/AuraLauncher/`     |
-| Linux   | `$XDG_DATA_HOME/aura-launcher/` (по умолчанию `~/.local/share/aura-launcher/`) |
+| Windows | `%LOCALAPPDATA%\Nexira\`                    |
+| macOS   | `~/Library/Application Support/Nexira/`     |
+| Linux   | `$XDG_DATA_HOME/nexira/` (по умолчанию `~/.local/share/nexira/`) |
 
-Переменная окружения **`AURA_DATA_DIR`** перекрывает дефолт на любой ОС — пригодится чтобы перенести данные на другой диск (например `D:\AuraLauncher` на Windows) без правки кода.
+Переменная окружения **`AURA_DATA_DIR`** перекрывает дефолт на любой ОС — пригодится чтобы перенести данные на другой диск (например `D:\Nexira` на Windows) без правки кода.
 
 При первом запуске legacy-директория `~/.aura/` (использовалась в версиях ≤ 2.2.x) копируется в итоговую директорию данных, в неё пишется маркер `.migrated`. Старые данные **не удаляются** — пользователь может убрать их вручную, убедившись что миграция прошла.
 

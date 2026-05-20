@@ -71,7 +71,7 @@ internal class MacOSKeychainStorage : IKeyringStorage {
         const val kCFStringEncodingUTF8: Int = 0x08000100
 
         /** Probe service for [isAvailable] -- same shape as the Linux/Windows peers. */
-        const val PROBE_SERVICE = "io.github.kitty_hivens.AuraLauncher.probe"
+        const val PROBE_SERVICE = "io.github.kitty_hivens.Nexira.probe"
         const val PROBE_ACCOUNT = "isAvailable"
     }
 

@@ -8,13 +8,13 @@ import org.gradle.kotlin.dsl.named
 import org.gradle.kotlin.dsl.register
 
 /**
- * Convention plugin for Aura's packaging tasks. Apply via:
+ * Convention plugin for Nexira's packaging tasks. Apply via:
  *
  * ```kotlin
- * plugins { id("aura.packaging") }
+ * plugins { id("nexira.packaging") }
  *
  * packaging {
- *     appName.set("AuraLauncher")
+ *     appName.set("Nexira")
  *     mainClass.set("hivens.ui.MainKt")
  *     modules.set(listOf("java.base", "java.desktop", ...))
  *     jlink {
@@ -32,7 +32,7 @@ import org.gradle.kotlin.dsl.register
  * Defaults: strip-debug + no-header-files + no-man-pages are set to true
  * out of the box (small, safe, only-want-them-on for distribution builds);
  * compress / vmKind / includeLocales stay unset by default so a consumer
- * who wants the unaltered runtime can omit them. The `aura.packaging`
+ * who wants the unaltered runtime can omit them. The `nexira.packaging`
  * consumer always sets all three explicitly in client-ui/build.gradle.kts.
  */
 class PackagingPlugin : Plugin<Project> {

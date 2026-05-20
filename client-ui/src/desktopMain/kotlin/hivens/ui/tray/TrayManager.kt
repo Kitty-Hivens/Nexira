@@ -46,7 +46,7 @@ object TrayManager {
 
     private var tray: Tray? = null
     private var strings: Strings? = null
-    private var appName: String = "Aura Launcher"
+    private var appName: String = "Nexira"
     private var unsubscribe: (() -> Unit)? = null
 
     @Volatile private var servers: List<ServerProfile> = emptyList()
@@ -119,7 +119,7 @@ object TrayManager {
                 title = appName,
                 iconBytes = iconBytes,
                 tooltip = "$appName | ${strings.statusIdle}",
-                menu = buildMenu(strings, servers, gameRunning, gameServerName),
+                menu = buildMenu(strings, servers),
             )
             val t = Tray.create(builder) ?: run {
                 logger.warn("libtray Tray.create returned null -- no tray host reachable on this session")
@@ -129,9 +129,8 @@ object TrayManager {
             tray = t
             unsubscribe = t.onEvent { event ->
                 when (event) {
-                    // Left click -> restore window. Matches the previous
-                    // dorkbox default and what every other tray-icon app
-                    // does on every desktop.
+                    // Left click -> restore window. Standard tray-icon
+                    // behaviour on every desktop.
                     is TrayEvent.Activated -> onShowWindow?.invoke()
                     is TrayEvent.MenuItemSelected -> dispatchMenu(event.id)
                     else -> Unit
@@ -185,21 +184,18 @@ object TrayManager {
 
     private fun rebuildMenu() {
         val s = strings ?: return
-        tray?.setMenu(buildMenu(s, servers, gameRunning, gameServerName))
+        tray?.setMenu(buildMenu(s, servers))
     }
 
     private fun buildMenu(
         s: Strings,
         servers: List<ServerProfile>,
-        @Suppress("UNUSED_PARAMETER") running: Boolean,
-        @Suppress("UNUSED_PARAMETER") serverName: String?,
     ): TrayMenu {
         val items = mutableListOf<TrayMenuItem>()
 
-        // Status used to live as the first (disabled) menu entry too, but
-        // the same string is already in the SNI tooltip -- the menu line
-        // was pure duplication. Removed; running/serverName params are
-        // kept on the signature so callers don't have to change shape.
+        // Game status surfaces only in the SNI tooltip; a duplicate disabled
+        // menu entry would just clutter the menu. running/serverName params
+        // stay on the signature so callers don't have to change shape.
         items += TrayMenuItem.Standard(id = ID_SHOW,    label = s.show)
         items += TrayMenuItem.Standard(id = ID_CONSOLE, label = s.console)
         items += TrayMenuItem.Separator

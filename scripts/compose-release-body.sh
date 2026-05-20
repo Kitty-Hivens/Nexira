@@ -23,7 +23,7 @@ set -euo pipefail
 : "${CHANGELOG_NOTES:?CHANGELOG_NOTES is required (markdown body for this version)}"
 CHECKSUMS_FILE="${CHECKSUMS_FILE:-dist/SHA256SUMS.txt}"
 
-REPO_BASE="https://github.com/Kitty-Hivens/Aura-Launcher/releases/download/v${APP_VERSION}"
+REPO_BASE="https://github.com/Kitty-Hivens/Nexira/releases/download/v${APP_VERSION}"
 
 # Extract the ### Highlights section verbatim — the in-app updater renders
 # this as the "What's new" panel; the GitHub release body shows it too,
@@ -45,7 +45,7 @@ done < "$CHECKSUMS_FILE"
 # the output is markdown, no shell expansion inside literal blocks.
 {
   printf '> [!NOTE]\n'
-  printf '> **Aura Launcher** is an unofficial third-party launcher and is not affiliated with or endorsed by the original game developers.\n\n'
+  printf '> **Nexira** is an unofficial third-party launcher and is not affiliated with or endorsed by the original game developers.\n\n'
 
   if [ -n "$HIGHLIGHTS" ]; then
     printf "## What's New\n\n"
@@ -54,11 +54,11 @@ done < "$CHECKSUMS_FILE"
 
   printf '## Downloads\n\n'
   printf '| Platform | Tier | File |\n|---|---|---|\n'
-  printf '| Windows Installer | tier-1 | [`AuraLauncher-%s-Setup.exe`](%s/AuraLauncher-%s-Setup.exe) |\n' "$APP_VERSION" "$REPO_BASE" "$APP_VERSION"
-  printf '| Windows Portable  | tier-1 | [`AuraLauncher-%s-Windows-Portable.zip`](%s/AuraLauncher-%s-Windows-Portable.zip) |\n' "$APP_VERSION" "$REPO_BASE" "$APP_VERSION"
-  printf '| Linux AppImage    | tier-1 | [`AuraLauncher-%s-x86_64.AppImage`](%s/AuraLauncher-%s-x86_64.AppImage) |\n' "$APP_VERSION" "$REPO_BASE" "$APP_VERSION"
-  printf '| macOS Apple Silicon | tier-1 | [`AuraLauncher-%s-aarch64.dmg`](%s/AuraLauncher-%s-aarch64.dmg) |\n' "$APP_VERSION" "$REPO_BASE" "$APP_VERSION"
-  printf '| macOS Intel       | community | [`AuraLauncher-%s-x86_64-community.dmg`](%s/AuraLauncher-%s-x86_64-community.dmg) ※ |\n\n' "$APP_VERSION" "$REPO_BASE" "$APP_VERSION"
+  printf '| Windows Installer | tier-1 | [`Nexira-%s-Setup.exe`](%s/Nexira-%s-Setup.exe) |\n' "$APP_VERSION" "$REPO_BASE" "$APP_VERSION"
+  printf '| Windows Portable  | tier-1 | [`Nexira-%s-Windows-Portable.zip`](%s/Nexira-%s-Windows-Portable.zip) |\n' "$APP_VERSION" "$REPO_BASE" "$APP_VERSION"
+  printf '| Linux AppImage    | tier-1 | [`Nexira-%s-x86_64.AppImage`](%s/Nexira-%s-x86_64.AppImage) |\n' "$APP_VERSION" "$REPO_BASE" "$APP_VERSION"
+  printf '| macOS Apple Silicon | tier-1 | [`Nexira-%s-aarch64.dmg`](%s/Nexira-%s-aarch64.dmg) |\n' "$APP_VERSION" "$REPO_BASE" "$APP_VERSION"
+  printf '| macOS Intel       | community | [`Nexira-%s-x86_64-community.dmg`](%s/Nexira-%s-x86_64-community.dmg) ※ |\n\n' "$APP_VERSION" "$REPO_BASE" "$APP_VERSION"
 
   printf '> ※ The Intel macOS DMG is built and uploaded asynchronously by the maintainer\n'
   printf '> via the `build-macos-x86_64-community.yml` workflow once macos-13 capacity\n'

@@ -36,7 +36,7 @@ class UpdateService(
     private val lastMetaCheckFile = updateDir.resolve(".last_meta_check")
 
     companion object {
-        private const val GITHUB_REPO          = "Kitty-Hivens/Aura-Launcher"
+        private const val GITHUB_REPO          = "Kitty-Hivens/Nexira"
         private const val GITHUB_API_LATEST    = "https://api.github.com/repos/$GITHUB_REPO/releases/latest"
         private const val GITHUB_API_RELEASES  = "https://api.github.com/repos/$GITHUB_REPO/releases"
         private const val GITHUB_RELEASE_PAGE  = "https://github.com/$GITHUB_REPO/releases/tag"
@@ -129,12 +129,13 @@ class UpdateService(
                 return@withContext null
             }
 
-            // release-manifest.json is mandatory: it pins the SHA-256 the auto-
-            // updater verifies before launching the installer. Without a manifest
-            // (or without an entry for this asset) we refuse to construct an
-            // update -- auto-install of unverified bytes is a remote-code-execution
-            // path if the release page were ever tampered with. Releases ≥ 2.2.7-rc3
-            // ship the manifest; older releases require manual reinstall.
+            // release-manifest.json is mandatory: it pins the SHA-256
+            // the auto-updater verifies before launching the installer.
+            // Without a manifest (or without an entry for this asset)
+            // we refuse to construct an update -- auto-install of
+            // unverified bytes is a remote-code-execution path if the
+            // release page were ever tampered with. Older releases
+            // that ship no manifest require manual reinstall.
             val manifest = tryFetchManifest(release) ?: run {
                 logger.warn(
                     "Refusing auto-update: release {} ships no release-manifest.json " +
@@ -423,24 +424,25 @@ class UpdateService(
      *
      * Windows: `.exe`  (Inno Setup -- see setup.iss / build_release.yml)
      * macOS:   `-aarch64.dmg` on Apple Silicon, `-x86_64.dmg` on Intel.
-     *          Falls back to any `.dmg` for legacy pre-dual-arch releases
-     *          (i.e. ≤ 2.2.12 which shipped a single ARM64-only DMG).
+     *          Falls back to any `.dmg` for legacy pre-dual-arch
+     *          releases that shipped a single ARM64-only DMG.
      * Linux:   `.AppImage`
      */
     internal fun findAssetForCurrentOS(assets: List<GitHubAsset>): GitHubAsset? {
         val osName = System.getProperty("os.name").lowercase()
 
         return when {
-            // FIX: was .msi -- CI builds .exe via Inno Setup, not MSI
+            // Windows installer is Inno Setup (`.exe`), not MSI -- see
+            // `setup.iss` + `build_release.yml`.
             osName.contains("windows") -> assets.find {
                 it.name.endsWith(".exe") && it.name.contains("Setup", ignoreCase = true)
             }
             osName.contains("mac") -> {
-                // Picking the first .dmg blindly was the bug pre-#89: dual-arch
-                // releases ship both aarch64 and x86_64; whichever came first
-                // alphabetically was returned, leaving Intel users with an
-                // ARM64 DMG that fails with "not supported on this Mac" before
-                // Gatekeeper even fires. Match on arch first.
+                // Match on arch first. Picking the first `.dmg` blindly
+                // breaks dual-arch releases: aarch64 + x86_64 both ship
+                // and the alphabetically-first one would leave Intel
+                // users with an ARM64 DMG that fails with "not
+                // supported on this Mac" before Gatekeeper fires.
                 val arch = System.getProperty("os.arch", "").lowercase()
                 val archSuffix = when {
                     arch.contains("aarch64") || arch.contains("arm64") -> "aarch64.dmg"
@@ -480,12 +482,11 @@ class UpdateService(
     }
 
     /**
-     * Extracts SHA256 checksum for [fileName] from the GitHub release body.
-     *
-     * No longer called by [checkForUpdate] -- release-manifest.json is now the
-     * single source of truth for verifiable hashes (see #186). Kept and tested
-     * because the parser is generic and may be wired back in for an out-of-band
-     * recovery flow (e.g. signed manifest fetch from a secondary mirror).
+     * Extracts SHA256 checksum for [fileName] from a GitHub release
+     * body. Not on the active update path -- release-manifest.json is
+     * the single source of truth for verifiable hashes. Kept (and
+     * tested) for a future out-of-band recovery flow (e.g. signed
+     * manifest fetch from a secondary mirror).
      *
      * Supports two formats commonly found in release notes:
      *   1. Markdown table:  `| \`filename\` | \`hash\` |`
@@ -494,7 +495,7 @@ class UpdateService(
     internal fun extractChecksum(releaseBody: String?, fileName: String): String {
         if (releaseBody == null) return ""
 
-        // Format 1: Markdown table row  --  | `AuraLauncher-1.3.0-Setup.exe` | `abcdef...` |
+        // Format 1: Markdown table row  --  | `Nexira-1.3.0-Setup.exe` | `abcdef...` |
         val tablePattern = """\|\s*`${Regex.escape(fileName)}`\s*\|\s*`([a-fA-F0-9]{64})`\s*\|""".toRegex()
         tablePattern.find(releaseBody)?.groupValues?.get(1)?.let { return it }
 
@@ -504,12 +505,12 @@ class UpdateService(
     }
 
     /**
-     * Defense-in-depth gate at the install boundary: an empty [expectedChecksum]
-     * is treated as a verification failure, not "skip." The cold path in
-     * [checkForUpdate] already refuses to construct an update without a
-     * manifest-pinned hash, so empty here means a bug elsewhere (cached
-     * `LauncherUpdate` from before this fix, malformed deserialization, etc.) --
-     * fail closed instead of trusting unverified bytes.
+     * Defense-in-depth gate at the install boundary: an empty
+     * [expectedChecksum] is a verification failure, not "skip".
+     * [checkForUpdate] already refuses to construct an update without
+     * a manifest-pinned hash, so empty here means a bug elsewhere
+     * (stale `LauncherUpdate`, malformed deserialization) -- fail
+     * closed instead of trusting unverified bytes.
      */
     internal fun verifyChecksum(file: Path, expectedChecksum: String): Boolean {
         if (expectedChecksum.isBlank()) {
@@ -540,16 +541,16 @@ class UpdateService(
     /**
      * SemVer-ish comparison.
      *
-     * 1. Numeric base (`X.Y.Z`) compared element-wise -- missing segments = 0.
+     * 1. Numeric base (`X.Y.Z`) compared element-wise; missing
+     *    segments = 0.
      * 2. If bases tie, the prerelease suffix decides:
      *    - no suffix on either side -> equal
-     *    - one side has no suffix -> it wins (final > rc/beta/alpha)
-     *    - both have suffixes -> **natural-order** compare token-by-token
+     *    - one side has no suffix -> it wins (final > rc / beta / alpha)
+     *    - both have suffixes -> natural-order compare token-by-token
      *      (digit runs as numbers, non-digit runs as text), giving
-     *      `alpha < beta < rc1 < rc2 < rc10`. A previous version used pure
-     *      lex compare and would incorrectly rank `rc10 < rc2`; the launcher's
-     *      release cadence has not yet hit double-digit RCs but the fix is
-     *      cheap and the failure mode is silent.
+     *      `alpha < beta < rc1 < rc2 < rc10`. Pure lex compare would
+     *      incorrectly rank `rc10 < rc2`; the failure mode is silent
+     *      so the natural-order path is the load-bearing one.
      */
     internal fun compareVersions(v1: String, v2: String): Int {
         val base1 = v1.substringBefore('-')
@@ -581,7 +582,7 @@ class UpdateService(
      * out of tokens first, the shorter side sorts first ("alpha" < "alpha1").
      * On token-type mismatch at the same index, numeric tokens sort before
      * text tokens -- arbitrary but deterministic; we don't expect to hit this
-     * case for any real Aura version string.
+     * case for any real Nexira version string.
      */
     private fun compareSuffixNatural(s1: String, s2: String): Int {
         val tokens1 = tokenizeSuffix(s1)

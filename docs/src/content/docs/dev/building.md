@@ -1,6 +1,6 @@
 ---
 title: Building from Source
-description: How to build and run Aura Launcher locally.
+description: How to build and run Nexira locally.
 ---
 
 ## Requirements
@@ -11,8 +11,8 @@ description: How to build and run Aura Launcher locally.
 ## Clone and run
 
 ```bash
-git clone https://github.com/Kitty-Hivens/Aura-Launcher.git
-cd Aura-Launcher
+git clone https://github.com/Kitty-Hivens/Nexira.git
+cd Nexira
 
 # Run in development mode
 ./gradlew :client-ui:run

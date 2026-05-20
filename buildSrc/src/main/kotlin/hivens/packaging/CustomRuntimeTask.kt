@@ -18,7 +18,7 @@ import javax.inject.Inject
  * [PackagingExtension]'s [JlinkOptionsExtension] values.
  *
  * Replaces the off-the-shelf badass-runtime-plugin path. Three concrete
- * blockers made that plugin a poor fit for Aura: hard plugin-apply conflict
+ * blockers made that plugin a poor fit for Nexira: hard plugin-apply conflict
  * with Compose Multiplatform's `run` task, `Task.project` usage at
  * execution time that trips the project-wide strict configuration-cache
  * policy, and a competing source of truth for jlink flags (DSL vs the

@@ -14,7 +14,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
- * Coverage focused on the wrong-OS-natives filter (#157). Server-side
+ * Coverage focused on the wrong-OS-natives filter. Server-side
  * manifests ship every platform's native classifier to every client; the
  * launcher must drop the foreign ones before they reach the JVM, otherwise
  * loading a `*-natives-windows.jar` on Linux either wastes RAM or -- when
@@ -66,7 +66,7 @@ class ClasspathProviderTest {
     private fun provider(osName: String) =
         ClasspathProvider(ManifestProcessorService(json), osName = osName)
 
-    // ── Wrong-OS native JAR filter (#157) ──────────────────────────────────
+    // ── Wrong-OS native JAR filter ──────────────────────────────────────────
 
     @Test
     fun `Linux build drops Windows and macOS native classifiers`() {

@@ -9,18 +9,10 @@ import androidx.compose.ui.unit.IntSize
 
 /**
  * Real [AprilFoolsLifecycle] implementation. Thin facade over the chaos
- * singletons that have always done the work (`AprilFools` calendar logic,
+ * singletons that do the work (`AprilFools` calendar logic,
  * `AprilFoolsProgress` regression, `AprilFoolsText` corruption,
  * `ChaosState` overlay state, plus the top-level `AprilFoolsButton` /
  * `AprilFoolsWrapper` / `AprilFoolsDebugPanel` composables).
- *
- * In B3 sub-batch 12.1 this class + every file it delegates to still
- * lives in `desktopMain/`. The next sub-batch (12.2) `git mv`s the
- * implementation files plus this facade to `desktopAprilFoolsMain/` and
- * adds the SPI descriptor at
- * `META-INF/services/hivens.ui.easter.AprilFoolsLifecycle`. Production
- * builds will then resolve to [NoOpAprilFools] and ship none of the
- * chaos code.
  *
  * Must have a public no-arg constructor so `ServiceLoader` can
  * instantiate it.
@@ -109,11 +101,9 @@ class RealAprilFools : AprilFoolsLifecycle {
 }
 
 /**
- * Real card tracker -- delegates to the existing [FloatingButton] +
- * [ChaosState] machinery. Registration happens only when chaos is active
- * (mirrors the prior `if (AprilFools.isActive())` guards in
- * `SquareServerCard`); during a non-April session the tracker still
- * answers `originalVisible = true` and the card renders normally.
+ * Real card tracker -- delegates to the [FloatingButton] + [ChaosState]
+ * machinery. Registration happens only when chaos is active; otherwise the
+ * tracker answers `originalVisible = true` and the card renders normally.
  */
 private class RealCardTracker(
     id: String,

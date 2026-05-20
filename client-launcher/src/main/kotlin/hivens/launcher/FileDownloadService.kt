@@ -72,37 +72,36 @@ class FileDownloadService(
         // TTL inside ManifestCache is the safety valve for "what if a
         // file got corrupted on disk?" scenarios.
         //
-        // ignoredFiles is part of the cache input because cleanupIgnoredFiles
-        // (which physically deletes disabled mod jars) lives below this
-        // gate -- caching only on manifest hash would let a freshly-disabled
-        // mod stay loaded until the cache expires or the manifest changes
-        // upstream. (Codex P2 on PR #128.)
+        // ignoredFiles is part of the cache input because
+        // cleanupIgnoredFiles (which physically deletes disabled mod
+        // jars) lives below this gate -- caching only on manifest hash
+        // would let a freshly-disabled mod stay loaded until the cache
+        // expires or the manifest changes upstream.
         val manifestHash = manifestCache.hashOf(cacheKeyInputFor(manifest, ignoredFiles))
-        // Disk-sanity gate (#184 + #203): the manifest-cache file alone
-        // can't tell that the user moved their data dir leaving
-        // manifest-cache/ behind, deleted clients/<id>/ by hand, removed
-        // one mod, or restored from a partial backup. Walk EVERY manifest
-        // entry with a single stat() per file and require:
+        // Disk-sanity gate: the manifest-cache file alone can't tell
+        // that the user moved their data dir leaving manifest-cache/
+        // behind, deleted clients/<id>/ by hand, removed one mod, or
+        // restored from a partial backup. Walk EVERY manifest entry
+        // with a single stat() per file and require:
         //   * the path exists,
         //   * it's a regular file (not a dangling symlink or directory
         //     squatting on the name),
         //   * its byte size matches the manifest's recorded size.
-        // If anything fails, fall through to the full MD5 integrity walk
-        // + redownload.
+        // If anything fails, fall through to the full MD5 integrity
+        // walk + redownload.
         //
-        // Cost: ~1 stat per file. A 1000-entry modpack walks in <10 ms on
-        // Linux/macOS, ~50 ms on Windows. Negligible vs the full MD5 walk
-        // (seconds for the same pack) and vs the user-perceived launch
-        // latency (~5+ s for non-cache paths).
+        // Cost: ~1 stat per file. A 1000-entry modpack walks in <10 ms
+        // on Linux / macOS, ~50 ms on Windows. Negligible against the
+        // full MD5 walk (seconds for the same pack) and the
+        // user-perceived launch latency (~5+ s for non-cache paths).
         //
-        // Pre-#203, this check sampled only the first 20 manifest entries.
-        // A user-caused deletion or truncation outside the top 20 (the
-        // normal case -- Aura's modpacks have 50-1000+ entries, the affected
-        // file is rarely at the top of the alphabetical traversal) slipped
-        // past the gate, the cache was trusted, and Minecraft launched with
-        // a missing/corrupt mod and crashed with a downstream
-        // NoClassDefFoundError that the user couldn't map back to "the
-        // launcher silently skipped verifying my mod folder".
+        // Sampling only the top N manifest entries would miss
+        // deletions or truncations elsewhere -- Nexira packs run
+        // 50-1000+ entries and the affected file is rarely at the top
+        // of an alphabetical traversal. The walk MUST cover every
+        // entry or the cache silently masks a missing mod and the
+        // game crashes downstream with a NoClassDefFoundError the
+        // user can't map back to a launcher-side cause.
         val filesMap = flattenManifest(manifest)
         val cacheValid = manifestCache.isClean(serverId, manifestHash) {
             filesMap.entries.all { (rawPath, fileData) ->
@@ -367,13 +366,12 @@ class FileDownloadService(
     }
 
     /**
-     * Sentinel for "we deliberately threw to trigger a retry after fixing
-     * local state". Currently the only thrower is the 416 branch in
-     * [downloadFileInternal], which deletes the bad partial before
-     * raising this so the next retry fetches from byte 0. Adding a
-     * subclass instead of pattern-matching the message keeps the contract
-     * explicit -- string matching on `cause.message` was the bug Codex
-     * caught on PR #128.
+     * Sentinel for "we deliberately threw to trigger a retry after
+     * fixing local state". Currently the only thrower is the 416
+     * branch in [downloadFileInternal], which deletes the bad partial
+     * before raising this so the next retry fetches from byte 0.
+     * Subclass over string-matching `cause.message` keeps the contract
+     * explicit.
      */
     private class RetryableHttpException(message: String) : IOException(message)
 
@@ -425,16 +423,17 @@ class FileDownloadService(
             val localMd5 = calculateMD5(file)
             if (!localMd5.equals(expectedMd5, ignoreCase = true)) return true
 
-            // ZIP-structure validation for mods/*.jar (#169). Bytes-on-disk
-            // can match the manifest's MD5 verbatim and still be a malformed
-            // ZIP -- happens when the upstream CDN serves corrupt bytes that
-            // were already corrupt at hash-time, or a partial write got
-            // truncated mid-stream and the post-write integrity check
-            // missed it. NeoForge's BootstrapLauncher dies with
-            // "invalid CEN header (bad signature)" on the broken jar; the
-            // user has no signal except the crash. Scoped to mods/ only
-            // because that's where the corruption hot zone is and a
-            // 1000-file libraries-dir scan would dominate cold-start.
+            // ZIP-structure validation for `mods/*.jar`. Bytes-on-disk
+            // can match the manifest's MD5 verbatim and still be a
+            // malformed ZIP -- happens when the upstream uploaded
+            // already-corrupt bytes (manifest hash was computed over
+            // the broken file) or a partial write that the post-write
+            // integrity check missed. NeoForge's BootstrapLauncher
+            // dies with "invalid CEN header (bad signature)" on the
+            // broken jar and the user has no signal except the crash.
+            // Scoped to `mods/` only -- that's the corruption hot zone
+            // and a 1000-file `libraries/` scan would dominate cold
+            // start.
             if (isModsJar(relativePath) && !isZipValid(file)) return true
 
             false

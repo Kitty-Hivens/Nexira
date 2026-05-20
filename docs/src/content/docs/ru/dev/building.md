@@ -1,6 +1,6 @@
 ---
 title: Сборка из исходников
-description: Как собрать и запустить Aura Launcher локально.
+description: Как собрать и запустить Nexira локально.
 ---
 
 ## Требования
@@ -11,8 +11,8 @@ description: Как собрать и запустить Aura Launcher лока�
 ## Клонирование и запуск
 
 ```bash
-git clone https://github.com/Kitty-Hivens/Aura-Launcher.git
-cd Aura-Launcher
+git clone https://github.com/Kitty-Hivens/Nexira.git
+cd Nexira
 
 # Запуск в режиме разработки
 ./gradlew :client-ui:run

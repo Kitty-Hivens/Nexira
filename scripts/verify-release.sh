@@ -20,7 +20,7 @@
 
 set -euo pipefail
 
-REPO="Kitty-Hivens/Aura-Launcher"
+REPO="Kitty-Hivens/Nexira"
 API_BASE="https://api.github.com/repos/$REPO"
 
 RED='\033[0;31m'
@@ -72,7 +72,7 @@ fetch() {
 
 echo ""
 echo "═══════════════════════════════════════════════════════════"
-echo " Aura Launcher — Release Verification"
+echo " Nexira — Release Verification"
 echo "═══════════════════════════════════════════════════════════"
 echo ""
 

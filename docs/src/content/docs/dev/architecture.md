@@ -1,12 +1,12 @@
 ---
 title: Architecture
-description: Module structure and key design decisions in Aura Launcher.
+description: Module structure and key design decisions in Nexira.
 ---
 
 ## Module structure
 
 ```
-aura-launcher/
+nexira/
 ├── client-config      # Constants, AppConfig, BuildConfig
 ├── client-core        # Domain models, API services, interfaces
 ├── client-launcher    # DI wiring, file download, update, launch logic
@@ -75,11 +75,11 @@ User data (settings, credentials, downloaded clients, skin cache, logs, crash re
 
 | OS      | Path                                              |
 |---------|---------------------------------------------------|
-| Windows | `%LOCALAPPDATA%\AuraLauncher\`                    |
-| macOS   | `~/Library/Application Support/AuraLauncher/`     |
-| Linux   | `$XDG_DATA_HOME/aura-launcher/` (default `~/.local/share/aura-launcher/`) |
+| Windows | `%LOCALAPPDATA%\Nexira\`                    |
+| macOS   | `~/Library/Application Support/Nexira/`     |
+| Linux   | `$XDG_DATA_HOME/nexira/` (default `~/.local/share/nexira/`) |
 
-The environment variable **`AURA_DATA_DIR`** overrides the platform default on every OS — useful for moving data to another drive (e.g. `D:\AuraLauncher` on Windows) without code changes.
+The environment variable **`AURA_DATA_DIR`** overrides the platform default on every OS — useful for moving data to another drive (e.g. `D:\Nexira` on Windows) without code changes.
 
 On first launch the legacy `~/.aura/` directory (used by versions ≤ 2.2.x) is copied into the resolved data directory and a `.migrated` marker is written into the legacy directory. The legacy data is **not** deleted — users can remove it manually after verifying the migration.
 

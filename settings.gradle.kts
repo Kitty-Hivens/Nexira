@@ -63,7 +63,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "aura-launcher"
+rootProject.name = "nexira"
 
 include(":client-config")
 include(":client-core")

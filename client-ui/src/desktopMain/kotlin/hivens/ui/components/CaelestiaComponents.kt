@@ -16,7 +16,7 @@ import hivens.ui.theme.CelestiaTheme
 /**
  * Main Celestia container -- translucent, with a thin border.
  *
- * [borderColor] is now theme-aware: if [Color.Unspecified] is passed (or omitted),
+ * [borderColor] is theme-aware: if [Color.Unspecified] is passed (or omitted),
  * a light gray border is used in light theme, and dark gray in dark theme.
  */
 @Composable

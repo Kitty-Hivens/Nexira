@@ -103,7 +103,7 @@ internal fun PuppetToggle(
  *
  * Nested calls are NOT scoped (out of MVP scope) -- if two PuppetScreen
  * declarations are alive simultaneously, the most recently composed
- * one wins. Aura's current navigation is a single top-level screen at
+ * one wins. Nexira's current navigation is a single top-level screen at
  * a time, so this is fine.
  */
 @Composable

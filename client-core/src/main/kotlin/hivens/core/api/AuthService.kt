@@ -19,16 +19,14 @@ import javax.crypto.Cipher
 import javax.crypto.spec.SecretKeySpec
 
 /**
- * Login coordinator + per-server session cache.
+ * Login coordinator + per-server session cache. Delegates the actual
+ * network call to [IServerProtocol.login]; this class owns session
+ * caching, password hashing, AES game-token generation, and
+ * retry-with-backoff.
  *
- * Pre-Conduit: built the wire request directly. Post-Conduit Phase 1: just
- * delegates the actual network call to [IServerProtocol.login], keeping the
- * session caching / password hashing / AES game-token generation / retry-
- * with-backoff logic on the consumer side where it belongs.
- *
- * Status-mapping nuance: server returns [ProtocolStatus] enum, this class
- * exposes [AuthStatus] (Aura's UX-facing enum, slightly different shape).
- * Mapping happens in [mapStatus] -- keep them aligned when adding new values.
+ * Status-mapping nuance: the server returns [ProtocolStatus]; this
+ * class exposes [AuthStatus] (Nexira's UX-facing enum, slightly different
+ * shape). Mapping lives in [mapStatus] -- keep aligned when adding values.
  */
 class AuthService(
     private val protocol: IServerProtocol,
@@ -37,25 +35,21 @@ class AuthService(
     private val logger = LoggerFactory.getLogger(AuthService::class.java)
 
     /**
-     * Per-server session cache. The dashboard renders server cards by
-     * doing a "list servers" auth, then the Play button does a "launch
-     * server" auth -- historically two consecutive logins for the same
-     * serverId within ~3 seconds. Both call sites are legitimate; they
-     * just don't share state. Caching here deduplicates them down to
-     * one network request as long as the user clicks Play within the
-     * TTL window.
+     * Per-server session cache. The dashboard renders cards by listing
+     * servers (one auth), then Play does the launch auth -- historically
+     * two consecutive logins for the same serverId within ~3 seconds.
+     * Caching deduplicates to one network request when the user clicks
+     * Play inside the TTL window.
      *
-     * Cache key is `(username, passwordHash, serverId)`. Password hash
-     * is mandatory in the key because otherwise a second login attempt
-     * with the *wrong* password within the 30 s TTL would silently
-     * succeed via cache, masking real credential rotation (Codex P2 on
-     * PR #128). We use the MD5 already computed for the auth request,
-     * not the plaintext password -- same secret-handling profile as the
-     * rest of the call.
+     * Cache key includes `passwordHash` because otherwise a second
+     * login attempt with the WRONG password within the TTL would
+     * silently succeed via cache, masking real credential rotation.
+     * MD5 (already computed for the auth request) is the hash form;
+     * plaintext never enters the key.
      *
-     * 30 s TTL: long enough for "open launcher -> pick server -> click Play",
-     * short enough that the upstream server still considers the session
-     * fresh. Cache is in-memory only -- process restart re-auths.
+     * 30 s TTL: long enough for "open launcher -> pick server -> click
+     * Play", short enough that the upstream still considers the session
+     * fresh. In-memory only; process restart re-auths.
      */
     private data class CacheKey(val username: String, val passwordHash: String, val serverId: String)
     private data class CachedSession(val session: SessionData, val expiresAt: Long)
@@ -64,27 +58,22 @@ class AuthService(
     private val sessionTtlMs = 30_000L
 
     /**
-     * Per-user cache of the LoginResponse the server returned alongside a
-     * TWOAUTH status -- held until [completeTwoFactor] consumes it (or a
-     * fresh login overwrites it). The official protocol's TWOAUTH response
-     * is sometimes status-only (per spec) and sometimes carries enough
-     * session fields to short-circuit the post-twoauth re-login loop.
-     * Caching it here lets [completeTwoFactor] try the no-re-login path
-     * first and avoids the loop the user observed when the server returns
-     * TWOAUTH on every login retry.
+     * Per-user cache of the [LoginResponse] the server returned alongside
+     * a TWOAUTH status -- held until [completeTwoFactor] consumes it (or
+     * a fresh login overwrites it). The TWOAUTH response is sometimes
+     * status-only (per spec) and sometimes carries enough session fields
+     * to short-circuit the post-twoauth re-login loop. Caching here lets
+     * [completeTwoFactor] try the no-re-login path first and avoids the
+     * loop the server sometimes drops us into when it returns TWOAUTH on
+     * every login retry.
      */
     private val pendingTwoFactor = java.util.concurrent.ConcurrentHashMap<CacheKey, LoginResponse>()
 
     override suspend fun login(username: String, password: String, serverId: String): SessionData {
-        // Hash first so the cache key includes the password -- otherwise a
-        // wrong/rotated password within the TTL would silently succeed
-        // via cache. (Codex P2 on PR #128.)
         val passwordEncoded = HashUtils.md5(password)
-        // Each fresh login attempt invalidates any stale pendingTwoFactor
-        // entry for this triple -- covers the case where the user canceled
-        // a previous 2FA dialog (or it errored out) and is now retrying.
-        // Without this the map would grow unbounded across the launcher's
-        // lifetime (audit catch on the 22-commit batch).
+        // Drop any stale TWOAUTH state for this triple -- covers the
+        // canceled-2FA-dialog and previous-error retry paths. Without
+        // this the pendingTwoFactor map grows unbounded.
         pendingTwoFactor.remove(CacheKey(username, passwordEncoded, serverId))
         cachedFor(username, passwordEncoded, serverId)?.let {
             logger.info("Login via API V3 (server: {}) -- cache hit, skipping network", serverId)
@@ -121,7 +110,7 @@ class AuthService(
                 throw AuthException(
                     status     = AuthStatus.INTERNAL_ERROR,
                     message    = "SSL certificate error: ${e.message}",
-                    isSslError = true
+                    isSslError = true,
                 )
             }
             throw AuthException(AuthStatus.INTERNAL_ERROR, "Network Error: ${e.message}")
@@ -129,13 +118,13 @@ class AuthService(
 
         val parsedStatus = response.parsedStatus
         if (parsedStatus == ProtocolStatus.TWOAUTH) {
-            // The TWOAUTH branch isn't a failure -- it's a "do the second
-            // factor and call back". Cache the response so completeTwoFactor
-            // can build a SessionData directly from it (preferred path) and
-            // only fall back to a re-login when the cached fields are too
-            // sparse to construct one -- necessary to avoid the
-            // login->TWOAUTH->twoauth=OK->login->TWOAUTH->… loop the server
-            // sometimes drops us into.
+            // TWOAUTH is not a failure -- it's "do the second factor and
+            // call back". Cache the response so completeTwoFactor can
+            // build a SessionData directly from it (preferred path) and
+            // only fall back to a re-login when the cached fields are
+            // too sparse -- avoids the
+            // login->TWOAUTH->twoauth=OK->login->TWOAUTH-> loop the
+            // server sometimes drops us into.
             pendingTwoFactor[CacheKey(username, passwordEncoded, serverId)] = response
             throw TwoFactorRequiredException(uid = response.uid, login = username)
         }
@@ -168,9 +157,9 @@ class AuthService(
         code: String,
     ): SessionData {
         if (uid.isBlank()) {
-            // The TWOAUTH login response didn't include a uid (server quirk
-            // documented in the protocol spec; sometimes the response is
-            // status-only). Without uid we can't sign the twoauth request.
+            // TWOAUTH login response didn't include a uid (server quirk:
+            // sometimes the response is status-only). Without uid we
+            // cannot sign the twoauth request.
             throw AuthException(
                 AuthStatus.TWO_FACTOR_EXPIRED,
                 "2FA flow can't continue: server didn't return a session id. Please log in again.",
@@ -187,51 +176,50 @@ class AuthService(
         }
 
         when (twoauthResponse.parsedStatus) {
-            ProtocolStatus.OK -> Unit  // proceed below
+            ProtocolStatus.OK -> Unit
             ProtocolStatus.CODE -> throw AuthException(AuthStatus.WRONG_CODE, "Wrong 2FA code")
             ProtocolStatus.LOGIN -> throw AuthException(
                 AuthStatus.TWO_FACTOR_EXPIRED,
                 "2FA session expired. Please log in again.",
             )
-            // Anything else (server-side ERROR, INTERNAL, an unexpected
-            // status the spec never mentions) is unrecoverable from the
-            // dialog: there's nothing the user can re-type that will
-            // change the answer. Per spec, the documented recovery is
-            // "restart full login" -- which is exactly the contract of
-            // TWO_FACTOR_EXPIRED. Surface that status so the UI dismisses
-            // the dialog and routes the user back to the credentials
-            // form, instead of pinning them to a verify button that will
-            // keep returning the same error.
+            // Anything else (server-side ERROR / INTERNAL / unexpected
+            // status) is unrecoverable from the dialog -- there is
+            // nothing the user can re-type that will change the answer.
+            // Per spec, the documented recovery is "restart full login",
+            // which is exactly the contract of TWO_FACTOR_EXPIRED.
+            // Surface that so the UI dismisses the dialog and routes
+            // back to the credentials form.
             else -> throw AuthException(
                 AuthStatus.TWO_FACTOR_EXPIRED,
                 "2FA verification could not be completed. Please log in again.",
             )
         }
 
-        // twoauth=OK -- server now considers the second factor satisfied.
-        // Two reconstruction strategies, in order:
-        //   1. The TWOAUTH login response is sometimes complete (uuid +
-        //      playername + session populated) -- promote it to a SessionData
-        //      directly. Cheaper and avoids the next strategy's loop hazard.
-        //   2. If the cached response is too sparse, fall back to a single
-        //      re-login. If THAT comes back TWOAUTH again (server quirk --
-        //      observed empirically when the account doesn't actually have
-        //      2FA configured but the server still routes through the gate),
-        //      give up with TWO_FACTOR_EXPIRED rather than loop.
+        // twoauth=OK -- server considers the second factor satisfied.
+        // Two reconstruction strategies:
+        //   1. The cached TWOAUTH login response is sometimes complete
+        //      (uuid + playername + session all populated) -- promote it
+        //      to a SessionData directly. Cheaper and avoids strategy 2's
+        //      loop hazard.
+        //   2. If the cached response is too sparse, fall back to a
+        //      single re-login. If THAT returns TWOAUTH again (server
+        //      quirk -- observed when the account doesn't actually have
+        //      2FA but the server routes through the gate anyway), give
+        //      up with TWO_FACTOR_EXPIRED rather than loop.
         val passwordEncoded = HashUtils.md5(password)
         val key = CacheKey(username, passwordEncoded, serverId)
         val cachedResponse = pendingTwoFactor.remove(key)
 
-        // `session` MUST be checked too -- it's the AES-encrypted bytes that
-        // become accessToken via generateGameToken. A TWOAUTH response with
+        // `session` MUST be checked too -- it's the AES-encrypted bytes
+        // that become accessToken via generateGameToken. A response with
         // uuid + playername populated but session null would build a
-        // SessionData with an empty accessToken and the game would die at
+        // SessionData with an empty accessToken; game would die at
         // smartycraft auth-host with no signal back to the launcher.
-        // Audit-pass catch on the 25-commit batch.
         if (cachedResponse != null &&
             cachedResponse.uuid != null &&
             cachedResponse.playername != null &&
-            cachedResponse.session != null) {
+            cachedResponse.session != null
+        ) {
             return buildSessionData(cachedResponse, password, serverId)
                 .also { cacheSession(username, passwordEncoded, serverId, it) }
         }
@@ -239,10 +227,10 @@ class AuthService(
         return try {
             login(username, password, serverId)
         } catch (_: TwoFactorRequiredException) {
-            // Re-login STILL returns TWOAUTH after our verified twoauth=OK.
-            // Either the server rejected the verify silently or the account
-            // is in a weird state. Whatever the cause, looping is wrong;
-            // surface as a clean restart-the-flow signal.
+            // Re-login STILL returns TWOAUTH after our verified
+            // twoauth=OK. Either the server rejected the verify
+            // silently or the account is in a weird state. Looping is
+            // wrong; surface as a clean restart-the-flow signal.
             throw AuthException(
                 AuthStatus.TWO_FACTOR_EXPIRED,
                 "2FA verification didn't unlock the session. Please log in again.",
@@ -251,10 +239,10 @@ class AuthService(
     }
 
     /**
-     * Reconstruct a [SessionData] from an OK-shaped [LoginResponse] without
-     * making any network calls. Shared between the cold-login OK path and
-     * the post-twoauth promotion path so the field mapping stays in one
-     * place. Caller is responsible for cache write.
+     * Reconstructs a [SessionData] from an OK-shaped [LoginResponse]
+     * without making any network calls. Shared between the cold-login
+     * OK path and the post-twoauth promotion path so the field mapping
+     * lives in one place. Caller is responsible for the cache write.
      */
     private fun buildSessionData(response: LoginResponse, password: String, serverId: String): SessionData {
         val finalGameToken = generateGameToken(response.uid, response.session)
@@ -272,10 +260,7 @@ class AuthService(
         )
     }
 
-    /**
-     * Map protocol-layer [ProtocolStatus] to UX-layer [AuthStatus]. Keep
-     * aligned with [SessionData.status] consumers.
-     */
+    /** Map protocol-layer [ProtocolStatus] to UX-layer [AuthStatus]. Keep aligned with [SessionData.status] consumers. */
     private fun mapStatus(status: ProtocolStatus): AuthStatus = when (status) {
         ProtocolStatus.OK -> AuthStatus.OK
         ProtocolStatus.LOGIN -> AuthStatus.BAD_LOGIN
@@ -326,8 +311,8 @@ class AuthService(
     private fun generateRandomMac(): String {
         // Colon separator to match the wire spec in
         // `docs/dev/smartycraft-v1-protocol.md` and what smrt-deco emits.
-        // The server doesn't validate the content today, but doc/code drift
-        // surfaces as a mystery the next time someone reads either side.
+        // Server doesn't validate content today; doc/code drift surfaces
+        // as a mystery next time someone reads either side.
         val rand = Random()
         val mac = ByteArray(6)
         rand.nextBytes(mac)
@@ -336,12 +321,12 @@ class AuthService(
     }
 
     /**
-     * True for the narrow set of transient network failures we've seen on
+     * True for the narrow set of transient network failures we see on
      * the SMARTYcraft channel -- h2 frame resets over SOCKS, raw socket
-     * resets during TLS, ktor's wrapped channel-closed exception. NOT true
-     * for [AuthException] (those are server-side rejections, retrying just
-     * locks the user out faster) or SSL cert errors (those need user opt-in,
-     * not a silent retry).
+     * resets during TLS, ktor's wrapped channel-closed exception. NOT
+     * true for [AuthException] (those are server-side rejections;
+     * retrying just locks the user out faster) or SSL cert errors
+     * (those need user opt-in, not silent retry).
      */
     private fun isTransientNetworkError(t: Throwable): Boolean {
         if (t is AuthException) return false

@@ -9,8 +9,8 @@ import java.nio.file.Paths
 /**
  * macOS update flow.
  *
- * Mounts the downloaded `.dmg` at `/Volumes/AuraUpdate`, kills any
- * AuraLauncher survivors, replaces the existing `.app` bundle, unmounts
+ * Mounts the downloaded `.dmg` at `/Volumes/NexiraUpdate`, kills any
+ * Nexira survivors, replaces the existing `.app` bundle, unmounts
  * and relaunches via `open`. Self-deletes the bash trampoline script.
  */
 class MacUpdateApplicator : IUpdateApplicator {
@@ -20,7 +20,7 @@ class MacUpdateApplicator : IUpdateApplicator {
         try {
             val scriptPath = Files.createTempFile("aura_update", ".sh")
             val currentBinary = resolveExecutable()
-            val currentAppBundle = currentBinary.parent?.parent?.parent ?: Paths.get("/Applications/AuraLauncher.app")
+            val currentAppBundle = currentBinary.parent?.parent?.parent ?: Paths.get("/Applications/Nexira.app")
             val targetDir = currentAppBundle.parent ?: Paths.get("/Applications")
 
             // Paths are passed via env vars, not string-interpolated into the
@@ -37,15 +37,15 @@ class MacUpdateApplicator : IUpdateApplicator {
                 sleep 2
 
                 # Kill any remaining processes
-                killall -9 AuraLauncher 2>/dev/null || true
+                killall -9 Nexira 2>/dev/null || true
 
                 # Mount DMG
                 echo "Mounting update image..."
-                hdiutil attach "$INSTALLER" -mountpoint /Volumes/AuraUpdate -nobrowse -quiet || exit 1
+                hdiutil attach "$INSTALLER" -mountpoint /Volumes/NexiraUpdate -nobrowse -quiet || exit 1
 
-                if [ ! -d "/Volumes/AuraUpdate/AuraLauncher.app" ]; then
-                    echo "Error: AuraLauncher.app not found in DMG"
-                    hdiutil detach /Volumes/AuraUpdate -quiet || true
+                if [ ! -d "/Volumes/NexiraUpdate/Nexira.app" ]; then
+                    echo "Error: Nexira.app not found in DMG"
+                    hdiutil detach /Volumes/NexiraUpdate -quiet || true
                     exit 1
                 fi
 
@@ -55,17 +55,17 @@ class MacUpdateApplicator : IUpdateApplicator {
 
                 # Copy new version
                 echo "Installing new version..."
-                cp -R /Volumes/AuraUpdate/AuraLauncher.app "$TARGET/"
+                cp -R /Volumes/NexiraUpdate/Nexira.app "$TARGET/"
 
                 # Unmount DMG
                 echo "Cleaning up..."
-                hdiutil detach /Volumes/AuraUpdate -quiet
+                hdiutil detach /Volumes/NexiraUpdate -quiet
                 rm -f "$INSTALLER"
 
                 # Relaunch
                 echo "Launching updated version..."
                 sleep 1
-                open "$TARGET/AuraLauncher.app"
+                open "$TARGET/Nexira.app"
 
                 # Cleanup script
                 rm -f "$SCRIPT"
@@ -95,12 +95,12 @@ class MacUpdateApplicator : IUpdateApplicator {
     }
 
     private fun resolveExecutable(): Path {
-        // .app/Contents/app/<jar>.jar  ->  .app/Contents/MacOS/AuraLauncher
+        // .app/Contents/app/<jar>.jar  ->  .app/Contents/MacOS/Nexira
         val classPath = System.getProperty("java.class.path")
         if (!classPath.isNullOrBlank()) {
             val jarPath = Paths.get(classPath.split(":").first()).toAbsolutePath()
             val contents = jarPath.parent?.parent
-            if (contents != null) return contents.resolve("MacOS").resolve("AuraLauncher")
+            if (contents != null) return contents.resolve("MacOS").resolve("Nexira")
         }
         error("Cannot resolve macOS launcher binary: java.class.path missing or not in expected .app/Contents/app/ layout")
     }

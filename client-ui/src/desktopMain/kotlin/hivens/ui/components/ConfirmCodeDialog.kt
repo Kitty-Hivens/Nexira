@@ -24,7 +24,7 @@ import hivens.ui.puppet.PuppetField
 import hivens.ui.theme.CelestiaTheme
 
 /**
- * Six-digit TOTP prompt for the second factor of the SmartyCraft login (#159).
+ * Six-digit TOTP prompt for the second factor of the SmartyCraft login.
  *
  * Pure presentation: filters input to digits only, caps at 6, surfaces an
  * inline error string supplied by the caller, disables the submit button

@@ -20,7 +20,7 @@ class DataDirMoverTest {
 
     @BeforeTest
     fun setup() {
-        workDir = Files.createTempDirectory("aura-mover-test-")
+        workDir = Files.createTempDirectory("nexira-mover-test-")
         confFile = workDir / "bootstrap.conf"
         source = workDir / "source"
         target = workDir / "target"
@@ -117,15 +117,15 @@ class DataDirMoverTest {
         DataDirMover.schedule(source, target, confFile)
         // Pre-populate target with unrelated data.
         Files.createDirectories(target)
-        Files.writeString(target / "stranger.txt", "this is not Aura's data")
+        Files.writeString(target / "stranger.txt", "this is not the launcher's data")
 
         DataDirMover.applyPending(confFile)
 
         // Source untouched
         assertTrue(Files.exists(source / "credentials.json"))
         // Target stranger file untouched
-        assertEquals("this is not Aura's data", Files.readString(target / "stranger.txt"))
-        // Aura files NOT copied into target (refused)
+        assertEquals("this is not the launcher's data", Files.readString(target / "stranger.txt"))
+        // Launcher files NOT copied into target (refused)
         assertFalse(Files.exists(target / "credentials.json"))
         // Pending cleared so we don't infinitely retry
         val conf = BootstrapConf.read(confFile)
@@ -141,21 +141,21 @@ class DataDirMoverTest {
         val pp = PlatformPaths(
             osName = "Linux",
             home = workDir,
-            env = { null }, // no AURA_DATA_DIR
+            env = { null }, // no NEXIRA_DATA_DIR
             bootstrapDataDir = { BootstrapConf.read(confFile)[BootstrapConf.KEY_DATA_DIR]?.let { java.nio.file.Paths.get(it) } },
         )
         assertEquals(custom, pp.dataDir)
     }
 
     @Test
-    fun `AURA_DATA_DIR env wins over bootstrap conf override`() {
+    fun `NEXIRA_DATA_DIR env wins over bootstrap conf override`() {
         BootstrapConf.write(mapOf(BootstrapConf.KEY_DATA_DIR to "/tmp/conf-side"), confFile)
         val envOverride = workDir / "env-side"
 
         val pp = PlatformPaths(
             osName = "Linux",
             home = workDir,
-            env = { if (it == "AURA_DATA_DIR") envOverride.toString() else null },
+            env = { if (it == "NEXIRA_DATA_DIR") envOverride.toString() else null },
             bootstrapDataDir = { BootstrapConf.read(confFile)[BootstrapConf.KEY_DATA_DIR]?.let { java.nio.file.Paths.get(it) } },
         )
         assertEquals(envOverride, pp.dataDir)

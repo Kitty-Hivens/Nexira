@@ -3,7 +3,6 @@ package hivens.launcher.di
 import hivens.config.Protocol
 import hivens.config.Storage
 import hivens.core.api.AuthService
-import hivens.core.api.interfaces.IServerProtocol
 import hivens.launcher.network.ChannelRouter
 import hivens.launcher.network.NetworkState
 import hivens.launcher.network.ServerProtocolConfig
@@ -15,6 +14,7 @@ import hivens.core.api.PlayerRepository
 import hivens.core.api.ServerRepository
 import hivens.core.api.SkinRepository
 import hivens.core.api.interfaces.*
+import hivens.core.security.IKeyringStorage
 import hivens.launcher.*
 import hivens.launcher.component.ClasspathProvider
 import hivens.launcher.component.EnvironmentPreparer
@@ -22,6 +22,7 @@ import hivens.launcher.component.GameCommandBuilder
 import hivens.launcher.component.ProcessLogHandler
 import hivens.launcher.launch.LauncherController
 import hivens.launcher.platform.PlatformPaths
+import hivens.launcher.security.KeyringStorageFactory
 import hivens.launcher.update.UpdateApplicators
 import hivens.launcher.update.UpdateService
 import io.ktor.client.*
@@ -31,14 +32,26 @@ import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
+import java.net.Authenticator
 import kotlinx.serialization.json.Json
+import okhttp3.Call
 import okhttp3.OkHttpClient
 import org.koin.core.module.dsl.singleOf
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
 import java.net.InetSocketAddress
+import java.net.PasswordAuthentication
 import java.net.Proxy
+import java.nio.file.Path
+import java.security.SecureRandom
+import java.security.cert.X509Certificate
 import java.util.concurrent.TimeUnit
+import javax.net.ssl.SSLContext
+import javax.net.ssl.SSLSocketFactory
+import javax.net.ssl.X509TrustManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 
 /**
  * Module responsible for network interaction.
@@ -73,12 +86,12 @@ val networkModule = module {
         // creds never leak to a third-party HTTP/HTTPS proxy that an unrelated
         // JVM caller might be talking to -- only this exact SOCKS host/port
         // gets answered.
-        java.net.Authenticator.setDefault(object : java.net.Authenticator() {
-            override fun getPasswordAuthentication(): java.net.PasswordAuthentication? {
+        Authenticator.setDefault(object : Authenticator() {
+            override fun getPasswordAuthentication(): PasswordAuthentication? {
                 if (requestorType != RequestorType.PROXY) return null
                 if (requestingHost != cfg.proxyHost) return null
                 if (requestingPort != cfg.proxyPort) return null
-                return java.net.PasswordAuthentication(cfg.proxyUser, cfg.proxyPass.toCharArray())
+                return PasswordAuthentication(cfg.proxyUser, cfg.proxyPass.toCharArray())
             }
         })
 
@@ -92,19 +105,19 @@ val networkModule = module {
     /**
      * Smartycraft insecure client (SSL verification disabled).
      * Registered only for the explicit "connect anyway" user flow.
-     * Never injected by default -- must be requested by named("insecure").
+     * Never injected by default -- must be requested by `named("insecure")`.
      *
-     * **Conduit Phase 4 audit (#157):** the default `HttpClientProvider`
-     * already returns this insecure client when `NetworkState.bypassFor()`
-     * is true (see the smartycraft `single<HttpClientProvider>` below),
-     * so a caller that has just granted bypass via `NetworkState.grantBypass()`
-     * can switch back to the regular `authService` and reach the same
-     * underlying transport. The named("insecure") chain (this client +
-     * its dependent ChannelRouter / IServerProtocol / IAuthService) is
-     * therefore redundant for the standard "Connect anyway" flow and is
-     * planned for removal in 2.2.14 once the UI call sites have been
-     * migrated. Until then it stays -- it remains useful as a one-shot
-     * insecure transport that doesn't require touching `NetworkState`.
+     * The default `HttpClientProvider` already returns this insecure
+     * client when `NetworkState.bypassFor()` is true (see
+     * `single<HttpClientProvider>` below), so a caller that has just
+     * granted bypass via `NetworkState.grantBypass()` can switch back
+     * to the regular `authService` and reach the same transport. The
+     * `named("insecure")` chain (this client + dependent ChannelRouter
+     * / IServerProtocol / IAuthService) is therefore redundant for the
+     * standard "Connect anyway" flow and is slated for removal once
+     * the UI call sites are migrated. Until then it stays -- still
+     * useful as a one-shot insecure transport that doesn't require
+     * touching `NetworkState`.
      */
     single<OkHttpClient>(named("insecure")) {
         val cfg: ServerProtocolConfig = get()
@@ -152,7 +165,7 @@ val networkModule = module {
      *
      * Pre-fix the provider always returned a proxy-only client regardless of
      * the user's force-proxy toggle, so `SkinManager` and `FileDownloadService`
-     * never honoured the setting -- the Settings switch only affected auth
+     * never honored the setting -- the Settings switch only affected auth
      * routing via ChannelRouter, while skin and client-file traffic stayed
      * pinned to the SOCKS hop. Users whose network couldn't reach
      * `proxy.smartycraft.ru:58613` saw login work (direct-first via
@@ -175,16 +188,6 @@ val networkModule = module {
     }
 
     /**
-     * Named insecure [HttpClientProvider] for [AuthService] -- always uses
-     * the insecure smartycraft client regardless of [NetworkState], because it
-     * is injected specifically for the "connect anyway" login retry path.
-     */
-    single<HttpClientProvider>(named("insecure")) {
-        val insecure = buildHttpClient(get<OkHttpClient>(named("insecure")), get())
-        HttpClientProvider { insecure }
-    }
-
-    /**
      * Direct-channel [HttpClientProvider]. Inject this (`named("direct")`)
      * for any outbound call that does NOT need to tunnel through the
      * SMARTYcraft proxy -- see routing notes in [HttpClientProvider].
@@ -192,6 +195,33 @@ val networkModule = module {
     single<HttpClientProvider>(named("direct")) {
         val direct = buildHttpClient(get<OkHttpClient>(named("direct")), get())
         HttpClientProvider { direct }
+    }
+
+    /**
+     * Smartycraft-routed `okhttp3.Call.Factory` for callers that consume the
+     * OkHttp call API directly (Coil's image fetcher today; no Ktor [HttpClient]
+     * adapter on its side). Mirrors the per-request channel decision the
+     * default smartycraft [HttpClientProvider] makes; both must agree, or
+     * Nexira's news strip and skin images would route differently from the
+     * auth / protocol traffic that uses [HttpClientProvider].
+     *
+     * Keeping the two implementations in one file makes the divergence
+     * surface concrete: any future change to the routing rule touches both
+     * adjacent registrations under one diff.
+     */
+    single<Call.Factory> {
+        val cfg: ServerProtocolConfig = get()
+        val direct   = get<OkHttpClient>(named("direct"))
+        val secure   = get<OkHttpClient>()
+        val insecure = get<OkHttpClient>(named("insecure"))
+        Call.Factory { request ->
+            val client = when {
+                NetworkState.bypassFor(cfg.sslBypassHost) -> insecure
+                NetworkState.forceProxyMode()             -> secure
+                else                                      -> direct
+            }
+            client.newCall(request)
+        }
     }
 
     // ── Conduit (network refactor) ──────────────────────────────────────────
@@ -239,11 +269,11 @@ val networkModule = module {
     // base URL change for Mirror development / test environments (gated by
     // ExperimentalConduitOverride opt-in inside the loader).
     single<ServerProtocolConfig> {
-        ServerProtocolConfigLoader(get()).load(get<java.nio.file.Path>())
+        ServerProtocolConfigLoader(get()).load(get<Path>())
     }
 
     single { LauncherHashCache(
-        dataDir = get<java.nio.file.Path>().toFile(),
+        dataDir = get<Path>().toFile(),
         router  = get<ChannelRouter>(),
         config  = get<ServerProtocolConfig>(),
     ) }
@@ -260,15 +290,12 @@ val networkModule = module {
         )
     }
 
-    // Repositories -- thin adapters over IServerProtocol post-Conduit Phase 1.
+    // Repositories -- thin adapters over IServerProtocol.
     single { ServerRepository(get<IServerProtocol>()) }
     single { SkinRepository(get<IServerProtocol>()) }
     single { PlayerRepository(get<IServerProtocol>()) }
 }
 
-/**
- * Module of the main components of the application.
- */
 val appModule = module {
     /**
      * Per-OS application paths. See [PlatformPaths] for layout.
@@ -280,7 +307,7 @@ val appModule = module {
      * subsystems (settings, profiles, credentials, downloaded clients,
      * skin cache, logs, crash reports) share one platform-correct root.
      */
-    single<java.nio.file.Path>(createdAtStart = true) { get<PlatformPaths>().dataDir }
+    single<Path>(createdAtStart = true) { get<PlatformPaths>().dataDir }
 
     /**
      * Crash report generator + dialog presenter. Main.kt constructs its
@@ -291,20 +318,19 @@ val appModule = module {
      */
     single { CrashReporter(get()) }
 
-    // Managers and services
-    //
-    // IKeyringStorage chosen at startup via KeyringStorageFactory.system()
-    // -- Linux libsecret on this platform, NoOp fallback elsewhere or when
-    // the daemon is unreachable. CredentialsManager handles the file-fallback
-    // path internally when keyring.store() returns false, so this single
-    // line wires both the happy path and the degraded path.
-    single<hivens.core.security.IKeyringStorage> {
-        hivens.launcher.security.KeyringStorageFactory.system()
+    // IKeyringStorage picked at startup via KeyringStorageFactory.system()
+    // -- libsecret on Linux, Credential Manager / DPAPI on Windows,
+    // Keychain on macOS, NoOp fallback when no daemon is reachable.
+    // CredentialsManager handles the file-fallback path internally when
+    // keyring.store() returns false, so this single line wires both
+    // the happy and the degraded path.
+    single<IKeyringStorage> {
+        KeyringStorageFactory.system()
     }
     single { CredentialsManager(get(), get(), get()) }
 
     single<ISettingsService> {
-        val dataDir: java.nio.file.Path = get()
+        val dataDir: Path = get()
         SettingsService(get(), dataDir.resolve(Storage.SETTINGS_FILE))
     }
 
@@ -312,21 +338,20 @@ val appModule = module {
     // mimicVersionOverride) into their respective global state holders
     // on Koin start. `createdAtStart = true` makes this run during
     // `startKoin { modules(...) }` so the values are live before the
-    // first protocol call -- previously done via a `KoinJavaComponent`
-    // escape hatch in `Main.kt`.
+    // first protocol call.
     single(createdAtStart = true) { SettingsRestoreHook(get()) }
 
     /**
-     * Process-lifetime coroutine scope for fire-and-forget background work
-     * (tray-launch flow, AutoSync, `LauncherController.launch`). SupervisorJob
-     * so a single failed child doesn't take down the rest. Previously two
-     * separate scopes existed (`Main.applicationScope` + LauncherController's
-     * own); unified so the JVM shutdown hook installed by
-     * [AppCoroutineScopeHook] cancels the same scope every coroutine lives on.
+     * Process-lifetime coroutine scope for fire-and-forget background
+     * work (tray-launch flow, AutoSync, `LauncherController.launch`).
+     * SupervisorJob so a single failed child doesn't take down the
+     * rest. Single shared scope across the whole launcher so the JVM
+     * shutdown hook installed by [AppCoroutineScopeHook] cancels every
+     * coroutine on process exit.
      */
-    single<kotlinx.coroutines.CoroutineScope>(createdAtStart = true) {
-        kotlinx.coroutines.CoroutineScope(
-            kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO
+    single<CoroutineScope>(createdAtStart = true) {
+        CoroutineScope(
+            SupervisorJob() + Dispatchers.IO
         )
     }
 
@@ -336,20 +361,19 @@ val appModule = module {
     single(createdAtStart = true) { AppCoroutineScopeHook(get()) }
 
     /**
-     * Launch-flow orchestrator. Used to live in `client-ui/logic/` while
-     * it still depended on UI types (i18n strings, console service);
-     * after the B1 decoupling (sub-batches 11.1-11.2) it consumes only
-     * `client-core` interfaces + the shared coroutine scope, so it now
-     * sits on the correct side of the module layering.
+     * Launch-flow orchestrator. Consumes only `client-core` interfaces
+     * + the shared coroutine scope, so it sits cleanly on the
+     * client-launcher side of the module layering -- no UI types
+     * (i18n strings, console service) leak in.
      */
     singleOf(::LauncherController)
 
     single {
-        val dataDir: java.nio.file.Path = get()
+        val dataDir: Path = get()
         ProtectedPaths(dataDir.resolve(Storage.PROTECTED_PATHS_FILE), get())
     }
     single {
-        val dataDir: java.nio.file.Path = get()
+        val dataDir: Path = get()
         ManifestCache(dataDir.resolve("manifest-cache"), get())
     }
     single<IFileDownloadService> { FileDownloadService(get(), get(), get(), get<ServerProtocolConfig>()) }
@@ -380,7 +404,7 @@ val appModule = module {
     single<IServerListService> { ServerListService(get(), get()) }
 
     single {
-        val dataDir: java.nio.file.Path = get()
+        val dataDir: Path = get()
         val profiles: ProfileManager = get()
         val credentials: CredentialsManager = get()
         AutoSyncService(
@@ -430,10 +454,7 @@ val appModule = module {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/**
- * Builds an [HttpClient] backed by the given [OkHttpClient].
- * Extracted to eliminate duplication between secure and insecure variants.
- */
+/** Wraps the given [OkHttpClient] in a Ktor [HttpClient] with our shared timeouts, headers, and JSON content-negotiation. */
 private fun buildHttpClient(okHttpInstance: OkHttpClient, json: Json): HttpClient =
     HttpClient(OkHttp) {
         engine { preconfigured = okHttpInstance }
@@ -457,17 +478,17 @@ private fun buildHttpClient(okHttpInstance: OkHttpClient, json: Json): HttpClien
  * Allows connecting to servers with expired certificates
  * when the user explicitly accepts the risk.
  */
-private fun buildTrustAllSsl(): Pair<javax.net.ssl.SSLSocketFactory, javax.net.ssl.X509TrustManager> {
-    val trustManager = object : javax.net.ssl.X509TrustManager {
+private fun buildTrustAllSsl(): Pair<SSLSocketFactory, X509TrustManager> {
+    val trustManager = object : X509TrustManager {
         override fun checkClientTrusted(
-            chain: Array<java.security.cert.X509Certificate>, authType: String
+            chain: Array<X509Certificate>, authType: String
         ) = Unit
         override fun checkServerTrusted(
-            chain: Array<java.security.cert.X509Certificate>, authType: String
+            chain: Array<X509Certificate>, authType: String
         ) = Unit
-        override fun getAcceptedIssuers(): Array<java.security.cert.X509Certificate> = emptyArray()
+        override fun getAcceptedIssuers(): Array<X509Certificate> = emptyArray()
     }
-    val ctx = javax.net.ssl.SSLContext.getInstance("TLS")
-    ctx.init(null, arrayOf(trustManager), java.security.SecureRandom())
+    val ctx = SSLContext.getInstance("TLS")
+    ctx.init(null, arrayOf(trustManager), SecureRandom())
     return ctx.socketFactory to trustManager
 }

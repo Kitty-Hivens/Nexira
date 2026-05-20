@@ -11,9 +11,9 @@ import java.lang.management.ThreadInfo
 import java.time.Instant
 
 /**
- * Read-only `/diag/...` endpoints that expose JVM internals + Aura's own
+ * Read-only `/diag/...` endpoints that expose JVM internals + Nexira's own
  * action ring as JSON, intended for AI / automated profiling rather than
- * human eyes. Pair with the existing UI-driving endpoints to drive Aura
+ * human eyes. Pair with the existing UI-driving endpoints to drive Nexira
  * through a deterministic reproduction (login -> click play) and then poll
  * `/diag/snapshot` at the freeze point to capture exactly which thread
  * holds what.
@@ -36,7 +36,7 @@ import java.time.Instant
  * **Response shape favors machine parsing over compactness.** Lock and
  * stack frame info is explicit-fielded rather than stringified so a
  * consumer can pivot by class/method/file without regex. Sizes for a
- * typical Aura process: threads ~200 KB, snapshot ~250 KB. Both fine on
+ * typical Nexira process: threads ~200 KB, snapshot ~250 KB. Both fine on
  * localhost.
  */
 private object DiagCollector {

@@ -61,10 +61,9 @@ fun BackgroundSettingsScreen(
     PuppetClick("background.reset") {
         settings = BackgroundSettings(); onSettingsChanged(settings)
     }
-    // Sliders are float-valued; PuppetField (string) doesn't fit naturally.
-    // Out of MVP scope -- a numeric setter shape can be added later if needed.
-    // Note: scale-mode + tint-color buttons reachable from in-process state,
-    // but selecting them by enum/hex name belongs in a follow-up.
+    // Puppet exposes only the binary controls here: PuppetField is string-typed
+    // so float sliders aren't reachable, and scale-mode / tint-color buttons
+    // require selecting by enum/hex name which has no puppet shape yet.
 
     Column(Modifier.fillMaxSize().padding(24.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {

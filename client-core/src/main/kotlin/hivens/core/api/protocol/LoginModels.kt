@@ -4,20 +4,17 @@ import hivens.core.data.FileManifest
 import kotlinx.serialization.Serializable
 
 /**
- * Request body for `action=login`. Unsigned (uses password MD5 in body).
+ * Request body for `action=login`. Unsigned (uses password MD5 in the
+ * body). All 12 fields are required -- server returns HTTP 500 on any
+ * absence. [classPath] and [rtCheckSum] are cargo-cult: server reads
+ * them but doesn't validate; pass any non-blank string.
  *
- * All 12 fields are required -- server returns HTTP 500 if any is absent
- * (verified empirically 2026-05-14). [classPath] and [rtCheckSum] are
- * cargo-cult -- server reads them but doesn't validate content; pass any
- * non-blank string.
+ * [password] must be `MD5(plaintext)` lowercase hex. No salt -- server
+ * stores passwords as plain MD5.
  *
- * [password] must be `MD5(plaintext)` lowercase hex. No salt -- server stores
- * passwords as plain MD5 (security posture documented in
- * `reference_smartycraft_community.md`).
- *
- * [session] is a client-generated random 32-char hex (UUID minus dashes
- * works fine). Persisted in subsequent server-side response as the AES-
- * encrypted session token.
+ * [session] is a client-generated random 32-char hex (UUID minus
+ * dashes works). The encrypted session token in the response continues
+ * the session via this value.
  */
 @Serializable
 data class LoginRequest(
@@ -36,18 +33,18 @@ data class LoginRequest(
 )
 
 /**
- * Response from `action=login`. Carries the full session needed to launch
- * the game and download files.
+ * Response from `action=login`. Carries the full session needed to
+ * launch the game and download files.
  *
- * - [uid]: 128-char hex (SHA-512-shaped). Used as input to all signed-action
- *   signatures. Treat as opaque -- never log raw, redact to first 8 chars when
- *   diagnostic context demands.
- * - [session]: Base64 of 32 bytes. AES-encrypted continuation token.
- *   Decrypts via key = first 16 chars of `MD5(uid + AUTH_SALT)`,
- *   `AES/ECB/PKCS5Padding`. We don't decrypt it -- pass through as-is to the
- *   game's `--accessToken` argument.
- * - [client]: file manifest the launcher must reconcile to local disk before
- *   game launch. [hivens.launcher.FileDownloadService] consumes this.
+ * - [uid]: 128-char hex (SHA-512-shaped). Input to all signed-action
+ *   signatures. Treat as opaque -- never log raw; redact to first 8
+ *   chars when diagnostic context demands.
+ * - [session]: Base64 of 32 bytes; AES-encrypted continuation token.
+ *   Decrypt via key = first 16 chars of `MD5(uid + AUTH_SALT)`,
+ *   `AES/ECB/PKCS5Padding`. We don't decrypt -- pass through to the
+ *   game's `--accessToken` argument as-is.
+ * - [client]: file manifest the launcher reconciles to local disk
+ *   before launch ([hivens.launcher.FileDownloadService] consumes it).
  */
 @Serializable
 data class LoginResponse(

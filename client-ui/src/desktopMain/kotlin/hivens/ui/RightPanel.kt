@@ -11,10 +11,7 @@ import hivens.ui.theme.CelestiaTheme
 /**
  * Right-side panel. Orchestrator only -- the auth panel (Loading /
  * Unauthenticated / Authenticated) and news feed live in their own files
- * (`LoginPanel.kt`, `AccountPanel.kt`, `CompactNewsFeed.kt`) after the
- * B5 god-file split. Keeps this file under 50 LOC so reading the right-
- * panel layout doesn't require scrolling through 800 lines of widget
- * internals.
+ * (`LoginPanel.kt`, `AccountPanel.kt`, `CompactNewsFeed.kt`).
  */
 @Composable
 fun RightPanel(

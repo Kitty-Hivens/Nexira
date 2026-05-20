@@ -49,6 +49,7 @@ import hivens.launcher.launch.LaunchState
 import hivens.launcher.launch.LauncherController
 import hivens.launcher.network.ServerProtocolConfig
 import hivens.ui.screens.ConsoleWindow
+import hivens.ui.screens.MigrationScreen
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.CustomTheme
 import hivens.ui.theme.ThemeManager
@@ -66,7 +67,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
-import okhttp3.OkHttpClient
+import okhttp3.Call
 import org.jetbrains.compose.resources.ExperimentalResourceApi
 import org.jetbrains.compose.resources.painterResource
 import org.koin.compose.koinInject
@@ -162,7 +163,7 @@ private fun setLinuxXToolkitAppClassName() {
 @OptIn(ExperimentalResourceApi::class)
 fun main() {
     // Resolve logs dir BEFORE any LoggerFactory.getLogger() call so
-    // logback.xml (which reads `${aura.logs.dir}` for its rolling-file
+    // logback.xml (which reads `${nexira.logs.dir}` for its rolling-file
     // appenders) sees the platform-correct path on its very first init.
     // PlatformPaths.system() is pure computation -- no logger init --
     // safe to call before the property is set. DataDirMover and
@@ -170,7 +171,7 @@ fun main() {
     // ordering works without their applyPending() / read() touching
     // logback first; see those files for the long-form rationale.
     val paths = PlatformPaths.system()
-    System.setProperty("aura.logs.dir", paths.logsDir.toString())
+    System.setProperty("nexira.logs.dir", paths.logsDir.toString())
 
     // NOW safe to apply any pending data-dir move scheduled from the
     // Settings UI. If user clicked "Move data directory" -> picker ->
@@ -191,9 +192,9 @@ fun main() {
     // so a multi-launch user dump can be sliced per process invocation
     // (`grep sessionId=abc12345 *.log`). System property (not MDC) because
     // MDC is thread-local, and we want this on every line from every thread --
-    // the logback pattern reads the property via `${aura.sessionId}`.
+    // the logback pattern reads the property via `${nexira.sessionId}`.
     val sessionId = UUID.randomUUID().toString().take(8)
-    System.setProperty("aura.sessionId", sessionId)
+    System.setProperty("nexira.sessionId", sessionId)
 
     // Beacon: the very first entry in the action ring -- handy when reading a
     // bundle to confirm what process / version / OS produced it.
@@ -211,7 +212,7 @@ fun main() {
     NetworkState.initialize(paths.dataDir.resolve("ssl-bypasses.json"))
 
     System.setProperty("skiko.fps.limit", "60")
-    // X11 WM_CLASS = "AuraLauncher". Stock OpenJDK derives WM_CLASS from
+    // X11 WM_CLASS = "Nexira". Stock OpenJDK derives WM_CLASS from
     // argv[0] and exposes no public knob to override it, so we reflect into
     // the package-private sun.awt.X11.XToolkit.awtAppClassName field before
     // the first window is created. See jvmArgs --add-opens in
@@ -244,14 +245,18 @@ fun main() {
         }
     }
 
-    // Single-instance lock acquired BEFORE migration. Two launchers started
-    // close together would otherwise both reach DataDirMigration.run() and
-    // race on REPLACE_EXISTING file copies. DataDirMigration's emptiness
-    // check is taught to ignore .lock / .show / .migrated so its first-run
-    // trigger still fires.
+    // Single-instance lock acquired BEFORE migration is consulted. Two
+    // launchers started close together would otherwise both render the
+    // MigrationScreen and race on file copies. DataDirMigration's
+    // emptiness check is taught to ignore .lock / .show / .migrated so
+    // its first-run trigger still fires.
     if (!SingleInstance.acquire(paths.dataDir)) exitProcess(0)
 
-    DataDirMigration.run(paths)
+    // Migration runs INSIDE Compose now, as a mandatory full-screen UI
+    // shown before AppRoot. The detection is read here once so the
+    // result is stable across recompositions; the actual copy and
+    // progress reporting happens in MigrationScreen.
+    val pendingMigration = DataDirMigration.detect(paths)
 
     // Two createdAtStart hooks registered in appModule fire here:
     //   - SettingsRestoreHook       -- replays persisted experimental overrides.
@@ -259,8 +264,9 @@ fun main() {
     //                                   the shared process-lifetime scope.
     // The shared CoroutineScope itself is also createdAtStart so the hook above
     // has a real instance to wire up, and LauncherController + tray-launch flow
-    // share the same scope (previously two scopes, only one of which was
-    // canceled on shutdown -- see B2 in the 2026-05-17 audit).
+    // share the same scope -- otherwise a tray-launched process can outlive
+    // the JVM shutdown signal because its launching coroutine isn't joined to
+    // the canceled scope.
     startKoin { modules(networkModule, appModule, uiModule) }
 
     // Puppet mode: opt-in localhost HTTP control surface for automated
@@ -272,7 +278,7 @@ fun main() {
     //      not contain the implementation at all -- ServiceLoader returns
     //      nothing, the loader falls back to NoOpPuppetServer.
     //   2. Runtime: even when the real impl IS on the classpath,
-    //      `startIfRequested()` only binds when `-Daura.puppet.port=N`
+    //      `startIfRequested()` only binds when `-Dnexira.puppet.port=N`
     //      is set as a JVM system property.
     // MUST run after Koin so PuppetRegistry-using Composables can resolve
     // their dependencies, and before `application` so the server is
@@ -303,10 +309,11 @@ fun main() {
 
         val settings = remember { settingsService.getSettings() }
 
-        // Window starts visible -- `startInTray` was retired in 2.2.14:
-        // it confused users (launcher invisible after first run) and
-        // had no clear use case. Tray is the dock-style fallback for
-        // close-while-game-running, not a launcher hide-by-default mode.
+        // Window starts visible. Tray is the dock-style fallback for
+        // close-while-game-running, not a launcher hide-by-default
+        // mode -- a start-in-tray toggle was tried and dropped; it
+        // confused users (launcher invisible after first run) without
+        // a clear use case.
         var isWindowVisible by remember { mutableStateOf(true) }
 
         var isDarkTheme   by remember { mutableStateOf(settings.isDarkTheme) }
@@ -425,14 +432,12 @@ fun main() {
                 // Tray failed to init -- restore the window so the user isn't
                 // stuck with no reachable UI. The scenario is:
                 //   - the user clicked the close button during the
-                //     INITIALIZING window (the close handler at the bottom
-                //     of this file uses canBeReady, not isSupported,
-                //      not isSupported, to avoid killing the launcher
-                //      mid-init). Same outcome -- window hidden, no tray
-                //      either. Without this restore the process keeps
-                //      running with no UI and the user has to kill it.
-                //   (Codex P1 from PR #131 -- the canBeReady-during-INIT
-                //   path needs this failure-path unhide.)
+                //     INITIALIZING window (the close handler at the
+                //     bottom of this file uses canBeReady, not
+                //     isSupported, to avoid killing the launcher
+                //     mid-init). Same outcome: window hidden, no tray
+                //     either. Without this restore the process keeps
+                //     running with no UI and the user has to kill it.
                 if (!TrayManager.isSupported && !isWindowVisible) {
                     isWindowVisible = true
                 }
@@ -506,13 +511,12 @@ fun main() {
                 // Fire-and-forget background sync of every installed pack.
                 // Gated by experimentalFeaturesEnabled master + autoSyncAllPacks
                 // child to match the rest of the experimental opt-ins. Runs on
-                // applicationScope so it survives composition resets but DOES
-                // get cancelled on JVM exit -- under the prior GlobalScope a
-                // user closing the launcher mid-sync left network/file handles
-                // open until the process truly died (#191). The service itself
-                // is a singleton and idempotent (will no-op on subsequent calls
-                // if already running -- TODO: enforce via in-flight flag once we
-                // add UI re-trigger).
+                // applicationScope so it survives composition resets but does
+                // get cancelled on JVM exit -- the alternative (GlobalScope)
+                // leaks network/file handles past window close until the
+                // process actually exits. The service itself is a singleton
+                // and idempotent (no-ops on subsequent calls while already
+                // running).
                 if (settings.experimentalFeaturesEnabled
                     && settings.autoSyncAllPacks
                     && dashboardServers.isNotEmpty()
@@ -536,11 +540,12 @@ fun main() {
                     // we'd have taken anyway (tray-hide if available, else exit).
                     af.requestCloseDialog {
                         if (TrayManager.canBeReady) {
-                            // canBeReady (not isSupported) so we don't kill the
-                            // launcher mid-init when dorkbox's GTK probe is
-                            // taking its time. If it ultimately fails, the user
-                            // can quit via tray (when it appears) or kill the
-                            // process -- strictly better than exiting on a close
+                            // canBeReady (not isSupported) so we don't kill
+                            // the launcher mid-init while the tray library
+                            // is still settling D-Bus / SNI handshake. If
+                            // it ultimately fails, the user can quit via
+                            // tray (when it appears) or kill the process --
+                            // strictly better than exiting on a close
                             // request the user clearly meant as "minimize".
                             isWindowVisible = false
                         } else {
@@ -573,41 +578,53 @@ fun main() {
                 }
 
                 CelestiaTheme(useDarkTheme = isDarkTheme, customTheme = customTheme) {
-                    AppRoot(
-                        onCloseApp = {
-                            val gameRunning = launchState is LaunchState.GameRunning
-                            if (gameRunning && TrayManager.canBeReady) {
-                                // Same canBeReady reasoning as the Window
-                                // onCloseRequest: don't pull the rug from
-                                // under a running game just because tray
-                                // init is still mid-flight.
-                                isWindowVisible = false
-                            } else {
-                                exitApplication()
+                    if (pendingMigration != null) {
+                        // Migration is mandatory: the screen does not return
+                        // to AppRoot on completion. The user clicks Quit and
+                        // relaunches; the next process sees the .migrated
+                        // marker and skips this branch.
+                        MigrationScreen(
+                            source = pendingMigration,
+                            target = paths.dataDir,
+                            onQuit = { exitApplication() },
+                        )
+                    } else {
+                        AppRoot(
+                            onCloseApp = {
+                                val gameRunning = launchState is LaunchState.GameRunning
+                                if (gameRunning && TrayManager.canBeReady) {
+                                    // Same canBeReady reasoning as the Window
+                                    // onCloseRequest: don't pull the rug from
+                                    // under a running game just because tray
+                                    // init is still mid-flight.
+                                    isWindowVisible = false
+                                } else {
+                                    exitApplication()
+                                }
+                            },
+                            onRealExit   = { exitApplication() },
+                            onHideToTray = if (TrayManager.canBeReady) {{ isWindowVisible = false }}
+                            else null,
+                            isDarkTheme          = isDarkTheme,
+                            onToggleDarkTheme    = {
+                                isDarkTheme = !isDarkTheme
+                                val current = settingsService.getSettings()
+                                settingsService.saveSettings(current.copy(isDarkTheme = isDarkTheme))
+                            },
+                            customTheme          = customTheme,
+                            onCustomThemeChanged = { newTheme ->
+                                customTheme = newTheme
+                                themeManager.saveTheme(newTheme)
+                            },
+                            currentLocale   = currentLocale,
+                            onLocaleChanged = { newLocale ->
+                                currentLocale = newLocale
+                                val current = settingsService.getSettings()
+                                settingsService.saveSettings(current.copy(locale = newLocale.tag))
                             }
-                        },
-                        onRealExit   = { exitApplication() },
-                        onHideToTray = if (TrayManager.canBeReady) {{ isWindowVisible = false }}
-                        else null,
-                        isDarkTheme          = isDarkTheme,
-                        onToggleDarkTheme    = {
-                            isDarkTheme = !isDarkTheme
-                            val current = settingsService.getSettings()
-                            settingsService.saveSettings(current.copy(isDarkTheme = isDarkTheme))
-                        },
-                        customTheme          = customTheme,
-                        onCustomThemeChanged = { newTheme ->
-                            customTheme = newTheme
-                            themeManager.saveTheme(newTheme)
-                        },
-                        currentLocale   = currentLocale,
-                        onLocaleChanged = { newLocale ->
-                            currentLocale = newLocale
-                            val current = settingsService.getSettings()
-                            settingsService.saveSettings(current.copy(locale = newLocale.tag))
-                        }
-                    )
-                    UpdateManager()
+                        )
+                        UpdateManager()
+                    }
                 }
             }
         }
@@ -635,27 +652,15 @@ fun AppRoot(
     val settingsService: ISettingsService      = koinInject()
     val dataDirectory: java.nio.file.Path      = koinInject()
     val json: Json                             = koinInject()
-    val httpClient: OkHttpClient               = koinInject()
     val insecureAuthService: IAuthService      = koinInject(named("insecure"))
     val protocolConfig: ServerProtocolConfig   = koinInject()
+    // Smartycraft-routed Call.Factory for Coil's image fetcher. The
+    // bypass / forceProxy / direct routing rule lives in Modules.kt
+    // alongside the same rule for the Ktor HttpClientProvider; both
+    // must agree or news / skin images would diverge from auth and
+    // protocol traffic on the same host.
+    val routingCallFactory: Call.Factory       = koinInject()
     val af = LocalAprilFools.current
-
-    // Mirror the smartycraft HttpClientProvider's per-request channel choice
-    // for Coil's image fetcher -- news images are served from www.smartycraft.ru
-    // alongside skins, so they have to honour the same forceProxyMode +
-    // SSL-bypass decisions or the user's toggle does nothing for the
-    // news strip. Each `newCall` re-reads NetworkState so the toggle
-    // takes effect immediately.
-    val directHttpClient: OkHttpClient   = koinInject(named("direct"))
-    val insecureHttpClient: OkHttpClient = koinInject(named("insecure"))
-    val routingCallFactory = okhttp3.Call.Factory { request ->
-        val client = when {
-            NetworkState.bypassFor(protocolConfig.sslBypassHost) -> insecureHttpClient
-            NetworkState.forceProxyMode()                        -> httpClient
-            else                                                  -> directHttpClient
-        }
-        client.newCall(request)
-    }
 
     setSingletonImageLoaderFactory { context ->
         ImageLoader.Builder(context)
@@ -672,7 +677,7 @@ fun AppRoot(
     val backgroundManager = remember { BackgroundManager(dataDirectory, json) }
     var backgroundSettings by remember { mutableStateOf(backgroundManager.load()) }
 
-    // ── Auto-login with offline mode support (#63) ────────────────────────
+    // ── Auto-login with offline mode support ──────────────────────────────
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
             val settings = settingsService.getSettings()

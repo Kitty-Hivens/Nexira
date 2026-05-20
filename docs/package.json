@@ -1,7 +1,6 @@
 {
-  "name": "aura-launcher-docs",
+  "name": "nexira-docs",
   "type": "module",
-  "need_update": "TODO: UPDATE ASTRO TO 6.1.10 FAST AS WE CAN",
   "version": "0.0.1",
   "scripts": {
     "dev": "astro dev",
@@ -9,10 +8,7 @@
     "preview": "astro preview"
   },
   "dependencies": {
-    "@astrojs/starlight": "0.32.6",
-    "astro": "^5.0.0"
-  },
-  "overrides": {
-    "@astrojs/sitemap": "3.2.1"
+    "@astrojs/starlight": "^0.39.2",
+    "astro": "^6.3.5"
   }
 }
