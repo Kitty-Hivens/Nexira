@@ -1,0 +1,14 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Nexira
+GenericName=Game Launcher
+Comment=Launch and manage SmartyCraft game servers
+Icon=nexira
+Exec=env BAMF_DESKTOP_FILE_HINT=%k nexira %U
+Terminal=false
+StartupNotify=true
+StartupWMClass=Nexira
+Categories=Game;
+MimeType=x-scheme-handler/nexira;
+Keywords=launcher;game;hivens;smartycraft;minecraft;

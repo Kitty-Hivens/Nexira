@@ -21,7 +21,7 @@ set -euo pipefail
 APP_VERSION="${1:?usage: $0 <version>}"
 DATE="${DATE:-$(date -u +%Y-%m-%d)}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-METAINFO="${METAINFO:-$ROOT/resources/io.github.kitty_hivens.nexira.metainfo.xml}"
+METAINFO="${METAINFO:-$ROOT/resources/dev.hivens.nexira.metainfo.xml}"
 REPO_BASE="${REPO_BASE:-https://github.com/Kitty-Hivens/Nexira}"
 DETAIL_URL="${REPO_BASE}/releases/tag/v${APP_VERSION}"
 
