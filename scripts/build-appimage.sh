@@ -107,10 +107,10 @@ cp "$ROOT/resources/icons/512x512.png" "$APPDIR/usr/share/icons/hicolor/512x512/
 cp "$ROOT/resources/icons/256x256.png" "$APPDIR/nexira.png"
 # Provide both filenames so appimagetool finds the AppStream metadata under
 # either of the two names it has historically searched.
-cp "$ROOT/resources/io.github.kitty_hivens.nexira.metainfo.xml" \
-   "$APPDIR/usr/share/metainfo/io.github.kitty_hivens.nexira.metainfo.xml"
-cp "$ROOT/resources/io.github.kitty_hivens.nexira.metainfo.xml" \
-   "$APPDIR/usr/share/metainfo/io.github.kitty_hivens.nexira.appdata.xml"
+cp "$ROOT/resources/dev.hivens.nexira.metainfo.xml" \
+   "$APPDIR/usr/share/metainfo/dev.hivens.nexira.metainfo.xml"
+cp "$ROOT/resources/dev.hivens.nexira.metainfo.xml" \
+   "$APPDIR/usr/share/metainfo/dev.hivens.nexira.appdata.xml"
 
 # ── 5. Build AppImage ───────────────────────────────────────────────────────
 ARCH="$ARCH" appimagetool "$APPDIR" "$OUTPUT"

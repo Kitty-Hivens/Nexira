@@ -348,7 +348,7 @@ jobs:
         run: desktop-file-validate resources/nexira.desktop
 
       - name: Validate AppStream metainfo
-        run: appstreamcli validate --pedantic resources/io.github.kitty_hivens.nexira.metainfo.xml
+        run: appstreamcli validate --pedantic resources/dev.hivens.nexira.metainfo.xml
 
       - name: Inject release entry into metainfo
         run: ./scripts/inject-metainfo-release.sh "$APP_VERSION"
