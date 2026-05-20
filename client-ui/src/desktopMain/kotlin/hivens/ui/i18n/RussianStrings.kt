@@ -343,6 +343,10 @@ object RussianStrings : AppStrings {
     override val auth2faInvalid         = "Неверный код. Попробуйте снова."
     override val auth2faExpired         = "Сессия 2FA истекла. Пожалуйста, войдите заново."
 
+    override val auth2faUnsupportedTitle   = "К сожалению, 2FA не работает"
+    override val auth2faUnsupportedBody    = "К сожалению, мы не можем поддерживать 2FA. Наши протоколы сильно отличаются от тех, что использует Smartycraft. У нас есть поддержка 2FA, но при попытке играть, у тебя просто полезут ошибки. Пожалуйста, отключи 2FA с аккаунта на сайте."
+    override val auth2faUnsupportedDismiss = "Понятно"
+
     // --- SSL Warning ---
     override val sslWarningTitle        = "Сертификат безопасности устарел"
     override val sslWarningBody         = "Сертификат сервера истёк. Соединение может быть небезопасным — данные передаются без проверки подлинности сервера. Продолжить на свой страх и риск?"
