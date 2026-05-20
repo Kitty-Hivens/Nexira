@@ -2,12 +2,12 @@
 <!--
     ─── Pulse — central logging configuration ────────────────────────────────
 
-    LOGS_DIR resolves from the system property `aura.logs.dir` set in
+    LOGS_DIR resolves from the system property `nexira.logs.dir` set in
     `hivens.ui.MainKt` BEFORE the first LoggerFactory.getLogger() call.
-    The property value comes from PlatformPaths.logsDir, so AURA_DATA_DIR
+    The property value comes from PlatformPaths.logsDir, so NEXIRA_DATA_DIR
     override and per-OS data-dir layout flow through automatically.
 
-    Falls back to `${java.io.tmpdir}/aura-launcher-fallback-logs/` if the
+    Falls back to `${java.io.tmpdir}/nexira-fallback-logs/` if the
     property is missing. The /tmp location is deliberate; the previous
     fallback was CWD-relative `logs/`, which silently polluted the project
     tree (39 MB of `client-ui/logs/` accumulated across 2026-03 to 2026-05
@@ -17,7 +17,7 @@
 
     Fallback hits should be impossible in normal runs because Main.main()
     sets the property as its first executable statement. If logs appear
-    under /tmp/aura-launcher-fallback-logs/, something is loading logback
+    under /tmp/nexira-fallback-logs/, something is loading logback
     before Main.main() runs; usually a static `private val log =
     LoggerFactory.getLogger(...)` at file scope in a Kotlin file loaded
     by JVM class init before main() (top-level file vals initialize on
@@ -56,8 +56,8 @@
     <conversionRule conversionWord="rex"
                     converterClass="hivens.ui.logging.RedactingThrowableConverter"/>
 
-    <property name="LOGS_DIR"   value="${aura.logs.dir:-${java.io.tmpdir}/aura-launcher-fallback-logs}"/>
-    <property name="SESSION_ID" value="${aura.sessionId:-?}"/>
+    <property name="LOGS_DIR"   value="${nexira.logs.dir:-${java.io.tmpdir}/nexira-fallback-logs}"/>
+    <property name="SESSION_ID" value="${nexira.sessionId:-?}"/>
 
     <!-- sessionId is process-wide (system property → logback variable interpolation
          at config-load time). launchId is per-game-launch (MDC, propagated through

@@ -34,16 +34,16 @@ class ManifestCache(
     private val log = LoggerFactory.getLogger(ManifestCache::class.java)
 
     /**
-     * The cached entry stores the manifest content alongside the integrity
-     * hash + timestamp. The hash + timestamp drive the [isClean] short-circuit
-     * for online sync; the manifest content is what [loadManifest] returns to
-     * recover the file list when launching offline (when `session.fileManifest`
-     * is null because auth was skipped).
+     * Cached entry: manifest content + integrity hash + timestamp.
+     * Hash + timestamp drive the [isClean] short-circuit for online
+     * sync; the manifest content is what [loadManifest] returns to
+     * recover the file list during offline launch (when
+     * `session.fileManifest` is null because auth was skipped).
      *
-     * `manifest` is nullable for backwards-compat with cache files written by
-     * launcher 2.2.9, which stored only the hash. Old cache files still work
-     * for the integrity check; offline fallback just won't have data until the
-     * next online sync re-populates the cache.
+     * `manifest` is nullable for backwards-compat with old cache files
+     * that stored only the hash. They still work for the integrity
+     * check; offline fallback just lacks data until the next online
+     * sync re-populates.
      */
     @Serializable
     data class Entry(
@@ -65,16 +65,16 @@ class ManifestCache(
     }
 
     /**
-     * @param diskSanityCheck called only when the cache is otherwise valid
-     *        (hash matches, within TTL). Returning false invalidates the
-     *        cache entry -- this is how callers gate the short-circuit on
-     *        actual on-disk state. Cheap by design: a handful of
-     *        Files.exists checks against the manifest's top entries are
-     *        enough to catch the bulk-loss cases (#184: data dir moved
-     *        but cache stayed; user `rm`'d the client dir; partial
-     *        restore-from-backup), without paying for a full MD5 walk.
-     *        Default no-op preserves the legacy contract for callers that
-     *        only need the hash + TTL gate.
+     * @param diskSanityCheck called only when the cache is otherwise
+     *        valid (hash matches, within TTL). Returning false
+     *        invalidates the cache entry -- this is how callers gate
+     *        the short-circuit on actual on-disk state. Cheap by
+     *        design: a handful of `Files.exists` checks against the
+     *        manifest's top entries are enough to catch bulk-loss
+     *        scenarios (data dir moved but cache stayed; user `rm`'d
+     *        the client dir; partial restore-from-backup) without
+     *        paying for a full MD5 walk. Default no-op preserves the
+     *        legacy contract for callers that only need hash + TTL.
      */
     fun isClean(
         serverId: String,

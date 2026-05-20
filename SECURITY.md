@@ -9,7 +9,7 @@
 
 ## Reporting a vulnerability
 
-Open a [GitHub Security Advisory](https://github.com/Kitty-Hivens/Aura-Launcher/security/advisories/new) or email the maintainer directly.
+Open a [GitHub Security Advisory](https://github.com/Kitty-Hivens/Nexira/security/advisories/new) or email the maintainer directly.
 
 Please include:
 - Affected version

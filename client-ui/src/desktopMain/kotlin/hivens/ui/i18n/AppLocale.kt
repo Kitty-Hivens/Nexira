@@ -50,13 +50,10 @@ val LocalStrings: ProvidableCompositionLocal<AppStrings> =
 // LocaleProvider -- wrap the whole app with this to propagate locale
 // ============================================================================
 //
-// `LocalStrings` (above) is the single source of truth for UI text. The B9
-// cleanup (2026-05-17) removed the prior `object I18n` mutable-global escape
-// hatch -- it had no thread-safety guarantees and was only needed because
-// LauncherController (now in `client-launcher`, pre-B1) read i18n outside
-// Compose. After B1 every consumer is @Composable; non-Composable lambdas
-// inside them use `rememberUpdatedState(LocalStrings.current)` to capture
-// a live snapshot. See `LaunchLogCollector` for the pattern.
+// `LocalStrings` (above) is the single source of truth for UI text.
+// Non-Composable lambdas inside Composables capture a live snapshot via
+// `rememberUpdatedState(LocalStrings.current)` -- see `LaunchLogCollector`
+// for the pattern.
 
 @Composable
 fun LocaleProvider(

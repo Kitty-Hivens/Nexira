@@ -10,4 +10,4 @@ This project follows the [Contributor Covenant v2.1](https://www.contributor-cov
 
 ## Enforcement
 
-Report issues by opening a [GitHub Security Advisory](https://github.com/Kitty-Hivens/Aura-Launcher/security/advisories/new) or contacting the maintainer directly.
+Report issues by opening a [GitHub Security Advisory](https://github.com/Kitty-Hivens/Nexira/security/advisories/new) or contacting the maintainer directly.

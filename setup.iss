@@ -1,9 +1,9 @@
 ; ============================================================================
-; Aura Launcher — Inno Setup 6 Script
+; Nexira — Inno Setup 6 Script
 ; https://jrsoftware.org/ishelp/
 ;
 ; Build:  iscc setup.iss /DAppVersion="1.3.0"
-; Silent: AuraLauncher-Setup.exe /SILENT /NORESTART
+; Silent: Nexira-Setup.exe /SILENT /NORESTART
 ; ============================================================================
 
 #ifndef AppVersion
@@ -20,10 +20,10 @@
   #define VersionInfo AppVersion
 #endif
 
-#define MyAppName      "Aura Launcher"
+#define MyAppName      "Nexira"
 #define MyAppPublisher "Hivens"
-#define MyAppURL       "https://github.com/Kitty-Hivens/Aura-Launcher"
-#define MyAppExeName   "AuraLauncher.exe"
+#define MyAppURL       "https://github.com/Kitty-Hivens/Nexira"
+#define MyAppExeName   "Nexira.exe"
 #define MyAppId        "30571060-3129-4503-b09e-716912389146"
 
 [Setup]
@@ -39,19 +39,19 @@ AppUpdatesURL={#MyAppURL}/releases
 
 ; ── Privileges ──────────────────────────────────────────────────────────────
 ; No UAC prompt — installs into %AppData% (Roaming) without admin rights.
-; User-generated data (clients, profiles, logs) lives separately in %LocalAppData%\AuraLauncher.
+; User-generated data (clients, profiles, logs) lives separately in %LocalAppData%\Nexira.
 ; The dialog option lets a power user elevate if they WANT a machine-wide install.
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
 
 ; ── Paths ───────────────────────────────────────────────────────────────────
-DefaultDirName={userappdata}\AuraLauncher
+DefaultDirName={userappdata}\Nexira
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 
 ; ── Output ──────────────────────────────────────────────────────────────────
 OutputDir=.
-OutputBaseFilename=AuraLauncher-Setup
+OutputBaseFilename=Nexira-Setup
 SetupIconFile=resources\icons\icon.ico
 
 ; ── Compression ─────────────────────────────────────────────────────────────
@@ -70,7 +70,7 @@ DisableReadyPage=no
 ; ── Uninstaller ─────────────────────────────────────────────────────────────
 UninstallDisplayName={#MyAppName}
 UninstallDisplayIcon={app}\{#MyAppExeName}
-; Do NOT auto-delete the user's game data in %LocalAppData%\AuraLauncher
+; Do NOT auto-delete the user's game data in %LocalAppData%\Nexira
 ; (or the legacy %UserProfile%\.aura directory). The user can remove it manually.
 CloseApplications=force
 CloseApplicationsFilter=*{#MyAppExeName}*
@@ -93,14 +93,14 @@ Name: "desktopicon"; \
 
 [Files]
 ; Entire app directory built by :client-ui:customJpackageImage (buildSrc's
-; aura.packaging convention plugin). Replaced the Compose Desktop
+; nexira.packaging convention plugin). Replaced the Compose Desktop
 ; createReleaseDistributable path in B-3 so we get the same flag surface
 ; (--strip-debug, --vm=server, --include-locales=en,ru,de, etc.) here
 ; that the AppImage path on Linux already has. Layout is identical from
-; Inno's perspective: AuraLauncher\ subdir with bin\AuraLauncher.exe,
-; lib\runtime\, lib\app\, so the trailing AuraLauncher\* glob and the
+; Inno's perspective: Nexira\ subdir with bin\Nexira.exe,
+; lib\runtime\, lib\app\, so the trailing Nexira\* glob and the
 ; {app}\{#MyAppExeName} references below stay correct.
-Source: "client-ui\build\customJpackageImage\AuraLauncher\*"; \
+Source: "client-ui\build\customJpackageImage\Nexira\*"; \
   DestDir: "{app}"; \
   Flags: ignoreversion recursesubdirs createallsubdirs
 
@@ -122,7 +122,7 @@ Filename: "{app}\{#MyAppExeName}"; \
 
 [UninstallDelete]
 ; Remove the install directory if empty after uninstall
-; (user data lives in %LocalAppData%\AuraLauncher, NOT touched here)
+; (user data lives in %LocalAppData%\Nexira, NOT touched here)
 Type: dirifempty; Name: "{app}"
 
 [Code]

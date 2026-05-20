@@ -51,7 +51,7 @@ object SkiaTracker {
  * Toggle visibility with [visible]. Keep out of release builds.
  */
 @Composable
-fun SkiaDebugOverlay( // TODO: rework, expand debug functionality to ui (Project Atelier)
+fun SkiaDebugOverlay(
     visible: Boolean = true,
     modifier: Modifier = Modifier
 ) {

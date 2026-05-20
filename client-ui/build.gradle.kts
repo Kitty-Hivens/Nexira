@@ -8,14 +8,14 @@ plugins {
     alias(libs.plugins.kotlin.compose.compiler)
     alias(libs.plugins.buildconfig)
     alias(libs.plugins.kotlin.serialization)
-    // aura.packaging: convention plugin from buildSrc/ that owns the
+    // nexira.packaging: convention plugin from buildSrc/ that owns the
     // jlink + jpackage tasks for distribution builds. Currently registers
     // `:client-ui:customRuntime` only -- the jpackage path lands in a
     // follow-up commit. Source of truth for jlink flags lives in the
     // `packaging { jlink { ... } }` block below; AppImage shell script
     // consumes the same values via a generated profile fragment (also
     // follow-up).
-    id("aura.packaging")
+    id("nexira.packaging")
 }
 
 group = "hivens"
@@ -80,7 +80,7 @@ kotlin {
 
         // Puppet HTTP control surface (hivens.ui.puppet.RealPuppetServer +
         // META-INF/services descriptor). Source dir + Ktor server deps are
-        // added to the desktop compilation ONLY when `-PauraPuppetPort=N`
+        // added to the desktop compilation ONLY when `-PnexiraPuppetPort=N`
         // is on the Gradle command line; default production builds do not
         // contain RealPuppetServer or any of the Ktor server classes it
         // requires. Discovery is via Java SPI -- see PuppetServerLifecycle
@@ -88,7 +88,7 @@ kotlin {
         //
         // CIO engine chosen over Netty for footprint (~2.5 MB vs ~9 MB);
         // we only need a half-dozen localhost endpoints.
-        if (providers.gradleProperty("auraPuppetPort").isPresent) {
+        if (providers.gradleProperty("nexiraPuppetPort").isPresent) {
             desktopMain.kotlin.srcDir("src/desktopPuppetMain/kotlin")
             desktopMain.resources.srcDir("src/desktopPuppetMain/resources")
             desktopMain.dependencies {
@@ -117,7 +117,7 @@ buildConfig {
     packageName("hivens.ui")
     buildConfigField("String", "FORK_VERSION",    "\"${project.version}\"")
     buildConfigField("long",   "BUILD_TIME",      "${gitCommitTimeMillis}L")
-    buildConfigField("String", "APP_NAME",        "\"Aura Launcher\"")
+    buildConfigField("String", "APP_NAME",        "\"Nexira\"")
     buildConfigField("String", "COMPOSE_VERSION", "\"${libs.versions.compose.get()}\"")
     buildConfigField("String", "KTOR_VERSION",    "\"${libs.versions.ktor.get()}\"")
     buildConfigField("String", "KOIN_VERSION",    "\"${libs.versions.koin.get()}\"")
@@ -145,7 +145,7 @@ compose.desktop {
             // Shrinker: ProGuard 7.8.2, configured via compose-desktop.pro.
             // optimize=true enables the optimization passes declared in the
             // .pro file; obfuscate=false keeps stack traces / class names
-            // readable in crash reports (Aura is GPL, hiding names earns nothing).
+            // readable in crash reports (Nexira is GPL, hiding names earns nothing).
             // The `version.set(...)` pin ties ProGuard to the libs catalog
             // entry so a Compose-MP bump cannot silently drift the shrinker.
             buildTypes.release.proguard {
@@ -156,12 +156,12 @@ compose.desktop {
                 version.set(libs.versions.proguard.get())
             }
 
-            packageName = "AuraLauncher"
+            packageName = "Nexira"
 
             // jpackage expects a strictly numeric VersionInfoVersion: MAJOR.MINOR
             // [.BUILD[.REVISION]], digits only, no pre-release suffix. Our git
-            // tags follow `v<semver>[-<suffix>]` convention (e.g. v2.2.14-rc1,
-            // v2.2.14), so:
+            // tags follow `v<semver>[-<suffix>]` convention (e.g. `v2.4.0-rc1`,
+            // `v2.4.0`), so:
             //   1. Strip the leading "v" if present (tag invocation forces it,
             //      manual -PappVersion overrides may or may not).
             //   2. Drop everything from the first "-" (rc / beta / dirty suffix).
@@ -174,7 +174,7 @@ compose.desktop {
             val cleanVersion = project.version.toString().removePrefix("v").substringBefore("-")
             val safeVersion = if (cleanVersion.matches(Regex("\\d+\\.\\d+.*"))) cleanVersion else "1.0.0"
             packageVersion = safeVersion
-            description = "Aura Launcher v${project.version} (unofficial)"
+            description = "Nexira v${project.version} (unofficial)"
             copyright = "© 2026 Hivens"
             vendor = "Hivens"
 
@@ -208,7 +208,7 @@ compose.desktop {
 
             windows {
                 upgradeUuid = "30571060-3129-4503-b09e-716912389146"
-                menuGroup = "Aura Launcher"
+                menuGroup = "Nexira"
                 shortcut = true
                 dirChooser = true
                 iconFile.set(rootProject.file("resources/icons/icon.ico"))
@@ -226,8 +226,8 @@ compose.desktop {
                 // Reverse-DNS of the hivens.dev apex (was com.hivens.* by
                 // accident in earlier versions -- domain is hivens.dev, so
                 // the leftmost component must be `dev`).
-                bundleID = "dev.hivens.auralauncher"
-                dockName = "Aura Launcher"
+                bundleID = "dev.hivens.nexira"
+                dockName = "Nexira"
                 // Without iconFile, jpackage falls back to the default
                 // Compose/Kotlin "K + folder" placeholder. Regenerate via
                 // `png2icns` (libicns package) from the same source PNGs
@@ -242,8 +242,8 @@ compose.desktop {
         jvmArgs(
             // Linux window-manager identity. Main.kt reflects into
             // sun.awt.X11.XToolkit.awtAppClassName before the first window is
-            // created so the X11 WM_CLASS hint matches StartupWMClass=AuraLauncher
-            // in resources/aura-launcher.desktop. KDE / Hyprland / GNOME associate
+            // created so the X11 WM_CLASS hint matches StartupWMClass=Nexira
+            // in resources/nexira.desktop. KDE / Hyprland / GNOME associate
             // the live window with the .desktop entry on that match and pick up
             // the hicolor icon at the size the compositor actually wants. The
             // --add-opens below is what allows the reflection. Stock OpenJDK
@@ -271,7 +271,7 @@ compose.desktop {
 
             // No JIT-level lock. The previous block here set TieredStopAtLevel=1
             // (cap at C1, no C2) plus an explicit +TieredCompilation (already the
-            // HotSpot default since Java 8). The cap was wrong for Aura's shape:
+            // HotSpot default since Java 8). The cap was wrong for Nexira's shape:
             // launcher sessions are long-running (multi-minute downloads + game
             // launch + tray idle), Compose recompose is hot, file verify + jdk
             // extract are CPU-bound. C2 compilation pays for itself many times
@@ -284,15 +284,15 @@ compose.desktop {
             "-XX:MaxMetaspaceSize=256m",
             "-XX:ReservedCodeCacheSize=128m",
 
-            // Security — libtray's Panama bindings need access to native
-            // memory + downcall stubs. Same flag also enables the
-            // macOS keyring + libsecret bindings shipped in 2.2.13.
+            // Security — libtray's Panama bindings need native memory +
+            // downcall stubs. Same flag also enables the macOS keyring
+            // and Linux libsecret bindings.
             "--enable-native-access=ALL-UNNAMED",
 
             // Puppet mode (hivens.ui.puppet.PuppetServer) -- opt-in HTTP
             // control surface for CLI-driven UI testing. Activated when
-            // the launcher is run with `-PauraPuppetPort=N` (forwarded
-            // into the JVM as -Daura.puppet.port=N). Without the property
+            // the launcher is run with `-PnexiraPuppetPort=N` (forwarded
+            // into the JVM as -Dnexira.puppet.port=N). Without the property
             // the puppet server's startIfRequested() is a no-op.
             //
             // providers.gradleProperty(...) over project.findProperty(...):
@@ -300,8 +300,8 @@ compose.desktop {
             // cache, so a property flip invalidates correctly; findProperty
             // bypasses the cache hook and bakes the value in on first
             // config-resolve.
-            *(providers.gradleProperty("auraPuppetPort").orNull
-                ?.let { arrayOf("-Daura.puppet.port=$it") }
+            *(providers.gradleProperty("nexiraPuppetPort").orNull
+                ?.let { arrayOf("-Dnexira.puppet.port=$it") }
                 ?: emptyArray())
         )
     }
@@ -313,13 +313,13 @@ compose.resources {
     generateResClass = always
 }
 
-// Aura's distribution-build profile. Single source of truth: the gradle
+// Nexira's distribution-build profile. Single source of truth: the gradle
 // `customRuntime` task consumes these values, and (in a follow-up commit)
 // the AppImage shell script will read them from a generated profile
 // fragment. Mirror of what scripts/build-appimage.sh currently hardcodes;
 // once the emitter task lands, the hardcode goes away.
 packaging {
-    appName.set("AuraLauncher")
+    appName.set("Nexira")
     mainClass.set("hivens.ui.MainKt")
 
     // jpackage's `--app-version` is strict-digits (MAJOR.MINOR[.BUILD[.REVISION]],
@@ -347,7 +347,7 @@ packaging {
     // jvmArgs baked into the jpackage launcher script via repeated
     // --java-options. Same set as compose.desktop.application.jvmArgs
     // above (still authoritative until B-3 retires that block).
-    // AURA_WAYLAND_TRIAL flow is gone (Liberica swap commit e573318);
+    // NEXIRA_WAYLAND_TRIAL flow is gone (Liberica swap commit e573318);
     // -Dawt.appClassName is JBR-only honour, dropped in the same
     // commit; jna.nosys was a dorkbox/JBR rudiment, also dropped.
     jvmArgs.set(listOf(
@@ -369,7 +369,7 @@ packaging {
 
     windowsIcon.set(rootProject.file("resources/icons/icon.ico"))
     macosIcon.set(rootProject.file("resources/icons/icon.icns"))
-    macosPackageIdentifier.set("dev.hivens.auralauncher")
+    macosPackageIdentifier.set("dev.hivens.nexira")
 
     jlink {
         // compress unset: inner zip-9 leaves outer compressors less to work
@@ -384,32 +384,31 @@ packaging {
 }
 
 // Kotlin compiler options for every JVM compile task in client-ui.
+// freeCompilerArgs split into "always on" and "opt-in" groups.
 //
-// freeCompilerArgs are split into "always on" and "opt-in" groups.
+// Flags explicitly NOT set (worth recording so they don't creep back in):
 //
-// Removed 2026-05-17 (audit chunk 2 item #26) and worth recording why so
-// they do not creep back in:
+//   * `-Xinline-classes` -- deprecated since value classes stabilized
+//     (Kotlin 1.5+). Today the compiler treats it as no-op-or-warning.
 //
-//   * -Xinline-classes : deprecated since the value-classes language feature
-//     stabilized (Kotlin 1.5+). Compiler treats it as no-op-or-warning today.
+//   * `-Xno-param-assertions / -Xno-call-assertions / -Xno-receiver-assertions`
+//     -- strip Kotlin's generated nullability runtime checks. Trades
+//     a handful of microseconds per call for a deep-stack NPE whenever
+//     a non-null contract is violated, instead of an
+//     IllegalArgumentException pointing at the boundary. Launcher
+//     workloads aren't hot enough for the microseconds to matter and
+//     contract-violation triage suffers a lot from the masked failure
+//     mode; throw-on-boundary wins.
 //
-//   * -Xno-param-assertions / -Xno-call-assertions / -Xno-receiver-assertions :
-//     strip Kotlin's generated nullability runtime checks. Trades a handful
-//     of microseconds per call for a deep-stack NullPointerException whenever
-//     a non-null contract is violated, instead of an IllegalArgumentException
-//     pointing at the boundary. Launcher workloads are nowhere near hot enough
-//     for the micros to matter and contract-violation triage suffers a lot
-//     from the masked failure mode; the throw-on-boundary side wins.
-//
-// The Compose-compiler metrics + reports flags are now opt-in via
-// `-PauraComposeMetrics=true`. They write per-compile files into
-// build/compose_metrics and build/compose_reports, which is useful for
+// Compose-compiler metrics + reports are opt-in via
+// `-PnexiraComposeMetrics=true`. They write per-compile files into
+// `build/compose_metrics` and `build/compose_reports`, useful for
 // recomposition audits but wasted IO on every regular compile.
 tasks.withType<KotlinJvmCompile>().configureEach {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_25)
 
-        val composeMetricsEnabled = providers.gradleProperty("auraComposeMetrics")
+        val composeMetricsEnabled = providers.gradleProperty("nexiraComposeMetrics")
             .map { it == "true" }.orElse(false).get()
         val buildDirAbsolute = layout.buildDirectory.get().asFile.absolutePath
 
@@ -445,14 +444,13 @@ tasks.withType<KotlinJvmCompile>().configureEach {
 
 // Jar packaging.
 //
-// Removed 2026-05-17 (audit chunk 2 item #27):
-//   exclude("**/*.kotlin_metadata"), exclude("**/*.kotlin_builtins").
-//   Stripping those breaks reflection on our own classes -- kotlin-reflect
-//   (which is on the runtime classpath at 3 MB), sealed-class enumeration,
-//   KClass.members, and kotlinx.serialization runtime fallback paths all
-//   read .kotlin_metadata for type information. The size win was kilobytes
-//   per jar against the risk of silent runtime reflection breakage that
-//   would only show up in production -- not a trade worth making.
+// We do NOT exclude `**/*.kotlin_metadata` / `**/*.kotlin_builtins` --
+// stripping those breaks reflection on our own classes: kotlin-reflect
+// (3 MB on the runtime classpath), sealed-class enumeration,
+// `KClass.members`, and kotlinx.serialization runtime fallback paths
+// all read `.kotlin_metadata` for type information. Saves kilobytes
+// per jar at the cost of silent runtime reflection breakage in
+// production -- not a trade worth making.
 tasks.withType<Jar>().configureEach {
     // Signed-JAR manifest metadata: not relevant; we ship unsigned and
     // jpackage / Inno Setup handle authenticode on their own envelope.
@@ -499,6 +497,6 @@ tasks.register<Zip>("packageWindowsPortableZip") {
     dependsOn("createReleaseDistributable")
 
     from(layout.buildDirectory.dir("compose/binaries/main-release/app"))
-    archiveFileName.set("AuraLauncher-${project.version}-Windows-Portable.zip")
+    archiveFileName.set("Nexira-${project.version}-Windows-Portable.zip")
     destinationDirectory.set(layout.buildDirectory.dir("compose/binaries/main-release"))
 }

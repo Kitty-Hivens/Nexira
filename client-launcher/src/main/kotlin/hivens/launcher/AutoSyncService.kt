@@ -72,11 +72,9 @@ class AutoSyncService(
     }
 
     /**
-     * Single observable view -- per-server lifecycle map paired with the
-     * aggregate progress. Collapsed from two StateFlows into one because
-     * dashboard consumers always need both together (badges + progress
-     * strip), and the prior two-flow shape forced an extra `collectAsState`
-     * subscription with no separation-of-concerns benefit.
+     * Single observable view -- per-server lifecycle map paired with
+     * the aggregate progress. One snapshot because dashboard consumers
+     * always need both together (badges + progress strip).
      */
     data class Snapshot(
         val perServer: Map<String, ServerState>,
@@ -143,20 +141,20 @@ class AutoSyncService(
                 totalBytes = 0,
             ))
 
-            // Try to obtain a SessionData for this server. Four outcomes:
+            // Try to obtain a SessionData. Four outcomes:
             //   * regular login -> use that session directly
             //   * 2FA gate WITH cached manifest -> use cached creds + manifest
-            //   * 2FA gate WITHOUT cached manifest -> mark SKIPPED (not failed)
-            //     and move on. This isn't a failure -- the account just hasn't
-            //     been through 2FA on this machine for this server yet, so
-            //     we have nothing to sync against. Red FAILED would imply
-            //     "server is broken"; SKIPPED reads as "awaiting user action".
-            //   * any other login throw (network, server reject, etc.) ->
-            //     mark FAILED for this server and continue. Pre-refactor
-            //     the outer runCatching covered everything; the refactor
-            //     split login + processSession, so non-2FA throws need
-            //     their own catch -- without it a single login exception
-            //     terminates syncAll for every later server.
+            //   * 2FA gate WITHOUT cached manifest -> mark SKIPPED
+            //     (not failed). The account just hasn't been through
+            //     2FA on this machine for this server yet, so we have
+            //     nothing to sync against. Red FAILED would read
+            //     "server is broken"; SKIPPED reads "awaiting user
+            //     action".
+            //   * any other login throw (network, server reject) ->
+            //     mark FAILED for this server and continue. Each
+            //     server needs its own catch; without it a single
+            //     login exception terminates syncAll for every later
+            //     server in the queue.
             var sessionFailed = false
             val session: SessionData? = try {
                 authService.login(creds.playerName, pass, server.assetDir)

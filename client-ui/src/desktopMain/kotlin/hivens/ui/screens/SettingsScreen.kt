@@ -15,12 +15,18 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.unit.TextUnitType
 import hivens.config.Branding
 import hivens.config.ExperimentalProtocolOverride
 import hivens.config.Protocol
 import hivens.core.api.interfaces.ISettingsService
+import hivens.core.data.SettingsData
+import hivens.core.diag.ActionRing
 import hivens.launcher.diag.DiagnosticBundle
+import hivens.launcher.diag.IssueReporter
 import hivens.launcher.network.NetworkState
+import hivens.launcher.platform.DataDirMover
 import hivens.launcher.platform.PlatformPaths
 import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.PlatformFile
@@ -40,7 +46,17 @@ import hivens.ui.puppet.PuppetToggle
 import hivens.ui.theme.CelestiaTheme
 import org.koin.compose.koinInject
 import hivens.ui.utils.SystemActions
+import java.awt.Toolkit
+import java.awt.datatransfer.StringSelection
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.Paths
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
+import kotlin.system.exitProcess
 import kotlin.time.Duration.Companion.milliseconds
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 
 @Composable
 fun SettingsScreen(
@@ -60,19 +76,7 @@ fun SettingsScreen(
     val af = LocalAprilFools.current
 
     val initialSettings        = remember { settingsService.getSettings() }
-    var closeAfterStart        by remember { mutableStateOf(initialSettings.closeAfterStart) } // TODO: Duplicate
-    var isOfflineMode          by remember { mutableStateOf(initialSettings.isOfflineMode) }
-    var experimentalEnabled    by remember { mutableStateOf(initialSettings.experimentalFeaturesEnabled) }
-    var mandatoryUpdates       by remember { mutableStateOf(initialSettings.mandatoryUpdatesEnabled) }
-    var prereleaseChannel      by remember { mutableStateOf(initialSettings.prereleaseChannelEnabled) } // TODO: Duplicate
-    var autoSyncAllPacks       by remember { mutableStateOf(initialSettings.autoSyncAllPacks) }
-    var jvmBuilderEnabled      by remember { mutableStateOf(initialSettings.jvmBuilderEnabled) }
-    var forceProxyMode         by remember { mutableStateOf(initialSettings.forceProxyMode) }
-    // Mimic-version override -- gated by experimentalEnabled. The toggle is
-    // derived from "is there a persisted non-blank override" so reopening
-    // Settings on the next launch reflects the actually-applied state.
-    var mimicOverrideEnabled   by remember { mutableStateOf(!initialSettings.mimicVersionOverride.isNullOrBlank()) }
-    var mimicVersionText       by remember { mutableStateOf(initialSettings.mimicVersionOverride ?: "") }
+    val form                   = remember { SettingsFormState(initialSettings) }
     var langDropdownExpanded   by remember { mutableStateOf(false) }
     var showSavedMessage       by remember { mutableStateOf(false) }
 
@@ -82,35 +86,17 @@ fun SettingsScreen(
     var showAprilDebug by remember { mutableStateOf(false) }
 
     fun save() {
-        // Normalise the override to null when disabled or blank -- the
-        // SettingsData contract is "null/blank means use default", so storing
-        // a stale value with the toggle off would silently re-arm on next
-        // launch via the Main.kt restore block.
-        val normalisedMimic = if (mimicOverrideEnabled) mimicVersionText.trim().ifBlank { null } else null
-
-        val current = settingsService.getSettings()
-        settingsService.saveSettings(
-            current.copy(
-                closeAfterStart             = closeAfterStart,
-                isOfflineMode               = isOfflineMode,
-                experimentalFeaturesEnabled = experimentalEnabled,
-                mandatoryUpdatesEnabled     = mandatoryUpdates,
-                prereleaseChannelEnabled    = prereleaseChannel,
-                autoSyncAllPacks            = autoSyncAllPacks,
-                jvmBuilderEnabled           = jvmBuilderEnabled,
-                forceProxyMode              = forceProxyMode,
-                mimicVersionOverride        = normalisedMimic,
-            )
-        )
+        val toPersist = form.mergeInto(settingsService.getSettings())
+        settingsService.saveSettings(toPersist)
         // Mirror to NetworkState so ChannelRouter sees it on the very next
         // request without waiting for launcher restart.
-        NetworkState.setForceProxyMode(forceProxyMode)
+        NetworkState.setForceProxyMode(form.forceProxyMode)
         // Apply the mimic-version override immediately so the next protocol
         // handshake picks it up. Without this the user would have to restart
         // for the change to take effect, even though the system property
         // mechanism Protocol.MIMIC_LAUNCHER_VERSION reads is live.
         @OptIn(ExperimentalProtocolOverride::class)
-        Protocol.setMimicLauncherVersion(normalisedMimic)
+        Protocol.setMimicLauncherVersion(toPersist.mimicVersionOverride)
         showSavedMessage = true
     }
 
@@ -264,10 +250,10 @@ fun SettingsScreen(
                     SettingsSectionTitle(s.settingsSectionBehavior)
                     SettingsSwitchRow(
                         title           = s.settingsCloseAfterLaunch,
-                        checked         = closeAfterStart,
-                        onCheckedChange = { closeAfterStart = it; save() }
+                        checked         = form.closeAfterStart,
+                        onCheckedChange = { form.closeAfterStart = it; save() }
                     )
-                    PuppetToggle("settings.closeAfterStart", closeAfterStart) { closeAfterStart = it; save() }
+                    PuppetToggle("settings.closeAfterStart", form.closeAfterStart) { form.closeAfterStart = it; save() }
 
                     Spacer(Modifier.height(16.dp))
 
@@ -277,7 +263,7 @@ fun SettingsScreen(
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(12.dp))
                             .background(
-                                if (isOfflineMode) CelestiaTheme.colors.error.copy(alpha = 0.08f)
+                                if (form.isOfflineMode) CelestiaTheme.colors.error.copy(alpha = 0.08f)
                                 else CelestiaTheme.colors.background.copy(alpha = 0.4f)
                             )
                             .padding(16.dp),
@@ -288,7 +274,7 @@ fun SettingsScreen(
                             Icon(
                                 Icons.Default.WifiOff,
                                 null,
-                                tint = if (isOfflineMode) CelestiaTheme.colors.error else CelestiaTheme.colors.textSecondary,
+                                tint = if (form.isOfflineMode) CelestiaTheme.colors.error else CelestiaTheme.colors.textSecondary,
                                 modifier = Modifier.size(24.dp)
                             )
                             Spacer(Modifier.width(16.dp))
@@ -306,37 +292,36 @@ fun SettingsScreen(
                             }
                         }
                         Switch(
-                            checked = isOfflineMode,
-                            onCheckedChange = { isOfflineMode = it; save() },
+                            checked = form.isOfflineMode,
+                            onCheckedChange = { form.isOfflineMode = it; save() },
                             colors = SwitchDefaults.colors(
                                 checkedThumbColor = CelestiaTheme.colors.error,
                                 checkedTrackColor = CelestiaTheme.colors.error.copy(alpha = 0.5f)
                             )
                         )
-                        PuppetToggle("settings.offlineMode", isOfflineMode) { isOfflineMode = it; save() }
+                        PuppetToggle("settings.offlineMode", form.isOfflineMode) { form.isOfflineMode = it; save() }
                     }
                 }
 
                 // ── Network ───────────────────────────────────────────────────
                 //
-                // Currently surfaces just the SSL-bypass list (Vault #2 followup).
-                // Future: proxy override, channel routing toggles, etc. live
-                // here under one section so users have a single place to look
-                // for "things that affect how Aura talks to the network".
+                // Single section grouping for "things that affect how Nexira
+                // talks to the network" (SSL bypasses, proxy toggles, etc.) so
+                // users have one place to look.
                 item {
                     SettingsSectionTitle(s.settingsSectionNetwork)
 
                     // Live snapshot -- re-reads every 1s. Sufficient for a
                     // settings screen (no rapid-fire updates expected). Avoids
                     // setting up a Flow purely for this single read site.
-                    val bypasses = androidx.compose.runtime.produceState(initialValue = hivens.launcher.network.NetworkState.listBypasses()) {
+                    val bypasses = produceState(initialValue = NetworkState.listBypasses()) {
                         while (true) {
-                            value = hivens.launcher.network.NetworkState.listBypasses()
-                            kotlinx.coroutines.delay(1_000.milliseconds)
+                            value = NetworkState.listBypasses()
+                            delay(1_000.milliseconds)
                         }
                     }.value
-                    val dateFormatter = java.time.format.DateTimeFormatter
-                        .ofLocalizedDateTime(java.time.format.FormatStyle.MEDIUM)
+                    val dateFormatter = DateTimeFormatter
+                        .ofLocalizedDateTime(FormatStyle.MEDIUM)
                         .withZone(java.time.ZoneId.systemDefault())
 
                     Column(
@@ -381,10 +366,10 @@ fun SettingsScreen(
                                     }
                                     OutlinedButton(
                                         onClick = {
-                                            hivens.core.diag.ActionRing.record(
+                                            ActionRing.record(
                                                 "SSL bypass revoked by user from Settings: ${entry.host}",
                                             )
-                                            hivens.launcher.network.NetworkState.revokeBypass(entry.host)
+                                            NetworkState.revokeBypass(entry.host)
                                         },
                                         shape = RoundedCornerShape(6.dp),
                                     ) {
@@ -393,16 +378,16 @@ fun SettingsScreen(
                                     // Puppet: per-host revoke. Driver picks the host
                                     // by its actual hostname string.
                                     PuppetClick("settings.sslBypass.revoke.${entry.host}") {
-                                        hivens.core.diag.ActionRing.record(
+                                        ActionRing.record(
                                             "SSL bypass revoked by puppet driver: ${entry.host}",
                                         )
-                                        hivens.launcher.network.NetworkState.revokeBypass(entry.host)
+                                        NetworkState.revokeBypass(entry.host)
                                     }
                                 }
                             }
                         }
 
-                        // ── Force proxy mode (Conduit Phase 2) ────────────────
+                        // ── Force proxy mode ──────────────────────────────────
                         Spacer(Modifier.height(12.dp))
                         Row(
                             modifier              = Modifier.fillMaxWidth(),
@@ -422,11 +407,11 @@ fun SettingsScreen(
                                 )
                             }
                             Switch(
-                                checked         = forceProxyMode,
-                                onCheckedChange = { forceProxyMode = it; save() },
+                                checked         = form.forceProxyMode,
+                                onCheckedChange = { form.forceProxyMode = it; save() },
                             )
                         }
-                        PuppetToggle("settings.forceProxyMode", forceProxyMode) { forceProxyMode = it; save() }
+                        PuppetToggle("settings.forceProxyMode", form.forceProxyMode) { form.forceProxyMode = it; save() }
                     }
                 }
 
@@ -440,11 +425,11 @@ fun SettingsScreen(
                         description    = s.settingsExperimentalMasterDesc,
                         icon           = Icons.Default.Science,
                         iconTint       = CelestiaTheme.colors.primary,
-                        checked        = experimentalEnabled,
+                        checked        = form.experimentalEnabled,
                         enabled        = true,
-                        onCheckedChange = { experimentalEnabled = it; save() }
+                        onCheckedChange = { form.experimentalEnabled = it; save() }
                     )
-                    PuppetToggle("settings.experimental", experimentalEnabled) { experimentalEnabled = it; save() }
+                    PuppetToggle("settings.experimental", form.experimentalEnabled) { form.experimentalEnabled = it; save() }
 
                     Spacer(Modifier.height(16.dp))
 
@@ -453,13 +438,13 @@ fun SettingsScreen(
                         description    = s.settingsMandatoryUpdatesDesc,
                         icon           = Icons.Default.Update,
                         iconTint       = CelestiaTheme.colors.primary,
-                        checked        = experimentalEnabled && mandatoryUpdates,
-                        enabled        = experimentalEnabled,
-                        onCheckedChange = { mandatoryUpdates = it; save() }
+                        checked        = form.experimentalEnabled && form.mandatoryUpdates,
+                        enabled        = form.experimentalEnabled,
+                        onCheckedChange = { form.mandatoryUpdates = it; save() }
                     )
                     // Mirror the UI's enabled-gating: master switch off => can't touch sub-toggles.
-                    PuppetToggle("settings.mandatoryUpdates", mandatoryUpdates, enabled = experimentalEnabled) {
-                        mandatoryUpdates = it; save()
+                    PuppetToggle("settings.mandatoryUpdates", form.mandatoryUpdates, enabled = form.experimentalEnabled) {
+                        form.mandatoryUpdates = it; save()
                     }
 
                     Spacer(Modifier.height(16.dp))
@@ -469,12 +454,12 @@ fun SettingsScreen(
                         description    = s.settingsPrereleaseChannelDesc,
                         icon           = Icons.Default.NewReleases,
                         iconTint       = CelestiaTheme.colors.primary,
-                        checked        = experimentalEnabled && prereleaseChannel,
-                        enabled        = experimentalEnabled,
-                        onCheckedChange = { prereleaseChannel = it; save() }
+                        checked        = form.experimentalEnabled && form.prereleaseChannel,
+                        enabled        = form.experimentalEnabled,
+                        onCheckedChange = { form.prereleaseChannel = it; save() }
                     )
-                    PuppetToggle("settings.prereleaseChannel", prereleaseChannel, enabled = experimentalEnabled) {
-                        prereleaseChannel = it; save()
+                    PuppetToggle("settings.prereleaseChannel", form.prereleaseChannel, enabled = form.experimentalEnabled) {
+                        form.prereleaseChannel = it; save()
                     }
 
                     Spacer(Modifier.height(16.dp))
@@ -484,12 +469,12 @@ fun SettingsScreen(
                         description    = s.settingsAutoSyncAllPacksDesc,
                         icon           = Icons.Default.Sync,
                         iconTint       = CelestiaTheme.colors.primary,
-                        checked        = experimentalEnabled && autoSyncAllPacks,
-                        enabled        = experimentalEnabled,
-                        onCheckedChange = { autoSyncAllPacks = it; save() }
+                        checked        = form.experimentalEnabled && form.autoSyncAllPacks,
+                        enabled        = form.experimentalEnabled,
+                        onCheckedChange = { form.autoSyncAllPacks = it; save() }
                     )
-                    PuppetToggle("settings.autoSyncAllPacks", autoSyncAllPacks, enabled = experimentalEnabled) {
-                        autoSyncAllPacks = it; save()
+                    PuppetToggle("settings.autoSyncAllPacks", form.autoSyncAllPacks, enabled = form.experimentalEnabled) {
+                        form.autoSyncAllPacks = it; save()
                     }
 
                     Spacer(Modifier.height(16.dp))
@@ -499,12 +484,12 @@ fun SettingsScreen(
                         description    = s.settingsJvmBuilderDesc,
                         icon           = Icons.Default.Tune,
                         iconTint       = CelestiaTheme.colors.primary,
-                        checked        = experimentalEnabled && jvmBuilderEnabled,
-                        enabled        = experimentalEnabled,
-                        onCheckedChange = { jvmBuilderEnabled = it; save() }
+                        checked        = form.experimentalEnabled && form.jvmBuilderEnabled,
+                        enabled        = form.experimentalEnabled,
+                        onCheckedChange = { form.jvmBuilderEnabled = it; save() }
                     )
-                    PuppetToggle("settings.jvmBuilder", jvmBuilderEnabled, enabled = experimentalEnabled) {
-                        jvmBuilderEnabled = it; save()
+                    PuppetToggle("settings.jvmBuilder", form.jvmBuilderEnabled, enabled = form.experimentalEnabled) {
+                        form.jvmBuilderEnabled = it; save()
                     }
 
                     Spacer(Modifier.height(16.dp))
@@ -519,14 +504,14 @@ fun SettingsScreen(
                         description    = s.settingsMimicVersionDesc,
                         icon           = Icons.Default.Tag,
                         iconTint       = CelestiaTheme.colors.primary,
-                        checked        = experimentalEnabled && mimicOverrideEnabled,
-                        enabled        = experimentalEnabled,
-                        onCheckedChange = { mimicOverrideEnabled = it; save() }
+                        checked        = form.experimentalEnabled && form.mimicOverrideEnabled,
+                        enabled        = form.experimentalEnabled,
+                        onCheckedChange = { form.mimicOverrideEnabled = it; save() }
                     )
-                    PuppetToggle("settings.mimicVersion", mimicOverrideEnabled, enabled = experimentalEnabled) {
-                        mimicOverrideEnabled = it; save()
+                    PuppetToggle("settings.mimicVersion", form.mimicOverrideEnabled, enabled = form.experimentalEnabled) {
+                        form.mimicOverrideEnabled = it; save()
                     }
-                    if (experimentalEnabled && mimicOverrideEnabled) {
+                    if (form.experimentalEnabled && form.mimicOverrideEnabled) {
                         Spacer(Modifier.height(8.dp))
                         // Debounce text-field writes: onValueChange fires per
                         // keystroke and save() runs a synchronous file write
@@ -540,13 +525,27 @@ fun SettingsScreen(
                         // onCheckedChange (above) so the dependency between
                         // the toggle and the field stays intuitive.
                         OutlinedTextField(
-                            value           = mimicVersionText,
-                            onValueChange   = { mimicVersionText = it },
+                            // Filter at every keystroke -- the value propagates
+                            // into a User-Agent header, a JVM system property,
+                            // and the spawned game's -Dminecraft.launcher.version
+                            // argv, all of which reject non-ASCII. A user with
+                            // a Cyrillic keyboard layout accidentally typing
+                            // here used to break login with an opaque "Network
+                            // Error". Protocol.setMimicLauncherVersion repeats
+                            // the same check as defense for hand-edited or
+                            // older-version persistence files.
+                            value           = form.mimicVersionText,
+                            onValueChange   = { newValue ->
+                                form.mimicVersionText = newValue.filter {
+                                    @OptIn(ExperimentalProtocolOverride::class)
+                                    it in Protocol.MIMIC_VERSION_ALLOWED_CHARS
+                                }
+                            },
                             singleLine      = true,
                             placeholder     = {
                                 Text(
                                     s.settingsMimicVersionPlaceholder(
-                                        hivens.config.Protocol.DEFAULT_MIMIC_LAUNCHER_VERSION
+                                        Protocol.DEFAULT_MIMIC_LAUNCHER_VERSION
                                     ),
                                     color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.55f),
                                 )
@@ -555,16 +554,19 @@ fun SettingsScreen(
                                 .fillMaxWidth()
                                 .padding(start = 56.dp),
                         )
-                        PuppetField("settings.mimicVersion.text", mimicVersionText) {
-                            mimicVersionText = it
+                        PuppetField("settings.mimicVersion.text", form.mimicVersionText) { newValue ->
+                            form.mimicVersionText = newValue.filter {
+                                @OptIn(ExperimentalProtocolOverride::class)
+                                it in Protocol.MIMIC_VERSION_ALLOWED_CHARS
+                            }
                         }
-                        LaunchedEffect(mimicVersionText) {
+                        LaunchedEffect(form.mimicVersionText) {
                             // Skip the initial-composition fire when the
                             // field equals the persisted value.
-                            if (mimicVersionText == (initialSettings.mimicVersionOverride ?: "")) {
+                            if (form.mimicVersionText == (initialSettings.mimicVersionOverride ?: "")) {
                                 return@LaunchedEffect
                             }
-                            kotlinx.coroutines.delay(400.milliseconds)
+                            delay(400.milliseconds)
                             save()
                         }
                     }
@@ -580,7 +582,7 @@ fun SettingsScreen(
                 item {
                     SettingsSectionTitle(s.settingsSectionDataDir)
 
-                    var pendingTarget by remember { mutableStateOf<java.nio.file.Path?>(null) }
+                    var pendingTarget by remember { mutableStateOf<Path?>(null) }
                     var showError     by remember { mutableStateOf<String?>(null) }
                     val moveScope     = rememberCoroutineScope()
 
@@ -615,9 +617,8 @@ fun SettingsScreen(
                                     // dialogSettings(title=...) is the key bit -- without
                                     // it FileKit hands the portal a blank-title request and
                                     // some backends render a less-styled fallback chrome
-                                    // (no titlebar text, generic icon). ProfileScreen +
-                                    // ServerSettingsScreen all pass dialogSettings; this
-                                    // site used to be the odd one out.
+                                    // (no titlebar text, generic icon). Match what
+                                    // ProfileScreen + ServerSettingsScreen pass here.
                                     val pickedFile = runCatching {
                                         FileKit.openDirectoryPicker(
                                             directory      = PlatformFile(paths.dataDir.toFile()),
@@ -625,16 +626,16 @@ fun SettingsScreen(
                                         )
                                     }.getOrNull() ?: return@launch
 
-                                    val picked = java.nio.file.Paths.get(pickedFile.path)
+                                    val picked = Paths.get(pickedFile.path)
 
                                     if (picked.toAbsolutePath().normalize() == paths.dataDir.toAbsolutePath().normalize()) {
                                         showError = s.settingsDataDirErrorSamePath
                                         return@launch
                                     }
-                                    val populated = withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                    val populated = withContext(Dispatchers.IO) {
                                         runCatching {
-                                            java.nio.file.Files.exists(picked) &&
-                                                java.nio.file.Files.list(picked).use { it.findAny().isPresent }
+                                            Files.exists(picked) &&
+                                                Files.list(picked).use { it.findAny().isPresent }
                                         }.getOrDefault(false)
                                     }
                                     if (populated) {
@@ -670,12 +671,12 @@ fun SettingsScreen(
                             },
                             confirmButton = {
                                 Button(onClick = {
-                                    val ok = hivens.launcher.platform.DataDirMover.schedule(
+                                    val ok = DataDirMover.schedule(
                                         source = paths.dataDir,
                                         target = target,
                                     )
                                     if (ok) {
-                                        hivens.core.diag.ActionRing.record(
+                                        ActionRing.record(
                                             "Data-dir move scheduled: ${paths.dataDir} -> $target -- quitting for restart",
                                         )
                                         // Hard exit -- user explicitly clicked "Quit now". Avoids the
@@ -683,7 +684,7 @@ fun SettingsScreen(
                                         // is mid-launch. The pending move only applies AFTER the
                                         // launcher restarts, so a clean process termination is the
                                         // right move.
-                                        kotlin.system.exitProcess(0)
+                                        exitProcess(0)
                                     } else {
                                         // Schedule was refused (target validations failed at the
                                         // mover layer -- e.g., race with another process touching
@@ -764,7 +765,7 @@ fun SettingsScreen(
                     // enough to freeze Settings for a noticeable beat. While
                     // generating, the button is disabled so a double click
                     // doesn't fire two parallel writes to the same data dir.
-                    var lastBundlePath by remember { mutableStateOf<java.nio.file.Path?>(null) }
+                    var lastBundlePath by remember { mutableStateOf<Path?>(null) }
                     var bundleBusy     by remember { mutableStateOf(false) }
                     val bundleScope    = rememberCoroutineScope()
 
@@ -776,7 +777,7 @@ fun SettingsScreen(
                                 if (bundleBusy) return@ChaosButton
                                 bundleBusy = true
                                 bundleScope.launch {
-                                    val zip = withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                    val zip = withContext(Dispatchers.IO) {
                                         runCatching { DiagnosticBundle.create(paths) }.getOrNull()
                                     }
                                     if (zip != null) {
@@ -798,7 +799,7 @@ fun SettingsScreen(
                         PuppetClick("settings.createDiagBundle", enabled = !bundleBusy) {
                             bundleBusy = true
                             bundleScope.launch {
-                                val zip = withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                val zip = withContext(Dispatchers.IO) {
                                     runCatching { DiagnosticBundle.create(paths) }.getOrNull()
                                 }
                                 if (zip != null) lastBundlePath = zip
@@ -813,9 +814,9 @@ fun SettingsScreen(
                                 runCatching {
                                     // Copy path so the user can drag-attach from the file
                                     // manager OR paste the path into a comment.
-                                    java.awt.Toolkit.getDefaultToolkit().systemClipboard
-                                        .setContents(java.awt.datatransfer.StringSelection(zip.toString()), null)
-                                    SystemActions.openUrl(hivens.launcher.diag.IssueReporter.bundleIssueUrl(zip))
+                                    Toolkit.getDefaultToolkit().systemClipboard
+                                        .setContents(StringSelection(zip.toString()), null)
+                                    SystemActions.openUrl(IssueReporter.bundleIssueUrl(zip))
                                 }
                             },
                             modifier = Modifier.weight(1f),
@@ -830,16 +831,16 @@ fun SettingsScreen(
                         PuppetClick("settings.reportOnGithub", enabled = lastBundlePath != null) {
                             val zip = lastBundlePath ?: return@PuppetClick
                             runCatching {
-                                java.awt.Toolkit.getDefaultToolkit().systemClipboard
-                                    .setContents(java.awt.datatransfer.StringSelection(zip.toString()), null)
-                                SystemActions.openUrl(hivens.launcher.diag.IssueReporter.bundleIssueUrl(zip))
+                                Toolkit.getDefaultToolkit().systemClipboard
+                                    .setContents(StringSelection(zip.toString()), null)
+                                SystemActions.openUrl(IssueReporter.bundleIssueUrl(zip))
                             }
                         }
                     }
                     Text(
                         text     = s.settingsDiagnosticBundleHint,
                         color    = CelestiaTheme.colors.textSecondary,
-                        fontSize = androidx.compose.ui.unit.TextUnit(11f, androidx.compose.ui.unit.TextUnitType.Sp),
+                        fontSize = TextUnit(11f, TextUnitType.Sp),
                         modifier = Modifier.padding(start = 8.dp, top = 2.dp)
                     )
                 }
@@ -883,9 +884,69 @@ fun SettingsScreen(
                 Text(s.settingsSaved, color = CelestiaTheme.colors.success, style = MaterialTheme.typography.bodySmall)
             }
             LaunchedEffect(showSavedMessage) {
-                if (showSavedMessage) { kotlinx.coroutines.delay(2000.milliseconds); showSavedMessage = false }
+                if (showSavedMessage) { delay(2000.milliseconds); showSavedMessage = false }
             }
         }
+    }
+}
+
+/**
+ * Mutable form-state holder for the editable surface of [SettingsScreen].
+ *
+ * One field per editable setting; each field is its own [mutableStateOf]
+ * so Compose recomposition stays granular (flipping a single toggle only
+ * invalidates the rows that read that one field). The class is a thin
+ * namespace -- it does not centralize behavior, only the ten or so
+ * `var x by mutableStateOf(initial.x)` declarations that otherwise sit
+ * inline in the composable.
+ *
+ * [mimicOverrideEnabled] / [mimicVersionText] are UI-only state, not
+ * 1:1-mapped to [SettingsData]:
+ *   - `mimicOverrideEnabled` is derived from whether the persisted
+ *     override is non-blank at composition time, then maintained
+ *     independently so a user can toggle off, edit the text, toggle on
+ *     without losing what they typed.
+ *   - `mimicVersionText` is the live edit value; `mergeInto` normalises
+ *     it (trim + blank-to-null) before writing to [SettingsData].
+ */
+@Stable
+private class SettingsFormState(initial: SettingsData) {
+    var closeAfterStart        by mutableStateOf(initial.closeAfterStart)
+    var isOfflineMode          by mutableStateOf(initial.isOfflineMode)
+    var experimentalEnabled    by mutableStateOf(initial.experimentalFeaturesEnabled)
+    var mandatoryUpdates       by mutableStateOf(initial.mandatoryUpdatesEnabled)
+    var prereleaseChannel      by mutableStateOf(initial.prereleaseChannelEnabled)
+    var autoSyncAllPacks       by mutableStateOf(initial.autoSyncAllPacks)
+    var jvmBuilderEnabled      by mutableStateOf(initial.jvmBuilderEnabled)
+    var forceProxyMode         by mutableStateOf(initial.forceProxyMode)
+    var mimicOverrideEnabled   by mutableStateOf(!initial.mimicVersionOverride.isNullOrBlank())
+    var mimicVersionText       by mutableStateOf(initial.mimicVersionOverride ?: "")
+
+    /**
+     * Build a [SettingsData] suitable for persistence by overlaying this
+     * form's editable fields onto [current] (a freshly-read snapshot, so
+     * non-screen fields like server-specific knobs are not clobbered).
+     *
+     * The mimic-version override is normalized here: empty toggle OR
+     * blank text both collapse to null, which is the contract
+     * [SettingsData.mimicVersionOverride] expects for "use the shipped
+     * default" semantics. Storing a stale non-null value with the toggle
+     * off would silently re-arm on next launch via the Main.kt restore
+     * block.
+     */
+    fun mergeInto(current: SettingsData): SettingsData {
+        val normalisedMimic = if (mimicOverrideEnabled) mimicVersionText.trim().ifBlank { null } else null
+        return current.copy(
+            closeAfterStart             = closeAfterStart,
+            isOfflineMode               = isOfflineMode,
+            experimentalFeaturesEnabled = experimentalEnabled,
+            mandatoryUpdatesEnabled     = mandatoryUpdates,
+            prereleaseChannelEnabled    = prereleaseChannel,
+            autoSyncAllPacks            = autoSyncAllPacks,
+            jvmBuilderEnabled           = jvmBuilderEnabled,
+            forceProxyMode              = forceProxyMode,
+            mimicVersionOverride        = normalisedMimic,
+        )
     }
 }
 

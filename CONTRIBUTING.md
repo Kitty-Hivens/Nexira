@@ -1,4 +1,4 @@
-# Contributing to Aura Launcher
+# Contributing to Nexira
 
 PRs and forks are welcome. Code is GPL-3.0 — take it and do whatever.
 

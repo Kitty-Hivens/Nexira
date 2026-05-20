@@ -22,7 +22,7 @@ import org.jetbrains.skia.Paint
 import org.jetbrains.skia.Rect
 
 /**
- * Skin manager with persistent disk cache (#61).
+ * Skin manager with persistent disk cache.
  *
  * Cache layout (mirrors original h.java):
  *   <dataDir>/skin-cache/front_<nick>.png

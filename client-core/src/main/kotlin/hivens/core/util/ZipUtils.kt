@@ -9,26 +9,22 @@ object ZipUtils {
     private val logger = LoggerFactory.getLogger(ZipUtils::class.java)
 
     /**
-     * Unzips [zipFile] into [destDir]. Returns the relative paths of every
-     * file (NOT directory) extracted, normalized to forward slashes, in
-     * the order they appeared in the archive. Existing callers that
-     * ignore the return value are unaffected.
+     * Unzips [zipFile] into [destDir]. Returns the relative paths of
+     * every file (forward slashes), in archive order. Callers that
+     * ignore the return value are unaffected; the list powers extra.zip
+     * orphan-pruning in `FileDownloadService` -- snapshot the previous
+     * unpack, diff the next, remove what the upstream modpack dropped.
      *
-     * The path list is what powers `FileDownloadService`'s extra.zip
-     * orphan-pruning -- by snapshotting the contents of the previous
-     * unpack we can diff against the new contents and remove files that
-     * the upstream modpack dropped.
-     *
-     * ## Hardening (#187)
-     * Plain Zip Slip protection (`startsWith(destDir)`) catches `../`
+     * Security: plain Zip Slip (`startsWith(destDir)`) catches `../`
      * traversal in entry names but not symbolic-link entries. A symlink
-     * entry named `safe.txt` whose payload is the path of `~/.ssh/id_rsa`
+     * entry named `safe.txt` whose payload points to `~/.ssh/id_rsa`
      * would normalize to a path INSIDE [destDir], pass the check, then
-     * cause the launcher to write attacker-controlled bytes to the linked
-     * target on the *next* extraction touching that name. We therefore
-     * use [ZipFile] (random-access central-directory reader) instead of
-     * the streaming variant: only the central directory carries the
-     * external-attributes field that holds the unix file-type bits.
+     * cause attacker-controlled bytes to land on the linked target on
+     * the next extraction touching that name. We use [ZipFile]
+     * (random-access central-directory reader) rather than the
+     * streaming variant: only the central directory carries the
+     * external-attributes field that holds the unix file-type bits
+     * needed to detect and refuse the symlink.
      */
     fun unzip(zipFile: File, destDir: File): List<String> {
         if (!destDir.exists()) destDir.mkdirs()
@@ -40,16 +36,15 @@ object ZipUtils {
             for (zipEntry in zf.entries) {
                 val newFile = File(destDir, zipEntry.name)
 
-                // Zip Slip protection (preventing path traversal vulnerability)
+                // Zip Slip: refuse anything that escapes destDir.
                 val destFilePath = newFile.canonicalPath
                 if (!destFilePath.startsWith(destDirPath + File.separator)) {
                     logger.warn("Missed attempt to go outside the folder when unpacking: {}", zipEntry.name)
                     continue
                 }
 
-                // Symlink / non-regular-file rejection. SmartyCraft modpacks and
-                // assets archives ship plain files only; anything else is either
-                // a packaging accident or a hostile payload -- refuse and skip.
+                // SmartyCraft modpacks ship plain files only; symlink
+                // entries are either packaging accidents or hostile.
                 if (zipEntry.isUnixSymlink) {
                     logger.warn("Refusing symlink entry from archive {}: {}", zipFile.name, zipEntry.name)
                     continue

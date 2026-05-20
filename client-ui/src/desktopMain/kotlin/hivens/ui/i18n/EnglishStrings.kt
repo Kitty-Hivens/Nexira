@@ -3,10 +3,10 @@ package hivens.ui.i18n
 object EnglishStrings : AppStrings {
 
     // App
-    override val appName = "Aura Launcher"
+    override val appName = "Nexira"
 
     // Login
-    override val loginTitle        = "Aura Launcher"
+    override val loginTitle        = "Nexira"
     override val loginUsername     = "Username"
     override val loginPassword     = "Password"
     override val loginRemember     = "Remember password"
@@ -303,7 +303,7 @@ object EnglishStrings : AppStrings {
     override val settingsJvmBuilder             = "Visual JVM args builder"
     override val settingsJvmBuilderDesc         = "Reveals a 'Build args' button in the per-server constructor. Pick a GC algorithm, tune heap regions, enable AppCDS or JFR profiling — without memorizing flags. Curated presets cover Aikar's recipe, GTNH-class heavy modded, ZGC for huge heaps, and more."
     override val settingsMimicVersion           = "Mimic launcher version override"
-    override val settingsMimicVersionDesc       = "Pin the version string sent to upstream in the handshake and User-Agent. Leave blank to use the shipped default — set this only when upstream has bumped its version pin faster than Aura's release cycle. Takes effect on the next protocol call after save; no restart needed."
+    override val settingsMimicVersionDesc       = "Pin the version string sent to upstream in the handshake and User-Agent. Leave blank to use the shipped default — set this only when upstream has bumped its version pin faster than Nexira's release cycle. Takes effect on the next protocol call after save; no restart needed."
     override fun settingsMimicVersionPlaceholder(default: String) = "Default: $default"
     override fun dashboardAutoSyncProgress(serverName: String, current: Int, total: Int) =
         "Syncing $serverName ($current/$total)"
@@ -342,6 +342,10 @@ object EnglishStrings : AppStrings {
     override val auth2faInvalid         = "Wrong code. Try again."
     override val auth2faExpired         = "The 2FA session expired. Please sign in again."
 
+    override val auth2faUnsupportedTitle   = "Unfortunately, 2FA doesn't work here"
+    override val auth2faUnsupportedBody    = "We're sorry — we can't really support 2FA here. Our protocols differ enough from what Smartycraft uses that even though the 2FA login itself works, the game just throws errors after that. Please disable 2FA on your account on the website."
+    override val auth2faUnsupportedDismiss = "Got it"
+
     // --- SSL Warning ---
     override val sslWarningTitle        = "Server certificate expired"
     override val sslWarningBody         = "The server's SSL certificate has expired. Your connection may be insecure — server identity cannot be verified. Proceed at your own risk?"
@@ -364,11 +368,11 @@ object EnglishStrings : AppStrings {
     override val settingsSectionDataDir       = "Data directory"
     override val settingsDataDirCurrent       = "Current path:"
     override val settingsDataDirMove          = "Move..."
-    override val settingsDataDirPickerTitle   = "Choose a new location for Aura data"
+    override val settingsDataDirPickerTitle   = "Choose a new location for Nexira data"
     override val settingsDataDirConfirmTitle  = "Move data directory?"
     override fun settingsDataDirConfirmBody(source: String, target: String) =
-        "Aura will relocate its data:\nfrom: $source\nto:   $target\n\nThe move applies on the next launcher start."
-    override val settingsDataDirRestartRequired = "Restart required — Aura will apply the move on next start"
+        "Nexira will relocate its data:\nfrom: $source\nto:   $target\n\nThe move applies on the next launcher start."
+    override val settingsDataDirRestartRequired = "Restart required — Nexira will apply the move on next start"
     override val settingsDataDirQuitNow         = "Quit now"
     override val settingsDataDirErrorSamePath   = "That's already the current directory — pick a different folder"
     override val settingsDataDirErrorNotEmpty   = "Target folder is not empty — pick an empty folder or delete its contents"
@@ -454,4 +458,21 @@ object EnglishStrings : AppStrings {
     override val jvmCustomHeader = "Custom passthrough"
     override val jvmCustomIntro  = "Extra flags appended verbatim. Use for one-off experiments or vendor-specific knobs not surfaced in the UI yet. Space-separated."
     override val jvmCustomLabel  = "Extra args"
+
+    // --- Data dir migration UI ---
+    override val migrationWelcome      = "Welcome to Nexira"
+    override val migrationDescription  = "Nexira is now Nexira. Your existing data needs to be copied to the new location before the launcher can start. Your old folder is left untouched as a backup; you can delete it manually once everything works."
+    override val migrationFromHeader   = "From"
+    override val migrationToHeader     = "To"
+    override fun migrationSize(megabytes: Int, files: Int) = "$megabytes MB across $files files"
+    override val migrationStart        = "Migrate now"
+    override val migrationInProgress   = "Migrating to Nexira"
+    override fun migrationCurrentFile(file: String) = "Copying $file"
+    override fun migrationProgressBytes(doneMb: Int, totalMb: Int) = "$doneMb MB of $totalMb MB"
+    override val migrationCompletedTitle = "Migration complete"
+    override val migrationCompletedBody  = "Restart Nexira to begin using your migrated data."
+    override val migrationFailedTitle    = "Migration failed"
+    override fun migrationFailedBody(error: String) = "Some files could not be copied: $error"
+    override val migrationRetry = "Retry"
+    override val migrationQuit  = "Quit Nexira"
 }

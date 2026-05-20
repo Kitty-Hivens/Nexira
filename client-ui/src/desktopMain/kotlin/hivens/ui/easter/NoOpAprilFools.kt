@@ -36,9 +36,7 @@ object NoOpAprilFools : AprilFoolsLifecycle {
     override fun maybeGibberish(text: String, probability: Float, mode: GibberishMode?): String = text
 
     override fun requestCloseDialog(onActualClose: () -> Unit) {
-        // No chaos dialog -- close immediately. Mirrors what the old
-        // `if (AprilFools.isActive()) showDialog else exitApplication()`
-        // call site used to do explicitly.
+        // No chaos dialog -- close immediately.
         onActualClose()
     }
 

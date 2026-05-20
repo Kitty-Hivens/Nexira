@@ -46,12 +46,12 @@ fun CompactNewsFeed(
 
     var news    by remember { mutableStateOf<List<NewsItem>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
-    // Bumped by the retry button to re-trigger the fetch effect. Pre-fix the
-    // feed had a single LaunchedEffect(Unit) -- a first-call failure stuck
-    // the strip at "no news" forever even after the user fixed their proxy
-    // toggle / network. Now: refetch fires on (a) initial composition,
-    // (b) force-proxy toggle change, (c) SSL bypass grant for the host,
-    // (d) explicit retry click. Each is keyed via this counter.
+    // Bumped by the retry button to re-trigger the fetch effect. The effect
+    // re-runs on (a) initial composition, (b) force-proxy toggle change,
+    // (c) SSL bypass grant for the host, (d) explicit retry click. Each is
+    // keyed via this counter, so a first-call failure doesn't strand the
+    // strip at "no news" forever -- the user can recover by toggling the
+    // proxy or clicking Retry.
     var retryTick by remember { mutableStateOf(0) }
 
     val forceProxy by NetworkState.forceProxyState.collectAsState()

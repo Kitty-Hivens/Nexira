@@ -47,7 +47,7 @@ fun ThemePickerScreen(
     // Per-theme select. Puppet driver names themes by their canonical
     // theme.name (free text -- Tea Sakura, Aurora, etc.). LazyVerticalGrid
     // only composes visible rows; scroll the grid first if you target an
-    // off-screen theme. Aura's preset list fits in one viewport.
+    // off-screen theme. Nexira's preset list fits in one viewport.
     themes.forEach { theme ->
         PuppetClick("themePicker.select.${theme.name}") { selectedTheme = theme }
     }

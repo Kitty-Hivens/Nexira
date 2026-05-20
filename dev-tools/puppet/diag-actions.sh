@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Last 64 entries from Aura's ActionRing -- the in-process breadcrumb log
+# Last 64 entries from Nexira's ActionRing -- the in-process breadcrumb log
 # every launch / auth / sync milestone records. Pair with /diag/threads
 # to correlate "what was the launcher doing" with "what does the stack
 # say it's blocked on".

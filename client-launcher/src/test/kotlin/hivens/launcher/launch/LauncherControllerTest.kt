@@ -47,7 +47,7 @@ import kotlin.test.assertTrue
  *   not require Byte Buddy class retransformation.
  * - **Final classes** (`ProfileManager`, `ManifestCache`, `CredentialsManager`)
  *   are instantiated for real against the test sandbox directory. Reason:
- *   this project's tests run on JBR 25, and the mockk-bundled Byte Buddy
+ *   this project's tests run on JDK 25, and the mockk-bundled Byte Buddy
  *   (1.14.x) cannot transform Java 25 bytecode -- recording an `every {}`
  *   block on a final-class mock invokes the real method on an uninitialized
  *   instance, which NPEs. Real instances pointed at a tempdir give us
@@ -96,8 +96,8 @@ class LauncherControllerTest {
         launcherService    = mockk()
         manifestProcessor  = mockk()
 
-        // Real instances: cheaper than fighting mockk on JBR 25, and the
-        // default no-data behaviour (empty profile map, missing manifest
+        // Real instances: cheaper than fighting mockk on JDK 25, and the
+        // default no-data behavior (empty profile map, missing manifest
         // file, no credentials.json) is exactly what the smoke + edge
         // paths expect.
         profileManager     = ProfileManager(sandbox, json)

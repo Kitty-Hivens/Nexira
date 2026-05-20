@@ -336,7 +336,11 @@ interface AppStrings {
     val aprilCloseHideTray: String
     fun aprilCloseEscapeCount(current: Int, max: Int): String
 
-    // --- 2FA (TOTP) — #159 ---
+    // --- 2FA (TOTP) ---
+    // Code-path scaffolding kept for future auth providers that DO support 2FA
+    // (see [[project_client_auth_extraction]]). For the SmartyCraft provider
+    // these strings are unused at runtime; the banner copy below is what the
+    // user actually sees when the upstream demands a 2FA code.
     val auth2faTitle: String
     val auth2faPrompt: String
     val auth2faPlaceholder: String
@@ -344,6 +348,11 @@ interface AppStrings {
     val auth2faCancel: String
     val auth2faInvalid: String
     val auth2faExpired: String
+
+    /** Banner shown in LoginPanel when SmartyCraft demands 2FA. Apologetic + factual + actionable. */
+    val auth2faUnsupportedTitle: String
+    val auth2faUnsupportedBody: String
+    val auth2faUnsupportedDismiss: String
 
     // --- SSL Warning ---
     val sslWarningTitle: String
@@ -468,4 +477,25 @@ interface AppStrings {
     val jvmCustomHeader: String
     val jvmCustomIntro: String
     val jvmCustomLabel: String
+
+    // --- Data dir migration UI (mandatory first-launch flow after Nexira -> Nexira rebrand) ---
+    val migrationWelcome: String
+    val migrationDescription: String
+    val migrationFromHeader: String
+    val migrationToHeader: String
+    /** Templated: total size in MB and total file count. */
+    fun migrationSize(megabytes: Int, files: Int): String
+    val migrationStart: String
+    val migrationInProgress: String
+    /** Templated: filename currently being copied, relative to the legacy root. */
+    fun migrationCurrentFile(file: String): String
+    /** Templated: bytes-done in MB and total in MB. */
+    fun migrationProgressBytes(doneMb: Int, totalMb: Int): String
+    val migrationCompletedTitle: String
+    val migrationCompletedBody: String
+    val migrationFailedTitle: String
+    /** Templated: human-readable error message. */
+    fun migrationFailedBody(error: String): String
+    val migrationRetry: String
+    val migrationQuit: String
 }

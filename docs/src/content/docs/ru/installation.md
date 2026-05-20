@@ -1,40 +1,40 @@
 ---
 title: Установка
-description: Как установить Aura Launcher на Windows, Linux и macOS.
+description: Как установить Nexira на Windows, Linux и macOS.
 ---
 
-Скачай последний релиз с [GitHub Releases](https://github.com/Kitty-Hivens/Aura-Launcher/releases/latest).
+Скачай последний релиз с [GitHub Releases](https://github.com/Kitty-Hivens/Nexira/releases/latest).
 
 ## Windows
 
 **Установщик (рекомендуется)**
 
-1. Скачай `AuraLauncher-*-Setup.exe`
-2. Запусти — права администратора не нужны
-3. Лаунчер установится в `%AppData%\AuraLauncher`
+1. Скачай `Nexira-*-Setup.exe`
+2. Запусти -- права администратора не нужны
+3. Лаунчер ставится в `%AppData%\Nexira`
 
-**Portable**
+**Портативная версия**
 
-1. Скачай `AuraLauncher-*-Windows-Portable.zip`
-2. Распакуй куда угодно
-3. Запусти `AuraLauncher.exe`
+1. Скачай `Nexira-*-Windows-Portable.zip`
+2. Распакуй куда удобно
+3. Запусти `Nexira.exe`
 
 ## Linux
 
-1. Скачай `AuraLauncher-*-x86_64.AppImage`
+1. Скачай `Nexira-*-x86_64.AppImage`
 2. Сделай исполняемым и запусти:
 
 ```bash
-chmod +x AuraLauncher-*.AppImage
-./AuraLauncher-*.AppImage
+chmod +x Nexira-*.AppImage
+./Nexira-*.AppImage
 ```
 
 :::tip
-В большинстве DE можно правой кнопкой → Свойства → Разрешить выполнение как программы.
+В большинстве DE можно правый клик → Свойства → Разрешить выполнение как программы.
 :::
 
 :::note[Нужен FUSE]
-AppImage требует FUSE. На Ubuntu 22.04+ может не быть по умолчанию:
+AppImage требует FUSE. На Ubuntu 22.04+ может не быть из коробки:
 
 ```bash
 sudo apt install libfuse2
@@ -43,21 +43,33 @@ sudo apt install libfuse2
 
 ## macOS
 
-1. Скачай `AuraLauncher-*.dmg`
+1. Скачай `Nexira-*.dmg`
 2. Открой DMG и перетащи приложение в Applications
-3. При первом запуске: правой кнопкой → **Открыть**, если macOS заблокировал
+3. При первом запуске правый клик → **Открыть**, если macOS заблокирует
 
 :::note
-**Apple Silicon** — нативно.  
-**Intel** — через Rosetta 2, устанавливается автоматически.
+**Apple Silicon** -- нативная сборка.  
+**Intel** -- community-сборка (`*-macos-x86_64-community.dmg`); валидируется в CI, не входит в основной релиз-набор.
 :::
 
 ## Первый запуск
 
-1. Войди с данными аккаунта SMARTYcraft
+1. Войди со своими данными SMARTYcraft
 2. Выбери сервер
-3. Нажми **Играть** — лаунчер синхронизирует файлы при первом запуске
+3. Жми **Играть** -- лаунчер синхронизирует файлы автоматически при первом запуске
 
-Данные хранятся в:
-- Linux/macOS: `~/.aura/`
-- Windows: `%AppData%\.aura`
+### Переход с Aura
+
+Если у тебя стояла Aura, Nexira увидит старую папку с данными при первом запуске и покажет обязательный экран миграции. Нажми **Перенести данные**, дождись окончания копирования и нажми **Закрыть Nexira**, потом запусти заново. Старая папка остаётся нетронутой как резервная копия; удали её вручную когда убедишься что всё работает.
+
+## Где хранятся данные
+
+| Платформа | Путь |
+|---|---|
+| Windows | `%LOCALAPPDATA%\Nexira` |
+| macOS | `~/Library/Application Support/Nexira` |
+| Linux | `$XDG_DATA_HOME/nexira` (по умолчанию `~/.local/share/nexira`) |
+
+Папка установки -- отдельная: `%AppData%\Nexira` (установщик Windows) или место AppImage на Linux. Пользовательские данные (клиенты, настройки, кэш скинов, краш-репорты, логи) живут по путям выше.
+
+Для переопределения дефолта на любой платформе выстави переменную окружения `NEXIRA_DATA_DIR` в абсолютный путь до запуска. Альтернативно -- **Настройки → Папка данных → Переместить** покажет нативный пикер и применит перенос при следующем старте.

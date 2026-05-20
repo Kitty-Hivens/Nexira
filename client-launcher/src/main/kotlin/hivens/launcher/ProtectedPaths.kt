@@ -7,22 +7,23 @@ import java.nio.file.Files
 import java.nio.file.Path
 
 /**
- * User-config files inside a synced client install that the launcher must
- * NEVER overwrite even when the server's manifest claims they're stale.
+ * User-config files inside a synced client install that the launcher
+ * must NEVER overwrite even when the server's manifest claims they're
+ * stale. Without this gate, every server-side modpack push would erase
+ * a player's hand-tuned settings.
  *
- * The default list covers in-game settings (`options.txt`, `servers.dat`)
- * and per-mod state directories that mod authors traditionally store
+ * Defaults cover in-game settings (`options.txt`, `servers.dat`) and
+ * per-mod state directories that mod authors traditionally store
  * directly under the client root (Xaero's minimap waypoints, VoxelMap
- * configs, JourneyMap data, JEI bookmarks). Without this gate, every
- * server-side modpack push would erase a player's hand-tuned settings.
+ * configs, JourneyMap data, JEI bookmarks).
  *
- * Externalized so users can extend the list without recompiling -- drop a
- * mod name into `~/.local/share/aura-launcher/protected-paths.json` and
- * restart. On first run the file is created with the defaults so users
- * can see what's already covered before adding their own.
+ * Externalized: users extend the list without recompiling -- drop a
+ * mod name into `protected-paths.json` in the data dir and restart.
+ * On first run the file is created with the defaults so users see
+ * what's already covered before adding their own.
  *
  * `endsWith` matches exact filenames (case-insensitive, after path
- * normalization), `contains` matches anywhere in the relative path
+ * normalization); `contains` matches anywhere in the relative path
  * (typically a mod directory name).
  */
 @Serializable

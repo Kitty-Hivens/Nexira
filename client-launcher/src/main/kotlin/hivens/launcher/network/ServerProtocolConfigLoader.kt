@@ -13,7 +13,7 @@ import java.nio.file.Path
  * override on top via [ServerProtocolConfig.resolve].
  *
  * Failure modes (malformed JSON, partial fields):
- * - Malformed JSON -> log warn, use defaults. Aura should not fail to start
+ * - Malformed JSON -> log warn, use defaults. Nexira should not fail to start
  *   because someone hand-edited the file wrong.
  * - Unknown extra fields -> tolerated by [Json.ignoreUnknownKeys].
  * - Missing fields -> defaults from [ServerProtocolConfig] data class.

@@ -13,12 +13,12 @@ import kotlin.io.path.isRegularFile
 import kotlin.io.path.name
 
 /**
- * Component responsible for assembling the classpath for launching the JVM.
- * Filters unnecessary files (configs, natives, mods) so that the local hash matches the server hash.
+ * Assembles the classpath for the game JVM. Filters out unnecessary
+ * files (configs, mods, wrong-OS natives) so the local launch-hash
+ * matches what the server expects.
  *
- * @param osName the current OS as reported by `os.name`. Defaulted to the
- *        runtime property; tests inject a fixed value to verify wrong-OS
- *        native filtering (#157).
+ * @param osName as reported by `os.name`. Tests inject a fixed value
+ *        to verify wrong-OS native filtering.
  */
 class ClasspathProvider(
     private val manifestProcessor: IManifestProcessorService,
@@ -140,13 +140,14 @@ class ClasspathProvider(
             return false
         }
 
-        // 6. Wrong-OS native JARs (#157). Server-side manifests ship every
-        // platform's native classifier ("…-natives-windows.jar",
-        // "…-natives-linux.jar", "…-natives-macos.jar") to every client by
-        // default. Loading the wrong-platform jar onto the classpath either
-        // wastes a few MB of RAM (best case) or raises UnsatisfiedLinkError
-        // when the JVM tries to dlopen a Mach-O on Linux. Drop anything
-        // matching another platform's classifier; keep our own.
+        // 6. Wrong-OS native JARs. Server-side manifests ship every
+        //    platform's native classifier ("…-natives-windows.jar",
+        //    "…-natives-linux.jar", "…-natives-macos.jar") to every
+        //    client by default. Loading the wrong-platform jar either
+        //    wastes a few MB of RAM (best case) or raises
+        //    UnsatisfiedLinkError when the JVM tries to dlopen a
+        //    Mach-O on Linux. Drop anything matching another
+        //    platform's classifier; keep our own.
         if (fileName.endsWith(".jar")) {
             val withoutExt = fileName.removeSuffix(".jar")
             for (suffix in foreignNativeSuffixes) {
@@ -168,15 +169,12 @@ class ClasspathProvider(
     }
 
     /**
-     * Resolves the path from the manifest relative to the client root.
-     * Removes the prefix with the server name, if any (Legacy Smarty structure).
-     *
-     * The "is first segment a known root dir vs a server name" decision uses
-     * [ClientRootDirs] so it matches what `FileDownloadService.normalizePath`
-     * decides for the same path. Pre-fix the check enumerated only
-     * `libraries* / bin / mods`, which incorrectly stripped legitimate
-     * `config/foo.jar` and `assets/foo.jar` top-level prefixes -- the same
-     * paths the file-download side kept as-is.
+     * Resolves a manifest path against [root]. Strips the optional
+     * leading server-name segment (legacy Smarty layout) when the
+     * first segment is not in [ClientRootDirs] -- this matches
+     * `FileDownloadService.normalizePath`'s decision for the same
+     * path, so the two sides agree on whether `config/foo.jar` is a
+     * top-level dir or a server-prefixed entry.
      */
     private fun resolveSanitizedPath(root: Path, rawPath: String): Path {
         val pathPart = Paths.get(rawPath)

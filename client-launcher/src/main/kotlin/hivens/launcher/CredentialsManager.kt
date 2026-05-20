@@ -23,7 +23,8 @@ import javax.crypto.spec.SecretKeySpec
  *
  * Per-secret storage hierarchy (most-to-least preferred):
  *
- *  1. **OS keyring** (libsecret on Linux, follow-ups for Win/Mac).
+ *  1. **OS keyring** (libsecret on Linux, Credential Manager / DPAPI
+ *     on Windows, Keychain on macOS -- all three via Project Panama).
  *     The plaintext lives here when [IKeyringStorage.isAvailable] and
  *     `store()` succeed. The credentials JSON file then carries
  *     `keyringHasX=true` and a null `encryptedX` field -- keyring is
@@ -66,7 +67,10 @@ class CredentialsManager(
         private const val GCM_IV_LENGTH = 12
         private const val GCM_TAG_LENGTH = 128
         private const val PBKDF2_ITERATIONS = 65536
-        private const val SALT = "AuraLauncher_v2_salt" // Static salt component
+        // PBKDF2 static-salt component for the v2/v3 envelope. Kept
+        // verbatim across the Aura -> Nexira rebrand: rotating it would
+        // invalidate every existing user's saved-credentials envelope.
+        private const val SALT = "Aura_v2_salt"
 
         // Keyring identity. SERVICE is the launcher-wide brand scope;
         // ACCOUNT_* is the per-secret name inside that scope. Each
@@ -74,6 +78,10 @@ class CredentialsManager(
         // independently retrievable, rotatable, and clearable.
         // Multi-account support (currently SmartyCraft is single-account
         // per launcher install) would extend this with the username.
+        //
+        // Service name kept verbatim across rebrand so an existing
+        // user's keyring entry (saved under Aura) stays readable under
+        // Nexira -- the underlying secret is the same.
         private const val KEYRING_SERVICE = "io.github.kitty_hivens.AuraLauncher"
         private const val KEYRING_ACCOUNT_PASSWORD = "password"
         private const val KEYRING_ACCOUNT_ACCESS_TOKEN = "accessToken"

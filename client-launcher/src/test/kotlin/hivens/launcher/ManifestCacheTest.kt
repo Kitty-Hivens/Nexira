@@ -143,7 +143,7 @@ class ManifestCacheTest {
         assertEquals(1, loaded.files.size)
     }
 
-    // ── Disk-sanity gate (#184) ────────────────────────────────────────────
+    // ── Disk-sanity gate ────────────────────────────────────────────────────
 
     @Test
     fun `isClean invalidates entry when diskSanityCheck returns false`() {

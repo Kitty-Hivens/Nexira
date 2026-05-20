@@ -17,8 +17,8 @@ class BootstrapConfTest {
 
     @BeforeTest
     fun setup() {
-        workDir = Files.createTempDirectory("aura-bootstrap-test-")
-        confFile = workDir / ".aura-launcher.conf"
+        workDir = Files.createTempDirectory("nexira-bootstrap-test-")
+        confFile = workDir / ".nexira.conf"
     }
 
     @AfterTest
@@ -34,11 +34,11 @@ class BootstrapConfTest {
     @Test
     fun `write then read -- round-trips known keys`() {
         BootstrapConf.write(mapOf(
-            BootstrapConf.KEY_DATA_DIR to "/tmp/custom-aura-data",
+            BootstrapConf.KEY_DATA_DIR to "/tmp/custom-nexira-data",
         ), confFile)
 
         val read = BootstrapConf.read(confFile)
-        assertEquals("/tmp/custom-aura-data", read[BootstrapConf.KEY_DATA_DIR])
+        assertEquals("/tmp/custom-nexira-data", read[BootstrapConf.KEY_DATA_DIR])
     }
 
     @Test
@@ -95,7 +95,7 @@ class BootstrapConfTest {
 
     @Test
     fun `write creates parent directory if missing`() {
-        val nested = workDir / "sub" / "dir" / ".aura-launcher.conf"
+        val nested = workDir / "sub" / "dir" / ".nexira.conf"
         BootstrapConf.write(mapOf(BootstrapConf.KEY_DATA_DIR to "/tmp/x"), nested)
         assertTrue(Files.exists(nested))
         assertEquals("/tmp/x", BootstrapConf.read(nested)[BootstrapConf.KEY_DATA_DIR])

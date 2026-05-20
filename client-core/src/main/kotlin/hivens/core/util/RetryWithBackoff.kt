@@ -7,18 +7,17 @@ import org.slf4j.LoggerFactory
 private val log = LoggerFactory.getLogger("RetryWithBackoff")
 
 /**
- * Retries [block] up to [attempts] times with a hard-coded 1s / 3s / 9s
- * backoff between attempts, retrying only on exceptions matching
- * [shouldRetry]. The last exception bubbles up unmodified.
+ * Retries [block] up to [attempts] times with hard-coded 1s / 3s / 9s
+ * backoff, retrying only when [shouldRetry] matches. Last exception
+ * bubbles up unmodified.
  *
- * Designed narrowly for the "transient HTTP/2 reset over SOCKS" case the
- * launcher hits in production -- auth flow and chunk downloads on the
- * smartycraft channel periodically die mid-stream and a single retry
- * almost always succeeds. Not a general-purpose retry utility; resist
- * the urge to grow it.
+ * Designed narrowly for transient HTTP/2 reset over SOCKS on the
+ * smartycraft channel (auth + chunk downloads periodically die
+ * mid-stream; one retry almost always succeeds). Not a general-purpose
+ * retry utility -- resist growing it.
  *
- * The [operation] string is for logs only -- appears in the retry warning
- * lines so a user log paste shows which call is flapping.
+ * [operation] is for logs only; appears in retry warnings so a user
+ * log paste shows which call is flapping.
  */
 suspend fun <T> retryWithBackoff(
     operation: String,

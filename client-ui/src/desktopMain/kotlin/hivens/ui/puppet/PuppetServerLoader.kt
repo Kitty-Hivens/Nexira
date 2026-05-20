@@ -19,7 +19,7 @@ import java.util.ServiceLoader
  * Ktor server stack land in `desktopPuppetMain` and are added to the
  * compilation only when `-PauraPuppetPort=N` is on the Gradle command
  * line. Production builds therefore cannot accidentally bind the
- * control surface even if `-Daura.puppet.port=N` is set at runtime,
+ * control surface even if `-Dnexira.puppet.port=N` is set at runtime,
  * because no implementation exists to bind.
  */
 internal object PuppetServerLoader {
