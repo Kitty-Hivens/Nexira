@@ -241,15 +241,15 @@ have launchers negotiate via Accept header.
 
 Empirical RTT for `action=loader` from German residential IP (~470ms baseline RTT to RU):
 
-| Channel | RTT | Notes |
-|---|---|---|
-| HTTPS direct | **426 ms** | baseline target for 99% of users |
-| HTTP direct (no TLS) | 398 ms | server has plain HTTP listener on :80 too |
-| HTTPS via SOCKS5+auth proxy | **928 ms (+502 ms)** | proxy works correctly, ~50% overhead |
-| HTTP via SOCKS5+auth proxy | 489 ms | mixed mode |
-| HTTPS direct + HTTP/1.1 | 485 ms | no penalty for HTTP/1.1 |
-| HTTPS direct + HTTP/2 | 487 ms | **HTTP/2 works fine on smartycraft** |
-| HTTPS proxied + HTTP/2 | 731 ms | proxy supports HTTP/2 too |
+| Channel                     | RTT                  | Notes                                     |
+|-----------------------------|----------------------|-------------------------------------------|
+| HTTPS direct                | **426 ms**           | baseline target for 99% of users          |
+| HTTP direct (no TLS)        | 398 ms               | server has plain HTTP listener on :80 too |
+| HTTPS via SOCKS5+auth proxy | **928 ms (+502 ms)** | proxy works correctly, ~50% overhead      |
+| HTTP via SOCKS5+auth proxy  | 489 ms               | mixed mode                                |
+| HTTPS direct + HTTP/1.1     | 485 ms               | no penalty for HTTP/1.1                   |
+| HTTPS direct + HTTP/2       | 487 ms               | **HTTP/2 works fine on smartycraft**      |
+| HTTPS proxied + HTTP/2      | 731 ms               | proxy supports HTTP/2 too                 |
 
 ### Implications
 
