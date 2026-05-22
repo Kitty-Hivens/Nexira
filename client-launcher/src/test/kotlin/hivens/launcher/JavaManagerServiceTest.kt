@@ -30,6 +30,7 @@ import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertFails
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
@@ -246,6 +247,45 @@ class JavaManagerServiceTest {
         val found = svc.findJavaExecutable(jdkRoot)
         assertNotNull(found)
         assertEquals("java", found.fileName.toString())
+    }
+
+    // ── isJavaUsable: subprocess gate against broken JDK extractions ──────
+
+    @Test
+    @EnabledOnOs(OS.LINUX, OS.MAC)
+    fun `isJavaUsable returns true for runnable binary exiting 0`() {
+        val ok = workDir / "fakejava"
+        Files.writeString(ok, "#!/bin/sh\nexit 0\n")
+        ok.toFile().setExecutable(true)
+        assertTrue(svc.isJavaUsable(ok))
+    }
+
+    @Test
+    @EnabledOnOs(OS.LINUX, OS.MAC)
+    fun `isJavaUsable returns false for executable file with no valid interpreter`() {
+        // +x bit set but content is not a valid script or ELF -- the
+        // exec syscall fails and the spawned process never starts.
+        val broken = workDir / "garbage"
+        Files.writeString(broken, "this is not a script or executable")
+        broken.toFile().setExecutable(true)
+        assertFalse(svc.isJavaUsable(broken))
+    }
+
+    @Test
+    fun `isJavaUsable returns false for missing file`() {
+        assertFalse(svc.isJavaUsable(workDir / "does-not-exist"))
+    }
+
+    @Test
+    @EnabledOnOs(OS.LINUX, OS.MAC)
+    fun `isJavaUsable returns false when subprocess does not finish within timeout`() {
+        // A real broken JDK can hang during the dynamic linker stage. The
+        // 5s timeout fires and destroyForcibly cleans up; we must not
+        // wait forever.
+        val slow = workDir / "slow"
+        Files.writeString(slow, "#!/bin/sh\nsleep 30\n")
+        slow.toFile().setExecutable(true)
+        assertFalse(svc.isJavaUsable(slow))
     }
 
     // ── unzip: zip-slip protection (security-relevant) ───────────────────
@@ -541,16 +581,82 @@ class JavaManagerServiceTest {
         }
     }
 
+    @Test
+    @EnabledOnOs(OS.LINUX, OS.MAC)
+    fun `getJavaPath re-downloads when existing executable fails -version check`() {
+        // Pre-place a "java" with the +x bit but content that cannot
+        // execute (no shebang, no interpreter). isJavaUsable rejects it,
+        // the orchestrator must fall through to download instead of
+        // returning a path that would die with exit 127 when launched.
+        val runtimesRoot = workDir
+        val folderName = "java-21-linux-x64"
+        val targetDir = runtimesRoot / "runtimes" / folderName
+        val binDir = (targetDir / "bin").also { Files.createDirectories(it) }
+        Files.writeString(binDir / "java", "broken bytes with no shebang")
+        binDir.resolve("java").toFile().setExecutable(true)
+
+        val tarGz = synthesiseJdkTarGz("jdk-21.0.9+15/bin/java")
+        val provider = mockClientWithBytes(tarGz)
+
+        withSystemProp("os.name", "Linux") {
+            withSystemProp("os.arch", "amd64") {
+                val resolved = runBlocking {
+                    JavaManagerService(runtimesRoot, provider).getJavaPath("1.21.1")
+                }
+                assertEquals("java", resolved.fileName.toString())
+                assertTrue(
+                    svc.isJavaUsable(resolved),
+                    "re-downloaded Java must be runnable so the next call short-circuits",
+                )
+            }
+        }
+    }
+
+    @Test
+    @EnabledOnOs(OS.LINUX, OS.MAC)
+    fun `getJavaPath throws when freshly downloaded java fails -version check`() {
+        // Server returns a tarball whose "java" exists at the expected
+        // path with the +x bit but cannot run. This is the libjli-missing
+        // shape: findJavaExecutable returns a path, isJavaUsable rejects
+        // it, the orchestrator throws so the caller surfaces a clear
+        // error instead of handing back a path that will exit 127.
+        val runtimesRoot = workDir
+        val tarGz = synthesiseJdkTarGz(
+            "jdk-21.0.9+15/bin/java",
+            "unrunnable garbage with no shebang".toByteArray(),
+        )
+        val provider = mockClientWithBytes(tarGz)
+
+        withSystemProp("os.name", "Linux") {
+            withSystemProp("os.arch", "amd64") {
+                val ex = assertFails {
+                    runBlocking {
+                        JavaManagerService(runtimesRoot, provider).getJavaPath("1.21.1")
+                    }
+                }
+                assertTrue(
+                    ex is IOException &&
+                        ex.message?.contains("failed -version", ignoreCase = true) == true,
+                    "expected IOException about failed -version check, got ${ex::class.simpleName}: ${ex.message}",
+                )
+            }
+        }
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────
 
     /**
      * Build a minimal in-memory `.tar.gz` containing a single regular-file
-     * entry at [path] with execute-bit-set mode. Bytes are the literal
-     * "fake-jdk-binary" -- enough for findJavaExecutable to treat the file
-     * as a real binary candidate after extraction.
+     * entry at [path] with execute-bit-set mode. Default [payload] is a
+     * minimal shell script that exits 0 -- runnable enough for the
+     * isJavaUsable `-version` probe to return true after extraction.
+     * Override [payload] for tests that need an explicitly unrunnable
+     * binary (e.g. the libjli-missing shape).
      */
-    private fun synthesiseJdkTarGz(path: String): ByteArray {
-        val payload = "fake-jdk-binary".toByteArray()
+    private fun synthesiseJdkTarGz(
+        path: String,
+        payload: ByteArray = "#!/bin/sh\nexit 0\n".toByteArray(),
+    ): ByteArray {
         val out = ByteArrayOutputStream()
         GzipCompressorOutputStream(out).use { gz ->
             TarArchiveOutputStream(gz).use { tar ->

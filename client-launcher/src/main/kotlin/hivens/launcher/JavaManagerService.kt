@@ -16,6 +16,7 @@ import java.io.*
 import java.nio.file.*
 import java.nio.file.attribute.BasicFileAttributes
 import java.nio.file.attribute.PosixFilePermission
+import java.util.concurrent.TimeUnit
 
 class JavaManagerService(
     baseDir: Path,
@@ -37,9 +38,15 @@ class JavaManagerService(
         val folderName = "java-$javaVersion-$os-$arch"
         val targetDir = runtimesDir.resolve(folderName)
 
-        findJavaExecutable(targetDir)?.let { return@withContext it }
-
-        log.info("Java {} ({}/{}) was not found locally. We are starting to download...", javaVersion, os, arch)
+        val existing = findJavaExecutable(targetDir)
+        if (existing != null && isJavaUsable(existing)) {
+            return@withContext existing
+        }
+        if (existing != null) {
+            log.warn("Java at {} failed -version check, treating as broken and re-downloading", existing)
+        } else {
+            log.info("Java {} ({}/{}) was not found locally. We are starting to download...", javaVersion, os, arch)
+        }
         downloadAndUnpack(javaVersion, targetDir)
 
         val executable = findJavaExecutable(targetDir)
@@ -47,6 +54,10 @@ class JavaManagerService(
 
         if (os != "win") {
             setExecutablePermissions(executable)
+        }
+
+        if (!isJavaUsable(executable)) {
+            throw IOException("Java was downloaded and extracted, but $executable failed -version check. Archive may be corrupt or missing native loader files (e.g. libjli.so).")
         }
 
         return@withContext executable
@@ -124,6 +135,36 @@ class JavaManagerService(
                 }.findFirst().orElse(null)
             }
         } catch (_: Exception) { null }
+    }
+
+    /**
+     * Runs `<javaExe> -version` and returns true iff the process completes
+     * with exit code 0 within a few seconds. Detects JDKs whose binary exists
+     * and has the executable bit set but cannot actually launch — e.g. an
+     * extracted archive missing native loader files like `libjli.so`, where
+     * the dynamic linker fails before the JVM itself starts.
+     */
+    internal fun isJavaUsable(javaExe: Path): Boolean {
+        return try {
+            val process = ProcessBuilder(javaExe.toString(), "-version")
+                .redirectErrorStream(true)
+                .start()
+            // Drain the merged stream in a background daemon thread so a
+            // chatty JDK does not block on a full pipe buffer, and so a
+            // hanging child cannot keep us in readBytes() past the
+            // waitFor timeout. Daemon so JVM exit is never blocked by a
+            // stuck reader.
+            Thread {
+                try { process.inputStream.use { it.readBytes() } } catch (_: Exception) {}
+            }.apply { isDaemon = true }.start()
+            if (!process.waitFor(5, TimeUnit.SECONDS)) {
+                process.destroyForcibly()
+                return false
+            }
+            process.exitValue() == 0
+        } catch (_: Exception) {
+            false
+        }
     }
 
     private fun deleteDirectoryRecursively(path: Path) {
