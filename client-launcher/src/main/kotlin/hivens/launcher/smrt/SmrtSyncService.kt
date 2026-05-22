@@ -156,13 +156,14 @@ class SmrtSyncService(
     private suspend fun downloadToFile(url: String, dest: Path) {
         val tmp = dest.resolveSibling("${dest.fileName}.tmp")
         runCatching { Files.deleteIfExists(tmp) }
-        val channel = client.openDownloadStream(url)
-        FileOutputStream(tmp.toFile()).use { out ->
-            val buf = ByteArray(64 * 1024)
-            while (!channel.isClosedForRead) {
-                val n = channel.readAvailable(buf, 0, buf.size)
-                if (n <= 0) break
-                out.write(buf, 0, n)
+        client.downloadStreaming(url) { channel ->
+            FileOutputStream(tmp.toFile()).use { out ->
+                val buf = ByteArray(64 * 1024)
+                while (!channel.isClosedForRead) {
+                    val n = channel.readAvailable(buf, 0, buf.size)
+                    if (n <= 0) break
+                    out.write(buf, 0, n)
+                }
             }
         }
         Files.move(tmp, dest, java.nio.file.StandardCopyOption.REPLACE_EXISTING)

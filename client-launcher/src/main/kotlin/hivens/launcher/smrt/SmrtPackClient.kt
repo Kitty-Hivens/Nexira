@@ -5,12 +5,11 @@ import hivens.core.api.dto.smrt.ModrinthVersion
 import hivens.core.api.dto.smrt.SmrtPackListing
 import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.dto.smrt.SmrtPackSummary
-import io.ktor.client.call.body
 import io.ktor.client.request.get
+import io.ktor.client.request.prepareGet
+import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.client.statement.bodyAsText
-import io.ktor.client.statement.HttpResponse
-import io.ktor.http.HttpStatusCode
 import io.ktor.http.isSuccess
 import io.ktor.utils.io.ByteReadChannel
 import kotlinx.serialization.json.Json
@@ -66,18 +65,30 @@ class SmrtPackClient(
         getJson("$MODRINTH_API_BASE/v2/project/$projectId/version/$versionId")
 
     /**
-     * Stream a download into a callback. Used for file-by-file fetching
-     * so the per-file progress can be tracked and the buffer never
-     * holds the whole jar in RAM. Caller writes the channel to disk.
+     * Stream a download through a caller-supplied consumer. The
+     * consumer must drain (or copy out of) the channel before the
+     * lambda returns -- the underlying response is closed on exit and
+     * the channel becomes invalid.
+     *
+     * The `prepareGet().execute { }` pattern is mandatory here: a
+     * plain `get(url).bodyAsChannel()` would route through ktor's
+     * SavedHttpCall, which loads the entire response into a single
+     * ByteArray before exposing the channel. On a 24 MB resource pack
+     * with concurrent downloads that triggers OutOfMemoryError on the
+     * compose-desktop heap. execute{} bypasses SavedHttpCall and gives
+     * a true streaming channel; the 64 KB read loop downstream keeps
+     * resident memory bounded regardless of file size.
      */
-    suspend fun openDownloadStream(url: String): ByteReadChannel {
-        val resp = httpProvider.current.get(url) {
+    suspend fun downloadStreaming(url: String, consume: suspend (ByteReadChannel) -> Unit) {
+        httpProvider.current.prepareGet(url) {
             headers.append("User-Agent", USER_AGENT)
+        }.execute { resp ->
+            if (!resp.status.isSuccess()) {
+                val body = runCatching { resp.bodyAsText() }.getOrDefault("")
+                throw IOException("GET $url failed: ${resp.status} body=$body")
+            }
+            consume(resp.bodyAsChannel())
         }
-        if (!resp.status.isSuccess()) {
-            throw IOException("GET $url failed: ${resp.status}")
-        }
-        return resp.bodyAsChannel()
     }
 
     private suspend inline fun <reified T> getJson(url: String): T {
