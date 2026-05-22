@@ -63,6 +63,20 @@ class FileDownloadService(
         val manifest = session.fileManifest ?: throw IOException("File manifest is empty!")
         Files.createDirectories(targetDir)
 
+        // ── Disabled-mod cleanup runs UNCONDITIONALLY ────────────────────
+        // Must precede the cache short-circuit below: a stale jar in
+        // top-level mods/ (from a prior install where the upstream
+        // manifest placed the mod there, or from SC's own launcher)
+        // never appears in the current manifest's filesMap, so the
+        // integrity walk doesn't notice it. Cache hit then skips the
+        // walk too, and Forge happily loads a "disabled" mod every
+        // launch. The cost is one Files.walk over a few-hundred-entry
+        // tree -- well under 50 ms on SSD, negligible against the rest
+        // of launch latency.
+        if (!ignoredFiles.isNullOrEmpty()) {
+            cleanupIgnoredFiles(targetDir, ignoredFiles)
+        }
+
         // ── Manifest cache short-circuit ─────────────────────────────────
         // If this same manifest *with the same ignoredFiles set* was
         // successfully synced recently (≤TTL), skip the full per-file
@@ -72,11 +86,11 @@ class FileDownloadService(
         // TTL inside ManifestCache is the safety valve for "what if a
         // file got corrupted on disk?" scenarios.
         //
-        // ignoredFiles is part of the cache input because
-        // cleanupIgnoredFiles (which physically deletes disabled mod
-        // jars) lives below this gate -- caching only on manifest hash
-        // would let a freshly-disabled mod stay loaded until the cache
-        // expires or the manifest changes upstream.
+        // ignoredFiles is still part of the cache key so a toggle change
+        // invalidates the cache and forces the full integrity walk;
+        // cleanupIgnoredFiles above is the belt that catches stale jars,
+        // the cache key is the suspenders that catches missing
+        // newly-enabled jars.
         val manifestHash = manifestCache.hashOf(cacheKeyInputFor(manifest, ignoredFiles))
         // Disk-sanity gate: the manifest-cache file alone can't tell
         // that the user moved their data dir leaving manifest-cache/
@@ -117,13 +131,14 @@ class FileDownloadService(
             return@withContext
         }
 
-        // 2. Filtering
+        // 2. Filtering -- remove disabled mods from the download set.
+        // (Their on-disk copies, if any, were already removed by the
+        // unconditional cleanupIgnoredFiles pass above the cache gate.)
         if (!ignoredFiles.isNullOrEmpty()) {
             filesMap.keys.removeIf { relativePath ->
                 val clean = normalizePath(relativePath)
                 ignoredFiles.any { clean.endsWith("/$it") || clean == it }
             }
-            cleanupIgnoredFiles(targetDir, ignoredFiles)
         }
 
         // 3. Downloading
@@ -585,34 +600,46 @@ class FileDownloadService(
         if (ignoredFiles.isEmpty()) return
 
         val modsDir = baseDir.resolve("mods")
-        var deletedCount = 0
+        if (!Files.exists(modsDir)) return
 
-        if (Files.exists(modsDir)) {
-            try {
-                // .use{} closes the underlying directory stream; Files.walk holds
-                // an OS file handle that won't be released by .forEach termination.
-                Files.walk(modsDir).use { stream ->
-                    stream
-                        .filter { Files.isRegularFile(it) }
-                        .forEach { file ->
-                            val fileName = file.fileName.toString()
-                            if (ignoredFiles.contains(fileName)) {
-                                try {
-                                    Files.delete(file)
-                                    deletedCount++
-                                } catch (e: Exception) {
-                                    logger.warn("Failed to remove disabled mod: $fileName", e)
-                                }
+        var deletedCount = 0
+        var failureCount = 0
+
+        // Recursive walk covers both top-level mods/ and version subdirs
+        // like mods/1.12.2/. A jar gets matched by basename so the
+        // ignoredFiles set can contain plain names ("FoamFix.jar")
+        // regardless of where the manifest currently places it. Catches
+        // the case where SC moved the jar between top-level and a
+        // version subdir across releases -- without this, the old copy
+        // in the old location would survive and Forge would load a
+        // user-disabled mod.
+        try {
+            Files.walk(modsDir).use { stream ->
+                stream
+                    .filter { Files.isRegularFile(it) }
+                    .forEach { file ->
+                        val fileName = file.fileName.toString()
+                        if (ignoredFiles.contains(fileName)) {
+                            try {
+                                Files.delete(file)
+                                deletedCount++
+                                logger.debug("Removed disabled mod jar: {}", file)
+                            } catch (e: Exception) {
+                                failureCount++
+                                logger.warn("Failed to remove disabled mod jar: {}", file, e)
                             }
                         }
-                }
-            } catch (e: Exception) {
-                logger.error("Error cleaning mods folder: ${e.message}")
+                    }
             }
+        } catch (e: Exception) {
+            logger.error("Error walking mods folder during cleanup", e)
         }
 
-        if (deletedCount > 0) {
-            logger.info("Client cleanup: deleted $deletedCount disabled mods.")
+        if (deletedCount > 0 || failureCount > 0) {
+            logger.info(
+                "Disabled-mod cleanup: removed {}, failures {}",
+                deletedCount, failureCount,
+            )
         }
     }
 }
