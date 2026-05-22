@@ -292,6 +292,71 @@ class FileDownloadDiskIntegrationTest {
             "post-truncation sync must refetch -- cache must NOT short-circuit when size doesn't match manifest")
     }
 
+    // ── Stale disabled jars in legacy location ────────────────────────────
+
+    @Test
+    fun `cleanup deletes disabled jar in top-level mods even when cache is hot`() = runBlocking {
+        // Scenario: SC's manifest used to place FoamFix at top-level
+        // mods/FoamFix.jar; a later release moved it into the version
+        // subdir mods/1.12.2/FoamFix.jar. The user has the mod disabled.
+        // The current manifest only references the subdir path, so the
+        // integrity walk never inspects the top-level legacy copy --
+        // without an unconditional cleanup pass, Forge happily loads the
+        // "disabled" mod from the stale top-level path every launch.
+        val keeperBytes = "still-here".toByteArray()
+        val files = mapOf("mods/1.12.2/FoamFix.jar" to "current-version".toByteArray())
+        val manifest = manifestOf(files + mapOf("mods/keeper.jar" to keeperBytes))
+        val (svc, _) = newService(files + mapOf("mods/keeper.jar" to keeperBytes))
+
+        // Pre-populate the stale top-level jar (the historical install).
+        Files.createDirectories(clientDir.resolve("mods"))
+        Files.write(clientDir.resolve("mods/FoamFix.jar"), "legacy-bytes".toByteArray())
+        Files.write(clientDir.resolve("mods/keeper.jar"), keeperBytes)
+
+        val ignored = setOf("FoamFix.jar")
+
+        // First sync: cache cold, integrity walk runs, cleanup runs.
+        svc.processSession(sessionWith(manifest), "Industrial", clientDir, null, ignored, null, null)
+        assertTrue(!Files.exists(clientDir.resolve("mods/FoamFix.jar")),
+            "stale top-level disabled jar must be removed on first sync")
+        assertTrue(Files.exists(clientDir.resolve("mods/keeper.jar")),
+            "non-ignored jar must be preserved")
+
+        // Reintroduce the stale jar (simulating an external write between launches)
+        // and confirm cleanup still fires on the next sync even when the
+        // manifest cache would short-circuit the integrity walk.
+        Files.write(clientDir.resolve("mods/FoamFix.jar"), "legacy-bytes-again".toByteArray())
+        svc.processSession(sessionWith(manifest), "Industrial", clientDir, null, ignored, null, null)
+        assertTrue(!Files.exists(clientDir.resolve("mods/FoamFix.jar")),
+            "cleanup must run before the cache short-circuit so a reintroduced stale jar still gets removed")
+    }
+
+    @Test
+    fun `cleanup deletes disabled jar from version subdir alongside top-level`() = runBlocking {
+        // The cleanup walk must hit both `mods/` directly and `mods/{mc}/`
+        // -- some mods appear in both locations during the upstream
+        // transition period, and missing either side would leave Forge
+        // loading the disabled mod from whichever copy survived.
+        val files = mapOf("mods/keeper.jar" to "keep me".toByteArray())
+        val manifest = manifestOf(files)
+        val (svc, _) = newService(files)
+
+        Files.createDirectories(clientDir.resolve("mods/1.12.2"))
+        Files.write(clientDir.resolve("mods/FoamFix.jar"), "top".toByteArray())
+        Files.write(clientDir.resolve("mods/1.12.2/FoamFix.jar"), "sub".toByteArray())
+        Files.write(clientDir.resolve("mods/keeper.jar"), files.values.first())
+
+        svc.processSession(sessionWith(manifest), "Industrial", clientDir,
+            null, setOf("FoamFix.jar"), null, null)
+
+        assertTrue(!Files.exists(clientDir.resolve("mods/FoamFix.jar")),
+            "top-level disabled jar must be removed")
+        assertTrue(!Files.exists(clientDir.resolve("mods/1.12.2/FoamFix.jar")),
+            "version-subdir disabled jar must be removed")
+        assertTrue(Files.exists(clientDir.resolve("mods/keeper.jar")),
+            "non-ignored jar must survive cleanup")
+    }
+
     // ── Network failure ───────────────────────────────────────────────────
 
     @Test
