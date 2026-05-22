@@ -65,6 +65,34 @@ class SmrtSyncService(
             progress?.invoke(current, total, asset.dest)
             syncAsset(asset, clientDir)
         }
+
+        // Prune jars in mods/ that the manifest does not declare. Without
+        // this, a switch from the SC sync to the mirror sync leaves the
+        // previous SC payload (e.g. SC's proprietary Smarty jar) sitting
+        // next to the mirror-published files; both register the same
+        // FML channel and the game crashes with "That channel is already
+        // registered". Scope is mods/ only; static-asset trees are left
+        // alone so user-added resource packs and configs survive.
+        pruneOrphanMods(clientDir, manifest.mods.map { it.filename }.toSet())
+    }
+
+    private fun pruneOrphanMods(clientDir: Path, expected: Set<String>) {
+        val modsDir = clientDir.resolve("mods")
+        if (!Files.isDirectory(modsDir)) return
+        var removed = 0
+        Files.walk(modsDir).use { stream ->
+            stream.filter { Files.isRegularFile(it) && it.fileName.toString().endsWith(".jar") }
+                .forEach { jar ->
+                    if (jar.fileName.toString() !in expected) {
+                        runCatching {
+                            Files.delete(jar)
+                            removed++
+                            log.debug("smrt sync: pruned orphan jar {}", jar)
+                        }.onFailure { log.warn("smrt sync: failed to prune {}", jar, it) }
+                    }
+                }
+        }
+        if (removed > 0) log.info("smrt sync: pruned {} orphan jar(s) from mods/", removed)
     }
 
     /**
