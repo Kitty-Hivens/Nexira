@@ -303,6 +303,8 @@ object RussianStrings : AppStrings {
     override val settingsAutoSyncAllPacksDesc   = "Тихо обновлять все уже установленные сборки в фоне при старте лаунчера. Тратит фоновый трафик — полезно если играешь на нескольких серверах и хочешь свежее состояние без клика по каждому."
     override val settingsJvmBuilder             = "Визуальный конструктор JVM-аргументов"
     override val settingsJvmBuilderDesc         = "Показывает кнопку «Собрать аргументы» в настройках сервера. Выбираешь сборщик мусора, настраиваешь регионы хипа, включаешь AppCDS или JFR — без необходимости помнить флаги. Готовые пресеты: Aikar's recipe, GTNH-класс, ZGC для больших хипов и другие."
+    override val settingsExperimentalMirror     = "Hivens Mirror (alpha)"
+    override val settingsExperimentalMirrorDesc = "Качать файлы сборки Industrial через smrt.hivens.dev вместо CDN SmartyCraft. Авторизация и адреса игровых серверов идут через SC как обычно; меняется только источник синхронизации файлов. Alpha — пока только Industrial доступна на зеркале, остальные сборки качаются с SC. На любой ошибке зеркала — падаем громко с понятной ошибкой, без тихого фолбэка на SC, чтобы поломка зеркала была видна сразу."
     override val settingsMimicVersion           = "Подмена версии лаунчера"
     override val settingsMimicVersionDesc       = "Зафиксировать строку версии, которая отправляется в рукопожатии и User-Agent. Оставь пустым для стандартного значения — заполни только если апстрим успел поднять свою версию быстрее цикла релизов Nexira. Применяется на следующем запросе к протоколу после сохранения, перезапуск не требуется."
     override fun settingsMimicVersionPlaceholder(default: String) = "По умолчанию: $default"
