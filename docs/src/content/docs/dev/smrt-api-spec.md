@@ -63,8 +63,10 @@ Optional, additive-only metadata on both mod and asset entries. Clients ignore t
 
 - `name` -- human-readable label. Defaults to filename with extension stripped.
 - `description` -- short text shown next to the toggle. Markdown allowed for emphasis only (no images / no script). Defaults to empty.
-- `category` -- semantic group identifier. Free-form string; well-known values include `minimap`, `world-overlay`, `inventory`, `performance`, `audio`, `visual`, `client-cosmetic`, `shader`, `resource-pack`, `config`, `ui`. Launchers may group entries with the same category in the UI; unknown values fall back to "Other".
+- `category` -- semantic group identifier. Free-form string; well-known values include `minimap`, `world-overlay`, `inventory`, `performance`, `audio`, `visual`, `client-cosmetic`, `shader`, `resource-pack`, `config`, `ui`, `render`, `tooltip`, `recipe-viewer`, `world-tools`, `chat`, `misc`, `content`, `cosmetic`, `admin-tool`, `lib`. Launchers may group entries with the same category in the UI; unknown values fall back to "Other". The `lib` category is a convention for hidden-from-UI dependencies that should always install when the depending entry is enabled.
 - `incompatible_with` -- array of `filename` (for mods) or `dest` (for assets) strings. Two entries in this list are mutually exclusive; a launcher may render a `minimap` category whose members are pair-wise incompatible as a radio group rather than checkboxes.
+- `license` -- SPDX identifier where known (e.g. `MIT`, `LGPL-3.0-only`, `CC-BY-NC-SA-3.0`). Lets a launcher flag non-redistributable mods to the user. Absent for proprietary mods without an SPDX-compatible declaration.
+- `url` -- source / project / wiki link. Used for a "Learn more" affordance. Preferred sources in order: the mod's own `mcmod.info`/`mods.toml` URL, the Modrinth project's `source_url`, the CurseForge project page.
 
 The block is purely advisory. It does not affect handshake, download routing, or file resolution -- only how a launcher shows the entry. Adding or removing `display` fields is forward-compatible and does not bump `schema_version`.
 
@@ -145,7 +147,9 @@ GET /v1/packs/{pack_id}/manifest/{version}   -> specific version
         "name": "Sodium (1.12 fork)",
         "description": "Render-thread rewrite for higher FPS. Conflicts with OptiFine.",
         "category": "performance",
-        "incompatible_with": ["OptiFine.jar"]
+        "incompatible_with": ["OptiFine.jar"],
+        "license": "LGPL-3.0-only",
+        "url": "https://github.com/CaffeineMC/sodium-fabric"
       }
     }
   ],
