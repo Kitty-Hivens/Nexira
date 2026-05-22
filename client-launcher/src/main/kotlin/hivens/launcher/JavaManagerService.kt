@@ -159,6 +159,13 @@ class JavaManagerService(
             }.apply { isDaemon = true }.start()
             if (!process.waitFor(5, TimeUnit.SECONDS)) {
                 process.destroyForcibly()
+                // destroyForcibly is async (SIGKILL on Linux,
+                // TerminateProcess on Windows). Block briefly so file
+                // handles release before the caller deletes targetDir
+                // -- on Windows a still-alive java.exe keeps extracted
+                // files locked, turning the recovery re-download into
+                // an exception loop.
+                process.waitFor(3, TimeUnit.SECONDS)
                 return false
             }
             process.exitValue() == 0
