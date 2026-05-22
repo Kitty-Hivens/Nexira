@@ -302,6 +302,8 @@ object EnglishStrings : AppStrings {
     override val settingsAutoSyncAllPacksDesc   = "Quietly refresh every server pack you've already installed when the launcher starts. Costs background bandwidth — useful if you switch between many servers and want fresh state without clicking each one."
     override val settingsJvmBuilder             = "Visual JVM args builder"
     override val settingsJvmBuilderDesc         = "Reveals a 'Build args' button in the per-server constructor. Pick a GC algorithm, tune heap regions, enable AppCDS or JFR profiling — without memorizing flags. Curated presets cover Aikar's recipe, GTNH-class heavy modded, ZGC for huge heaps, and more."
+    override val settingsExperimentalMirror     = "Hivens Mirror (alpha)"
+    override val settingsExperimentalMirrorDesc = "Route Industrial's pack files through smrt.hivens.dev instead of SmartyCraft's CDN. Auth and game-server addresses stay on SC; only the sync source changes. Alpha — only Industrial is published on the mirror, every other pack still syncs from SC. Loud failure on mirror error; no silent fallback to SC, so a broken mirror sync surfaces immediately rather than masking behind a working-but-stale SC sync."
     override val settingsMimicVersion           = "Mimic launcher version override"
     override val settingsMimicVersionDesc       = "Pin the version string sent to upstream in the handshake and User-Agent. Leave blank to use the shipped default — set this only when upstream has bumped its version pin faster than Nexira's release cycle. Takes effect on the next protocol call after save; no restart needed."
     override fun settingsMimicVersionPlaceholder(default: String) = "Default: $default"

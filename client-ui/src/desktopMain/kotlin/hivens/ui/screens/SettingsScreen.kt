@@ -494,6 +494,26 @@ fun SettingsScreen(
 
                     Spacer(Modifier.height(16.dp))
 
+                    // ── Hivens Mirror ─────────────────────────────────────────
+                    // Routes Industrial's sync source to smrt.hivens.dev. Auth
+                    // and game-server addresses stay on SC; only file delivery
+                    // swaps. Other packs ignore the flag. Errors surface; no
+                    // silent fallback to the SC sync path.
+                    SettingsRowWithDescription(
+                        title          = s.settingsExperimentalMirror,
+                        description    = s.settingsExperimentalMirrorDesc,
+                        icon           = Icons.Default.Cloud,
+                        iconTint       = CelestiaTheme.colors.primary,
+                        checked        = form.experimentalEnabled && form.experimentalMirror,
+                        enabled        = form.experimentalEnabled,
+                        onCheckedChange = { form.experimentalMirror = it; save() }
+                    )
+                    PuppetToggle("settings.experimentalMirror", form.experimentalMirror, enabled = form.experimentalEnabled) {
+                        form.experimentalMirror = it; save()
+                    }
+
+                    Spacer(Modifier.height(16.dp))
+
                     // ── Mimic launcher version override ───────────────────────
                     // Toggle row + revealed text input. Doubly gated: master
                     // experimental switch AND the row's own toggle. Saving an
@@ -918,6 +938,7 @@ private class SettingsFormState(initial: SettingsData) {
     var prereleaseChannel      by mutableStateOf(initial.prereleaseChannelEnabled)
     var autoSyncAllPacks       by mutableStateOf(initial.autoSyncAllPacks)
     var jvmBuilderEnabled      by mutableStateOf(initial.jvmBuilderEnabled)
+    var experimentalMirror     by mutableStateOf(initial.experimentalMirrorEnabled)
     var forceProxyMode         by mutableStateOf(initial.forceProxyMode)
     var mimicOverrideEnabled   by mutableStateOf(!initial.mimicVersionOverride.isNullOrBlank())
     var mimicVersionText       by mutableStateOf(initial.mimicVersionOverride ?: "")
@@ -944,6 +965,7 @@ private class SettingsFormState(initial: SettingsData) {
             prereleaseChannelEnabled    = prereleaseChannel,
             autoSyncAllPacks            = autoSyncAllPacks,
             jvmBuilderEnabled           = jvmBuilderEnabled,
+            experimentalMirrorEnabled   = experimentalMirror,
             forceProxyMode              = forceProxyMode,
             mimicVersionOverride        = normalisedMimic,
         )

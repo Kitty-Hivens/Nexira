@@ -22,6 +22,8 @@ import hivens.launcher.component.GameCommandBuilder
 import hivens.launcher.component.ProcessLogHandler
 import hivens.launcher.launch.LauncherController
 import hivens.launcher.platform.PlatformPaths
+import hivens.launcher.smrt.SmrtPackClient
+import hivens.launcher.smrt.SmrtSyncService
 import hivens.launcher.security.KeyringStorageFactory
 import hivens.launcher.update.UpdateApplicators
 import hivens.launcher.update.UpdateService
@@ -377,6 +379,13 @@ val appModule = module {
         ManifestCache(dataDir.resolve("manifest-cache"), get())
     }
     single<IFileDownloadService> { FileDownloadService(get(), get(), get(), get<ServerProtocolConfig>()) }
+
+    // Hivens Mirror sync. Uses the "direct" HttpClient because
+    // smrt.hivens.dev and Modrinth are public CDN-fronted endpoints
+    // that don't need the SC channel's SOCKS proxy or SSL bypass.
+    // Always wired so toggling on at runtime requires no graph rebuild.
+    single { SmrtPackClient(get(named("direct"))) }
+    single { SmrtSyncService(get(), get()) }
 
     single<IManifestProcessorService> { ManifestProcessorService(get()) }
     single { ProfileManager(get(), get()) }
