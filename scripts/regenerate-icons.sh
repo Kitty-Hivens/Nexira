@@ -45,13 +45,23 @@ mkdir -p "$DRAWABLE" "$HICOLOR"
 echo "── app-icon.png  →  variants ──────────────────────────────────────────"
 
 # Compose desktop Linux iconFile — generous resolution for HiDPI scaling.
-"${IM[@]}" "$APP_SRC" -resize 1024x1024 -strip -define png:compression-level=9 \
+# png:color-type=6 forces RGBA output; without it ImageMagick detects the
+# bilevel source as colorless and writes a 2-channel graya PNG which some
+# Linux compositors fail to decode for _NET_WM_ICON, leaving the launcher
+# window without an icon in the dock / app switcher.
+"${IM[@]}" "$APP_SRC" -resize 1024x1024 -strip \
+    -define png:color-type=6 -define png:compression-level=9 \
     "$DRAWABLE/icon.png"
 
-# AppImage hicolor sizes (referenced by build_release.yml).
-"${IM[@]}" "$APP_SRC" -resize 256x256 -strip -define png:compression-level=9 \
+# AppImage hicolor sizes (referenced by build_release.yml). Same RGBA
+# forcing as the Compose drawable above -- AppImageLauncher / appimaged
+# integration extract these into ~/.local/share/icons/hicolor/.../apps/
+# and the desktop env reads them via the same icon-theme code path.
+"${IM[@]}" "$APP_SRC" -resize 256x256 -strip \
+    -define png:color-type=6 -define png:compression-level=9 \
     "$HICOLOR/256x256.png"
-"${IM[@]}" "$APP_SRC" -resize 512x512 -strip -define png:compression-level=9 \
+"${IM[@]}" "$APP_SRC" -resize 512x512 -strip \
+    -define png:color-type=6 -define png:compression-level=9 \
     "$HICOLOR/512x512.png"
 
 # Multi-size .ico for Windows. Single-size ICO (the prior state) renders
