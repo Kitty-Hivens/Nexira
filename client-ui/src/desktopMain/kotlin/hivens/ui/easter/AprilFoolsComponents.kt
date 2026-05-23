@@ -2,7 +2,6 @@ package hivens.ui.easter
 
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
@@ -313,12 +312,17 @@ fun AprilFoolsButton(
     }
 
     // ── Render ────────────────────────────────────────────────────────────
+    // No Modifier.hoverable here -- the Button itself emits hover into
+    // interactionSource via its internal clickable. Adding hoverable on
+    // top double-emits, which in Compose Multiplatform 1.11 + M3 1.11
+    // alpha resulted in a second hover state layer painting beside the
+    // correct rounded one (user-reported 2026-05-23). The collectIsHoveredAsState
+    // below picks up the Button's emissions just as well.
     Button(
         onClick = onClick,
         enabled = enabled,
         modifier = modifier
             .offset { IntOffset(animFleeX.toInt(), animFleeY.toInt()) }
-            .hoverable(interactionSource)
             .onGloballyPositioned { coords ->
                 // Update origin so the engine knows where to snap the overlay clone
                 btn.originPx = coords.positionInWindow()
@@ -440,14 +444,16 @@ fun AprilFoolsCloseDialog(
                         ) { Text(s.aprilCloseHideTray) }
                     }
 
-                    // Close (right side, runs away)
+                    // Close (right side, runs away). Same single-source rule
+                    // as the chaos AprilFoolsButton -- no extra
+                    // Modifier.hoverable on top of Button.interactionSource,
+                    // otherwise hover paints twice.
                     Button(
                         onClick  = { if (surrendered) onConfirmClose() },
                         enabled  = surrendered,
                         modifier = Modifier
                             .align(Alignment.CenterEnd)
-                            .offset { IntOffset(animCloseX.toInt(), animCloseY.toInt()) }
-                            .hoverable(closeBtnInteraction),
+                            .offset { IntOffset(animCloseX.toInt(), animCloseY.toInt()) },
                         colors = ButtonDefaults.buttonColors(
                             containerColor         = CelestiaTheme.colors.error,
                             disabledContainerColor = CelestiaTheme.colors.error.copy(alpha = 0.75f),
