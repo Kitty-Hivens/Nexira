@@ -1,9 +1,14 @@
 package hivens.ui.easter
 
+import androidx.compose.foundation.IndicationNodeFactory
+import androidx.compose.foundation.LocalIndication
+import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonColors
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.node.DelegatableNode
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.compose.ui.Modifier
@@ -58,19 +63,26 @@ object NoOpAprilFools : AprilFoolsLifecycle {
         enabled: Boolean,
         colors: ButtonColors,
     ) {
-        // Explicit shape: M3 Button's default ButtonDefaults.shape is the
-        // "Full" token (pill, 50%) which our Shapes() constructor doesn't
-        // surface. Without overriding here, every chaos-target Button
-        // would render as a pill regardless of the active style. Pinning
-        // to shapes.small routes through the style's buttonCorner.
-        Button(
-            onClick  = onClick,
-            modifier = modifier,
-            enabled  = enabled,
-            colors   = colors,
-            shape    = MaterialTheme.shapes.small,
-        ) {
-            Text(text)
+        // Suppress M3's default ripple/state-layer indication, then
+        // render a normal M3 Button. Compose Multiplatform 1.11 + M3
+        // 1.11-alpha07 paint the state-layer with a shape that doesn't
+        // line up with the container shape, producing the "rectangle
+        // beside the rounded spot" the user flagged 2026-05-23. With
+        // LocalIndication overridden to a no-op, the Button still has
+        // a rest container, still receives click events, still
+        // forwards hover into its internal interactionSource -- it
+        // just doesn't paint a hover overlay. Cursor change to pointer
+        // is the remaining hover affordance.
+        CompositionLocalProvider(LocalIndication provides NoOpIndication) {
+            Button(
+                onClick  = onClick,
+                modifier = modifier,
+                enabled  = enabled,
+                colors   = colors,
+                shape    = MaterialTheme.shapes.small,
+            ) {
+                Text(text)
+            }
         }
     }
 
@@ -101,4 +113,25 @@ private object NoOpCardTracker : ChaosCardTracker {
     override fun setOrigin(positionInWindow: Offset) = Unit
     override fun setOnClick(onClick: () -> Unit) = Unit
     override fun release() = Unit
+}
+
+/**
+ * Indication that paints nothing -- the node it returns is an empty
+ * [Modifier.Node] that doesn't react to any interaction. Used to
+ * suppress M3's default ripple/state-layer on chaos buttons where
+ * Compose Multiplatform 1.11 + M3 1.11-alpha07 was painting the
+ * hover overlay with a shape that didn't line up with the Button
+ * container.
+ *
+ * Implements [IndicationNodeFactory], the non-deprecated successor
+ * to the old `Indication`/`IndicationInstance` pair. Singleton
+ * object so equality / hashCode are by identity.
+ */
+private object NoOpIndication : IndicationNodeFactory {
+    private class EmptyNode : Modifier.Node()
+
+    override fun create(interactionSource: InteractionSource): DelegatableNode = EmptyNode()
+
+    override fun equals(other: Any?): Boolean = other === this
+    override fun hashCode(): Int = System.identityHashCode(this)
 }
