@@ -51,11 +51,24 @@ Ordering is **numeric tuple comparison with missing trailing segments treated as
 
 ### Mod entry
 
-One entry in a pack manifest's `mods` array. Identified by `filename` (the destination name in the client's `mods/` directory). Carries the canonical SHA-1, expected size, required/optional flag, and a single `source` pointer.
+One entry in a pack manifest's `mods` array. Identified by `filename` (the destination name in the client's `mods/` directory). Carries the canonical SHA-1, expected size, required/optional flag, a single `source` pointer, and an optional `display` block with human-readable metadata for the launcher UI.
 
 ### Asset entry
 
-One entry in a pack manifest's `assets` array. Carries a destination path (`dest`) within the pack root, expected SHA-1, expected size, required/optional flag, and a single `source` pointer. Covers everything that is not a mod jar: mod configs, options.txt, resource packs, shader packs, server lists, Nexira UI overrides, anything pack-unique.
+One entry in a pack manifest's `assets` array. Carries a destination path (`dest`) within the pack root, expected SHA-1, expected size, required/optional flag, a single `source` pointer, and an optional `display` block. Covers everything that is not a mod jar: mod configs, options.txt, resource packs, shader packs, server lists, Nexira UI overrides, anything pack-unique.
+
+### Display block
+
+Optional, additive-only metadata on both mod and asset entries. Clients ignore the whole block if absent and fall back to defaults derived from `filename` / `dest`. Fields:
+
+- `name` -- human-readable label. Defaults to filename with extension stripped.
+- `description` -- short text shown next to the toggle. Markdown allowed for emphasis only (no images / no script). Defaults to empty.
+- `category` -- semantic group identifier. Free-form string; well-known values include `minimap`, `world-overlay`, `inventory`, `performance`, `audio`, `visual`, `client-cosmetic`, `shader`, `resource-pack`, `config`, `ui`, `render`, `tooltip`, `recipe-viewer`, `world-tools`, `chat`, `misc`, `content`, `cosmetic`, `admin-tool`, `lib`. Launchers may group entries with the same category in the UI; unknown values fall back to "Other". The `lib` category is a convention for hidden-from-UI dependencies that should always install when the depending entry is enabled.
+- `incompatible_with` -- array of `filename` (for mods) or `dest` (for assets) strings. Two entries in this list are mutually exclusive; a launcher may render a `minimap` category whose members are pair-wise incompatible as a radio group rather than checkboxes.
+- `license` -- SPDX identifier where known (e.g. `MIT`, `LGPL-3.0-only`, `CC-BY-NC-SA-3.0`). Lets a launcher flag non-redistributable mods to the user. Absent for proprietary mods without an SPDX-compatible declaration.
+- `url` -- source / project / wiki link. Used for a "Learn more" affordance. Preferred sources in order: the mod's own `mcmod.info`/`mods.toml` URL, the Modrinth project's `source_url`, the CurseForge project page.
+
+The block is purely advisory. It does not affect handshake, download routing, or file resolution -- only how a launcher shows the entry. Adding or removing `display` fields is forward-compatible and does not bump `schema_version`.
 
 ### Source
 
@@ -129,6 +142,14 @@ GET /v1/packs/{pack_id}/manifest/{version}   -> specific version
         "type": "modrinth",
         "project_id": "...",
         "version_id": "..."
+      },
+      "display": {
+        "name": "Sodium (1.12 fork)",
+        "description": "Render-thread rewrite for higher FPS. Conflicts with OptiFine.",
+        "category": "performance",
+        "incompatible_with": ["OptiFine.jar"],
+        "license": "LGPL-3.0-only",
+        "url": "https://github.com/CaffeineMC/sodium-fabric"
       }
     }
   ],
