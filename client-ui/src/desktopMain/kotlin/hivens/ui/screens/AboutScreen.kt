@@ -40,7 +40,7 @@ import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
 import org.koin.compose.koinInject
 import org.slf4j.LoggerFactory
-import hivens.ui.utils.SystemActions
+import hivens.ui.platform.SystemActions
 import java.lang.management.ManagementFactory
 import java.text.SimpleDateFormat
 import java.util.*
@@ -396,7 +396,7 @@ fun AboutScreen(onBack: () -> Unit) {
                                 Button(
                                     onClick = { showUpdateDialog = true },
                                     modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(10.dp),
+                                    shape = MaterialTheme.shapes.small,
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = if (state.update.isCritical)
                                             CelestiaTheme.colors.error
@@ -534,7 +534,7 @@ private fun LinkButton(label: String, url: String, icon: ImageVector) {
             SystemActions.openUrl(url)
         },
         modifier = Modifier.fillMaxWidth(),
-        shape    = RoundedCornerShape(8.dp),
+        shape    = MaterialTheme.shapes.small,
         border   = BorderStroke(1.dp, CelestiaTheme.colors.outline.copy(alpha = 0.2f))
     ) {
         Icon(icon, null, modifier = Modifier.size(16.dp), tint = CelestiaTheme.colors.primary)

@@ -36,7 +36,7 @@ import hivens.ui.puppet.PuppetField
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.puppet.PuppetToggle
 import hivens.ui.theme.CelestiaTheme
-import hivens.ui.utils.SystemActions
+import hivens.ui.platform.SystemActions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext

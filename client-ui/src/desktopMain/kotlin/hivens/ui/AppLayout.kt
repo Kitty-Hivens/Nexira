@@ -11,7 +11,9 @@ import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -22,7 +24,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import hivens.core.api.SkinRepository
 import hivens.core.api.model.ServerProfile
+import hivens.core.data.HomeView
 import hivens.core.data.SessionData
+import hivens.core.data.UiStyle
 import hivens.launcher.network.NetworkState
 import hivens.launcher.network.ServerProtocolConfig
 import hivens.ui.background.BackgroundSettings
@@ -30,7 +34,13 @@ import hivens.ui.easter.LocalAprilFools
 import hivens.ui.i18n.AppLocale
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.screens.*
+import hivens.ui.screens.browse.BrowseScreen
+import hivens.ui.screens.detail.PackDetailScreen
+import hivens.ui.screens.library.LibraryScreen
+import hivens.ui.screens.profile.ProfileScreen
+import hivens.ui.screens.settings.SettingsScreen
 import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.CustomTheme
 import hivens.ui.utils.GameConsoleService
 import org.koin.compose.koinInject
@@ -53,6 +63,10 @@ fun AppLayout(
     onCustomThemeChanged: (CustomTheme) -> Unit,
     currentLocale: AppLocale,
     onLocaleChanged: (AppLocale) -> Unit,
+    homeView: HomeView,
+    onHomeViewChanged: (HomeView) -> Unit,
+    uiStyle: UiStyle,
+    onUiStyleChanged: (UiStyle) -> Unit,
     backgroundSettings: BackgroundSettings = BackgroundSettings(),
     onBackgroundSettingsChanged: (BackgroundSettings) -> Unit = {}
 ) {
@@ -90,23 +104,30 @@ fun AppLayout(
 
         // ── Main content ──────────────────────────────────────────────────
         Box(Modifier.weight(1f).fillMaxHeight()) {
+            // Screen-to-screen Crossfade duration follows the active
+            // style. Under Brut (animationMultiplier = 0) the swap is
+            // effectively instant; under Celestia keeps the 180ms fade.
+            val crossfadeMs = LocalStyle.current.animationDurationMs(180)
             Crossfade(
                 targetState   = currentScreen,
-                animationSpec = tween(180)
+                animationSpec = tween(crossfadeMs)
             ) { screen ->
                 when (screen) {
                     Screen.Home -> {
                         val session = currentSession
                         when {
-                            session != null -> DashboardScreen(
-                                session               = session,
-                                initialSelectedServer = selectedServer,
-                                onServerSelected      = { selectedServer = it },
-                                onSessionUpdated      = { currentSession = it },
-                                onCloseApp            = onCloseApp,
-                                onOpenServerSettings  = { onScreenChange(Screen.ServerSettings(it)) },
-                                onOpenDetails         = { onScreenChange(Screen.ServerDetails(it)) }
-                            )
+                            session != null -> when (homeView) {
+                                HomeView.Classic -> DashboardScreen(
+                                    session               = session,
+                                    initialSelectedServer = selectedServer,
+                                    onServerSelected      = { selectedServer = it },
+                                    onSessionUpdated      = { currentSession = it },
+                                    onCloseApp            = onCloseApp,
+                                    onOpenServerSettings  = { onScreenChange(Screen.ServerSettings(it)) },
+                                    onOpenDetails         = { onScreenChange(Screen.ServerDetails(it)) }
+                                )
+                                HomeView.LibraryFirst -> LibraryScreen()
+                            }
                             // `Loading` is the brief window between startup and resolved
                             // credentials -- spinner is appropriate. `Unauthenticated` is
                             // a stable state waiting on user input; show the explicit
@@ -129,6 +150,10 @@ fun AppLayout(
                             onOpenThemePicker        = { onScreenChange(Screen.ThemePicker) },
                             currentLocale            = currentLocale,
                             onLocaleChanged          = onLocaleChanged,
+                            homeView                 = homeView,
+                            onHomeViewChanged        = onHomeViewChanged,
+                            uiStyle                  = uiStyle,
+                            onUiStyleChanged         = onUiStyleChanged,
                             onOpenBackgroundSettings = { onScreenChange(Screen.BackgroundSettings) },
                             onOpenAbout              = { onScreenChange(Screen.About) }
                         )
@@ -163,6 +188,16 @@ fun AppLayout(
 
                     is Screen.ServerDetails ->
                         ServerDetailScreen(
+                            server = screen.server,
+                            onBack = { onScreenChange(Screen.Home) }
+                        )
+
+                    Screen.Library -> LibraryScreen()
+
+                    Screen.Browse  -> BrowseScreen()
+
+                    is Screen.PackDetail ->
+                        PackDetailScreen(
                             server = screen.server,
                             onBack = { onScreenChange(Screen.Home) }
                         )
@@ -201,6 +236,9 @@ fun AppSidebar(
     val homeActive = currentScreen is Screen.Home
             || currentScreen is Screen.ServerSettings
             || currentScreen is Screen.ServerDetails
+    val libraryActive  = currentScreen is Screen.Library
+            || currentScreen is Screen.PackDetail
+    val browseActive   = currentScreen is Screen.Browse
     val profileActive  = currentScreen is Screen.Profile
     val settingsActive = currentScreen is Screen.Settings
             || currentScreen is Screen.ThemePicker
@@ -244,6 +282,8 @@ fun AppSidebar(
 
     // Different phase offset per button -- they never all peak at the same time
     val homeOffset    = sin(bounceCycle + 0.0f) * bounceAmplitude
+    val libraryOffset = sin(bounceCycle + 0.55f) * bounceAmplitude
+    val browseOffset  = sin(bounceCycle + 1.65f) * bounceAmplitude
     val profileOffset = sin(bounceCycle + 1.1f) * bounceAmplitude
     val settingsOffset= sin(bounceCycle + 2.2f) * bounceAmplitude
     val aboutOffset   = sin(bounceCycle + 3.3f) * bounceAmplitude
@@ -253,6 +293,8 @@ fun AppSidebar(
     // to test against. Direct onScreenChange calls keep test runs
     // deterministic regardless of the calendar.
     PuppetClick("nav.home")     { onScreenChange(Screen.Home) }
+    PuppetClick("nav.library")  { onScreenChange(Screen.Library) }
+    PuppetClick("nav.browse")   { onScreenChange(Screen.Browse) }
     PuppetClick("nav.profile", enabled = isAuthenticated) { onScreenChange(Screen.Profile) }
     PuppetClick("nav.settings") { onScreenChange(Screen.Settings) }
     PuppetClick("nav.about")    { onScreenChange(Screen.About) }
@@ -278,6 +320,22 @@ fun AppSidebar(
                 icon     = Icons.Default.Home,
                 selected = homeActive,
                 onClick  = chaosNavClick { onScreenChange(Screen.Home) }
+            )
+        }
+
+        Box(Modifier.graphicsLayer { translationY = libraryOffset }) {
+            SidebarNavItem(
+                icon     = Icons.Default.Star,
+                selected = libraryActive,
+                onClick  = chaosNavClick { onScreenChange(Screen.Library) }
+            )
+        }
+
+        Box(Modifier.graphicsLayer { translationY = browseOffset }) {
+            SidebarNavItem(
+                icon     = Icons.Default.Search,
+                selected = browseActive,
+                onClick  = chaosNavClick { onScreenChange(Screen.Browse) }
             )
         }
 

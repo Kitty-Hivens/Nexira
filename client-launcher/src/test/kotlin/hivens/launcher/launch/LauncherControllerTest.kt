@@ -15,6 +15,7 @@ import hivens.core.security.IKeyringStorage
 import hivens.launcher.CredentialsManager
 import hivens.launcher.ManifestCache
 import hivens.launcher.ProfileManager
+import hivens.launcher.smrt.SmrtSyncService
 import io.mockk.coEvery
 import io.mockk.coJustRun
 import io.mockk.coVerify
@@ -74,6 +75,7 @@ class LauncherControllerTest {
     private lateinit var credentialsManager: CredentialsManager
     private lateinit var manifestCache: ManifestCache
     private lateinit var profileManager: ProfileManager
+    private lateinit var smrtSyncService: SmrtSyncService
 
     private val server = ServerProfile(
         name     = "TestSrv",
@@ -95,6 +97,7 @@ class LauncherControllerTest {
         javaManagerService = mockk()
         launcherService    = mockk()
         manifestProcessor  = mockk()
+        smrtSyncService    = mockk()
 
         // Real instances: cheaper than fighting mockk on JDK 25, and the
         // default no-data behavior (empty profile map, missing manifest
@@ -126,6 +129,7 @@ class LauncherControllerTest {
         profileManager     = profileManager,
         dataDirectory      = sandbox,
         appScope           = scope,
+        smrtSyncService    = smrtSyncService,
     )
 
     @Test

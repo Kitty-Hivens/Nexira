@@ -303,6 +303,8 @@ object RussianStrings : AppStrings {
     override val settingsAutoSyncAllPacksDesc   = "Тихо обновлять все уже установленные сборки в фоне при старте лаунчера. Тратит фоновый трафик — полезно если играешь на нескольких серверах и хочешь свежее состояние без клика по каждому."
     override val settingsJvmBuilder             = "Визуальный конструктор JVM-аргументов"
     override val settingsJvmBuilderDesc         = "Показывает кнопку «Собрать аргументы» в настройках сервера. Выбираешь сборщик мусора, настраиваешь регионы хипа, включаешь AppCDS или JFR — без необходимости помнить флаги. Готовые пресеты: Aikar's recipe, GTNH-класс, ZGC для больших хипов и другие."
+    override val settingsExperimentalMirror     = "Hivens Mirror (alpha)"
+    override val settingsExperimentalMirrorDesc = "Качать файлы сборки Industrial через smrt.hivens.dev вместо CDN SmartyCraft. Авторизация и адреса игровых серверов идут через SC как обычно; меняется только источник синхронизации файлов. Alpha — пока только Industrial доступна на зеркале, остальные сборки качаются с SC. На любой ошибке зеркала — падаем громко с понятной ошибкой, без тихого фолбэка на SC, чтобы поломка зеркала была видна сразу."
     override val settingsMimicVersion           = "Подмена версии лаунчера"
     override val settingsMimicVersionDesc       = "Зафиксировать строку версии, которая отправляется в рукопожатии и User-Agent. Оставь пустым для стандартного значения — заполни только если апстрим успел поднять свою версию быстрее цикла релизов Nexira. Применяется на следующем запросе к протоколу после сохранения, перезапуск не требуется."
     override fun settingsMimicVersionPlaceholder(default: String) = "По умолчанию: $default"
@@ -476,4 +478,29 @@ object RussianStrings : AppStrings {
     override fun migrationFailedBody(error: String) = "Некоторые файлы не удалось скопировать: $error"
     override val migrationRetry = "Повторить"
     override val migrationQuit  = "Закрыть Nexira"
+
+    override val placeholderNotImplemented = "Пока не реализовано..."
+    override val placeholderHint           = "Этот экран зарезервирован под работу Atelier."
+
+    override val navLibrary = "Библиотека"
+    override val navBrowse  = "Каталог"
+
+    override val settingsHomeViewTitle   = "Главный экран"
+    override val settingsHomeViewSub     = "Попробуй новый Library-first интерфейс параллельно с классическим Dashboard. Можно переключаться когда захочешь."
+    override val settingsHomeViewClassic = "Классический"
+    override val settingsHomeViewLibrary = "Library (alpha)"
+
+    override val settingsUiStyleTitle    = "Стиль интерфейса"
+    override val settingsUiStyleSub      = "Переключай форму / поверхности / анимации независимо от цветовой палитры. Celestia — текущий вид с мягкими скруглениями и стеклом; Brut — жёсткий, без скруглений, без анимаций."
+    override val settingsUiStyleCelestia = "Celestia"
+    override val settingsUiStyleBrut     = "Brut"
+
+    override val settingsCategoryAppearance   = "Внешний вид"
+    override val settingsCategoryNetwork      = "Сеть"
+    override val settingsCategoryExperimental = "Эксперименты"
+    override val settingsCategoryAdvanced     = "Расширенные"
+    override val settingsCategoryDiagnostics  = "Диагностика"
+
+    override val profileCategorySkin    = "Скин"
+    override val profileCategoryAccount = "Аккаунт"
 }

@@ -2,6 +2,33 @@ package hivens.core.data
 
 import kotlinx.serialization.Serializable
 
+/**
+ * Which Home surface the user is currently running. Set in Settings.
+ * Lets the user A/B between the legacy Dashboard (SC server grid +
+ * launch panel + always-on right panel) and the new Library-first IA
+ * (Library + Browse + sliding login panel + unified card). Until the
+ * Library surface lands properly, [LibraryFirst] routes to the
+ * "not yet implemented" placeholder -- intentional: the toggle is
+ * how the user explores the direction before it's finished.
+ */
+@Serializable
+enum class HomeView { Classic, LibraryFirst }
+
+/**
+ * Which visual style variant is active. Independent from palette
+ * (themes live in `ThemeManager.CustomTheme`). Style governs form,
+ * surface treatment, motion -- not color. See `hivens.ui.theme.StyleSpec`
+ * for the token set and the two initial variants.
+ *
+ * - [Celestia] -- rounded corners, glass cards, soft glow, animations.
+ *   Current default; matches the launcher's pre-Atelier feel.
+ * - [Brut] -- hard corners, flat surfaces, no glow, no animations.
+ *   Designed for the user's "жёсткий интерфейс" personal lean as one
+ *   open direction under Atelier exploration.
+ */
+@Serializable
+enum class UiStyle { Celestia, Brut }
+
 @Serializable
 data class SettingsData(
     val javaPath: String? = null,
@@ -84,4 +111,34 @@ data class SettingsData(
      * upstream version pin faster than the Nexira release cycle.
      */
     val mimicVersionOverride: String? = null,
+
+    /**
+     * Route pack content delivery through the Hivens mirror
+     * (smrt.hivens.dev) instead of SmartyCraft's CDN. Auth and
+     * game-server addresses stay on SC regardless -- the mirror only
+     * publishes pack files. Currently scoped to Industrial, the sole
+     * pack with a smrt v2 manifest; other server packs ignore this
+     * flag and stay on the SC sync path. Mirror sync fails loudly on
+     * any error; there is no silent SC fallback for the affected
+     * pack, otherwise mirror regressions would hide behind a
+     * working-but-stale SC sync.
+     */
+    val experimentalMirrorEnabled: Boolean = false,
+
+    /**
+     * Which Home surface to render after login. Lets the user explore
+     * the new Library-first IA without committing the whole launcher
+     * to it -- the toggle flips back at any time. See [HomeView] for
+     * the option set and [[project_home_library_ia]] for the IA spec
+     * the LibraryFirst variant is reaching toward.
+     */
+    val homeView: HomeView = HomeView.Classic,
+
+    /**
+     * Visual style variant. Independent from palette / color preset.
+     * Lets the user compare form/surface/motion approaches concretely
+     * rather than guessing in the abstract. Defaults to Celestia
+     * (current visual feel); see [UiStyle] for available variants.
+     */
+    val uiStyle: UiStyle = UiStyle.Celestia,
 )

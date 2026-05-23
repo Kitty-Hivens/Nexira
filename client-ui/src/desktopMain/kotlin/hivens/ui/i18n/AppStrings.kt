@@ -315,6 +315,8 @@ interface AppStrings {
     val settingsAutoSyncAllPacksDesc: String
     val settingsJvmBuilder: String
     val settingsJvmBuilderDesc: String
+    val settingsExperimentalMirror: String
+    val settingsExperimentalMirrorDesc: String
     val settingsMimicVersion: String
     val settingsMimicVersionDesc: String
     /** Placeholder shown inside the mimic-version text field when override is empty. Receives the built-in default version, e.g. `Default: 3.6.5`. */
@@ -498,4 +500,40 @@ interface AppStrings {
     fun migrationFailedBody(error: String): String
     val migrationRetry: String
     val migrationQuit: String
+
+    // --- Placeholder screens (Library / Browse / PackDetail) ---
+    /** Title shown on screens that exist for navigation routing but have no
+     *  real implementation yet -- the new Library / Browse / PackDetail
+     *  surfaces under Atelier. Replaces the screen body with a centered
+     *  message so the nav target is visibly reachable but the user is not
+     *  misled into expecting working functionality. */
+    val placeholderNotImplemented: String
+    val placeholderHint: String
+
+    // --- Navigation entries (Library / Browse, added with placeholder screens) ---
+    val navLibrary: String
+    val navBrowse: String
+
+    // --- Home view variant picker (in Settings -> Interface) ---
+    val settingsHomeViewTitle: String
+    val settingsHomeViewSub: String
+    val settingsHomeViewClassic: String
+    val settingsHomeViewLibrary: String
+
+    // --- UI style variant picker (in Settings -> Interface) ---
+    val settingsUiStyleTitle: String
+    val settingsUiStyleSub: String
+    val settingsUiStyleCelestia: String
+    val settingsUiStyleBrut: String
+
+    // --- Settings two-column nav labels ---
+    val settingsCategoryAppearance: String
+    val settingsCategoryNetwork: String
+    val settingsCategoryExperimental: String
+    val settingsCategoryAdvanced: String
+    val settingsCategoryDiagnostics: String
+
+    // --- Profile two-column nav labels ---
+    val profileCategorySkin: String
+    val profileCategoryAccount: String
 }

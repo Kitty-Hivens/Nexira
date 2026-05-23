@@ -137,8 +137,8 @@ object AprilFoolsEngine {
         while (System.currentTimeMillis() < stickEnd) {
             val c = cursor()
             // Offset so it's not dead-center on cursor -- feels more natural/creepy
-            btn.overlayX.animateTo(c.x - btn.widthPx / 2f + 10f, tween(90, easing = LinearEasing))
-            btn.overlayY.animateTo(c.y - btn.heightPx / 2f + 5f,  tween(90, easing = LinearEasing))
+            btn.overlayX.animateTo(c.x - btn.widthPx / 2f + 10f, tween(AprilFools.scaledDuration(90), easing = LinearEasing))
+            btn.overlayY.animateTo(c.y - btn.heightPx / 2f + 5f,  tween(AprilFools.scaledDuration(90), easing = LinearEasing))
         }
 
         // Fling to a random spot -- fast and dramatic
@@ -149,10 +149,10 @@ object AprilFoolsEngine {
 
         btn.phase = ChaosPhase.RESTING
         coroutineScope {
-            launch { btn.overlayX.animateTo(restX,   tween(550, easing = FastOutSlowInEasing)) }
-            launch { btn.overlayY.animateTo(restY,   tween(550, easing = FastOutSlowInEasing)) }
-            launch { btn.overlayRot.animateTo(restRot, tween(550)) }
-            launch { btn.overlayScale.animateTo(0.9f + Random.nextFloat() * 0.4f, tween(300)) }
+            launch { btn.overlayX.animateTo(restX,   tween(AprilFools.scaledDuration(550), easing = FastOutSlowInEasing)) }
+            launch { btn.overlayY.animateTo(restY,   tween(AprilFools.scaledDuration(550), easing = FastOutSlowInEasing)) }
+            launch { btn.overlayRot.animateTo(restRot, tween(AprilFools.scaledDuration(550))) }
+            launch { btn.overlayScale.animateTo(0.9f + Random.nextFloat() * 0.4f, tween(AprilFools.scaledDuration(300))) }
         }
 
         delay(Random.nextLong(7_000L, 16_000L).milliseconds)
@@ -227,9 +227,9 @@ object AprilFoolsEngine {
 
                 // Lean in the direction of movement
                 val lean  = (atan2(ny, nx) * (180f / PI.toFloat())).coerceIn(-30f, 30f)
-                btn.overlayX.animateTo(newX, tween(40, easing = LinearEasing))
-                btn.overlayY.animateTo(newY, tween(40, easing = LinearEasing))
-                btn.overlayRot.animateTo(lean, tween(80))
+                btn.overlayX.animateTo(newX, tween(AprilFools.scaledDuration(40), easing = LinearEasing))
+                btn.overlayY.animateTo(newY, tween(AprilFools.scaledDuration(40), easing = LinearEasing))
+                btn.overlayRot.animateTo(lean, tween(AprilFools.scaledDuration(80)))
             } else {
                 delay(30L.milliseconds)
             }
@@ -258,7 +258,7 @@ object AprilFoolsEngine {
             launch { btn.overlayRot.animateTo(360f * spins, rpm) }
             launch {
                 delay(200.milliseconds)
-                btn.overlayScale.animateTo(1.25f, tween(300))
+                btn.overlayScale.animateTo(1.25f, tween(AprilFools.scaledDuration(300)))
             }
         }
 
@@ -269,10 +269,10 @@ object AprilFoolsEngine {
 
         btn.phase = ChaosPhase.RESTING
         coroutineScope {
-            launch { btn.overlayX.animateTo(cx, tween(380, easing = FastOutSlowInEasing)) }
-            launch { btn.overlayY.animateTo(cy, tween(380, easing = FastOutSlowInEasing)) }
-            launch { btn.overlayRot.animateTo(btn.overlayRot.value + Random.nextFloat() * 90f - 45f, tween(380)) }
-            launch { btn.overlayScale.animateTo(1f, tween(300)) }
+            launch { btn.overlayX.animateTo(cx, tween(AprilFools.scaledDuration(380), easing = FastOutSlowInEasing)) }
+            launch { btn.overlayY.animateTo(cy, tween(AprilFools.scaledDuration(380), easing = FastOutSlowInEasing)) }
+            launch { btn.overlayRot.animateTo(btn.overlayRot.value + Random.nextFloat() * 90f - 45f, tween(AprilFools.scaledDuration(380))) }
+            launch { btn.overlayScale.animateTo(1f, tween(AprilFools.scaledDuration(300))) }
         }
 
         delay(Random.nextLong(6_000L, 14_000L).milliseconds)
@@ -294,9 +294,9 @@ object AprilFoolsEngine {
 
         // Shrink + spin out
         coroutineScope {
-            launch { btn.overlayScale.animateTo(0f,    tween(280, easing = FastOutSlowInEasing)) }
-            launch { btn.overlayRot.animateTo(360f,    tween(280)) }
-            launch { btn.overlayAlpha.animateTo(0f,    tween(200)) }
+            launch { btn.overlayScale.animateTo(0f,    tween(AprilFools.scaledDuration(280), easing = FastOutSlowInEasing)) }
+            launch { btn.overlayRot.animateTo(360f,    tween(AprilFools.scaledDuration(280))) }
+            launch { btn.overlayAlpha.animateTo(0f,    tween(AprilFools.scaledDuration(200))) }
         }
 
         // Teleport to random position
@@ -313,9 +313,9 @@ object AprilFoolsEngine {
             1.4f + Random.nextFloat() * 0.7f       // oversized
         }
 
-        btn.overlayAlpha.animateTo(1f, tween(80))
-        btn.overlayScale.animateTo(weirdScale * 1.3f, tween(160, easing = FastOutSlowInEasing))
-        btn.overlayScale.animateTo(weirdScale,         tween(100, easing = LinearEasing))
+        btn.overlayAlpha.animateTo(1f, tween(AprilFools.scaledDuration(80)))
+        btn.overlayScale.animateTo(weirdScale * 1.3f, tween(AprilFools.scaledDuration(160), easing = FastOutSlowInEasing))
+        btn.overlayScale.animateTo(weirdScale,         tween(AprilFools.scaledDuration(100), easing = LinearEasing))
 
         btn.phase = ChaosPhase.RESTING
         delay(Random.nextLong(8_000L, 15_000L).milliseconds)
@@ -352,21 +352,21 @@ object AprilFoolsEngine {
             launch {
                 ghost.overlayY.animateTo(
                     ghost.overlayY.value - Random.nextFloat() * 280f - 80f,
-                    tween(3_200, easing = LinearEasing)
+                    tween(AprilFools.scaledDuration(3_200), easing = LinearEasing)
                 )
             }
             launch {
                 ghost.overlayX.animateTo(
                     ghost.overlayX.value + drift,
-                    tween(3_200, easing = LinearEasing)
+                    tween(AprilFools.scaledDuration(3_200), easing = LinearEasing)
                 )
             }
             launch {
-                ghost.overlayRot.animateTo(ghost.overlayRot.value + (Random.nextFloat() * 2f - 1f) * 30f, tween(3_200))
+                ghost.overlayRot.animateTo(ghost.overlayRot.value + (Random.nextFloat() * 2f - 1f) * 30f, tween(AprilFools.scaledDuration(3_200)))
             }
             launch {
                 delay(1_600.milliseconds)
-                ghost.overlayAlpha.animateTo(0f, tween(1_600))
+                ghost.overlayAlpha.animateTo(0f, tween(AprilFools.scaledDuration(1_600)))
             }
         }
 
@@ -461,11 +461,11 @@ object AprilFoolsEngine {
     private suspend fun returnToOrigin(btn: FloatingButton) {
         btn.phase = ChaosPhase.RETURNING
         coroutineScope {
-            launch { btn.overlayX.animateTo(btn.originPx.x,   tween(480, easing = FastOutSlowInEasing)) }
-            launch { btn.overlayY.animateTo(btn.originPx.y,   tween(480, easing = FastOutSlowInEasing)) }
-            launch { btn.overlayRot.animateTo(0f,              tween(480)) }
-            launch { btn.overlayScale.animateTo(1f,            tween(320)) }
-            launch { btn.overlayAlpha.animateTo(1f,            tween(200)) }
+            launch { btn.overlayX.animateTo(btn.originPx.x,   tween(AprilFools.scaledDuration(480), easing = FastOutSlowInEasing)) }
+            launch { btn.overlayY.animateTo(btn.originPx.y,   tween(AprilFools.scaledDuration(480), easing = FastOutSlowInEasing)) }
+            launch { btn.overlayRot.animateTo(0f,              tween(AprilFools.scaledDuration(480))) }
+            launch { btn.overlayScale.animateTo(1f,            tween(AprilFools.scaledDuration(320))) }
+            launch { btn.overlayAlpha.animateTo(1f,            tween(AprilFools.scaledDuration(200))) }
         }
         btn.originalVisible = true
         btn.phase = ChaosPhase.IDLE

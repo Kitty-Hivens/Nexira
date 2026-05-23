@@ -78,6 +78,7 @@ fun AprilFoolsDebugPanel() {
             enabled        = isForced,
             modifier       = Modifier.height(32.dp),
             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+            shape          = MaterialTheme.shapes.small,
         ) {
             Text(label, fontSize = 11.sp)
         }
@@ -87,8 +88,8 @@ fun AprilFoolsDebugPanel() {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .border(1.dp, CelestiaTheme.colors.error.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
+            .clip(MaterialTheme.shapes.medium)
+            .border(1.dp, CelestiaTheme.colors.error.copy(alpha = 0.4f), MaterialTheme.shapes.medium)
             .background(CelestiaTheme.colors.error.copy(alpha = 0.06f))
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -249,6 +250,7 @@ fun AprilFoolsDebugPanel() {
             colors   = ButtonDefaults.outlinedButtonColors(
                 contentColor = CelestiaTheme.colors.error,
             ),
+            shape    = MaterialTheme.shapes.small,
         ) {
             Text("Reset all overrides + stop chaos")
         }
