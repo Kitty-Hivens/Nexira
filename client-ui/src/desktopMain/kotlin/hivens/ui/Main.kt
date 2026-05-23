@@ -55,7 +55,7 @@ import hivens.ui.theme.CustomTheme
 import hivens.ui.theme.ThemeManager
 import hivens.ui.tray.TrayManager
 import hivens.ui.utils.GameConsoleService
-import hivens.ui.utils.SkinManager
+import hivens.ui.identity.SkinManager
 import java.awt.Toolkit
 import java.nio.file.Files
 import java.time.Instant
