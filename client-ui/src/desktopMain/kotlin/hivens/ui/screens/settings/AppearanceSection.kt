@@ -115,7 +115,7 @@ internal fun AppearanceSection(
         }
     }
 
-    Spacer(Modifier.height(16.dp))
+    Spacer(Modifier.height(8.dp))
 
     // Theme picker shortcut
     PuppetClick("settings.openThemePicker") { onOpenThemePicker() }
@@ -140,7 +140,7 @@ internal fun AppearanceSection(
         Icon(Icons.Default.ArrowDropDown, null, tint = CelestiaTheme.colors.primary)
     }
 
-    Spacer(Modifier.height(16.dp))
+    Spacer(Modifier.height(8.dp))
 
     // Custom background shortcut
     PuppetClick("settings.openBackground") { onOpenBackgroundSettings() }
@@ -165,7 +165,7 @@ internal fun AppearanceSection(
         Icon(Icons.Default.ChevronRight, null, tint = CelestiaTheme.colors.primary)
     }
 
-    Spacer(Modifier.height(16.dp))
+    Spacer(Modifier.height(8.dp))
 
     // Dark theme toggle
     var themeSwitchState by remember(isDarkTheme) { mutableStateOf(isDarkTheme) }
@@ -178,7 +178,7 @@ internal fun AppearanceSection(
         themeSwitchState = isChecked; onToggleTheme()
     }
 
-    Spacer(Modifier.height(16.dp))
+    Spacer(Modifier.height(8.dp))
 
     // Home view variant picker. Lets the user A/B between the legacy
     // Dashboard and the new Library-first surface (currently a
@@ -195,7 +195,7 @@ internal fun AppearanceSection(
     PuppetClick("settings.homeView.classic")      { onHomeViewChanged(HomeView.Classic) }
     PuppetClick("settings.homeView.libraryFirst") { onHomeViewChanged(HomeView.LibraryFirst) }
 
-    Spacer(Modifier.height(16.dp))
+    Spacer(Modifier.height(8.dp))
 
     // UI style variant picker. Independent axis from palette -- governs
     // form, surface treatment, motion. Two initial variants: Celestia
@@ -211,7 +211,7 @@ internal fun AppearanceSection(
     PuppetClick("settings.uiStyle.celestia") { onUiStyleChanged(UiStyle.Celestia) }
     PuppetClick("settings.uiStyle.brut")     { onUiStyleChanged(UiStyle.Brut) }
 
-    Spacer(Modifier.height(24.dp))
+    Spacer(Modifier.height(12.dp))
 
     // ── Behavior subsection ──────────────────────────────────────────
     SettingsSectionTitle(s.settingsSectionBehavior)
@@ -222,7 +222,7 @@ internal fun AppearanceSection(
     )
     PuppetToggle("settings.closeAfterStart", form.closeAfterStart) { form.closeAfterStart = it; save() }
 
-    Spacer(Modifier.height(16.dp))
+    Spacer(Modifier.height(8.dp))
 
     // Offline Mode
     Row(
