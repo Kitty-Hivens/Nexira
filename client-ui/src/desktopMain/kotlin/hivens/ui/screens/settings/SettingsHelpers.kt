@@ -44,9 +44,9 @@ internal fun SettingsSectionTitle(text: String) {
         color      = CelestiaTheme.colors.primary,
         fontWeight = FontWeight.Bold
     )
-    Spacer(Modifier.height(8.dp))
+    Spacer(Modifier.height(4.dp))
     HorizontalDivider(color = CelestiaTheme.colors.primary.copy(alpha = 0.3f))
-    Spacer(Modifier.height(16.dp))
+    Spacer(Modifier.height(8.dp))
 }
 
 /**

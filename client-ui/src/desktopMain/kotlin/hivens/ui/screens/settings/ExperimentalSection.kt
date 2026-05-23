@@ -56,7 +56,7 @@ internal fun ExperimentalSection(
     )
     PuppetToggle("settings.experimental", form.experimentalEnabled) { form.experimentalEnabled = it; save() }
 
-    Spacer(Modifier.height(16.dp))
+    Spacer(Modifier.height(8.dp))
 
     SettingsRowWithDescription(
         title          = s.settingsMandatoryUpdates,
@@ -72,7 +72,7 @@ internal fun ExperimentalSection(
         form.mandatoryUpdates = it; save()
     }
 
-    Spacer(Modifier.height(16.dp))
+    Spacer(Modifier.height(8.dp))
 
     SettingsRowWithDescription(
         title          = s.settingsPrereleaseChannel,
@@ -87,7 +87,7 @@ internal fun ExperimentalSection(
         form.prereleaseChannel = it; save()
     }
 
-    Spacer(Modifier.height(16.dp))
+    Spacer(Modifier.height(8.dp))
 
     SettingsRowWithDescription(
         title          = s.settingsAutoSyncAllPacks,
@@ -102,7 +102,7 @@ internal fun ExperimentalSection(
         form.autoSyncAllPacks = it; save()
     }
 
-    Spacer(Modifier.height(16.dp))
+    Spacer(Modifier.height(8.dp))
 
     SettingsRowWithDescription(
         title          = s.settingsJvmBuilder,
@@ -117,7 +117,7 @@ internal fun ExperimentalSection(
         form.jvmBuilderEnabled = it; save()
     }
 
-    Spacer(Modifier.height(16.dp))
+    Spacer(Modifier.height(8.dp))
 
     // ── Hivens Mirror ─────────────────────────────────────────
     // Routes Industrial's sync source to smrt.hivens.dev. Auth and
@@ -137,7 +137,7 @@ internal fun ExperimentalSection(
         form.experimentalMirror = it; save()
     }
 
-    Spacer(Modifier.height(16.dp))
+    Spacer(Modifier.height(8.dp))
 
     // ── Mimic launcher version override ───────────────────────
     // Toggle row + revealed text input. Doubly gated: master

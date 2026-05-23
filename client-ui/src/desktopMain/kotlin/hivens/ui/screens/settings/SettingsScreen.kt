@@ -107,7 +107,7 @@ fun SettingsScreen(
                         .weight(1f)
                         .fillMaxHeight()
                         .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(24.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     when (selectedCategory) {
                         SettingsCategory.Appearance -> AppearanceSection(

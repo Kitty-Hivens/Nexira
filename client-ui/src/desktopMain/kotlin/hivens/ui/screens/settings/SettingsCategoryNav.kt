@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -46,21 +47,22 @@ internal fun SettingsCategoryNav(
         modifier = modifier
             .width(200.dp)
             .fillMaxHeight()
-            .padding(end = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+            .padding(end = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         SettingsCategory.entries.forEach { category ->
             val isSelected = category == current
             PuppetClick("settings.category.${category.name}") { onSelect(category) }
             Row(
                 modifier = Modifier
+                    .fillMaxWidth()
                     .clip(RoundedCornerShape(style.cardCorner))
                     .background(
                         if (isSelected) CelestiaTheme.colors.primary.copy(alpha = 0.18f)
                         else CelestiaTheme.colors.background.copy(alpha = 0.0f),
                     )
                     .clickable { onSelect(category) }
-                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(
