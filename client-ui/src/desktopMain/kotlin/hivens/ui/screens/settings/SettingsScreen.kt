@@ -85,7 +85,13 @@ fun SettingsScreen(
 
         Spacer(Modifier.height(24.dp))
 
-        GlassCard(Modifier.weight(1f).fillMaxWidth()) {
+        // Explicit backgroundColor opts the Settings frame out of
+        // style.cardSurface -- stays glassy under Brut, same as the
+        // inner row panels.
+        GlassCard(
+            modifier        = Modifier.weight(1f).fillMaxWidth(),
+            backgroundColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
+        ) {
             Row(Modifier.fillMaxSize().padding(16.dp)) {
                 SettingsCategoryNav(
                     current  = selectedCategory,
