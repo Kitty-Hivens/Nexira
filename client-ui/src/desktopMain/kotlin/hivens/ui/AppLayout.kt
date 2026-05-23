@@ -11,7 +11,9 @@ import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -30,6 +32,9 @@ import hivens.ui.easter.LocalAprilFools
 import hivens.ui.i18n.AppLocale
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.screens.*
+import hivens.ui.screens.browse.BrowseScreen
+import hivens.ui.screens.detail.PackDetailScreen
+import hivens.ui.screens.library.LibraryScreen
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.CustomTheme
 import hivens.ui.utils.GameConsoleService
@@ -166,6 +171,16 @@ fun AppLayout(
                             server = screen.server,
                             onBack = { onScreenChange(Screen.Home) }
                         )
+
+                    Screen.Library -> LibraryScreen()
+
+                    Screen.Browse  -> BrowseScreen()
+
+                    is Screen.PackDetail ->
+                        PackDetailScreen(
+                            server = screen.server,
+                            onBack = { onScreenChange(Screen.Home) }
+                        )
                 }
             }
         }
@@ -201,6 +216,9 @@ fun AppSidebar(
     val homeActive = currentScreen is Screen.Home
             || currentScreen is Screen.ServerSettings
             || currentScreen is Screen.ServerDetails
+    val libraryActive  = currentScreen is Screen.Library
+            || currentScreen is Screen.PackDetail
+    val browseActive   = currentScreen is Screen.Browse
     val profileActive  = currentScreen is Screen.Profile
     val settingsActive = currentScreen is Screen.Settings
             || currentScreen is Screen.ThemePicker
@@ -244,6 +262,8 @@ fun AppSidebar(
 
     // Different phase offset per button -- they never all peak at the same time
     val homeOffset    = sin(bounceCycle + 0.0f) * bounceAmplitude
+    val libraryOffset = sin(bounceCycle + 0.55f) * bounceAmplitude
+    val browseOffset  = sin(bounceCycle + 1.65f) * bounceAmplitude
     val profileOffset = sin(bounceCycle + 1.1f) * bounceAmplitude
     val settingsOffset= sin(bounceCycle + 2.2f) * bounceAmplitude
     val aboutOffset   = sin(bounceCycle + 3.3f) * bounceAmplitude
@@ -253,6 +273,8 @@ fun AppSidebar(
     // to test against. Direct onScreenChange calls keep test runs
     // deterministic regardless of the calendar.
     PuppetClick("nav.home")     { onScreenChange(Screen.Home) }
+    PuppetClick("nav.library")  { onScreenChange(Screen.Library) }
+    PuppetClick("nav.browse")   { onScreenChange(Screen.Browse) }
     PuppetClick("nav.profile", enabled = isAuthenticated) { onScreenChange(Screen.Profile) }
     PuppetClick("nav.settings") { onScreenChange(Screen.Settings) }
     PuppetClick("nav.about")    { onScreenChange(Screen.About) }
@@ -278,6 +300,22 @@ fun AppSidebar(
                 icon     = Icons.Default.Home,
                 selected = homeActive,
                 onClick  = chaosNavClick { onScreenChange(Screen.Home) }
+            )
+        }
+
+        Box(Modifier.graphicsLayer { translationY = libraryOffset }) {
+            SidebarNavItem(
+                icon     = Icons.Default.Star,
+                selected = libraryActive,
+                onClick  = chaosNavClick { onScreenChange(Screen.Library) }
+            )
+        }
+
+        Box(Modifier.graphicsLayer { translationY = browseOffset }) {
+            SidebarNavItem(
+                icon     = Icons.Default.Search,
+                selected = browseActive,
+                onClick  = chaosNavClick { onScreenChange(Screen.Browse) }
             )
         }
 

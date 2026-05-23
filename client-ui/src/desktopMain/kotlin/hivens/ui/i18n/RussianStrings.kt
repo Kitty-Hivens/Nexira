@@ -478,4 +478,10 @@ object RussianStrings : AppStrings {
     override fun migrationFailedBody(error: String) = "Некоторые файлы не удалось скопировать: $error"
     override val migrationRetry = "Повторить"
     override val migrationQuit  = "Закрыть Nexira"
+
+    override val placeholderNotImplemented = "Пока не реализовано..."
+    override val placeholderHint           = "Этот экран зарезервирован под работу Atelier."
+
+    override val navLibrary = "Библиотека"
+    override val navBrowse  = "Каталог"
 }

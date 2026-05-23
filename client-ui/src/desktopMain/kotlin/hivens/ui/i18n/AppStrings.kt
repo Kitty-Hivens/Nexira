@@ -500,4 +500,17 @@ interface AppStrings {
     fun migrationFailedBody(error: String): String
     val migrationRetry: String
     val migrationQuit: String
+
+    // --- Placeholder screens (Library / Browse / PackDetail) ---
+    /** Title shown on screens that exist for navigation routing but have no
+     *  real implementation yet -- the new Library / Browse / PackDetail
+     *  surfaces under Atelier. Replaces the screen body with a centered
+     *  message so the nav target is visibly reachable but the user is not
+     *  misled into expecting working functionality. */
+    val placeholderNotImplemented: String
+    val placeholderHint: String
+
+    // --- Navigation entries (Library / Browse, added with placeholder screens) ---
+    val navLibrary: String
+    val navBrowse: String
 }

@@ -477,4 +477,10 @@ object GermanStrings : AppStrings {
     override fun migrationFailedBody(error: String) = "Einige Dateien konnten nicht kopiert werden: $error"
     override val migrationRetry = "Wiederholen"
     override val migrationQuit  = "Nexira beenden"
+
+    override val placeholderNotImplemented = "Noch nicht implementiert..."
+    override val placeholderHint           = "Dieser Bildschirm ist reserviert, bis die Atelier-Arbeit ankommt."
+
+    override val navLibrary = "Bibliothek"
+    override val navBrowse  = "Durchsuchen"
 }

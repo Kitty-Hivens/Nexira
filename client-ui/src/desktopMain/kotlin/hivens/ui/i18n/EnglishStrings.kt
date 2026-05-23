@@ -477,4 +477,10 @@ object EnglishStrings : AppStrings {
     override fun migrationFailedBody(error: String) = "Some files could not be copied: $error"
     override val migrationRetry = "Retry"
     override val migrationQuit  = "Quit Nexira"
+
+    override val placeholderNotImplemented = "Not yet implemented..."
+    override val placeholderHint           = "This screen is reserved while Atelier work lands."
+
+    override val navLibrary = "Library"
+    override val navBrowse  = "Browse"
 }
