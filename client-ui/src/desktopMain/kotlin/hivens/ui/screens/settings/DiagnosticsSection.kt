@@ -88,6 +88,13 @@ internal fun DiagnosticsSection(
         Spacer(Modifier.height(8.dp))
     }
 
+    // Subtle visible container so the buttons have a body at rest --
+    // matches the alpha-0.4 background pattern used elsewhere in Settings
+    // section rows. Avoids the previous "transparent button + ugly
+    // hover overlay that floats out of nowhere" failure mode the user
+    // flagged 2026-05-23.
+    val ghostBg = CelestiaTheme.colors.background.copy(alpha = 0.4f)
+
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         // Open logs -- chaos target
         af.ChaosButton(
@@ -96,7 +103,7 @@ internal fun DiagnosticsSection(
             onClick  = { SystemActions.openFolder(paths.logsDir.toString()) },
             modifier = Modifier.weight(1f),
             colors   = ButtonDefaults.buttonColors(
-                containerColor = Color.Transparent,
+                containerColor = ghostBg,
                 contentColor   = CelestiaTheme.colors.textPrimary,
             ),
         )
@@ -108,7 +115,7 @@ internal fun DiagnosticsSection(
             onClick  = { SystemActions.openFolder(paths.crashDir.toString()) },
             modifier = Modifier.weight(1f),
             colors   = ButtonDefaults.buttonColors(
-                containerColor = Color.Transparent,
+                containerColor = ghostBg,
                 contentColor   = CelestiaTheme.colors.textPrimary,
             ),
         )
@@ -151,7 +158,7 @@ internal fun DiagnosticsSection(
             },
             modifier = Modifier.weight(1f),
             colors   = ButtonDefaults.buttonColors(
-                containerColor = Color.Transparent,
+                containerColor = ghostBg,
                 contentColor   = CelestiaTheme.colors.textPrimary.copy(
                     alpha = if (bundleBusy) 0.45f else 1f
                 ),
@@ -183,7 +190,7 @@ internal fun DiagnosticsSection(
             },
             modifier = Modifier.weight(1f),
             colors   = ButtonDefaults.buttonColors(
-                containerColor = Color.Transparent,
+                containerColor = ghostBg,
                 contentColor   = CelestiaTheme.colors.textPrimary.copy(
                     alpha = if (lastBundlePath != null) 1f else 0.35f
                 ),
