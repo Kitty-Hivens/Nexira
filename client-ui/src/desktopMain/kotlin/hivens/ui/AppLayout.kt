@@ -37,6 +37,7 @@ import hivens.ui.screens.*
 import hivens.ui.screens.browse.BrowseScreen
 import hivens.ui.screens.detail.PackDetailScreen
 import hivens.ui.screens.library.LibraryScreen
+import hivens.ui.screens.settings.SettingsScreen
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.CustomTheme
 import hivens.ui.utils.GameConsoleService
