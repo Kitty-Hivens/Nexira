@@ -25,7 +25,7 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.theme.CelestiaTheme
-import hivens.ui.utils.SystemActions
+import hivens.ui.platform.SystemActions
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import org.slf4j.LoggerFactory
