@@ -57,7 +57,7 @@ internal fun AdvancedSection(paths: PlatformPaths) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(style.cardCorner))
-            .background(CelestiaTheme.colors.background.copy(alpha = 0.4f))
+            .background(settingsRowBackground())
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
