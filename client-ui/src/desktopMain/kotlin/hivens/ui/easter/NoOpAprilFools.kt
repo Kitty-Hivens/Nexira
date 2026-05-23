@@ -127,7 +127,7 @@ private object NoOpCardTracker : ChaosCardTracker {
  * to the old `Indication`/`IndicationInstance` pair. Singleton
  * object so equality / hashCode are by identity.
  */
-private object NoOpIndication : IndicationNodeFactory {
+internal object NoOpIndication : IndicationNodeFactory {
     private class EmptyNode : Modifier.Node()
 
     override fun create(interactionSource: InteractionSource): DelegatableNode = EmptyNode()
