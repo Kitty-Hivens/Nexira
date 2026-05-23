@@ -14,6 +14,7 @@ import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.security.MessageDigest
+import java.util.Comparator
 
 /**
  * v2-manifest sync. Parallel to [FileDownloadService] but speaks the
@@ -52,6 +53,24 @@ class SmrtSyncService(
         }
 
         Files.createDirectories(clientDir)
+
+        // Wipe mods/ when the previous sync used a different source
+        // (SC's mods/{mcversion}/ layout vs mirror's flat mods/).
+        // Forge scans both trees, a duplicate jar loads its coremod
+        // twice, and stacking ASM transformers (FoamFix hashCode
+        // patch) recurse into StackOverflowError on the second pass.
+        // The marker is per-clientDir so each pack tracks its own
+        // source independently.
+        val marker = clientDir.resolve(SOURCE_MARKER_FILE)
+        val previousSource = readSourceMarker(marker)
+        if (previousSource != SOURCE_MIRROR) {
+            log.info(
+                "smrt sync: source change ({} -> {}), wiping mods/",
+                previousSource ?: "<none>", SOURCE_MIRROR,
+            )
+            wipeModsDir(clientDir)
+        }
+
         val total = manifest.mods.size + manifest.assets.size
         var current = 0
 
@@ -66,14 +85,14 @@ class SmrtSyncService(
             syncAsset(asset, clientDir)
         }
 
-        // Prune jars in mods/ that the manifest does not declare. Without
-        // this, a switch from the SC sync to the mirror sync leaves the
-        // previous SC payload (e.g. SC's proprietary Smarty jar) sitting
-        // next to the mirror-published files; both register the same
-        // FML channel and the game crashes with "That channel is already
-        // registered". Scope is mods/ only; static-asset trees are left
-        // alone so user-added resource packs and configs survive.
+        // Drop manifest-removed mods and catch foreign payloads that
+        // the wipe missed (an SC sync ran between two mirror syncs
+        // without touching the marker, so the wipe gate saw a stale
+        // "mirror" value). Only top-level mods/{expected_filename}
+        // entries survive.
         pruneOrphanMods(clientDir, manifest.mods.map { it.filename }.toSet())
+
+        writeSourceMarker(marker, SOURCE_MIRROR)
     }
 
     private fun pruneOrphanMods(clientDir: Path, expected: Set<String>) {
@@ -83,7 +102,9 @@ class SmrtSyncService(
         Files.walk(modsDir).use { stream ->
             stream.filter { Files.isRegularFile(it) && it.fileName.toString().endsWith(".jar") }
                 .forEach { jar ->
-                    if (jar.fileName.toString() !in expected) {
+                    val isCanonical = jar.parent == modsDir &&
+                        jar.fileName.toString() in expected
+                    if (!isCanonical) {
                         runCatching {
                             Files.delete(jar)
                             removed++
@@ -93,6 +114,35 @@ class SmrtSyncService(
                 }
         }
         if (removed > 0) log.info("smrt sync: pruned {} orphan jar(s) from mods/", removed)
+    }
+
+    private fun wipeModsDir(clientDir: Path) {
+        val modsDir = clientDir.resolve("mods")
+        if (!Files.isDirectory(modsDir)) return
+        var removed = 0
+        Files.walk(modsDir).use { stream ->
+            stream.sorted(Comparator.reverseOrder())
+                .forEach { p ->
+                    if (p == modsDir) return@forEach
+                    runCatching {
+                        Files.delete(p)
+                        removed++
+                    }.onFailure { log.warn("smrt sync: failed to wipe {}", p, it) }
+                }
+        }
+        if (removed > 0) log.info("smrt sync: wiped {} entries from mods/", removed)
+    }
+
+    private fun readSourceMarker(marker: Path): String? =
+        marker.toFile()
+            .takeIf { it.exists() }
+            ?.readText()
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+
+    private fun writeSourceMarker(marker: Path, value: String) {
+        runCatching { marker.toFile().writeText(value) }
+            .onFailure { log.warn("smrt sync: failed to write source marker", it) }
     }
 
     /**
@@ -217,5 +267,8 @@ class SmrtSyncService(
          * change; this client must refuse rather than misinterpret.
          */
         const val EXPECTED_SCHEMA = 2
+
+        private const val SOURCE_MARKER_FILE = ".nexira-sync-source"
+        private const val SOURCE_MIRROR = "mirror"
     }
 }
