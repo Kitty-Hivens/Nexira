@@ -23,6 +23,7 @@ import hivens.core.api.interfaces.IAuthService
 import hivens.core.api.interfaces.IServerListService
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.api.model.ServerProfile
+import hivens.core.data.HomeView
 import hivens.core.data.SessionData
 import hivens.launcher.AutoSyncService
 import hivens.launcher.bootstrap.AutoLoginCoordinator
@@ -137,6 +138,7 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
     var currentLocale by remember {
         mutableStateOf(AppLocale.fromTag(settings.locale))
     }
+    var homeView      by remember { mutableStateOf(settings.homeView) }
 
     val launchState by controller.state.collectAsState()
 
@@ -440,6 +442,12 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
                             currentLocale = newLocale
                             val current = settingsService.getSettings()
                             settingsService.saveSettings(current.copy(locale = newLocale.tag))
+                        },
+                        homeView           = homeView,
+                        onHomeViewChanged = { newView ->
+                            homeView = newView
+                            val current = settingsService.getSettings()
+                            settingsService.saveSettings(current.copy(homeView = newView))
                         }
                     )
                     UpdateManager()
@@ -462,7 +470,9 @@ fun AppRoot(
     customTheme: CustomTheme,
     onCustomThemeChanged: (CustomTheme) -> Unit,
     currentLocale: AppLocale,
-    onLocaleChanged: (AppLocale) -> Unit
+    onLocaleChanged: (AppLocale) -> Unit,
+    homeView: HomeView,
+    onHomeViewChanged: (HomeView) -> Unit,
 ) {
     val credentialsManager: CredentialsManager = koinInject()
     val authService: IAuthService              = koinInject()
@@ -557,6 +567,8 @@ fun AppRoot(
                 onCustomThemeChanged = onCustomThemeChanged,
                 currentLocale = currentLocale,
                 onLocaleChanged = onLocaleChanged,
+                homeView = homeView,
+                onHomeViewChanged = onHomeViewChanged,
                 backgroundSettings = backgroundSettings,
                 onBackgroundSettingsChanged = { newSettings ->
                     backgroundSettings = newSettings

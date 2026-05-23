@@ -24,6 +24,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import hivens.core.api.SkinRepository
 import hivens.core.api.model.ServerProfile
+import hivens.core.data.HomeView
 import hivens.core.data.SessionData
 import hivens.launcher.network.NetworkState
 import hivens.launcher.network.ServerProtocolConfig
@@ -58,6 +59,8 @@ fun AppLayout(
     onCustomThemeChanged: (CustomTheme) -> Unit,
     currentLocale: AppLocale,
     onLocaleChanged: (AppLocale) -> Unit,
+    homeView: HomeView,
+    onHomeViewChanged: (HomeView) -> Unit,
     backgroundSettings: BackgroundSettings = BackgroundSettings(),
     onBackgroundSettingsChanged: (BackgroundSettings) -> Unit = {}
 ) {
@@ -103,15 +106,18 @@ fun AppLayout(
                     Screen.Home -> {
                         val session = currentSession
                         when {
-                            session != null -> DashboardScreen(
-                                session               = session,
-                                initialSelectedServer = selectedServer,
-                                onServerSelected      = { selectedServer = it },
-                                onSessionUpdated      = { currentSession = it },
-                                onCloseApp            = onCloseApp,
-                                onOpenServerSettings  = { onScreenChange(Screen.ServerSettings(it)) },
-                                onOpenDetails         = { onScreenChange(Screen.ServerDetails(it)) }
-                            )
+                            session != null -> when (homeView) {
+                                HomeView.Classic -> DashboardScreen(
+                                    session               = session,
+                                    initialSelectedServer = selectedServer,
+                                    onServerSelected      = { selectedServer = it },
+                                    onSessionUpdated      = { currentSession = it },
+                                    onCloseApp            = onCloseApp,
+                                    onOpenServerSettings  = { onScreenChange(Screen.ServerSettings(it)) },
+                                    onOpenDetails         = { onScreenChange(Screen.ServerDetails(it)) }
+                                )
+                                HomeView.LibraryFirst -> LibraryScreen()
+                            }
                             // `Loading` is the brief window between startup and resolved
                             // credentials -- spinner is appropriate. `Unauthenticated` is
                             // a stable state waiting on user input; show the explicit
@@ -134,6 +140,8 @@ fun AppLayout(
                             onOpenThemePicker        = { onScreenChange(Screen.ThemePicker) },
                             currentLocale            = currentLocale,
                             onLocaleChanged          = onLocaleChanged,
+                            homeView                 = homeView,
+                            onHomeViewChanged        = onHomeViewChanged,
                             onOpenBackgroundSettings = { onScreenChange(Screen.BackgroundSettings) },
                             onOpenAbout              = { onScreenChange(Screen.About) }
                         )
