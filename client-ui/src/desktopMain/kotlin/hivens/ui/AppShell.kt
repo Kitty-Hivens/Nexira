@@ -50,7 +50,6 @@ import hivens.ui.theme.BrutStyle
 import hivens.ui.theme.CelestiaStyle
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.CustomTheme
-import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.ThemeManager
 import hivens.ui.tray.TrayManager
 import hivens.ui.utils.GameConsoleService
@@ -403,8 +402,11 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
                 }
             }
 
-            CelestiaTheme(useDarkTheme = isDarkTheme, customTheme = customTheme) {
-                CompositionLocalProvider(LocalStyle provides styleSpec) {
+            CelestiaTheme(
+                useDarkTheme = isDarkTheme,
+                customTheme  = customTheme,
+                style        = styleSpec,
+            ) {
                 val migration = boot.pendingMigration
                 if (migration != null) {
                     // Migration is mandatory: the screen does not return
@@ -469,7 +471,6 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
                     )
                     UpdateManager()
                 }
-                } // end CompositionLocalProvider(LocalStyle)
             }
         }
     }

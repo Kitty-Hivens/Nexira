@@ -3,6 +3,7 @@ package hivens.ui
 import androidx.compose.ui.window.application
 import hivens.launcher.bootstrap.LauncherBootstrap
 import hivens.ui.identity.SkinManager
+import hivens.ui.puppet.PuppetServerLoader
 import hivens.ui.utils.GameConsoleService
 import org.jetbrains.compose.resources.ExperimentalResourceApi
 import org.koin.dsl.module
@@ -35,7 +36,7 @@ fun main() {
     // using Composables can resolve their dependencies, and before
     // `application` so the server is listening when the first Composable
     // registers itself.
-    hivens.ui.puppet.PuppetServerLoader.instance.startIfRequested()
+    PuppetServerLoader.instance.startIfRequested()
 
     application { AppShell(boot) }
 }
