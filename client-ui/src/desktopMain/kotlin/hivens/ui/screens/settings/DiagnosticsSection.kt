@@ -29,6 +29,7 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.platform.SystemActions
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.LocalStyle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -61,6 +62,7 @@ internal fun DiagnosticsSection(
 ) {
     val s  = LocalStrings.current
     val af = LocalAprilFools.current
+    val style = LocalStyle.current
 
     // ── April Fools debug panel -- secret unlock ────────────────────
     var debugTapCount  by remember { mutableStateOf(0) }
@@ -213,7 +215,7 @@ internal fun DiagnosticsSection(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(style.cardCorner))
             .clickable(onClick = onOpenAbout)
             .background(CelestiaTheme.colors.surface.copy(alpha = 0.4f))
             .padding(16.dp),

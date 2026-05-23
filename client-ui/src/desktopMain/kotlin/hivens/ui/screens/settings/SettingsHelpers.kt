@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import hivens.core.data.HomeView
 import hivens.core.data.UiStyle
 import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.LocalStyle
 
 /**
  * Section header used by every Settings section. Small bold caps title
@@ -64,10 +65,11 @@ internal fun SettingsRowWithDescription(
     onCheckedChange: (Boolean) -> Unit
 ) {
     val alpha = if (enabled) 1f else 0.4f
+    val style = LocalStyle.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(style.cardCorner))
             .background(CelestiaTheme.colors.background.copy(alpha = 0.4f))
             .padding(16.dp),
         verticalAlignment     = Alignment.CenterVertically,
@@ -138,10 +140,11 @@ internal fun HomeViewPicker(
     classicLabel: String,
     libraryLabel: String,
 ) {
+    val style = LocalStyle.current
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(style.cardCorner))
             .background(CelestiaTheme.colors.background.copy(alpha = 0.4f))
             .padding(16.dp),
     ) {
@@ -181,10 +184,11 @@ internal fun UiStylePicker(
     celestia: String,
     brut: String,
 ) {
+    val style = LocalStyle.current
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(style.cardCorner))
             .background(CelestiaTheme.colors.background.copy(alpha = 0.4f))
             .padding(16.dp),
     ) {
@@ -203,9 +207,10 @@ private fun VariantPill(label: String, selected: Boolean, onClick: () -> Unit) {
     val bg = if (selected) CelestiaTheme.colors.primary.copy(alpha = 0.18f)
              else CelestiaTheme.colors.surface.copy(alpha = 0.4f)
     val fg = if (selected) CelestiaTheme.colors.primary else CelestiaTheme.colors.textSecondary
+    val style = LocalStyle.current
     Row(
         Modifier
-            .clip(RoundedCornerShape(10.dp))
+            .clip(RoundedCornerShape(style.buttonCorner))
             .background(bg)
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 10.dp),
