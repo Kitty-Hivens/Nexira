@@ -2,6 +2,7 @@ package hivens.ui.easter
 
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
@@ -263,15 +264,21 @@ fun AprilFoolsButton(
     ),
 ) {
     // ── Pass-through when chaos is not active ──────────────────────────────
+    // Wrap in NoOpIndication for the same reason NoOpAprilFools does --
+    // M3 1.11-alpha07's default state-layer paints with a shape that
+    // doesn't line up with the Button container, producing the stray
+    // rectangle on hover.
     if (!AprilFools.isActive()) {
-        Button(
-            onClick  = onClick,
-            modifier = modifier,
-            enabled  = enabled,
-            colors   = colors,
-            shape    = MaterialTheme.shapes.small,
-        ) {
-            Text(text)
+        CompositionLocalProvider(LocalIndication provides NoOpIndication) {
+            Button(
+                onClick  = onClick,
+                modifier = modifier,
+                enabled  = enabled,
+                colors   = colors,
+                shape    = MaterialTheme.shapes.small,
+            ) {
+                Text(text)
+            }
         }
         return
     }
@@ -312,12 +319,12 @@ fun AprilFoolsButton(
     }
 
     // ── Render ────────────────────────────────────────────────────────────
-    // No Modifier.hoverable here -- the Button itself emits hover into
-    // interactionSource via its internal clickable. Adding hoverable on
-    // top double-emits, which in Compose Multiplatform 1.11 + M3 1.11
-    // alpha resulted in a second hover state layer painting beside the
-    // correct rounded one (user-reported 2026-05-23). The collectIsHoveredAsState
-    // below picks up the Button's emissions just as well.
+    // Single hover affordance: NoOpIndication suppresses the M3 default
+    // state-layer (the source of the stray rectangle on hover). The
+    // chaos engine still wires up via the explicit interactionSource
+    // passed to Button; the engine reads isHovered via the same source
+    // for the FLEEING-phase relocation trigger above.
+    CompositionLocalProvider(LocalIndication provides NoOpIndication) {
     Button(
         onClick = onClick,
         enabled = enabled,
@@ -349,6 +356,7 @@ fun AprilFoolsButton(
     ) {
         Text(text)
     }
+    } // end CompositionLocalProvider(LocalIndication = NoOpIndication)
 }
 
 // ─── Close dialog ─────────────────────────────────────────────────────────────
