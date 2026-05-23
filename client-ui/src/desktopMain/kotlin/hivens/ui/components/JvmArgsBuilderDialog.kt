@@ -66,7 +66,7 @@ fun JvmArgsBuilderDialog(
     ) {
         Surface(
             modifier = Modifier.width(820.dp).heightIn(min = 540.dp, max = 720.dp),
-            shape = RoundedCornerShape(16.dp),
+            shape = MaterialTheme.shapes.large,
             color = CelestiaTheme.colors.surface,
         ) {
             Column(Modifier.fillMaxSize()) {
