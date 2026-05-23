@@ -25,18 +25,10 @@ import hivens.core.api.model.ServerProfile
 import hivens.core.data.SessionData
 import hivens.core.diag.ActionRing
 import hivens.launcher.AutoSyncService
-import hivens.launcher.bootstrap.DisplayDiagnostics
-import hivens.launcher.bootstrap.XToolkitOverride
-import hivens.launcher.CrashReporter
+import hivens.launcher.bootstrap.LauncherBootstrap
 import hivens.launcher.CredentialsManager
 import hivens.launcher.network.NetworkState
 import hivens.launcher.ProfileManager
-import hivens.launcher.di.appModule
-import hivens.launcher.di.networkModule
-import hivens.launcher.platform.DataDirMigration
-import hivens.launcher.platform.DataDirMover
-import hivens.launcher.platform.PlatformPaths
-import hivens.launcher.platform.SingleInstance
 import hivens.ui.background.BackgroundManager
 import hivens.ui.background.CustomBackground
 import hivens.ui.components.UpdateManager
@@ -58,10 +50,8 @@ import hivens.ui.theme.ThemeManager
 import hivens.ui.tray.TrayManager
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.identity.SkinManager
-import java.nio.file.Files
 import java.time.Instant
 import java.time.temporal.ChronoUnit
-import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -72,13 +62,11 @@ import okhttp3.Call
 import org.jetbrains.compose.resources.ExperimentalResourceApi
 import org.jetbrains.compose.resources.painterResource
 import org.koin.compose.koinInject
-import org.koin.core.context.startKoin
 import org.koin.core.context.stopKoin
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
 import org.slf4j.LoggerFactory
 import javax.swing.SwingUtilities
-import kotlin.system.exitProcess
 import kotlin.time.Duration.Companion.milliseconds
 
 // ─── DI ──────────────────────────────────────────────────────────────────────
@@ -113,124 +101,17 @@ sealed class Screen {
 
 @OptIn(ExperimentalResourceApi::class)
 fun main() {
-    // Resolve logs dir BEFORE any LoggerFactory.getLogger() call so
-    // logback.xml (which reads `${nexira.logs.dir}` for its rolling-file
-    // appenders) sees the platform-correct path on its very first init.
-    // PlatformPaths.system() is pure computation -- no logger init --
-    // safe to call before the property is set. DataDirMover and
-    // BootstrapConf both have lazy log fields specifically so this
-    // ordering works without their applyPending() / read() touching
-    // logback first; see those files for the long-form rationale.
-    val paths = PlatformPaths.system()
-    System.setProperty("nexira.logs.dir", paths.logsDir.toString())
-
-    // NOW safe to apply any pending data-dir move scheduled from the
-    // Settings UI. If user clicked "Move data directory" -> picker ->
-    // restart, this is where the relocation actually happens. Operation
-    // is idempotent; safe to call on every startup. The first log line
-    // it produces (only in the actual-move case, no-op otherwise) lands
-    // in `paths.logsDir/launcher.log`, not `./logs/launcher.log`.
-    //
-    // Edge case: if applyPending DOES move the data dir, paths.logsDir
-    // points at the old location and logback opens the file there --
-    // log entries about the move itself stream to the old path right
-    // up until the source dir is deleted. Next startup uses the new
-    // path correctly. The user opted into this two-restart flow when
-    // they clicked Move, so the one-time misdirect is acceptable.
-    DataDirMover.applyPending()
-
-    // Pulse: tag every log line in this process with a stable 8-char sessionId
-    // so a multi-launch user dump can be sliced per process invocation
-    // (`grep sessionId=abc12345 *.log`). System property (not MDC) because
-    // MDC is thread-local, and we want this on every line from every thread --
-    // the logback pattern reads the property via `${nexira.sessionId}`.
-    val sessionId = UUID.randomUUID().toString().take(8)
-    System.setProperty("nexira.sessionId", sessionId)
-
-    // Beacon: the very first entry in the action ring -- handy when reading a
-    // bundle to confirm what process / version / OS produced it.
-    ActionRing.record(
-        "Launcher started (v${Branding.VERSION}, sessionId=$sessionId, os=${System.getProperty("os.name")})"
-    )
-
-    // Vault #2: wire SSL-bypass persistence. Expired entries from prior
-    // sessions are dropped during load -- a 30-day grant from a month ago
-    // doesn't silently re-arm itself. Called before Koin / HttpClientProvider
-    // bootstrap so the very first network request sees the correct bypass
-    // state. (Calling later would race: HttpClientProvider's selector
-    // reads `NetworkState.bypassFor(...)` and could see an empty set if
-    // initialize hadn't run yet.)
-    NetworkState.initialize(paths.dataDir.resolve("ssl-bypasses.json"))
-
-    System.setProperty("skiko.fps.limit", "60")
-    // X11 WM_CLASS = "Nexira". See XToolkitOverride for the cross-vendor
-    // details; jvmArgs --add-opens in client-ui/build.gradle.kts unlocks
-    // the reflective set this hack relies on.
-    XToolkitOverride.applyLinuxAppClassName()
-
-    // Capture toolkit + session-type now that the toolkit has been triggered
-    // by XToolkitOverride. One INFO line per launch -- gives every
-    // user-attached launcher.log enough context to slot into the
-    // Wayland-Native investigation matrix.
-    DisplayDiagnostics.logEnvironment()
-
-    Files.createDirectories(paths.dataDir)
-
-    // Constructed here (pre-Koin) so the uncaught-exception handler below
-    // can capture an instance with the resolved PlatformPaths. A parallel
-    // Koin singleton wires the same shape for post-Koin consumers; they
-    // share no mutable state so the parallel instances are functionally
-    // identical.
-    val crashReporter = CrashReporter(paths)
-
-    Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
-        val logger = LoggerFactory.getLogger("CrashHandler")
-        logger.error("Uncaught exception on thread '${thread.name}'", throwable)
-        runCatching {
-            val report     = crashReporter.generate(throwable, thread)
-            val reportFile = crashReporter.saveToDisk(report)
-            SwingUtilities.invokeLater { crashReporter.showCrashDialog(report, reportFile) }
-        }
-    }
-
-    // Single-instance lock acquired BEFORE migration is consulted. Two
-    // launchers started close together would otherwise both render the
-    // MigrationScreen and race on file copies. DataDirMigration's
-    // emptiness check is taught to ignore .lock / .show / .migrated so
-    // its first-run trigger still fires.
-    if (!SingleInstance.acquire(paths.dataDir)) exitProcess(0)
-
-    // Migration runs INSIDE Compose now, as a mandatory full-screen UI
-    // shown before AppRoot. The detection is read here once so the
-    // result is stable across recompositions; the actual copy and
-    // progress reporting happens in MigrationScreen.
-    val pendingMigration = DataDirMigration.detect(paths)
-
-    // Two createdAtStart hooks registered in appModule fire here:
-    //   - SettingsRestoreHook       -- replays persisted experimental overrides.
-    //   - AppCoroutineScopeHook     -- installs JVM shutdown hook that cancels
-    //                                   the shared process-lifetime scope.
-    // The shared CoroutineScope itself is also createdAtStart so the hook above
-    // has a real instance to wire up, and LauncherController + tray-launch flow
-    // share the same scope -- otherwise a tray-launched process can outlive
-    // the JVM shutdown signal because its launching coroutine isn't joined to
-    // the canceled scope.
-    startKoin { modules(networkModule, appModule, uiModule) }
+    val boot = LauncherBootstrap.preBoot(listOf(uiModule))
 
     // Puppet mode: opt-in localhost HTTP control surface for automated
     // UI driving (see hivens.ui.puppet.PuppetServerLifecycle + Loader).
-    // Two-layer gating:
-    //   1. Build-time: RealPuppetServer + Ktor server classes are only
-    //      compiled into the desktop target when `-PauraPuppetPort=N`
-    //      is on the Gradle command line. Default production builds do
-    //      not contain the implementation at all -- ServiceLoader returns
-    //      nothing, the loader falls back to NoOpPuppetServer.
-    //   2. Runtime: even when the real impl IS on the classpath,
-    //      `startIfRequested()` only binds when `-Dnexira.puppet.port=N`
-    //      is set as a JVM system property.
-    // MUST run after Koin so PuppetRegistry-using Composables can resolve
-    // their dependencies, and before `application` so the server is
-    // listening when the first Composable registers itself.
+    // Two-layer gating: build-time SPI (RealPuppetServer ships only when
+    // -PauraPuppetPort=N is on the Gradle command line) + runtime system
+    // property (-Dnexira.puppet.port=N must be set to actually bind).
+    // MUST run after Koin (LauncherBootstrap.preBoot) so PuppetRegistry-
+    // using Composables can resolve their dependencies, and before
+    // `application` so the server is listening when the first Composable
+    // registers itself.
     hivens.ui.puppet.PuppetServerLoader.instance.startIfRequested()
 
     application {
@@ -287,7 +168,7 @@ fun main() {
         var raiseTick by remember { mutableStateOf(0) }
 
         LaunchedEffect(Unit) {
-            val showFile = paths.dataDir.resolve(".show").toFile()
+            val showFile = boot.paths.dataDir.resolve(".show").toFile()
             while (true) {
                 delay(500.milliseconds)
                 if (showFile.exists()) {
@@ -526,14 +407,19 @@ fun main() {
                 }
 
                 CelestiaTheme(useDarkTheme = isDarkTheme, customTheme = customTheme) {
-                    if (pendingMigration != null) {
+                    val migration = boot.pendingMigration
+                    if (migration != null) {
                         // Migration is mandatory: the screen does not return
                         // to AppRoot on completion. The user clicks Quit and
                         // relaunches; the next process sees the .migrated
-                        // marker and skips this branch.
+                        // marker and skips this branch. Local capture so
+                        // the smart cast survives the nested MigrationScreen
+                        // call -- boot.pendingMigration is a public property
+                        // declared in client-launcher, and Kotlin's smart-cast
+                        // doesn't extend across module boundaries.
                         MigrationScreen(
-                            source = pendingMigration,
-                            target = paths.dataDir,
+                            source = migration,
+                            target = boot.paths.dataDir,
                             onQuit = { exitApplication() },
                         )
                     } else {
