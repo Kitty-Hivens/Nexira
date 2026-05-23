@@ -80,6 +80,7 @@ val LocalCelestiaColors = staticCompositionLocalOf<CelestiaColors> {
 fun CelestiaTheme(
     useDarkTheme: Boolean = true,
     customTheme: CustomTheme? = null,
+    style: StyleSpec = CelestiaStyle,
     content: @Composable () -> Unit
 ) {
     // If there is a custom theme, use it, otherwise use the default one
@@ -97,21 +98,24 @@ fun CelestiaTheme(
         baseColors
     }
 
-    // Color change animation (500ms)
-    val animSpec = remember { TweenSpec<Color>(durationMillis = 500) }
+    // Color change animation duration scales with style.animationMultiplier.
+    // Brut (multiplier 0) collapses to ~1ms so palette swaps land instantly;
+    // Celestia keeps the original 500ms cross-fade.
+    val animDurationMs = style.animationDurationMs(500)
+    val colorAnimSpec = remember(animDurationMs) { TweenSpec<Color>(durationMillis = animDurationMs) }
 
-    val animatedPrimary by animateColorAsState(targetColors.primary, animSpec)
-    val animatedSecondary by animateColorAsState(targetColors.secondary, animSpec)
-    val animatedBackground by animateColorAsState(targetColors.background, animSpec)
-    val animatedSurface by animateColorAsState(targetColors.surface, animSpec)
-    val animatedSurfaceVariant by animateColorAsState(targetColors.surfaceVariant, animSpec)
-    val animatedError by animateColorAsState(targetColors.error, animSpec)
-    val animatedSuccess by animateColorAsState(targetColors.success, animSpec)
-    val animatedTextPrimary by animateColorAsState(targetColors.textPrimary, animSpec)
-    val animatedTextSecondary by animateColorAsState(targetColors.textSecondary, animSpec)
-    val animatedOutline by animateColorAsState(targetColors.outline, animSpec)
-    val animatedGlassBg by animateColorAsState(targetColors.glassBackground, animSpec)
-    val animatedGlassAlpha by animateFloatAsState(targetColors.glassAlpha, TweenSpec(500))
+    val animatedPrimary by animateColorAsState(targetColors.primary, colorAnimSpec)
+    val animatedSecondary by animateColorAsState(targetColors.secondary, colorAnimSpec)
+    val animatedBackground by animateColorAsState(targetColors.background, colorAnimSpec)
+    val animatedSurface by animateColorAsState(targetColors.surface, colorAnimSpec)
+    val animatedSurfaceVariant by animateColorAsState(targetColors.surfaceVariant, colorAnimSpec)
+    val animatedError by animateColorAsState(targetColors.error, colorAnimSpec)
+    val animatedSuccess by animateColorAsState(targetColors.success, colorAnimSpec)
+    val animatedTextPrimary by animateColorAsState(targetColors.textPrimary, colorAnimSpec)
+    val animatedTextSecondary by animateColorAsState(targetColors.textSecondary, colorAnimSpec)
+    val animatedOutline by animateColorAsState(targetColors.outline, colorAnimSpec)
+    val animatedGlassBg by animateColorAsState(targetColors.glassBackground, colorAnimSpec)
+    val animatedGlassAlpha by animateFloatAsState(targetColors.glassAlpha, TweenSpec(animDurationMs))
 
     // Assembling an animated palette
     val animatedPalette = targetColors.copy(
@@ -160,12 +164,17 @@ fun CelestiaTheme(
         )
     }
 
+    // Provide LocalStyle alongside the palette so child composables can
+    // read StyleSpec tokens without a separate CompositionLocalProvider
+    // chain at every entry point.
     CompositionLocalProvider(
-        LocalCelestiaColors provides animatedPalette
+        LocalCelestiaColors provides animatedPalette,
+        LocalStyle          provides style,
     ) {
         MaterialTheme(
             colorScheme = colorScheme,
-            content = content
+            shapes      = style.toMaterialShapes(),
+            content     = content
         )
     }
 }

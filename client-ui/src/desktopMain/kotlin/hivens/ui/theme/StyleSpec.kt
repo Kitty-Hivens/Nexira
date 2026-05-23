@@ -1,5 +1,7 @@
 package hivens.ui.theme
 
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Shapes
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -31,7 +33,31 @@ data class StyleSpec(
     val animationMultiplier: Float,
     /** Whether decorative effects (pulsating glow, soft shadow) render at all. */
     val softGlowEnabled: Boolean,
-)
+) {
+    /**
+     * Build a Material 3 [Shapes] bundle from this style. Driven by
+     * [cardCorner] and [buttonCorner] so M3 `Card`, `Button`,
+     * `OutlinedCard`, `OutlinedButton`, dialogs, sheets etc. pick the
+     * active style's corners without per-call-site shape overrides.
+     *
+     * Sizes follow the M3 hierarchy (extraSmall -> chips, small ->
+     * buttons, medium -> cards, large -> dialogs, extraLarge ->
+     * sheets). Anchored to the two source values so Brut collapses
+     * the whole shape stack to near-square in one step.
+     */
+    fun toMaterialShapes(): Shapes = Shapes(
+        extraSmall = RoundedCornerShape(buttonCorner / 2),
+        small      = RoundedCornerShape(buttonCorner),
+        medium     = RoundedCornerShape(cardCorner),
+        large      = RoundedCornerShape(cardCorner + 4.dp),
+        extraLarge = RoundedCornerShape(cardCorner * 2),
+    )
+
+    /** Apply [animationMultiplier] to a base duration. 0.0 short-circuits to 1ms
+     *  so frameworks that reject zero-duration animations still accept it. */
+    fun animationDurationMs(baseMs: Int): Int =
+        (baseMs * animationMultiplier).toInt().coerceAtLeast(1)
+}
 
 enum class CardSurface { Glass, Flat }
 

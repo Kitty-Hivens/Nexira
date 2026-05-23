@@ -39,6 +39,7 @@ import hivens.ui.screens.detail.PackDetailScreen
 import hivens.ui.screens.library.LibraryScreen
 import hivens.ui.screens.settings.SettingsScreen
 import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.CustomTheme
 import hivens.ui.utils.GameConsoleService
 import org.koin.compose.koinInject
@@ -102,9 +103,13 @@ fun AppLayout(
 
         // ── Main content ──────────────────────────────────────────────────
         Box(Modifier.weight(1f).fillMaxHeight()) {
+            // Screen-to-screen Crossfade duration follows the active
+            // style. Under Brut (animationMultiplier = 0) the swap is
+            // effectively instant; under Celestia keeps the 180ms fade.
+            val crossfadeMs = LocalStyle.current.animationDurationMs(180)
             Crossfade(
                 targetState   = currentScreen,
-                animationSpec = tween(180)
+                animationSpec = tween(crossfadeMs)
             ) { screen ->
                 when (screen) {
                     Screen.Home -> {
