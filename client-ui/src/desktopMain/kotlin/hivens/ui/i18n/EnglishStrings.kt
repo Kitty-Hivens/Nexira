@@ -493,4 +493,10 @@ object EnglishStrings : AppStrings {
     override val settingsUiStyleSub      = "Switch the form / surface / motion approach independently from the color palette. Celestia is the current rounded-glass look; Brut is hard-edged and flat."
     override val settingsUiStyleCelestia = "Celestia"
     override val settingsUiStyleBrut     = "Brut"
+
+    override val settingsCategoryAppearance   = "Appearance"
+    override val settingsCategoryNetwork      = "Network"
+    override val settingsCategoryExperimental = "Experimental"
+    override val settingsCategoryAdvanced     = "Advanced"
+    override val settingsCategoryDiagnostics  = "Diagnostics"
 }

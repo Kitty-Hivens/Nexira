@@ -494,4 +494,10 @@ object RussianStrings : AppStrings {
     override val settingsUiStyleSub      = "Переключай форму / поверхности / анимации независимо от цветовой палитры. Celestia — текущий вид с мягкими скруглениями и стеклом; Brut — жёсткий, без скруглений, без анимаций."
     override val settingsUiStyleCelestia = "Celestia"
     override val settingsUiStyleBrut     = "Brut"
+
+    override val settingsCategoryAppearance   = "Внешний вид"
+    override val settingsCategoryNetwork      = "Сеть"
+    override val settingsCategoryExperimental = "Эксперименты"
+    override val settingsCategoryAdvanced     = "Расширенные"
+    override val settingsCategoryDiagnostics  = "Диагностика"
 }
