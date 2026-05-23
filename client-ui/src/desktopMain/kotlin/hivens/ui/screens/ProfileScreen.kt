@@ -19,7 +19,7 @@ import hivens.core.api.SkinRepository
 import hivens.core.data.SessionData
 import hivens.ui.components.GlassCard
 import hivens.ui.easter.LocalAprilFools
-import hivens.ui.utils.SystemActions
+import hivens.ui.platform.SystemActions
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen

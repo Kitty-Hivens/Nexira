@@ -45,7 +45,7 @@ import hivens.ui.puppet.PuppetField
 import hivens.ui.puppet.PuppetToggle
 import hivens.ui.theme.CelestiaTheme
 import org.koin.compose.koinInject
-import hivens.ui.utils.SystemActions
+import hivens.ui.platform.SystemActions
 import java.awt.Toolkit
 import java.awt.datatransfer.StringSelection
 import java.nio.file.Files

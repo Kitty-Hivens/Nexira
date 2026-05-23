@@ -1,4 +1,4 @@
-package hivens.ui.utils
+package hivens.ui.platform
 
 import java.awt.Desktop
 import java.io.File

@@ -40,7 +40,7 @@ import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
 import org.koin.compose.koinInject
 import org.slf4j.LoggerFactory
-import hivens.ui.utils.SystemActions
+import hivens.ui.platform.SystemActions
 import java.lang.management.ManagementFactory
 import java.text.SimpleDateFormat
 import java.util.*
