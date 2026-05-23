@@ -37,6 +37,7 @@ import hivens.launcher.ProfileManager
 import hivens.ui.background.BackgroundManager
 import hivens.ui.background.CustomBackground
 import hivens.ui.components.UpdateManager
+import hivens.ui.easter.AprilFools
 import hivens.ui.easter.AprilFoolsLoader
 import hivens.ui.easter.LocalAprilFools
 import hivens.ui.generated.resources.Res
@@ -147,6 +148,15 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
     val styleSpec = when (uiStyle) {
         UiStyle.Celestia -> CelestiaStyle
         UiStyle.Brut     -> BrutStyle
+    }
+
+    // Push style coupling into AprilFools so the chaos engine (a plain
+    // singleton, not a Composable) and chaos components pick up the
+    // active style without having to thread a CompositionLocal through
+    // them. Triggered on every uiStyle change.
+    LaunchedEffect(styleSpec) {
+        AprilFools.styleAnimationMultiplier = styleSpec.animationMultiplier
+        AprilFools.useFlatSurface           = styleSpec.cardSurface == hivens.ui.theme.CardSurface.Flat
     }
 
     val launchState by controller.state.collectAsState()

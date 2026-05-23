@@ -177,8 +177,10 @@ private fun EscapedButtonRenderer(btn: FloatingButton, isGhost: Boolean) {
                     else
                         CelestiaTheme.colors.primary,
                 ),
+                // Flat style drops elevation -- Brut surfaces don't lift,
+                // so a chaos button shouldn't either.
                 elevation = ButtonDefaults.buttonElevation(
-                    defaultElevation = if (isGhost) 0.dp else 4.dp
+                    defaultElevation = if (isGhost || AprilFools.useFlatSurface) 0.dp else 4.dp
                 ),
             ) {
                 Text(
@@ -385,7 +387,7 @@ fun AprilFoolsCloseDialog(
             modifier       = Modifier.width(440.dp).wrapContentHeight(),
             shape          = MaterialTheme.shapes.large,
             color          = CelestiaTheme.colors.surface,
-            tonalElevation = 10.dp,
+            tonalElevation = if (AprilFools.useFlatSurface) 0.dp else 10.dp,
         ) {
             Column(
                 modifier            = Modifier.padding(28.dp),
