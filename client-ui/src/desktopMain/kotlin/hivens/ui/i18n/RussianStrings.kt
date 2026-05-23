@@ -500,4 +500,7 @@ object RussianStrings : AppStrings {
     override val settingsCategoryExperimental = "Эксперименты"
     override val settingsCategoryAdvanced     = "Расширенные"
     override val settingsCategoryDiagnostics  = "Диагностика"
+
+    override val profileCategorySkin    = "Скин"
+    override val profileCategoryAccount = "Аккаунт"
 }

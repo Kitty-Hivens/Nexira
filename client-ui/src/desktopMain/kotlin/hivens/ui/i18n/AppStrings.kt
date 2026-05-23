@@ -532,4 +532,8 @@ interface AppStrings {
     val settingsCategoryExperimental: String
     val settingsCategoryAdvanced: String
     val settingsCategoryDiagnostics: String
+
+    // --- Profile two-column nav labels ---
+    val profileCategorySkin: String
+    val profileCategoryAccount: String
 }
