@@ -5,6 +5,7 @@ import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonColors
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.CompositionLocalProvider
@@ -14,6 +15,7 @@ import androidx.compose.runtime.State
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.dp
 
 /**
  * Default no-op implementation of [AprilFoolsLifecycle]. Returned by
@@ -75,11 +77,24 @@ object NoOpAprilFools : AprilFoolsLifecycle {
         // is the remaining hover affordance.
         CompositionLocalProvider(LocalIndication provides NoOpIndication) {
             Button(
-                onClick  = onClick,
-                modifier = modifier,
-                enabled  = enabled,
-                colors   = colors,
-                shape    = MaterialTheme.shapes.small,
+                onClick   = onClick,
+                modifier  = modifier,
+                enabled   = enabled,
+                colors    = colors,
+                shape     = MaterialTheme.shapes.small,
+                // Zero elevation across every state. M3 default
+                // hoveredElevation = 2.dp paints a shadow on hover that
+                // doesn't follow the button's rounded clip and bleeds
+                // outside the shape -- the "second rectangle wider than
+                // the button" the user flagged 2026-05-23. Killing
+                // elevation removes the shadow paint entirely.
+                elevation = ButtonDefaults.buttonElevation(
+                    defaultElevation  = 0.dp,
+                    pressedElevation  = 0.dp,
+                    focusedElevation  = 0.dp,
+                    hoveredElevation  = 0.dp,
+                    disabledElevation = 0.dp,
+                ),
             ) {
                 Text(text)
             }

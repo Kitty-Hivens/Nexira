@@ -264,18 +264,25 @@ fun AprilFoolsButton(
     ),
 ) {
     // ── Pass-through when chaos is not active ──────────────────────────────
-    // Wrap in NoOpIndication for the same reason NoOpAprilFools does --
-    // M3 1.11-alpha07's default state-layer paints with a shape that
-    // doesn't line up with the Button container, producing the stray
-    // rectangle on hover.
+    // Wrap in NoOpIndication + zero elevation -- M3 1.11-alpha07's
+    // state-layer + hovered-shadow paint with shapes that don't line
+    // up with the Button container, producing the stray rectangle on
+    // hover the user flagged 2026-05-23.
     if (!AprilFools.isActive()) {
         CompositionLocalProvider(LocalIndication provides NoOpIndication) {
             Button(
-                onClick  = onClick,
-                modifier = modifier,
-                enabled  = enabled,
-                colors   = colors,
-                shape    = MaterialTheme.shapes.small,
+                onClick   = onClick,
+                modifier  = modifier,
+                enabled   = enabled,
+                colors    = colors,
+                shape     = MaterialTheme.shapes.small,
+                elevation = ButtonDefaults.buttonElevation(
+                    defaultElevation  = 0.dp,
+                    pressedElevation  = 0.dp,
+                    focusedElevation  = 0.dp,
+                    hoveredElevation  = 0.dp,
+                    disabledElevation = 0.dp,
+                ),
             ) {
                 Text(text)
             }
