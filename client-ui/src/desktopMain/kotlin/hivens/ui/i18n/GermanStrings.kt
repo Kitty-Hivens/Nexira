@@ -499,4 +499,7 @@ object GermanStrings : AppStrings {
     override val settingsCategoryExperimental = "Experimentell"
     override val settingsCategoryAdvanced     = "Erweitert"
     override val settingsCategoryDiagnostics  = "Diagnose"
+
+    override val profileCategorySkin    = "Skin"
+    override val profileCategoryAccount = "Konto"
 }

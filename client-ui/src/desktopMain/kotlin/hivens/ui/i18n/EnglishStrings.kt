@@ -499,4 +499,7 @@ object EnglishStrings : AppStrings {
     override val settingsCategoryExperimental = "Experimental"
     override val settingsCategoryAdvanced     = "Advanced"
     override val settingsCategoryDiagnostics  = "Diagnostics"
+
+    override val profileCategorySkin    = "Skin"
+    override val profileCategoryAccount = "Account"
 }
