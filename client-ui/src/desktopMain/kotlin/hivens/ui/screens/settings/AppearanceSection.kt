@@ -25,6 +25,7 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetToggle
 import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.LocalStyle
 
 /**
  * Interface + Behavior block. Drives anything user-facing about how the
@@ -51,6 +52,7 @@ internal fun AppearanceSection(
     onUiStyleChanged: (UiStyle) -> Unit,
 ) {
     val s = LocalStrings.current
+    val style = LocalStyle.current
     var langDropdownExpanded by remember { mutableStateOf(false) }
 
     SettingsSectionTitle(s.settingsSectionUI)
@@ -59,7 +61,7 @@ internal fun AppearanceSection(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(style.cardCorner))
             .background(CelestiaTheme.colors.background.copy(alpha = 0.4f))
             .padding(16.dp),
         verticalAlignment     = Alignment.CenterVertically,
@@ -120,7 +122,7 @@ internal fun AppearanceSection(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(style.cardCorner))
             .clickable(onClick = onOpenThemePicker)
             .background(CelestiaTheme.colors.primary.copy(alpha = 0.1f))
             .padding(16.dp),
@@ -145,7 +147,7 @@ internal fun AppearanceSection(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(style.cardCorner))
             .clickable(onClick = onOpenBackgroundSettings)
             .background(CelestiaTheme.colors.surface.copy(alpha = 0.4f))
             .padding(16.dp),
@@ -226,7 +228,7 @@ internal fun AppearanceSection(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(style.cardCorner))
             .background(
                 if (form.isOfflineMode) CelestiaTheme.colors.error.copy(alpha = 0.08f)
                 else CelestiaTheme.colors.background.copy(alpha = 0.4f)

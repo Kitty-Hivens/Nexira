@@ -19,6 +19,7 @@ import hivens.launcher.platform.DataDirMover
 import hivens.launcher.platform.PlatformPaths
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.LocalStyle
 import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
@@ -44,6 +45,7 @@ import kotlin.system.exitProcess
 @Composable
 internal fun AdvancedSection(paths: PlatformPaths) {
     val s = LocalStrings.current
+    val style = LocalStyle.current
 
     SettingsSectionTitle(s.settingsSectionDataDir)
 
@@ -54,7 +56,7 @@ internal fun AdvancedSection(paths: PlatformPaths) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(style.cardCorner))
             .background(CelestiaTheme.colors.background.copy(alpha = 0.4f))
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),

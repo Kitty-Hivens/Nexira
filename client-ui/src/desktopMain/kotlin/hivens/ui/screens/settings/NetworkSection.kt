@@ -16,6 +16,7 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetToggle
 import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.LocalStyle
 import kotlinx.coroutines.delay
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
@@ -33,6 +34,7 @@ internal fun NetworkSection(
     save: () -> Unit,
 ) {
     val s = LocalStrings.current
+    val style = LocalStyle.current
 
     SettingsSectionTitle(s.settingsSectionNetwork)
 
@@ -52,7 +54,7 @@ internal fun NetworkSection(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(style.cardCorner))
             .background(CelestiaTheme.colors.background.copy(alpha = 0.4f))
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
