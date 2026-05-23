@@ -302,6 +302,8 @@ object GermanStrings : AppStrings {
     override val settingsAutoSyncAllPacksDesc   = "Aktualisiert beim Launcher-Start jedes bereits installierte Server-Pack im Hintergrund. Kostet Bandbreite — nützlich, wenn du zwischen mehreren Servern wechselst und frischen Stand ohne Klick auf jeden willst."
     override val settingsJvmBuilder             = "Visueller JVM-Argument-Builder"
     override val settingsJvmBuilderDesc         = "Zeigt einen „Argumente bauen“-Button in den Server-Einstellungen. Wähle Garbage Collector, justiere Heap-Regionen, aktiviere AppCDS oder JFR — ohne Flags auswendig zu lernen. Vorgaben: Aikar's Rezept, GTNH-Klasse, ZGC für große Heaps und mehr."
+    override val settingsExperimentalMirror     = "Hivens Mirror (alpha)"
+    override val settingsExperimentalMirrorDesc = "Pack-Dateien für Industrial über smrt.hivens.dev statt SmartyCraft's CDN abrufen. Authentifizierung und Spielserver-Adressen bleiben bei SC; nur die Sync-Quelle ändert sich. Alpha — nur Industrial ist auf dem Mirror verfügbar, jedes andere Pack läuft weiter über SC. Lauter Fehlschlag bei Mirror-Problemen; kein stiller Fallback auf SC, damit ein kaputter Mirror sofort sichtbar wird."
     override val settingsMimicVersion           = "Launcher-Version-Override"
     override val settingsMimicVersionDesc       = "Fixiert den Versions-String, der an den Upstream im Handshake und User-Agent gesendet wird. Leer lassen für den eingebauten Standard — nur setzen, wenn der Upstream seine Versions-Anforderung schneller anhebt als Nexiras Release-Zyklus. Wirkt beim nächsten Protokoll-Aufruf nach Speichern, kein Neustart nötig."
     override fun settingsMimicVersionPlaceholder(default: String) = "Standard: $default"
@@ -475,4 +477,29 @@ object GermanStrings : AppStrings {
     override fun migrationFailedBody(error: String) = "Einige Dateien konnten nicht kopiert werden: $error"
     override val migrationRetry = "Wiederholen"
     override val migrationQuit  = "Nexira beenden"
+
+    override val placeholderNotImplemented = "Noch nicht implementiert..."
+    override val placeholderHint           = "Dieser Bildschirm ist reserviert, bis die Atelier-Arbeit ankommt."
+
+    override val navLibrary = "Bibliothek"
+    override val navBrowse  = "Durchsuchen"
+
+    override val settingsHomeViewTitle   = "Startansicht"
+    override val settingsHomeViewSub     = "Probiere die neue Library-first-Ansicht neben dem klassischen Dashboard. Jederzeit umschaltbar."
+    override val settingsHomeViewClassic = "Klassisch"
+    override val settingsHomeViewLibrary = "Library (Alpha)"
+
+    override val settingsUiStyleTitle    = "UI-Stil"
+    override val settingsUiStyleSub      = "Wechsle Form / Oberfläche / Bewegung unabhängig von der Farbpalette. Celestia ist die aktuelle abgerundete Glasoptik; Brut ist hart und flach."
+    override val settingsUiStyleCelestia = "Celestia"
+    override val settingsUiStyleBrut     = "Brut"
+
+    override val settingsCategoryAppearance   = "Erscheinungsbild"
+    override val settingsCategoryNetwork      = "Netzwerk"
+    override val settingsCategoryExperimental = "Experimentell"
+    override val settingsCategoryAdvanced     = "Erweitert"
+    override val settingsCategoryDiagnostics  = "Diagnose"
+
+    override val profileCategorySkin    = "Skin"
+    override val profileCategoryAccount = "Konto"
 }

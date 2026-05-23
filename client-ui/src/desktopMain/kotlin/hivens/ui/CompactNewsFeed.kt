@@ -27,7 +27,7 @@ import hivens.launcher.network.NetworkState
 import hivens.launcher.network.ServerProtocolConfig
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
-import hivens.ui.utils.SystemActions
+import hivens.ui.platform.SystemActions
 import androidx.compose.ui.geometry.Offset
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext

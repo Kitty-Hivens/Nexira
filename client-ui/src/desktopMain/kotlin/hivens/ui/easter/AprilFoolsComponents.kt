@@ -2,7 +2,7 @@ package hivens.ui.easter
 
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
@@ -170,15 +170,17 @@ private fun EscapedButtonRenderer(btn: FloatingButton, isGhost: Boolean) {
                 modifier = Modifier
                     .width(btn.widthPx.dp)
                     .height(btn.heightPx.dp),
-                shape = RoundedCornerShape(8.dp),
+                shape = MaterialTheme.shapes.small,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = if (isGhost)
                         CelestiaTheme.colors.primary.copy(alpha = 0.38f)
                     else
                         CelestiaTheme.colors.primary,
                 ),
+                // Flat style drops elevation -- Brut surfaces don't lift,
+                // so a chaos button shouldn't either.
                 elevation = ButtonDefaults.buttonElevation(
-                    defaultElevation = if (isGhost) 0.dp else 4.dp
+                    defaultElevation = if (isGhost || AprilFools.useFlatSurface) 0.dp else 4.dp
                 ),
             ) {
                 Text(
@@ -261,10 +263,27 @@ fun AprilFoolsButton(
         containerColor = CelestiaTheme.colors.primary,
     ),
 ) {
-    // ── Pass-through when chaos is not active ──────────────────────────────
+    // Pass-through when chaos is inactive. Same NoOpIndication +
+    // zero-elevation pair as NoOpAprilFools.ChaosButton -- shape and
+    // shadow off-clip leaks otherwise.
     if (!AprilFools.isActive()) {
-        Button(onClick = onClick, modifier = modifier, enabled = enabled, colors = colors) {
-            Text(text)
+        CompositionLocalProvider(LocalIndication provides NoOpIndication) {
+            Button(
+                onClick   = onClick,
+                modifier  = modifier,
+                enabled   = enabled,
+                colors    = colors,
+                shape     = MaterialTheme.shapes.small,
+                elevation = ButtonDefaults.buttonElevation(
+                    defaultElevation  = 0.dp,
+                    pressedElevation  = 0.dp,
+                    focusedElevation  = 0.dp,
+                    hoveredElevation  = 0.dp,
+                    disabledElevation = 0.dp,
+                ),
+            ) {
+                Text(text)
+            }
         }
         return
     }
@@ -305,12 +324,17 @@ fun AprilFoolsButton(
     }
 
     // ── Render ────────────────────────────────────────────────────────────
+    // Single hover affordance: NoOpIndication suppresses the M3 default
+    // state-layer (the source of the stray rectangle on hover). The
+    // chaos engine still wires up via the explicit interactionSource
+    // passed to Button; the engine reads isHovered via the same source
+    // for the FLEEING-phase relocation trigger above.
+    CompositionLocalProvider(LocalIndication provides NoOpIndication) {
     Button(
         onClick = onClick,
         enabled = enabled,
         modifier = modifier
             .offset { IntOffset(animFleeX.toInt(), animFleeY.toInt()) }
-            .hoverable(interactionSource)
             .onGloballyPositioned { coords ->
                 // Update origin so the engine knows where to snap the overlay clone
                 btn.originPx = coords.positionInWindow()
@@ -333,9 +357,11 @@ fun AprilFoolsButton(
             ),
         colors            = colors,
         interactionSource = interactionSource,
+        shape             = MaterialTheme.shapes.small,
     ) {
         Text(text)
     }
+    } // end CompositionLocalProvider(LocalIndication = NoOpIndication)
 }
 
 // ─── Close dialog ─────────────────────────────────────────────────────────────
@@ -383,9 +409,9 @@ fun AprilFoolsCloseDialog(
     Dialog(onDismissRequest = { /* intentionally empty */ }) {
         Surface(
             modifier       = Modifier.width(440.dp).wrapContentHeight(),
-            shape          = RoundedCornerShape(18.dp),
+            shape          = MaterialTheme.shapes.large,
             color          = CelestiaTheme.colors.surface,
-            tonalElevation = 10.dp,
+            tonalElevation = if (AprilFools.useFlatSurface) 0.dp else 10.dp,
         ) {
             Column(
                 modifier            = Modifier.padding(28.dp),
@@ -420,6 +446,7 @@ fun AprilFoolsCloseDialog(
                     OutlinedButton(
                         onClick  = onStay,
                         modifier = Modifier.align(Alignment.CenterStart),
+                        shape    = MaterialTheme.shapes.small,
                     ) { Text(s.aprilCloseStay) }
 
                     // Hide to tray (middle, optional)
@@ -430,19 +457,22 @@ fun AprilFoolsCloseDialog(
                         ) { Text(s.aprilCloseHideTray) }
                     }
 
-                    // Close (right side, runs away)
+                    // Close (right side, runs away). Same single-source rule
+                    // as the chaos AprilFoolsButton -- no extra
+                    // Modifier.hoverable on top of Button.interactionSource,
+                    // otherwise hover paints twice.
                     Button(
                         onClick  = { if (surrendered) onConfirmClose() },
                         enabled  = surrendered,
                         modifier = Modifier
                             .align(Alignment.CenterEnd)
-                            .offset { IntOffset(animCloseX.toInt(), animCloseY.toInt()) }
-                            .hoverable(closeBtnInteraction),
+                            .offset { IntOffset(animCloseX.toInt(), animCloseY.toInt()) },
                         colors = ButtonDefaults.buttonColors(
                             containerColor         = CelestiaTheme.colors.error,
                             disabledContainerColor = CelestiaTheme.colors.error.copy(alpha = 0.75f),
                         ),
                         interactionSource = closeBtnInteraction,
+                        shape             = MaterialTheme.shapes.small,
                     ) {
                         Text(
                             text  = if (surrendered) s.aprilCloseSurrender else s.aprilCloseClose,

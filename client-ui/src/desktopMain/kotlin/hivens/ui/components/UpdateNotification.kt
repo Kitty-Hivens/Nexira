@@ -58,7 +58,7 @@ fun UpdateNotification(
                     .background(
                         color = if (update.isCritical) CelestiaTheme.colors.error.copy(alpha = 0.95f)
                         else CelestiaTheme.colors.surface,
-                        shape = RoundedCornerShape(12.dp)
+                        shape = MaterialTheme.shapes.medium
                     )
                     .padding(16.dp)
             ) {
@@ -100,7 +100,7 @@ fun UpdateNotification(
                                 modifier = Modifier.background(
                                     color = if (update.isCritical) Color.White.copy(alpha = 0.2f)
                                     else CelestiaTheme.colors.primary.copy(alpha = 0.1f),
-                                    shape = RoundedCornerShape(6.dp)
+                                    shape = MaterialTheme.shapes.small
                                 )
                             ) {
                                 Text(

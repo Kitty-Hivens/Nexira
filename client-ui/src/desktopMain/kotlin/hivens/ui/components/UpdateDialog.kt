@@ -25,7 +25,7 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.theme.CelestiaTheme
-import hivens.ui.utils.SystemActions
+import hivens.ui.platform.SystemActions
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import org.slf4j.LoggerFactory
@@ -120,7 +120,7 @@ fun UpdateDialog(
     ) {
         Surface(
             modifier  = Modifier.width(700.dp).wrapContentHeight(),
-            shape     = RoundedCornerShape(16.dp),
+            shape     = MaterialTheme.shapes.large,
             color     = CelestiaTheme.colors.surface,
             tonalElevation = 8.dp
         ) {
@@ -298,7 +298,7 @@ fun UpdateDialog(
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = if (isBlocking) CelestiaTheme.colors.error else CelestiaTheme.colors.primary
                                 ),
-                                shape  = RoundedCornerShape(8.dp)
+                                shape  = MaterialTheme.shapes.small
                             ) {
                                 Text(
                                     if (isBlocking) s.updateDownloadNow else s.updateDownload,
@@ -315,7 +315,7 @@ fun UpdateDialog(
                                 colors   = ButtonDefaults.buttonColors(
                                     disabledContainerColor = CelestiaTheme.colors.primary.copy(alpha = 0.5f)
                                 ),
-                                shape = RoundedCornerShape(8.dp)
+                                shape = MaterialTheme.shapes.small
                             ) {
                                 CircularProgressIndicator(
                                     modifier    = Modifier.size(16.dp),
@@ -332,7 +332,7 @@ fun UpdateDialog(
                             Button(
                                 onClick = { installUpdate(path) },
                                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
-                                shape  = RoundedCornerShape(8.dp)
+                                shape  = MaterialTheme.shapes.small
                             ) {
                                 Text(s.updateInstall, color = Color.White, fontWeight = FontWeight.Bold)
                             }
@@ -342,7 +342,7 @@ fun UpdateDialog(
                             Button(
                                 onClick = { errorMessage = null; downloadState = DownloadState.Idle },
                                 colors  = ButtonDefaults.buttonColors(containerColor = CelestiaTheme.colors.primary),
-                                shape   = RoundedCornerShape(8.dp)
+                                shape   = MaterialTheme.shapes.small
                             ) {
                                 Text(s.updateRetry, color = Color.White)
                             }

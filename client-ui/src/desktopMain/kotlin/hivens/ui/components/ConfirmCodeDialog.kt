@@ -55,7 +55,7 @@ fun ConfirmCodeDialog(
     ) {
         Surface(
             modifier = Modifier.width(420.dp),
-            shape = RoundedCornerShape(16.dp),
+            shape = MaterialTheme.shapes.large,
             color = CelestiaTheme.colors.surface,
         ) {
             Column(
@@ -148,6 +148,7 @@ fun ConfirmCodeDialog(
                         colors = ButtonDefaults.buttonColors(
                             containerColor = CelestiaTheme.colors.primary,
                         ),
+                        shape = MaterialTheme.shapes.small,
                     ) {
                         Text(s.auth2faSubmit)
                     }

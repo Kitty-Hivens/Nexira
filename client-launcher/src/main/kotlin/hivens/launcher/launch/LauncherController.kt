@@ -4,7 +4,9 @@ import hivens.core.api.TwoFactorRequiredException
 import hivens.core.api.interfaces.*
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.SessionData
+import hivens.core.data.SettingsData
 import hivens.core.diag.ActionRing
+import hivens.launcher.smrt.SmrtSyncService
 import hivens.launcher.CredentialsManager
 import hivens.launcher.ManifestCache
 import hivens.launcher.ProfileManager
@@ -48,6 +50,7 @@ class LauncherController(
     private val profileManager: ProfileManager,
     private val dataDirectory: Path,
     private val appScope: CoroutineScope,
+    private val smrtSyncService: SmrtSyncService,
 ) {
 
     private val logger = LoggerFactory.getLogger(LauncherController::class.java)
@@ -221,6 +224,28 @@ class LauncherController(
                         }
                     }
                     emit(LaunchLogEvent.OfflineSkipSync)
+                } else if (shouldUseMirror(settings, targetServerId)) {
+                    // Mirror sync path. Any error from the smrt side throws
+                    // through to the user; no silent fallback to the SC path,
+                    // otherwise mirror failures hide behind a working-but-
+                    // stale SC sync and the bug never surfaces.
+                    logger.info("Using Hivens Mirror for {} sync (experimental)", targetServerId)
+                    smrtSyncService.sync(
+                        packId = targetServerId,
+                        clientDir = clientDir,
+                        progress = { current, total, filename ->
+                            if (!isActive) return@sync
+                            _state.value = LaunchState.Downloading(
+                                currentFileIdx   = current,
+                                totalFiles       = total,
+                                downloadedBytes  = 0L,
+                                totalBytes       = 0L,
+                                speedBytesPerSec = 0L,
+                            )
+                            val fraction = if (total > 0) current.toFloat() / total else 0f
+                            setStage(PrepareStage.SYNC, 0.2f + 0.5f * fraction)
+                        },
+                    )
                 } else {
                     downloadService.processSession(
                         session = session,
@@ -326,6 +351,24 @@ class LauncherController(
     private fun calculateIgnoredFiles(server: ServerProfile): Set<String> {
         val userState = profileManager.getProfile(server.assetDir).optionalModsState
         return manifestProcessor.calculateIgnoredFiles(server, userState)
+    }
+
+    /**
+     * Mirror sync is gated by (a) the master experimental switch, (b) the
+     * Hivens Mirror per-feature toggle, and (c) the pack having a published
+     * smrt manifest. Only Industrial is on the mirror today, so the third
+     * gate is a hard-coded allowlist for now; a future iteration could
+     * probe `/v1/packs` instead and cache the result.
+     */
+    private fun shouldUseMirror(settings: SettingsData, serverId: String): Boolean {
+        if (!settings.experimentalFeaturesEnabled) return false
+        if (!settings.experimentalMirrorEnabled) return false
+        return serverId in MIRROR_PUBLISHED_PACKS
+    }
+
+    private companion object {
+        /** Packs we know have a v2 manifest on smrt.hivens.dev today. */
+        val MIRROR_PUBLISHED_PACKS = setOf("Industrial")
     }
 
     /**
