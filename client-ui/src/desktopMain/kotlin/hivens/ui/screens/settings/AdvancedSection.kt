@@ -162,7 +162,7 @@ internal fun AdvancedSection(paths: PlatformPaths) {
                 }) { Text(s.settingsDataDirQuitNow) }
             },
             dismissButton = {
-                OutlinedButton(onClick = { pendingTarget = null }) {
+                OutlinedButton(onClick = { pendingTarget = null }, shape = MaterialTheme.shapes.small) {
                     Text(s.sslWarningCancel)
                 }
             },

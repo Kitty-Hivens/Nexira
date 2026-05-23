@@ -429,6 +429,7 @@ fun AprilFoolsCloseDialog(
                     OutlinedButton(
                         onClick  = onStay,
                         modifier = Modifier.align(Alignment.CenterStart),
+                        shape    = MaterialTheme.shapes.small,
                     ) { Text(s.aprilCloseStay) }
 
                     // Hide to tray (middle, optional)
