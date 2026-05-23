@@ -19,7 +19,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.theme.CelestiaTheme
-import hivens.ui.utils.SkinManager
+import hivens.ui.identity.SkinManager
 import org.koin.compose.koinInject
 
 @Composable
