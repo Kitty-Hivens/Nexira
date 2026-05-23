@@ -265,7 +265,13 @@ fun AprilFoolsButton(
 ) {
     // ── Pass-through when chaos is not active ──────────────────────────────
     if (!AprilFools.isActive()) {
-        Button(onClick = onClick, modifier = modifier, enabled = enabled, colors = colors) {
+        Button(
+            onClick  = onClick,
+            modifier = modifier,
+            enabled  = enabled,
+            colors   = colors,
+            shape    = MaterialTheme.shapes.small,
+        ) {
             Text(text)
         }
         return
@@ -335,6 +341,7 @@ fun AprilFoolsButton(
             ),
         colors            = colors,
         interactionSource = interactionSource,
+        shape             = MaterialTheme.shapes.small,
     ) {
         Text(text)
     }
@@ -445,6 +452,7 @@ fun AprilFoolsCloseDialog(
                             disabledContainerColor = CelestiaTheme.colors.error.copy(alpha = 0.75f),
                         ),
                         interactionSource = closeBtnInteraction,
+                        shape             = MaterialTheme.shapes.small,
                     ) {
                         Text(
                             text  = if (surrendered) s.aprilCloseSurrender else s.aprilCloseClose,
