@@ -489,4 +489,9 @@ object RussianStrings : AppStrings {
     override val settingsHomeViewSub     = "Попробуй новый Library-first интерфейс параллельно с классическим Dashboard. Можно переключаться когда захочешь."
     override val settingsHomeViewClassic = "Классический"
     override val settingsHomeViewLibrary = "Library (alpha)"
+
+    override val settingsUiStyleTitle    = "Стиль интерфейса"
+    override val settingsUiStyleSub      = "Переключай форму / поверхности / анимации независимо от цветовой палитры. Celestia — текущий вид с мягкими скруглениями и стеклом; Brut — жёсткий, без скруглений, без анимаций."
+    override val settingsUiStyleCelestia = "Celestia"
+    override val settingsUiStyleBrut     = "Brut"
 }

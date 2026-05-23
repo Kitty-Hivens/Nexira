@@ -488,4 +488,9 @@ object GermanStrings : AppStrings {
     override val settingsHomeViewSub     = "Probiere die neue Library-first-Ansicht neben dem klassischen Dashboard. Jederzeit umschaltbar."
     override val settingsHomeViewClassic = "Klassisch"
     override val settingsHomeViewLibrary = "Library (Alpha)"
+
+    override val settingsUiStyleTitle    = "UI-Stil"
+    override val settingsUiStyleSub      = "Wechsle Form / Oberfläche / Bewegung unabhängig von der Farbpalette. Celestia ist die aktuelle abgerundete Glasoptik; Brut ist hart und flach."
+    override val settingsUiStyleCelestia = "Celestia"
+    override val settingsUiStyleBrut     = "Brut"
 }
