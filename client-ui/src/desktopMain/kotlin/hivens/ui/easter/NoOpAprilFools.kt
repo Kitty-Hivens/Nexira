@@ -2,6 +2,7 @@ package hivens.ui.easter
 
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonColors
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
@@ -57,7 +58,18 @@ object NoOpAprilFools : AprilFoolsLifecycle {
         enabled: Boolean,
         colors: ButtonColors,
     ) {
-        Button(onClick = onClick, modifier = modifier, enabled = enabled, colors = colors) {
+        // Explicit shape: M3 Button's default ButtonDefaults.shape is the
+        // "Full" token (pill, 50%) which our Shapes() constructor doesn't
+        // surface. Without overriding here, every chaos-target Button
+        // would render as a pill regardless of the active style. Pinning
+        // to shapes.small routes through the style's buttonCorner.
+        Button(
+            onClick  = onClick,
+            modifier = modifier,
+            enabled  = enabled,
+            colors   = colors,
+            shape    = MaterialTheme.shapes.small,
+        ) {
             Text(text)
         }
     }

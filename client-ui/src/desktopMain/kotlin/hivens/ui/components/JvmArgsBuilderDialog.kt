@@ -172,6 +172,7 @@ fun JvmArgsBuilderDialog(
                         colors = ButtonDefaults.buttonColors(
                             containerColor = CelestiaTheme.colors.primary,
                         ),
+                        shape = MaterialTheme.shapes.small,
                     ) {
                         Icon(Icons.Default.Check, null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))

@@ -136,7 +136,7 @@ internal fun AdvancedSection(paths: PlatformPaths) {
                 ))
             },
             confirmButton = {
-                Button(onClick = {
+                Button(shape = MaterialTheme.shapes.small, onClick = {
                     val ok = DataDirMover.schedule(
                         source = paths.dataDir,
                         target = target,

@@ -148,6 +148,7 @@ fun ConfirmCodeDialog(
                         colors = ButtonDefaults.buttonColors(
                             containerColor = CelestiaTheme.colors.primary,
                         ),
+                        shape = MaterialTheme.shapes.small,
                     ) {
                         Text(s.auth2faSubmit)
                     }
