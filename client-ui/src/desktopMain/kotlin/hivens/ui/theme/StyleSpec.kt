@@ -76,11 +76,9 @@ val CelestiaStyle = StyleSpec(
 )
 
 /**
- * Sharp / brutal alternative. Hard corners, hard borders, no glass, no
- * decorative glow. Sits in the same palette as Celestia but with the
- * Compose-default soft styling stripped out. Reads as the user's "жёсткий
- * интерфейс" personal lean from the 2026-05-23 Atelier conversation;
- * meant to feel sober and dense rather than warm and breathing.
+ * Sharp alternative to Celestia: near-square corners, opaque
+ * surfaces, hard borders, motion off, glow off. Same palette, no
+ * soft styling.
  */
 val BrutStyle = StyleSpec(
     cardCorner          = 2.dp,
