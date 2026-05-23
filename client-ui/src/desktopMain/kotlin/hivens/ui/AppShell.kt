@@ -77,6 +77,8 @@ sealed class AppState {
 
 sealed class Screen {
     object Home               : Screen()
+    object Library            : Screen()
+    object Browse             : Screen()
     object Profile            : Screen()
     object Settings           : Screen()
     object ThemePicker        : Screen()
@@ -84,6 +86,7 @@ sealed class Screen {
     object BackgroundSettings : Screen()
     data class ServerSettings(val server: ServerProfile) : Screen()
     data class ServerDetails (val server: ServerProfile) : Screen()
+    data class PackDetail    (val server: ServerProfile) : Screen()
 }
 
 // ─── App Shell ───────────────────────────────────────────────────────────────
