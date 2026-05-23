@@ -62,7 +62,7 @@ internal fun AppearanceSection(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(style.cardCorner))
-            .background(CelestiaTheme.colors.background.copy(alpha = 0.4f))
+            .background(settingsRowBackground())
             .padding(16.dp),
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
@@ -231,7 +231,7 @@ internal fun AppearanceSection(
             .clip(RoundedCornerShape(style.cardCorner))
             .background(
                 if (form.isOfflineMode) CelestiaTheme.colors.error.copy(alpha = 0.08f)
-                else CelestiaTheme.colors.background.copy(alpha = 0.4f)
+                else settingsRowBackground()
             )
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically,

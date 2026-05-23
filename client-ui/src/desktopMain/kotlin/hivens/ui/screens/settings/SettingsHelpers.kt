@@ -28,8 +28,24 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.core.data.HomeView
 import hivens.core.data.UiStyle
+import hivens.ui.theme.CardSurface
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.LocalStyle
+
+/**
+ * Background color for Settings row / picker / panel containers.
+ * Reads from the active [LocalStyle] so panels obey the Glass / Flat
+ * surface preference: Celestia (Glass) leaves them as subtle blend-in
+ * boxes; Brut (Flat) makes them opaque distinct blocks. Hardcoding
+ * background.copy(alpha=0.4) made them ignore the style toggle --
+ * user-reported 2026-05-23.
+ */
+@Composable
+internal fun settingsRowBackground(): androidx.compose.ui.graphics.Color =
+    when (LocalStyle.current.cardSurface) {
+        CardSurface.Glass -> CelestiaTheme.colors.background.copy(alpha = 0.4f)
+        CardSurface.Flat  -> CelestiaTheme.colors.surfaceVariant
+    }
 
 /**
  * Section header used by every Settings section. Small bold caps title
@@ -70,7 +86,7 @@ internal fun SettingsRowWithDescription(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(style.cardCorner))
-            .background(CelestiaTheme.colors.background.copy(alpha = 0.4f))
+            .background(settingsRowBackground())
             .padding(16.dp),
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
@@ -145,7 +161,7 @@ internal fun HomeViewPicker(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(style.cardCorner))
-            .background(CelestiaTheme.colors.background.copy(alpha = 0.4f))
+            .background(settingsRowBackground())
             .padding(16.dp),
     ) {
         Text(labelTitle, color = CelestiaTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
@@ -189,7 +205,7 @@ internal fun UiStylePicker(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(style.cardCorner))
-            .background(CelestiaTheme.colors.background.copy(alpha = 0.4f))
+            .background(settingsRowBackground())
             .padding(16.dp),
     ) {
         Text(title, color = CelestiaTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
