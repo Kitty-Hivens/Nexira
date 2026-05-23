@@ -15,16 +15,14 @@ import coil3.ImageLoader
 import coil3.compose.setSingletonImageLoaderFactory
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import hivens.config.Branding
-import hivens.config.Protocol
-import hivens.core.api.AuthException
 import hivens.core.api.TwoFactorRequiredException
 import hivens.core.api.interfaces.IAuthService
 import hivens.core.api.interfaces.IServerListService
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.SessionData
-import hivens.core.diag.ActionRing
 import hivens.launcher.AutoSyncService
+import hivens.launcher.bootstrap.AutoLoginCoordinator
 import hivens.launcher.bootstrap.LauncherBootstrap
 import hivens.launcher.CredentialsManager
 import hivens.launcher.network.NetworkState
@@ -50,8 +48,6 @@ import hivens.ui.theme.ThemeManager
 import hivens.ui.tray.TrayManager
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.identity.SkinManager
-import java.time.Instant
-import java.time.temporal.ChronoUnit
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -512,84 +508,20 @@ fun AppRoot(
     var backgroundSettings by remember { mutableStateOf(backgroundManager.load()) }
 
     // ── Auto-login with offline mode support ──────────────────────────────
+    // Business logic lives in AutoLoginCoordinator; the Composable just
+    // calls into it and maps the result into the local AppState machine.
     LaunchedEffect(Unit) {
-        withContext(Dispatchers.IO) {
-            val settings = settingsService.getSettings()
-            val saved    = credentialsManager.load()
-
-            appState = when {
-                settings.isOfflineMode && saved != null -> {
-                    val offlineSession = SessionData(
-                        playerName     = saved.playerName,
-                        uuid           = saved.uuid.ifBlank { "offline-${saved.playerName}" },
-                        uid            = saved.uid,
-                        accessToken    = "offline",
-                        cachedPassword = saved.cachedPassword,
-                        status         = null,
-                        serverId       = profileManager.lastServerId
-                    )
-                    AppState.Authenticated(offlineSession)
-                }
-                settings.isOfflineMode -> AppState.Unauthenticated
-                saved?.cachedPassword != null -> {
-                    try {
-                        val server  = profileManager.lastServerId ?: Protocol.DEFAULT_SERVER_ID
-                        val session = authService.login(saved.playerName, saved.cachedPassword!!, server)
-                        AppState.Authenticated(session)
-                    } catch (e: TwoFactorRequiredException) {
-                        // 2FA accounts already paid the 2FA cost when they
-                        // got the cached accessToken. Re-validating with
-                        // login() just re-triggers the gate on every
-                        // launcher startup -- which is what the cached
-                        // accessToken is supposed to prevent. Trust the
-                        // cache: promote `saved` straight to Authenticated.
-                        // If the token is actually stale, the server will
-                        // reject it at game launch and the user re-logs in
-                        // from the credentials form -- same recovery path
-                        // as a server-side logout. Fix for the "double
-                        // login on every launch with 2FA" report.
-                        ActionRing.record(
-                            "Auto-login: 2FA account, trusting cached accessToken (uid=${e.uid?.take(8) ?: "<missing>"})"
-                        )
-                        AppState.Authenticated(
-                            saved.copy(serverId = profileManager.lastServerId),
-                        )
-                    } catch (e: AuthException) {
-                        if (e.isSslError) {
-                            // Auto-grant on cached-credential cert error gets the same
-                            // 30-day expiry as user-initiated accept (RightPanel). The
-                            // user accepted the SSL bypass implicitly by saving credentials
-                            // through a prior cert outage; we extend that consent until
-                            // the cert issue resolves or 30 days, whichever comes first.
-                            val until = Instant.now().plus(30, ChronoUnit.DAYS)
-                            ActionRing.record("SSL bypass auto-granted on cached-credential auto-login (cert error) -- 30 days")
-                            NetworkState.grantBypass(protocolConfig.sslBypassHost, until)
-                            try {
-                                val server  = profileManager.lastServerId ?: Protocol.DEFAULT_SERVER_ID
-                                val session = insecureAuthService.login(saved.playerName, saved.cachedPassword!!, server)
-                                AppState.Authenticated(session)
-                            } catch (e2: Exception) {
-                                LoggerFactory.getLogger("Main").warn(
-                                    "Auto-login with cached credentials failed after SSL bypass", e2
-                                )
-                                AppState.Unauthenticated
-                            }
-                        } else {
-                            LoggerFactory.getLogger("Main").warn(
-                                "Cached-credential auto-login failed (non-SSL)", e
-                            )
-                            AppState.Unauthenticated
-                        }
-                    } catch (e: Exception) {
-                        LoggerFactory.getLogger("Main").warn(
-                            "Cached-credential auto-login failed with non-Auth exception", e
-                        )
-                        AppState.Unauthenticated
-                    }
-                }
-                else -> AppState.Unauthenticated
-            }
+        val session = withContext(Dispatchers.IO) {
+            AutoLoginCoordinator.resolveSession(
+                settings            = settingsService.getSettings(),
+                saved               = credentialsManager.load(),
+                lastServerId        = profileManager.lastServerId,
+                authService         = authService,
+                insecureAuthService = insecureAuthService,
+                protocolConfig      = protocolConfig,
+            )
         }
+        appState = if (session != null) AppState.Authenticated(session) else AppState.Unauthenticated
     }
 
     // ── Render: background behind layout ──────────────────────────────────
