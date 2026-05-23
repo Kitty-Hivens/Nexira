@@ -111,7 +111,7 @@ internal fun AdvancedSection(paths: PlatformPaths) {
                     pendingTarget = picked
                 }
             },
-            shape = RoundedCornerShape(6.dp),
+            shape = MaterialTheme.shapes.small,
         ) {
             Text(s.settingsDataDirMove, color = CelestiaTheme.colors.textPrimary)
         }

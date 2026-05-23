@@ -55,7 +55,7 @@ fun ConfirmCodeDialog(
     ) {
         Surface(
             modifier = Modifier.width(420.dp),
-            shape = RoundedCornerShape(16.dp),
+            shape = MaterialTheme.shapes.large,
             color = CelestiaTheme.colors.surface,
         ) {
             Column(

@@ -95,7 +95,7 @@ fun ThemePickerScreen(
             horizontalArrangement = Arrangement.spacedBy(24.dp)
         ) {
             Box(modifier = Modifier.weight(2f).fillMaxHeight()) {
-                GlassCard(modifier = Modifier.fillMaxSize(), shape = RoundedCornerShape(16.dp)) {
+                GlassCard(modifier = Modifier.fillMaxSize(), shape = MaterialTheme.shapes.large) {
                     LazyVerticalGrid(
                         columns               = GridCells.Fixed(2),
                         contentPadding        = PaddingValues(16.dp),
@@ -218,7 +218,7 @@ fun ColorCircle(color: Color) {
 fun ThemePreviewPanel(theme: CustomTheme, s: hivens.ui.i18n.AppStrings) {
     GlassCard(
         modifier        = Modifier.fillMaxSize(),
-        shape           = RoundedCornerShape(16.dp),
+        shape           = MaterialTheme.shapes.large,
         backgroundColor = CustomTheme.parseHexColor(theme.background).copy(alpha = 0.8f)
     ) {
         Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {

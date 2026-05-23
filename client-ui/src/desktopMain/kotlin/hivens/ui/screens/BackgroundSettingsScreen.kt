@@ -102,7 +102,7 @@ fun BackgroundSettingsScreen(
                                 title = s.backgroundPickFile
                             )
                             )?.path?.let { path -> update { copy(imagePath = path, enabled = true) } }
-                        } }, shape = RoundedCornerShape(8.dp), modifier = Modifier.weight(1f)) {
+                        } }, shape = MaterialTheme.shapes.small, modifier = Modifier.weight(1f)) {
                             Icon(Icons.Default.Image, null, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text(s.backgroundPickButton)
                         }
                         if (settings.imagePath != null) {
@@ -163,7 +163,7 @@ fun BackgroundSettingsScreen(
                     }
 
                     Spacer(Modifier.height(16.dp))
-                    OutlinedButton(onClick = { settings = BackgroundSettings(); onSettingsChanged(settings) }, shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    OutlinedButton(onClick = { settings = BackgroundSettings(); onSettingsChanged(settings) }, shape = MaterialTheme.shapes.small, modifier = Modifier.fillMaxWidth()) {
                         Icon(Icons.Default.RestartAlt, null, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text(s.backgroundReset)
                     }
                 }

@@ -124,7 +124,7 @@ fun RamSelector(
                     unfocusedBorderColor = CelestiaTheme.colors.textSecondary.copy(alpha = 0.2f),
                     focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent
                 ),
-                shape = RoundedCornerShape(8.dp)
+                shape = MaterialTheme.shapes.small
             )
         }
 

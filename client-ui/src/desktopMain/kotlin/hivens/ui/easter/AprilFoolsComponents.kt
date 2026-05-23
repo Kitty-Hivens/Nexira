@@ -170,7 +170,7 @@ private fun EscapedButtonRenderer(btn: FloatingButton, isGhost: Boolean) {
                 modifier = Modifier
                     .width(btn.widthPx.dp)
                     .height(btn.heightPx.dp),
-                shape = RoundedCornerShape(8.dp),
+                shape = MaterialTheme.shapes.small,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = if (isGhost)
                         CelestiaTheme.colors.primary.copy(alpha = 0.38f)
@@ -383,7 +383,7 @@ fun AprilFoolsCloseDialog(
     Dialog(onDismissRequest = { /* intentionally empty */ }) {
         Surface(
             modifier       = Modifier.width(440.dp).wrapContentHeight(),
-            shape          = RoundedCornerShape(18.dp),
+            shape          = MaterialTheme.shapes.large,
             color          = CelestiaTheme.colors.surface,
             tonalElevation = 10.dp,
         ) {

@@ -98,7 +98,7 @@ internal fun NetworkSection(
                             )
                             NetworkState.revokeBypass(entry.host)
                         },
-                        shape = RoundedCornerShape(6.dp),
+                        shape = MaterialTheme.shapes.small,
                     ) {
                         Text(s.sslBypassRevoke, color = CelestiaTheme.colors.textSecondary)
                     }
