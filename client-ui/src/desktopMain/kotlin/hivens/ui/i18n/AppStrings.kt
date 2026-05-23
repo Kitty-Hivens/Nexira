@@ -525,4 +525,11 @@ interface AppStrings {
     val settingsUiStyleSub: String
     val settingsUiStyleCelestia: String
     val settingsUiStyleBrut: String
+
+    // --- Settings two-column nav labels ---
+    val settingsCategoryAppearance: String
+    val settingsCategoryNetwork: String
+    val settingsCategoryExperimental: String
+    val settingsCategoryAdvanced: String
+    val settingsCategoryDiagnostics: String
 }

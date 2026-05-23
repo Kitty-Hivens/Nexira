@@ -1,7 +1,8 @@
 package hivens.ui.screens.settings
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -26,19 +27,23 @@ import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Settings orchestrator. Holds the form state, the persistence helper,
- * and the "saved!" banner -- the actual rendered surface is composed
- * from per-domain sections in this package
- * ([AppearanceSection], [NetworkSection], [ExperimentalSection],
- * [AdvancedSection], [DiagnosticsSection]).
+ * the currently-selected category, and the "saved!" banner.
+ *
+ * Two-column layout (decided 2026-05-23, picked over tabs / accordion /
+ * single-scroll): left vertical nav of [SettingsCategory] entries,
+ * right content of the selected category's section composable. Sections
+ * still live in their per-domain files ([AppearanceSection],
+ * [NetworkSection], [ExperimentalSection], [AdvancedSection],
+ * [DiagnosticsSection]) -- they are unchanged.
  *
  * Persistence flow:
  *   form mutates -> save() -> form.mergeInto(latestSettings) -> persist
  *   -> mirror to NetworkState.forceProxyMode + Protocol.mimicLauncher
  *   -> flash "saved" banner for 2s.
  *
- * The mirror to NetworkState + Protocol is critical -- those reads
- * happen at every protocol call, so without it the user would have to
- * restart for force-proxy / mimic-version changes to take effect.
+ * Mirror to NetworkState + Protocol is critical: those reads happen at
+ * every protocol call, so without it force-proxy / mimic-version
+ * changes would require a restart.
  */
 @Composable
 fun SettingsScreen(
@@ -63,6 +68,7 @@ fun SettingsScreen(
     val initialSettings = remember { settingsService.getSettings() }
     val form            = remember { SettingsFormState(initialSettings) }
     var showSavedMessage by remember { mutableStateOf(false) }
+    var selectedCategory by remember { mutableStateOf(SettingsCategory.Appearance) }
 
     fun save() {
         val toPersist = form.mergeInto(settingsService.getSettings())
@@ -90,37 +96,50 @@ fun SettingsScreen(
         Spacer(Modifier.height(24.dp))
 
         GlassCard(Modifier.weight(1f).fillMaxWidth()) {
-            LazyColumn(
-                modifier            = Modifier.fillMaxSize(),
-                contentPadding      = PaddingValues(24.dp),
-                verticalArrangement = Arrangement.spacedBy(24.dp)
-            ) {
-                item {
-                    AppearanceSection(
-                        form                     = form,
-                        save                     = ::save,
-                        isDarkTheme              = isDarkTheme,
-                        onToggleTheme            = onToggleTheme,
-                        onOpenThemePicker        = onOpenThemePicker,
-                        onOpenBackgroundSettings = onOpenBackgroundSettings,
-                        currentLocale            = currentLocale,
-                        onLocaleChanged          = onLocaleChanged,
-                        homeView                 = homeView,
-                        onHomeViewChanged        = onHomeViewChanged,
-                        uiStyle                  = uiStyle,
-                        onUiStyleChanged         = onUiStyleChanged,
-                    )
+            Row(Modifier.fillMaxSize().padding(16.dp)) {
+                SettingsCategoryNav(
+                    current  = selectedCategory,
+                    onSelect = { selectedCategory = it },
+                )
+
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(24.dp),
+                ) {
+                    when (selectedCategory) {
+                        SettingsCategory.Appearance -> AppearanceSection(
+                            form                     = form,
+                            save                     = ::save,
+                            isDarkTheme              = isDarkTheme,
+                            onToggleTheme            = onToggleTheme,
+                            onOpenThemePicker        = onOpenThemePicker,
+                            onOpenBackgroundSettings = onOpenBackgroundSettings,
+                            currentLocale            = currentLocale,
+                            onLocaleChanged          = onLocaleChanged,
+                            homeView                 = homeView,
+                            onHomeViewChanged        = onHomeViewChanged,
+                            uiStyle                  = uiStyle,
+                            onUiStyleChanged         = onUiStyleChanged,
+                        )
+                        SettingsCategory.Network -> NetworkSection(
+                            form = form,
+                            save = ::save,
+                        )
+                        SettingsCategory.Experimental -> ExperimentalSection(
+                            form            = form,
+                            save            = ::save,
+                            initialSettings = initialSettings,
+                        )
+                        SettingsCategory.Advanced -> AdvancedSection(paths = paths)
+                        SettingsCategory.Diagnostics -> DiagnosticsSection(
+                            paths       = paths,
+                            onOpenAbout = onOpenAbout,
+                        )
+                    }
                 }
-                item { NetworkSection(form = form, save = ::save) }
-                item {
-                    ExperimentalSection(
-                        form            = form,
-                        save            = ::save,
-                        initialSettings = initialSettings,
-                    )
-                }
-                item { AdvancedSection(paths = paths) }
-                item { DiagnosticsSection(paths = paths, onOpenAbout = onOpenAbout) }
             }
         }
 
