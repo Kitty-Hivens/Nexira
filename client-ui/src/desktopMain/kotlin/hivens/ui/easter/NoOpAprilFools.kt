@@ -65,16 +65,10 @@ object NoOpAprilFools : AprilFoolsLifecycle {
         enabled: Boolean,
         colors: ButtonColors,
     ) {
-        // Suppress M3's default ripple/state-layer indication, then
-        // render a normal M3 Button. Compose Multiplatform 1.11 + M3
-        // 1.11-alpha07 paint the state-layer with a shape that doesn't
-        // line up with the container shape, producing the "rectangle
-        // beside the rounded spot" the user flagged 2026-05-23. With
-        // LocalIndication overridden to a no-op, the Button still has
-        // a rest container, still receives click events, still
-        // forwards hover into its internal interactionSource -- it
-        // just doesn't paint a hover overlay. Cursor change to pointer
-        // is the remaining hover affordance.
+        // M3 1.11-alpha07 paints the default state-layer with a shape
+        // that does not match Button.shape; killing LocalIndication
+        // here drops the second overlay. Hover affordance survives as
+        // the cursor change.
         CompositionLocalProvider(LocalIndication provides NoOpIndication) {
             Button(
                 onClick   = onClick,
@@ -82,12 +76,9 @@ object NoOpAprilFools : AprilFoolsLifecycle {
                 enabled   = enabled,
                 colors    = colors,
                 shape     = MaterialTheme.shapes.small,
-                // Zero elevation across every state. M3 default
-                // hoveredElevation = 2.dp paints a shadow on hover that
-                // doesn't follow the button's rounded clip and bleeds
-                // outside the shape -- the "second rectangle wider than
-                // the button" the user flagged 2026-05-23. Killing
-                // elevation removes the shadow paint entirely.
+                // Skiko paints hoveredElevation shadow as a rect-blur
+                // outside the rounded clip; zero every elevation to
+                // suppress.
                 elevation = ButtonDefaults.buttonElevation(
                     defaultElevation  = 0.dp,
                     pressedElevation  = 0.dp,

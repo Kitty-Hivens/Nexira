@@ -88,11 +88,9 @@ internal fun DiagnosticsSection(
         Spacer(Modifier.height(2.dp))
     }
 
-    // Subtle visible container so the buttons have a body at rest --
-    // matches the alpha-0.4 background pattern used elsewhere in Settings
-    // section rows. Avoids the previous "transparent button + ugly
-    // hover overlay that floats out of nowhere" failure mode the user
-    // flagged 2026-05-23.
+    // Buttons need a visible body at rest; transparent containers
+    // turn M3's hover state-layer into the only paint and read as a
+    // rect popping out of nowhere.
     val ghostBg = CelestiaTheme.colors.background.copy(alpha = 0.4f)
 
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {

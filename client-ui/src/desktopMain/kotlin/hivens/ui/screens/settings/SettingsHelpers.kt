@@ -32,16 +32,10 @@ import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.LocalStyle
 
 /**
- * Background color for Settings row / picker / panel containers.
- *
- * Always returns the subtle Glass tint (background.copy alpha 0.4),
- * regardless of the active style's cardSurface preference. User
- * decided 2026-05-23: "это всё таки настройки пользователя" -- the
- * Settings page is where the user expresses preferences, so the
- * panel style here should stay neutral and not be re-painted as
- * opaque just because the global style toggle says Flat. cardSurface
- * still drives GlassCard / content cards elsewhere; this single
- * surface (Settings) opts out.
+ * Glass-tinted panel background for every Settings row / picker /
+ * card. Opted out of [LocalStyle.cardSurface] -- the Settings page
+ * stays neutral; Flat treatment applies only to content surfaces
+ * (GlassCard, library cards) elsewhere.
  */
 @Composable
 internal fun settingsRowBackground(): androidx.compose.ui.graphics.Color =

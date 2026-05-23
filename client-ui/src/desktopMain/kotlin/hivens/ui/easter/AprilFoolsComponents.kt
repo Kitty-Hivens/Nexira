@@ -263,11 +263,9 @@ fun AprilFoolsButton(
         containerColor = CelestiaTheme.colors.primary,
     ),
 ) {
-    // ── Pass-through when chaos is not active ──────────────────────────────
-    // Wrap in NoOpIndication + zero elevation -- M3 1.11-alpha07's
-    // state-layer + hovered-shadow paint with shapes that don't line
-    // up with the Button container, producing the stray rectangle on
-    // hover the user flagged 2026-05-23.
+    // Pass-through when chaos is inactive. Same NoOpIndication +
+    // zero-elevation pair as NoOpAprilFools.ChaosButton -- shape and
+    // shadow off-clip leaks otherwise.
     if (!AprilFools.isActive()) {
         CompositionLocalProvider(LocalIndication provides NoOpIndication) {
             Button(

@@ -26,24 +26,14 @@ import org.koin.compose.koinInject
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * Settings orchestrator. Holds the form state, the persistence helper,
- * the currently-selected category, and the "saved!" banner.
+ * Settings orchestrator: form state, persistence, the "saved" banner,
+ * and the [SettingsCategory] routing of the right pane. Sections live
+ * in their per-domain files in this package.
  *
- * Two-column layout (decided 2026-05-23, picked over tabs / accordion /
- * single-scroll): left vertical nav of [SettingsCategory] entries,
- * right content of the selected category's section composable. Sections
- * still live in their per-domain files ([AppearanceSection],
- * [NetworkSection], [ExperimentalSection], [AdvancedSection],
- * [DiagnosticsSection]) -- they are unchanged.
- *
- * Persistence flow:
- *   form mutates -> save() -> form.mergeInto(latestSettings) -> persist
- *   -> mirror to NetworkState.forceProxyMode + Protocol.mimicLauncher
- *   -> flash "saved" banner for 2s.
- *
- * Mirror to NetworkState + Protocol is critical: those reads happen at
- * every protocol call, so without it force-proxy / mimic-version
- * changes would require a restart.
+ * save() mirrors [NetworkState.forceProxyMode] and
+ * [Protocol.setMimicLauncherVersion] inline -- those reads are
+ * per-protocol-call, so without the mirror the user would need a
+ * restart for those two knobs to take effect.
  */
 @Composable
 fun SettingsScreen(
