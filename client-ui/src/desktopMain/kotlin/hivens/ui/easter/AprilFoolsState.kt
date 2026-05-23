@@ -20,6 +20,29 @@ object AprilFools {
     /** When non-null (0.0..1.0), overrides intensity() calculation */
     var debugIntensity: Float? by mutableStateOf(null)
 
+    // ── Style coupling ────────────────────────────────────────────────────────
+    // The chaos subsystem was designed under CelestiaTheme assumptions
+    // (rounded corners, glass surfaces, lively animations). With the
+    // UiStyle axis live, chaos should follow the active style instead of
+    // sitting outside it. AppShell pushes these values whenever uiStyle
+    // changes; the engine reads styleAnimationMultiplier per tween, and
+    // components read useFlatSurface to drop elevation under Brut.
+
+    /** Multiplier on every chaos animation duration. 1.0 = base motion,
+     *  0.0 = instant snap (Brut). AppShell mirrors style.animationMultiplier
+     *  here. */
+    var styleAnimationMultiplier: Float by mutableStateOf(1f)
+
+    /** When true, chaos surfaces render without tonal / button elevation --
+     *  matches the active style's flat surface treatment (Brut). AppShell
+     *  mirrors style.cardSurface == Flat here. */
+    var useFlatSurface: Boolean by mutableStateOf(false)
+
+    /** Scale a base ms duration by the active style multiplier. Coerces to
+     *  >= 1ms because Compose animation specs reject zero. */
+    fun scaledDuration(baseMs: Int): Int =
+        (baseMs * styleAnimationMultiplier).toInt().coerceAtLeast(1)
+
     // ── Calendar logic ────────────────────────────────────────────────────────
 
     private fun year() = LocalDate.now().year
