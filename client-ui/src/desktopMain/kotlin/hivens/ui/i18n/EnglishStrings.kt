@@ -483,4 +483,9 @@ object EnglishStrings : AppStrings {
 
     override val navLibrary = "Library"
     override val navBrowse  = "Browse"
+
+    override val settingsHomeViewTitle   = "Home view"
+    override val settingsHomeViewSub     = "Try the new Library-first surface alongside the classic Dashboard. Switch any time."
+    override val settingsHomeViewClassic = "Classic"
+    override val settingsHomeViewLibrary = "Library (alpha)"
 }

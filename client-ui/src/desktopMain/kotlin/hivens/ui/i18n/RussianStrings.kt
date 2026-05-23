@@ -484,4 +484,9 @@ object RussianStrings : AppStrings {
 
     override val navLibrary = "Библиотека"
     override val navBrowse  = "Каталог"
+
+    override val settingsHomeViewTitle   = "Главный экран"
+    override val settingsHomeViewSub     = "Попробуй новый Library-first интерфейс параллельно с классическим Dashboard. Можно переключаться когда захочешь."
+    override val settingsHomeViewClassic = "Классический"
+    override val settingsHomeViewLibrary = "Library (alpha)"
 }

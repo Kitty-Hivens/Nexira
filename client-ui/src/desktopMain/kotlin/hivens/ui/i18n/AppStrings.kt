@@ -513,4 +513,10 @@ interface AppStrings {
     // --- Navigation entries (Library / Browse, added with placeholder screens) ---
     val navLibrary: String
     val navBrowse: String
+
+    // --- Home view variant picker (in Settings -> Interface) ---
+    val settingsHomeViewTitle: String
+    val settingsHomeViewSub: String
+    val settingsHomeViewClassic: String
+    val settingsHomeViewLibrary: String
 }

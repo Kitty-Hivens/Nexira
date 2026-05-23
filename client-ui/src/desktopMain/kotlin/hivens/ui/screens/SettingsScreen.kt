@@ -21,6 +21,7 @@ import hivens.config.Branding
 import hivens.config.ExperimentalProtocolOverride
 import hivens.config.Protocol
 import hivens.core.api.interfaces.ISettingsService
+import hivens.core.data.HomeView
 import hivens.core.data.SettingsData
 import hivens.core.diag.ActionRing
 import hivens.launcher.diag.DiagnosticBundle
@@ -65,6 +66,8 @@ fun SettingsScreen(
     onOpenThemePicker: () -> Unit,
     currentLocale: AppLocale,
     onLocaleChanged: (AppLocale) -> Unit,
+    homeView: HomeView,
+    onHomeViewChanged: (HomeView) -> Unit,
     onOpenBackgroundSettings: () -> Unit = {},
     onOpenAbout: () -> Unit = {}
 ) {
@@ -243,6 +246,23 @@ fun SettingsScreen(
                     PuppetToggle("settings.darkTheme", themeSwitchState) { isChecked ->
                         themeSwitchState = isChecked; onToggleTheme()
                     }
+
+                    Spacer(Modifier.height(16.dp))
+
+                    // Home view variant picker. Lets the user A/B between
+                    // the legacy Dashboard and the new Library-first surface
+                    // (currently a placeholder). The toggle persists via
+                    // settings; the parent updates routing on change.
+                    HomeViewPicker(
+                        current  = homeView,
+                        onChange = onHomeViewChanged,
+                        labelTitle    = s.settingsHomeViewTitle,
+                        labelSub      = s.settingsHomeViewSub,
+                        classicLabel  = s.settingsHomeViewClassic,
+                        libraryLabel  = s.settingsHomeViewLibrary,
+                    )
+                    PuppetClick("settings.homeView.classic")      { onHomeViewChanged(HomeView.Classic) }
+                    PuppetClick("settings.homeView.libraryFirst") { onHomeViewChanged(HomeView.LibraryFirst) }
                 }
 
                 // ── Behavior ──────────────────────────────────────────────────
@@ -1058,5 +1078,65 @@ private fun SettingsSwitchRow(title: String, checked: Boolean, onCheckedChange: 
                 checkedTrackColor  = CelestiaTheme.colors.primary.copy(alpha = 0.5f)
             )
         )
+    }
+}
+
+/**
+ * Pair of pill-style buttons for picking [HomeView]. Active pill takes
+ * the primary fill; inactive sits on surface. Designed to be extensible
+ * past two options when more home variants land.
+ */
+@Composable
+private fun HomeViewPicker(
+    current: HomeView,
+    onChange: (HomeView) -> Unit,
+    labelTitle: String,
+    labelSub: String,
+    classicLabel: String,
+    libraryLabel: String,
+) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(CelestiaTheme.colors.background.copy(alpha = 0.4f))
+            .padding(16.dp),
+    ) {
+        Text(labelTitle, color = CelestiaTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
+        Text(
+            labelSub,
+            style = MaterialTheme.typography.bodySmall,
+            color = CelestiaTheme.colors.textSecondary,
+        )
+        Spacer(Modifier.height(12.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            HomeViewPill(
+                label    = classicLabel,
+                selected = current == HomeView.Classic,
+                onClick  = { onChange(HomeView.Classic) },
+            )
+            HomeViewPill(
+                label    = libraryLabel,
+                selected = current == HomeView.LibraryFirst,
+                onClick  = { onChange(HomeView.LibraryFirst) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun HomeViewPill(label: String, selected: Boolean, onClick: () -> Unit) {
+    val bg = if (selected) CelestiaTheme.colors.primary.copy(alpha = 0.18f)
+             else CelestiaTheme.colors.surface.copy(alpha = 0.4f)
+    val fg = if (selected) CelestiaTheme.colors.primary else CelestiaTheme.colors.textSecondary
+    Row(
+        Modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(bg)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, color = fg, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal)
     }
 }

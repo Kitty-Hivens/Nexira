@@ -2,6 +2,18 @@ package hivens.core.data
 
 import kotlinx.serialization.Serializable
 
+/**
+ * Which Home surface the user is currently running. Set in Settings.
+ * Lets the user A/B between the legacy Dashboard (SC server grid +
+ * launch panel + always-on right panel) and the new Library-first IA
+ * (Library + Browse + sliding login panel + unified card). Until the
+ * Library surface lands properly, [LibraryFirst] routes to the
+ * "not yet implemented" placeholder -- intentional: the toggle is
+ * how the user explores the direction before it's finished.
+ */
+@Serializable
+enum class HomeView { Classic, LibraryFirst }
+
 @Serializable
 data class SettingsData(
     val javaPath: String? = null,
@@ -97,4 +109,13 @@ data class SettingsData(
      * working-but-stale SC sync.
      */
     val experimentalMirrorEnabled: Boolean = false,
+
+    /**
+     * Which Home surface to render after login. Lets the user explore
+     * the new Library-first IA without committing the whole launcher
+     * to it -- the toggle flips back at any time. See [HomeView] for
+     * the option set and [[project_home_library_ia]] for the IA spec
+     * the LibraryFirst variant is reaching toward.
+     */
+    val homeView: HomeView = HomeView.Classic,
 )
