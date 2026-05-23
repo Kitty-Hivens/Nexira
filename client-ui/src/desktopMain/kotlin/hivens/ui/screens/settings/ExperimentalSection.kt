@@ -56,7 +56,7 @@ internal fun ExperimentalSection(
     )
     PuppetToggle("settings.experimental", form.experimentalEnabled) { form.experimentalEnabled = it; save() }
 
-    Spacer(Modifier.height(8.dp))
+    Spacer(Modifier.height(4.dp))
 
     SettingsRowWithDescription(
         title          = s.settingsMandatoryUpdates,
@@ -72,7 +72,7 @@ internal fun ExperimentalSection(
         form.mandatoryUpdates = it; save()
     }
 
-    Spacer(Modifier.height(8.dp))
+    Spacer(Modifier.height(4.dp))
 
     SettingsRowWithDescription(
         title          = s.settingsPrereleaseChannel,
@@ -87,7 +87,7 @@ internal fun ExperimentalSection(
         form.prereleaseChannel = it; save()
     }
 
-    Spacer(Modifier.height(8.dp))
+    Spacer(Modifier.height(4.dp))
 
     SettingsRowWithDescription(
         title          = s.settingsAutoSyncAllPacks,
@@ -102,7 +102,7 @@ internal fun ExperimentalSection(
         form.autoSyncAllPacks = it; save()
     }
 
-    Spacer(Modifier.height(8.dp))
+    Spacer(Modifier.height(4.dp))
 
     SettingsRowWithDescription(
         title          = s.settingsJvmBuilder,
@@ -117,7 +117,7 @@ internal fun ExperimentalSection(
         form.jvmBuilderEnabled = it; save()
     }
 
-    Spacer(Modifier.height(8.dp))
+    Spacer(Modifier.height(4.dp))
 
     // ── Hivens Mirror ─────────────────────────────────────────
     // Routes Industrial's sync source to smrt.hivens.dev. Auth and
@@ -137,7 +137,7 @@ internal fun ExperimentalSection(
         form.experimentalMirror = it; save()
     }
 
-    Spacer(Modifier.height(8.dp))
+    Spacer(Modifier.height(4.dp))
 
     // ── Mimic launcher version override ───────────────────────
     // Toggle row + revealed text input. Doubly gated: master
@@ -157,7 +157,7 @@ internal fun ExperimentalSection(
         form.mimicOverrideEnabled = it; save()
     }
     if (form.experimentalEnabled && form.mimicOverrideEnabled) {
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(4.dp))
         // Debounce text-field writes: onValueChange fires per keystroke
         // and save() runs a synchronous file write + applies the new
         // value to live protocol traffic. Calling save() on every

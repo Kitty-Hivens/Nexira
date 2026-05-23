@@ -83,9 +83,9 @@ internal fun DiagnosticsSection(
 
     // April Fools debug panel (hidden by default)
     if (showAprilDebug) {
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(2.dp))
         af.DebugPanel()
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(2.dp))
     }
 
     // Subtle visible container so the buttons have a body at rest --
@@ -122,7 +122,7 @@ internal fun DiagnosticsSection(
         PuppetClick("settings.openCrashReports") { SystemActions.openFolder(paths.crashDir.toString()) }
     }
 
-    Spacer(Modifier.height(4.dp))
+    Spacer(Modifier.height(2.dp))
 
     // Beacon: one-click ZIP for support -- bundles redacted logs,
     // crash reports, action ring and system info. The companion
@@ -213,7 +213,7 @@ internal fun DiagnosticsSection(
         modifier = Modifier.padding(start = 8.dp, top = 2.dp)
     )
 
-    Spacer(Modifier.height(12.dp))
+    Spacer(Modifier.height(8.dp))
 
     // ── About link ───────────────────────────────────────────────────
     SettingsSectionTitle(s.settingsSectionAbout)
