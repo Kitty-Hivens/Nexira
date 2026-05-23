@@ -28,24 +28,24 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.core.data.HomeView
 import hivens.core.data.UiStyle
-import hivens.ui.theme.CardSurface
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.LocalStyle
 
 /**
  * Background color for Settings row / picker / panel containers.
- * Reads from the active [LocalStyle] so panels obey the Glass / Flat
- * surface preference: Celestia (Glass) leaves them as subtle blend-in
- * boxes; Brut (Flat) makes them opaque distinct blocks. Hardcoding
- * background.copy(alpha=0.4) made them ignore the style toggle --
- * user-reported 2026-05-23.
+ *
+ * Always returns the subtle Glass tint (background.copy alpha 0.4),
+ * regardless of the active style's cardSurface preference. User
+ * decided 2026-05-23: "это всё таки настройки пользователя" -- the
+ * Settings page is where the user expresses preferences, so the
+ * panel style here should stay neutral and not be re-painted as
+ * opaque just because the global style toggle says Flat. cardSurface
+ * still drives GlassCard / content cards elsewhere; this single
+ * surface (Settings) opts out.
  */
 @Composable
 internal fun settingsRowBackground(): androidx.compose.ui.graphics.Color =
-    when (LocalStyle.current.cardSurface) {
-        CardSurface.Glass -> CelestiaTheme.colors.background.copy(alpha = 0.4f)
-        CardSurface.Flat  -> CelestiaTheme.colors.surfaceVariant
-    }
+    CelestiaTheme.colors.background.copy(alpha = 0.4f)
 
 /**
  * Section header used by every Settings section. Small bold caps title
