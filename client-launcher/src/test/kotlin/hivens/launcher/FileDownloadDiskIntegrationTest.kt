@@ -295,40 +295,59 @@ class FileDownloadDiskIntegrationTest {
     // ── Stale disabled jars in legacy location ────────────────────────────
 
     @Test
-    fun `cleanup deletes disabled jar in top-level mods even when cache is hot`() = runBlocking {
+    fun `cleanup runs on every sync, including when the manifest cache short-circuits the integrity walk`() = runBlocking {
         // Scenario: SC's manifest used to place FoamFix at top-level
-        // mods/FoamFix.jar; a later release moved it into the version
-        // subdir mods/1.12.2/FoamFix.jar. The user has the mod disabled.
-        // The current manifest only references the subdir path, so the
-        // integrity walk never inspects the top-level legacy copy --
-        // without an unconditional cleanup pass, Forge happily loads the
-        // "disabled" mod from the stale top-level path every launch.
+        // mods/FoamFix.jar; a later release moved it into a version
+        // subdir (or dropped it entirely from the manifest when the user
+        // disabled the optional). The user has the mod disabled. The
+        // current manifest doesn't reference the top-level path, so the
+        // integrity walk never inspects the legacy copy -- without an
+        // unconditional cleanup pass, Forge happily loads the "disabled"
+        // mod from the stale top-level path every launch.
+        //
+        // Critical: the manifest in this test must NOT contain the
+        // disabled mod. If it did, the disk-sanity gate inside
+        // ManifestCache.isClean would see the disabled (and therefore
+        // absent-from-disk) manifest entry and return false on every
+        // call, invalidating the cache and forcing the slow path on
+        // every sync. Cleanup would then run via the slow path on its
+        // own and the test would silently lose its "cache hot" claim.
         val keeperBytes = "still-here".toByteArray()
-        val files = mapOf("mods/1.12.2/FoamFix.jar" to "current-version".toByteArray())
-        val manifest = manifestOf(files + mapOf("mods/keeper.jar" to keeperBytes))
-        val (svc, _) = newService(files + mapOf("mods/keeper.jar" to keeperBytes))
+        val files = mapOf("mods/keeper.jar" to keeperBytes)
+        val manifest = manifestOf(files)
+        val (svc, requests) = newService(files)
 
-        // Pre-populate the stale top-level jar (the historical install).
         Files.createDirectories(clientDir.resolve("mods"))
         Files.write(clientDir.resolve("mods/FoamFix.jar"), "legacy-bytes".toByteArray())
-        Files.write(clientDir.resolve("mods/keeper.jar"), keeperBytes)
 
         val ignored = setOf("FoamFix.jar")
 
-        // First sync: cache cold, integrity walk runs, cleanup runs.
+        // First sync: cache cold. cleanup deletes the legacy jar, then the
+        // integrity walk downloads keeper.jar, then the cache is marked
+        // clean against the (keeper-only) manifest with this ignored set.
         svc.processSession(sessionWith(manifest), "Industrial", clientDir, null, ignored, null, null)
         assertTrue(!Files.exists(clientDir.resolve("mods/FoamFix.jar")),
             "stale top-level disabled jar must be removed on first sync")
         assertTrue(Files.exists(clientDir.resolve("mods/keeper.jar")),
             "non-ignored jar must be preserved")
+        val requestsAfterFirstSync = requests.get()
 
-        // Reintroduce the stale jar (simulating an external write between launches)
-        // and confirm cleanup still fires on the next sync even when the
-        // manifest cache would short-circuit the integrity walk.
+        // Reintroduce the stale jar (simulating an external write between
+        // launches), then sync again. Manifest hash and ignored set are
+        // both unchanged from the previous run AND every manifest entry
+        // is present on disk at the right size, so the cache short-circuit
+        // fires: no HTTP requests should be made. The fix's whole point is
+        // that cleanup still runs before that short-circuit, removing the
+        // reintroduced stale jar even though the integrity walk gets
+        // skipped.
         Files.write(clientDir.resolve("mods/FoamFix.jar"), "legacy-bytes-again".toByteArray())
         svc.processSession(sessionWith(manifest), "Industrial", clientDir, null, ignored, null, null)
+
         assertTrue(!Files.exists(clientDir.resolve("mods/FoamFix.jar")),
-            "cleanup must run before the cache short-circuit so a reintroduced stale jar still gets removed")
+            "cleanup must run on the cache-hot path too; a reintroduced disabled jar must not survive a subsequent sync")
+        assertEquals(requestsAfterFirstSync, requests.get(),
+            "the second sync must hit the cache short-circuit (zero new HTTP requests); " +
+                "if this fails the test silently exercised the slow path instead of the cache-hot path it claims to validate")
     }
 
     @Test
