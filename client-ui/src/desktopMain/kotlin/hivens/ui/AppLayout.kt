@@ -26,6 +26,7 @@ import hivens.core.api.SkinRepository
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.HomeView
 import hivens.core.data.SessionData
+import hivens.core.data.UiStyle
 import hivens.launcher.network.NetworkState
 import hivens.launcher.network.ServerProtocolConfig
 import hivens.ui.background.BackgroundSettings
@@ -61,6 +62,8 @@ fun AppLayout(
     onLocaleChanged: (AppLocale) -> Unit,
     homeView: HomeView,
     onHomeViewChanged: (HomeView) -> Unit,
+    uiStyle: UiStyle,
+    onUiStyleChanged: (UiStyle) -> Unit,
     backgroundSettings: BackgroundSettings = BackgroundSettings(),
     onBackgroundSettingsChanged: (BackgroundSettings) -> Unit = {}
 ) {
@@ -142,6 +145,8 @@ fun AppLayout(
                             onLocaleChanged          = onLocaleChanged,
                             homeView                 = homeView,
                             onHomeViewChanged        = onHomeViewChanged,
+                            uiStyle                  = uiStyle,
+                            onUiStyleChanged         = onUiStyleChanged,
                             onOpenBackgroundSettings = { onScreenChange(Screen.BackgroundSettings) },
                             onOpenAbout              = { onScreenChange(Screen.About) }
                         )

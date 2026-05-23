@@ -11,22 +11,39 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.unit.dp
 import hivens.ui.effects.pulsatingGlow
+import hivens.ui.theme.CardSurface
 import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.LocalStyle
 
 /**
- * Main Celestia container -- translucent, with a thin border.
+ * Theme-aware container card. Reads form / surface tokens from
+ * [LocalStyle], so the same call site looks different under CelestiaStyle
+ * (rounded corners, glass-alpha fill, no visible border) vs BrutStyle
+ * (near-square corners, flat opaque fill, hard 1dp border).
  *
- * [borderColor] is theme-aware: if [Color.Unspecified] is passed (or omitted),
- * a light gray border is used in light theme, and dark gray in dark theme.
+ * [borderColor] override stays available for the rare call site that
+ * wants a deliberate accent; left unspecified, light theme picks light
+ * gray and dark theme picks dark gray.
+ *
+ * [shape] override exists for cases like ServerDetail's banner area
+ * that want a specific shape regardless of style variant. Default
+ * pulls from the active style, so most callers don't need to pass it.
  */
 @Composable
 fun GlassCard(
     modifier: Modifier = Modifier,
-    shape: Shape = MaterialTheme.shapes.medium,
-    backgroundColor: Color = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
+    shape: Shape? = null,
+    backgroundColor: Color? = null,
     borderColor: Color = Color.Unspecified,
     content: @Composable BoxScope.() -> Unit
 ) {
+    val style = LocalStyle.current
+    val resolvedShape = shape ?: RoundedCornerShape(style.cardCorner)
+    val resolvedBackground = backgroundColor ?: when (style.cardSurface) {
+        CardSurface.Glass -> MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)
+        CardSurface.Flat  -> MaterialTheme.colorScheme.surface
+    }
+    val resolvedBorderWidth = style.cardBorder.coerceAtLeast(0.dp)
     val resolvedBorder = when {
         borderColor != Color.Unspecified -> borderColor
         MaterialTheme.colorScheme.surface.luminance() < 0.5f -> Color(0xFF2C2C2C)
@@ -35,9 +52,9 @@ fun GlassCard(
 
     OutlinedCard(
         modifier  = modifier,
-        shape     = shape,
-        colors    = CardDefaults.outlinedCardColors(containerColor = backgroundColor),
-        border    = BorderStroke(1.dp, resolvedBorder),
+        shape     = resolvedShape,
+        colors    = CardDefaults.outlinedCardColors(containerColor = resolvedBackground),
+        border    = BorderStroke(if (resolvedBorderWidth > 0.dp) resolvedBorderWidth else 1.dp, resolvedBorder),
         elevation = CardDefaults.outlinedCardElevation(defaultElevation = 0.dp)
     ) {
         Box(content = content)
@@ -59,16 +76,21 @@ fun CelestiaButton(
     primary: Boolean = true,
     glowing: Boolean = false
 ) {
+    val style = LocalStyle.current
     val glowColor = MaterialTheme.colorScheme.primary
+    val buttonShape = RoundedCornerShape(style.buttonCorner)
+    // Glow attaches only when the active style enables decorative glow.
+    // BrutStyle suppresses it without the call site having to know.
+    val showGlow = glowing && style.softGlowEnabled
 
     if (primary) {
         Button(
             onClick = onClick,
             modifier = modifier
                 .height(48.dp)
-                .let { if (glowing) it.pulsatingGlow(glowColor, cornerRadius = 12.dp) else it },
+                .let { if (showGlow) it.pulsatingGlow(glowColor, cornerRadius = style.buttonCorner) else it },
             enabled = enabled,
-            shape = RoundedCornerShape(12.dp),
+            shape = buttonShape,
             colors = ButtonDefaults.buttonColors(
                 containerColor = CelestiaTheme.colors.primary,
                 contentColor = Color.White,
@@ -84,7 +106,7 @@ fun CelestiaButton(
             onClick = onClick,
             modifier = modifier.height(48.dp),
             enabled = enabled,
-            shape = RoundedCornerShape(12.dp),
+            shape = buttonShape,
             colors = ButtonDefaults.outlinedButtonColors(
                 contentColor = MaterialTheme.colorScheme.onSurface,
                 disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)

@@ -25,6 +25,7 @@ import hivens.core.api.interfaces.ISettingsService
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.HomeView
 import hivens.core.data.SessionData
+import hivens.core.data.UiStyle
 import hivens.launcher.AutoSyncService
 import hivens.launcher.bootstrap.AutoLoginCoordinator
 import hivens.launcher.bootstrap.LauncherBootstrap
@@ -45,8 +46,11 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.i18n.LocaleProvider
 import hivens.ui.screens.ConsoleWindow
 import hivens.ui.screens.MigrationScreen
+import hivens.ui.theme.BrutStyle
+import hivens.ui.theme.CelestiaStyle
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.CustomTheme
+import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.ThemeManager
 import hivens.ui.tray.TrayManager
 import hivens.ui.utils.GameConsoleService
@@ -139,6 +143,12 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
         mutableStateOf(AppLocale.fromTag(settings.locale))
     }
     var homeView      by remember { mutableStateOf(settings.homeView) }
+    var uiStyle       by remember { mutableStateOf(settings.uiStyle) }
+
+    val styleSpec = when (uiStyle) {
+        UiStyle.Celestia -> CelestiaStyle
+        UiStyle.Brut     -> BrutStyle
+    }
 
     val launchState by controller.state.collectAsState()
 
@@ -394,6 +404,7 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
             }
 
             CelestiaTheme(useDarkTheme = isDarkTheme, customTheme = customTheme) {
+                CompositionLocalProvider(LocalStyle provides styleSpec) {
                 val migration = boot.pendingMigration
                 if (migration != null) {
                     // Migration is mandatory: the screen does not return
@@ -448,10 +459,17 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
                             homeView = newView
                             val current = settingsService.getSettings()
                             settingsService.saveSettings(current.copy(homeView = newView))
+                        },
+                        uiStyle           = uiStyle,
+                        onUiStyleChanged  = { newStyle ->
+                            uiStyle = newStyle
+                            val current = settingsService.getSettings()
+                            settingsService.saveSettings(current.copy(uiStyle = newStyle))
                         }
                     )
                     UpdateManager()
                 }
+                } // end CompositionLocalProvider(LocalStyle)
             }
         }
     }
@@ -473,6 +491,8 @@ fun AppRoot(
     onLocaleChanged: (AppLocale) -> Unit,
     homeView: HomeView,
     onHomeViewChanged: (HomeView) -> Unit,
+    uiStyle: UiStyle,
+    onUiStyleChanged: (UiStyle) -> Unit,
 ) {
     val credentialsManager: CredentialsManager = koinInject()
     val authService: IAuthService              = koinInject()
@@ -569,6 +589,8 @@ fun AppRoot(
                 onLocaleChanged = onLocaleChanged,
                 homeView = homeView,
                 onHomeViewChanged = onHomeViewChanged,
+                uiStyle = uiStyle,
+                onUiStyleChanged = onUiStyleChanged,
                 backgroundSettings = backgroundSettings,
                 onBackgroundSettingsChanged = { newSettings ->
                     backgroundSettings = newSettings

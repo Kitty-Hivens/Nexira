@@ -23,6 +23,7 @@ import hivens.config.Protocol
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.data.HomeView
 import hivens.core.data.SettingsData
+import hivens.core.data.UiStyle
 import hivens.core.diag.ActionRing
 import hivens.launcher.diag.DiagnosticBundle
 import hivens.launcher.diag.IssueReporter
@@ -68,6 +69,8 @@ fun SettingsScreen(
     onLocaleChanged: (AppLocale) -> Unit,
     homeView: HomeView,
     onHomeViewChanged: (HomeView) -> Unit,
+    uiStyle: UiStyle,
+    onUiStyleChanged: (UiStyle) -> Unit,
     onOpenBackgroundSettings: () -> Unit = {},
     onOpenAbout: () -> Unit = {}
 ) {
@@ -263,6 +266,22 @@ fun SettingsScreen(
                     )
                     PuppetClick("settings.homeView.classic")      { onHomeViewChanged(HomeView.Classic) }
                     PuppetClick("settings.homeView.libraryFirst") { onHomeViewChanged(HomeView.LibraryFirst) }
+
+                    Spacer(Modifier.height(16.dp))
+
+                    // UI style variant picker. Independent axis from palette --
+                    // governs form, surface treatment, motion. Two initial
+                    // variants: Celestia (current) and Brut (sharp / flat).
+                    UiStylePicker(
+                        current   = uiStyle,
+                        onChange  = onUiStyleChanged,
+                        title     = s.settingsUiStyleTitle,
+                        sub       = s.settingsUiStyleSub,
+                        celestia  = s.settingsUiStyleCelestia,
+                        brut      = s.settingsUiStyleBrut,
+                    )
+                    PuppetClick("settings.uiStyle.celestia") { onUiStyleChanged(UiStyle.Celestia) }
+                    PuppetClick("settings.uiStyle.brut")     { onUiStyleChanged(UiStyle.Brut) }
                 }
 
                 // ── Behavior ──────────────────────────────────────────────────
@@ -1120,6 +1139,37 @@ private fun HomeViewPicker(
                 selected = current == HomeView.LibraryFirst,
                 onClick  = { onChange(HomeView.LibraryFirst) },
             )
+        }
+    }
+}
+
+/**
+ * Mirror of [HomeViewPicker] for the visual-style axis. Same pill UI,
+ * different domain. Future variants slot in by adding rows here and
+ * options to [UiStyle].
+ */
+@Composable
+private fun UiStylePicker(
+    current: UiStyle,
+    onChange: (UiStyle) -> Unit,
+    title: String,
+    sub: String,
+    celestia: String,
+    brut: String,
+) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(CelestiaTheme.colors.background.copy(alpha = 0.4f))
+            .padding(16.dp),
+    ) {
+        Text(title, color = CelestiaTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
+        Text(sub, style = MaterialTheme.typography.bodySmall, color = CelestiaTheme.colors.textSecondary)
+        Spacer(Modifier.height(12.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            HomeViewPill(label = celestia, selected = current == UiStyle.Celestia, onClick = { onChange(UiStyle.Celestia) })
+            HomeViewPill(label = brut,     selected = current == UiStyle.Brut,     onClick = { onChange(UiStyle.Brut) })
         }
     }
 }
