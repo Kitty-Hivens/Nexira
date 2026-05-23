@@ -25,6 +25,8 @@ import hivens.core.api.model.ServerProfile
 import hivens.core.data.SessionData
 import hivens.core.diag.ActionRing
 import hivens.launcher.AutoSyncService
+import hivens.launcher.bootstrap.DisplayDiagnostics
+import hivens.launcher.bootstrap.XToolkitOverride
 import hivens.launcher.CrashReporter
 import hivens.launcher.CredentialsManager
 import hivens.launcher.network.NetworkState
@@ -56,7 +58,6 @@ import hivens.ui.theme.ThemeManager
 import hivens.ui.tray.TrayManager
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.identity.SkinManager
-import java.awt.Toolkit
 import java.nio.file.Files
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -110,56 +111,6 @@ sealed class Screen {
 
 // ─── Entry Point ─────────────────────────────────────────────────────────────
 
-/**
- * Single startup line summarizing which AWT toolkit the JDK picked and what
- * Linux display-server environment we're in. Diagnostic value applies to
- * every Linux user; trivial to grep across `launcher.log` files attached to
- * bundles when a display issue gets reported.
- */
-private fun logToolkitAndSession() {
-    if (!System.getProperty("os.name").lowercase().contains("linux")) return
-    val toolkit = runCatching { Toolkit.getDefaultToolkit().javaClass.name }
-        .getOrElse { "<unavailable: ${it.javaClass.simpleName}>" }
-    fun env(k: String) = System.getenv(k) ?: "<unset>"
-    LoggerFactory.getLogger("Main").info(
-        "Display: toolkit={} XDG_SESSION_TYPE={} XDG_CURRENT_DESKTOP={} WAYLAND_DISPLAY={} DISPLAY={}",
-        toolkit, env("XDG_SESSION_TYPE"), env("XDG_CURRENT_DESKTOP"),
-        env("WAYLAND_DISPLAY"), env("DISPLAY"),
-    )
-}
-
-/**
- * Force the X11 toolkit's app class name so the WM_CLASS hint on every window
- * we create matches `StartupWMClass=` in the .desktop entry.
- *
- * Stock OpenJDK derives WM_CLASS from the launcher binary's argv[0] and exposes
- * no public knob to override it; JBR exposes `-Dawt.appClassName` but only that
- * one vendor honors it. Reflection into the package-private static field works
- * across both -- provided we run before any window is shown (XWindow.setWMClass
- * snapshots the value at construction time) and the JVM was launched with
- * `--add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED`.
- *
- * No-op on macOS/Windows. Failures are logged but never fatal -- a wrong icon
- * is annoying, not crash-worthy.
- */
-private fun setLinuxXToolkitAppClassName() {
-    if (!System.getProperty("os.name").lowercase().contains("linux")) return
-    runCatching {
-        // Triggers XToolkit class load + initial awtAppClassName assignment.
-        Toolkit.getDefaultToolkit()
-        val cls = Class.forName("sun.awt.X11.XToolkit")
-        val field = cls.getDeclaredField("awtAppClassName")
-        field.isAccessible = true
-        field.set(null, Branding.WM_CLASS)
-    }.onFailure {
-        LoggerFactory.getLogger("Main").warn(
-            "Could not override XToolkit.awtAppClassName ({}); " +
-            "compositors may show a generic icon. Cause: {}",
-            Branding.WM_CLASS, it.toString()
-        )
-    }
-}
-
 @OptIn(ExperimentalResourceApi::class)
 fun main() {
     // Resolve logs dir BEFORE any LoggerFactory.getLogger() call so
@@ -212,19 +163,16 @@ fun main() {
     NetworkState.initialize(paths.dataDir.resolve("ssl-bypasses.json"))
 
     System.setProperty("skiko.fps.limit", "60")
-    // X11 WM_CLASS = "Nexira". Stock OpenJDK derives WM_CLASS from
-    // argv[0] and exposes no public knob to override it, so we reflect into
-    // the package-private sun.awt.X11.XToolkit.awtAppClassName field before
-    // the first window is created. See jvmArgs --add-opens in
-    // client-ui/build.gradle.kts and the function doc on
-    // setLinuxXToolkitAppClassName for the cross-vendor details.
-    setLinuxXToolkitAppClassName()
+    // X11 WM_CLASS = "Nexira". See XToolkitOverride for the cross-vendor
+    // details; jvmArgs --add-opens in client-ui/build.gradle.kts unlocks
+    // the reflective set this hack relies on.
+    XToolkitOverride.applyLinuxAppClassName()
 
-    // Capture toolkit + session-type as soon as the toolkit has been triggered
-    // by setLinuxXToolkitAppClassName above. One INFO line per launch -- gives
-    // every user-attached `launcher.log` enough context to slot into the
+    // Capture toolkit + session-type now that the toolkit has been triggered
+    // by XToolkitOverride. One INFO line per launch -- gives every
+    // user-attached launcher.log enough context to slot into the
     // Wayland-Native investigation matrix.
-    logToolkitAndSession()
+    DisplayDiagnostics.logEnvironment()
 
     Files.createDirectories(paths.dataDir)
 
