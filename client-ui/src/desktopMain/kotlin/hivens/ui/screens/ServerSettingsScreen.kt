@@ -262,7 +262,10 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
             // ══════════════════════════════════════════════════════════════════
             // LEFT COLUMN -- System settings
             // ══════════════════════════════════════════════════════════════════
-            GlassCard(Modifier.weight(1f).fillMaxHeight()) {
+            GlassCard(
+                modifier        = Modifier.weight(1f).fillMaxHeight(),
+                backgroundColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
+            ) {
                 Column(Modifier.padding(24.dp).verticalScroll(rememberScrollState())) {
 
                     // ── SYSTEM ────────────────────────────────────────────────
@@ -494,7 +497,10 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
             // ══════════════════════════════════════════════════════════════════
             // RIGHT COLUMN -- Mods
             // ══════════════════════════════════════════════════════════════════
-            GlassCard(Modifier.weight(1f).fillMaxHeight()) {
+            GlassCard(
+                modifier        = Modifier.weight(1f).fillMaxHeight(),
+                backgroundColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
+            ) {
                 Column(Modifier.padding(24.dp)) {
                     Text(s.serverSettingsSectionMods, style = MaterialTheme.typography.titleSmall, color = CelestiaTheme.colors.primary)
                     Spacer(Modifier.height(16.dp))

@@ -85,7 +85,10 @@ fun ServerDetailScreen(
             )
         }
 
-        GlassCard(Modifier.weight(1f).fillMaxWidth()) {
+        GlassCard(
+            modifier        = Modifier.weight(1f).fillMaxWidth(),
+            backgroundColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
+        ) {
             if (isLoading) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = CelestiaTheme.colors.primary)

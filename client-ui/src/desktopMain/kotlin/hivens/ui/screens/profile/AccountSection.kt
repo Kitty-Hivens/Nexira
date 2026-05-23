@@ -39,7 +39,7 @@ internal fun AccountSection(session: SessionData) {
         SystemActions.openUrl("http://smartycraft.ru/cabinet")
     }
 
-    Column(Modifier.fillMaxSize()) {
+    Column(Modifier.fillMaxWidth()) {
         Text(
             text  = session.playerName,
             style = MaterialTheme.typography.headlineSmall,
