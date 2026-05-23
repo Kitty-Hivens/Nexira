@@ -73,11 +73,11 @@ internal fun SkinSection(
 
     LaunchedEffect(Unit) { loadSkins() }
 
-    Column(Modifier.fillMaxSize()) {
+    Column(Modifier.fillMaxWidth()) {
         Box(
             Modifier
                 .fillMaxWidth()
-                .weight(1f)
+                .height(360.dp)
                 .clip(RoundedCornerShape(style.cardCorner))
                 .background(CelestiaTheme.colors.background.copy(alpha = 0.4f))
         ) {
