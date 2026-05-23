@@ -1,4 +1,4 @@
-package hivens.ui.screens
+package hivens.ui.screens.profile
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
