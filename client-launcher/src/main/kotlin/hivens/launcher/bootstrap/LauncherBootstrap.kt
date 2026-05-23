@@ -40,8 +40,6 @@ import kotlin.system.exitProcess
  */
 object LauncherBootstrap {
 
-    private val log = LoggerFactory.getLogger(LauncherBootstrap::class.java)
-
     /**
      * Bundle of values the Compose layer needs from pre-Compose setup.
      *
