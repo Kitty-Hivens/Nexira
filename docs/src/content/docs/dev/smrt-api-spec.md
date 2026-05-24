@@ -82,7 +82,7 @@ Each item has exactly one source. If a Modrinth source becomes invalid (mod remo
 
 ### Server entry
 
-A curated description of one SC game server. Carries display name, MOTD override, tagline, banner image URL, tags, owner handle, Discord / website links. Decoupled from packs (multiple servers can run the same pack version).
+A curated description of one game server reachable through Nexira. Carries the network address the client connects to, the auth provider the server expects, plus display metadata (name, MOTD override, tagline, banner, tags, owner handle, Discord / website links). Decoupled from packs (multiple servers can run the same pack version) and from auth providers (the mirror may list servers that use different auth backends in the same response).
 
 ## Wire formats
 
@@ -264,6 +264,7 @@ GET /v1/servers/{server_id}
 {
   "schema_version": 2,
   "server_id": "industrial.smartycraft.ru",
+  "address": "industrial.smartycraft.ru:25566",
   "pack_id": "Industrial",
   "display_name": "Industrial",
   "tagline": "Vanilla-friendly Industrial progression",
@@ -276,11 +277,35 @@ GET /v1/servers/{server_id}
   "owner_display": "ServerAdmin",
   "motd_override": "Industrial Server\nWelcome back, %playername%",
   "founded_at": "2024-03-12",
-  "featured": false
+  "featured": false,
+  "auth": {
+    "type": "smartycraft",
+    "endpoint": "https://www.smartycraft.ru/launcher/"
+  }
 }
 ```
 
 `motd_override` is optional; when present, the Nexira client renders it instead of querying SLP for the server's live MOTD. `banner_url` may reference a `smrt_static`-hosted asset under the relevant pack.
+
+#### `address`
+
+Network address the client connects to, in `host:port` form. Optional for backward compatibility; when absent, the client treats `server_id` as the host and uses the Minecraft default port 25565. New entries SHOULD always set `address` explicitly because `server_id` is an opaque identifier in principle and is not guaranteed to be a resolvable hostname.
+
+#### `auth`
+
+Declares the authentication provider the server expects. Optional for backward compatibility; when absent, the client defaults to `{"type": "smartycraft", "endpoint": "https://www.smartycraft.ru/launcher/"}`, matching the legacy single-provider deploy.
+
+`type` is one of:
+
+- `smartycraft` -- SmartyCraft's proprietary HTTP auth backend. `endpoint` required.
+- `mojang` -- official Microsoft / Mojang OAuth. `endpoint` ignored.
+- `elyby` -- Ely.by auth. `endpoint` may pin a specific instance; absent means `https://authserver.ely.by/`.
+- `hivens` -- Hivens-side auth backend (future, not yet shipped). `endpoint` required when shipped.
+- `offline` -- no auth, client picks a name locally. `endpoint` ignored. For LAN / dev / cracked targets.
+
+Clients implement one cached session per `(type, endpoint)` pair stored in the local keyring. On a connect attempt the client looks the cached session up by the server's declared `auth` value and reuses it without prompting; a missing or expired session triggers the credential UI for that provider only. 2FA challenges are a provider-level concern: a provider that requires 2FA gates the *session refresh*, not every connect, so the user is prompted only when the cached access token has actually expired.
+
+The spec does not constrain client-side session storage; the contract is just that the server's `auth` value is sufficient for the client to pick the right cached session or the right login flow.
 
 ### Featured / categories
 
