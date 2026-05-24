@@ -487,16 +487,13 @@ tasks.configureEach {
     }
 }
 
-// ========================================================================
-// PORTABLE ZIP (Windows)
-// For local dev use; CI also runs this step independently.
-// ========================================================================
-tasks.register<Zip>("packageWindowsPortableZip") {
-    group = "compose desktop"
-    description = "Packages the Windows distributable as a portable ZIP"
-    dependsOn("createReleaseDistributable")
-
-    from(layout.buildDirectory.dir("compose/binaries/main-release/app"))
-    archiveFileName.set("Nexira-${project.version}-Windows-Portable.zip")
-    destinationDirectory.set(layout.buildDirectory.dir("compose/binaries/main-release"))
-}
+// Portable ZIP packaging lives in the build_release workflow's
+// PowerShell step, not in a Gradle task. The previous local-dev task
+// here still pointed at the pre-B-3 Compose Desktop output path
+// (compose/binaries/main-release/app) which is no longer produced
+// since the customJpackageImage migration, so the task produced an
+// empty / broken zip. Having two sources of truth for the same
+// artifact (Gradle task + CI step) is the worst-of-both: divergence
+// goes unnoticed locally until CI's version reaches a user. CI is
+// the single source of truth; reproduce the steps from
+// build_release.yml directly if you need a local portable.

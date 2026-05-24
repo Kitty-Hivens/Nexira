@@ -257,6 +257,13 @@ jobs:
           # Nexira\bin\..., Nexira\lib\runtime\... shape
           # inside the zip stays identical from the user's perspective.
           $src = "client-ui\build\customJpackageImage"
+          # Drop the bilingual README inside Nexira\ before zipping so
+          # users see it immediately on extraction. Without it, the
+          # natural-but-wrong "copy just Nexira.exe to Desktop" move
+          # produces a cryptic "Nexira.cfg not found" error at launch
+          # (see issue #227).
+          Copy-Item -Path "packaging\portable-readme.txt" `
+                    -Destination "$src\Nexira\README.txt"
           Compress-Archive -Path "$src\*" `
             -DestinationPath "Nexira-$env:APP_VERSION-Windows-Portable.zip"
 
