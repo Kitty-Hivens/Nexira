@@ -293,17 +293,19 @@ Network address the client connects to, in `host:port` form. Optional for backwa
 
 #### `auth`
 
-Declares the authentication provider the server expects. Optional for backward compatibility; when absent, the client defaults to `{"type": "smartycraft", "endpoint": "https://www.smartycraft.ru/launcher/"}`, matching the legacy single-provider deploy.
+Declares the authentication provider the **game server** expects. This is unrelated to mirror access: the mirror itself is unauthenticated for all read endpoints (see *HTTP API*), so listing a server in `/v1/servers` requires no credentials of any kind on the mirror side; `auth` here is purely a hint for the client about how to authenticate to the game server when the user clicks Play.
+
+Optional for backward compatibility; when absent, the client defaults to `{"type": "smartycraft", "endpoint": "https://www.smartycraft.ru/launcher/"}`, matching the legacy single-provider deploy.
 
 `type` is one of:
 
-- `smartycraft` -- SmartyCraft's proprietary HTTP auth backend. `endpoint` required.
+- `smartycraft` -- SmartyCraft's proprietary HTTP auth backend. `endpoint` required. 2FA is intentionally not supported on this provider (SC's 2FA implementation is broken in ways the client cannot work around; the provider treats 2FA-enabled accounts as a configuration error and surfaces a banner asking the user to disable 2FA on SC's side).
 - `mojang` -- official Microsoft / Mojang OAuth. `endpoint` ignored.
 - `elyby` -- Ely.by auth. `endpoint` may pin a specific instance; absent means `https://authserver.ely.by/`.
-- `hivens` -- Hivens-side auth backend (future, not yet shipped). `endpoint` required when shipped.
+- `hivens` -- Hivens-side auth backend (future, not yet shipped). `endpoint` required when shipped. By design the second factor is requested on every login and never persisted; this is distinct from session-refresh-only 2FA.
 - `offline` -- no auth, client picks a name locally. `endpoint` ignored. For LAN / dev / cracked targets.
 
-Clients implement one cached session per `(type, endpoint)` pair stored in the local keyring. On a connect attempt the client looks the cached session up by the server's declared `auth` value and reuses it without prompting; a missing or expired session triggers the credential UI for that provider only. 2FA challenges are a provider-level concern: a provider that requires 2FA gates the *session refresh*, not every connect, so the user is prompted only when the cached access token has actually expired.
+Clients implement one cached session per `(type, endpoint)` pair stored in the local keyring. On a connect attempt the client looks the cached session up by the server's declared `auth` value and reuses it without prompting; a missing or expired session triggers the credential UI for that provider. When and how the provider prompts (every connect, only on session expiry, second-factor every time) is provider-specific and not constrained by this spec.
 
 The spec does not constrain client-side session storage; the contract is just that the server's `auth` value is sufficient for the client to pick the right cached session or the right login flow.
 
