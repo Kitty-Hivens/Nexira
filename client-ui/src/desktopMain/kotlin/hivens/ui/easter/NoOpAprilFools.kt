@@ -30,6 +30,8 @@ object NoOpAprilFools : AprilFoolsLifecycle {
     override fun isActive(): Boolean = false
     override fun intensity(): Float = 0f
 
+    override val providesDebugPanel: Boolean = false
+
     // Debug knobs are still writable so the DebugPanel UI itself could
     // bind to them (the panel doesn't render in NoOp, but the contract
     // stays uniform).

@@ -70,47 +70,48 @@ internal fun DiagnosticsSection(
     val style = LocalStyle.current
 
     // ── April Fools debug panel -- secret unlock ────────────────────
-    var debugTapCount  by remember { mutableStateOf(0) }
-    var showAprilDebug by remember { mutableStateOf(false) }
-    // Brings the panel into the ancestor vertical-scroll viewport when
-    // it appears. Without this the panel renders below the visible
-    // area (Diagnostics also hosts Open-logs / Crash-reports / Bundle
-    // / About below the title, plenty of content to push the panel
-    // off-screen) and the user only sees the rest of the list shift a
-    // couple of pixels -- looks like a click that "did nothing but
-    // twitch" instead of an unlock.
-    val debugPanelBringIntoView = remember { BringIntoViewRequester() }
+    // Only wire the 5-tap gesture when the active impl actually renders
+    // a debug panel. Production builds without `-PauraAprilFools=true`
+    // ship NoOpAprilFools whose DebugPanel() is empty, so a 5-tap on
+    // those builds would toggle a hidden state that renders to a couple
+    // of invisible Spacers -- exact symptom of "tap the title, list
+    // twitches a tiny bit, panel never shows" from the 2.3.2 report.
+    if (af.providesDebugPanel) {
+        var debugTapCount  by remember { mutableStateOf(0) }
+        var showAprilDebug by remember { mutableStateOf(false) }
+        val debugPanelBringIntoView = remember { BringIntoViewRequester() }
 
-    // Tap the diagnostics title 5 times to toggle the April Fools debug panel
-    Box(
-        Modifier.clickable {
-            debugTapCount++
-            if (debugTapCount >= 5) {
-                debugTapCount  = 0
-                showAprilDebug = !showAprilDebug
+        Box(
+            Modifier.clickable {
+                debugTapCount++
+                if (debugTapCount >= 5) {
+                    debugTapCount  = 0
+                    showAprilDebug = !showAprilDebug
+                }
+            }
+        ) {
+            SettingsSectionTitle(s.settingsSectionDiagnostics)
+        }
+
+        LaunchedEffect(showAprilDebug) {
+            if (showAprilDebug) {
+                // Wait one frame so the panel has been laid out before
+                // the scroll request is sent. bringIntoView() against a
+                // not-yet-positioned target is a no-op.
+                yield()
+                runCatching { debugPanelBringIntoView.bringIntoView() }
             }
         }
-    ) {
-        SettingsSectionTitle(s.settingsSectionDiagnostics)
-    }
 
-    LaunchedEffect(showAprilDebug) {
         if (showAprilDebug) {
-            // Wait one frame so the panel has been laid out before the
-            // scroll request is sent. bringIntoView() against a not-
-            // yet-positioned target is a no-op.
-            yield()
-            runCatching { debugPanelBringIntoView.bringIntoView() }
+            Spacer(Modifier.height(2.dp))
+            Box(Modifier.bringIntoViewRequester(debugPanelBringIntoView)) {
+                af.DebugPanel()
+            }
+            Spacer(Modifier.height(2.dp))
         }
-    }
-
-    // April Fools debug panel (hidden by default)
-    if (showAprilDebug) {
-        Spacer(Modifier.height(2.dp))
-        Box(Modifier.bringIntoViewRequester(debugPanelBringIntoView)) {
-            af.DebugPanel()
-        }
-        Spacer(Modifier.height(2.dp))
+    } else {
+        SettingsSectionTitle(s.settingsSectionDiagnostics)
     }
 
     // Buttons need a visible body at rest; transparent containers

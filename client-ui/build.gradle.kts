@@ -202,6 +202,15 @@ compose.desktop {
                 "java.management",
                 "java.prefs",
                 "jdk.crypto.ec",
+                // jdk.security.auth: provides com.sun.security.auth.module.UnixSystem,
+                // which FileKit's Linux dialog backend dlopens for user/group lookup
+                // when resolving xdg-desktop-portal session context. Without it the
+                // first FilePicker call on Linux crashes with NoClassDefFoundError
+                // for UnixSystem -- reported on 2.3.2 via the AdvancedSection
+                // openDirectoryPicker after the silent-swallow fix in PR 231 made
+                // the underlying exception visible. Module is small (~30 KB);
+                // adding it is cheaper than hand-wrapping the Linux backend.
+                "jdk.security.auth",
                 "jdk.unsupported",
                 "jdk.zipfs"
             )
@@ -339,6 +348,13 @@ packaging {
         "java.management",
         "java.prefs",
         "jdk.crypto.ec",
+        // See the matching note in the compose.desktop.application block
+        // above for why jdk.security.auth is required (FileKit Linux
+        // dialog backend dlopens UnixSystem; absence -> NoClassDefFound
+        // on first FilePicker call). This is the authoritative list
+        // since the customJpackageImage migration; keep it in sync with
+        // the legacy compose block until that block goes away.
+        "jdk.security.auth",
         "jdk.unsupported",
         "jdk.zipfs",
         "jdk.localedata",
