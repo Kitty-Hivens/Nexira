@@ -12,6 +12,108 @@ below are for the GitHub release page and CHANGELOG readers.
 
 ## [Unreleased]
 
+## [2.3.1] - 2026-05-24
+
+Maintenance release focused on the Windows 11 installer bug that
+broke OneDrive users, plus a sweep of UI polish on the Style
+variant infrastructure that landed in 2.3.0's wake.
+
+### Highlights
+- **Windows 11 installer no longer breaks under OneDrive.** New
+  installs land in `%LocalAppData%\Nexira\Programs\` instead of the
+  OneDrive-synced Roaming tree, so `jvm.dll` stays materialised on
+  disk and the "Invalid Image" crash no longer triggers. Existing
+  Roaming installs are uninstalled silently when you run this
+  installer over them.
+- **Style variant infrastructure.** Settings now offers Celestia
+  (rounded, glassy, motion-rich) and Brut (sharp, flat, no glow,
+  no motion) as live-switchable UI looks. No restart required.
+- **Two-column Settings and Profile.** Vertical category navigation
+  on the left, selected section's form on the right. Form state
+  persists when you switch categories.
+- **Portable build ships a README** inside the `Nexira\` folder
+  explaining that `Nexira.exe`, `app\`, and `runtime\` must stay
+  together. Bilingual (EN / RU). Heads off the very common "copy
+  just the EXE to Desktop" mistake.
+
+### Added
+- Style variant axis (`SettingsData.uiStyle`): Celestia (default,
+  current look) vs Brut (sharp, flat, no glow, no motion). Live
+  switches across visible UI through `LocalStyle` and
+  `MaterialTheme.shapes`.
+- Home view variant axis (`SettingsData.homeView`): Classic
+  (current Dashboard) vs LibraryFirst (placeholder for the upcoming
+  pack-library IA).
+- Placeholder Library, Browse, and PackDetail screens with
+  localised "not yet implemented" notices, wired into navigation.
+- Experimental Hivens Mirror sync path for the Industrial pack.
+  Subject to redesign per the pack-centric architecture roadmap
+  (issue #224); do not rely on the current shape.
+- `IServerListService` SPI groundwork: the existing SC-bound
+  implementation is renamed to `SmartyCraftServerListService` and
+  `ServerProfile` gains a `source` field. No user-visible
+  difference yet; prepares the second implementation that fetches
+  server lists from the Hivens mirror.
+
+### Changed
+- Settings screen layout: vertical category navigation on the
+  left, selected category's form on the right.
+- Profile screen layout mirrors Settings: `SkinSection` and
+  `AccountSection` routed through the same category-nav shape.
+- `client-ui` module restructure: the Compose entry point split
+  into `bootstrap` (pre-Compose pipeline) and `AppShell` (Compose
+  root); the pre-existing `utils/` package dissolved into
+  `identity/` and `platform/` subpackages. `Main.kt` shrinks from
+  822 to 41 LOC.
+- Windows installer: install dir moves from `%AppData%\Nexira`
+  (Roaming) to `%LocalAppData%\Nexira\Programs` (Local).
+  Old-location installs are removed automatically on first run of
+  the new installer via the `InitializeSetup` hook.
+- Smrt API spec: server entry gains a required `address` field
+  (`host:port`); the previous server-id-as-host fallback is
+  removed because SC servers do not run on the Minecraft default
+  port. Mirror operators must publish `address` for every server.
+
+### Fixed
+- **Windows 11 installer** no longer crashes on launch under
+  OneDrive's Known Folder Move (`STATUS_CLOUD_FILE_NOT_IN_SYNC`,
+  surfaced as "Nexira.exe -- Invalid Image"). Closes #225.
+- **Portable launcher** ships a bilingual README explaining the
+  keep-files-together constraint. Closes #227.
+- Bootstrap logger initialisation order: the class-level logger
+  field in `LauncherBootstrap` instantiated during the object's
+  static init, before the body could set `nexira.logs.dir`.
+  Logback then pinned the file appender to the fallback path and
+  the CI smoke test never saw `launcher.log`. The field was
+  unused; removed.
+- Skin avatar visibility and outer frame transparency under the
+  Brut style variant: Settings, Profile, ServerDetail, and
+  ServerSettings frames stay glassy when Brut is active.
+- April Fools chaos buttons no longer leak the Material 3 default
+  state layer or the elevation hover shadow.
+- Mirror sync robustness: streams downloads via
+  `prepareGet { execute }` to keep peak memory bounded regardless
+  of file size; prunes orphan jars after sync; wipes the mods
+  directory on a source flip between SmartyCraft and the mirror.
+- Disabled-mod cleanup runs on every sync, including when the
+  manifest cache short-circuits the integrity walk. Previously
+  the cleanup pass would skip when the cache was hot, leaving
+  reintroduced stale jars on disk.
+- Linux app icon now forces RGBA output so wlroots and Mutter
+  compositors render it correctly in the task bar.
+- JDK validation: existing and freshly-downloaded JDKs are probed
+  for runnability before being marked as the active runtime; the
+  download path also waits for the child process to terminate
+  before the resolver returns.
+
+### Removed
+- Stale `packageWindowsPortableZip` Gradle task. It pointed at the
+  pre-`customJpackageImage` Compose Desktop output path and
+  produced empty / broken zips. CI's PowerShell step in
+  `build_release.yml` has been the real portable builder for some
+  time; a comment in the same place now points future contributors
+  at the CI step.
+
 ## [2.3.0] - 2026-05-20
 
 Rebrand release. The launcher is now called **Nexira**; the underlying
