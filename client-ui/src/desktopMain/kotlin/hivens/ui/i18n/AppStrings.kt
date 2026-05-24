@@ -390,6 +390,7 @@ interface AppStrings {
     val settingsDataDirQuitNow: String
     val settingsDataDirErrorSamePath: String
     val settingsDataDirErrorNotEmpty: String
+    fun settingsDataDirErrorPickerFailed(reason: String): String
 
     // ═══════════════════════════════════════════════════════════════════════
     // JVM Args Builder dialog

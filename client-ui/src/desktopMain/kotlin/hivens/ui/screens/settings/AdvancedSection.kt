@@ -21,17 +21,19 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.LocalStyle
 import io.github.vinceglb.filekit.FileKit
-import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
 import io.github.vinceglb.filekit.dialogs.openDirectoryPicker
 import io.github.vinceglb.filekit.path
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 import kotlin.system.exitProcess
+
+private val log = LoggerFactory.getLogger("AdvancedSection")
 
 /**
  * Advanced surface -- currently houses the data-directory mover.
@@ -85,12 +87,36 @@ internal fun AdvancedSection(paths: PlatformPaths) {
                     // and some backends render a less-styled fallback
                     // chrome (no titlebar text, generic icon). Match what
                     // ProfileScreen + ServerSettingsScreen pass here.
-                    val pickedFile = runCatching {
+                    //
+                    // The `directory =` initial-folder hint is deliberately
+                    // NOT passed. On Win11 the data dir lives at
+                    // %LocalAppData%\Nexira (a reparse-pointed path under
+                    // some OEM setups); IFileDialog returns ERROR_CANCELLED
+                    // when given such a path as its initial folder, and
+                    // FileKit translates that into an exception that this
+                    // call site used to swallow silently -- the button
+                    // appeared "dead" with no log, no UI feedback (issue
+                    // raised on 2.3.1 release day). Letting FileKit pick
+                    // its own default (CWD or last-used) sidesteps the
+                    // platform quirk; the dialog title carries enough
+                    // context for the user. Other FilePicker call sites
+                    // (ProfileScreen, ServerSettingsScreen) also do not
+                    // pass `directory =` and have always worked.
+                    val pickResult = runCatching {
                         FileKit.openDirectoryPicker(
-                            directory      = PlatformFile(paths.dataDir.toFile()),
                             dialogSettings = FileKitDialogSettings(title = s.settingsDataDirMove),
                         )
-                    }.getOrNull() ?: return@launch
+                    }
+                    val pickedFile = pickResult.getOrElse { ex ->
+                        // Swallowing the exception silently here was the
+                        // exact bug above. Surface it: log so the next
+                        // diagnostic bundle has the stack, show a short
+                        // line to the user so a "dead button" stops
+                        // looking dead.
+                        log.warn("openDirectoryPicker failed", ex)
+                        showError = s.settingsDataDirErrorPickerFailed(ex.message ?: ex.javaClass.simpleName)
+                        return@launch
+                    } ?: return@launch
 
                     val picked = Paths.get(pickedFile.path)
 
