@@ -379,6 +379,8 @@ object RussianStrings : AppStrings {
     override val settingsDataDirQuitNow         = "Выйти сейчас"
     override val settingsDataDirErrorSamePath   = "Это и есть текущий каталог — выбери другую папку"
     override val settingsDataDirErrorNotEmpty   = "Целевая папка не пуста — выбери пустую папку или удали её содержимое"
+    override fun settingsDataDirErrorPickerFailed(reason: String) =
+        "Не удалось открыть выбор папки: $reason"
 
     // ── JVM Args Builder ────────────────────────────────────────────────
     override val jvmTitle    = "Конструктор JVM-аргументов"

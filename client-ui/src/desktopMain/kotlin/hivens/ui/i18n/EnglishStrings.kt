@@ -378,6 +378,8 @@ object EnglishStrings : AppStrings {
     override val settingsDataDirQuitNow         = "Quit now"
     override val settingsDataDirErrorSamePath   = "That's already the current directory — pick a different folder"
     override val settingsDataDirErrorNotEmpty   = "Target folder is not empty — pick an empty folder or delete its contents"
+    override fun settingsDataDirErrorPickerFailed(reason: String) =
+        "Couldn't open the folder picker: $reason"
 
     // ── JVM Args Builder ────────────────────────────────────────────────
     override val jvmTitle    = "JVM Args Builder"
