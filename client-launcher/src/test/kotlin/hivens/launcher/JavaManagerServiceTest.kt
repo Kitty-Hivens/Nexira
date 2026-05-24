@@ -221,6 +221,60 @@ class JavaManagerServiceTest {
         }
     }
 
+    // ── getAdoptiumUrl + getDownloadUrls: fallback mirror plumbing ──────────
+
+    @Test
+    fun `getAdoptiumUrl shapes GitHub-release path with +-encoded build tag`() {
+        // Filed 2026-05-24: RF tester on CloudFlare WARP got blanket
+        // 403 from BellSoft (CloudFlare bot manager hostile to its own
+        // WARP exits). Adoptium on GitHub releases dodges both legs of
+        // the CloudFlare double-whammy. This test pins the URL shape so
+        // a future Temurin tag rotation surfaces in tests, not in a
+        // user report.
+        withSystemProp("os.name", "Windows 10") {
+            withSystemProp("os.arch", "amd64") {
+                val url21 = svc.getAdoptiumUrl(21)!!
+                assertEquals(true, url21.startsWith("https://github.com/adoptium/temurin21-binaries/releases/download/"))
+                assertEquals(true, url21.contains("%2B"))                // + is %2B-encoded
+                assertEquals(true, url21.endsWith("_windows_hotspot_21.0.5_11.zip"))
+
+                val url17 = svc.getAdoptiumUrl(17)!!
+                assertEquals(true, url17.contains("temurin17-binaries"))
+                assertEquals(true, url17.endsWith("_windows_hotspot_17.0.13_11.zip"))
+
+                val url8 = svc.getAdoptiumUrl(8)!!
+                // Java 8 tag prefix is `jdk` (no dash), 9+ is `jdk-`.
+                assertEquals(true, url8.contains("/download/jdk8u442-b06/"))
+                assertEquals(true, url8.endsWith("_windows_hotspot_8u442b06.zip"))
+            }
+        }
+    }
+
+    @Test
+    fun `getDownloadUrls returns BellSoft first then Adoptium`() {
+        withSystemProp("os.name", "Linux") {
+            withSystemProp("os.arch", "amd64") {
+                val urls = svc.getDownloadUrls(21)
+                assertEquals(2, urls.size)
+                assertEquals(true, urls[0].startsWith("https://download.bell-sw.com/"))
+                assertEquals(true, urls[1].startsWith("https://github.com/adoptium/"))
+            }
+        }
+    }
+
+    @Test
+    fun `getDownloadUrls is empty for unsupported os arch combos`() {
+        withSystemProp("os.name", "Linux") {
+            withSystemProp("os.arch", "i386") {
+                // Neither mirror ships Linux x86, so the list collapses
+                // to empty rather than half-populated -- caller throws
+                // "no Java build for this system" instead of trying a
+                // mismatched arch.
+                assertEquals(emptyList<String>(), svc.getDownloadUrls(21))
+            }
+        }
+    }
+
     // ── findJavaExecutable: locate java/java.exe in BellSoft archive layout ─
 
     @Test
