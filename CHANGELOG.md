@@ -12,6 +12,60 @@ below are for the GitHub release page and CHANGELOG readers.
 
 ## [Unreleased]
 
+## [2.3.2] - 2026-05-24
+
+Same-day patch on 2.3.1. Three user-facing bugs surfaced within
+hours of the 2.3.1 release; this rolls them up.
+
+### Highlights
+- **Java 21 downloads work again** for users on CloudFlare WARP and
+  similar VPNs. The launcher now adds a real-browser User-Agent on
+  the JDK fetch and falls back to Adoptium / GitHub releases when
+  BellSoft's CloudFlare CDN refuses the request. Affects launching
+  Create and any other 1.21.x pack.
+- **"Move data directory" button works** again on every platform.
+  The release-build shrinker was culling FileKit internals reached
+  only from that one call site; a `keep` rule restores the affected
+  overload and a localized error line now surfaces on the rare
+  picker failure instead of a silent dead button.
+- **April Fools debug panel auto-scrolls into view** when unlocked
+  by the 5-tap Diagnostics title gesture. Previously the panel did
+  open but rendered below the visible scroll area on most window
+  sizes, which read as "the click did nothing but jiggle the list".
+
+### Fixed
+- JDK download path silently 403'd from CloudFlare WARP exits
+  (CloudFlare bot manager hostile to its own infrastructure when
+  the destination is also CloudFlare-fronted, as BellSoft is).
+  Added a Chrome-shaped `User-Agent` header on the JDK fetch and a
+  mirror list with Adoptium / Temurin GitHub releases as a second
+  attempt. GitHub releases are Azure-hosted, not CloudFlare, so the
+  WARP-to-CF problem evaporates. Pinned LTS-line Temurin tags for
+  each Java major; URL-shape tests catch any rename in the Adoptium
+  release path before users do.
+- "Move data directory" button in Advanced settings did nothing on
+  Win11 and on Linux AppImage release builds. ProGuard's reachability
+  analysis had culled the with-`directory` overload of
+  `FileKit.openDirectoryPicker` and / or the `PlatformFile(File)`
+  constructor as unreachable -- only one call site in the codebase
+  used that shape. Added a `-keep` rule covering the whole
+  `io.github.vinceglb.filekit` namespace; the picker now opens
+  correctly and any future picker failure shows a localized error
+  line instead of being silently swallowed.
+- April Fools debug panel: 5-tapping the Diagnostics section title
+  did toggle the panel state, but DiagnosticsSection has enough
+  content below the title that the panel rendered below the visible
+  scroll viewport. From the user's view: a small layout shift, no
+  visible panel. The panel emit is now wrapped in a
+  `BringIntoViewRequester` that scrolls it into view on toggle.
+- Existing Roaming-AppData installs from 2.3.0 are now removed
+  automatically when 2.3.2 (or 2.3.1) installs over them. The
+  `setup.iss` migration hook reads the old install's quiet
+  uninstaller and runs it before laying down the new files, so the
+  Add / Remove Programs entry no longer stays registered pointing
+  at orphaned files. (Codex P1 follow-up on the 2.3.1 install-dir
+  move.)
+
 ## [2.3.1] - 2026-05-24
 
 Maintenance release focused on the Windows 11 installer bug that
