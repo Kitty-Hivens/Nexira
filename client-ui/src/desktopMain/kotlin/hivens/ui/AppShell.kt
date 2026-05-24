@@ -91,7 +91,15 @@ sealed class Screen {
     object BackgroundSettings : Screen()
     data class ServerSettings(val server: ServerProfile) : Screen()
     data class ServerDetails (val server: ServerProfile) : Screen()
-    data class PackDetail    (val server: ServerProfile) : Screen()
+
+    /**
+     * Library card click target. Carries the PackInstance UUID; the
+     * detail screen resolves it via [hivens.core.api.interfaces.IPackRepository]
+     * so the Screen sealed class stays free of domain types and the
+     * back-stack item stays small (a UUID string, not a PackInstance
+     * graph).
+     */
+    data class PackDetail    (val instanceId: String) : Screen()
 }
 
 // ─── App Shell ───────────────────────────────────────────────────────────────

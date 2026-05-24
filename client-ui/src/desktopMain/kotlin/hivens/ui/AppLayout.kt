@@ -126,7 +126,10 @@ fun AppLayout(
                                     onOpenServerSettings  = { onScreenChange(Screen.ServerSettings(it)) },
                                     onOpenDetails         = { onScreenChange(Screen.ServerDetails(it)) }
                                 )
-                                HomeView.LibraryFirst -> LibraryScreen()
+                                HomeView.LibraryFirst -> LibraryScreen(
+                                    appState       = appState,
+                                    onScreenChange = onScreenChange,
+                                )
                             }
                             // `Loading` is the brief window between startup and resolved
                             // credentials -- spinner is appropriate. `Unauthenticated` is
@@ -192,14 +195,17 @@ fun AppLayout(
                             onBack = { onScreenChange(Screen.Home) }
                         )
 
-                    Screen.Library -> LibraryScreen()
+                    Screen.Library -> LibraryScreen(
+                        appState       = appState,
+                        onScreenChange = onScreenChange,
+                    )
 
                     Screen.Browse  -> BrowseScreen()
 
                     is Screen.PackDetail ->
                         PackDetailScreen(
-                            server = screen.server,
-                            onBack = { onScreenChange(Screen.Home) }
+                            instanceId = screen.instanceId,
+                            onBack     = { onScreenChange(Screen.Library) },
                         )
                 }
             }
