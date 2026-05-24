@@ -82,7 +82,7 @@ Each item has exactly one source. If a Modrinth source becomes invalid (mod remo
 
 ### Server entry
 
-A curated description of one SC game server. Carries display name, MOTD override, tagline, banner image URL, tags, owner handle, Discord / website links. Decoupled from packs (multiple servers can run the same pack version).
+A curated description of one SmartyCraft game server reachable through Nexira. Carries the network address the client connects to plus display metadata (name, MOTD override, tagline, banner, tags, owner handle, Discord / website links). Decoupled from packs (multiple servers can run the same pack version). Auth is implicit: every server listed by the mirror authenticates against SmartyCraft's launcher API; the mirror itself is unauthenticated and exists specifically so the client can browse and download without holding an SC session.
 
 ## Wire formats
 
@@ -264,6 +264,7 @@ GET /v1/servers/{server_id}
 {
   "schema_version": 2,
   "server_id": "industrial.smartycraft.ru",
+  "address": "industrial.smartycraft.ru:25566",
   "pack_id": "Industrial",
   "display_name": "Industrial",
   "tagline": "Vanilla-friendly Industrial progression",
@@ -281,6 +282,10 @@ GET /v1/servers/{server_id}
 ```
 
 `motd_override` is optional; when present, the Nexira client renders it instead of querying SLP for the server's live MOTD. `banner_url` may reference a `smrt_static`-hosted asset under the relevant pack.
+
+#### `address`
+
+Network address the client connects to, in `host:port` form. Optional for backward compatibility; when absent, the client treats `server_id` as the host and uses the Minecraft default port 25565. New entries SHOULD always set `address` explicitly because `server_id` is an opaque identifier in principle and is not guaranteed to be a resolvable hostname.
 
 ### Featured / categories
 
