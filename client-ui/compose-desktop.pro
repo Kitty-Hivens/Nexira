@@ -151,6 +151,23 @@
 # namespace; we don't ship anything else in those packages.
 -keep class org.freedesktop.dbus.** { *; }
 
+# ── FileKit: extension-function overloads + PlatformFile constructors ─────
+# Filed report after 2.3.1: the "Move data directory" picker call site
+# (only one that passes `directory = PlatformFile(...)`) was a dead
+# button on Win11 AND on Linux AppImage, but worked in dev. Other
+# FilePicker call sites that don't pass `directory =` worked everywhere.
+# Release-vs-dev with same platform behaviour points at ProGuard:
+# the with-directory overload of openDirectoryPicker is reachable from
+# only one place, and the `PlatformFile(File)` constructor only from
+# that same place -- ProGuard's reachability culled one or both, and
+# the call exploded at runtime in a way the call site silently
+# swallowed. Keep the whole filekit namespace; the jar is small, we
+# use the API surface across multiple screens, and a wildcard prevents
+# the next "only this picker uses parameter X and now it's broken"
+# variant of the same class of bug.
+-keep class io.github.vinceglb.filekit.** { *; }
+-keepclassmembers class io.github.vinceglb.filekit.** { *; }
+
 # --- Suppress Warnings ---
 -dontwarn ch.qos.logback.**
 -dontwarn org.slf4j.**
