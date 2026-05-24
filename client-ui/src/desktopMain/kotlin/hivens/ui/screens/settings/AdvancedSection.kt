@@ -21,6 +21,7 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.LocalStyle
 import io.github.vinceglb.filekit.FileKit
+import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
 import io.github.vinceglb.filekit.dialogs.openDirectoryPicker
 import io.github.vinceglb.filekit.path
@@ -88,22 +89,21 @@ internal fun AdvancedSection(paths: PlatformPaths) {
                     // chrome (no titlebar text, generic icon). Match what
                     // ProfileScreen + ServerSettingsScreen pass here.
                     //
-                    // The `directory =` initial-folder hint is deliberately
-                    // NOT passed. On Win11 the data dir lives at
-                    // %LocalAppData%\Nexira (a reparse-pointed path under
-                    // some OEM setups); IFileDialog returns ERROR_CANCELLED
-                    // when given such a path as its initial folder, and
-                    // FileKit translates that into an exception that this
-                    // call site used to swallow silently -- the button
-                    // appeared "dead" with no log, no UI feedback (issue
-                    // raised on 2.3.1 release day). Letting FileKit pick
-                    // its own default (CWD or last-used) sidesteps the
-                    // platform quirk; the dialog title carries enough
-                    // context for the user. Other FilePicker call sites
-                    // (ProfileScreen, ServerSettingsScreen) also do not
-                    // pass `directory =` and have always worked.
+                    // The bug this call site had on 2.3.1: button did
+                    // nothing on Windows AND on Linux AppImage. Initial
+                    // hypothesis was a platform-specific FileKit issue
+                    // (Win11 IFileDialog rejecting Local-AppData junction
+                    // paths via `directory =`), but the bug also showed
+                    // on AppImage Linux which ruled platform out and left
+                    // ProGuard as the only release-vs-dev discriminator.
+                    // Fix lives in client-ui/compose-desktop.pro: keep
+                    // io.github.vinceglb.filekit.** so PlatformFile +
+                    // the with-directory overload survive shrinking.
+                    // With the keep rule in place the original
+                    // directory-hint call below works on every platform.
                     val pickResult = runCatching {
                         FileKit.openDirectoryPicker(
+                            directory      = PlatformFile(paths.dataDir.toFile()),
                             dialogSettings = FileKitDialogSettings(title = s.settingsDataDirMove),
                         )
                     }
