@@ -4,6 +4,7 @@ import hivens.core.api.ServerRepository
 import hivens.core.api.dto.SmartyServer
 import hivens.core.api.interfaces.IServerListService
 import hivens.core.api.model.ServerProfile
+import hivens.core.api.model.ServerSource
 import hivens.core.data.DashboardData
 import hivens.core.data.NewsItem
 import hivens.launcher.network.ServerProtocolConfig
@@ -19,12 +20,12 @@ import java.time.format.DateTimeFormatter
 import java.util.*
 import java.util.concurrent.CompletableFuture
 
-class ServerListService(
+class SmartyCraftServerListService(
     private val repository: ServerRepository,
     private val protocolConfig: ServerProtocolConfig = ServerProtocolConfig(),
 ) : IServerListService {
 
-    private val logger = LoggerFactory.getLogger(ServerListService::class.java)
+    private val logger = LoggerFactory.getLogger(SmartyCraftServerListService::class.java)
     private val lock = Any()
     @Volatile
     private var cachedData: DashboardData? = null
@@ -99,6 +100,7 @@ class ServerListService(
             assetDir         = srv.assetDir,
             extraCheckSum    = srv.extraCheckSum,
             optionalModsData = (srv.optionalMods as? JsonObject) ?: emptyMap(),
+            source           = ServerSource.Smartycraft,
         )
 
     private fun formatTimestamp(ts: Long): String {

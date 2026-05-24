@@ -21,7 +21,7 @@ import kotlin.time.Duration.Companion.milliseconds
  * The pre-fix `@Volatile` stopgap allowed all N to slip past the null check
  * and each kick off their own future.
  */
-class ServerListServiceTest {
+class SmartyCraftServerListServiceTest {
 
     @Test
     fun `concurrent fetchDashboardData fires the underlying repo only once`() = runBlocking {
@@ -35,7 +35,7 @@ class ServerListServiceTest {
             }
         }
         val repo = ServerRepository(protocol)
-        val svc = ServerListService(repo)
+        val svc = SmartyCraftServerListService(repo)
 
         val parallel = 32
         val results = coroutineScope {
@@ -52,7 +52,7 @@ class ServerListServiceTest {
             // Cache only memorizes a non-empty result -- give it something to bite on.
             loaderResult = { LoaderResponse(status = "OK", servers = listOf(SmartyServer(id = "Industrial", ip = "127.0.0.1"))) }
         }
-        val svc = ServerListService(ServerRepository(protocol))
+        val svc = SmartyCraftServerListService(ServerRepository(protocol))
 
         val first = svc.fetchDashboardData().await()
         val second = svc.fetchDashboardData().await()
@@ -69,7 +69,7 @@ class ServerListServiceTest {
         val protocol = FakeServerProtocol().apply {
             loaderResult = { LoaderResponse(status = "ERROR") }
         }
-        val svc = ServerListService(ServerRepository(protocol))
+        val svc = SmartyCraftServerListService(ServerRepository(protocol))
 
         svc.fetchDashboardData().await()
         delay(10.milliseconds)
