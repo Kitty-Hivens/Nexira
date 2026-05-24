@@ -117,9 +117,24 @@ interface AprilFoolsLifecycle {
     /**
      * Developer-only debug panel that flips [debugForceActive] / [debugIntensity]
      * to test chaos behaviour out of season. NoOp impl renders nothing.
+     *
+     * Callers MUST gate access on [providesDebugPanel]; rendering this when
+     * the impl returns false produces an invisible no-op, and any unlock
+     * gesture wired to it (5-tap-Diagnostics-title) silently does nothing.
+     * That mismatch was the 2.3.2 "screen jiggles but panel never shows"
+     * report.
      */
     @Composable
     fun DebugPanel()
+
+    /**
+     * Whether [DebugPanel] renders real content in this build. False for
+     * NoOpAprilFools (production builds without `-PauraAprilFools=true`),
+     * true for RealAprilFools. Used by Diagnostics to conditionally
+     * attach the 5-tap unlock gesture so users on production builds do
+     * not see the title twitch on tap with nothing to show for it.
+     */
+    val providesDebugPanel: Boolean
 }
 
 /**
