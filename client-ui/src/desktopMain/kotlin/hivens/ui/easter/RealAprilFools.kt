@@ -22,6 +22,8 @@ class RealAprilFools : AprilFoolsLifecycle {
     override fun isActive(): Boolean = AprilFools.isActive()
     override fun intensity(): Float = AprilFools.intensity()
 
+    override val providesDebugPanel: Boolean = true
+
     override var debugForceActive: Boolean?
         get() = AprilFools.debugForceActive
         set(value) { AprilFools.debugForceActive = value }
