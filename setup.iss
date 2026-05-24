@@ -38,14 +38,24 @@ AppSupportURL={#MyAppURL}/issues
 AppUpdatesURL={#MyAppURL}/releases
 
 ; ── Privileges ──────────────────────────────────────────────────────────────
-; No UAC prompt — installs into %AppData% (Roaming) without admin rights.
-; User-generated data (clients, profiles, logs) lives separately in %LocalAppData%\Nexira.
+; No UAC prompt — installs into %LocalAppData% (machine-local) without admin rights.
+; User-generated data (clients, profiles, logs) lives in %LocalAppData%\Nexira\
+; (resolved by PlatformPaths via LOCALAPPDATA), so install lives one level
+; deeper at %LocalAppData%\Nexira\Programs\ to avoid colliding with it.
 ; The dialog option lets a power user elevate if they WANT a machine-wide install.
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
 
 ; ── Paths ───────────────────────────────────────────────────────────────────
-DefaultDirName={userappdata}\Nexira
+; %LOCALAPPDATA% is intentional: %AppData% (Roaming) is touched by OneDrive's
+; Known Folder Move on Win11 default-OEM installs, which downgrades binaries
+; in the install dir to cloud placeholders. LoadLibrary against a placeholder
+; jvm.dll fails with STATUS_CLOUD_FILE_NOT_IN_SYNC (0xC0E90002), surfacing as
+; "Nexira.exe - Invalid Image" on first launch after sync runs. Local AppData
+; is never synced. The `Programs\` subdir matches the Slack / Discord /
+; GitHub-Desktop convention for user-install Windows apps and avoids
+; colliding with the data dir at %LocalAppData%\Nexira\.
+DefaultDirName={localappdata}\Nexira\Programs
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 
