@@ -28,10 +28,13 @@ import io.github.vinceglb.filekit.path
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 import kotlin.system.exitProcess
+
+private val log = LoggerFactory.getLogger("AdvancedSection")
 
 /**
  * Advanced surface -- currently houses the data-directory mover.
@@ -85,12 +88,35 @@ internal fun AdvancedSection(paths: PlatformPaths) {
                     // and some backends render a less-styled fallback
                     // chrome (no titlebar text, generic icon). Match what
                     // ProfileScreen + ServerSettingsScreen pass here.
-                    val pickedFile = runCatching {
+                    //
+                    // The bug this call site had on 2.3.1: button did
+                    // nothing on Windows AND on Linux AppImage. Initial
+                    // hypothesis was a platform-specific FileKit issue
+                    // (Win11 IFileDialog rejecting Local-AppData junction
+                    // paths via `directory =`), but the bug also showed
+                    // on AppImage Linux which ruled platform out and left
+                    // ProGuard as the only release-vs-dev discriminator.
+                    // Fix lives in client-ui/compose-desktop.pro: keep
+                    // io.github.vinceglb.filekit.** so PlatformFile +
+                    // the with-directory overload survive shrinking.
+                    // With the keep rule in place the original
+                    // directory-hint call below works on every platform.
+                    val pickResult = runCatching {
                         FileKit.openDirectoryPicker(
                             directory      = PlatformFile(paths.dataDir.toFile()),
                             dialogSettings = FileKitDialogSettings(title = s.settingsDataDirMove),
                         )
-                    }.getOrNull() ?: return@launch
+                    }
+                    val pickedFile = pickResult.getOrElse { ex ->
+                        // Swallowing the exception silently here was the
+                        // exact bug above. Surface it: log so the next
+                        // diagnostic bundle has the stack, show a short
+                        // line to the user so a "dead button" stops
+                        // looking dead.
+                        log.warn("openDirectoryPicker failed", ex)
+                        showError = s.settingsDataDirErrorPickerFailed(ex.message ?: ex.javaClass.simpleName)
+                        return@launch
+                    } ?: return@launch
 
                     val picked = Paths.get(pickedFile.path)
 

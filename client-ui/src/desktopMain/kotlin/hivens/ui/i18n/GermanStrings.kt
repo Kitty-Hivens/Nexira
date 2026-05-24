@@ -378,6 +378,8 @@ object GermanStrings : AppStrings {
     override val settingsDataDirQuitNow         = "Jetzt beenden"
     override val settingsDataDirErrorSamePath   = "Das ist bereits das aktuelle Verzeichnis — wähle einen anderen Ordner"
     override val settingsDataDirErrorNotEmpty   = "Zielordner ist nicht leer — wähle einen leeren Ordner oder lösche dessen Inhalt"
+    override fun settingsDataDirErrorPickerFailed(reason: String) =
+        "Ordnerauswahl konnte nicht geöffnet werden: $reason"
 
     // ── JVM Args Builder ────────────────────────────────────────────────
     override val jvmTitle    = "JVM-Argument-Builder"
