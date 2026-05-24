@@ -72,37 +72,67 @@ class JavaManagerService(
     }
 
     private suspend fun downloadAndUnpack(version: Int, targetDir: Path) {
-        val url = getDownloadUrl(version)
-            ?: throw IOException("There is no Java build for this system (${getOsName()} ${getArchName()})")
-
-        val isZip = url.endsWith(".zip")
-        val archive = Files.createTempFile("java_pkg", if (isZip) ".zip" else ".tar.gz")
-
-        try {
-            log.info("Download Java: $url")
-
-            httpClient.prepareGet(url).execute { httpResponse ->
-                if (!httpResponse.status.isSuccess()) {
-                    throw IOException("Loading error: ${httpResponse.status}")
-                }
-                val channel = httpResponse.bodyAsChannel()
-                FileOutputStream(archive.toFile()).use { fileStream ->
-                    channel.copyTo(fileStream)
-                }
-            }
-
-            log.info("Unpacking to $targetDir")
-            deleteDirectoryRecursively(targetDir)
-            Files.createDirectories(targetDir)
-
-            if (isZip) {
-                unzip(archive.toFile(), targetDir)
-            } else {
-                untargz(archive.toFile(), targetDir)
-            }
-        } finally {
-            Files.deleteIfExists(archive)
+        val urls = getDownloadUrls(version)
+        if (urls.isEmpty()) {
+            throw IOException("There is no Java build for this system (${getOsName()} ${getArchName()})")
         }
+
+        // Try each mirror in order; first one that returns a usable
+        // archive wins. Fallback exists because CloudFlare in front of
+        // BellSoft 403s certain regions / IP ranges entirely (filed
+        // 2026-05-24: RF-based tester saw consistent 403 from BellSoft
+        // despite valid URL, while curl from elsewhere returned 200).
+        // Adoptium is hosted on GitHub releases which has wider regional
+        // reachability and less aggressive bot detection.
+        var lastError: Exception? = null
+        for ((index, url) in urls.withIndex()) {
+            val isZip = url.endsWith(".zip")
+            val archive = Files.createTempFile("java_pkg", if (isZip) ".zip" else ".tar.gz")
+            try {
+                log.info("Download Java attempt {}/{}: {}", index + 1, urls.size, url)
+
+                // Browser-shaped User-Agent. Default ktor UA ("Ktor
+                // client/...") is on CloudFlare's bot signature list and
+                // gets blanket-403'd from regions CloudFlare flags as
+                // bot-heavy. Sending a real-Chrome UA passes the cheap
+                // bot heuristic; sophisticated TLS-fingerprint detection
+                // would still catch us, but BellSoft / GitHub don't
+                // appear to use that tier.
+                httpClient.prepareGet(url) {
+                    header(HttpHeaders.UserAgent, DOWNLOAD_UA)
+                }.execute { httpResponse ->
+                    if (!httpResponse.status.isSuccess()) {
+                        throw IOException("Loading error: ${httpResponse.status}")
+                    }
+                    val channel = httpResponse.bodyAsChannel()
+                    FileOutputStream(archive.toFile()).use { fileStream ->
+                        channel.copyTo(fileStream)
+                    }
+                }
+
+                log.info("Unpacking to {}", targetDir)
+                deleteDirectoryRecursively(targetDir)
+                Files.createDirectories(targetDir)
+
+                if (isZip) {
+                    unzip(archive.toFile(), targetDir)
+                } else {
+                    untargz(archive.toFile(), targetDir)
+                }
+                Files.deleteIfExists(archive)
+                return
+            } catch (e: Exception) {
+                Files.deleteIfExists(archive)
+                log.warn("Download from {} failed: {}", url, e.message)
+                lastError = e
+                // Continue to next mirror.
+            }
+        }
+        throw IOException(
+            "All Java $version download mirrors failed for ${getOsName()} ${getArchName()}. " +
+                "Last error: ${lastError?.message ?: "unknown"}",
+            lastError,
+        )
     }
     internal fun getOsName(): String {
         val os = System.getProperty("os.name").lowercase()
@@ -321,7 +351,24 @@ class JavaManagerService(
         }
     }
 
-    internal fun getDownloadUrl(version: Int): String? {
+    /**
+     * Ordered list of mirrors to try for the given Java major. The
+     * downloader walks the list in order; first one that delivers a
+     * usable archive wins. Adoptium is the fallback because BellSoft
+     * (via CloudFlare) blanket-403s certain regions / IP ranges that
+     * the user's network may sit behind.
+     */
+    internal fun getDownloadUrls(version: Int): List<String> =
+        listOfNotNull(getBellSoftUrl(version), getAdoptiumUrl(version))
+
+    /**
+     * Backwards-compatible alias: existing tests + callers that want
+     * just the primary URL keep working. New code should prefer
+     * [getDownloadUrls] so fallback is exercised.
+     */
+    internal fun getDownloadUrl(version: Int): String? = getBellSoftUrl(version)
+
+    internal fun getBellSoftUrl(version: Int): String? {
         val os = getOsName()
         val arch = getArchName()
         return when (version) {
@@ -350,5 +397,70 @@ class JavaManagerService(
             }
             else -> null
         }
+    }
+
+    /**
+     * Adoptium / Temurin GitHub-release URL for the given Java major.
+     * Pinned to a known LTS-line build per major; bump these by hand
+     * when a newer build is needed. GitHub releases are statically
+     * served, no CloudFlare bot manager in front -- works from
+     * regions where BellSoft's CDN returns 403.
+     *
+     * The `+` in the Temurin tag name is %2B-encoded so the URL stays
+     * valid through every HTTP-client URL-parser variant. The filename
+     * uses the underscored form (`21.0.5_11`) which is Adoptium's own
+     * convention.
+     */
+    internal fun getAdoptiumUrl(version: Int): String? {
+        val os = getOsName()
+        val arch = getArchName()
+        return when (version) {
+            8 -> when (os) {
+                "win"   if arch == "x64"   -> adoptium(8, "8u442-b06", "8u442b06", "x64",     "windows", "zip")
+                "linux" if arch == "x64"   -> adoptium(8, "8u442-b06", "8u442b06", "x64",     "linux",   "tar.gz")
+                "mac"   if arch == "x64"   -> adoptium(8, "8u442-b06", "8u442b06", "x64",     "mac",     "tar.gz")
+                "mac"   if arch == "arm64" -> adoptium(8, "8u442-b06", "8u442b06", "aarch64", "mac",     "tar.gz")
+                else -> null
+            }
+            17 -> when (os) {
+                "win"   if arch == "x64"   -> adoptium(17, "17.0.13+11", "17.0.13_11", "x64",     "windows", "zip")
+                "linux" if arch == "x64"   -> adoptium(17, "17.0.13+11", "17.0.13_11", "x64",     "linux",   "tar.gz")
+                "mac"   if arch == "x64"   -> adoptium(17, "17.0.13+11", "17.0.13_11", "x64",     "mac",     "tar.gz")
+                "mac"   if arch == "arm64" -> adoptium(17, "17.0.13+11", "17.0.13_11", "aarch64", "mac",     "tar.gz")
+                else -> null
+            }
+            21 -> when (os) {
+                "win"   if arch == "x64"   -> adoptium(21, "21.0.5+11", "21.0.5_11", "x64",     "windows", "zip")
+                "linux" if arch == "x64"   -> adoptium(21, "21.0.5+11", "21.0.5_11", "x64",     "linux",   "tar.gz")
+                "mac"   if arch == "x64"   -> adoptium(21, "21.0.5+11", "21.0.5_11", "x64",     "mac",     "tar.gz")
+                "mac"   if arch == "arm64" -> adoptium(21, "21.0.5+11", "21.0.5_11", "aarch64", "mac",     "tar.gz")
+                else -> null
+            }
+            else -> null
+        }
+    }
+
+    private fun adoptium(
+        major: Int,
+        tag: String,
+        fileVersion: String,
+        arch: String,
+        os: String,
+        ext: String,
+    ): String {
+        val tagEncoded = tag.replace("+", "%2B")
+        // Java 8 release tag prefix is `jdk` (no dash before the version),
+        // 9+ uses `jdk-`. Mirrors Adoptium's own release naming.
+        val tagPrefix = if (major == 8) "jdk" else "jdk-"
+        return "https://github.com/adoptium/temurin${major}-binaries/releases/download/" +
+            "$tagPrefix$tagEncoded/OpenJDK${major}U-jdk_${arch}_${os}_hotspot_$fileVersion.$ext"
+    }
+
+    companion object {
+        // Real-Chrome User-Agent. See downloadAndUnpack for why this is
+        // not the launcher's default identifier.
+        internal const val DOWNLOAD_UA =
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+                "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
 }
