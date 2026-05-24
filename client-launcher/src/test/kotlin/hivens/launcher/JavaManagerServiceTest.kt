@@ -478,11 +478,21 @@ class JavaManagerServiceTest {
     // ── getJavaPath: orchestrator (find -> download -> find -> +x) ────────
 
     @Test
+    @EnabledOnOs(OS.LINUX, OS.MAC)
     fun `getJavaPath returns existing executable without triggering download`() {
         // Pre-place a valid-looking java binary in the version-specific
         // runtime dir. The dead-HttpClient provider catches a regression
         // where the early-return gate fails and the orchestrator falls
         // through to downloadAndUnpack.
+        //
+        // Linux/Mac only: even though the test simulates Linux via
+        // os.name/os.arch overrides, the underlying file system probe
+        // (Files.isExecutable on the pre-placed `bin/java` binary)
+        // runs on the real OS. On Windows NTFS, isExecutable returns
+        // false for extensionless files regardless of setExecutable(true),
+        // so the orchestrator decides "binary not present" and falls
+        // through to download -- hits the dead HttpClient and throws.
+        // Same rationale as the tar.gz unpack test below.
         val runtimesRoot = workDir
         withSystemProp("os.name", "Linux") {
             withSystemProp("os.arch", "amd64") {
