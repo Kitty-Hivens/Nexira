@@ -59,6 +59,16 @@ DefaultDirName={localappdata}\Nexira\Programs
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 
+; UsePreviousAppDir defaults to yes, which makes Inno reuse the path of a
+; prior install with the same AppId regardless of DefaultDirName. That's
+; the wrong behaviour for THIS upgrade: existing users sit on the broken
+; %AppData%\Nexira location (the whole reason for this migration), so
+; honoring their old path would leave them stuck. Force the upgrader to
+; land at DefaultDirName for everyone. The InitializeSetup hook below
+; runs the old uninstaller silently so we don't leave a phantom install
+; behind in registry / Start Menu.
+UsePreviousAppDir=no
+
 ; ── Output ──────────────────────────────────────────────────────────────────
 OutputDir=.
 OutputBaseFilename=Nexira-Setup
@@ -136,7 +146,84 @@ Filename: "{app}\{#MyAppExeName}"; \
 Type: dirifempty; Name: "{app}"
 
 [Code]
-// Show a friendly message when upgrading from an older install
+// Detect a prior install (regardless of where it lives -- Roaming AppData
+// from pre-{#AppVersion} builds, or LocalAppData\Nexira\Programs from a
+// previous run of this installer) and run its silent uninstaller before
+// we lay down the new files.
+//
+// Necessary because UsePreviousAppDir=no above tells Inno to ignore the
+// prior install's registered directory, which means the OLD uninstall
+// entry would otherwise stay in Add/Remove Programs forever, pointing at
+// an install we just orphaned. Running the prior uninstaller here cleans
+// it up before we write our own.
+//
+// `Exec` waits for the uninstaller to terminate (`ewWaitUntilTerminated`)
+// so the new install does not race the old one's file deletes. Failure
+// is non-fatal: we log and proceed -- a stranded uninstall entry is bad
+// UX but not worse than refusing to install.
+function GetPriorUninstallerCmd(): String;
+var
+  s: String;
+begin
+  Result := '';
+  if RegQueryStringValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{{#MyAppId}}_is1', 'QuietUninstallString', s) then
+    Result := s
+  else if RegQueryStringValue(HKLM, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{{#MyAppId}}_is1', 'QuietUninstallString', s) then
+    Result := s;
+end;
+
+function InitializeSetup(): Boolean;
+var
+  cmd: String;
+  exe: String;
+  args: String;
+  spacePos: Integer;
+  exitCode: Integer;
+begin
+  Result := True;
+  cmd := GetPriorUninstallerCmd();
+  if cmd = '' then Exit;
+
+  Log('Prior install found, running silent uninstaller: ' + cmd);
+
+  // QuietUninstallString is `"<exe>" /VERYSILENT` (Inno's own format).
+  // Split on the first space after the quoted path so we can pass args
+  // to Exec separately (Exec wants exe + params, not a single command line).
+  if (Length(cmd) > 0) and (cmd[1] = '"') then begin
+    spacePos := Pos('" ', cmd);
+    if spacePos > 0 then begin
+      exe  := Copy(cmd, 2, spacePos - 2);
+      args := Copy(cmd, spacePos + 2, Length(cmd) - spacePos - 1);
+    end else begin
+      exe  := Copy(cmd, 2, Length(cmd) - 2);
+      args := '';
+    end;
+  end else begin
+    spacePos := Pos(' ', cmd);
+    if spacePos > 0 then begin
+      exe  := Copy(cmd, 1, spacePos - 1);
+      args := Copy(cmd, spacePos + 1, Length(cmd) - spacePos);
+    end else begin
+      exe  := cmd;
+      args := '';
+    end;
+  end;
+
+  // /NORESTART is added unconditionally even if QuietUninstallString
+  // already implies it -- defends against future Inno versions that
+  // shape the command differently.
+  if Pos('/NORESTART', UpperCase(args)) = 0 then begin
+    if args <> '' then args := args + ' ';
+    args := args + '/NORESTART';
+  end;
+
+  if not Exec(exe, args, '', SW_HIDE, ewWaitUntilTerminated, exitCode) then begin
+    Log('Prior uninstaller failed to launch; continuing anyway.');
+  end else if exitCode <> 0 then begin
+    Log('Prior uninstaller exited with code ' + IntToStr(exitCode) + '; continuing.');
+  end;
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
   if CurStep = ssInstall then begin
