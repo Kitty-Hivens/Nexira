@@ -15,6 +15,14 @@ data class ServerProfile(
     val optionalModsData: Map<String, JsonElement>? = null,
     val neoForgeArgs: Map<String, String>? = null,
     val ignoreModulesList: String? = null,
+    /**
+     * Default is [ServerSource.Smartycraft] because every persisted
+     * ServerProfile from before this field existed originated from
+     * the SC dashboard. Cached profiles deserialise into Smartycraft
+     * automatically; new profiles produced by the mirror impl set
+     * the field explicitly.
+     */
+    val source: ServerSource = ServerSource.Smartycraft,
 ) {
     override fun toString(): String = title ?: name
 }
