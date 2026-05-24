@@ -410,7 +410,7 @@ val appModule = module {
         AuthService(get<IServerProtocol>(named("insecure")))
     }
 
-    single<IServerListService> { ServerListService(get(), get()) }
+    single<IServerListService> { SmartyCraftServerListService(get(), get()) }
 
     single {
         val dataDir: Path = get()
