@@ -1,0 +1,261 @@
+package hivens.ui.screens.library
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import hivens.core.data.PackInstance
+import hivens.core.data.PackLoader
+import hivens.core.data.PackOrigin
+import hivens.ui.theme.CelestiaTheme
+import java.time.Duration
+import java.time.Instant
+
+/**
+ * One Library row. Banner-as-background (placeholder gradient until
+ * AsyncImage plumbing lands -- bannerUrl will be honored when the
+ * catalogue service starts populating it from manifests), avatar +
+ * title + metadata chips overlaid on top, quick actions on the
+ * right. Whole card click-routes to [PackDetailScreen]; the explicit
+ * Play / Settings / Overflow buttons short-circuit common actions
+ * without the detail hop.
+ *
+ * Source-badge is the small chip next to the title; it differentiates
+ * cards from the four [PackOrigin] values at a glance per
+ * [[project_home_library_ia]]'s unified-entity-with-source-badge
+ * rule.
+ *
+ * Sizes are deliberately defaulted, not pinned to a design spec --
+ * Atelier visual rework will revisit; this is the working baseline.
+ */
+@Composable
+fun PackCard(
+    instance: PackInstance,
+    onOpenDetail: () -> Unit,
+    onPlay: () -> Unit,
+    onSettings: () -> Unit,
+    onMore: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val bg = originGradient(instance.packRef.origin)
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(132.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(bg)
+            .clickable(onClick = onOpenDetail),
+    ) {
+        // Dim overlay so any future banner image stays legible behind
+        // the title / chips. With the placeholder gradient the dim is
+        // visually redundant but keeps the layering consistent when
+        // bannerUrl support lands.
+        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.35f)))
+
+        Row(
+            modifier              = Modifier.fillMaxSize().padding(14.dp),
+            verticalAlignment     = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            PackAvatar(instance)
+
+            Column(
+                modifier              = Modifier.weight(1f),
+                verticalArrangement   = Arrangement.spacedBy(6.dp),
+            ) {
+                Row(
+                    verticalAlignment     = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        text       = instance.displayName,
+                        style      = MaterialTheme.typography.titleMedium,
+                        color      = Color.White,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines   = 1,
+                        overflow   = TextOverflow.Ellipsis,
+                        modifier   = Modifier.weight(1f, fill = false),
+                    )
+                    SourceBadge(instance.packRef.origin)
+                }
+
+                Row(
+                    verticalAlignment     = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    MetaChip(instance.packRef.version ?: "—")
+                    instance.forkedFrom?.let {
+                        MetaChip("fork", emphasis = true)
+                    }
+                    LastPlayedChip(instance.lastPlayedEpochOrZero)
+                }
+            }
+
+            Row(
+                verticalAlignment     = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Button(
+                    onClick        = onPlay,
+                    shape          = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                    colors         = ButtonDefaults.buttonColors(
+                        containerColor = CelestiaTheme.colors.primary,
+                        contentColor   = Color.White,
+                    ),
+                ) {
+                    Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Играть", fontWeight = FontWeight.SemiBold)
+                }
+                IconButton(onClick = onSettings) {
+                    Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color.White)
+                }
+                IconButton(onClick = onMore) {
+                    Icon(Icons.Default.MoreVert, contentDescription = "More", tint = Color.White)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PackAvatar(instance: PackInstance) {
+    val initials = instance.displayName
+        .split(' ', '-', '_')
+        .filter { it.isNotBlank() }
+        .take(2)
+        .joinToString("") { it.first().uppercaseChar().toString() }
+        .ifEmpty { "?" }
+    Box(
+        modifier         = Modifier
+            .size(64.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(originAvatarColor(instance.packRef.origin)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text       = initials,
+            color      = Color.White,
+            style      = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+        )
+    }
+}
+
+@Composable
+private fun SourceBadge(origin: PackOrigin) {
+    val (label, color) = when (origin) {
+        PackOrigin.Smartycraft -> "SC"       to Color(0xFF8B5CF6)
+        PackOrigin.Mirror      -> "Mirror"   to Color(0xFF3B82F6)
+        PackOrigin.Modrinth    -> "Modrinth" to Color(0xFF22C55E)
+        PackOrigin.Local       -> "Local"    to Color(0xFF9CA3AF)
+    }
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(color.copy(alpha = 0.85f))
+            .padding(horizontal = 8.dp, vertical = 2.dp),
+    ) {
+        Text(label, style = MaterialTheme.typography.labelSmall, color = Color.White, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+private fun MetaChip(text: String, emphasis: Boolean = false) {
+    AssistChip(
+        onClick   = {},
+        enabled   = false,
+        shape     = RoundedCornerShape(8.dp),
+        label     = { Text(text, style = MaterialTheme.typography.labelSmall, color = Color.White) },
+        colors    = AssistChipDefaults.assistChipColors(
+            disabledContainerColor = if (emphasis) CelestiaTheme.colors.primary.copy(alpha = 0.85f)
+                                     else          Color.Black.copy(alpha = 0.35f),
+            disabledLabelColor     = Color.White,
+        ),
+        border    = null,
+    )
+}
+
+@Composable
+private fun LastPlayedChip(lastPlayedEpoch: Long) {
+    if (lastPlayedEpoch <= 0L) {
+        MetaChip("Не запускался")
+        return
+    }
+    val now = Instant.now()
+    val then = Instant.ofEpochSecond(lastPlayedEpoch)
+    val dur = Duration.between(then, now)
+    val label = when {
+        dur.toMinutes() < 1   -> "только что"
+        dur.toHours()   < 1   -> "${dur.toMinutes()} мин назад"
+        dur.toDays()    < 1   -> "${dur.toHours()} ч назад"
+        dur.toDays()    < 14  -> "${dur.toDays()} дн назад"
+        else                  -> "давно"
+    }
+    MetaChip(label)
+}
+
+private fun originGradient(origin: PackOrigin): Brush {
+    val pair = when (origin) {
+        PackOrigin.Smartycraft -> Color(0xFF4C1D95) to Color(0xFF6D28D9)
+        PackOrigin.Mirror      -> Color(0xFF1E3A8A) to Color(0xFF1D4ED8)
+        PackOrigin.Modrinth    -> Color(0xFF14532D) to Color(0xFF15803D)
+        PackOrigin.Local       -> Color(0xFF374151) to Color(0xFF4B5563)
+    }
+    return Brush.linearGradient(listOf(pair.first, pair.second))
+}
+
+private fun originAvatarColor(origin: PackOrigin): Color = when (origin) {
+    PackOrigin.Smartycraft -> Color(0xFF7C3AED)
+    PackOrigin.Mirror      -> Color(0xFF2563EB)
+    PackOrigin.Modrinth    -> Color(0xFF16A34A)
+    PackOrigin.Local       -> Color(0xFF6B7280)
+}
+
+/**
+ * Workaround helper for the `requiredJava` chip on the detail screen
+ * (PackDetailScreen reuses [MetaChip] via this re-exported alias so
+ * it doesn't have to duplicate the chip styling).
+ */
+@Composable
+internal fun PackMetaChip(text: String, emphasis: Boolean = false) {
+    MetaChip(text, emphasis = emphasis)
+}
+
+@Composable
+internal fun PackLoaderChip(loader: PackLoader) {
+    MetaChip(loader.name)
+}
