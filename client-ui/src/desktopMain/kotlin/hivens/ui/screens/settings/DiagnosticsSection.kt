@@ -1,8 +1,11 @@
 package hivens.ui.screens.settings
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
@@ -33,6 +36,7 @@ import hivens.ui.theme.LocalStyle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.yield
 import java.awt.Toolkit
 import java.awt.datatransfer.StringSelection
 import java.nio.file.Path
@@ -55,6 +59,7 @@ import java.nio.file.Path
  * label and license tag. Kept in the same section because they share
  * the "meta about the launcher" register.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun DiagnosticsSection(
     paths: PlatformPaths,
@@ -67,6 +72,14 @@ internal fun DiagnosticsSection(
     // ── April Fools debug panel -- secret unlock ────────────────────
     var debugTapCount  by remember { mutableStateOf(0) }
     var showAprilDebug by remember { mutableStateOf(false) }
+    // Brings the panel into the ancestor vertical-scroll viewport when
+    // it appears. Without this the panel renders below the visible
+    // area (Diagnostics also hosts Open-logs / Crash-reports / Bundle
+    // / About below the title, plenty of content to push the panel
+    // off-screen) and the user only sees the rest of the list shift a
+    // couple of pixels -- looks like a click that "did nothing but
+    // twitch" instead of an unlock.
+    val debugPanelBringIntoView = remember { BringIntoViewRequester() }
 
     // Tap the diagnostics title 5 times to toggle the April Fools debug panel
     Box(
@@ -81,10 +94,22 @@ internal fun DiagnosticsSection(
         SettingsSectionTitle(s.settingsSectionDiagnostics)
     }
 
+    LaunchedEffect(showAprilDebug) {
+        if (showAprilDebug) {
+            // Wait one frame so the panel has been laid out before the
+            // scroll request is sent. bringIntoView() against a not-
+            // yet-positioned target is a no-op.
+            yield()
+            runCatching { debugPanelBringIntoView.bringIntoView() }
+        }
+    }
+
     // April Fools debug panel (hidden by default)
     if (showAprilDebug) {
         Spacer(Modifier.height(2.dp))
-        af.DebugPanel()
+        Box(Modifier.bringIntoViewRequester(debugPanelBringIntoView)) {
+            af.DebugPanel()
+        }
         Spacer(Modifier.height(2.dp))
     }
 
