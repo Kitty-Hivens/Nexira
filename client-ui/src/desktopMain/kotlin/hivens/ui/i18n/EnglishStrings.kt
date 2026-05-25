@@ -547,4 +547,14 @@ object EnglishStrings : AppStrings {
     override val browseDetailAssetsTitle   = "Assets"
     override val browseDetailAssetsCount   = "%d asset(s) (configs, resource packs, etc.)"
     override val browseDetailTagsTitle     = "Tags"
+
+    override val browseDetailModsSearch         = "Search mods..."
+    override val browseDetailModsFilteredCount  = "Showing %d of %d"
+    override val browseDetailModsEmptyFilter    = "No mods match this filter."
+    override val browseDetailModsOptional       = "Optional"
+    override val browseDetailModsIncompatible   = "Conflicts with: %s"
+    override val browseDetailSourceModrinth     = "Modrinth"
+    override val browseDetailSourceMirrorCache  = "Mirror cache"
+    override val browseDetailSourceMirrorStatic = "Mirror static"
+    override val browseDetailAssetsEmpty        = "No assets in this manifest."
 }

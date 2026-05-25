@@ -548,4 +548,14 @@ object RussianStrings : AppStrings {
     override val browseDetailAssetsTitle   = "Ассеты"
     override val browseDetailAssetsCount   = "Ассетов: %d (конфиги, ресурспаки и т.д.)"
     override val browseDetailTagsTitle     = "Теги"
+
+    override val browseDetailModsSearch         = "Поиск модов..."
+    override val browseDetailModsFilteredCount  = "Показано %d из %d"
+    override val browseDetailModsEmptyFilter    = "Под фильтр ничего не подходит."
+    override val browseDetailModsOptional       = "Опциональный"
+    override val browseDetailModsIncompatible   = "Конфликт с: %s"
+    override val browseDetailSourceModrinth     = "Modrinth"
+    override val browseDetailSourceMirrorCache  = "Кеш зеркала"
+    override val browseDetailSourceMirrorStatic = "Статика зеркала"
+    override val browseDetailAssetsEmpty        = "В manifest нет ассетов."
 }

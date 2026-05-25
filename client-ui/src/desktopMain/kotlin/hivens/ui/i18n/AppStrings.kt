@@ -584,4 +584,15 @@ interface AppStrings {
     val browseDetailAssetsTitle: String
     val browseDetailAssetsCount: String
     val browseDetailTagsTitle: String
+
+    // --- Browse pack detail: mods + assets browser ---
+    val browseDetailModsSearch: String
+    val browseDetailModsFilteredCount: String
+    val browseDetailModsEmptyFilter: String
+    val browseDetailModsOptional: String
+    val browseDetailModsIncompatible: String
+    val browseDetailSourceModrinth: String
+    val browseDetailSourceMirrorCache: String
+    val browseDetailSourceMirrorStatic: String
+    val browseDetailAssetsEmpty: String
 }
