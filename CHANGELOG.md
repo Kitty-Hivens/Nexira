@@ -12,6 +12,93 @@ below are for the GitHub release page and CHANGELOG readers.
 
 ## [Unreleased]
 
+## [2.3.3] - 2026-05-25
+
+Visual customization release. Custom background gains real
+animated-format support (GIF / APNG / animated WebP) with
+playback controls. A new experimental Customization screen
+exposes density, glass intensity, accent override, and a full
+per-role color override matrix on top of the active theme.
+
+### Highlights
+- **Animated wallpapers**. Pick a GIF, APNG, or animated WebP as
+  your custom background and it actually animates. Frame 0 shows
+  immediately on cold load instead of grey while the remaining
+  frames decode. New Animation speed slider (0.25 - 4x, live
+  during playback) and Loop mode picker (Use codec / Loop forever
+  / Play once -- the last one freezes on the last frame for
+  intro-and-settle patterns).
+- **Customization (experimental)**. New Settings entry exposes
+  density scale (0.85 - 1.15x, all `.dp` values), glass density
+  (0 - 100%, every glass surface in the launcher), accent color
+  override (free hex), and a full 7-role color override matrix
+  behind an experimental toggle.
+- **Glass density reaches every glass surface**. Sidebar, right
+  panel, dividers, every card and tile across every screen
+  respect the slider, not just the few screens it was first
+  wired into.
+- **GlassCard finally honours palette.glassAlpha**. The Glass
+  branch had been hardcoding `alpha = 0.7f` and ignoring the
+  palette's own field (0.60 dark, 0.65 light). Now reads the
+  palette correctly.
+
+### Added
+- Multi-frame background decoder via Skiko `Codec`. Reads
+  `frameCount`, `framesInfo[i].duration`, `repetitionCount`.
+  Safety cap at 240 frames or ~240 MB raw RGBA -- oversize
+  formats fall back to static frame 0 with a logged warning.
+- `BackgroundSettings.animationSpeedMultiplier` (0.25 - 4x).
+  Slider on BackgroundSettings screen; changes apply mid-playback
+  via `rememberUpdatedState`.
+- `BackgroundSettings.loopMode` (`UseCodec` / `LoopForever` /
+  `PlayOnce`) with segmented control on the same screen.
+- GIF and APNG added to the background file picker extension
+  filter.
+- New `CustomizationExtensionScreen` under Settings ->
+  Customization (exp.). Persists separately in
+  `customization.json`.
+- `CustomizationSettings` data class: `densityScale`,
+  `glassIntensity`, `accentOverride`, `colorOverrides` (per-role
+  map), `experimentalColorOverridesEnabled` (gates the 7-role
+  matrix UI).
+- Density scale wired through `LocalDensity` at the app root so
+  every `.dp` scales live. The Customization screen counter-wraps
+  to base density so the slider stays grabbable while the outer
+  UI live-scales as the user drags.
+- `glassSurfaceAlpha(baseAlpha)` and `scaledAlpha(color, baseAlpha)`
+  helpers in `hivens.ui.customization`. Centralized surface-alpha
+  math; migrated 25+ call sites across the codebase.
+
+### Changed
+- GlassCard `CardSurface.Glass` reads `palette.glassAlpha *
+  customization.glassIntensity` instead of the previously
+  hardcoded 0.7. Fixes a long-standing palette-field-ignored bug.
+- GlassCard `CardSurface.Flat` (Brut) lerps between
+  `palette.glassBackground` and `colorScheme.surface` driven by
+  intensity. At intensity = 1.0 the surface stays solid grey
+  (Brut identity); lower intensity blends toward translucent
+  black so the slider is visually obvious even under the
+  "opaque" style.
+- AppLayout sidebar, right panel, dividers, plus 22 other
+  previously hardcoded `surface.copy(alpha = X)` sites all
+  routed through `glassSurfaceAlpha`. Default at intensity = 1.0
+  matches the prior hardcoded values byte-for-byte.
+- ThemePicker theme cards + preview panel use
+  `scaledAlpha(theme.background, 0.8f)` so the theme's own
+  background colour scales by glass intensity.
+
+### Fixed
+- GlassCard ignored `CelestiaColors.glassAlpha` entirely (used
+  hardcoded 0.7f). The two palette presets had the field defined
+  but no caller respected it.
+- Density slider lost pointer mid-drag. Updating density
+  re-measured the slider host on every drag tick; the gesture
+  detector lost the pointer. The Customization screen now
+  counter-wraps to base density.
+- Animated wallpaper cold load showed grey for several seconds
+  while all frames decoded. Frame 0 now emits as a preview as
+  soon as it lands; the remaining frames decode behind it.
+
 ## [2.3.2] - 2026-05-24
 
 Same-day patch on 2.3.1. Three user-facing bugs surfaced within
