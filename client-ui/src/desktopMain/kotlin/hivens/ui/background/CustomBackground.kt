@@ -187,7 +187,9 @@ private fun rememberSkiaImage(
 
     LaunchedEffect(file) {
         if (!file.exists()) return@LaunchedEffect
-        withContext(Dispatchers.IO) { decoded = decodeBackground(file) }
+        withContext(Dispatchers.IO) {
+            decoded = decodeBackground(file) { preview -> decoded = preview }
+        }
     }
 
     val d = decoded ?: return null
@@ -226,48 +228,57 @@ private fun rememberSkiaImage(
     return d.frames[frameIdx.coerceIn(0, d.frames.lastIndex)]
 }
 
-private fun decodeBackground(file: File): DecodedBg? {
+private fun decodeBackground(file: File, onPreview: (DecodedBg) -> Unit = {}): DecodedBg? {
     var data:  Data?  = null
     var codec: Codec? = null
-    return try {
+    try {
         data  = Data.makeFromFileName(file.absolutePath)
         codec = Codec.makeFromData(data)
         val frameCount = codec.frameCount
         val info       = codec.imageInfo
 
-        if (frameCount <= 1) {
-            DecodedBg(
-                frames          = listOf(decodeFrame(codec, info, frame = 0, trackTag = "BG.static")),
-                durationsMs     = listOf(0),
-                repetitionCount = 0,
+        // Frame 0 first -- becomes the final result for statics and
+        // the preview emit for multi-frame formats so the user sees
+        // the image immediately instead of grey while the remaining
+        // N-1 frames decode.
+        val frame0 = decodeFrame(
+            codec, info,
+            frame    = 0,
+            trackTag = if (frameCount > 1) "BG.animated" else "BG.static",
+        )
+        val preview = DecodedBg(
+            frames          = listOf(frame0),
+            durationsMs     = listOf(0),
+            repetitionCount = 0,
+        )
+
+        if (frameCount <= 1) return preview
+
+        val pixelsTotal = info.width.toLong() * info.height.toLong() * frameCount.toLong()
+        if (frameCount > MAX_ANIMATED_FRAMES || pixelsTotal > MAX_ANIMATED_PIXELS_TOTAL) {
+            log.warn(
+                "Animated bg too large (frames={}, ~{}MB raw) -- using frame 0 only",
+                frameCount, pixelsTotal * 4 / 1_048_576,
             )
-        } else {
-            val pixelsTotal = info.width.toLong() * info.height.toLong() * frameCount.toLong()
-            if (frameCount > MAX_ANIMATED_FRAMES || pixelsTotal > MAX_ANIMATED_PIXELS_TOTAL) {
-                log.warn(
-                    "Animated bg too large (frames={}, ~{}MB raw) -- using frame 0 only",
-                    frameCount, pixelsTotal * 4 / 1_048_576,
-                )
-                DecodedBg(
-                    frames          = listOf(decodeFrame(codec, info, frame = 0, trackTag = "BG.static")),
-                    durationsMs     = listOf(0),
-                    repetitionCount = 0,
-                )
-            } else {
-                val frames    = ArrayList<ImageBitmap>(frameCount)
-                val durations = ArrayList<Int>(frameCount)
-                val infos     = codec.framesInfo
-                for (i in 0 until frameCount) {
-                    frames.add(decodeFrame(codec, info, frame = i, trackTag = "BG.animated"))
-                    // delay() of 0 spins -- guarantee positive duration per frame.
-                    durations.add(infos[i].duration.coerceAtLeast(1))
-                }
-                DecodedBg(frames, durations, codec.repetitionCount)
-            }
+            return preview
         }
+
+        // Emit the preview so the user sees frame 0 while frames
+        // 1..N-1 decode below.
+        onPreview(preview)
+
+        val frames    = ArrayList<ImageBitmap>(frameCount).also { it.add(frame0) }
+        val durations = ArrayList<Int>(frameCount).also { it.add(codec.framesInfo[0].duration.coerceAtLeast(1)) }
+        val infos     = codec.framesInfo
+        for (i in 1 until frameCount) {
+            frames.add(decodeFrame(codec, info, frame = i, trackTag = "BG.animated"))
+            // delay() of 0 spins -- guarantee positive duration per frame.
+            durations.add(infos[i].duration.coerceAtLeast(1))
+        }
+        return DecodedBg(frames, durations, codec.repetitionCount)
     } catch (e: Exception) {
         log.error("Failed to decode custom background at {}", file.absolutePath, e)
-        null
+        return null
     } finally {
         codec?.close()
         data?.close()
