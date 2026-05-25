@@ -10,7 +10,7 @@ object GermanStrings : AppStrings {
     override val loginUsername     = "Benutzername"
     override val loginPassword     = "Passwort"
     override val loginRemember     = "Passwort speichern"
-    override val loginButton       = "ANMELDEN"
+    override val loginButton       = "Anmelden"
     override val loginErrorEmpty   = "Benutzername und Passwort eingeben"
     override val loginErrorGeneric = "Anmeldefehler"
     override val loginRegister     = "Konto erstellen"
@@ -28,8 +28,8 @@ object GermanStrings : AppStrings {
 
     // Launch Control
     override val launchReady       = "Bereit zum Spielen"
-    override val launchButton      = "SPIELEN"
-    override val launchAbort       = "ABBRECHEN"
+    override val launchButton      = "Spielen"
+    override val launchAbort       = "Abbrechen"
     override val launchRunning     = "Spiel läuft"
     override val launchResetError  = "FEHLER ZURÜCKSETZEN"
     override val launchDownloading = "Herunterladen:"
@@ -47,7 +47,7 @@ object GermanStrings : AppStrings {
     override fun authSuccess(uuid: String) = "Anmeldung erfolgreich. UUID: $uuid"
 
     // Profile
-    override val profileTitle              = "PROFIL"
+    override val profileTitle              = "Profil"
     override val profileStatusLabel        = "Status"
     override val profileStatusOnline       = "Angemeldet"
     override val profileStatusOffline      = "Offline"
@@ -63,7 +63,7 @@ object GermanStrings : AppStrings {
     override fun profileUploadError(msg: String) = "Upload-Fehler: $msg"
 
     // Settings
-    override val settingsTitle              = "GLOBALE EINSTELLUNGEN"
+    override val settingsTitle              = "Globale Einstellungen"
     override val settingsSectionUI          = "Oberfläche"
     override val settingsSectionBehavior    = "Verhalten"
     override val settingsThemePicker        = "Design auswählen"
@@ -75,8 +75,8 @@ object GermanStrings : AppStrings {
 
     // Theme Picker
     override val themePickerTitle           = "DESIGN WÄHLEN"
-    override val themePickerApply           = "ANWENDEN"
-    override val themePickerPreview         = "VORSCHAU"
+    override val themePickerApply           = "Anwenden"
+    override val themePickerPreview         = "Vorschau"
     override val themePickerSelected        = "Ausgewählt"
     override val themePickerColorPrimary    = "Primär"
     override val themePickerColorSecondary  = "Sekundär"
@@ -89,7 +89,7 @@ object GermanStrings : AppStrings {
     override val themePickerBtnOutlined     = "Umrandete Schaltfläche"
 
     // News
-    override val newsTitle   = "PROJEKTNEUIGKEITEN"
+    override val newsTitle   = "Projektneuigkeiten"
     override val newsEmpty   = "Noch keine Neuigkeiten..."
 
     // Server Detail
@@ -101,8 +101,8 @@ object GermanStrings : AppStrings {
 
     // Server Settings
     override val serverSettingsSubtitle        = "Starteinstellungen"
-    override val serverSettingsSectionSystem   = "SYSTEM"
-    override val serverSettingsSectionMods     = "MODIFIKATIONEN"
+    override val serverSettingsSectionSystem   = "System"
+    override val serverSettingsSectionMods     = "Modifikationen"
     override val serverSettingsRam             = "RAM"
     override fun serverSettingsRamValue(mb: Int) = "RAM: $mb MB"
     override val serverSettingsJava            = "Java-Version"
@@ -115,7 +115,7 @@ object GermanStrings : AppStrings {
 
     // Update
     override val updateTitle           = "Update verfügbar"
-    override val updateTitleCritical   = "KRITISCHES UPDATE"
+    override val updateTitleCritical   = "Kritisches Update"
     override val updateTitleMandatory  = "PFLICHT-UPDATE"
     override val updateCriticalBanner  = "Dieses Update enthält kritische Sicherheitskorrekturen."
     override val updateMandatoryBanner =
@@ -128,7 +128,7 @@ object GermanStrings : AppStrings {
     override val updateLater           = "Später"
     override val updateExit            = "Beenden"
     override val updateDownload        = "Herunterladen und installieren"
-    override val updateDownloadNow     = "JETZT HERUNTERLADEN"
+    override val updateDownloadNow     = "Jetzt herunterladen"
     override val updateDownloading     = "Herunterladen..."
     override val updateInstall         = "Installieren und neustarten"
     override val updateRetry           = "Erneut versuchen"
@@ -207,22 +207,22 @@ object GermanStrings : AppStrings {
     // =========================================================================
     // Custom Background
     // =========================================================================
-    override val backgroundTitle          = "BENUTZERDEFINIERTER HINTERGRUND"
+    override val backgroundTitle          = "Benutzerdefinierter Hintergrund"
     override val backgroundSubtitle       = "Launcher-Hintergrund anpassen"
     override val backgroundEnable         = "Aktivieren"
-    override val backgroundSectionImage   = "BILD"
+    override val backgroundSectionImage   = "Bild"
     override val backgroundPickFile       = "Hintergrundbild auswählen"
     override val backgroundPickButton     = "Datei auswählen"
-    override val backgroundSectionScale   = "SKALIERUNG"
+    override val backgroundSectionScale   = "Skalierung"
     override val backgroundScaleCover     = "Füllen"
     override val backgroundScaleContain   = "Einpassen"
     override val backgroundScaleStretch   = "Strecken"
     override val backgroundScaleOriginal  = "Original"
     override val backgroundScaleTile      = "Kacheln"
-    override val backgroundSectionPosition = "POSITION"
+    override val backgroundSectionPosition = "Position"
     override val backgroundAlignX         = "Horizontal"
     override val backgroundAlignY         = "Vertikal"
-    override val backgroundSectionEffects = "EFFEKTE"
+    override val backgroundSectionEffects = "Effekte"
     override val backgroundBlur           = "Unschärfe"
     override val backgroundDarken         = "Abdunkeln"
     override val backgroundOpacity        = "Deckkraft"
@@ -239,7 +239,7 @@ object GermanStrings : AppStrings {
     override val backgroundTintSteel      = "Stahl"
     override val backgroundTintIntensity  = "Intensität"
     override val backgroundReset          = "Auf Standardwerte zurücksetzen"
-    override val backgroundPreview        = "VORSCHAU"
+    override val backgroundPreview        = "Vorschau"
     override val backgroundPreviewServer  = "Beispielserver"
     override val settingsBackground       = "Benutzerdefinierter Hintergrund"
     override val settingsBackgroundSub    = "Foto oder GIF als Launcher-Hintergrund"
@@ -250,11 +250,11 @@ object GermanStrings : AppStrings {
     override val aboutTitle                = "ÜBER DEN LAUNCHER"
     override fun aboutDescription(branding: String) = "Inoffizieller Launcher für $branding"
     override fun aboutBuildDate(date: String) = "Erstellt: $date"
-    override val aboutSectionCreator       = "ERSTELLER"
-    override val aboutSectionTechnologies  = "TECHNOLOGIEN"
-    override val aboutSectionLicense       = "LIZENZ"
+    override val aboutSectionCreator       = "Ersteller"
+    override val aboutSectionTechnologies  = "Technologien"
+    override val aboutSectionLicense       = "Lizenz"
     override val aboutLicenseText          = "GPLv3 — Freie und quelloffene Software"
-    override val aboutSectionUpdates       = "UPDATES"
+    override val aboutSectionUpdates       = "Updates"
     override val aboutCurrentVersion       = "Aktuelle Version"
     override val aboutCheckUpdates         = "Auf Updates prüfen"
     override val aboutChecking             = "Prüfe..."
@@ -262,9 +262,9 @@ object GermanStrings : AppStrings {
     override val aboutCheckAgain           = "Erneut prüfen"
     override fun aboutUpdateAvailable(version: String) = "Version $version verfügbar"
     override val aboutCriticalUpdate       = "Kritisches Update"
-    override val aboutSectionSystem        = "SYSTEM"
+    override val aboutSectionSystem        = "System"
     override val aboutOs                   = "Betriebssystem"
-    override val aboutSectionLinks         = "LINKS"
+    override val aboutSectionLinks         = "Links"
     override val aboutLinkGithub           = "GitHub"
     override val aboutLinkBugReport        = "Fehler melden"
     override val aboutLinkReleases         = "Veröffentlichungen"
@@ -519,7 +519,7 @@ object GermanStrings : AppStrings {
     override val customizationGlassIntensity  = "Glas-Deckkraft"
     override val customizationAccentOverride  = "Akzent überschreiben"
     override val customizationAccentClear     = "Überschreibung löschen"
-    override val customizationSectionVisual   = "VISUELL"
+    override val customizationSectionVisual   = "Visuell"
     override val customizationSectionColors   = "FARBÜBERSCHREIBUNGEN"
     override val customizationExperimentalToggle = "Alle Farben überschreiben"
     override val customizationExperimentalSub    = "7-Farb-Matrix freischalten. Kann unleserlich werden."
@@ -527,7 +527,7 @@ object GermanStrings : AppStrings {
     override val customizationHexInvalid      = "Ungültiger Hex"
     override val themePickerAccentOverride    = "Akzent überschreiben (sofort)"
 
-    override val browseTitle        = "KATALOG"
+    override val browseTitle        = "Katalog"
     override val browseSubtitle     = "Auf dem Mirror veröffentlichte Packs"
     override val browseEmptyTitle   = "Katalog ist leer"
     override val browseEmptyMessage = "Der Mirror ist erreichbar, hat aber noch keine Packs veröffentlicht. Schau später wieder vorbei."
@@ -539,7 +539,7 @@ object GermanStrings : AppStrings {
     override val browseDetailErrorMessage  = "Manifest konnte nicht geladen werden. Verbindung prüfen und erneut versuchen."
     override val browseDetailInstallReady  = "Bereit zur Installation"
     override val browseDetailInstallHint   = "Erstellt eine neue Instanz in deinem Datenverzeichnis."
-    override val browseDetailInstallButton = "INSTALLIEREN"
+    override val browseDetailInstallButton = "Installieren"
     override val browseDetailTagsTitle     = "Tags"
     override val browseDetailAboutTitle       = "Über dieses Pack"
     override val browseDetailAboutPlaceholder = "Dieses Pack enthält %d Mods und %d Assets."
@@ -555,7 +555,7 @@ object GermanStrings : AppStrings {
     override val browseDetailInstallStarting      = "Wird gestartet..."
     override val browseDetailInstallDoneTitle     = "Installiert"
     override val browseDetailInstallDoneHint      = "Zur Library hinzugefügt."
-    override val browseDetailInstallOpenLibrary   = "IN LIBRARY ÖFFNEN"
+    override val browseDetailInstallOpenLibrary   = "In Library öffnen"
     override val browseDetailInstallFailedTitle   = "Installation fehlgeschlagen"
     override val browseDetailInstallFailedGeneric = "Installation aus unbekanntem Grund fehlgeschlagen."
 
