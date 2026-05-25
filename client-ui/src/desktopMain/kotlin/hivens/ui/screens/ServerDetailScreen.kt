@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import hivens.core.api.model.ServerProfile
 import hivens.launcher.platform.PlatformPaths
 import hivens.ui.components.GlassCard
+import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.debug.SkiaTracker
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
@@ -87,7 +88,7 @@ fun ServerDetailScreen(
 
         GlassCard(
             modifier        = Modifier.weight(1f).fillMaxWidth(),
-            backgroundColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
+            backgroundColor = glassSurfaceAlpha(0.7f),
         ) {
             if (isLoading) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -139,7 +140,7 @@ fun ServerDetailScreen(
                             .fillMaxHeight()
                             .padding(16.dp)
                             .clip(RoundedCornerShape(16.dp))
-                            .background(CelestiaTheme.colors.surface.copy(alpha = 0.5f))
+                            .background(glassSurfaceAlpha(0.5f))
                             .border(
                                 1.dp,
                                 CelestiaTheme.colors.outline.copy(alpha = 0.2f),

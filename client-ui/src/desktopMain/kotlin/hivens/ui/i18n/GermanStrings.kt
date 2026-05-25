@@ -505,4 +505,25 @@ object GermanStrings : AppStrings {
 
     override val profileCategorySkin    = "Skin"
     override val profileCategoryAccount = "Konto"
+
+    override val backgroundLoopMode      = "Schleife"
+    override val backgroundLoopUseCodec  = "Aus Codec"
+    override val backgroundLoopForever   = "Endlos"
+    override val backgroundLoopOnce      = "Einmal"
+
+    override val settingsCustomizationExt    = "Anpassung (exp.)"
+    override val settingsCustomizationExtSub = "Dichte, Akzent, Glas-Deckkraft, Farbüberschreibungen"
+    override val customizationTitle           = "Anpassung"
+    override val customizationSubtitle        = "Experimentelle Feinabstimmung"
+    override val customizationDensity         = "Dichteskala"
+    override val customizationGlassIntensity  = "Glas-Deckkraft"
+    override val customizationAccentOverride  = "Akzent überschreiben"
+    override val customizationAccentClear     = "Überschreibung löschen"
+    override val customizationSectionVisual   = "VISUELL"
+    override val customizationSectionColors   = "FARBÜBERSCHREIBUNGEN"
+    override val customizationExperimentalToggle = "Alle Farben überschreiben"
+    override val customizationExperimentalSub    = "7-Farb-Matrix freischalten. Kann unleserlich werden."
+    override val customizationReset           = "Alles zurücksetzen"
+    override val customizationHexInvalid      = "Ungültiger Hex"
+    override val themePickerAccentOverride    = "Akzent überschreiben (sofort)"
 }

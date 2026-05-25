@@ -17,6 +17,7 @@ import hivens.core.data.UiStyle
 import hivens.launcher.network.NetworkState
 import hivens.launcher.platform.PlatformPaths
 import hivens.ui.components.GlassCard
+import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetScreen
@@ -47,6 +48,7 @@ fun SettingsScreen(
     uiStyle: UiStyle,
     onUiStyleChanged: (UiStyle) -> Unit,
     onOpenBackgroundSettings: () -> Unit = {},
+    onOpenCustomizationExtension: () -> Unit = {},
     onOpenAbout: () -> Unit = {}
 ) {
     PuppetScreen("Settings")
@@ -87,10 +89,11 @@ fun SettingsScreen(
 
         // Explicit backgroundColor opts the Settings frame out of
         // style.cardSurface -- stays glassy under Brut, same as the
-        // inner row panels.
+        // inner row panels. Routed through glassSurfaceAlpha so the
+        // customization knob still scales it.
         GlassCard(
             modifier        = Modifier.weight(1f).fillMaxWidth(),
-            backgroundColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
+            backgroundColor = glassSurfaceAlpha(0.7f),
         ) {
             Row(Modifier.fillMaxSize().padding(16.dp)) {
                 SettingsCategoryNav(
@@ -106,18 +109,19 @@ fun SettingsScreen(
                 ) {
                     when (selectedCategory) {
                         SettingsCategory.Appearance -> AppearanceSection(
-                            form                     = form,
-                            save                     = ::save,
-                            isDarkTheme              = isDarkTheme,
-                            onToggleTheme            = onToggleTheme,
-                            onOpenThemePicker        = onOpenThemePicker,
-                            onOpenBackgroundSettings = onOpenBackgroundSettings,
-                            currentLocale            = currentLocale,
-                            onLocaleChanged          = onLocaleChanged,
-                            homeView                 = homeView,
-                            onHomeViewChanged        = onHomeViewChanged,
-                            uiStyle                  = uiStyle,
-                            onUiStyleChanged         = onUiStyleChanged,
+                            form                         = form,
+                            save                         = ::save,
+                            isDarkTheme                  = isDarkTheme,
+                            onToggleTheme                = onToggleTheme,
+                            onOpenThemePicker            = onOpenThemePicker,
+                            onOpenBackgroundSettings     = onOpenBackgroundSettings,
+                            onOpenCustomizationExtension = onOpenCustomizationExtension,
+                            currentLocale                = currentLocale,
+                            onLocaleChanged              = onLocaleChanged,
+                            homeView                     = homeView,
+                            onHomeViewChanged            = onHomeViewChanged,
+                            uiStyle                      = uiStyle,
+                            onUiStyleChanged             = onUiStyleChanged,
                         )
                         SettingsCategory.Network -> NetworkSection(
                             form = form,

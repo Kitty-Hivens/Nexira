@@ -23,6 +23,7 @@ import coil3.request.ImageRequest
 import coil3.request.crossfade
 import hivens.core.api.interfaces.IServerListService
 import hivens.core.data.NewsItem
+import hivens.ui.customization.glassSurfaceAlpha
 import hivens.launcher.network.NetworkState
 import hivens.launcher.network.ServerProtocolConfig
 import hivens.ui.i18n.LocalStrings
@@ -93,7 +94,7 @@ fun CompactNewsFeed(
             modifier   = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
         )
 
-        HorizontalDivider(color = CelestiaTheme.colors.surface.copy(alpha = 0.6f))
+        HorizontalDivider(color = glassSurfaceAlpha(0.6f))
 
         when {
             loading -> NewsSkeleton()
@@ -124,7 +125,7 @@ fun CompactNewsFeed(
                 items(news) { item ->
                     CompactNewsItem(item = item)
                     HorizontalDivider(
-                        color    = CelestiaTheme.colors.surface.copy(alpha = 0.4f),
+                        color    = glassSurfaceAlpha(0.4f),
                         modifier = Modifier.padding(horizontal = 16.dp)
                     )
                 }
@@ -138,9 +139,9 @@ fun CompactNewsFeed(
 @Composable
 private fun NewsSkeleton() {
     val shimmerColors = listOf(
-        CelestiaTheme.colors.surface.copy(alpha = 0.6f),
-        CelestiaTheme.colors.surface.copy(alpha = 0.25f),
-        CelestiaTheme.colors.surface.copy(alpha = 0.6f),
+        glassSurfaceAlpha(0.6f),
+        glassSurfaceAlpha(0.25f),
+        glassSurfaceAlpha(0.6f),
     )
 
     val transition = rememberInfiniteTransition(label = "skeleton")
@@ -164,7 +165,7 @@ private fun NewsSkeleton() {
         repeat(4) {
             SkeletonNewsItem(brush)
             HorizontalDivider(
-                color    = CelestiaTheme.colors.surface.copy(alpha = 0.4f),
+                color    = glassSurfaceAlpha(0.4f),
                 modifier = Modifier.padding(horizontal = 16.dp)
             )
         }

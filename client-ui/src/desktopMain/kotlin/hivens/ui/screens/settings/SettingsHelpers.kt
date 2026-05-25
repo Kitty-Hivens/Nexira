@@ -28,6 +28,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.core.data.HomeView
 import hivens.core.data.UiStyle
+import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.LocalStyle
 
@@ -215,7 +216,7 @@ internal fun UiStylePicker(
 @Composable
 private fun VariantPill(label: String, selected: Boolean, onClick: () -> Unit) {
     val bg = if (selected) CelestiaTheme.colors.primary.copy(alpha = 0.18f)
-             else CelestiaTheme.colors.surface.copy(alpha = 0.4f)
+             else glassSurfaceAlpha(0.4f)
     val fg = if (selected) CelestiaTheme.colors.primary else CelestiaTheme.colors.textSecondary
     val style = LocalStyle.current
     Row(
