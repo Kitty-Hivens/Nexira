@@ -37,6 +37,7 @@ import hivens.ui.components.GlassCard
 import hivens.ui.components.JvmArgsBuilderDialog
 import hivens.ui.components.ModItemCard
 import hivens.ui.components.RamSelector
+import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.debug.SkiaTracker
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
@@ -264,7 +265,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
             // ══════════════════════════════════════════════════════════════════
             GlassCard(
                 modifier        = Modifier.weight(1f).fillMaxHeight(),
-                backgroundColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
+                backgroundColor = glassSurfaceAlpha(0.7f),
             ) {
                 Column(Modifier.padding(24.dp).verticalScroll(rememberScrollState())) {
 
@@ -499,7 +500,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
             // ══════════════════════════════════════════════════════════════════
             GlassCard(
                 modifier        = Modifier.weight(1f).fillMaxHeight(),
-                backgroundColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
+                backgroundColor = glassSurfaceAlpha(0.7f),
             ) {
                 Column(Modifier.padding(24.dp)) {
                     Text(s.serverSettingsSectionMods, style = MaterialTheme.typography.titleSmall, color = CelestiaTheme.colors.primary)
