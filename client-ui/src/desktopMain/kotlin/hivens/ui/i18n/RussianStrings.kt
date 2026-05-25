@@ -558,7 +558,10 @@ object RussianStrings : AppStrings {
     override val browseDetailInstallFailedTitle   = "Ошибка установки"
     override val browseDetailInstallFailedGeneric = "Установка не удалась по неизвестной причине."
 
-
-
-
+    override val fileBrowserNoRoot          = "У этого экземпляра ещё нет файлов на диске."
+    override val fileBrowserPickAFile       = "Выберите файл слева для предпросмотра."
+    override val fileBrowserBinaryHint      = "Бинарный файл — предпросмотр недоступен."
+    override val fileBrowserOpenExternally  = "Открыть во внешней программе"
+    override fun fileBrowserTextTruncated(maxKb: Long) =
+        "Предпросмотр обрезан до первых $maxKb KB. Открой во внешней программе чтобы увидеть весь файл."
 }

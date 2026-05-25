@@ -557,7 +557,10 @@ object GermanStrings : AppStrings {
     override val browseDetailInstallFailedTitle   = "Installation fehlgeschlagen"
     override val browseDetailInstallFailedGeneric = "Installation aus unbekanntem Grund fehlgeschlagen."
 
-
-
-
+    override val fileBrowserNoRoot          = "Diese Instanz hat noch keine Dateien auf der Festplatte."
+    override val fileBrowserPickAFile       = "Wähle links eine Datei für die Vorschau."
+    override val fileBrowserBinaryHint      = "Binärdatei -- keine Vorschau verfügbar."
+    override val fileBrowserOpenExternally  = "Extern öffnen"
+    override fun fileBrowserTextTruncated(maxKb: Long) =
+        "Vorschau auf die ersten $maxKb KB beschränkt. Öffne extern, um die ganze Datei zu sehen."
 }

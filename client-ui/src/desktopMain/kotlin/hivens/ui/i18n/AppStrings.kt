@@ -593,4 +593,12 @@ interface AppStrings {
     val browseDetailInstallOpenLibrary: String
     val browseDetailInstallFailedTitle: String
     val browseDetailInstallFailedGeneric: String
+
+    // ── Library / PackDetail / Files tab ────────────────────────────────
+    val fileBrowserNoRoot: String
+    val fileBrowserPickAFile: String
+    val fileBrowserBinaryHint: String
+    val fileBrowserOpenExternally: String
+    /** Receives the cap in KB, e.g. `Preview truncated to first 256 KB`. */
+    fun fileBrowserTextTruncated(maxKb: Long): String
 }
