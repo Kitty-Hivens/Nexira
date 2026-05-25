@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.sp
 import hivens.ui.components.GlassCard
 import hivens.ui.customization.ColorRole
 import hivens.ui.customization.CustomizationSettings
+import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
@@ -329,7 +330,7 @@ private fun HexField(
                 .weight(1f)
                 .height(36.dp)
                 .clip(RoundedCornerShape(6.dp))
-                .background(CelestiaTheme.colors.surface.copy(alpha = 0.4f))
+                .background(glassSurfaceAlpha(0.4f))
                 .border(
                     1.dp,
                     if (valid) CelestiaTheme.colors.outline.copy(alpha = 0.3f) else CelestiaTheme.colors.error,

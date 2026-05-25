@@ -140,7 +140,7 @@ fun ServerDetailScreen(
                             .fillMaxHeight()
                             .padding(16.dp)
                             .clip(RoundedCornerShape(16.dp))
-                            .background(CelestiaTheme.colors.surface.copy(alpha = 0.5f))
+                            .background(glassSurfaceAlpha(0.5f))
                             .border(
                                 1.dp,
                                 CelestiaTheme.colors.outline.copy(alpha = 0.2f),

@@ -31,6 +31,7 @@ import hivens.ui.easter.LocalAprilFools
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.platform.SystemActions
 import hivens.ui.puppet.PuppetClick
+import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.LocalStyle
 import kotlinx.coroutines.Dispatchers
@@ -248,7 +249,7 @@ internal fun DiagnosticsSection(
             .fillMaxWidth()
             .clip(RoundedCornerShape(style.cardCorner))
             .clickable(onClick = onOpenAbout)
-            .background(CelestiaTheme.colors.surface.copy(alpha = 0.4f))
+            .background(glassSurfaceAlpha(0.4f))
             .padding(16.dp),
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween

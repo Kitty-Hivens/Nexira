@@ -25,6 +25,7 @@ import hivens.launcher.network.NetworkState
 import hivens.launcher.ProfileManager
 import hivens.ui.components.LaunchControlPanel
 import hivens.ui.components.ServerGrid
+import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.theme.CelestiaTheme
@@ -238,7 +239,7 @@ fun DashboardScreen(
                     shape = RoundedCornerShape(14.dp)
                 )
                 .background(
-                    color = CelestiaTheme.colors.surface.copy(alpha = 0.45f),
+                    color = glassSurfaceAlpha(0.45f),
                     shape = RoundedCornerShape(14.dp)
                 )
                 .padding(horizontal = 16.dp, vertical = 14.dp)
@@ -281,7 +282,7 @@ private fun AutoSyncProgressStrip(
                 shape = RoundedCornerShape(10.dp)
             )
             .background(
-                color = CelestiaTheme.colors.surface.copy(alpha = 0.35f),
+                color = glassSurfaceAlpha(0.35f),
                 shape = RoundedCornerShape(10.dp)
             )
             .padding(horizontal = 14.dp, vertical = 8.dp)

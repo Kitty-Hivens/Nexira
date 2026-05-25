@@ -26,6 +26,7 @@ import hivens.ui.background.BackgroundSettings
 import hivens.ui.background.CustomBackground
 import hivens.ui.background.ScaleMode
 import hivens.ui.components.GlassCard
+import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
@@ -122,7 +123,7 @@ fun BackgroundSettingsScreen(
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         scaleModes.forEach { (mode, label) ->
                             val selected = settings.scaleMode == mode
-                            Box(Modifier.weight(1f).height(32.dp).clip(RoundedCornerShape(6.dp)).background(if (selected) CelestiaTheme.colors.primary else CelestiaTheme.colors.surface.copy(alpha = 0.4f)).clickable { update { copy(scaleMode = mode) } }, contentAlignment = Alignment.Center) {
+                            Box(Modifier.weight(1f).height(32.dp).clip(RoundedCornerShape(6.dp)).background(if (selected) CelestiaTheme.colors.primary else glassSurfaceAlpha(0.4f)).clickable { update { copy(scaleMode = mode) } }, contentAlignment = Alignment.Center) {
                                 Text(label, fontSize = 10.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal, color = if (selected) Color.White else CelestiaTheme.colors.textSecondary)
                             }
                         }
@@ -159,7 +160,7 @@ fun BackgroundSettingsScreen(
                                     .weight(1f)
                                     .height(32.dp)
                                     .clip(RoundedCornerShape(6.dp))
-                                    .background(if (selected) CelestiaTheme.colors.primary else CelestiaTheme.colors.surface.copy(alpha = 0.4f))
+                                    .background(if (selected) CelestiaTheme.colors.primary else glassSurfaceAlpha(0.4f))
                                     .clickable { update { copy(loopMode = mode) } },
                                 contentAlignment = Alignment.Center,
                             ) {
@@ -221,7 +222,7 @@ fun BackgroundSettingsScreen(
                     Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.SpaceBetween) {
                         Text(s.backgroundPreview, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.5f), fontWeight = FontWeight.Bold)
                         Column {
-                            Box(Modifier.fillMaxWidth().height(80.dp).clip(RoundedCornerShape(12.dp)).background(CelestiaTheme.colors.surface.copy(alpha = 0.6f)).border(1.dp, CelestiaTheme.colors.outline.copy(alpha = 0.2f), RoundedCornerShape(12.dp)).padding(16.dp), contentAlignment = Alignment.CenterStart) {
+                            Box(Modifier.fillMaxWidth().height(80.dp).clip(RoundedCornerShape(12.dp)).background(glassSurfaceAlpha(0.6f)).border(1.dp, CelestiaTheme.colors.outline.copy(alpha = 0.2f), RoundedCornerShape(12.dp)).padding(16.dp), contentAlignment = Alignment.CenterStart) {
                                 Column {
                                     Text(s.backgroundPreviewServer, color = CelestiaTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
                                     Text("1.21.1 • 42/100", style = MaterialTheme.typography.bodySmall, color = CelestiaTheme.colors.textSecondary)
