@@ -22,3 +22,17 @@ fun glassSurfaceAlpha(baseAlpha: Float): Color {
         alpha = (baseAlpha * multiplier).coerceIn(0f, 1f),
     )
 }
+
+/**
+ * Same as [glassSurfaceAlpha] but takes a pre-resolved base color
+ * instead of pulling from the palette. Use when the caller has a
+ * theme-derived color (e.g., a CustomTheme background) that should
+ * still honor the glass intensity knob.
+ */
+@Composable
+fun scaledAlpha(baseColor: Color, baseAlpha: Float): Color {
+    val multiplier = LocalCustomization.current.glassIntensity
+    return baseColor.copy(
+        alpha = (baseAlpha * multiplier).coerceIn(0f, 1f),
+    )
+}
