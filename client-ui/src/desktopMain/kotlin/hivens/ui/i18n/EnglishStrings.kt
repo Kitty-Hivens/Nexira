@@ -526,4 +526,12 @@ object EnglishStrings : AppStrings {
     override val customizationReset           = "Reset all"
     override val customizationHexInvalid      = "Invalid hex"
     override val themePickerAccentOverride    = "Accent override (live)"
+
+    override val browseTitle        = "BROWSE"
+    override val browseSubtitle     = "Packs published on the mirror"
+    override val browseEmptyTitle   = "Catalog is empty"
+    override val browseEmptyMessage = "The mirror is reachable but has not published any packs yet. Check back later."
+    override val browseErrorTitle   = "Mirror unreachable"
+    override val browseErrorMessage = "Could not reach the mirror. Check your connection and retry."
+    override val browseRetry        = "Retry"
 }
