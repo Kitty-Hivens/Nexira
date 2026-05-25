@@ -229,6 +229,7 @@ object GermanStrings : AppStrings {
     override val backgroundSaturation     = "Sättigung"
     override val backgroundParallax       = "Parallaxe"
     override val backgroundVignette       = "Vignette"
+    override val backgroundAnimationSpeed = "Animationsgeschwindigkeit"
     override val backgroundSectionTint    = "FARBTÖNUNG"
     override val backgroundTintNone       = "Keine"
     override val backgroundTintNavy       = "Dunkelblau"
