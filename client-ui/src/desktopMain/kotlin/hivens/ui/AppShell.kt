@@ -27,6 +27,7 @@ import hivens.core.data.HomeView
 import hivens.core.data.SessionData
 import hivens.core.data.UiStyle
 import hivens.launcher.AutoSyncService
+import hivens.launcher.ServerListCacheStore
 import hivens.launcher.bootstrap.AutoLoginCoordinator
 import hivens.launcher.bootstrap.LauncherBootstrap
 import hivens.launcher.CredentialsManager
@@ -140,6 +141,7 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
     val windowState      = rememberWindowState(placement = WindowPlacement.Maximized)
     val settingsService: ISettingsService      = koinInject()
     val serverListService: IServerListService  = koinInject()
+    val serverListCache: ServerListCacheStore  = koinInject()
     val controller: LauncherController         = koinInject()
     val credentialsManager: CredentialsManager = koinInject()
     val authService: IAuthService              = koinInject()
@@ -261,6 +263,18 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
         // ── Tray init on background thread ────────────────────────────
         LaunchedEffect(Unit) {
             withContext(Dispatchers.IO) {
+                // Stale-while-revalidate: seed [TrayManager] from the disk
+                // cache BEFORE init() so libtray's first published DBusMenu
+                // layout already carries real servers. Without this seed,
+                // a user right-clicking the tray icon during the 0.5-3s
+                // window before [fetchDashboardData] returns sees the
+                // "(No servers)" placeholder and concludes the tray is
+                // broken. The live fetch below overwrites the seed.
+                val cachedServers = serverListCache.load()
+                if (cachedServers.isNotEmpty()) {
+                    TrayManager.updateServers(cachedServers)
+                }
+
                 try {
                     val iconBytes = Res.readBytes("drawable/favicon.png")
                     TrayManager.init(

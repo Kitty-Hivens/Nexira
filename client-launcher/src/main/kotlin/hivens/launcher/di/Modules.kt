@@ -411,7 +411,18 @@ val appModule = module {
         AuthService(get<IServerProtocol>(named("insecure")))
     }
 
-    single<IServerListService> { SmartyCraftServerListService(get(), get()) }
+    // Cache feeds the tray menu's first published DBusMenu layout before
+    // the live fetch returns -- see [ServerListCacheStore] KDoc for the
+    // "(No servers)" placeholder bug it fixes.
+    single<ServerListCacheStore> {
+        val dataDir: Path = get()
+        JsonServerListCacheStore(
+            file = dataDir.resolve(Storage.SERVERS_CACHE_FILE),
+            json = get(),
+        )
+    }
+
+    single<IServerListService> { SmartyCraftServerListService(get(), get(), get()) }
 
     // JSON-on-disk pack registry. Persists installed PackInstances
     // to <dataDir>/packs.json so Library reflects real state across
