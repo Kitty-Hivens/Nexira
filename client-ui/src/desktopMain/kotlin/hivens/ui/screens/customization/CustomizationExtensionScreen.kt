@@ -33,6 +33,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -41,10 +42,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import hivens.ui.components.GlassCard
@@ -89,6 +92,21 @@ fun CustomizationExtensionScreen(
     PuppetClick("customization.reset") {
         settings = CustomizationSettings(); onSettingsChanged(settings)
     }
+
+    // Counter-wrap the screen back to the base (unscaled) density so
+    // the density slider stays grabbable while every other surface
+    // (sidebar, right panel, dropped-in dialogs) live-scales as the
+    // user drags. Without this, every drag tick re-measures the
+    // slider host under a new density and Material's gesture detector
+    // loses the pointer.
+    val outerDensity = LocalDensity.current
+    val baseDensity  = remember(outerDensity, settings.densityScale) {
+        Density(
+            outerDensity.density / settings.densityScale.coerceAtLeast(0.01f),
+            outerDensity.fontScale,
+        )
+    }
+    CompositionLocalProvider(LocalDensity provides baseDensity) {
 
     Column(Modifier.fillMaxSize().padding(24.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -208,6 +226,7 @@ fun CustomizationExtensionScreen(
             }
         }
     }
+    } // end CompositionLocalProvider(LocalDensity)
 }
 
 @Composable
