@@ -2,16 +2,14 @@ package hivens.ui.customization
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
-import hivens.ui.theme.CardSurface
 import hivens.ui.theme.CelestiaTheme
-import hivens.ui.theme.LocalStyle
 
 /**
  * Resolves the active surface tint at [baseAlpha], scaled by the
- * user's glass intensity preference -- but only when the active
- * style is glass-capable. Brut's [CardSurface.Flat] short-circuits
- * to the original [baseAlpha] so opaque surfaces stay opaque
- * regardless of the customization knob (its identity).
+ * user's glass intensity preference. Applies under every style,
+ * not just Celestia -- default value 1.0 preserves each style's
+ * natural opacity, lower values let the user opt into translucency
+ * even under Brut.
  *
  * Use this anywhere that currently does
  * `CelestiaTheme.colors.surface.copy(alpha = X)` to make the
@@ -19,12 +17,7 @@ import hivens.ui.theme.LocalStyle
  */
 @Composable
 fun glassSurfaceAlpha(baseAlpha: Float): Color {
-    val style      = LocalStyle.current
-    val multiplier = if (style.cardSurface == CardSurface.Glass) {
-        LocalCustomization.current.glassIntensity
-    } else {
-        1f
-    }
+    val multiplier = LocalCustomization.current.glassIntensity
     return CelestiaTheme.colors.surface.copy(
         alpha = (baseAlpha * multiplier).coerceIn(0f, 1f),
     )
