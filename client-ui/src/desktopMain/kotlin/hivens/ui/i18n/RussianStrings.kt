@@ -517,7 +517,7 @@ object RussianStrings : AppStrings {
     override val customizationTitle           = "Кастомизация"
     override val customizationSubtitle        = "Экспериментальная тонкая настройка вида"
     override val customizationDensity         = "Масштаб плотности"
-    override val customizationGlassIntensity  = "Прозрачность стекла"
+    override val customizationGlassIntensity  = "Плотность стекла"
     override val customizationAccentOverride  = "Свой акцент"
     override val customizationAccentClear     = "Сбросить акцент"
     override val customizationSectionVisual   = "ВИЗУАЛ"
