@@ -561,4 +561,35 @@ interface AppStrings {
     val customizationReset: String
     val customizationHexInvalid: String
     val themePickerAccentOverride: String
+
+    // --- Browse screen ---
+    val browseTitle: String
+    val browseSubtitle: String
+    val browseEmptyTitle: String
+    val browseEmptyMessage: String
+    val browseErrorTitle: String
+    val browseErrorMessage: String
+    val browseRetry: String
+
+    // --- Browse pack detail ---
+    val browseDetailErrorTitle: String
+    val browseDetailErrorMessage: String
+    val browseDetailInstallReady: String
+    val browseDetailInstallHint: String
+    val browseDetailInstallButton: String
+    val browseDetailTagsTitle: String
+    val browseDetailAboutTitle: String
+    val browseDetailAboutPlaceholder: String
+    val browseDetailAboutNote: String
+    val browseDetailCompatTitle: String
+    val browseDetailCompatMc: String
+    val browseDetailCompatLoader: String
+    val browseDetailCompatJava: String
+    val browseDetailVersionTitle: String
+
+    // --- Browse pack detail: mods + assets browser ---
+
+    // --- Floating mod / asset browsers ---
+
+
 }

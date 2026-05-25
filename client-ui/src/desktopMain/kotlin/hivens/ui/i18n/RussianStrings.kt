@@ -527,4 +527,31 @@ object RussianStrings : AppStrings {
     override val customizationReset           = "Сбросить всё"
     override val customizationHexInvalid      = "Неверный hex"
     override val themePickerAccentOverride    = "Свой акцент (применяется сразу)"
+
+    override val browseTitle        = "КАТАЛОГ"
+    override val browseSubtitle     = "Сборки опубликованные на зеркале"
+    override val browseEmptyTitle   = "Каталог пуст"
+    override val browseEmptyMessage = "Зеркало доступно, но пока не публикует сборки. Загляни позже."
+    override val browseErrorTitle   = "Зеркало недоступно"
+    override val browseErrorMessage = "Не удалось дотянуться до зеркала. Проверь соединение и повтори."
+    override val browseRetry        = "Повторить"
+
+    override val browseDetailErrorTitle    = "Не удалось загрузить сборку"
+    override val browseDetailErrorMessage  = "Не удалось получить manifest. Проверь соединение и повтори."
+    override val browseDetailInstallReady  = "Готово к установке"
+    override val browseDetailInstallHint   = "Установка появится в следующем релизе"
+    override val browseDetailInstallButton = "УСТАНОВИТЬ"
+    override val browseDetailTagsTitle     = "Теги"
+    override val browseDetailAboutTitle       = "О сборке"
+    override val browseDetailAboutPlaceholder = "Сборка включает %d модов и %d ассетов."
+    override val browseDetailAboutNote        = "Развёрнутое описание появится здесь когда зеркало начнёт заполнять его в manifest."
+    override val browseDetailCompatTitle      = "Совместимость"
+    override val browseDetailCompatMc         = "Minecraft"
+    override val browseDetailCompatLoader     = "Лоадер"
+    override val browseDetailCompatJava       = "Java"
+    override val browseDetailVersionTitle     = "Версия"
+
+
+
+
 }
