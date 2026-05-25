@@ -6,6 +6,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import hivens.core.data.SessionData
+import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.theme.CelestiaTheme
 
 /**
@@ -27,7 +28,7 @@ fun RightPanel(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(CelestiaTheme.colors.surface.copy(alpha = 0.22f))
+                .background(glassSurfaceAlpha(0.22f))
         ) {
             when (appState) {
                 AppState.Loading          -> AuthLoadingSlot()
@@ -39,7 +40,7 @@ fun RightPanel(
             }
         }
 
-        HorizontalDivider(color = CelestiaTheme.colors.surface.copy(alpha = 0.7f))
+        HorizontalDivider(color = glassSurfaceAlpha(0.7f))
 
         // ── News feed (bottom) ────────────────────────────────────────────────
         CompactNewsFeed(

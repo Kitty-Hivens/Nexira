@@ -8,6 +8,8 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.Color
+import hivens.ui.customization.ColorRole
+import hivens.ui.customization.LocalCustomization
 
 // --- COLOR PALETTES ---
 data class CelestiaColors(
@@ -83,10 +85,12 @@ fun CelestiaTheme(
     style: StyleSpec = CelestiaStyle,
     content: @Composable () -> Unit
 ) {
+    val customization = LocalCustomization.current
+
     // If there is a custom theme, use it, otherwise use the default one
     val baseColors = if (useDarkTheme) DarkColorPalette else LightColorPalette
 
-    val targetColors = if (customTheme != null) {
+    val themedColors = if (customTheme != null) {
         baseColors.copy(
             primary        = CustomTheme.parseHexColor(customTheme.primary),
             primaryVariant = CustomTheme.parseHexColor(customTheme.primary).copy(alpha = 0.8f),
@@ -96,6 +100,31 @@ fun CelestiaTheme(
         )
     } else {
         baseColors
+    }
+
+    // Customization overrides land on top of the active theme. Accent
+    // always available; per-role full overrides only when the user has
+    // explicitly enabled the experimental toggle.
+    val targetColors = run {
+        var c = themedColors
+        customization.accentOverride?.let { hex ->
+            parseHexColorOrNull(hex)?.let { col ->
+                c = c.copy(primary = col, primaryVariant = col.copy(alpha = 0.8f))
+            }
+        }
+        if (customization.experimentalColorOverridesEnabled && customization.colorOverrides.isNotEmpty()) {
+            val o = customization.colorOverrides
+            c = c.copy(
+                primary    = o[ColorRole.PRIMARY]?.let(::parseHexColorOrNull)    ?: c.primary,
+                secondary  = o[ColorRole.SECONDARY]?.let(::parseHexColorOrNull)  ?: c.secondary,
+                background = o[ColorRole.BACKGROUND]?.let(::parseHexColorOrNull) ?: c.background,
+                surface    = o[ColorRole.SURFACE]?.let(::parseHexColorOrNull)    ?: c.surface,
+                success    = o[ColorRole.SUCCESS]?.let(::parseHexColorOrNull)    ?: c.success,
+                error      = o[ColorRole.ERROR]?.let(::parseHexColorOrNull)      ?: c.error,
+                outline    = o[ColorRole.OUTLINE]?.let(::parseHexColorOrNull)    ?: c.outline,
+            )
+        }
+        c
     }
 
     // Color change animation duration scales with style.animationMultiplier.
@@ -185,3 +214,9 @@ object CelestiaTheme {
         @Composable
         get() = LocalCelestiaColors.current
 }
+
+private fun parseHexColorOrNull(hex: String): Color? = try {
+    val clean = hex.trim().removePrefix("#")
+    val full = if (clean.length == 6) "FF$clean" else clean
+    Color(full.toLong(16))
+} catch (_: Exception) { null }

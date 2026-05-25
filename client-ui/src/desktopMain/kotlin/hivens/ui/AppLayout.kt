@@ -30,6 +30,8 @@ import hivens.core.data.UiStyle
 import hivens.launcher.network.NetworkState
 import hivens.launcher.network.ServerProtocolConfig
 import hivens.ui.background.BackgroundSettings
+import hivens.ui.customization.CustomizationSettings
+import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.easter.LocalAprilFools
 import hivens.ui.i18n.AppLocale
 import hivens.ui.puppet.PuppetClick
@@ -68,7 +70,9 @@ fun AppLayout(
     uiStyle: UiStyle,
     onUiStyleChanged: (UiStyle) -> Unit,
     backgroundSettings: BackgroundSettings = BackgroundSettings(),
-    onBackgroundSettingsChanged: (BackgroundSettings) -> Unit = {}
+    onBackgroundSettingsChanged: (BackgroundSettings) -> Unit = {},
+    customization: CustomizationSettings = CustomizationSettings(),
+    onCustomizationChanged: (CustomizationSettings) -> Unit = {},
 ) {
     val skinRepository: SkinRepository = koinInject()
     val protocolConfig: ServerProtocolConfig = koinInject()
@@ -99,7 +103,7 @@ fun AppLayout(
 
         VerticalDivider(
             modifier = Modifier.fillMaxHeight(),
-            color    = CelestiaTheme.colors.surface.copy(alpha = 0.6f)
+            color    = glassSurfaceAlpha(0.6f)
         )
 
         // ── Main content ──────────────────────────────────────────────────
@@ -148,17 +152,18 @@ fun AppLayout(
 
                     Screen.Settings ->
                         SettingsScreen(
-                            isDarkTheme              = isDarkTheme,
-                            onToggleTheme            = onToggleDarkTheme,
-                            onOpenThemePicker        = { onScreenChange(Screen.ThemePicker) },
-                            currentLocale            = currentLocale,
-                            onLocaleChanged          = onLocaleChanged,
-                            homeView                 = homeView,
-                            onHomeViewChanged        = onHomeViewChanged,
-                            uiStyle                  = uiStyle,
-                            onUiStyleChanged         = onUiStyleChanged,
-                            onOpenBackgroundSettings = { onScreenChange(Screen.BackgroundSettings) },
-                            onOpenAbout              = { onScreenChange(Screen.About) }
+                            isDarkTheme                  = isDarkTheme,
+                            onToggleTheme                = onToggleDarkTheme,
+                            onOpenThemePicker            = { onScreenChange(Screen.ThemePicker) },
+                            currentLocale                = currentLocale,
+                            onLocaleChanged              = onLocaleChanged,
+                            homeView                     = homeView,
+                            onHomeViewChanged            = onHomeViewChanged,
+                            uiStyle                      = uiStyle,
+                            onUiStyleChanged             = onUiStyleChanged,
+                            onOpenBackgroundSettings     = { onScreenChange(Screen.BackgroundSettings) },
+                            onOpenCustomizationExtension = { onScreenChange(Screen.CustomizationExtension) },
+                            onOpenAbout                  = { onScreenChange(Screen.About) },
                         )
 
                     Screen.ThemePicker ->
@@ -168,7 +173,14 @@ fun AppLayout(
                                 onCustomThemeChanged(newTheme)
                                 onScreenChange(Screen.Settings)
                             },
-                            onBack = { onScreenChange(Screen.Settings) }
+                            onBack          = { onScreenChange(Screen.Settings) },
+                        )
+
+                    Screen.CustomizationExtension ->
+                        hivens.ui.screens.customization.CustomizationExtensionScreen(
+                            currentSettings   = customization,
+                            onSettingsChanged = onCustomizationChanged,
+                            onBack            = { onScreenChange(Screen.Settings) },
                         )
 
                     Screen.About ->
@@ -213,7 +225,7 @@ fun AppLayout(
 
         VerticalDivider(
             modifier = Modifier.fillMaxHeight(),
-            color    = CelestiaTheme.colors.surface.copy(alpha = 0.6f)
+            color    = glassSurfaceAlpha(0.6f)
         )
 
         // ── Right panel 264dp ─────────────────────────────────────────────
@@ -249,6 +261,7 @@ fun AppSidebar(
     val settingsActive = currentScreen is Screen.Settings
             || currentScreen is Screen.ThemePicker
             || currentScreen is Screen.BackgroundSettings
+            || currentScreen is Screen.CustomizationExtension
     val aboutActive    = currentScreen is Screen.About
 
     // ── April Fools: nav clicks have a 30% chance of being silently swallowed ──
@@ -314,7 +327,7 @@ fun AppSidebar(
 
     NavigationRail(
         modifier       = Modifier.width(64.dp).fillMaxHeight(),
-        containerColor = CelestiaTheme.colors.surface.copy(alpha = 0.35f),
+        containerColor = glassSurfaceAlpha(0.35f),
         contentColor   = CelestiaTheme.colors.textSecondary
     ) {
         // ── Nav items ─────────────────────────────────────────────────────

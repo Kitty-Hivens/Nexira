@@ -24,6 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import hivens.ui.components.GlassCard
+import hivens.ui.customization.scaledAlpha
 import hivens.ui.easter.LocalAprilFools
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
@@ -149,7 +150,7 @@ fun ThemeCard(
                     shape  = RoundedCornerShape(16.dp)
                 ),
             shape           = RoundedCornerShape(16.dp),
-            backgroundColor = CustomTheme.parseHexColor(theme.background).copy(alpha = 0.8f)
+            backgroundColor = scaledAlpha(CustomTheme.parseHexColor(theme.background), 0.8f)
         ) {
             Column(
                 modifier            = Modifier.fillMaxSize().padding(16.dp),
@@ -219,7 +220,7 @@ fun ThemePreviewPanel(theme: CustomTheme, s: hivens.ui.i18n.AppStrings) {
     GlassCard(
         modifier        = Modifier.fillMaxSize(),
         shape           = MaterialTheme.shapes.large,
-        backgroundColor = CustomTheme.parseHexColor(theme.background).copy(alpha = 0.8f)
+        backgroundColor = scaledAlpha(CustomTheme.parseHexColor(theme.background), 0.8f)
     ) {
         Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
             Text(

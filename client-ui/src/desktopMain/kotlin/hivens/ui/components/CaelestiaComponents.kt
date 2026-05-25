@@ -10,6 +10,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.unit.dp
+import hivens.ui.customization.LocalCustomization
 import hivens.ui.effects.pulsatingGlow
 import hivens.ui.theme.CardSurface
 import hivens.ui.theme.CelestiaTheme
@@ -37,11 +38,28 @@ fun GlassCard(
     borderColor: Color = Color.Unspecified,
     content: @Composable BoxScope.() -> Unit
 ) {
-    val style = LocalStyle.current
-    val resolvedShape = shape ?: RoundedCornerShape(style.cardCorner)
+    val style          = LocalStyle.current
+    val palette        = CelestiaTheme.colors
+    val customization  = LocalCustomization.current
+    val resolvedShape  = shape ?: RoundedCornerShape(style.cardCorner)
     val resolvedBackground = backgroundColor ?: when (style.cardSurface) {
-        CardSurface.Glass -> MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)
-        CardSurface.Flat  -> MaterialTheme.colorScheme.surface
+        CardSurface.Glass -> palette.glassBackground.copy(
+            alpha = (palette.glassAlpha * customization.glassIntensity).coerceIn(0f, 1f),
+        )
+        // Brut: at intensity = 1.0 keep the solid grey surface
+        // (Brut identity). As intensity drops, lerp the colour
+        // toward palette.glassBackground (the same near-black tint
+        // Celestia uses) AND drop alpha. The colour shift makes the
+        // translucency visually obvious -- grey alone at low alpha
+        // reads as "darker grey" rather than "see-through".
+        CardSurface.Flat  -> {
+            val intensity = customization.glassIntensity.coerceIn(0f, 1f)
+            androidx.compose.ui.graphics.lerp(
+                palette.glassBackground,
+                MaterialTheme.colorScheme.surface,
+                intensity,
+            ).copy(alpha = intensity)
+        }
     }
     val resolvedBorderWidth = style.cardBorder.coerceAtLeast(0.dp)
     val resolvedBorder = when {
