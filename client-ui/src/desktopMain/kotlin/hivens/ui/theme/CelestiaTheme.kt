@@ -216,7 +216,7 @@ object CelestiaTheme {
 }
 
 private fun parseHexColorOrNull(hex: String): Color? = try {
-    val clean = hex.removePrefix("#")
+    val clean = hex.trim().removePrefix("#")
     val full = if (clean.length == 6) "FF$clean" else clean
     Color(full.toLong(16))
 } catch (_: Exception) { null }

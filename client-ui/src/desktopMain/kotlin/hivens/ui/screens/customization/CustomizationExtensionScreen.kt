@@ -346,7 +346,10 @@ private fun HexField(
                     if (t.isBlank()) {
                         // empty is "no override" -- handled by parent via onClear
                     } else {
-                        parseHexOrNull(t)?.let { onValidHex(t) }
+                        // Store the trimmed form so theme parsers downstream
+                        // (which may not trim) get a clean value.
+                        val normalized = t.trim()
+                        parseHexOrNull(normalized)?.let { onValidHex(normalized) }
                     }
                 },
                 singleLine    = true,
