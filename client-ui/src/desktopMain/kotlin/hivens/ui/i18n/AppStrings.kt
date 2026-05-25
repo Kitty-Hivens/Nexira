@@ -238,6 +238,7 @@ interface AppStrings {
     val backgroundSaturation: String
     val backgroundParallax: String
     val backgroundVignette: String
+    val backgroundAnimationSpeed: String
     val backgroundSectionTint: String
     val backgroundTintNone: String
     val backgroundTintNavy: String

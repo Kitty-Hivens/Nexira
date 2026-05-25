@@ -229,6 +229,7 @@ object EnglishStrings : AppStrings {
     override val backgroundSaturation     = "Saturation"
     override val backgroundParallax       = "Parallax"
     override val backgroundVignette       = "Vignette"
+    override val backgroundAnimationSpeed = "Animation speed"
     override val backgroundSectionTint    = "COLOR TINT"
     override val backgroundTintNone       = "None"
     override val backgroundTintNavy       = "Dark blue"
