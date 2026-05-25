@@ -252,7 +252,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
             Spacer(Modifier.width(12.dp))
 
             Column {
-                Text(server.title?.uppercase() ?: "SERVER", style = MaterialTheme.typography.headlineSmall, color = CelestiaTheme.colors.textPrimary)
+                Text(server.title ?: "Server", style = MaterialTheme.typography.headlineSmall, color = CelestiaTheme.colors.textPrimary)
                 Text(s.serverSettingsSubtitle, style = MaterialTheme.typography.bodySmall, color = CelestiaTheme.colors.textSecondary)
             }
         }

@@ -10,7 +10,7 @@ object RussianStrings : AppStrings {
     override val loginUsername     = "Логин"
     override val loginPassword     = "Пароль"
     override val loginRemember     = "Запомнить пароль"
-    override val loginButton       = "ВОЙТИ"
+    override val loginButton       = "Войти"
     override val loginErrorEmpty   = "Введите логин и пароль"
     override val loginErrorGeneric = "Ошибка входа"
     override val loginRegister     = "Зарегистрироваться"
@@ -21,17 +21,17 @@ object RussianStrings : AppStrings {
 
     // Dashboard
     override fun dashboardWelcome(name: String) = "ДОБРО ПОЖАЛОВАТЬ, $name"
-    override val dashboardServers              = "ДОСТУПНЫЕ СЕРВЕРЫ"
+    override val dashboardServers              = "Доступные серверы"
     override val dashboardServersEmpty         = "Серверы не найдены"
     override val dashboardLoginRequiredTitle   = "Войдите, чтобы увидеть серверы"
     override val dashboardLoginRequiredHint    = "Воспользуйтесь панелью справа. Список серверов на SMARTYcraft скрыт за авторизацией."
 
     // Launch Control
     override val launchReady       = "Готов к игре"
-    override val launchButton      = "ИГРАТЬ"
-    override val launchAbort       = "ОТМЕНА"
+    override val launchButton      = "Играть"
+    override val launchAbort       = "Отмена"
     override val launchRunning     = "Игра запущена"
-    override val launchResetError  = "СБРОСИТЬ ОШИБКУ"
+    override val launchResetError  = "Сбросить ошибку"
     override val launchDownloading = "Загрузка:"
 
     // Launcher States
@@ -47,7 +47,7 @@ object RussianStrings : AppStrings {
     override fun authSuccess(uuid: String) = "Успешный вход. UUID: $uuid"
 
     // Profile
-    override val profileTitle              = "ПРОФИЛЬ"
+    override val profileTitle              = "Профиль"
     override val profileStatusLabel        = "Статус"
     override val profileStatusOnline       = "Авторизован"
     override val profileStatusOffline      = "Оффлайн"
@@ -63,7 +63,7 @@ object RussianStrings : AppStrings {
     override fun profileUploadError(msg: String) = "Ошибка загрузки: $msg"
 
     // Settings
-    override val settingsTitle              = "ГЛОБАЛЬНЫЕ НАСТРОЙКИ"
+    override val settingsTitle              = "Глобальные настройки"
     override val settingsSectionUI          = "Интерфейс"
     override val settingsSectionBehavior    = "Поведение"
     override val settingsThemePicker        = "Выбор темы"
@@ -74,9 +74,9 @@ object RussianStrings : AppStrings {
     override val settingsLanguage           = "Язык"
 
     // Theme Picker
-    override val themePickerTitle           = "ВЫБОР ТЕМЫ"
-    override val themePickerApply           = "ПРИМЕНИТЬ"
-    override val themePickerPreview         = "ПРЕДПРОСМОТР"
+    override val themePickerTitle           = "Выбор темы"
+    override val themePickerApply           = "Применить"
+    override val themePickerPreview         = "Предпросмотр"
     override val themePickerSelected        = "Выбрана"
     override val themePickerColorPrimary    = "Основной"
     override val themePickerColorSecondary  = "Дополнительный"
@@ -89,11 +89,11 @@ object RussianStrings : AppStrings {
     override val themePickerBtnOutlined     = "Кнопка с рамкой"
 
     // News
-    override val newsTitle   = "НОВОСТИ ПРОЕКТА"
+    override val newsTitle   = "Новости проекта"
     override val newsEmpty   = "Новостей пока нет..."
 
     // Server Detail
-    override val serverDetailTitle         = "ИНФОРМАЦИЯ О СЕРВЕРЕ"
+    override val serverDetailTitle         = "Информация о сервере"
     override val serverDetailNoImage       = "Нет изображения"
     override val serverDetailNoImageHint   = "banner.png"
     override val serverDetailMissingTitle  = "Информация отсутствует"
@@ -101,8 +101,8 @@ object RussianStrings : AppStrings {
 
     // Server Settings
     override val serverSettingsSubtitle        = "Настройки запуска"
-    override val serverSettingsSectionSystem   = "СИСТЕМА"
-    override val serverSettingsSectionMods     = "МОДИФИКАЦИИ"
+    override val serverSettingsSectionSystem   = "Система"
+    override val serverSettingsSectionMods     = "Модификации"
     override val serverSettingsRam             = "ОЗУ"
     override fun serverSettingsRamValue(mb: Int) = "ОЗУ: $mb МБ"
     override val serverSettingsJava            = "Версия Java"
@@ -115,8 +115,8 @@ object RussianStrings : AppStrings {
 
     // Update
     override val updateTitle           = "Доступно обновление"
-    override val updateTitleCritical   = "КРИТИЧЕСКОЕ ОБНОВЛЕНИЕ"
-    override val updateTitleMandatory  = "ОБЯЗАТЕЛЬНОЕ ОБНОВЛЕНИЕ"
+    override val updateTitleCritical   = "Критическое обновление"
+    override val updateTitleMandatory  = "Обязательное обновление"
     override val updateCriticalBanner  = "Это обновление содержит критические исправления безопасности."
     override val updateMandatoryBanner =
         "Совместимость со старыми версиями нарушена на стороне сервера. Запуск без обновления невозможен."
@@ -128,7 +128,7 @@ object RussianStrings : AppStrings {
     override val updateLater           = "Позже"
     override val updateExit            = "Выйти"
     override val updateDownload        = "Скачать и установить"
-    override val updateDownloadNow     = "СКАЧАТЬ СЕЙЧАС"
+    override val updateDownloadNow     = "Скачать сейчас"
     override val updateDownloading     = "Загрузка..."
     override val updateInstall         = "Установить и перезапустить"
     override val updateRetry           = "Повторить"
@@ -207,22 +207,22 @@ object RussianStrings : AppStrings {
     // =========================================================================
     // Custom Background
     // =========================================================================
-    override val backgroundTitle          = "ПОЛЬЗОВАТЕЛЬСКИЙ ФОН"
+    override val backgroundTitle          = "Пользовательский фон"
     override val backgroundSubtitle       = "Настройте обои лаунчера"
     override val backgroundEnable         = "Включить"
-    override val backgroundSectionImage   = "ИЗОБРАЖЕНИЕ"
+    override val backgroundSectionImage   = "Изображение"
     override val backgroundPickFile       = "Выберите изображение для фона"
     override val backgroundPickButton     = "Выбрать файл"
-    override val backgroundSectionScale   = "МАСШТАБИРОВАНИЕ"
+    override val backgroundSectionScale   = "Масштабирование"
     override val backgroundScaleCover     = "Заполнить"
     override val backgroundScaleContain   = "Вписать"
     override val backgroundScaleStretch   = "Растянуть"
     override val backgroundScaleOriginal  = "Оригинал"
     override val backgroundScaleTile      = "Плитка"
-    override val backgroundSectionPosition = "ПОЗИЦИЯ"
+    override val backgroundSectionPosition = "Позиция"
     override val backgroundAlignX         = "Горизонтально"
     override val backgroundAlignY         = "Вертикально"
-    override val backgroundSectionEffects = "ЭФФЕКТЫ"
+    override val backgroundSectionEffects = "Эффекты"
     override val backgroundBlur           = "Размытие"
     override val backgroundDarken         = "Затемнение"
     override val backgroundOpacity        = "Прозрачность"
@@ -230,7 +230,7 @@ object RussianStrings : AppStrings {
     override val backgroundParallax       = "Параллакс"
     override val backgroundVignette       = "Виньетка"
     override val backgroundAnimationSpeed = "Скорость анимации"
-    override val backgroundSectionTint    = "ЦВЕТОВОЙ ОТТЕНОК"
+    override val backgroundSectionTint    = "Цветовой оттенок"
     override val backgroundTintNone       = "Нет"
     override val backgroundTintNavy       = "Тёмно-синий"
     override val backgroundTintViolet     = "Фиолет"
@@ -239,7 +239,7 @@ object RussianStrings : AppStrings {
     override val backgroundTintSteel      = "Сталь"
     override val backgroundTintIntensity  = "Интенсивность"
     override val backgroundReset          = "Сбросить к значениям по умолчанию"
-    override val backgroundPreview        = "ПРЕДПРОСМОТР"
+    override val backgroundPreview        = "Предпросмотр"
     override val backgroundPreviewServer  = "Пример сервера"
     override val settingsBackground       = "Пользовательский фон"
     override val settingsBackgroundSub    = "Фото или GIF на фон лаунчера"
@@ -250,11 +250,11 @@ object RussianStrings : AppStrings {
     override val aboutTitle                = "О ЛАУНЧЕРЕ"
     override fun aboutDescription(branding: String) = "Неофициальный лаунчер для $branding"
     override fun aboutBuildDate(date: String) = "Собрано: $date"
-    override val aboutSectionCreator       = "СОЗДАТЕЛЬ"
-    override val aboutSectionTechnologies  = "ТЕХНОЛОГИИ"
-    override val aboutSectionLicense       = "ЛИЦЕНЗИЯ"
+    override val aboutSectionCreator       = "Создатель"
+    override val aboutSectionTechnologies  = "Технологии"
+    override val aboutSectionLicense       = "Лицензия"
     override val aboutLicenseText          = "GPLv3 — Свободное программное обеспечение"
-    override val aboutSectionUpdates       = "ОБНОВЛЕНИЯ"
+    override val aboutSectionUpdates       = "Обновления"
     override val aboutCurrentVersion       = "Текущая версия"
     override val aboutCheckUpdates         = "Проверить обновления"
     override val aboutChecking             = "Проверяем..."
@@ -262,9 +262,9 @@ object RussianStrings : AppStrings {
     override val aboutCheckAgain           = "Проверить ещё раз"
     override fun aboutUpdateAvailable(version: String) = "Доступна версия $version"
     override val aboutCriticalUpdate       = "Критическое обновление"
-    override val aboutSectionSystem        = "СИСТЕМА"
+    override val aboutSectionSystem        = "Система"
     override val aboutOs                   = "ОС"
-    override val aboutSectionLinks         = "ССЫЛКИ"
+    override val aboutSectionLinks         = "Ссылки"
     override val aboutLinkGithub           = "GitHub"
     override val aboutLinkBugReport        = "Сообщить о баге"
     override val aboutLinkReleases         = "Релизы"
@@ -520,15 +520,15 @@ object RussianStrings : AppStrings {
     override val customizationGlassIntensity  = "Плотность стекла"
     override val customizationAccentOverride  = "Свой акцент"
     override val customizationAccentClear     = "Сбросить акцент"
-    override val customizationSectionVisual   = "ВИЗУАЛ"
-    override val customizationSectionColors   = "ПЕРЕОПРЕДЕЛЕНИЕ ЦВЕТОВ"
+    override val customizationSectionVisual   = "Визуал"
+    override val customizationSectionColors   = "Переопределение цветов"
     override val customizationExperimentalToggle = "Переопределять все цвета"
     override val customizationExperimentalSub    = "Открыть матрицу из 7 цветов. Легко сделать нечитаемые сочетания."
     override val customizationReset           = "Сбросить всё"
     override val customizationHexInvalid      = "Неверный hex"
     override val themePickerAccentOverride    = "Свой акцент (применяется сразу)"
 
-    override val browseTitle        = "КАТАЛОГ"
+    override val browseTitle        = "Каталог"
     override val browseSubtitle     = "Сборки опубликованные на зеркале"
     override val browseEmptyTitle   = "Каталог пуст"
     override val browseEmptyMessage = "Зеркало доступно, но пока не публикует сборки. Загляни позже."
@@ -540,7 +540,7 @@ object RussianStrings : AppStrings {
     override val browseDetailErrorMessage  = "Не удалось получить manifest. Проверь соединение и повтори."
     override val browseDetailInstallReady  = "Готово к установке"
     override val browseDetailInstallHint   = "Создаст новый instance в твоей data-папке."
-    override val browseDetailInstallButton = "УСТАНОВИТЬ"
+    override val browseDetailInstallButton = "Установить"
     override val browseDetailTagsTitle     = "Теги"
     override val browseDetailAboutTitle       = "О сборке"
     override val browseDetailAboutPlaceholder = "Сборка включает %d модов и %d ассетов."
@@ -556,7 +556,7 @@ object RussianStrings : AppStrings {
     override val browseDetailInstallStarting      = "Запуск..."
     override val browseDetailInstallDoneTitle     = "Установлено"
     override val browseDetailInstallDoneHint      = "Добавлено в Library."
-    override val browseDetailInstallOpenLibrary   = "ОТКРЫТЬ В LIBRARY"
+    override val browseDetailInstallOpenLibrary   = "Открыть в Library"
     override val browseDetailInstallFailedTitle   = "Ошибка установки"
     override val browseDetailInstallFailedGeneric = "Установка не удалась по неизвестной причине."
 
