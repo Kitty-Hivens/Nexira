@@ -573,4 +573,10 @@ object GermanStrings : AppStrings {
     override val assetBrowserSearch        = "Assets suchen..."
     override val assetBrowserSelectedCount = "%d / %d ausgewählt"
     override val assetBrowserEmptyFilter   = "Keine Assets passen zum Filter."
+
+    override val browseDetailContentTitle  = "Inhalt"
+    override val browseDetailContentMods   = "MODS"
+    override val browseDetailContentAssets = "ASSETS"
+    override val browseDetailContentOpen   = "Browser öffnen →"
+    override val browseDetailContentEmpty  = "(leer)"
 }

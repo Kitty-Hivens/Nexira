@@ -612,4 +612,10 @@ interface AppStrings {
     val assetBrowserSearch: String
     val assetBrowserSelectedCount: String
     val assetBrowserEmptyFilter: String
+
+    val browseDetailContentTitle: String
+    val browseDetailContentMods: String
+    val browseDetailContentAssets: String
+    val browseDetailContentOpen: String
+    val browseDetailContentEmpty: String
 }

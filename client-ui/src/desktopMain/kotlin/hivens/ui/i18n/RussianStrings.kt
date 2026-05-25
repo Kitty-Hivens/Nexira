@@ -574,4 +574,10 @@ object RussianStrings : AppStrings {
     override val assetBrowserSearch        = "Поиск ассетов..."
     override val assetBrowserSelectedCount = "%d / %d выбрано"
     override val assetBrowserEmptyFilter   = "Под фильтр ничего не подходит."
+
+    override val browseDetailContentTitle  = "Содержимое"
+    override val browseDetailContentMods   = "МОДЫ"
+    override val browseDetailContentAssets = "АССЕТЫ"
+    override val browseDetailContentOpen   = "Открыть браузер →"
+    override val browseDetailContentEmpty  = "(пусто)"
 }
