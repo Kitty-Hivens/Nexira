@@ -9,6 +9,7 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Wallpaper
 import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material3.*
@@ -44,6 +45,7 @@ internal fun AppearanceSection(
     onToggleTheme: () -> Unit,
     onOpenThemePicker: () -> Unit,
     onOpenBackgroundSettings: () -> Unit,
+    onOpenCustomizationExtension: () -> Unit,
     currentLocale: AppLocale,
     onLocaleChanged: (AppLocale) -> Unit,
     homeView: HomeView,
@@ -160,6 +162,31 @@ internal fun AppearanceSection(
             Column {
                 Text(s.settingsBackground, color = CelestiaTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
                 Text(s.settingsBackgroundSub, style = MaterialTheme.typography.bodySmall, color = CelestiaTheme.colors.textSecondary)
+            }
+        }
+        Icon(Icons.Default.ChevronRight, null, tint = CelestiaTheme.colors.primary)
+    }
+
+    Spacer(Modifier.height(4.dp))
+
+    // Customization extension shortcut
+    PuppetClick("settings.openCustomizationExtension") { onOpenCustomizationExtension() }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(style.cardCorner))
+            .clickable(onClick = onOpenCustomizationExtension)
+            .background(CelestiaTheme.colors.surface.copy(alpha = 0.4f))
+            .padding(16.dp),
+        verticalAlignment     = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.Tune, null, tint = CelestiaTheme.colors.primary, modifier = Modifier.size(24.dp))
+            Spacer(Modifier.width(16.dp))
+            Column {
+                Text(s.settingsCustomizationExt, color = CelestiaTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
+                Text(s.settingsCustomizationExtSub, style = MaterialTheme.typography.bodySmall, color = CelestiaTheme.colors.textSecondary)
             }
         }
         Icon(Icons.Default.ChevronRight, null, tint = CelestiaTheme.colors.primary)

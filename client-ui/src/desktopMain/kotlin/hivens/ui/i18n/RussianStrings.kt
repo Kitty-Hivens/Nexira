@@ -506,4 +506,25 @@ object RussianStrings : AppStrings {
 
     override val profileCategorySkin    = "Скин"
     override val profileCategoryAccount = "Аккаунт"
+
+    override val backgroundLoopMode      = "Луп"
+    override val backgroundLoopUseCodec  = "Из кодека"
+    override val backgroundLoopForever   = "Бесконечно"
+    override val backgroundLoopOnce      = "Один раз"
+
+    override val settingsCustomizationExt    = "Кастомизация (эксп.)"
+    override val settingsCustomizationExtSub = "Плотность, акцент, прозрачность стекла, переопределение цветов"
+    override val customizationTitle           = "Кастомизация"
+    override val customizationSubtitle        = "Экспериментальная тонкая настройка вида"
+    override val customizationDensity         = "Масштаб плотности"
+    override val customizationGlassIntensity  = "Прозрачность стекла"
+    override val customizationAccentOverride  = "Свой акцент"
+    override val customizationAccentClear     = "Сбросить акцент"
+    override val customizationSectionVisual   = "ВИЗУАЛ"
+    override val customizationSectionColors   = "ПЕРЕОПРЕДЕЛЕНИЕ ЦВЕТОВ"
+    override val customizationExperimentalToggle = "Переопределять все цвета"
+    override val customizationExperimentalSub    = "Открыть матрицу из 7 цветов. Легко сделать нечитаемые сочетания."
+    override val customizationReset           = "Сбросить всё"
+    override val customizationHexInvalid      = "Неверный hex"
+    override val themePickerAccentOverride    = "Свой акцент (применяется сразу)"
 }

@@ -22,7 +22,20 @@ data class BackgroundSettings(
     val tintColor: String? = null,
     val tintOpacity: Float = 0.0f,
     val animationSpeedMultiplier: Float = 1.0f,
+    val loopMode: BackgroundLoopMode = BackgroundLoopMode.UseCodec,
 )
 
 @Serializable
 enum class ScaleMode { COVER, CONTAIN, STRETCH, ORIGINAL, TILE }
+
+/**
+ * Loop semantics for multi-frame backgrounds (GIF / APNG / animated
+ * WebP). Static formats ignore this -- there is nothing to loop.
+ *
+ * UseCodec: honor the codec's own repetitionCount field (-1 = forever,
+ *           N = N additional plays after the first). Default.
+ * LoopForever: ignore the codec, play indefinitely.
+ * PlayOnce: ignore the codec, freeze on the last frame after one pass.
+ */
+@Serializable
+enum class BackgroundLoopMode { UseCodec, LoopForever, PlayOnce }

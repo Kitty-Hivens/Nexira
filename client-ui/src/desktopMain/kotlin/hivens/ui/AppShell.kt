@@ -37,6 +37,9 @@ import hivens.launcher.ProfileManager
 import hivens.ui.background.BackgroundManager
 import hivens.ui.background.CustomBackground
 import hivens.ui.components.UpdateManager
+import hivens.ui.customization.CustomizationManager
+import hivens.ui.customization.CustomizationSettings
+import hivens.ui.customization.LocalCustomization
 import hivens.ui.easter.AprilFools
 import hivens.ui.easter.AprilFoolsLoader
 import hivens.ui.easter.LocalAprilFools
@@ -89,6 +92,7 @@ sealed class Screen {
     object ThemePicker        : Screen()
     object About              : Screen()
     object BackgroundSettings : Screen()
+    object CustomizationExtension : Screen()
     data class ServerSettings(val server: ServerProfile) : Screen()
     data class ServerDetails (val server: ServerProfile) : Screen()
 
@@ -229,6 +233,14 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
         val autoSyncService: AutoSyncService = koinInject()
         val themeManager  = remember { ThemeManager(dataDirectory) }
         var customTheme   by remember { mutableStateOf(themeManager.loadTheme()) }
+
+        // Customization extension: persisted overrides for accent /
+        // density / glass intensity / full color overrides. Provided
+        // via [LocalCustomization] so CelestiaTheme + GlassCard can
+        // read without prop-drilling.
+        val customizationJson    = remember { Json { ignoreUnknownKeys = true; encodeDefaults = true } }
+        val customizationManager = remember { CustomizationManager(dataDirectory, customizationJson) }
+        var customization        by remember { mutableStateOf(customizationManager.load()) }
 
         // Window chrome icon -- KDE overview / Hyprland switcher / macOS
         // dock want the detailed hi-res asset so they can be downscale
@@ -420,6 +432,17 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
                 }
             }
 
+            val baseDensity   = androidx.compose.ui.platform.LocalDensity.current
+            val scaledDensity = remember(baseDensity, customization.densityScale) {
+                androidx.compose.ui.unit.Density(
+                    baseDensity.density * customization.densityScale.coerceIn(0.5f, 2f),
+                    baseDensity.fontScale,
+                )
+            }
+            CompositionLocalProvider(
+                LocalCustomization                       provides customization,
+                androidx.compose.ui.platform.LocalDensity provides scaledDensity,
+            ) {
             CelestiaTheme(
                 useDarkTheme = isDarkTheme,
                 customTheme  = customTheme,
@@ -485,11 +508,17 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
                             uiStyle = newStyle
                             val current = settingsService.getSettings()
                             settingsService.saveSettings(current.copy(uiStyle = newStyle))
-                        }
+                        },
+                        customization              = customization,
+                        onCustomizationChanged     = { newCustomization ->
+                            customization = newCustomization
+                            customizationManager.save(newCustomization)
+                        },
                     )
                     UpdateManager()
                 }
             }
+            } // end CompositionLocalProvider(LocalCustomization + LocalDensity)
         }
     }
     } // end CompositionLocalProvider(LocalAprilFools)
@@ -512,6 +541,8 @@ fun AppRoot(
     onHomeViewChanged: (HomeView) -> Unit,
     uiStyle: UiStyle,
     onUiStyleChanged: (UiStyle) -> Unit,
+    customization: CustomizationSettings,
+    onCustomizationChanged: (CustomizationSettings) -> Unit,
 ) {
     val credentialsManager: CredentialsManager = koinInject()
     val authService: IAuthService              = koinInject()
@@ -617,7 +648,9 @@ fun AppRoot(
                     if (!newSettings.enabled || newSettings.imagePath != backgroundSettings.imagePath) {
                         System.gc()
                     }
-                }
+                },
+                customization              = customization,
+                onCustomizationChanged     = onCustomizationChanged,
             )
         }
     }

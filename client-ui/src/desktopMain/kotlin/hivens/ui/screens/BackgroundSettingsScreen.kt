@@ -21,6 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import hivens.ui.background.BackgroundLoopMode
 import hivens.ui.background.BackgroundSettings
 import hivens.ui.background.CustomBackground
 import hivens.ui.background.ScaleMode
@@ -143,6 +144,30 @@ fun BackgroundSettingsScreen(
                     LabeledSlider(s.backgroundParallax, settings.parallaxIntensity, 0f..1f, "%.0f%%", 100f) { update { copy(parallaxIntensity = it) } }
                     LabeledSlider(s.backgroundVignette, settings.vignetteIntensity, 0f..1f, "%.0f%%", 100f) { update { copy(vignetteIntensity = it) } }
                     LabeledSlider(s.backgroundAnimationSpeed, settings.animationSpeedMultiplier, 0.25f..4f, "%.2fx") { update { copy(animationSpeedMultiplier = it) } }
+
+                    SectionTitle(s.backgroundLoopMode)
+                    val loopModes = listOf(
+                        BackgroundLoopMode.UseCodec    to s.backgroundLoopUseCodec,
+                        BackgroundLoopMode.LoopForever to s.backgroundLoopForever,
+                        BackgroundLoopMode.PlayOnce    to s.backgroundLoopOnce,
+                    )
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        loopModes.forEach { (mode, label) ->
+                            val selected = settings.loopMode == mode
+                            Box(
+                                Modifier
+                                    .weight(1f)
+                                    .height(32.dp)
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(if (selected) CelestiaTheme.colors.primary else CelestiaTheme.colors.surface.copy(alpha = 0.4f))
+                                    .clickable { update { copy(loopMode = mode) } },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(label, fontSize = 10.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                     color = if (selected) Color.White else CelestiaTheme.colors.textSecondary)
+                            }
+                        }
+                    }
 
                     HorizontalDivider(color = CelestiaTheme.colors.outline.copy(alpha = 0.15f))
 
