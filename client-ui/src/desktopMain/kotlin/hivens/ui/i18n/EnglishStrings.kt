@@ -526,4 +526,31 @@ object EnglishStrings : AppStrings {
     override val customizationReset           = "Reset all"
     override val customizationHexInvalid      = "Invalid hex"
     override val themePickerAccentOverride    = "Accent override (live)"
+
+    override val browseTitle        = "BROWSE"
+    override val browseSubtitle     = "Packs published on the mirror"
+    override val browseEmptyTitle   = "Catalog is empty"
+    override val browseEmptyMessage = "The mirror is reachable but has not published any packs yet. Check back later."
+    override val browseErrorTitle   = "Mirror unreachable"
+    override val browseErrorMessage = "Could not reach the mirror. Check your connection and retry."
+    override val browseRetry        = "Retry"
+
+    override val browseDetailErrorTitle    = "Could not load pack"
+    override val browseDetailErrorMessage  = "Could not fetch the manifest. Check your connection and retry."
+    override val browseDetailInstallReady  = "Ready to install"
+    override val browseDetailInstallHint   = "The install pipeline lands in the next release"
+    override val browseDetailInstallButton = "INSTALL"
+    override val browseDetailTagsTitle     = "Tags"
+    override val browseDetailAboutTitle       = "About this pack"
+    override val browseDetailAboutPlaceholder = "This pack ships %d mods and %d assets."
+    override val browseDetailAboutNote        = "A long-form description appears here once the mirror starts populating it on the manifest."
+    override val browseDetailCompatTitle      = "Compatibility"
+    override val browseDetailCompatMc         = "Minecraft"
+    override val browseDetailCompatLoader     = "Loader"
+    override val browseDetailCompatJava       = "Java"
+    override val browseDetailVersionTitle     = "Version"
+
+
+
+
 }

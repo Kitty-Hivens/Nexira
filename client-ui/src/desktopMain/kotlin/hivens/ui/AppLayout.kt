@@ -212,7 +212,15 @@ fun AppLayout(
                         onScreenChange = onScreenChange,
                     )
 
-                    Screen.Browse  -> BrowseScreen()
+                    Screen.Browse  -> BrowseScreen(
+                        onOpenPack = { packId -> onScreenChange(Screen.BrowsePackDetail(packId)) },
+                    )
+
+                    is Screen.BrowsePackDetail ->
+                        hivens.ui.screens.browse.BrowsePackDetailScreen(
+                            packId = screen.packId,
+                            onBack = { onScreenChange(Screen.Browse) },
+                        )
 
                     is Screen.PackDetail ->
                         PackDetailScreen(
@@ -257,6 +265,7 @@ fun AppSidebar(
     val libraryActive  = currentScreen is Screen.Library
             || currentScreen is Screen.PackDetail
     val browseActive   = currentScreen is Screen.Browse
+            || currentScreen is Screen.BrowsePackDetail
     val profileActive  = currentScreen is Screen.Profile
     val settingsActive = currentScreen is Screen.Settings
             || currentScreen is Screen.ThemePicker

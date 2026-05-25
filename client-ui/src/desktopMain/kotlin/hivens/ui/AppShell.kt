@@ -104,6 +104,15 @@ sealed class Screen {
      * graph).
      */
     data class PackDetail    (val instanceId: String) : Screen()
+
+    /**
+     * Browse-side detail target. Carries the mirror-side `pack_id`
+     * (e.g. `"Industrial"`); the detail screen fetches manifest +
+     * summary fresh via [hivens.launcher.smrt.SmrtPackClient]. Distinct
+     * from [PackDetail] which resolves an installed [hivens.core.data.PackInstance]
+     * via [hivens.core.api.interfaces.IPackRepository].
+     */
+    data class BrowsePackDetail(val packId: String) : Screen()
 }
 
 // ─── App Shell ───────────────────────────────────────────────────────────────
