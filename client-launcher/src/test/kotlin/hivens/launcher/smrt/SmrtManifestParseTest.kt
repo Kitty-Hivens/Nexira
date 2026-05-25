@@ -1,10 +1,12 @@
 package hivens.launcher.smrt
 
 import hivens.core.api.dto.smrt.SmrtPackManifest
+import hivens.core.api.dto.smrt.SmrtPackSummary
 import hivens.core.api.dto.smrt.SmrtSource
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -42,6 +44,15 @@ class SmrtManifestParseTest {
         assertNotNull(modrinthMod.display)
         assertEquals("Appleskin", modrinthMod.display!!.name)
         assertEquals("performance", modrinthMod.display!!.category)
+        // Rich display fields round-trip
+        assertEquals("https://cdn.modrinth.com/data/EsAfCjCV/icon.png", modrinthMod.display!!.iconUrl)
+        assertEquals("recipe_viewer", modrinthMod.display!!.role)
+        assertEquals(1, modrinthMod.display!!.requires.size)
+        modrinthMod.display!!.requires[0].let { req ->
+            assertEquals("AdvancedMachines.jar", req.filename)
+            assertEquals(">=1.0", req.versionRange)
+            assertFalse(req.optional)
+        }
 
         val cacheMod = pm.mods.first { it.filename == "AdvancedMachines.jar" }
         val cacheSrc = cacheMod.source
@@ -57,6 +68,54 @@ class SmrtManifestParseTest {
         // URL must be percent-encoded (smrt-pack fix for spaces in rel_path)
         assertTrue(staticSrc.url.contains("%20"),
             "smrt_static URL must percent-encode spaces; got: ${staticSrc.url}")
+    }
+
+    @Test
+    fun `parses pack summary with rich metadata`() {
+        val payload = """
+        {
+            "pack_id": "Industrial",
+            "display_name": "Industrial",
+            "tagline": "Heavy industry and automation.",
+            "minecraft_version": "1.12.2",
+            "latest_pack_version": "2026.05.22.9",
+            "tags": ["industry", "automation"],
+            "featured": true,
+            "icon_url": "https://smrt.hivens.dev/v1/packs/Industrial/static/_nexira/icon.png",
+            "banner_url": "https://smrt.hivens.dev/v1/packs/Industrial/static/_nexira/banner.png",
+            "gallery_urls": [
+                "https://smrt.hivens.dev/v1/packs/Industrial/static/_nexira/g1.png",
+                "https://smrt.hivens.dev/v1/packs/Industrial/static/_nexira/g2.png"
+            ],
+            "description_md": "# Industrial\n\nLong-form pack copy."
+        }
+        """.trimIndent()
+        val s: SmrtPackSummary = json.decodeFromString(payload)
+        assertEquals("Industrial", s.packId)
+        assertEquals("https://smrt.hivens.dev/v1/packs/Industrial/static/_nexira/icon.png", s.iconUrl)
+        assertEquals("https://smrt.hivens.dev/v1/packs/Industrial/static/_nexira/banner.png", s.bannerUrl)
+        assertEquals(2, s.galleryUrls.size)
+        assertTrue(s.descriptionMd!!.startsWith("# Industrial"))
+    }
+
+    @Test
+    fun `parses pack summary without rich metadata`() {
+        // Mirror manifests authored before the rich-metadata extension still
+        // parse with all new fields defaulted to null / empty.
+        val bare = """
+        {
+            "pack_id": "Bare",
+            "display_name": "Bare",
+            "tagline": "",
+            "minecraft_version": "1.12.2",
+            "latest_pack_version": "2026.06.01"
+        }
+        """.trimIndent()
+        val s: SmrtPackSummary = json.decodeFromString(bare)
+        assertNull(s.iconUrl)
+        assertNull(s.bannerUrl)
+        assertTrue(s.galleryUrls.isEmpty())
+        assertNull(s.descriptionMd)
     }
 
     @Test
@@ -124,7 +183,12 @@ class SmrtManifestParseTest {
                     "name": "Appleskin",
                     "description": "Hunger and saturation visualization.",
                     "category": "performance",
-                    "url": "https://modrinth.com/mod/appleskin"
+                    "url": "https://modrinth.com/mod/appleskin",
+                    "icon_url": "https://cdn.modrinth.com/data/EsAfCjCV/icon.png",
+                    "role": "recipe_viewer",
+                    "requires": [
+                        {"filename": "AdvancedMachines.jar", "version_range": ">=1.0", "optional": false}
+                    ]
                 }
             },
             {
