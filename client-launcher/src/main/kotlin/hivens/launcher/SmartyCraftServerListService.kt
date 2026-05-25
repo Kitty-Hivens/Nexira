@@ -23,6 +23,7 @@ import java.util.concurrent.CompletableFuture
 class SmartyCraftServerListService(
     private val repository: ServerRepository,
     private val protocolConfig: ServerProtocolConfig = ServerProtocolConfig(),
+    private val cache: ServerListCacheStore = ServerListCacheStore.NoOp,
 ) : IServerListService {
 
     private val logger = LoggerFactory.getLogger(SmartyCraftServerListService::class.java)
@@ -77,6 +78,11 @@ class SmartyCraftServerListService(
                     val data = DashboardData(servers, news)
                     if (servers.isNotEmpty()) {
                         synchronized(lock) { cachedData = data }
+                        // Disk cache feeds [TrayManager] at the next launch
+                        // before the network round-trip; only persist on
+                        // success so a transient outage cannot overwrite
+                        // the last-known-good list with an empty one.
+                        cache.save(servers)
                     }
                     data
                 } catch (e: Exception) {
