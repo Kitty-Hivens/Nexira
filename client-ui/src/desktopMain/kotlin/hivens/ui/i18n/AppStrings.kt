@@ -574,48 +574,22 @@ interface AppStrings {
     // --- Browse pack detail ---
     val browseDetailErrorTitle: String
     val browseDetailErrorMessage: String
-    val browseDetailInstallTitle: String
     val browseDetailInstallReady: String
     val browseDetailInstallHint: String
     val browseDetailInstallButton: String
-    val browseDetailModsTitle: String
-    val browseDetailModsCount: String
-    val browseDetailModsMore: String
-    val browseDetailAssetsTitle: String
-    val browseDetailAssetsCount: String
     val browseDetailTagsTitle: String
+    val browseDetailAboutTitle: String
+    val browseDetailAboutPlaceholder: String
+    val browseDetailAboutNote: String
+    val browseDetailCompatTitle: String
+    val browseDetailCompatMc: String
+    val browseDetailCompatLoader: String
+    val browseDetailCompatJava: String
+    val browseDetailVersionTitle: String
 
     // --- Browse pack detail: mods + assets browser ---
-    val browseDetailModsSearch: String
-    val browseDetailModsFilteredCount: String
-    val browseDetailModsEmptyFilter: String
-    val browseDetailModsOptional: String
-    val browseDetailModsIncompatible: String
-    val browseDetailSourceModrinth: String
-    val browseDetailSourceMirrorCache: String
-    val browseDetailSourceMirrorStatic: String
-    val browseDetailAssetsEmpty: String
 
     // --- Floating mod / asset browsers ---
-    val modBrowserOpenButton: String
-    val modBrowserTitle: String
-    val modBrowserSelectedCount: String
-    val modBrowserShowingCount: String
-    val modBrowserOnlyOptional: String
-    val modBrowserApply: String
-    val modBrowserCancel: String
-    val modBrowserRequiredChip: String
-    val modBrowserConflictWarn: String
 
-    val assetBrowserOpenButton: String
-    val assetBrowserTitle: String
-    val assetBrowserSearch: String
-    val assetBrowserSelectedCount: String
-    val assetBrowserEmptyFilter: String
 
-    val browseDetailContentTitle: String
-    val browseDetailContentMods: String
-    val browseDetailContentAssets: String
-    val browseDetailContentOpen: String
-    val browseDetailContentEmpty: String
 }
