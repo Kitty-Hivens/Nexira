@@ -1,7 +1,6 @@
 package hivens.ui.screens.browse
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,8 +28,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -63,16 +60,21 @@ import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 
 /**
- * Catalogue detail screen: shows the full manifest of a pack served
- * by the mirror so a user can inspect what would be installed before
- * committing to it. Read-only; the actual install pipeline (creates
- * a [hivens.core.data.PackInstance], calls
- * [hivens.launcher.smrt.SmrtSyncService.sync]) lands in the next PR.
+ * Catalog inspect page for a single mirror-published pack.
+ * Modrinth-pattern: hero with banner + tagline up top, main column
+ * carries the install CTA + any future long-form description block,
+ * sidebar carries the structured metadata (compatibility, version,
+ * tags, links).
  *
- * Three states:
- *  - [DetailState.Loading] -- summary + manifest in flight in parallel
- *  - [DetailState.Loaded]  -- both succeeded
- *  - [DetailState.Error]   -- either call failed; retry available
+ * Intentionally NO mod / asset browser here. Catalog inspect answers
+ * "what is this and do I want it"; per-item content management is a
+ * concern of the installed-instance pack page (Library), not the
+ * catalog. Putting the browser here mixed the two surfaces and got
+ * reverted before the PR landed.
+ *
+ * Three states: [DetailState.Loading], [DetailState.Loaded] (summary
+ * + manifest both fetched in parallel), [DetailState.Error] with
+ * retry.
  */
 @Composable
 fun BrowsePackDetailScreen(packId: String, onBack: () -> Unit) {
@@ -89,9 +91,7 @@ fun BrowsePackDetailScreen(packId: String, onBack: () -> Unit) {
     LaunchedEffect(packId, retryTick) {
         state = DetailState.Loading
         state = try {
-            // Summary and manifest both come from independent endpoints;
-            // fetch in parallel so the wall-time is one round-trip, not two.
-            val pair: Pair<SmrtPackSummary, SmrtPackManifest> = coroutineScope {
+            val pair = coroutineScope {
                 val summary  = async(Dispatchers.IO) { client.fetchSummary(packId) }
                 val manifest = async(Dispatchers.IO) { client.fetchManifest(packId) }
                 awaitAll(summary, manifest)
@@ -103,78 +103,47 @@ fun BrowsePackDetailScreen(packId: String, onBack: () -> Unit) {
         }
     }
 
-    var selectedOptionalMods   by remember(packId) { mutableStateOf(emptySet<String>()) }
-    var selectedOptionalAssets by remember(packId) { mutableStateOf(emptySet<String>()) }
-    var modDialogOpen          by remember { mutableStateOf(false) }
-    var assetDialogOpen        by remember { mutableStateOf(false) }
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+        Hero(packId = packId, summary = (state as? DetailState.Loaded)?.summary, onBack = onBack)
 
-    Box(Modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-            Hero(packId = packId, summary = (state as? DetailState.Loaded)?.summary, onBack = onBack)
-
-            when (val st = state) {
-                DetailState.Loading -> Box(
-                    Modifier.fillMaxWidth().height(280.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    CircularProgressIndicator(
-                        color       = CelestiaTheme.colors.primary.copy(alpha = 0.6f),
-                        strokeWidth = 2.dp,
-                        modifier    = Modifier.size(28.dp),
-                    )
-                }
-                is DetailState.Error -> Box(
-                    Modifier.fillMaxWidth().padding(32.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        Text(
-                            text       = s.browseDetailErrorTitle,
-                            style      = MaterialTheme.typography.titleLarge,
-                            color      = CelestiaTheme.colors.error,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                        Text(
-                            text      = st.message,
-                            style     = MaterialTheme.typography.bodySmall,
-                            color     = CelestiaTheme.colors.textSecondary,
-                            textAlign = TextAlign.Center,
-                            modifier  = Modifier.widthIn(max = 480.dp),
-                        )
-                        Button(onClick = { retryTick++ }) { Text(s.browseRetry) }
-                    }
-                }
-                is DetailState.Loaded -> LoadedBody(
-                    summary             = st.summary,
-                    manifest            = st.manifest,
-                    onOpenModBrowser    = { modDialogOpen = true },
-                    onOpenAssetBrowser  = { assetDialogOpen = true },
+        when (val st = state) {
+            DetailState.Loading -> Box(
+                Modifier.fillMaxWidth().height(280.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator(
+                    color       = CelestiaTheme.colors.primary.copy(alpha = 0.6f),
+                    strokeWidth = 2.dp,
+                    modifier    = Modifier.size(28.dp),
                 )
             }
-        }
 
-        // Floating browsers -- overlay above the scrolling content,
-        // backdrop dismisses, selection state lives at this screen
-        // level so re-opens preserve what the user already picked.
-        val loaded = state as? DetailState.Loaded
-        if (modDialogOpen && loaded != null) {
-            ModBrowserDialog(
-                mods             = loaded.manifest.mods,
-                initialSelection = selectedOptionalMods,
-                onApply          = { selectedOptionalMods = it },
-                onDismiss        = { modDialogOpen = false },
-            )
-        }
-        if (assetDialogOpen && loaded != null) {
-            AssetBrowserDialog(
-                assets           = loaded.manifest.assets,
-                initialSelection = selectedOptionalAssets,
-                onApply          = { selectedOptionalAssets = it },
-                onDismiss        = { assetDialogOpen = false },
-            )
+            is DetailState.Error -> Box(
+                Modifier.fillMaxWidth().padding(32.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Text(
+                        text       = s.browseDetailErrorTitle,
+                        style      = MaterialTheme.typography.titleLarge,
+                        color      = CelestiaTheme.colors.error,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        text      = st.message,
+                        style     = MaterialTheme.typography.bodySmall,
+                        color     = CelestiaTheme.colors.textSecondary,
+                        textAlign = TextAlign.Center,
+                        modifier  = Modifier.widthIn(max = 480.dp),
+                    )
+                    Button(onClick = { retryTick++ }) { Text(s.browseRetry) }
+                }
+            }
+
+            is DetailState.Loaded -> LoadedBody(summary = st.summary, manifest = st.manifest)
         }
     }
 }
@@ -185,7 +154,7 @@ private fun Hero(packId: String, summary: SmrtPackSummary?, onBack: () -> Unit) 
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(200.dp)
+            .height(220.dp)
             .background(gradient),
     ) {
         Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.35f)))
@@ -198,7 +167,7 @@ private fun Hero(packId: String, summary: SmrtPackSummary?, onBack: () -> Unit) 
         }
 
         Column(
-            modifier            = Modifier.fillMaxSize().padding(start = 24.dp, end = 24.dp, top = 24.dp, bottom = 20.dp),
+            modifier            = Modifier.fillMaxSize().padding(start = 32.dp, end = 32.dp, top = 32.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.Bottom,
         ) {
             Text(
@@ -208,11 +177,11 @@ private fun Hero(packId: String, summary: SmrtPackSummary?, onBack: () -> Unit) 
                 fontWeight = FontWeight.Bold,
             )
             if (summary != null && summary.tagline.isNotBlank()) {
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(8.dp))
                 Text(
                     text  = summary.tagline,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White.copy(alpha = 0.85f),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = Color.White.copy(alpha = 0.88f),
                 )
             }
         }
@@ -220,76 +189,151 @@ private fun Hero(packId: String, summary: SmrtPackSummary?, onBack: () -> Unit) 
 }
 
 @Composable
-private fun LoadedBody(
-    summary: SmrtPackSummary,
-    manifest: SmrtPackManifest,
-    onOpenModBrowser: () -> Unit,
-    onOpenAssetBrowser: () -> Unit,
-) {
+private fun LoadedBody(summary: SmrtPackSummary, manifest: SmrtPackManifest) {
+    Row(
+        modifier              = Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 24.dp),
+        horizontalArrangement = Arrangement.spacedBy(24.dp),
+    ) {
+        // Main column: install CTA + (future) long-form description.
+        Column(
+            modifier            = Modifier.weight(2f),
+            verticalArrangement = Arrangement.spacedBy(20.dp),
+        ) {
+            InstallBar()
+            DescriptionPlaceholder(modsCount = manifest.mods.size, assetsCount = manifest.assets.size)
+        }
+        // Sidebar: structured metadata.
+        Column(
+            modifier            = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(20.dp),
+        ) {
+            CompatBlock(manifest = manifest)
+            VersionBlock(version = manifest.packVersion)
+            if (summary.tags.isNotEmpty()) TagsBlock(tags = summary.tags)
+        }
+    }
+}
+
+@Composable
+private fun InstallBar() {
     val s = LocalStrings.current
-    Column(
-        modifier            = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(glassSurfaceAlpha(0.6f))
+            .padding(20.dp),
     ) {
         Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier              = Modifier.fillMaxWidth(),
             verticalAlignment     = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Chip("MC ${manifest.minecraft.version}")
-            Chip("${manifest.loader.name} ${manifest.loader.version}")
-            Chip("Java ${manifest.java.major}")
-            Chip(manifest.packVersion, emphasis = true)
-        }
-
-        Section(title = s.browseDetailInstallTitle) {
-            Row(
-                modifier              = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment     = Alignment.CenterVertically,
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text       = s.browseDetailInstallReady,
+                    style      = MaterialTheme.typography.titleMedium,
+                    color      = CelestiaTheme.colors.textPrimary,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text  = s.browseDetailInstallHint,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = CelestiaTheme.colors.textSecondary,
+                )
+            }
+            Button(
+                onClick = { /* TODO: install pipeline -- next PR */ },
+                enabled = false,
+                shape   = RoundedCornerShape(12.dp),
+                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
+                colors  = ButtonDefaults.buttonColors(
+                    containerColor = CelestiaTheme.colors.primary,
+                    contentColor   = Color.White,
+                ),
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text       = s.browseDetailInstallReady,
-                        style      = MaterialTheme.typography.titleMedium,
-                        color      = CelestiaTheme.colors.textPrimary,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Text(
-                        text  = s.browseDetailInstallHint,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = CelestiaTheme.colors.textSecondary,
-                    )
-                }
-                Button(
-                    onClick = { /* TODO: install pipeline -- next PR */ },
-                    enabled = false,
-                    shape   = RoundedCornerShape(12.dp),
-                    colors  = ButtonDefaults.buttonColors(
-                        containerColor = CelestiaTheme.colors.primary,
-                        contentColor   = Color.White,
-                    ),
-                ) {
-                    Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.size(8.dp))
-                    Text(s.browseDetailInstallButton, fontWeight = FontWeight.Bold)
-                }
+                Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.size(8.dp))
+                Text(s.browseDetailInstallButton, fontWeight = FontWeight.Bold)
             }
         }
+    }
+}
 
-        ContentSummary(
-            modsCount        = manifest.mods.size,
-            assetsCount      = manifest.assets.size,
-            onOpenMods       = onOpenModBrowser,
-            onOpenAssets     = onOpenAssetBrowser,
+@Composable
+private fun DescriptionPlaceholder(modsCount: Int, assetsCount: Int) {
+    val s = LocalStrings.current
+    Section(title = s.browseDetailAboutTitle) {
+        Text(
+            text  = s.browseDetailAboutPlaceholder.format(modsCount, assetsCount),
+            style = MaterialTheme.typography.bodyMedium,
+            color = CelestiaTheme.colors.textPrimary.copy(alpha = 0.9f),
         )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text  = s.browseDetailAboutNote,
+            style = MaterialTheme.typography.bodySmall,
+            color = CelestiaTheme.colors.textSecondary,
+        )
+    }
+}
 
-        if (summary.tags.isNotEmpty()) {
-            Section(title = s.browseDetailTagsTitle) {
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    summary.tags.forEach { Chip(it) }
-                }
-            }
+@Composable
+private fun CompatBlock(manifest: SmrtPackManifest) {
+    val s = LocalStrings.current
+    SidebarBlock(title = s.browseDetailCompatTitle) {
+        MetaRow(label = s.browseDetailCompatMc,     value = manifest.minecraft.version)
+        MetaRow(label = s.browseDetailCompatLoader, value = "${manifest.loader.name} ${manifest.loader.version}")
+        MetaRow(label = s.browseDetailCompatJava,   value = "Java ${manifest.java.major}")
+    }
+}
+
+@Composable
+private fun VersionBlock(version: String) {
+    val s = LocalStrings.current
+    SidebarBlock(title = s.browseDetailVersionTitle) {
+        Text(
+            text       = version,
+            style      = MaterialTheme.typography.bodyMedium,
+            color      = CelestiaTheme.colors.textPrimary,
+            fontWeight = FontWeight.SemiBold,
+        )
+    }
+}
+
+@Composable
+private fun TagsBlock(tags: List<String>) {
+    val s = LocalStrings.current
+    SidebarBlock(title = s.browseDetailTagsTitle) {
+        // Inline flow of chips. Compose Material3 does not have a
+        // FlowRow primitive that handles wrap-around for arbitrary
+        // chip widths nicely at all sizes; an explicit Row that
+        // overflows for very wide tag sets is acceptable for now --
+        // tag lists in practice are 2-4 short strings.
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            tags.forEach { Chip(it) }
         }
+    }
+}
+
+@Composable
+private fun MetaRow(label: String, value: String) {
+    Row(
+        modifier              = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment     = Alignment.CenterVertically,
+    ) {
+        Text(
+            text  = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = CelestiaTheme.colors.textSecondary,
+        )
+        Text(
+            text       = value,
+            style      = MaterialTheme.typography.bodySmall,
+            color      = CelestiaTheme.colors.textPrimary,
+            fontWeight = FontWeight.SemiBold,
+        )
     }
 }
 
@@ -297,10 +341,10 @@ private fun LoadedBody(
 private fun Section(title: String, content: @Composable () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
-            text       = title.uppercase(),
-            style      = MaterialTheme.typography.titleSmall,
-            color      = CelestiaTheme.colors.primary,
-            fontWeight = FontWeight.Bold,
+            text          = title.uppercase(),
+            style         = MaterialTheme.typography.titleSmall,
+            color         = CelestiaTheme.colors.primary,
+            fontWeight    = FontWeight.Bold,
         )
         Box(
             modifier = Modifier
@@ -315,93 +359,32 @@ private fun Section(title: String, content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun Chip(text: String, emphasis: Boolean = false) {
+private fun SidebarBlock(title: String, content: @Composable () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text       = title,
+            style      = MaterialTheme.typography.titleSmall,
+            color      = CelestiaTheme.colors.textPrimary,
+            fontWeight = FontWeight.Bold,
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) { content() }
+    }
+}
+
+@Composable
+private fun Chip(text: String) {
     AssistChip(
         onClick = {},
         enabled = false,
         shape   = RoundedCornerShape(8.dp),
         label   = { Text(text, style = MaterialTheme.typography.labelSmall, color = CelestiaTheme.colors.textPrimary) },
         colors  = AssistChipDefaults.assistChipColors(
-            disabledContainerColor = if (emphasis) CelestiaTheme.colors.primary.copy(alpha = 0.18f)
-                                     else          glassSurfaceAlpha(0.4f),
+            disabledContainerColor = glassSurfaceAlpha(0.4f),
             disabledLabelColor     = CelestiaTheme.colors.textPrimary,
         ),
         border  = null,
     )
 }
-
-// ─── Content summary ──────────────────────────────────────────────────────────
-
-@Composable
-private fun ContentSummary(
-    modsCount: Int,
-    assetsCount: Int,
-    onOpenMods: () -> Unit,
-    onOpenAssets: () -> Unit,
-) {
-    val s = LocalStrings.current
-    Section(title = s.browseDetailContentTitle) {
-        Row(
-            modifier              = Modifier.fillMaxWidth(),
-            verticalAlignment     = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            SummaryTile(
-                label   = s.browseDetailContentMods,
-                count   = modsCount,
-                onClick = onOpenMods,
-                modifier = Modifier.weight(1f),
-            )
-            SummaryTile(
-                label   = s.browseDetailContentAssets,
-                count   = assetsCount,
-                enabled = assetsCount > 0,
-                onClick = onOpenAssets,
-                modifier = Modifier.weight(1f),
-            )
-        }
-    }
-}
-
-@Composable
-private fun SummaryTile(
-    label: String,
-    count: Int,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    enabled: Boolean = true,
-) {
-    val s = LocalStrings.current
-    Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(10.dp))
-            .background(glassSurfaceAlpha(0.4f))
-            .clickable(enabled = enabled, onClick = onClick)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        Text(
-            text       = label,
-            style      = MaterialTheme.typography.labelSmall,
-            color      = CelestiaTheme.colors.textSecondary,
-            fontWeight = FontWeight.SemiBold,
-        )
-        Text(
-            text       = count.toString(),
-            style      = MaterialTheme.typography.headlineMedium,
-            color      = if (enabled) CelestiaTheme.colors.textPrimary
-                         else          CelestiaTheme.colors.textSecondary.copy(alpha = 0.5f),
-            fontWeight = FontWeight.Bold,
-        )
-        Text(
-            text  = if (enabled) s.browseDetailContentOpen else s.browseDetailContentEmpty,
-            style = MaterialTheme.typography.labelSmall,
-            color = if (enabled) CelestiaTheme.colors.primary
-                    else         CelestiaTheme.colors.textSecondary.copy(alpha = 0.5f),
-        )
-    }
-}
-
 
 private sealed class DetailState {
     object Loading : DetailState()
