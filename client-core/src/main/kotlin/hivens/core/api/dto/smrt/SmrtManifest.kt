@@ -75,6 +75,13 @@ sealed class SmrtSource {
 /**
  * Advisory display metadata. All fields optional; a launcher renders
  * sensible defaults derived from filename / dest when absent.
+ *
+ * [iconUrl], [role], and [requires] enable richer browse/library UX:
+ * per-item icons, role-grouped pickers ("Recipe viewer" with a JEI ⇄
+ * REI ⇄ EMI dropdown), and a dependency DAG the launcher can render
+ * as a tree under each mod row. All three additive -- a manifest
+ * without them parses cleanly and the launcher falls back to its
+ * current rendering.
  */
 @Serializable
 data class SmrtDisplay(
@@ -84,8 +91,51 @@ data class SmrtDisplay(
     @SerialName("incompatible_with") val incompatibleWith: List<String> = emptyList(),
     val license: String? = null,
     val url: String? = null,
+    /**
+     * Per-item icon. Mirror serves directly for smrt_cache / smrt_static
+     * entries; Modrinth-sourced entries leave this null and the launcher
+     * resolves the project icon via the source's `project_id` on first
+     * render (Coil caches the result).
+     */
+    @SerialName("icon_url") val iconUrl: String? = null,
+    /**
+     * Short tag for grouping interchangeable mods. Launcher renders all
+     * mods with the same role as a single dropdown ("Recipe viewer: JEI
+     * [v]" lets the user swap to REI / JER / EMI). Canonical values are
+     * mirror-curated; the launcher does not enumerate them.
+     */
+    val role: String? = null,
+    /**
+     * DAG of same-manifest dependencies. Resolver validates every entry's
+     * `filename` references an actual mods[] entry; missing references
+     * surface as broken-manifest warnings at install time.
+     */
+    val requires: List<SmrtRequirement> = emptyList(),
 )
 
+/**
+ * Single edge in a mod's dependency DAG. [filename] points at another
+ * entry in the same manifest's mods[] list. [versionRange] follows
+ * Maven-style range syntax (`>=4.0`, `[1.0,2.0)`); null means "any
+ * version present is acceptable". [optional] = true means the consumer
+ * works without the dep but works better with it -- the launcher shows
+ * it greyed-out in the dep tree.
+ */
+@Serializable
+data class SmrtRequirement(
+    val filename: String,
+    @SerialName("version_range") val versionRange: String? = null,
+    val optional: Boolean = false,
+)
+
+/**
+ * Catalogue card payload for the Browse surface.
+ *
+ * [iconUrl] / [bannerUrl] / [galleryUrls] / [descriptionMd] are the
+ * "polish layer" -- a tagline-only catalogue reads as scaffolding even
+ * when the engine underneath is solid. All four optional, additive,
+ * and mirror-authored per pack release.
+ */
 @Serializable
 data class SmrtPackSummary(
     @SerialName("pack_id") val packId: String,
@@ -95,6 +145,14 @@ data class SmrtPackSummary(
     @SerialName("latest_pack_version") val latestPackVersion: String,
     val tags: List<String> = emptyList(),
     val featured: Boolean = false,
+    /** Square pack icon. Renders in BrowsePackCard avatar slot + BrowsePackDetail hero. */
+    @SerialName("icon_url") val iconUrl: String? = null,
+    /** Wide hero image. Renders behind BrowsePackDetail hero text; falls back to the mirror gradient when absent. */
+    @SerialName("banner_url") val bannerUrl: String? = null,
+    /** Optional marketing screenshots. Rendered in a horizontal scroller on BrowsePackDetail when non-empty. */
+    @SerialName("gallery_urls") val galleryUrls: List<String> = emptyList(),
+    /** Long-form CommonMark description for the BrowsePackDetail About section. HTML is not parsed. */
+    @SerialName("description_md") val descriptionMd: String? = null,
 )
 
 @Serializable
