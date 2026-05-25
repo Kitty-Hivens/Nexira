@@ -229,6 +229,7 @@ object RussianStrings : AppStrings {
     override val backgroundSaturation     = "Насыщенность"
     override val backgroundParallax       = "Параллакс"
     override val backgroundVignette       = "Виньетка"
+    override val backgroundAnimationSpeed = "Скорость анимации"
     override val backgroundSectionTint    = "ЦВЕТОВОЙ ОТТЕНОК"
     override val backgroundTintNone       = "Нет"
     override val backgroundTintNavy       = "Тёмно-синий"
