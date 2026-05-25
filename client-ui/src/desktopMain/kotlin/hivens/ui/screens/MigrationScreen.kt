@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.dp
 import hivens.launcher.platform.DataDirMigration
 import hivens.ui.components.CelestiaButton
 import hivens.ui.components.GlassCard
+import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
 import kotlinx.coroutines.Dispatchers
@@ -124,7 +125,7 @@ private fun ReadyContent(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(10.dp))
-            .background(CelestiaTheme.colors.surface.copy(alpha = 0.4f))
+            .background(glassSurfaceAlpha(0.4f))
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {

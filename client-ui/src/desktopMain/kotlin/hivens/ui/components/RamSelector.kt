@@ -22,6 +22,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
 
@@ -74,7 +75,7 @@ fun RamSelector(
                 row.forEach { preset ->
                     val isSelected = currentMb == preset && !isCustomMode
                     val bgColor by animateColorAsState(
-                        if (isSelected) CelestiaTheme.colors.primary else CelestiaTheme.colors.surface.copy(alpha = 0.5f),
+                        if (isSelected) CelestiaTheme.colors.primary else glassSurfaceAlpha(0.5f),
                         tween(200)
                     )
                     val textColor by animateColorAsState(

@@ -21,6 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.core.data.HomeView
 import hivens.core.data.UiStyle
+import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
@@ -151,7 +152,7 @@ internal fun AppearanceSection(
             .fillMaxWidth()
             .clip(RoundedCornerShape(style.cardCorner))
             .clickable(onClick = onOpenBackgroundSettings)
-            .background(CelestiaTheme.colors.surface.copy(alpha = 0.4f))
+            .background(glassSurfaceAlpha(0.4f))
             .padding(16.dp),
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
@@ -176,7 +177,7 @@ internal fun AppearanceSection(
             .fillMaxWidth()
             .clip(RoundedCornerShape(style.cardCorner))
             .clickable(onClick = onOpenCustomizationExtension)
-            .background(CelestiaTheme.colors.surface.copy(alpha = 0.4f))
+            .background(glassSurfaceAlpha(0.4f))
             .padding(16.dp),
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,

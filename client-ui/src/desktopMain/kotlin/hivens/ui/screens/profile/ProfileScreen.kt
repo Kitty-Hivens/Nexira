@@ -12,6 +12,7 @@ import androidx.compose.ui.unit.dp
 import hivens.core.api.SkinRepository
 import hivens.core.data.SessionData
 import hivens.ui.components.GlassCard
+import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.identity.SkinManager
 import hivens.ui.puppet.PuppetClick
@@ -52,7 +53,7 @@ fun ProfileScreen(session: SessionData, skinRepository: SkinRepository) {
         // glassy under Brut, same rule as the Settings frame.
         GlassCard(
             modifier        = Modifier.weight(1f).fillMaxWidth(),
-            backgroundColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
+            backgroundColor = glassSurfaceAlpha(0.7f),
         ) {
             Row(Modifier.fillMaxSize().padding(16.dp)) {
                 ProfileCategoryNav(

@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
+import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.screens.library.PackLoaderChip
 import hivens.ui.screens.library.PackMetaChip
@@ -183,7 +184,7 @@ private fun PlayBar(pack: PackInstance, onPlay: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
-            .background(CelestiaTheme.colors.surface.copy(alpha = 0.7f))
+            .background(glassSurfaceAlpha(0.7f))
             .padding(16.dp),
     ) {
         Row(
@@ -234,7 +235,7 @@ private fun Section(title: String, content: @Composable () -> Unit) {
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(12.dp))
-                .background(CelestiaTheme.colors.surface.copy(alpha = 0.6f))
+                .background(glassSurfaceAlpha(0.6f))
                 .padding(16.dp),
         ) {
             content()
