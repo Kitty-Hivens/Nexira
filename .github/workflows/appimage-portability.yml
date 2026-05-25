@@ -93,10 +93,14 @@ jobs:
           - distro_name: Debian-stable
             container: debian:stable
             expect_keyring: any
+            # ca-certificates is explicit because --no-install-recommends
+            # drops it from gh's dependency closure; the debian:stable image
+            # no longer ships a pre-installed CA bundle, so `gh release
+            # download` failed TLS verification against api.github.com.
             install_cmd: |
               apt-get update -qq
               apt-get install -y --no-install-recommends \
-                xvfb libfuse2 libsecret-1-0 gh \
+                ca-certificates xvfb libfuse2 libsecret-1-0 gh \
                 libxi6 libxrender1 libxtst6 libxext6 libxcursor1 libxxf86vm1 \
                 libfontconfig1 libfreetype6 libgl1 \
                 xauth
