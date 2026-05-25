@@ -527,4 +527,12 @@ object RussianStrings : AppStrings {
     override val customizationReset           = "Сбросить всё"
     override val customizationHexInvalid      = "Неверный hex"
     override val themePickerAccentOverride    = "Свой акцент (применяется сразу)"
+
+    override val browseTitle        = "КАТАЛОГ"
+    override val browseSubtitle     = "Сборки опубликованные на зеркале"
+    override val browseEmptyTitle   = "Каталог пуст"
+    override val browseEmptyMessage = "Зеркало доступно, но пока не публикует сборки. Загляни позже."
+    override val browseErrorTitle   = "Зеркало недоступно"
+    override val browseErrorMessage = "Не удалось дотянуться до зеркала. Проверь соединение и повтори."
+    override val browseRetry        = "Повторить"
 }

@@ -526,4 +526,12 @@ object GermanStrings : AppStrings {
     override val customizationReset           = "Alles zurücksetzen"
     override val customizationHexInvalid      = "Ungültiger Hex"
     override val themePickerAccentOverride    = "Akzent überschreiben (sofort)"
+
+    override val browseTitle        = "KATALOG"
+    override val browseSubtitle     = "Auf dem Mirror veröffentlichte Packs"
+    override val browseEmptyTitle   = "Katalog ist leer"
+    override val browseEmptyMessage = "Der Mirror ist erreichbar, hat aber noch keine Packs veröffentlicht. Schau später wieder vorbei."
+    override val browseErrorTitle   = "Mirror nicht erreichbar"
+    override val browseErrorMessage = "Mirror konnte nicht erreicht werden. Verbindung prüfen und erneut versuchen."
+    override val browseRetry        = "Erneut versuchen"
 }

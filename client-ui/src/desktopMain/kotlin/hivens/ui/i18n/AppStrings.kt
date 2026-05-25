@@ -561,4 +561,13 @@ interface AppStrings {
     val customizationReset: String
     val customizationHexInvalid: String
     val themePickerAccentOverride: String
+
+    // --- Browse screen ---
+    val browseTitle: String
+    val browseSubtitle: String
+    val browseEmptyTitle: String
+    val browseEmptyMessage: String
+    val browseErrorTitle: String
+    val browseErrorMessage: String
+    val browseRetry: String
 }
