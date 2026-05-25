@@ -31,6 +31,7 @@ import hivens.launcher.network.NetworkState
 import hivens.launcher.network.ServerProtocolConfig
 import hivens.ui.background.BackgroundSettings
 import hivens.ui.customization.CustomizationSettings
+import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.easter.LocalAprilFools
 import hivens.ui.i18n.AppLocale
 import hivens.ui.puppet.PuppetClick
@@ -102,7 +103,7 @@ fun AppLayout(
 
         VerticalDivider(
             modifier = Modifier.fillMaxHeight(),
-            color    = CelestiaTheme.colors.surface.copy(alpha = 0.6f)
+            color    = glassSurfaceAlpha(0.6f)
         )
 
         // ── Main content ──────────────────────────────────────────────────
@@ -224,7 +225,7 @@ fun AppLayout(
 
         VerticalDivider(
             modifier = Modifier.fillMaxHeight(),
-            color    = CelestiaTheme.colors.surface.copy(alpha = 0.6f)
+            color    = glassSurfaceAlpha(0.6f)
         )
 
         // ── Right panel 264dp ─────────────────────────────────────────────
@@ -326,7 +327,7 @@ fun AppSidebar(
 
     NavigationRail(
         modifier       = Modifier.width(64.dp).fillMaxHeight(),
-        containerColor = CelestiaTheme.colors.surface.copy(alpha = 0.35f),
+        containerColor = glassSurfaceAlpha(0.35f),
         contentColor   = CelestiaTheme.colors.textSecondary
     ) {
         // ── Nav items ─────────────────────────────────────────────────────
