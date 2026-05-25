@@ -587,9 +587,12 @@ interface AppStrings {
     val browseDetailCompatJava: String
     val browseDetailVersionTitle: String
 
-    // --- Browse pack detail: mods + assets browser ---
-
-    // --- Floating mod / asset browsers ---
-
-
+    val browseDetailInstallRunningTitle: String
+    val browseDetailInstallProgress: String
+    val browseDetailInstallStarting: String
+    val browseDetailInstallDoneTitle: String
+    val browseDetailInstallDoneHint: String
+    val browseDetailInstallOpenLibrary: String
+    val browseDetailInstallFailedTitle: String
+    val browseDetailInstallFailedGeneric: String
 }

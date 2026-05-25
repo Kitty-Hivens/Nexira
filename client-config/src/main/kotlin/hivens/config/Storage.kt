@@ -6,4 +6,5 @@ object Storage {
     const val PROFILES_FILE         = "profiles.json"
     const val HASH_CACHE_FILE       = "smarty_hash.cache"
     const val PROTECTED_PATHS_FILE  = "protected-paths.json"
+    const val PACKS_FILE            = "packs.json"
 }
