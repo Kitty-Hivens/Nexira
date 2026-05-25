@@ -46,7 +46,12 @@ fun GlassCard(
         CardSurface.Glass -> palette.glassBackground.copy(
             alpha = (palette.glassAlpha * customization.glassIntensity).coerceIn(0f, 1f),
         )
-        CardSurface.Flat  -> MaterialTheme.colorScheme.surface
+        // Brut's natural opacity is 1.0; the intensity knob scales
+        // from there so a user can opt into translucency even under
+        // the "opaque" style without losing Brut's default at 1.0.
+        CardSurface.Flat  -> MaterialTheme.colorScheme.surface.copy(
+            alpha = customization.glassIntensity.coerceIn(0f, 1f),
+        )
     }
     val resolvedBorderWidth = style.cardBorder.coerceAtLeast(0.dp)
     val resolvedBorder = when {

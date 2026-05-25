@@ -56,9 +56,7 @@ import hivens.ui.customization.CustomizationSettings
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
-import hivens.ui.theme.CardSurface
 import hivens.ui.theme.CelestiaTheme
-import hivens.ui.theme.LocalStyle
 
 /**
  * Experimental visual customization layer that sits on top of the
@@ -133,13 +131,8 @@ fun CustomizationExtensionScreen(
                 LabeledSlider(s.customizationDensity, settings.densityScale, 0.85f..1.15f, "%.2fx") {
                     update { copy(densityScale = it) }
                 }
-                // Brut renders cards as CardSurface.Flat which ignores
-                // palette.glassAlpha entirely; hide the slider rather
-                // than leave it silently inert.
-                if (LocalStyle.current.cardSurface == CardSurface.Glass) {
-                    LabeledSlider(s.customizationGlassIntensity, settings.glassIntensity, 0f..1f, "%.0f%%", 100f) {
-                        update { copy(glassIntensity = it) }
-                    }
+                LabeledSlider(s.customizationGlassIntensity, settings.glassIntensity, 0f..1f, "%.0f%%", 100f) {
+                    update { copy(glassIntensity = it) }
                 }
 
                 HorizontalDivider(color = CelestiaTheme.colors.outline.copy(alpha = 0.15f))
