@@ -20,11 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
@@ -51,15 +47,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import hivens.core.api.dto.smrt.SmrtAssetEntry
-import hivens.core.api.dto.smrt.SmrtModEntry
 import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.dto.smrt.SmrtPackSummary
-import hivens.core.api.dto.smrt.SmrtSource
 import hivens.launcher.smrt.SmrtPackClient
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.platform.SystemActions
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.theme.CelestiaTheme
@@ -69,7 +61,6 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
-import java.util.Locale
 
 /**
  * Catalogue detail screen: shows the full manifest of a pack served
@@ -285,8 +276,12 @@ private fun LoadedBody(
             }
         }
 
-        ModsSection(mods = manifest.mods, onOpenBrowser = onOpenModBrowser)
-        AssetsSection(assets = manifest.assets, onOpenBrowser = onOpenAssetBrowser)
+        ContentSummary(
+            modsCount        = manifest.mods.size,
+            assetsCount      = manifest.assets.size,
+            onOpenMods       = onOpenModBrowser,
+            onOpenAssets     = onOpenAssetBrowser,
+        )
 
         if (summary.tags.isNotEmpty()) {
             Section(title = s.browseDetailTagsTitle) {
@@ -335,293 +330,78 @@ private fun Chip(text: String, emphasis: Boolean = false) {
     )
 }
 
-// ─── Mods section ─────────────────────────────────────────────────────────────
+// ─── Content summary ──────────────────────────────────────────────────────────
 
 @Composable
-private fun ModsSection(mods: List<SmrtModEntry>, onOpenBrowser: () -> Unit) {
+private fun ContentSummary(
+    modsCount: Int,
+    assetsCount: Int,
+    onOpenMods: () -> Unit,
+    onOpenAssets: () -> Unit,
+) {
     val s = LocalStrings.current
-    var query    by remember { mutableStateOf("") }
-    val expanded = remember { mutableStateOf(setOf<String>()) }
-
-    val filtered = remember(mods, query) {
-        if (query.isBlank()) mods
-        else {
-            val q = query.trim().lowercase()
-            mods.filter { mod ->
-                mod.filename.lowercase().contains(q)
-                    || (mod.display?.name?.lowercase()?.contains(q) == true)
-                    || (mod.display?.category?.lowercase()?.contains(q) == true)
-            }
-        }
-    }
-
-    Section(title = s.browseDetailModsTitle) {
+    Section(title = s.browseDetailContentTitle) {
         Row(
             modifier              = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End,
+            verticalAlignment     = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Button(
-                onClick = onOpenBrowser,
-                shape   = RoundedCornerShape(8.dp),
-                colors  = ButtonDefaults.buttonColors(
-                    containerColor = CelestiaTheme.colors.primary,
-                    contentColor   = Color.White,
-                ),
-            ) { Text(s.modBrowserOpenButton, fontWeight = FontWeight.SemiBold) }
-        }
-        Spacer(Modifier.height(8.dp))
-        OutlinedTextField(
-            value         = query,
-            onValueChange = { query = it },
-            singleLine    = true,
-            modifier      = Modifier.fillMaxWidth(),
-            placeholder   = { Text(s.browseDetailModsSearch, style = MaterialTheme.typography.bodySmall) },
-            leadingIcon   = {
-                Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp),
-                    tint = CelestiaTheme.colors.textSecondary)
-            },
-            shape         = RoundedCornerShape(10.dp),
-            colors        = OutlinedTextFieldDefaults.colors(
-                focusedTextColor        = CelestiaTheme.colors.textPrimary,
-                unfocusedTextColor      = CelestiaTheme.colors.textPrimary,
-                focusedBorderColor      = CelestiaTheme.colors.primary,
-                unfocusedBorderColor    = CelestiaTheme.colors.outline.copy(alpha = 0.4f),
-                cursorColor             = CelestiaTheme.colors.primary,
-                focusedPlaceholderColor   = CelestiaTheme.colors.textSecondary.copy(alpha = 0.7f),
-                unfocusedPlaceholderColor = CelestiaTheme.colors.textSecondary.copy(alpha = 0.7f),
-            ),
-        )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text  = s.browseDetailModsFilteredCount.format(filtered.size, mods.size),
-            style = MaterialTheme.typography.labelSmall,
-            color = CelestiaTheme.colors.textSecondary,
-        )
-        Spacer(Modifier.height(8.dp))
-
-        if (filtered.isEmpty()) {
-            Text(
-                text  = s.browseDetailModsEmptyFilter,
-                style = MaterialTheme.typography.bodySmall,
-                color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.7f),
+            SummaryTile(
+                label   = s.browseDetailContentMods,
+                count   = modsCount,
+                onClick = onOpenMods,
+                modifier = Modifier.weight(1f),
             )
-        } else {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                filtered.forEach { mod ->
-                    ModRow(
-                        mod        = mod,
-                        isExpanded = mod.filename in expanded.value,
-                        onToggle   = {
-                            expanded.value = if (mod.filename in expanded.value) {
-                                expanded.value - mod.filename
-                            } else {
-                                expanded.value + mod.filename
-                            }
-                        },
-                    )
-                }
-            }
+            SummaryTile(
+                label   = s.browseDetailContentAssets,
+                count   = assetsCount,
+                enabled = assetsCount > 0,
+                onClick = onOpenAssets,
+                modifier = Modifier.weight(1f),
+            )
         }
     }
 }
 
 @Composable
-private fun ModRow(mod: SmrtModEntry, isExpanded: Boolean, onToggle: () -> Unit) {
+private fun SummaryTile(
+    label: String,
+    count: Int,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) {
+    val s = LocalStrings.current
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .background(glassSurfaceAlpha(0.35f))
-            .clickable(onClick = onToggle)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+        modifier = modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(glassSurfaceAlpha(0.4f))
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text       = mod.display?.name?.takeIf { it.isNotBlank() } ?: mod.filename,
-                    style      = MaterialTheme.typography.bodyMedium,
-                    color      = CelestiaTheme.colors.textPrimary,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines   = 1,
-                )
-                if (mod.display?.name?.takeIf { it.isNotBlank() } != null) {
-                    Text(
-                        text  = mod.filename,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.7f),
-                        maxLines = 1,
-                    )
-                }
-            }
-            Icon(
-                imageVector        = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                contentDescription = null,
-                tint               = CelestiaTheme.colors.textSecondary,
-                modifier           = Modifier.size(20.dp),
-            )
-        }
-        Spacer(Modifier.height(4.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            SmallChip(formatBytes(mod.sizeBytes))
-            SourceChip(mod.source)
-            if (!mod.required) SmallChip(LocalStrings.current.browseDetailModsOptional)
-            mod.display?.category?.takeIf { it.isNotBlank() }?.let { SmallChip(it) }
-            mod.display?.license?.takeIf { it.isNotBlank() }?.let { SmallChip(it) }
-        }
-        if (isExpanded) {
-            ModExpanded(mod)
-        }
-    }
-}
-
-@Composable
-private fun ModExpanded(mod: SmrtModEntry) {
-    val s = LocalStrings.current
-    Spacer(Modifier.height(8.dp))
-    mod.display?.description?.takeIf { it.isNotBlank() }?.let {
         Text(
-            text  = it,
-            style = MaterialTheme.typography.bodySmall,
-            color = CelestiaTheme.colors.textPrimary.copy(alpha = 0.9f),
+            text       = label,
+            style      = MaterialTheme.typography.labelSmall,
+            color      = CelestiaTheme.colors.textSecondary,
+            fontWeight = FontWeight.SemiBold,
         )
-        Spacer(Modifier.height(6.dp))
-    }
-    if (mod.display?.incompatibleWith?.isNotEmpty() == true) {
         Text(
-            text  = s.browseDetailModsIncompatible.format(mod.display!!.incompatibleWith.joinToString(", ")),
+            text       = count.toString(),
+            style      = MaterialTheme.typography.headlineMedium,
+            color      = if (enabled) CelestiaTheme.colors.textPrimary
+                         else          CelestiaTheme.colors.textSecondary.copy(alpha = 0.5f),
+            fontWeight = FontWeight.Bold,
+        )
+        Text(
+            text  = if (enabled) s.browseDetailContentOpen else s.browseDetailContentEmpty,
             style = MaterialTheme.typography.labelSmall,
-            color = CelestiaTheme.colors.error.copy(alpha = 0.9f),
+            color = if (enabled) CelestiaTheme.colors.primary
+                    else         CelestiaTheme.colors.textSecondary.copy(alpha = 0.5f),
         )
-        Spacer(Modifier.height(6.dp))
-    }
-    mod.display?.url?.takeIf { it.isNotBlank() }?.let { url ->
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier          = Modifier
-                .clickable { SystemActions.openUrl(url) }
-                .padding(vertical = 4.dp),
-        ) {
-            Icon(
-                imageVector        = Icons.AutoMirrored.Filled.OpenInNew,
-                contentDescription = null,
-                tint               = CelestiaTheme.colors.primary,
-                modifier           = Modifier.size(14.dp),
-            )
-            Spacer(Modifier.width(6.dp))
-            Text(
-                text  = url,
-                style = MaterialTheme.typography.labelSmall,
-                color = CelestiaTheme.colors.primary,
-            )
-        }
     }
 }
 
-// ─── Assets section ───────────────────────────────────────────────────────────
-
-@Composable
-private fun AssetsSection(assets: List<SmrtAssetEntry>, onOpenBrowser: () -> Unit) {
-    val s = LocalStrings.current
-    Section(title = s.browseDetailAssetsTitle) {
-        Row(
-            modifier              = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End,
-        ) {
-            Button(
-                onClick = onOpenBrowser,
-                enabled = assets.isNotEmpty(),
-                shape   = RoundedCornerShape(8.dp),
-                colors  = ButtonDefaults.buttonColors(
-                    containerColor = CelestiaTheme.colors.primary,
-                    contentColor   = Color.White,
-                ),
-            ) { Text(s.assetBrowserOpenButton, fontWeight = FontWeight.SemiBold) }
-        }
-        Spacer(Modifier.height(8.dp))
-        if (assets.isEmpty()) {
-            Text(
-                text  = s.browseDetailAssetsEmpty,
-                style = MaterialTheme.typography.bodySmall,
-                color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.7f),
-            )
-        } else {
-            Text(
-                text  = s.browseDetailAssetsCount.format(assets.size),
-                style = MaterialTheme.typography.labelSmall,
-                color = CelestiaTheme.colors.textSecondary,
-            )
-            Spacer(Modifier.height(6.dp))
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                assets.forEach { asset -> AssetRow(asset) }
-            }
-        }
-    }
-}
-
-@Composable
-private fun AssetRow(asset: SmrtAssetEntry) {
-    Row(
-        modifier              = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(6.dp))
-            .background(glassSurfaceAlpha(0.3f))
-            .padding(horizontal = 10.dp, vertical = 6.dp),
-        verticalAlignment     = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Text(
-            text     = asset.dest,
-            style    = MaterialTheme.typography.bodySmall,
-            color    = CelestiaTheme.colors.textPrimary,
-            modifier = Modifier.weight(1f),
-            maxLines = 1,
-        )
-        SmallChip(formatBytes(asset.sizeBytes))
-        SourceChip(asset.source)
-    }
-}
-
-// ─── Shared chips + helpers ───────────────────────────────────────────────────
-
-@Composable
-private fun SmallChip(text: String) {
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(4.dp))
-            .background(glassSurfaceAlpha(0.5f))
-            .padding(horizontal = 6.dp, vertical = 2.dp),
-    ) {
-        Text(text, style = MaterialTheme.typography.labelSmall, color = CelestiaTheme.colors.textSecondary)
-    }
-}
-
-@Composable
-private fun SourceChip(source: SmrtSource) {
-    val s = LocalStrings.current
-    val (label, color) = when (source) {
-        is SmrtSource.Modrinth   -> s.browseDetailSourceModrinth     to Color(0xFF22C55E)
-        is SmrtSource.SmrtCache  -> s.browseDetailSourceMirrorCache  to Color(0xFF3B82F6)
-        is SmrtSource.SmrtStatic -> s.browseDetailSourceMirrorStatic to Color(0xFF8B5CF6)
-    }
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(4.dp))
-            .background(color.copy(alpha = 0.85f))
-            .padding(horizontal = 6.dp, vertical = 2.dp),
-    ) {
-        Text(label, style = MaterialTheme.typography.labelSmall, color = Color.White, fontWeight = FontWeight.SemiBold)
-    }
-}
-
-private fun formatBytes(bytes: Long): String {
-    if (bytes < 1_024) return "$bytes B"
-    val kb = bytes / 1_024.0
-    if (kb < 1_024) return "%.1f KB".format(Locale.ROOT, kb)
-    val mb = kb / 1_024.0
-    if (mb < 1_024) return "%.1f MB".format(Locale.ROOT, mb)
-    val gb = mb / 1_024.0
-    return "%.2f GB".format(Locale.ROOT, gb)
-}
 
 private sealed class DetailState {
     object Loading : DetailState()
