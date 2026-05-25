@@ -226,7 +226,7 @@ private fun PlayBar(pack: PackInstance, onPlay: () -> Unit) {
 private fun Section(title: String, content: @Composable () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
-            text       = title.uppercase(),
+            text       = title,
             style      = MaterialTheme.typography.titleSmall,
             color      = CelestiaTheme.colors.primary,
             fontWeight = FontWeight.Bold,

@@ -99,7 +99,7 @@ fun ServerDetailScreen(
                     // Left: text
                     Column(Modifier.weight(1.5f).padding(32.dp)) {
                         Text(
-                            text       = server.title?.uppercase() ?: server.name,
+                            text       = server.title ?: server.name,
                             style      = MaterialTheme.typography.displaySmall,
                             fontWeight = FontWeight.Black,
                             color      = CelestiaTheme.colors.textPrimary

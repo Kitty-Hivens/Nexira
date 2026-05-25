@@ -50,7 +50,7 @@ internal fun settingsRowBackground(): androidx.compose.ui.graphics.Color =
 @Composable
 internal fun SettingsSectionTitle(text: String) {
     Text(
-        text.uppercase(),
+        text,
         style      = MaterialTheme.typography.bodySmall,
         color      = CelestiaTheme.colors.primary,
         fontWeight = FontWeight.Bold

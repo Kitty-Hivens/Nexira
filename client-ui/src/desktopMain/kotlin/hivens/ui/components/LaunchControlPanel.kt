@@ -127,7 +127,7 @@ fun LaunchControlPanel(
         // -- Action button --------------------------------------------------
         val btnText = when (state) {
             is LaunchState.Downloading, is LaunchState.Prepare -> s.launchAbort
-            is LaunchState.GameRunning                         -> s.launchRunning.uppercase()
+            is LaunchState.GameRunning                         -> s.launchRunning
             is LaunchState.Error                               -> s.launchResetError
             else                                               -> s.launchButton
         }
