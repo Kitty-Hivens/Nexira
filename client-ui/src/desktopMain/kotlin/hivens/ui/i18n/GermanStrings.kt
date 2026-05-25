@@ -538,7 +538,7 @@ object GermanStrings : AppStrings {
     override val browseDetailErrorTitle    = "Pack konnte nicht geladen werden"
     override val browseDetailErrorMessage  = "Manifest konnte nicht geladen werden. Verbindung prüfen und erneut versuchen."
     override val browseDetailInstallReady  = "Bereit zur Installation"
-    override val browseDetailInstallHint   = "Die Installation kommt im nächsten Release"
+    override val browseDetailInstallHint   = "Erstellt eine neue Instanz in deinem Datenverzeichnis."
     override val browseDetailInstallButton = "INSTALLIEREN"
     override val browseDetailTagsTitle     = "Tags"
     override val browseDetailAboutTitle       = "Über dieses Pack"
@@ -549,6 +549,15 @@ object GermanStrings : AppStrings {
     override val browseDetailCompatLoader     = "Loader"
     override val browseDetailCompatJava       = "Java"
     override val browseDetailVersionTitle     = "Version"
+
+    override val browseDetailInstallRunningTitle  = "Installation läuft..."
+    override val browseDetailInstallProgress      = "%s  (%d / %d)"
+    override val browseDetailInstallStarting      = "Wird gestartet..."
+    override val browseDetailInstallDoneTitle     = "Installiert"
+    override val browseDetailInstallDoneHint      = "Zur Library hinzugefügt."
+    override val browseDetailInstallOpenLibrary   = "IN LIBRARY ÖFFNEN"
+    override val browseDetailInstallFailedTitle   = "Installation fehlgeschlagen"
+    override val browseDetailInstallFailedGeneric = "Installation aus unbekanntem Grund fehlgeschlagen."
 
 
 

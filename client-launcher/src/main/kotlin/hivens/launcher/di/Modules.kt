@@ -386,6 +386,7 @@ val appModule = module {
     // Always wired so toggling on at runtime requires no graph rebuild.
     single { SmrtPackClient(get(named("direct"))) }
     single { SmrtSyncService(get(), get()) }
+    single { PackInstaller(syncService = get(), repository = get(), dataDir = get()) }
 
     single<IManifestProcessorService> { ManifestProcessorService(get()) }
     single { ProfileManager(get(), get()) }
