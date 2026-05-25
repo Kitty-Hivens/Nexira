@@ -2,7 +2,6 @@ package hivens.ui.screens.settings
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.NewReleases
 import androidx.compose.material.icons.filled.Science
 import androidx.compose.material.icons.filled.Sync
@@ -31,8 +30,8 @@ import kotlin.time.Duration.Companion.milliseconds
  * master is off, so the user can see what they're opting back into.
  *
  * Includes: mandatory-updates floor, prerelease channel, autosync,
- * JVM-args builder unlock, Hivens Mirror toggle, mimic-launcher-version
- * override (with a debounced text input revealed when its toggle is on).
+ * JVM-args builder unlock, mimic-launcher-version override (with a
+ * debounced text input revealed when its toggle is on).
  */
 @Composable
 internal fun ExperimentalSection(
@@ -115,26 +114,6 @@ internal fun ExperimentalSection(
     )
     PuppetToggle("settings.jvmBuilder", form.jvmBuilderEnabled, enabled = form.experimentalEnabled) {
         form.jvmBuilderEnabled = it; save()
-    }
-
-    Spacer(Modifier.height(4.dp))
-
-    // ── Hivens Mirror ─────────────────────────────────────────
-    // Routes Industrial's sync source to smrt.hivens.dev. Auth and
-    // game-server addresses stay on SC; only file delivery swaps.
-    // Other packs ignore the flag. Errors surface; no silent fallback
-    // to the SC sync path.
-    SettingsRowWithDescription(
-        title          = s.settingsExperimentalMirror,
-        description    = s.settingsExperimentalMirrorDesc,
-        icon           = Icons.Default.Cloud,
-        iconTint       = CelestiaTheme.colors.primary,
-        checked        = form.experimentalEnabled && form.experimentalMirror,
-        enabled        = form.experimentalEnabled,
-        onCheckedChange = { form.experimentalMirror = it; save() }
-    )
-    PuppetToggle("settings.experimentalMirror", form.experimentalMirror, enabled = form.experimentalEnabled) {
-        form.experimentalMirror = it; save()
     }
 
     Spacer(Modifier.height(4.dp))
