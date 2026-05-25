@@ -538,4 +538,27 @@ interface AppStrings {
     // --- Profile two-column nav labels ---
     val profileCategorySkin: String
     val profileCategoryAccount: String
+
+    // --- Background loop mode ---
+    val backgroundLoopMode: String
+    val backgroundLoopUseCodec: String
+    val backgroundLoopForever: String
+    val backgroundLoopOnce: String
+
+    // --- Customization extension ---
+    val settingsCustomizationExt: String
+    val settingsCustomizationExtSub: String
+    val customizationTitle: String
+    val customizationSubtitle: String
+    val customizationDensity: String
+    val customizationGlassIntensity: String
+    val customizationAccentOverride: String
+    val customizationAccentClear: String
+    val customizationSectionVisual: String
+    val customizationSectionColors: String
+    val customizationExperimentalToggle: String
+    val customizationExperimentalSub: String
+    val customizationReset: String
+    val customizationHexInvalid: String
+    val themePickerAccentOverride: String
 }

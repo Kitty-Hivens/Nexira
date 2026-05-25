@@ -47,6 +47,7 @@ fun SettingsScreen(
     uiStyle: UiStyle,
     onUiStyleChanged: (UiStyle) -> Unit,
     onOpenBackgroundSettings: () -> Unit = {},
+    onOpenCustomizationExtension: () -> Unit = {},
     onOpenAbout: () -> Unit = {}
 ) {
     PuppetScreen("Settings")
@@ -106,18 +107,19 @@ fun SettingsScreen(
                 ) {
                     when (selectedCategory) {
                         SettingsCategory.Appearance -> AppearanceSection(
-                            form                     = form,
-                            save                     = ::save,
-                            isDarkTheme              = isDarkTheme,
-                            onToggleTheme            = onToggleTheme,
-                            onOpenThemePicker        = onOpenThemePicker,
-                            onOpenBackgroundSettings = onOpenBackgroundSettings,
-                            currentLocale            = currentLocale,
-                            onLocaleChanged          = onLocaleChanged,
-                            homeView                 = homeView,
-                            onHomeViewChanged        = onHomeViewChanged,
-                            uiStyle                  = uiStyle,
-                            onUiStyleChanged         = onUiStyleChanged,
+                            form                         = form,
+                            save                         = ::save,
+                            isDarkTheme                  = isDarkTheme,
+                            onToggleTheme                = onToggleTheme,
+                            onOpenThemePicker            = onOpenThemePicker,
+                            onOpenBackgroundSettings     = onOpenBackgroundSettings,
+                            onOpenCustomizationExtension = onOpenCustomizationExtension,
+                            currentLocale                = currentLocale,
+                            onLocaleChanged              = onLocaleChanged,
+                            homeView                     = homeView,
+                            onHomeViewChanged            = onHomeViewChanged,
+                            uiStyle                      = uiStyle,
+                            onUiStyleChanged             = onUiStyleChanged,
                         )
                         SettingsCategory.Network -> NetworkSection(
                             form = form,

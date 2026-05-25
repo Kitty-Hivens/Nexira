@@ -505,4 +505,25 @@ object EnglishStrings : AppStrings {
 
     override val profileCategorySkin    = "Skin"
     override val profileCategoryAccount = "Account"
+
+    override val backgroundLoopMode      = "Loop"
+    override val backgroundLoopUseCodec  = "Use codec"
+    override val backgroundLoopForever   = "Forever"
+    override val backgroundLoopOnce      = "Play once"
+
+    override val settingsCustomizationExt    = "Customization (exp.)"
+    override val settingsCustomizationExtSub = "Density, accent, glass intensity, color overrides"
+    override val customizationTitle           = "Customization"
+    override val customizationSubtitle        = "Experimental visual tuning"
+    override val customizationDensity         = "Density scale"
+    override val customizationGlassIntensity  = "Glass intensity"
+    override val customizationAccentOverride  = "Accent override"
+    override val customizationAccentClear     = "Clear override"
+    override val customizationSectionVisual   = "VISUAL"
+    override val customizationSectionColors   = "COLOR OVERRIDES"
+    override val customizationExperimentalToggle = "Per-role color overrides"
+    override val customizationExperimentalSub    = "Unlock 7-color override matrix. Easy to make unreadable combinations."
+    override val customizationReset           = "Reset all"
+    override val customizationHexInvalid      = "Invalid hex"
+    override val themePickerAccentOverride    = "Accent override (live)"
 }

@@ -131,7 +131,7 @@ private fun AnimatedParallaxImage(
         IntOffset(x, y)
     }
 
-    val imageBitmap = rememberSkiaImage(file, settings.animationSpeedMultiplier)
+    val imageBitmap = rememberSkiaImage(file, settings.animationSpeedMultiplier, settings.loopMode)
 
     if (imageBitmap != null) {
         val useParallax = settings.parallaxIntensity > 0f
@@ -176,7 +176,11 @@ private fun AnimatedParallaxImage(
 }
 
 @Composable
-private fun rememberSkiaImage(file: File, speedMultiplier: Float): ImageBitmap? {
+private fun rememberSkiaImage(
+    file: File,
+    speedMultiplier: Float,
+    loopMode: BackgroundLoopMode,
+): ImageBitmap? {
     var decoded  by remember(file) { mutableStateOf<DecodedBg?>(null) }
     var frameIdx by remember(file) { mutableStateOf(0) }
     val speedRef = rememberUpdatedState(speedMultiplier)
@@ -192,11 +196,19 @@ private fun rememberSkiaImage(file: File, speedMultiplier: Float): ImageBitmap? 
     }
 
     // Skia spec: repetitionCount = N means N additional plays after the
-    // first. -1 = loop forever, 0 = play once. Slider changes mid-play
-    // take effect on the next frame swap (rememberUpdatedState keeps the
-    // captured ref fresh without restarting the effect).
-    LaunchedEffect(d) {
-        val totalPlays = if (d.repetitionCount < 0) Int.MAX_VALUE else d.repetitionCount + 1
+    // first. -1 = loop forever, 0 = play once. loopMode lets the user
+    // override the codec's stored hint -- LoopForever for ambient bg use,
+    // PlayOnce when they want the intro-frame settle pattern. Slider
+    // changes mid-play take effect on the next frame swap
+    // (rememberUpdatedState keeps the captured ref fresh without
+    // restarting the effect).
+    LaunchedEffect(d, loopMode) {
+        val totalPlays = when (loopMode) {
+            BackgroundLoopMode.LoopForever -> Int.MAX_VALUE
+            BackgroundLoopMode.PlayOnce    -> 1
+            BackgroundLoopMode.UseCodec    ->
+                if (d.repetitionCount < 0) Int.MAX_VALUE else d.repetitionCount + 1
+        }
         var played = 0
         while (played < totalPlays) {
             for (i in d.frames.indices) {
@@ -207,6 +219,8 @@ private fun rememberSkiaImage(file: File, speedMultiplier: Float): ImageBitmap? 
             }
             played++
         }
+        // PlayOnce / finite codec: hold on the last frame.
+        frameIdx = d.frames.lastIndex
     }
 
     return d.frames[frameIdx.coerceIn(0, d.frames.lastIndex)]
