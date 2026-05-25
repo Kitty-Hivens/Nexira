@@ -1,6 +1,7 @@
 package hivens.ui.screens.browse
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,7 +11,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -22,74 +30,113 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import hivens.core.api.dto.smrt.SmrtPackSummary
 
 /**
- * Tile shape for a single [SmrtPackSummary] from the mirror catalog.
- * Banner-as-background with Mirror gradient (every catalog entry is
- * mirror-sourced today; future Modrinth / CurseForge integrations
- * would need a per-source colour pass).
+ * One Browse row. Same shape as Library's PackCard (banner-as-bg +
+ * avatar + title + chips + right-side action) so the two surfaces
+ * read as one design language. Difference: no Play / Settings /
+ * More -- browse is for catalogue inspect, not installed-instance
+ * actions, so the right side carries a simple chevron and the whole
+ * card is a click target into [BrowsePackDetailScreen].
  *
- * Click is intentionally a no-op for now -- standalone install + the
- * BrowsePackDetail navigation hop lives in the next PR.
+ * Every catalogue entry is mirror-sourced today; once we add other
+ * sources (Modrinth / CurseForge / Local-imported) this card splits
+ * its colour pass like PackCard already does.
  */
 @Composable
-fun BrowsePackCard(pack: SmrtPackSummary) {
+fun BrowsePackCard(
+    pack: SmrtPackSummary,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .height(160.dp)
+            .height(132.dp)
             .clip(RoundedCornerShape(14.dp))
-            .background(mirrorGradient()),
+            .background(mirrorGradient())
+            .clickable(onClick = onClick),
     ) {
-        // Darken overlay for text readability over the gradient.
-        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.30f)))
+        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.35f)))
 
-        Column(
-            modifier            = Modifier.fillMaxSize().padding(16.dp),
-            verticalArrangement = Arrangement.SpaceBetween,
+        Row(
+            modifier              = Modifier.fillMaxSize().padding(14.dp),
+            verticalAlignment     = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Row(
-                modifier              = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment     = Alignment.Top,
+            BrowseAvatar(pack.displayName)
+
+            Column(
+                modifier            = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                Column(modifier = Modifier.padding(end = 8.dp)) {
+                Row(
+                    verticalAlignment     = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
                     Text(
                         text       = pack.displayName,
                         style      = MaterialTheme.typography.titleMedium,
                         color      = Color.White,
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.SemiBold,
                         maxLines   = 1,
                         overflow   = TextOverflow.Ellipsis,
+                        modifier   = Modifier.weight(1f, fill = false),
                     )
-                    if (pack.tagline.isNotBlank()) {
-                        Spacer(Modifier.height(2.dp))
-                        Text(
-                            text     = pack.tagline,
-                            style    = MaterialTheme.typography.bodySmall,
-                            color    = Color.White.copy(alpha = 0.85f),
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
+                    SourceBadgeMirror(featured = pack.featured)
                 }
-                SourceBadgeMirror(featured = pack.featured)
+                if (pack.tagline.isNotBlank()) {
+                    Text(
+                        text     = pack.tagline,
+                        style    = MaterialTheme.typography.bodySmall,
+                        color    = Color.White.copy(alpha = 0.80f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Row(
+                    verticalAlignment     = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    MetaChip("MC ${pack.minecraftVersion}")
+                    MetaChip(pack.latestPackVersion)
+                    pack.tags.take(2).forEach { MetaChip(it, emphasis = false) }
+                }
             }
 
-            Row(
-                modifier              = Modifier.fillMaxWidth(),
-                verticalAlignment     = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                MetaChip(text = "MC ${pack.minecraftVersion}")
-                MetaChip(text = pack.latestPackVersion)
-                if (pack.tags.isNotEmpty()) {
-                    pack.tags.take(2).forEach { MetaChip(text = it, emphasis = false) }
-                }
-            }
+            Icon(
+                imageVector        = Icons.AutoMirrored.Filled.ArrowForwardIos,
+                contentDescription = null,
+                tint               = Color.White.copy(alpha = 0.75f),
+                modifier           = Modifier.size(20.dp),
+            )
+            Spacer(Modifier.width(4.dp))
         }
+    }
+}
+
+@Composable
+private fun BrowseAvatar(displayName: String) {
+    val initials = displayName
+        .split(' ', '-', '_')
+        .filter { it.isNotBlank() }
+        .take(2)
+        .joinToString("") { it.first().uppercaseChar().toString() }
+        .ifEmpty { "?" }
+    Box(
+        modifier         = Modifier
+            .size(64.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color(0xFF2563EB)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text       = initials,
+            color      = Color.White,
+            style      = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+        )
     }
 }
 
@@ -100,35 +147,31 @@ private fun SourceBadgeMirror(featured: Boolean) {
         modifier = Modifier
             .clip(RoundedCornerShape(6.dp))
             .background(Color(0xFF3B82F6).copy(alpha = 0.85f))
-            .padding(horizontal = 8.dp, vertical = 3.dp),
+            .padding(horizontal = 8.dp, vertical = 2.dp),
     ) {
         Text(
             text       = label,
+            style      = MaterialTheme.typography.labelSmall,
             color      = Color.White,
-            fontSize   = 10.sp,
-            fontWeight = FontWeight.SemiBold,
+            fontWeight = FontWeight.Bold,
         )
     }
 }
 
 @Composable
-private fun MetaChip(text: String, emphasis: Boolean = true) {
-    val bg = if (emphasis) Color.White.copy(alpha = 0.18f) else Color.White.copy(alpha = 0.10f)
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(6.dp))
-            .background(bg)
-            .padding(horizontal = 8.dp, vertical = 3.dp),
-    ) {
-        Text(
-            text       = text,
-            color      = Color.White.copy(alpha = if (emphasis) 0.95f else 0.75f),
-            fontSize   = 10.sp,
-            fontWeight = FontWeight.SemiBold,
-            maxLines   = 1,
-            overflow   = TextOverflow.Ellipsis,
-        )
-    }
+private fun MetaChip(text: String, emphasis: Boolean = false) {
+    AssistChip(
+        onClick = {},
+        enabled = false,
+        shape   = RoundedCornerShape(8.dp),
+        label   = { Text(text, style = MaterialTheme.typography.labelSmall, color = Color.White) },
+        colors  = AssistChipDefaults.assistChipColors(
+            disabledContainerColor = if (emphasis) Color(0xFF2563EB).copy(alpha = 0.85f)
+                                     else          Color.Black.copy(alpha = 0.35f),
+            disabledLabelColor     = Color.White,
+        ),
+        border  = null,
+    )
 }
 
 private fun mirrorGradient(): Brush = Brush.linearGradient(

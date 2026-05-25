@@ -570,4 +570,18 @@ interface AppStrings {
     val browseErrorTitle: String
     val browseErrorMessage: String
     val browseRetry: String
+
+    // --- Browse pack detail ---
+    val browseDetailErrorTitle: String
+    val browseDetailErrorMessage: String
+    val browseDetailInstallTitle: String
+    val browseDetailInstallReady: String
+    val browseDetailInstallHint: String
+    val browseDetailInstallButton: String
+    val browseDetailModsTitle: String
+    val browseDetailModsCount: String
+    val browseDetailModsMore: String
+    val browseDetailAssetsTitle: String
+    val browseDetailAssetsCount: String
+    val browseDetailTagsTitle: String
 }

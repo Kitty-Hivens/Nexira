@@ -535,4 +535,17 @@ object RussianStrings : AppStrings {
     override val browseErrorTitle   = "Зеркало недоступно"
     override val browseErrorMessage = "Не удалось дотянуться до зеркала. Проверь соединение и повтори."
     override val browseRetry        = "Повторить"
+
+    override val browseDetailErrorTitle    = "Не удалось загрузить сборку"
+    override val browseDetailErrorMessage  = "Не удалось получить manifest. Проверь соединение и повтори."
+    override val browseDetailInstallTitle  = "Установка"
+    override val browseDetailInstallReady  = "Готово к установке"
+    override val browseDetailInstallHint   = "Установка появится в следующем релизе"
+    override val browseDetailInstallButton = "УСТАНОВИТЬ"
+    override val browseDetailModsTitle     = "Моды"
+    override val browseDetailModsCount     = "Модов в manifest: %d"
+    override val browseDetailModsMore      = "и ещё %d"
+    override val browseDetailAssetsTitle   = "Ассеты"
+    override val browseDetailAssetsCount   = "Ассетов: %d (конфиги, ресурспаки и т.д.)"
+    override val browseDetailTagsTitle     = "Теги"
 }
