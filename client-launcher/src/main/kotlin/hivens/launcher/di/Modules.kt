@@ -412,6 +412,13 @@ val appModule = module {
 
     single<IServerListService> { SmartyCraftServerListService(get(), get()) }
 
+    // In-memory pack repository: seeded fixture of representative
+    // PackInstances so the Library screen has something to render
+    // before the persistence layer + real install flow exist. Replaced
+    // by a JSON-on-disk repository in a follow-up PR; binding shape
+    // stays single<IPackRepository> so consumers don't need changes.
+    single<IPackRepository> { InMemoryPackRepository() }
+
     single {
         val dataDir: Path = get()
         val profiles: ProfileManager = get()
