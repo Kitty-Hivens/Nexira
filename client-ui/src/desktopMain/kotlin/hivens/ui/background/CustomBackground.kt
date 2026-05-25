@@ -24,17 +24,32 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import hivens.ui.debug.SkiaTracker
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import org.jetbrains.skia.Codec
 import org.jetbrains.skia.Data
+import org.jetbrains.skia.ImageInfo
 import org.jetbrains.skia.makeFromFileName
+import org.slf4j.LoggerFactory
 import java.io.File
+
+private val log = LoggerFactory.getLogger("CustomBackground")
+
+private const val MAX_ANIMATED_FRAMES        = 240
+private const val MAX_ANIMATED_PIXELS_TOTAL  = 1920L * 1080L * 60L
+
+private data class DecodedBg(
+    val frames: List<ImageBitmap>,
+    val durationsMs: List<Int>,
+    val repetitionCount: Int,
+)
 
 /**
  * Renders a custom background wallpaper behind the main app content.
  *
  * Supports: blur, darkening, opacity, parallax, vignette, color tint,
- * multiple scale modes, alignment control, and hardware-accelerated animated GIFs (via Skiko).
+ * multiple scale modes, alignment control, and multi-frame animated
+ * formats (GIF, APNG, animated WebP) decoded via Skiko Codec.
  */
 @Composable
 fun CustomBackground(
@@ -116,7 +131,7 @@ private fun AnimatedParallaxImage(
         IntOffset(x, y)
     }
 
-    val imageBitmap = rememberSkiaImage(file)
+    val imageBitmap = rememberSkiaImage(file, settings.animationSpeedMultiplier)
 
     if (imageBitmap != null) {
         val useParallax = settings.parallaxIntensity > 0f
@@ -161,39 +176,97 @@ private fun AnimatedParallaxImage(
 }
 
 @Composable
-private fun rememberSkiaImage(file: File): ImageBitmap? {
-    var bitmap by remember(file) { mutableStateOf<ImageBitmap?>(null) }
+private fun rememberSkiaImage(file: File, speedMultiplier: Float): ImageBitmap? {
+    var decoded  by remember(file) { mutableStateOf<DecodedBg?>(null) }
+    var frameIdx by remember(file) { mutableStateOf(0) }
+    val speedRef = rememberUpdatedState(speedMultiplier)
 
     LaunchedEffect(file) {
         if (!file.exists()) return@LaunchedEffect
+        withContext(Dispatchers.IO) { decoded = decodeBackground(file) }
+    }
 
-        withContext(Dispatchers.IO) {
-            var data:  Data?                      = null
-            var codec: Codec?                     = null
-            var bmp:   org.jetbrains.skia.Bitmap? = null
+    val d = decoded ?: return null
+    if (d.frames.size <= 1) {
+        return d.frames.firstOrNull()
+    }
 
-            try {
-                data  = Data.makeFromFileName(file.absolutePath)
-                codec = Codec.makeFromData(data)
-                bmp   = org.jetbrains.skia.Bitmap().apply { allocPixels(codec.imageInfo) }
-
-                codec.readPixels(bmp, 0)
-                val img = org.jetbrains.skia.Image.makeFromBitmap(bmp)
-                img.use { img ->
-                    bitmap = img.toComposeImageBitmap().also {
-                        SkiaTracker.track("BG.static", it)
-                    }
-                }
-
-            } catch (e: Exception) {
-                org.slf4j.LoggerFactory.getLogger("CustomBackground")
-                    .error("Failed to decode custom background image", e)
-            } finally {
-                bmp?.close()
-                codec?.close()
-                data?.close()
+    // Skia spec: repetitionCount = N means N additional plays after the
+    // first. -1 = loop forever, 0 = play once. Slider changes mid-play
+    // take effect on the next frame swap (rememberUpdatedState keeps the
+    // captured ref fresh without restarting the effect).
+    LaunchedEffect(d) {
+        val totalPlays = if (d.repetitionCount < 0) Int.MAX_VALUE else d.repetitionCount + 1
+        var played = 0
+        while (played < totalPlays) {
+            for (i in d.frames.indices) {
+                frameIdx = i
+                val speed   = speedRef.value.coerceAtLeast(0.01f)
+                val waitMs  = (d.durationsMs[i] / speed).toLong().coerceAtLeast(1L)
+                delay(waitMs)
             }
+            played++
         }
     }
-    return bitmap
+
+    return d.frames[frameIdx.coerceIn(0, d.frames.lastIndex)]
+}
+
+private fun decodeBackground(file: File): DecodedBg? {
+    var data:  Data?  = null
+    var codec: Codec? = null
+    return try {
+        data  = Data.makeFromFileName(file.absolutePath)
+        codec = Codec.makeFromData(data)
+        val frameCount = codec.frameCount
+        val info       = codec.imageInfo
+
+        if (frameCount <= 1) {
+            DecodedBg(
+                frames          = listOf(decodeFrame(codec, info, frame = 0, trackTag = "BG.static")),
+                durationsMs     = listOf(0),
+                repetitionCount = 0,
+            )
+        } else {
+            val pixelsTotal = info.width.toLong() * info.height.toLong() * frameCount.toLong()
+            if (frameCount > MAX_ANIMATED_FRAMES || pixelsTotal > MAX_ANIMATED_PIXELS_TOTAL) {
+                log.warn(
+                    "Animated bg too large (frames={}, ~{}MB raw) -- using frame 0 only",
+                    frameCount, pixelsTotal * 4 / 1_048_576,
+                )
+                DecodedBg(
+                    frames          = listOf(decodeFrame(codec, info, frame = 0, trackTag = "BG.static")),
+                    durationsMs     = listOf(0),
+                    repetitionCount = 0,
+                )
+            } else {
+                val frames    = ArrayList<ImageBitmap>(frameCount)
+                val durations = ArrayList<Int>(frameCount)
+                val infos     = codec.framesInfo
+                for (i in 0 until frameCount) {
+                    frames.add(decodeFrame(codec, info, frame = i, trackTag = "BG.animated"))
+                    // delay() of 0 spins -- guarantee positive duration per frame.
+                    durations.add(infos[i].duration.coerceAtLeast(1))
+                }
+                DecodedBg(frames, durations, codec.repetitionCount)
+            }
+        }
+    } catch (e: Exception) {
+        log.error("Failed to decode custom background at {}", file.absolutePath, e)
+        null
+    } finally {
+        codec?.close()
+        data?.close()
+    }
+}
+
+private fun decodeFrame(codec: Codec, info: ImageInfo, frame: Int, trackTag: String): ImageBitmap {
+    val bmp = org.jetbrains.skia.Bitmap().apply { allocPixels(info) }
+    return try {
+        codec.readPixels(bmp, frame)
+        val img = org.jetbrains.skia.Image.makeFromBitmap(bmp)
+        img.use { it.toComposeImageBitmap().also { ib -> SkiaTracker.track(trackTag, ib) } }
+    } finally {
+        bmp.close()
+    }
 }

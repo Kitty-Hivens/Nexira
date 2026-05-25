@@ -20,7 +20,8 @@ data class BackgroundSettings(
     val parallaxIntensity: Float = 0.0f,
     val vignetteIntensity: Float = 0.2f,
     val tintColor: String? = null,
-    val tintOpacity: Float = 0.0f
+    val tintOpacity: Float = 0.0f,
+    val animationSpeedMultiplier: Float = 1.0f,
 )
 
 @Serializable

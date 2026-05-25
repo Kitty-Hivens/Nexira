@@ -98,7 +98,7 @@ fun BackgroundSettingsScreen(
                     SectionTitle(s.backgroundSectionImage)
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(onClick = { scope.launch {
-                            FileKit.openFilePicker(type = FileKitType.File(extensions = listOf("png", "jpg", "jpeg", "webp", "bmp")), dialogSettings = FileKitDialogSettings(
+                            FileKit.openFilePicker(type = FileKitType.File(extensions = listOf("png", "jpg", "jpeg", "webp", "bmp", "gif", "apng")), dialogSettings = FileKitDialogSettings(
                                 title = s.backgroundPickFile
                             )
                             )?.path?.let { path -> update { copy(imagePath = path, enabled = true) } }
@@ -142,6 +142,7 @@ fun BackgroundSettingsScreen(
                     LabeledSlider(s.backgroundSaturation, settings.saturation, -1f..1f, "%+.0f%%", 100f) { update { copy(saturation = it) } }
                     LabeledSlider(s.backgroundParallax, settings.parallaxIntensity, 0f..1f, "%.0f%%", 100f) { update { copy(parallaxIntensity = it) } }
                     LabeledSlider(s.backgroundVignette, settings.vignetteIntensity, 0f..1f, "%.0f%%", 100f) { update { copy(vignetteIntensity = it) } }
+                    LabeledSlider(s.backgroundAnimationSpeed, settings.animationSpeedMultiplier, 0.25f..4f, "%.2fx") { update { copy(animationSpeedMultiplier = it) } }
 
                     HorizontalDivider(color = CelestiaTheme.colors.outline.copy(alpha = 0.15f))
 
