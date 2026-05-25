@@ -36,7 +36,6 @@ internal class SettingsFormState(initial: SettingsData) {
     var prereleaseChannel      by mutableStateOf(initial.prereleaseChannelEnabled)
     var autoSyncAllPacks       by mutableStateOf(initial.autoSyncAllPacks)
     var jvmBuilderEnabled      by mutableStateOf(initial.jvmBuilderEnabled)
-    var experimentalMirror     by mutableStateOf(initial.experimentalMirrorEnabled)
     var forceProxyMode         by mutableStateOf(initial.forceProxyMode)
     var mimicOverrideEnabled   by mutableStateOf(!initial.mimicVersionOverride.isNullOrBlank())
     var mimicVersionText       by mutableStateOf(initial.mimicVersionOverride ?: "")
@@ -62,7 +61,6 @@ internal class SettingsFormState(initial: SettingsData) {
             prereleaseChannelEnabled    = prereleaseChannel,
             autoSyncAllPacks            = autoSyncAllPacks,
             jvmBuilderEnabled           = jvmBuilderEnabled,
-            experimentalMirrorEnabled   = experimentalMirror,
             forceProxyMode              = forceProxyMode,
             mimicVersionOverride        = normalisedMimic,
         )

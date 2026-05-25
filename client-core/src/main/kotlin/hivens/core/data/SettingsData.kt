@@ -113,19 +113,6 @@ data class SettingsData(
     val mimicVersionOverride: String? = null,
 
     /**
-     * Route pack content delivery through the Hivens mirror
-     * (smrt.hivens.dev) instead of SmartyCraft's CDN. Auth and
-     * game-server addresses stay on SC regardless -- the mirror only
-     * publishes pack files. Currently scoped to Industrial, the sole
-     * pack with a smrt v2 manifest; other server packs ignore this
-     * flag and stay on the SC sync path. Mirror sync fails loudly on
-     * any error; there is no silent SC fallback for the affected
-     * pack, otherwise mirror regressions would hide behind a
-     * working-but-stale SC sync.
-     */
-    val experimentalMirrorEnabled: Boolean = false,
-
-    /**
      * Which Home surface to render after login. Lets the user explore
      * the new Library-first IA without committing the whole launcher
      * to it -- the toggle flips back at any time. See [HomeView] for
