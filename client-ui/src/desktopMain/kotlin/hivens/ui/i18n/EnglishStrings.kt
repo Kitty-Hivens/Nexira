@@ -534,4 +534,17 @@ object EnglishStrings : AppStrings {
     override val browseErrorTitle   = "Mirror unreachable"
     override val browseErrorMessage = "Could not reach the mirror. Check your connection and retry."
     override val browseRetry        = "Retry"
+
+    override val browseDetailErrorTitle    = "Could not load pack"
+    override val browseDetailErrorMessage  = "Could not fetch the manifest. Check your connection and retry."
+    override val browseDetailInstallTitle  = "Install"
+    override val browseDetailInstallReady  = "Ready to install"
+    override val browseDetailInstallHint   = "The install pipeline lands in the next release"
+    override val browseDetailInstallButton = "INSTALL"
+    override val browseDetailModsTitle     = "Mods"
+    override val browseDetailModsCount     = "%d mod(s) in the manifest"
+    override val browseDetailModsMore      = "+%d more"
+    override val browseDetailAssetsTitle   = "Assets"
+    override val browseDetailAssetsCount   = "%d asset(s) (configs, resource packs, etc.)"
+    override val browseDetailTagsTitle     = "Tags"
 }

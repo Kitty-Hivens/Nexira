@@ -534,4 +534,17 @@ object GermanStrings : AppStrings {
     override val browseErrorTitle   = "Mirror nicht erreichbar"
     override val browseErrorMessage = "Mirror konnte nicht erreicht werden. Verbindung prüfen und erneut versuchen."
     override val browseRetry        = "Erneut versuchen"
+
+    override val browseDetailErrorTitle    = "Pack konnte nicht geladen werden"
+    override val browseDetailErrorMessage  = "Manifest konnte nicht geladen werden. Verbindung prüfen und erneut versuchen."
+    override val browseDetailInstallTitle  = "Installation"
+    override val browseDetailInstallReady  = "Bereit zur Installation"
+    override val browseDetailInstallHint   = "Die Installation kommt im nächsten Release"
+    override val browseDetailInstallButton = "INSTALLIEREN"
+    override val browseDetailModsTitle     = "Mods"
+    override val browseDetailModsCount     = "%d Mod(s) im Manifest"
+    override val browseDetailModsMore      = "+%d weitere"
+    override val browseDetailAssetsTitle   = "Assets"
+    override val browseDetailAssetsCount   = "%d Assets (Konfigs, Resource Packs usw.)"
+    override val browseDetailTagsTitle     = "Tags"
 }

@@ -10,9 +10,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -57,7 +56,7 @@ import org.koin.compose.koinInject
  *  - [BrowseState.Error]   -- network / parse failure (retry button)
  */
 @Composable
-fun BrowseScreen() {
+fun BrowseScreen(onOpenPack: (packId: String) -> Unit) {
     PuppetScreen("Browse")
 
     val s = LocalStrings.current
@@ -97,7 +96,7 @@ fun BrowseScreen() {
             BrowseState.Loading -> BrowseLoading()
             BrowseState.Empty   -> BrowseEmpty(onRetry = { retryTick++ })
             is BrowseState.Error -> BrowseError(message = st.message, onRetry = { retryTick++ })
-            is BrowseState.Loaded -> BrowseList(packs = st.packs)
+            is BrowseState.Loaded -> BrowseList(packs = st.packs, onOpenPack = onOpenPack)
         }
     }
 }
@@ -180,16 +179,14 @@ private fun BrowseError(message: String, onRetry: () -> Unit) {
 }
 
 @Composable
-private fun BrowseList(packs: List<SmrtPackSummary>) {
-    LazyVerticalGrid(
-        columns               = GridCells.Adaptive(minSize = 280.dp),
-        modifier              = Modifier.fillMaxSize(),
-        contentPadding        = PaddingValues(bottom = 16.dp),
-        verticalArrangement   = Arrangement.spacedBy(12.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+private fun BrowseList(packs: List<SmrtPackSummary>, onOpenPack: (String) -> Unit) {
+    LazyColumn(
+        modifier            = Modifier.fillMaxSize(),
+        contentPadding      = PaddingValues(bottom = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         items(items = packs, key = { it.packId }) { pack ->
-            BrowsePackCard(pack)
+            BrowsePackCard(pack = pack, onClick = { onOpenPack(pack.packId) })
         }
     }
 }
