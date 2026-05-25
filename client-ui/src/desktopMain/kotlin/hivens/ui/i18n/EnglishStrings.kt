@@ -516,7 +516,7 @@ object EnglishStrings : AppStrings {
     override val customizationTitle           = "Customization"
     override val customizationSubtitle        = "Experimental visual tuning"
     override val customizationDensity         = "Density scale"
-    override val customizationGlassIntensity  = "Glass intensity"
+    override val customizationGlassIntensity  = "Glass opacity"
     override val customizationAccentOverride  = "Accent override"
     override val customizationAccentClear     = "Clear override"
     override val customizationSectionVisual   = "VISUAL"
