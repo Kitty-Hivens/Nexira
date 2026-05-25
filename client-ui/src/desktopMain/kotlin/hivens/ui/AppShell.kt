@@ -9,7 +9,9 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.ApplicationScope
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPlacement
@@ -34,6 +36,7 @@ import hivens.launcher.CredentialsManager
 import hivens.launcher.launch.LaunchState
 import hivens.launcher.launch.LauncherController
 import hivens.launcher.network.ServerProtocolConfig
+import hivens.launcher.platform.computeSafeWindowMinSize
 import hivens.launcher.ProfileManager
 import hivens.ui.background.BackgroundManager
 import hivens.ui.background.CustomBackground
@@ -71,8 +74,17 @@ import org.koin.compose.koinInject
 import org.koin.core.context.stopKoin
 import org.koin.core.qualifier.named
 import org.slf4j.LoggerFactory
+import java.awt.Dimension
+import java.awt.Toolkit
 import javax.swing.SwingUtilities
 import kotlin.time.Duration.Companion.milliseconds
+
+// 2-column Library + sidebar starts collapsing visibly below this width;
+// 600dp of height keeps PackDetail hero + sidebar both reachable. Held
+// as file-level consts so the prophylactic min-size effect inside
+// AppShell stays a one-liner.
+private const val MIN_WINDOW_WIDTH_DP  = 960
+private const val MIN_WINDOW_HEIGHT_DP = 600
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
@@ -453,6 +465,25 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
                     window.requestFocus()
                     window.isAlwaysOnTop = false
                 }
+            }
+
+            // Prophylactic minimum window size. Design intent is
+            // [MIN_WINDOW_WIDTH_DP] x [MIN_WINDOW_HEIGHT_DP] -- below
+            // those values multi-column screens collapse awkwardly.
+            // Clamped against the user's native screen so a small laptop
+            // can still drag the window edges. Floating WMs respect the
+            // hint; tiling WMs ignore it, which is fine.
+            val sizeDensity = LocalDensity.current
+            LaunchedEffect(Unit) {
+                val designPx = with(sizeDensity) {
+                    Dimension(
+                        MIN_WINDOW_WIDTH_DP.dp.toPx().toInt(),
+                        MIN_WINDOW_HEIGHT_DP.dp.toPx().toInt(),
+                    )
+                }
+                val screen = Toolkit.getDefaultToolkit().screenSize
+                val safe = computeSafeWindowMinSize(designPx.width, designPx.height, screen)
+                SwingUtilities.invokeLater { window.minimumSize = safe }
             }
 
             val baseDensity   = androidx.compose.ui.platform.LocalDensity.current
