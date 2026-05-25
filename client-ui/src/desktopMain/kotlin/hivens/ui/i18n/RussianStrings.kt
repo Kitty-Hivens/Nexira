@@ -558,4 +558,20 @@ object RussianStrings : AppStrings {
     override val browseDetailSourceMirrorCache  = "Кеш зеркала"
     override val browseDetailSourceMirrorStatic = "Статика зеркала"
     override val browseDetailAssetsEmpty        = "В manifest нет ассетов."
+
+    override val modBrowserOpenButton    = "Открыть браузер модов"
+    override val modBrowserTitle         = "Все моды"
+    override val modBrowserSelectedCount = "%d / %d выбрано"
+    override val modBrowserShowingCount  = "Показано %d из %d"
+    override val modBrowserOnlyOptional  = "Только опциональные"
+    override val modBrowserApply         = "Применить"
+    override val modBrowserCancel        = "Отмена"
+    override val modBrowserRequiredChip  = "Обязателен"
+    override val modBrowserConflictWarn  = "Конфликт с активными модами: %s"
+
+    override val assetBrowserOpenButton    = "Открыть браузер ассетов"
+    override val assetBrowserTitle         = "Все ассеты"
+    override val assetBrowserSearch        = "Поиск ассетов..."
+    override val assetBrowserSelectedCount = "%d / %d выбрано"
+    override val assetBrowserEmptyFilter   = "Под фильтр ничего не подходит."
 }

@@ -595,4 +595,21 @@ interface AppStrings {
     val browseDetailSourceMirrorCache: String
     val browseDetailSourceMirrorStatic: String
     val browseDetailAssetsEmpty: String
+
+    // --- Floating mod / asset browsers ---
+    val modBrowserOpenButton: String
+    val modBrowserTitle: String
+    val modBrowserSelectedCount: String
+    val modBrowserShowingCount: String
+    val modBrowserOnlyOptional: String
+    val modBrowserApply: String
+    val modBrowserCancel: String
+    val modBrowserRequiredChip: String
+    val modBrowserConflictWarn: String
+
+    val assetBrowserOpenButton: String
+    val assetBrowserTitle: String
+    val assetBrowserSearch: String
+    val assetBrowserSelectedCount: String
+    val assetBrowserEmptyFilter: String
 }

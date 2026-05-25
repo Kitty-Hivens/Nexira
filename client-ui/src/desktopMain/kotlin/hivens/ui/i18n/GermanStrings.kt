@@ -557,4 +557,20 @@ object GermanStrings : AppStrings {
     override val browseDetailSourceMirrorCache  = "Mirror-Cache"
     override val browseDetailSourceMirrorStatic = "Mirror-Statisch"
     override val browseDetailAssetsEmpty        = "Keine Assets im Manifest."
+
+    override val modBrowserOpenButton    = "Mod-Browser öffnen"
+    override val modBrowserTitle         = "Alle Mods"
+    override val modBrowserSelectedCount = "%d / %d ausgewählt"
+    override val modBrowserShowingCount  = "%d von %d angezeigt"
+    override val modBrowserOnlyOptional  = "Nur optionale"
+    override val modBrowserApply         = "Übernehmen"
+    override val modBrowserCancel        = "Abbrechen"
+    override val modBrowserRequiredChip  = "Erforderlich"
+    override val modBrowserConflictWarn  = "Konflikt mit aktiven Mods: %s"
+
+    override val assetBrowserOpenButton    = "Asset-Browser öffnen"
+    override val assetBrowserTitle         = "Alle Assets"
+    override val assetBrowserSearch        = "Assets suchen..."
+    override val assetBrowserSelectedCount = "%d / %d ausgewählt"
+    override val assetBrowserEmptyFilter   = "Keine Assets passen zum Filter."
 }

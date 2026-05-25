@@ -112,45 +112,78 @@ fun BrowsePackDetailScreen(packId: String, onBack: () -> Unit) {
         }
     }
 
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        Hero(packId = packId, summary = (state as? DetailState.Loaded)?.summary, onBack = onBack)
+    var selectedOptionalMods   by remember(packId) { mutableStateOf(emptySet<String>()) }
+    var selectedOptionalAssets by remember(packId) { mutableStateOf(emptySet<String>()) }
+    var modDialogOpen          by remember { mutableStateOf(false) }
+    var assetDialogOpen        by remember { mutableStateOf(false) }
 
-        when (val st = state) {
-            DetailState.Loading -> Box(
-                Modifier.fillMaxWidth().height(280.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                CircularProgressIndicator(
-                    color       = CelestiaTheme.colors.primary.copy(alpha = 0.6f),
-                    strokeWidth = 2.dp,
-                    modifier    = Modifier.size(28.dp),
+    Box(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+            Hero(packId = packId, summary = (state as? DetailState.Loaded)?.summary, onBack = onBack)
+
+            when (val st = state) {
+                DetailState.Loading -> Box(
+                    Modifier.fillMaxWidth().height(280.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CircularProgressIndicator(
+                        color       = CelestiaTheme.colors.primary.copy(alpha = 0.6f),
+                        strokeWidth = 2.dp,
+                        modifier    = Modifier.size(28.dp),
+                    )
+                }
+                is DetailState.Error -> Box(
+                    Modifier.fillMaxWidth().padding(32.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Text(
+                            text       = s.browseDetailErrorTitle,
+                            style      = MaterialTheme.typography.titleLarge,
+                            color      = CelestiaTheme.colors.error,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Text(
+                            text      = st.message,
+                            style     = MaterialTheme.typography.bodySmall,
+                            color     = CelestiaTheme.colors.textSecondary,
+                            textAlign = TextAlign.Center,
+                            modifier  = Modifier.widthIn(max = 480.dp),
+                        )
+                        Button(onClick = { retryTick++ }) { Text(s.browseRetry) }
+                    }
+                }
+                is DetailState.Loaded -> LoadedBody(
+                    summary             = st.summary,
+                    manifest            = st.manifest,
+                    onOpenModBrowser    = { modDialogOpen = true },
+                    onOpenAssetBrowser  = { assetDialogOpen = true },
                 )
             }
-            is DetailState.Error -> Box(
-                Modifier.fillMaxWidth().padding(32.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    Text(
-                        text       = s.browseDetailErrorTitle,
-                        style      = MaterialTheme.typography.titleLarge,
-                        color      = CelestiaTheme.colors.error,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Text(
-                        text      = st.message,
-                        style     = MaterialTheme.typography.bodySmall,
-                        color     = CelestiaTheme.colors.textSecondary,
-                        textAlign = TextAlign.Center,
-                        modifier  = Modifier.widthIn(max = 480.dp),
-                    )
-                    Button(onClick = { retryTick++ }) { Text(s.browseRetry) }
-                }
-            }
-            is DetailState.Loaded -> LoadedBody(summary = st.summary, manifest = st.manifest)
+        }
+
+        // Floating browsers -- overlay above the scrolling content,
+        // backdrop dismisses, selection state lives at this screen
+        // level so re-opens preserve what the user already picked.
+        val loaded = state as? DetailState.Loaded
+        if (modDialogOpen && loaded != null) {
+            ModBrowserDialog(
+                mods             = loaded.manifest.mods,
+                initialSelection = selectedOptionalMods,
+                onApply          = { selectedOptionalMods = it },
+                onDismiss        = { modDialogOpen = false },
+            )
+        }
+        if (assetDialogOpen && loaded != null) {
+            AssetBrowserDialog(
+                assets           = loaded.manifest.assets,
+                initialSelection = selectedOptionalAssets,
+                onApply          = { selectedOptionalAssets = it },
+                onDismiss        = { assetDialogOpen = false },
+            )
         }
     }
 }
@@ -196,7 +229,12 @@ private fun Hero(packId: String, summary: SmrtPackSummary?, onBack: () -> Unit) 
 }
 
 @Composable
-private fun LoadedBody(summary: SmrtPackSummary, manifest: SmrtPackManifest) {
+private fun LoadedBody(
+    summary: SmrtPackSummary,
+    manifest: SmrtPackManifest,
+    onOpenModBrowser: () -> Unit,
+    onOpenAssetBrowser: () -> Unit,
+) {
     val s = LocalStrings.current
     Column(
         modifier            = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 20.dp),
@@ -247,8 +285,8 @@ private fun LoadedBody(summary: SmrtPackSummary, manifest: SmrtPackManifest) {
             }
         }
 
-        ModsSection(mods = manifest.mods)
-        AssetsSection(assets = manifest.assets)
+        ModsSection(mods = manifest.mods, onOpenBrowser = onOpenModBrowser)
+        AssetsSection(assets = manifest.assets, onOpenBrowser = onOpenAssetBrowser)
 
         if (summary.tags.isNotEmpty()) {
             Section(title = s.browseDetailTagsTitle) {
@@ -300,7 +338,7 @@ private fun Chip(text: String, emphasis: Boolean = false) {
 // ─── Mods section ─────────────────────────────────────────────────────────────
 
 @Composable
-private fun ModsSection(mods: List<SmrtModEntry>) {
+private fun ModsSection(mods: List<SmrtModEntry>, onOpenBrowser: () -> Unit) {
     val s = LocalStrings.current
     var query    by remember { mutableStateOf("") }
     val expanded = remember { mutableStateOf(setOf<String>()) }
@@ -318,6 +356,20 @@ private fun ModsSection(mods: List<SmrtModEntry>) {
     }
 
     Section(title = s.browseDetailModsTitle) {
+        Row(
+            modifier              = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End,
+        ) {
+            Button(
+                onClick = onOpenBrowser,
+                shape   = RoundedCornerShape(8.dp),
+                colors  = ButtonDefaults.buttonColors(
+                    containerColor = CelestiaTheme.colors.primary,
+                    contentColor   = Color.White,
+                ),
+            ) { Text(s.modBrowserOpenButton, fontWeight = FontWeight.SemiBold) }
+        }
+        Spacer(Modifier.height(8.dp))
         OutlinedTextField(
             value         = query,
             onValueChange = { query = it },
@@ -468,9 +520,24 @@ private fun ModExpanded(mod: SmrtModEntry) {
 // ─── Assets section ───────────────────────────────────────────────────────────
 
 @Composable
-private fun AssetsSection(assets: List<SmrtAssetEntry>) {
+private fun AssetsSection(assets: List<SmrtAssetEntry>, onOpenBrowser: () -> Unit) {
     val s = LocalStrings.current
     Section(title = s.browseDetailAssetsTitle) {
+        Row(
+            modifier              = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End,
+        ) {
+            Button(
+                onClick = onOpenBrowser,
+                enabled = assets.isNotEmpty(),
+                shape   = RoundedCornerShape(8.dp),
+                colors  = ButtonDefaults.buttonColors(
+                    containerColor = CelestiaTheme.colors.primary,
+                    contentColor   = Color.White,
+                ),
+            ) { Text(s.assetBrowserOpenButton, fontWeight = FontWeight.SemiBold) }
+        }
+        Spacer(Modifier.height(8.dp))
         if (assets.isEmpty()) {
             Text(
                 text  = s.browseDetailAssetsEmpty,
