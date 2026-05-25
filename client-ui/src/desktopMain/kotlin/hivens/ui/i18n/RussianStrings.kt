@@ -539,7 +539,7 @@ object RussianStrings : AppStrings {
     override val browseDetailErrorTitle    = "Не удалось загрузить сборку"
     override val browseDetailErrorMessage  = "Не удалось получить manifest. Проверь соединение и повтори."
     override val browseDetailInstallReady  = "Готово к установке"
-    override val browseDetailInstallHint   = "Установка появится в следующем релизе"
+    override val browseDetailInstallHint   = "Создаст новый instance в твоей data-папке."
     override val browseDetailInstallButton = "УСТАНОВИТЬ"
     override val browseDetailTagsTitle     = "Теги"
     override val browseDetailAboutTitle       = "О сборке"
@@ -550,6 +550,15 @@ object RussianStrings : AppStrings {
     override val browseDetailCompatLoader     = "Лоадер"
     override val browseDetailCompatJava       = "Java"
     override val browseDetailVersionTitle     = "Версия"
+
+    override val browseDetailInstallRunningTitle  = "Установка..."
+    override val browseDetailInstallProgress      = "%s  (%d / %d)"
+    override val browseDetailInstallStarting      = "Запуск..."
+    override val browseDetailInstallDoneTitle     = "Установлено"
+    override val browseDetailInstallDoneHint      = "Добавлено в Library."
+    override val browseDetailInstallOpenLibrary   = "ОТКРЫТЬ В LIBRARY"
+    override val browseDetailInstallFailedTitle   = "Ошибка установки"
+    override val browseDetailInstallFailedGeneric = "Установка не удалась по неизвестной причине."
 
 
 

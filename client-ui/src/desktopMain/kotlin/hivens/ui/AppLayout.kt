@@ -218,8 +218,9 @@ fun AppLayout(
 
                     is Screen.BrowsePackDetail ->
                         hivens.ui.screens.browse.BrowsePackDetailScreen(
-                            packId = screen.packId,
-                            onBack = { onScreenChange(Screen.Browse) },
+                            packId      = screen.packId,
+                            onBack      = { onScreenChange(Screen.Browse) },
+                            onInstalled = { instanceId -> onScreenChange(Screen.PackDetail(instanceId)) },
                         )
 
                     is Screen.PackDetail ->
