@@ -444,14 +444,29 @@ class LauncherController(
      * absent. The returned [PackInstance] is the (possibly updated)
      * instance the caller should use for the rest of the launch flow
      * -- never falls back to the input value silently.
+     *
+     * For instances without a cached manifest the fetch targets the
+     * pinned version (`pinnedPackVersion` or `packRef.version`),
+     * NOT the mirror's latest. A floating instance (both pins null)
+     * picks up whatever the mirror currently serves -- but those are
+     * always created post-this-PR, so they already have a cached
+     * manifest and never reach this fallback.
      */
     private suspend fun resolveOrFetchManifest(
         instance: PackInstance,
     ): Pair<CachedManifestSnapshot, PackInstance> {
         instance.cachedManifest?.let { return it to instance }
 
-        logger.info("Pack {} has no cached manifest; fetching from mirror once.", instance.id)
-        val manifest = smrtPackClient.fetchManifest(instance.packRef.id)
+        val pin = instance.pinnedPackVersion ?: instance.packRef.version
+        logger.info(
+            "Pack {} has no cached manifest; fetching {} (pin={}) from mirror once.",
+            instance.id, instance.packRef.id, pin ?: "latest",
+        )
+        val manifest = if (pin != null) {
+            smrtPackClient.fetchManifestVersion(instance.packRef.id, pin)
+        } else {
+            smrtPackClient.fetchManifest(instance.packRef.id)
+        }
         val snapshot = CachedManifestSnapshot(
             minecraftVersion = manifest.minecraft.version,
             loaderName       = manifest.loader.name,
