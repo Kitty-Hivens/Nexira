@@ -156,8 +156,15 @@ private fun ExpandedDetails(mod: SmrtModEntry, graph: DepGraph) {
             )
         }
 
-        // Dependencies subsection -- collapsible, default collapsed.
-        DependenciesSubsection(mod = mod, graph = graph)
+        // Dependencies subsection -- only rendered when the mod has at
+        // least one declared requirement. Mirror today does not author
+        // `display.requires`, so emitting "Зависимости (0)" on every
+        // expanded mod was pure noise; the row reappears automatically
+        // once the mirror starts populating the field.
+        if (graph.edges.any { it.from == mod.filename } ||
+            graph.missingRequirements.any { it.from == mod.filename }) {
+            DependenciesSubsection(mod = mod, graph = graph)
+        }
     }
 }
 
