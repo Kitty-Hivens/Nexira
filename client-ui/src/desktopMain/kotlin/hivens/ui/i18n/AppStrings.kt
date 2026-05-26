@@ -601,6 +601,7 @@ interface AppStrings {
     val fileBrowserOpenExternally: String
     /** Receives the cap in KB, e.g. `Preview truncated to first 256 KB`. */
     fun fileBrowserTextTruncated(maxKb: Long): String
+    val fileBrowserEmptyFolder: String
 
     // ── Library / PackDetail / Content tab ──────────────────────────────
     val contentTabUnsupportedOrigin: String
@@ -628,6 +629,7 @@ interface AppStrings {
     fun contentTabModMissingCount(count: Int): String
     val contentTabDepOptional: String
     val contentTabDepMissing: String
+    val contentTabModOptional: String
     fun contentTabAssetSizeLabel(kb: Long): String
     val contentTabAssetOptional: String
     val contentTabAssetNoDescription: String

@@ -1,5 +1,6 @@
 package hivens.ui.screens.library
 
+import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -19,6 +20,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -38,6 +40,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -47,6 +50,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
@@ -101,7 +105,14 @@ fun FileBrowserPane(rootDir: Path, modifier: Modifier = Modifier) {
     val rootReal = remember(rootDir) { runCatching { rootDir.toRealPath() }.getOrDefault(rootDir) }
 
     var selected by remember { mutableStateOf<Path?>(null) }
-    val expanded = remember { mutableStateOf(setOf<Path>(rootDir)) }
+    // Per-path expansion as a SnapshotStateMap: granular reactivity, so a
+    // single subfolder toggle invalidates only the rows that read that
+    // specific path's expansion state. Earlier mutableStateOf<Set<Path>>
+    // implementation didn't reliably re-render children for tester on
+    // Hyprland builds; the state-map form removes the structural-equality
+    // ambiguity by tracking per-key reads explicitly.
+    val expanded = remember { mutableStateMapOf<Path, Boolean>().apply { put(rootDir, true) } }
+    val rows = flattenTree(rootDir, expanded)
 
     Row(modifier = modifier.fillMaxSize()) {
         // Left: tree.
@@ -112,25 +123,22 @@ fun FileBrowserPane(rootDir: Path, modifier: Modifier = Modifier) {
                 .clip(RoundedCornerShape(12.dp))
                 .background(glassSurfaceAlpha(0.55f)),
         ) {
+            val listState = rememberLazyListState()
             LazyColumn(
-                state               = rememberLazyListState(),
+                state               = listState,
                 modifier            = Modifier.fillMaxSize().padding(8.dp),
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 items(
-                    items = flattenTree(rootDir, expanded.value),
+                    items = rows,
                     key   = { it.path.toAbsolutePath().toString() },
                 ) { node ->
                     FileTreeRow(
                         node          = node,
                         isSelected    = selected == node.path,
-                        isExpanded    = node.path in expanded.value,
+                        isExpanded    = expanded[node.path] == true,
                         onToggleExpand = {
-                            expanded.value = if (node.path in expanded.value) {
-                                expanded.value - node.path
-                            } else {
-                                expanded.value + node.path
-                            }
+                            expanded[node.path] = expanded[node.path] != true
                         },
                         onSelect = {
                             if (node.path.isRegularFile()) {
@@ -141,6 +149,10 @@ fun FileBrowserPane(rootDir: Path, modifier: Modifier = Modifier) {
                     )
                 }
             }
+            VerticalScrollbar(
+                adapter  = rememberScrollbarAdapter(listState),
+                modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
+            )
         }
 
         Spacer(Modifier.width(12.dp))
@@ -172,24 +184,40 @@ fun FileBrowserPane(rootDir: Path, modifier: Modifier = Modifier) {
 
 // ── Tree flattening ────────────────────────────────────────────────────────
 
-private data class TreeRow(val path: Path, val depth: Int, val isDir: Boolean)
+private val log = org.slf4j.LoggerFactory.getLogger("FileBrowserPane")
 
-private fun flattenTree(root: Path, expanded: Set<Path>): List<TreeRow> {
+private data class TreeRow(val path: Path, val depth: Int, val isDir: Boolean, val isEmpty: Boolean = false)
+
+private fun flattenTree(root: Path, expanded: Map<Path, Boolean>): List<TreeRow> {
     val out = mutableListOf<TreeRow>()
     addNode(root, 0, expanded, out)
     return out
 }
 
-private fun addNode(node: Path, depth: Int, expanded: Set<Path>, out: MutableList<TreeRow>) {
+private fun addNode(node: Path, depth: Int, expanded: Map<Path, Boolean>, out: MutableList<TreeRow>) {
     val isDir = node.isDirectory()
     out += TreeRow(path = node, depth = depth, isDir = isDir)
-    if (isDir && node in expanded) {
-        val children = runCatching {
+    if (isDir && expanded[node] == true) {
+        val children = try {
             Files.list(node).use { stream ->
                 stream.toList().sortedWith(compareBy({ !it.isDirectory() }, { it.name.lowercase() }))
             }
-        }.getOrDefault(emptyList())
-        children.forEach { addNode(it, depth + 1, expanded, out) }
+        } catch (e: Exception) {
+            // Most-common cause: filesystem permission on a system-junction
+            // directory under Windows AppData. Without the log line a silent
+            // "expand does nothing" was indistinguishable from the bug we
+            // had before the SnapshotStateMap rewrite.
+            log.warn("Failed to list children of {}: {}", node, e.message)
+            emptyList()
+        }
+        if (children.isEmpty()) {
+            // Sentinel row so the user sees the expansion took effect even
+            // when the dir is genuinely empty -- otherwise the chevron
+            // flipped silently and the row looked broken.
+            out += TreeRow(path = node.resolve(".empty"), depth = depth + 1, isDir = false, isEmpty = true)
+        } else {
+            children.forEach { addNode(it, depth + 1, expanded, out) }
+        }
     }
 }
 
@@ -206,45 +234,64 @@ private fun FileTreeRow(
     val rowBg = if (isSelected) CelestiaTheme.colors.primary.copy(alpha = 0.25f)
                 else Color.Transparent
 
+    val s = LocalStrings.current
+    val clickHandler: () -> Unit = when {
+        node.isEmpty -> ({})              // empty-folder placeholder is read-only
+        node.isDir   -> onToggleExpand
+        else         -> onSelect
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(6.dp))
             .background(rowBg)
-            .clickable(onClick = if (node.isDir) onToggleExpand else onSelect)
+            .clickable(onClick = clickHandler)
             .padding(start = (12 * node.depth).dp, top = 4.dp, bottom = 4.dp, end = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (node.isDir) {
-            Icon(
-                imageVector        = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                contentDescription = null,
-                tint               = CelestiaTheme.colors.textSecondary,
-                modifier           = Modifier.size(16.dp),
-            )
-            Spacer(Modifier.width(4.dp))
-            Icon(
-                imageVector        = Icons.Default.Folder,
-                contentDescription = null,
-                tint               = CelestiaTheme.colors.primary.copy(alpha = 0.85f),
-                modifier           = Modifier.size(16.dp),
-            )
-        } else {
-            Spacer(Modifier.size(20.dp))
-            Icon(
-                imageVector        = fileIconFor(node.path),
-                contentDescription = null,
-                tint               = CelestiaTheme.colors.textSecondary,
-                modifier           = Modifier.size(16.dp),
-            )
+        when {
+            node.isEmpty -> Spacer(Modifier.size(20.dp))
+            node.isDir -> {
+                Icon(
+                    imageVector        = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = null,
+                    tint               = CelestiaTheme.colors.textSecondary,
+                    modifier           = Modifier.size(16.dp),
+                )
+                Spacer(Modifier.width(4.dp))
+                Icon(
+                    imageVector        = Icons.Default.Folder,
+                    contentDescription = null,
+                    tint               = CelestiaTheme.colors.primary.copy(alpha = 0.85f),
+                    modifier           = Modifier.size(16.dp),
+                )
+            }
+            else -> {
+                Spacer(Modifier.size(20.dp))
+                Icon(
+                    imageVector        = fileIconFor(node.path),
+                    contentDescription = null,
+                    tint               = CelestiaTheme.colors.textSecondary,
+                    modifier           = Modifier.size(16.dp),
+                )
+            }
         }
         Spacer(Modifier.width(8.dp))
-        Text(
-            text       = node.path.name,
-            style      = MaterialTheme.typography.bodySmall,
-            color      = CelestiaTheme.colors.textPrimary,
-            fontWeight = if (node.isDir) FontWeight.SemiBold else FontWeight.Normal,
-        )
+        if (node.isEmpty) {
+            Text(
+                text       = s.fileBrowserEmptyFolder,
+                style      = MaterialTheme.typography.bodySmall,
+                color      = CelestiaTheme.colors.textSecondary.copy(alpha = 0.7f),
+                fontStyle  = FontStyle.Italic,
+            )
+        } else {
+            Text(
+                text       = node.path.name,
+                style      = MaterialTheme.typography.bodySmall,
+                color      = CelestiaTheme.colors.textPrimary,
+                fontWeight = if (node.isDir) FontWeight.SemiBold else FontWeight.Normal,
+            )
+        }
     }
 }
 

@@ -563,6 +563,7 @@ object EnglishStrings : AppStrings {
     override val fileBrowserOpenExternally  = "Open externally"
     override fun fileBrowserTextTruncated(maxKb: Long) =
         "Preview truncated to the first $maxKb KB. Open externally to see the full file."
+    override val fileBrowserEmptyFolder      = "(empty)"
 
     override val contentTabUnsupportedOrigin    = "Content view is only available for mirror-published packs today. Other sources will get parity in a follow-up."
     override val contentTabFetchErrorTitle      = "Could not load pack content"
@@ -594,6 +595,7 @@ object EnglishStrings : AppStrings {
     override fun contentTabModMissingCount(count: Int) = "$count missing"
     override val contentTabDepOptional          = "optional"
     override val contentTabDepMissing           = "missing"
+    override val contentTabModOptional          = "optional"
     override fun contentTabAssetSizeLabel(kb: Long) = "$kb KB"
     override val contentTabAssetOptional        = "optional"
     override val contentTabAssetNoDescription   = "No description in the manifest yet."

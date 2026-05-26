@@ -1,11 +1,13 @@
 package hivens.ui.screens.library.content
 
+import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -14,6 +16,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -154,39 +158,51 @@ private fun LoadedBody(
     grouping: ModGrouping,
 ) {
     val s = LocalStrings.current
+    val listState = rememberLazyListState()
 
-    LazyColumn(
-        modifier            = modifier.fillMaxSize().padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp),
-    ) {
-        if (graph.cycles.isNotEmpty() || graph.missingRequirements.isNotEmpty()) {
-            item { ResolverWarnings(graph = graph) }
-        }
-
-        if (grouping.byRole.isNotEmpty()) {
-            item { SectionHeader(text = s.contentTabRoleSection) }
-            items(items = grouping.byRole, key = { it.role }) { group ->
-                RoleGroupSection(group = group, graph = graph)
+    Box(modifier = modifier.fillMaxSize()) {
+        LazyColumn(
+            state               = listState,
+            modifier            = Modifier.fillMaxSize().padding(start = 20.dp, end = 24.dp, top = 16.dp, bottom = 16.dp),
+            // Per-row component owns its own internal padding; section
+            // separation is the only thing this arrangement controls.
+            // 12dp gives sections breathing room without making a 50-mod
+            // list feel like an infinite rabbit hole.
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            if (graph.cycles.isNotEmpty() || graph.missingRequirements.isNotEmpty()) {
+                item { ResolverWarnings(graph = graph) }
             }
-        }
 
-        if (grouping.ungrouped.isNotEmpty()) {
-            item {
-                SectionHeader(text = s.contentTabModsSection(grouping.ungrouped.size))
+            if (grouping.byRole.isNotEmpty()) {
+                item { SectionHeader(text = s.contentTabRoleSection) }
+                items(items = grouping.byRole, key = { it.role }) { group ->
+                    RoleGroupSection(group = group, graph = graph)
+                }
             }
-            items(items = grouping.ungrouped, key = { it.filename }) { mod ->
-                ModRowPanel(mod = mod, graph = graph)
-            }
-        }
 
-        if (manifest.assets.isNotEmpty()) {
-            item { SectionHeader(text = s.contentTabAssetsSection(manifest.assets.size)) }
-            items(items = manifest.assets, key = { it.dest }) { asset ->
-                AssetRowPanel(asset = asset)
+            if (grouping.ungrouped.isNotEmpty()) {
+                item {
+                    SectionHeader(text = s.contentTabModsSection(grouping.ungrouped.size))
+                }
+                items(items = grouping.ungrouped, key = { it.filename }) { mod ->
+                    ModRowPanel(mod = mod, graph = graph)
+                }
             }
-        }
 
-        item { Spacer(Modifier.height(8.dp)) }
+            if (manifest.assets.isNotEmpty()) {
+                item { SectionHeader(text = s.contentTabAssetsSection(manifest.assets.size)) }
+                items(items = manifest.assets, key = { it.dest }) { asset ->
+                    AssetRowPanel(asset = asset)
+                }
+            }
+
+            item { Spacer(Modifier.height(8.dp)) }
+        }
+        VerticalScrollbar(
+            adapter  = rememberScrollbarAdapter(listState),
+            modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
+        )
     }
 }
 

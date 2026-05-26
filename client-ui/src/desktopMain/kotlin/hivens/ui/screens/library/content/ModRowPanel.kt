@@ -77,19 +77,19 @@ fun ModRowPanel(
             .clip(RoundedCornerShape(10.dp))
             .background(glassSurfaceAlpha(0.45f * rowAlpha))
             .clickable { expanded = !expanded }
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+            .padding(horizontal = 12.dp, vertical = 6.dp),
     ) {
         Row(
             verticalAlignment     = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier              = Modifier.fillMaxWidth(),
         ) {
-            ModIconImage(mod = mod, size = 32.dp)
+            ModIconImage(mod = mod, size = 28.dp)
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text           = mod.display?.name ?: mod.filename.removeSuffix(".jar"),
-                    style          = MaterialTheme.typography.bodyLarge,
+                    style          = MaterialTheme.typography.bodyMedium,
                     color          = CelestiaTheme.colors.textPrimary.copy(alpha = rowAlpha),
                     fontWeight     = if (emphasis == Emphasis.Primary) FontWeight.SemiBold else FontWeight.Normal,
                     textDecoration = titleDecoration,
@@ -105,6 +105,7 @@ fun ModRowPanel(
                 }
             }
 
+            if (!mod.required) MetaChip(text = s.contentTabModOptional)
             SourceBadge(mod.source)
 
             Icon(

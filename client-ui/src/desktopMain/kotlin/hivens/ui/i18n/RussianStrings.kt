@@ -564,6 +564,7 @@ object RussianStrings : AppStrings {
     override val fileBrowserOpenExternally  = "Открыть во внешней программе"
     override fun fileBrowserTextTruncated(maxKb: Long) =
         "Предпросмотр обрезан до первых $maxKb KB. Открой во внешней программе чтобы увидеть весь файл."
+    override val fileBrowserEmptyFolder      = "(пусто)"
 
     override val contentTabUnsupportedOrigin    = "Просмотр содержимого пока работает только для сборок с зеркала. Для остальных источников поддержку добавим в следующих PR."
     override val contentTabFetchErrorTitle      = "Не удалось загрузить содержимое сборки"
@@ -595,6 +596,7 @@ object RussianStrings : AppStrings {
     override fun contentTabModMissingCount(count: Int) = "$count нет"
     override val contentTabDepOptional          = "опционально"
     override val contentTabDepMissing           = "нет"
+    override val contentTabModOptional          = "опциональный"
     override fun contentTabAssetSizeLabel(kb: Long) = "$kb KB"
     override val contentTabAssetOptional        = "опционально"
     override val contentTabAssetNoDescription   = "Описания пока нет в манифесте."
