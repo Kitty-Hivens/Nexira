@@ -61,6 +61,7 @@ import hivens.ui.theme.CustomTheme
 import hivens.ui.theme.ThemeManager
 import hivens.ui.tray.TrayManager
 import hivens.ui.utils.GameConsoleService
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -386,15 +387,60 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
             }
 
             // ── Populate server list ───────────────────────────────────
+            // [SmartyCraftServerListService.fetchDashboardData] swallows
+            // network failures and returns `DashboardData(empty, empty)`
+            // rather than throwing, so an outage looks like a successful
+            // empty fetch from this call site. Without an explicit
+            // fetch-failed signal we cannot fully distinguish "outage"
+            // from "admin truly cleared the roster"; use the disk cache
+            // [serverListCache] as a heuristic: a previously-cached
+            // non-empty roster going to empty implies outage and we
+            // keep the seed; an already-empty cache going to empty is
+            // accepted as the new truth.
+            //
+            // Tradeoff: false-positive (admin actually cleared the
+            // roster while cache exists) keeps a stale entry for ONE
+            // session until next launch's fresh load(); the
+            // false-negative (transient outage wipes a real seed)
+            // hurts more, so the heuristic leans toward seed
+            // preservation. Reviewer flagged the previous "always
+            // preserve on empty" version as conflating both cases.
+            // Re-read the on-disk cache here -- the seed read inside
+            // the tray-init withContext block is local to that lambda,
+            // and re-reading is a cheap ~2 KB JSON load. The value is
+            // the heuristic we use to distinguish outage from a
+            // legitimately-empty roster below.
+            val seedFromCache = withContext(Dispatchers.IO) { serverListCache.load() }
             val dashboardServers = try {
                 val data = withContext(Dispatchers.IO) {
                     serverListService.fetchDashboardData().get()
                 }
-                TrayManager.updateServers(data.servers)
-                data.servers
+                when {
+                    data.servers.isNotEmpty() -> {
+                        TrayManager.updateServers(data.servers)
+                        data.servers
+                    }
+                    seedFromCache.isEmpty() -> {
+                        // No seed to preserve; accept the empty roster
+                        // and let the tray render "(No servers)".
+                        TrayManager.updateServers(emptyList())
+                        emptyList()
+                    }
+                    else -> {
+                        // Probable outage: keep the seeded tray entries
+                        // from the disk cache and return them so the
+                        // dashboard surface stays populated.
+                        seedFromCache
+                    }
+                }
+            } catch (e: CancellationException) {
+                // Composition leave / locale switch / exit mid-fetch
+                // must propagate cooperatively; converting to "outage"
+                // would defeat structured concurrency.
+                throw e
             } catch (_: Exception) {
-                /* tray shows empty list */
-                emptyList()
+                /* tray keeps the seeded cache from the IO init block */
+                seedFromCache
             }
 
             // ── Auto-sync (experimental, opt-in) ──────────────────────
@@ -481,7 +527,32 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
                         MIN_WINDOW_HEIGHT_DP.dp.toPx().toInt(),
                     )
                 }
-                val screen = Toolkit.getDefaultToolkit().screenSize
+                // Prefer the bounds of the display this window is on;
+                // the toolkit's screenSize is the PRIMARY monitor only,
+                // and on a multi-monitor setup where the user restored
+                // the launcher on a smaller secondary screen the
+                // primary-derived clamp can exceed the actual display
+                // and block resize to a usable size. GraphicsConfiguration
+                // returns null before the window is realised, so fall
+                // back to the toolkit for the initial placement pass.
+                //
+                // Wayland peer-init quirk: on Hyprland (and other
+                // Wayland compositors) starting tray-resident, the
+                // Compose Window is created but not yet displayable.
+                // window.graphicsConfiguration is non-null (returns the
+                // device's default GC) but its bounds are Rectangle(0,0,0,0)
+                // until the surface negotiates. Treating that as a
+                // valid screen yields minimumSize = (0,0) and the WM
+                // can later shrink the window to a 1px sliver. Guard
+                // on positive bounds and fall through to the toolkit
+                // size otherwise.
+                val gc = window.graphicsConfiguration
+                val gcBounds = gc?.bounds
+                val screen = if (gcBounds != null && gcBounds.width > 0 && gcBounds.height > 0) {
+                    Dimension(gcBounds.width, gcBounds.height)
+                } else {
+                    Toolkit.getDefaultToolkit().screenSize
+                }
                 val safe = computeSafeWindowMinSize(designPx.width, designPx.height, screen)
                 SwingUtilities.invokeLater { window.minimumSize = safe }
             }

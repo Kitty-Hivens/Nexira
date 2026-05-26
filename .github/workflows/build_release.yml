@@ -90,8 +90,38 @@ jobs:
           # exclude self-reviews and detect Qodana's comment-API engagement.
           PR_JSON=$(gh pr view "$PR" --repo "$GH_REPO" --json author,reviews,comments)
           AUTHOR=$(echo "$PR_JSON" | jq -r '.author.login')
-          APPROVED=$(echo "$PR_JSON" | jq --arg author "$AUTHOR" \
-            '[.reviews[] | select(.state=="APPROVED" and .author.login != $author)] | length')
+          # GitHub's own staleness rule: an APPROVED review is
+          # "current" until the same reviewer submits CHANGES_REQUESTED
+          # or DISMISSED. A later COMMENTED entry from the same
+          # reviewer does NOT supersede their approval (the GitHub UI
+          # keeps the green check). Our jq does the same: count a
+          # reviewer as approving iff they have at least one APPROVED
+          # entry AND no CHANGES_REQUESTED/DISMISSED entry that is
+          # newer.
+          #
+          # Defensive `select(.author != null)` drops reviews from
+          # deleted GitHub accounts; otherwise group_by(.author.login)
+          # buckets every null-author into a single group and the
+          # count diverges from the truth.
+          APPROVED=$(echo "$PR_JSON" | jq --arg author "$AUTHOR" '
+            [ .reviews
+              | map(select(.author != null and .author.login != $author))
+              | group_by(.author.login)
+              | map({
+                  lastApproved:
+                    (map(select(.state == "APPROVED") | .submittedAt) | max),
+                  lastSupersede:
+                    (map(select(.state == "CHANGES_REQUESTED" or .state == "DISMISSED") | .submittedAt) | max),
+                })
+              | map(select(
+                  .lastApproved != null
+                  and (.lastSupersede == null or .lastApproved > .lastSupersede)
+                ))
+            ] | length
+          ')
+          # Weak signal stays "any non-author review entry of any kind",
+          # since Codex always lands a COMMENTED review and is the cheapest
+          # bot signal we have when no human approval exists.
           ANY_REVIEW=$(echo "$PR_JSON" | jq --arg author "$AUTHOR" \
             '[.reviews[] | select(.author.login != $author)] | length')
           # Qodana posts as `github-actions[bot]` (login `github-actions`)

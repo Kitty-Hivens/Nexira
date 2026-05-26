@@ -38,8 +38,15 @@ object NoOpAprilFools : AprilFoolsLifecycle {
     override var debugForceActive: Boolean? = null
     override var debugIntensity: Float? = null
 
-    override fun wrapProgress(downloaded: Long, total: Long): Float =
-        if (total <= 0L) 0f else (downloaded.toFloat() / total).coerceIn(0f, 1f)
+    override fun wrapProgress(downloaded: Long, total: Long): Float {
+        // Same sentinel contract as the Real impl: NaN means "size
+        // unknown but bytes are flowing -> switch to indeterminate".
+        // See [AprilFoolsProgress.wrap] kdoc.
+        if (total <= 0L) {
+            return if (downloaded <= 0L) 0f else Float.NaN
+        }
+        return (downloaded.toFloat() / total).coerceIn(0f, 1f)
+    }
 
     override fun resetProgress() = Unit
 
