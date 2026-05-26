@@ -21,6 +21,7 @@ class NotificationCenter(
         sender: String,
         iconUrl: String?,
         severity: Severity,
+        kind: Kind,
         title: String,
         body: String? = null,
         progress: Float? = null,
@@ -29,6 +30,7 @@ class NotificationCenter(
         val event = NotificationEvent(
             id        = UUID.randomUUID(),
             severity  = severity,
+            kind      = kind,
             title     = title,
             body      = body,
             progress  = progress,

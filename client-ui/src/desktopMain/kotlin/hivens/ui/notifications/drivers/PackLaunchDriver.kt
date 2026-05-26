@@ -6,6 +6,7 @@ import hivens.launcher.launch.LaunchState
 import hivens.launcher.launch.LauncherController
 import hivens.ui.notifications.IndicationCenter
 import hivens.ui.notifications.IndicationCenter.LaunchIndication
+import hivens.ui.notifications.Kind
 import hivens.ui.notifications.NotifAction
 import hivens.ui.notifications.NotificationCenter
 import hivens.ui.notifications.SessionRegistry
@@ -86,7 +87,8 @@ class PackLaunchDriver(
             sourceKey = sourceKeyFor(pack),
             sender    = pack.displayName,
             iconUrl   = iconUrlFor(pack),
-            severity  = Severity.Progress,
+            severity  = Severity.Info,
+            kind      = Kind.Progress,
             title     = "Preparing ${pack.displayName}",
             body      = "Stage: ${state.stage.name.lowercase()}",
             progress  = state.progress.coerceIn(0f, 1f),
@@ -111,7 +113,8 @@ class PackLaunchDriver(
             sourceKey = sourceKeyFor(pack),
             sender    = pack.displayName,
             iconUrl   = iconUrlFor(pack),
-            severity  = Severity.Progress,
+            severity  = Severity.Info,
+            kind      = Kind.Progress,
             title     = "Syncing ${pack.displayName}",
             body      = "${state.currentFileIdx}/${state.totalFiles} files, $displayPct",
             progress  = notifProgress,
@@ -132,6 +135,7 @@ class PackLaunchDriver(
             sender    = pack.displayName,
             iconUrl   = iconUrlFor(pack),
             severity  = Severity.Success,
+            kind      = Kind.ActionRequired,
             title     = "${pack.displayName} is running",
             body      = null,
             actions   = listOf(
@@ -149,6 +153,7 @@ class PackLaunchDriver(
             sender    = pack.displayName,
             iconUrl   = iconUrlFor(pack),
             severity  = Severity.Critical,
+            kind      = Kind.Sticky,
             title     = "${pack.displayName} failed to launch",
             body      = humanReason(reason),
             actions   = listOf(
@@ -167,6 +172,7 @@ class PackLaunchDriver(
             sender    = pack.displayName,
             iconUrl   = iconUrlFor(pack),
             severity  = Severity.Success,
+            kind      = Kind.OneShot,
             title     = "${pack.displayName} session ended",
             body      = null,
         )

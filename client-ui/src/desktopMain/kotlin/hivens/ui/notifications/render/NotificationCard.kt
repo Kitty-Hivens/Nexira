@@ -50,6 +50,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.notifications.Kind
 import hivens.ui.notifications.NotifAction
 import hivens.ui.notifications.NotificationEvent
 import hivens.ui.notifications.NotificationGroup
@@ -71,7 +72,7 @@ fun NotificationCard(
     // appears already opened into stale history.
     var expanded by remember(group.sourceKey, group.count) { mutableStateOf(false) }
     val palette = CelestiaTheme.colors
-    val accentColor = severityAccent(group.severity, palette)
+    val accentColor = severityAccent(group.severity, group.kind, palette)
     val accentAlpha = if (group.severity == Severity.Critical) criticalPulse() else 1f
 
     Box(
@@ -81,7 +82,7 @@ fun NotificationCard(
             .background(CelestiaTheme.colors.surface)
     ) {
         Row(modifier = Modifier.fillMaxWidth()) {
-            if (group.severity != Severity.Info) {
+            if (accentColor != Color.Transparent) {
                 Box(
                     modifier = Modifier
                         .width(if (group.severity == Severity.Critical) 4.dp else 3.dp)
@@ -311,11 +312,12 @@ private fun criticalPulse(): Float {
     return v
 }
 
-// Routes Severity onto the active palette. Info has no stripe -- caller
-// elides the side-bar -- so Color.Transparent is the safe sentinel.
-private fun severityAccent(severity: Severity, colors: CelestiaColors): Color = when (severity) {
-    Severity.Info     -> Color.Transparent
-    Severity.Progress -> colors.progressAccent
+// Routes (Severity, Kind) onto the active palette. Severity drives the
+// color band; Kind.Progress promotes Info to the progress accent so the
+// card visibly tracks in-flight work. Info+non-Progress has no stripe --
+// caller elides the side-bar -- so Color.Transparent is the safe sentinel.
+private fun severityAccent(severity: Severity, kind: Kind, colors: CelestiaColors): Color = when (severity) {
+    Severity.Info     -> if (kind == Kind.Progress) colors.progressAccent else Color.Transparent
     Severity.Success  -> colors.success
     Severity.Warn     -> colors.warnAccent
     Severity.Critical -> colors.criticalAccent

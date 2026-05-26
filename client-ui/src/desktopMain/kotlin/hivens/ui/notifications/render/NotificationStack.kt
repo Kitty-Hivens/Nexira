@@ -59,7 +59,7 @@ fun NotificationStack(center: NotificationCenter = koinInject()) {
 
     LaunchedEffect(clockTick, groups) {
         groups.forEach { group ->
-            val window = group.severity.autoDismissAfter ?: return@forEach
+            val window = group.kind.autoDismissAfter(group.severity) ?: return@forEach
             val age = java.time.Duration.between(group.latest.createdAt, clockTick)
             if (age.toMillis() >= window.inWholeMilliseconds) {
                 center.dismiss(group.sourceKey)
