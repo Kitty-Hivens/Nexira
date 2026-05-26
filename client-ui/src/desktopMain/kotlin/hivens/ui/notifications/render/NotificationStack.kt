@@ -31,8 +31,15 @@ import java.time.Instant
 fun NotificationStack(center: NotificationCenter = koinInject()) {
     val groups by center.groups.collectAsState()
 
+    // Gate the 1Hz ticker on groups.isNotEmpty -- NotificationStack is
+    // mounted in AppShell at all times, so a naive `LaunchedEffect(Unit)`
+    // recomposes the subtree every second of idle even when nothing is
+    // visible. Keying on the boolean restarts the ticker only when the
+    // empty/non-empty transition happens.
     var clockTick by remember { mutableStateOf(Instant.now()) }
-    LaunchedEffect(Unit) {
+    val hasGroups = groups.isNotEmpty()
+    LaunchedEffect(hasGroups) {
+        if (!hasGroups) return@LaunchedEffect
         while (true) {
             delay(1_000L)
             clockTick = Instant.now()
@@ -49,7 +56,7 @@ fun NotificationStack(center: NotificationCenter = koinInject()) {
         }
     }
 
-    if (groups.isEmpty()) return
+    if (!hasGroups) return
 
     Box(modifier = Modifier.fillMaxSize().padding(top = 16.dp, end = 16.dp)) {
         Column(

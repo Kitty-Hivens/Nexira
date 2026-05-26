@@ -32,8 +32,10 @@ import hivens.core.data.PackInstance
 import hivens.launcher.launch.LauncherController
 import hivens.ui.AppState
 import hivens.ui.Screen
+import hivens.ui.notifications.drivers.PackLaunchDriver
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.theme.CelestiaTheme
+import hivens.ui.utils.GameConsoleService
 import org.koin.compose.koinInject
 
 /**
@@ -58,8 +60,8 @@ fun LibraryScreen(
 
     val repo: IPackRepository = koinInject()
     val controller: LauncherController = koinInject()
-    val launchDriver: hivens.ui.notifications.drivers.PackLaunchDriver = koinInject()
-    val gameConsole: hivens.ui.utils.GameConsoleService = koinInject()
+    val launchDriver: PackLaunchDriver = koinInject()
+    val gameConsole: GameConsoleService = koinInject()
     val instances by remember { repo.observe() }.collectAsState(initial = emptyList())
     val authedSession = (appState as? AppState.Authenticated)?.session
 

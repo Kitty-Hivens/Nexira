@@ -7,9 +7,11 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.Duration
 import java.time.Instant
+import java.util.concurrent.ConcurrentHashMap
 
 class SessionRegistry(
     private val appScope: CoroutineScope,
@@ -29,7 +31,11 @@ class SessionRegistry(
     private val _active = MutableStateFlow<Map<String, ActiveSession>>(emptyMap())
     val active: StateFlow<Map<String, ActiveSession>> = _active.asStateFlow()
 
-    private val uptimeJobs: MutableMap<String, Job> = mutableMapOf()
+    // ConcurrentHashMap, not plain MutableMap -- register/unregister can
+    // come from arbitrary coroutine contexts (driver-on-Default racing
+    // shutdown-hook); plain HashMap concurrent mutation corrupts the
+    // bucket table.
+    private val uptimeJobs: ConcurrentHashMap<String, Job> = ConcurrentHashMap()
 
     // Replaces on duplicate id: controller's re-entry guard rejects
     // concurrent launches, so a duplicate here means the prior session
@@ -52,20 +58,22 @@ class SessionRegistry(
             abort            = abort,
             showConsole      = showConsole,
         )
-        _active.value = _active.value + (packInstanceId to session)
+        // update {} is CAS-retry; plain `value = value + ...` is non-atomic
+        // and loses entries under concurrent register/unregister.
+        _active.update { it + (packInstanceId to session) }
 
-        uptimeJobs.remove(packInstanceId)?.cancel()
-        uptimeJobs[packInstanceId] = appScope.launch(Dispatchers.Default) {
+        val newJob = appScope.launch(Dispatchers.Default) {
             while (true) {
                 uptime.value = Duration.between(startedAt, clock())
                 delay(1_000L)
             }
         }
+        uptimeJobs.put(packInstanceId, newJob)?.cancel()
         return session
     }
 
     fun unregister(packInstanceId: String) {
         uptimeJobs.remove(packInstanceId)?.cancel()
-        _active.value = _active.value - packInstanceId
+        _active.update { it - packInstanceId }
     }
 }

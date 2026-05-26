@@ -10,6 +10,7 @@ import java.util.UUID
 // drivers on different coroutines do not lose events.
 class NotificationCenter(
     private val historyPerGroup: Int = DEFAULT_HISTORY_PER_GROUP,
+    private val maxGroups: Int = DEFAULT_MAX_GROUPS,
     private val clock: () -> Instant = Instant::now,
 ) {
     private val _groups = MutableStateFlow<List<NotificationGroup>>(emptyList())
@@ -36,7 +37,7 @@ class NotificationCenter(
         )
         _groups.update { current ->
             val existingIndex = current.indexOfFirst { it.sourceKey == sourceKey }
-            if (existingIndex < 0) {
+            val newList = if (existingIndex < 0) {
                 listOf(
                     NotificationGroup(
                         sourceKey = sourceKey,
@@ -55,6 +56,10 @@ class NotificationCenter(
                 val others = current.toMutableList().also { it.removeAt(existingIndex) }
                 listOf(merged) + others
             }
+            // Drop oldest groups beyond cap; symmetric to historyPerGroup.
+            // Without it a future driver pushing N distinct sourceKeys grows
+            // _groups unboundedly while the visible stack stays at 4.
+            newList.take(maxGroups)
         }
         return sourceKey
     }
@@ -69,5 +74,6 @@ class NotificationCenter(
 
     companion object {
         const val DEFAULT_HISTORY_PER_GROUP = 20
+        const val DEFAULT_MAX_GROUPS = 32
     }
 }

@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -24,9 +25,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -42,6 +45,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import hivens.ui.notifications.NotifAction
 import hivens.ui.notifications.NotificationEvent
 import hivens.ui.notifications.NotificationGroup
 import hivens.ui.notifications.Severity
@@ -55,7 +59,11 @@ fun NotificationCard(
     now: Instant,
     onDismiss: () -> Unit,
 ) {
-    var expanded by remember(group.sourceKey) { mutableStateOf(false) }
+    // Include count in the key so dismiss-then-re-push under the same
+    // sourceKey resets the expanded affordance; otherwise a freshly-
+    // pushed Critical inherits the user's prior expanded=true and
+    // appears already opened into stale history.
+    var expanded by remember(group.sourceKey, group.count) { mutableStateOf(false) }
     val accentColor = severityAccent(group.severity)
     val accentAlpha = if (group.severity == Severity.Critical) criticalPulse() else 1f
 
@@ -152,13 +160,15 @@ private fun HeaderRow(
                 )
             }
         } else {
-            Spacer(Modifier.width(6.dp))
-            Text(
-                text     = "✕",
-                modifier = Modifier.clickable(onClick = onDismiss).padding(2.dp),
-                style    = MaterialTheme.typography.labelSmall,
-                color    = CelestiaTheme.colors.textSecondary.copy(alpha = 0.6f),
-            )
+            Spacer(Modifier.width(2.dp))
+            IconButton(onClick = onDismiss, modifier = Modifier.size(20.dp)) {
+                Icon(
+                    imageVector       = Icons.Default.Close,
+                    contentDescription = null,
+                    modifier          = Modifier.size(14.dp),
+                    tint              = CelestiaTheme.colors.textSecondary.copy(alpha = 0.6f),
+                )
+            }
         }
     }
 }
@@ -201,7 +211,7 @@ private fun EventBody(event: NotificationEvent, accentColor: Color) {
 }
 
 @Composable
-private fun ActionsRow(actions: List<hivens.ui.notifications.NotifAction>, onDismiss: () -> Unit) {
+private fun ActionsRow(actions: List<NotifAction>, onDismiss: () -> Unit) {
     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         actions.forEach { action ->
             TextButton(
@@ -209,7 +219,7 @@ private fun ActionsRow(actions: List<hivens.ui.notifications.NotifAction>, onDis
                     action.onClick()
                     onDismiss()
                 },
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
             ) {
                 Text(
                     text  = action.label,
@@ -243,7 +253,7 @@ private fun HistoryRow(event: NotificationEvent, now: Instant) {
 }
 
 @Composable
-private fun AvatarSlot(group: hivens.ui.notifications.NotificationGroup) {
+private fun AvatarSlot(group: NotificationGroup) {
     // Neutral placeholder; wired to Coil + Url once PackInstance carries icon_url.
     Box(
         modifier = Modifier

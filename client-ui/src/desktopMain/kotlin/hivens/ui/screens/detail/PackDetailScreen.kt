@@ -45,6 +45,8 @@ import hivens.launcher.launch.LauncherController
 import hivens.launcher.platform.PlatformPaths
 import hivens.ui.AppState
 import hivens.ui.customization.glassSurfaceAlpha
+import hivens.ui.notifications.drivers.PackLaunchDriver
+import hivens.ui.utils.GameConsoleService
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
@@ -79,8 +81,8 @@ fun PackDetailScreen(
     val repo: IPackRepository = koinInject()
     val paths: PlatformPaths = koinInject()
     val controller: LauncherController = koinInject()
-    val launchDriver: hivens.ui.notifications.drivers.PackLaunchDriver = koinInject()
-    val gameConsole: hivens.ui.utils.GameConsoleService = koinInject()
+    val launchDriver: PackLaunchDriver = koinInject()
+    val gameConsole: GameConsoleService = koinInject()
     var instance by remember { mutableStateOf<PackInstance?>(null) }
     var resolved by remember { mutableStateOf(false) }
     LaunchedEffect(instanceId) {
