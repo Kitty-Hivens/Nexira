@@ -3,6 +3,8 @@ package hivens.launcher.launch
 import hivens.core.api.TwoFactorRequiredException
 import hivens.core.api.interfaces.*
 import hivens.core.api.model.ServerProfile
+import hivens.core.data.CachedManifestSnapshot
+import hivens.core.data.PackInstance
 import hivens.core.data.SessionData
 import hivens.core.data.SettingsData
 import hivens.core.diag.ActionRing
@@ -10,6 +12,7 @@ import hivens.launcher.CredentialsManager
 import hivens.launcher.ManifestCache
 import hivens.launcher.ProfileManager
 import hivens.launcher.di.AppCoroutineScopeHook
+import hivens.launcher.smrt.SmrtPackClient
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -21,6 +24,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
+import java.time.Instant
 import java.util.UUID
 import kotlinx.coroutines.slf4j.MDCContext
 
@@ -47,6 +51,8 @@ class LauncherController(
     private val manifestProcessor: IManifestProcessorService,
     private val manifestCache: ManifestCache,
     private val profileManager: ProfileManager,
+    private val packRepository: IPackRepository,
+    private val smrtPackClient: SmrtPackClient,
     private val dataDirectory: Path,
     private val appScope: CoroutineScope,
 ) {
@@ -299,6 +305,163 @@ class LauncherController(
                 }
             }
         }
+    }
+
+    /**
+     * Pack-centric launch path. Equivalent to [launch] for the
+     * Hivens mirror world: takes a [PackInstance] from the local
+     * Library, skips SC auth + per-launch asset re-sync (mirror
+     * packs are static + already on disk after install), resolves
+     * Java from the manifest's declared MC version, and spawns via
+     * [ILauncherService.launchPackClient].
+     *
+     * Re-entry guard, MDC tagging and abort semantics mirror [launch]
+     * exactly so the existing UI surfaces ([LaunchControlPanel],
+     * `GameConsoleService`) plug in unchanged.
+     *
+     * Behaviour notes:
+     * - No SC auth and no SmrtSyncService call: the install flow is
+     *   responsible for materialising the instance, and an explicit
+     *   "Update pack" Library action will run sync separately later.
+     * - When [PackInstance.cachedManifest] is null (instance created
+     *   before the field existed), a one-time mirror fetch fills it
+     *   in and the result is written back via [IPackRepository.put].
+     *   Subsequent Play clicks read from cache.
+     * - [PackInstance.lastPlayedEpochOrZero] is bumped on successful
+     *   spawn so the Library sort-by-recently-played stays accurate.
+     */
+    fun launchPackInstance(
+        currentSession: SessionData,
+        packInstance: PackInstance,
+    ) {
+        synchronized(launchLock) {
+            if (_state.value !is LaunchState.Idle &&
+                _state.value !is LaunchState.Error) return
+            _state.value = LaunchState.Prepare(PrepareStage.INIT, 0.0f)
+        }
+
+        val launchId = UUID.randomUUID().toString().take(8)
+
+        launchJob = appScope.launch(MDCContext(mapOf("launchId" to launchId))) {
+            val settings = settingsService.getSettings()
+
+            try {
+                _state.value = LaunchState.Prepare(PrepareStage.INIT, 0.0f)
+
+                emit(LaunchLogEvent.SessionStarted)
+                emit(LaunchLogEvent.AppBanner)
+                // Mirror packs are public read; surfacing the offline
+                // flag here would be misleading -- pack-centric Play
+                // does not need network at all when cachedManifest is
+                // populated.
+                emit(LaunchLogEvent.TargetServer(packInstance.displayName, offline = false))
+
+                ActionRing.record("Launching pack: ${packInstance.displayName} (launchId=$launchId)")
+
+                // 1. Resolve the manifest snapshot. Stored on the
+                // instance after install; one-shot fetch + write-back
+                // covers instances that predate the field.
+                setStage(PrepareStage.SYNC, 0.3f)
+                val (manifestSnapshot, refreshedInstance) =
+                    resolveOrFetchManifest(packInstance)
+
+                // 2. Java. Same JavaManager path as the SC flow --
+                // pack manifest's declared MC version drives the
+                // managed Liberica selection.
+                setStage(PrepareStage.JVM, 0.7f)
+                val javaPath = if (!settings.javaPath.isNullOrEmpty()) {
+                    Path.of(settings.javaPath!!)
+                } else {
+                    javaManagerService.getJavaPath(manifestSnapshot.minecraftVersion)
+                }
+
+                // 3. Spawn. Pack-centric clientRoot lives under
+                // `<dataDir>/instances/<instanceDirName>`, not under
+                // `<dataDir>/clients/<serverId>` like the SC flow.
+                setStage(PrepareStage.LAUNCH, 0.95f)
+                ActionRing.record("Game running: ${packInstance.displayName}")
+                emit(LaunchLogEvent.Launching)
+
+                val clientDir = dataDirectory
+                    .resolve("instances")
+                    .resolve(refreshedInstance.instanceDirName)
+                if (!Files.exists(clientDir)) {
+                    fail(LaunchError.OfflineNoClient)
+                    return@launch
+                }
+
+                val process = launcherService.launchPackClient(
+                    sessionData          = currentSession,
+                    manifest             = manifestSnapshot,
+                    runtime              = refreshedInstance.runtime,
+                    clientRootPath       = clientDir,
+                    javaExecutablePath   = javaPath,
+                    allocatedMemoryMB    = settings.memoryMB,
+                    displayName          = refreshedInstance.displayName,
+                ) { text, type ->
+                    emit(LaunchLogEvent.ProcessOutput(text, type))
+                }
+
+                runningProcess = process
+                _state.value = LaunchState.GameRunning(process)
+
+                // Bump lastPlayed *after* the process has actually
+                // spawned, not before -- a failed spawn should not
+                // pollute the recent-played sort.
+                runCatching {
+                    packRepository.put(
+                        refreshedInstance.copy(
+                            lastPlayedEpochOrZero = Instant.now().epochSecond,
+                        ),
+                    )
+                }.onFailure { logger.warn("Failed to bump lastPlayed for ${refreshedInstance.id}", it) }
+
+                val exitCode = process.waitFor()
+                runningProcess = null
+                ActionRing.record("Game exited: ${refreshedInstance.displayName} (code $exitCode)")
+
+                if (exitCode != 0) {
+                    fail(LaunchError.ExitCode(exitCode))
+                } else {
+                    _state.value = LaunchState.Idle
+                }
+
+            } catch (e: Exception) {
+                runningProcess = null
+                if (e !is CancellationException) {
+                    logger.error("Pack launch flow failed for {}", packInstance.displayName, e)
+                    fail(LaunchError.Internal(e.message ?: ""), e)
+                } else {
+                    _state.value = LaunchState.Idle
+                }
+            }
+        }
+    }
+
+    /**
+     * Returns the [CachedManifestSnapshot] for [instance], fetching
+     * from the mirror and persisting back when the on-disk value is
+     * absent. The returned [PackInstance] is the (possibly updated)
+     * instance the caller should use for the rest of the launch flow
+     * -- never falls back to the input value silently.
+     */
+    private suspend fun resolveOrFetchManifest(
+        instance: PackInstance,
+    ): Pair<CachedManifestSnapshot, PackInstance> {
+        instance.cachedManifest?.let { return it to instance }
+
+        logger.info("Pack {} has no cached manifest; fetching from mirror once.", instance.id)
+        val manifest = smrtPackClient.fetchManifest(instance.packRef.id)
+        val snapshot = CachedManifestSnapshot(
+            minecraftVersion = manifest.minecraft.version,
+            loaderName       = manifest.loader.name,
+            loaderVersion    = manifest.loader.version,
+            javaMajor        = manifest.java.major,
+        )
+        val refreshed = instance.copy(cachedManifest = snapshot)
+        runCatching { packRepository.put(refreshed) }
+            .onFailure { logger.warn("Failed to persist cachedManifest for ${instance.id}", it) }
+        return snapshot to refreshed
     }
 
     /**

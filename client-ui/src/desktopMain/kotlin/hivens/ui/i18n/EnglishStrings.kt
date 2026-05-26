@@ -628,6 +628,7 @@ object EnglishStrings : AppStrings {
     override val packDetailReadyTitle           = "Ready to play"
     override fun packDetailInstanceDirHint(dirName: String) = "Instance folder: instances/$dirName"
     override val packDetailPlay                 = "Play"
+    override val packDetailPlayLoginRequired    = "Sign in to play"
     override val packDetailNotFoundTitle        = "Instance not found"
     override val packDetailNotFoundHint         = "It may have been removed from another window."
     override val packDetailNotFoundBack         = "Back to Library"

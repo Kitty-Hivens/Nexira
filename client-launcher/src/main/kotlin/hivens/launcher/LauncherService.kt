@@ -3,13 +3,16 @@ package hivens.launcher
 import hivens.core.api.interfaces.IJavaManager
 import hivens.core.api.interfaces.ILauncherService
 import hivens.core.api.model.ServerProfile
+import hivens.core.data.CachedManifestSnapshot
 import hivens.core.data.FileManifest
 import hivens.core.data.InstanceProfile
+import hivens.core.data.InstanceRuntime
 import hivens.core.data.LauncherLogType
 import hivens.core.data.SessionData
 import hivens.launcher.component.ClasspathProvider
 import hivens.launcher.component.EnvironmentPreparer
 import hivens.launcher.component.GameCommandBuilder
+import hivens.launcher.component.LaunchTarget
 import hivens.launcher.component.ProcessLogHandler
 import org.slf4j.LoggerFactory
 import java.io.IOException
@@ -104,6 +107,79 @@ internal class LauncherService(
         ) { _, _ -> /* Logs are ignored */ }
     }
 
+    @Throws(IOException::class)
+    override suspend fun launchPackClient(
+        sessionData: SessionData,
+        manifest: CachedManifestSnapshot,
+        runtime: InstanceRuntime,
+        clientRootPath: Path,
+        javaExecutablePath: Path,
+        allocatedMemoryMB: Int,
+        displayName: String,
+        onLog: (String, LauncherLogType) -> Unit
+    ): Process {
+        val mcVersion = manifest.minecraftVersion
+
+        // 1. Memory allocation strategy -- same floor logic as the
+        // SC path; the InstanceRuntime value wins when positive.
+        val memory = normalizeMemory(runtime.memoryMb, allocatedMemoryMB)
+
+        // 2. Java path. Pack-centric runtime carries an optional
+        // explicit override; without it the caller's resolved default
+        // wins (LauncherController already consulted JavaManager).
+        val javaExec: String = resolvePackJavaPath(runtime, javaExecutablePath)
+
+        log.info("Session initialization (pack): {}, Java: {}, Heap: {}MB", displayName, javaExec, memory)
+        onLog("Running $displayName...", LauncherLogType.INFO)
+
+        // 3. Natives + assets layout. Reuse the same VersionConfig-keyed
+        // directory layout as the SC path; both flows write into the
+        // same canonical `<clientRoot>/bin/natives-<mcVersion>` shape.
+        val nativesDir = commandBuilder.getNativesDir(mcVersion)
+        envPreparer.prepareNatives(clientRootPath, nativesDir, mcVersion)
+        envPreparer.prepareAssets(clientRootPath, "assets-$mcVersion.zip")
+
+        // 4. Classpath. Pack-centric sync writes the same on-disk
+        // layout the SC FileManifest classpath provider expects (mods/,
+        // libraries-{ver}/, bin/, core mods, etc), so the same provider
+        // walks the directory and assembles the classpath without
+        // needing a server-side FileManifest object.
+        val classpath = classpathProvider.buildClasspath(
+            clientRootPath,
+            FileManifest(),
+            excludedModules = emptyList(),
+        )
+
+        // 5. Build the JVM command via the domain-agnostic LaunchTarget
+        // overload. Pack-centric installs do not pre-fill neoForgeArgs /
+        // ignoreModulesList (those are SC-server-side overrides); the
+        // builder's auto-detector and baked defaults handle the rest.
+        val command = commandBuilder.build(
+            javaExec   = javaExec,
+            memoryMB   = memory,
+            clientRoot = clientRootPath,
+            target     = LaunchTarget(
+                mcVersion         = mcVersion,
+                neoForgeArgs      = null,
+                ignoreModulesList = null,
+                jvmArgsOverride   = runtime.jvmArgs,
+                displayName       = displayName,
+            ),
+            session    = sessionData,
+            classpath  = classpath,
+        )
+
+        val pb = ProcessBuilder(command)
+        pb.directory(clientRootPath.toFile())
+        pb.redirectErrorStream(false)
+
+        onLog("CMD: ${java.lang.String.join(" ", command)}", LauncherLogType.INFO)
+
+        val process = pb.start()
+        logHandler.attach(process, onLog)
+        return process
+    }
+
     internal companion object {
         /**
          * Memory allocation rule: profile's per-instance value wins when positive,
@@ -113,6 +189,24 @@ internal class LauncherService(
         internal fun normalizeMemory(profileMb: Int, allocatedMb: Int): Int {
             val raw = if (profileMb > 0) profileMb else allocatedMb
             return if (raw < 768) 1024 else raw
+        }
+
+        /**
+         * Pack-centric Java path resolution. Mirrors [resolveJavaPath]'s
+         * fallback ladder but pulls the override from [InstanceRuntime]
+         * instead of the legacy [InstanceProfile]. The runtime's
+         * `javaPath` lands here as the highest priority; without it the
+         * caller's pre-resolved [defaultPath] wins (LauncherController
+         * already consulted JavaManager for the pack's Java major).
+         */
+        internal fun resolvePackJavaPath(
+            runtime: InstanceRuntime,
+            defaultPath: Path,
+        ): String {
+            val explicit = runtime.javaPath
+            if (!explicit.isNullOrEmpty()) return explicit
+            if (Files.exists(defaultPath)) return defaultPath.toString()
+            return "java"
         }
 
         /**

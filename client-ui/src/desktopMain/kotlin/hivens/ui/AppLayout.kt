@@ -226,6 +226,7 @@ fun AppLayout(
                     is Screen.PackDetail ->
                         PackDetailScreen(
                             instanceId = screen.instanceId,
+                            appState   = appState,
                             onBack     = { onScreenChange(Screen.Library) },
                         )
                 }
