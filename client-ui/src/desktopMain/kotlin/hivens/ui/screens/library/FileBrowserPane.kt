@@ -30,7 +30,7 @@ import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.InsertDriveFile
+import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -300,7 +300,7 @@ private fun fileIconFor(path: Path): androidx.compose.ui.graphics.vector.ImageVe
     return when {
         ext in TEXT_EXTENSIONS  -> Icons.Default.Description
         ext in IMAGE_EXTENSIONS -> Icons.Default.Image
-        else                    -> Icons.Default.InsertDriveFile
+        else                    -> Icons.AutoMirrored.Filled.InsertDriveFile
     }
 }
 
