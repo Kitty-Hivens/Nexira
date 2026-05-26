@@ -285,16 +285,8 @@ class SmrtSyncService(
                 }
             }
         }
-        // ATOMIC_MOVE so a crash between rename and fsync leaves either
-        // the old file or the new one, never a half-byte target. The
-        // resolveSafe contract draws an explicit "writes go inside the
-        // instance dir" boundary that a non-atomic rename would
-        // undermine -- on FAT32 / SMB shares (Steam Deck SD card, dual-
-        // boot partitions) Files.move(REPLACE_EXISTING) decomposes to
-        // delete-target-then-rename, and a power loss between the two
-        // can leave the dest as a 0-byte jar that Forge tries to
-        // classload and surfaces as an opaque ZipException. Mirrors
-        // the persist() fallback pattern in JsonPackRepository.
+        // Non-atomic REPLACE_EXISTING on FAT32/SMB can leave a 0-byte
+        // dest after power loss; Forge then classloads garbage.
         try {
             Files.move(
                 tmp,
@@ -304,9 +296,7 @@ class SmrtSyncService(
             )
         } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
             log.warn(
-                "Filesystem at {} does not support ATOMIC_MOVE; falling back to non-atomic rename. " +
-                    "A crash mid-rename can leave a 0-byte file at the dest. Move the data directory to a " +
-                    "filesystem that supports atomic rename (ext4, NTFS, APFS) for full sync durability.",
+                "Filesystem at {} does not support ATOMIC_MOVE; non-atomic fallback may leave a 0-byte file on crash",
                 dest.parent,
             )
             Files.move(tmp, dest, java.nio.file.StandardCopyOption.REPLACE_EXISTING)
