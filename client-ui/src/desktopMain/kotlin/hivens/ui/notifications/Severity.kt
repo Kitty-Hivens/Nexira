@@ -3,23 +3,23 @@ package hivens.ui.notifications
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
+// Color/urgency band. Orthogonal to Kind, which controls lifecycle.
 // Ordering matters: NotificationGroup.severity is `events.maxOf { it.severity }`,
-// so a past Critical event stays visually marked as Critical even after a later
-// Info arrives -- prevents accidentally hiding hard failures that scrolled past.
+// so a past Critical stays visually marked even after a later Info -- the
+// loud severity never silently drops out of the user's view.
 enum class Severity {
     Info,
-    Progress,
     Success,
     Warn,
     Critical;
 
-    /** Null = sticky until manually dismissed or the next event in the group supersedes. */
-    val autoDismissAfter: Duration?
+    // Default OneShot window. Kind.OneShot consults this; sticky kinds
+    // (Progress, Sticky, ActionRequired) ignore it entirely.
+    val defaultDuration: Duration
         get() = when (this) {
             Info     -> 5.seconds
             Success  -> 4.seconds
-            Progress -> null
             Warn     -> 30.seconds
-            Critical -> null
+            Critical -> 30.seconds
         }
 }

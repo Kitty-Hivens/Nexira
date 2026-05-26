@@ -1,7 +1,10 @@
 package hivens.ui
 
 import androidx.compose.ui.window.application
+import hivens.core.api.interfaces.ISettingsService
 import hivens.launcher.bootstrap.LauncherBootstrap
+import hivens.ui.i18n.AppLocale
+import hivens.ui.i18n.stringsFor
 import hivens.ui.identity.SkinManager
 import hivens.ui.notifications.IndicationCenter
 import hivens.ui.notifications.NotificationCenter
@@ -32,13 +35,15 @@ val uiModule = module {
     single { IndicationCenter() }
     single { SessionRegistry(appScope = get()) }
     single {
+        val settingsService: ISettingsService = get()
         PackLaunchDriver(
-            controller    = get(),
-            notifications = get(),
-            indications   = get(),
-            sessions      = get(),
-            gameConsole   = get(),
-            appScope      = get(),
+            controller      = get(),
+            notifications   = get(),
+            indications     = get(),
+            sessions        = get(),
+            gameConsole     = get(),
+            appScope        = get(),
+            stringsProvider = { stringsFor(AppLocale.fromTag(settingsService.getSettings().locale)) },
         )
     }
 }
