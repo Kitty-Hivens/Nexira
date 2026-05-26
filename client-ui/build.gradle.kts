@@ -8,6 +8,7 @@ plugins {
     alias(libs.plugins.kotlin.compose.compiler)
     alias(libs.plugins.buildconfig)
     alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.ksp)
     // nexira.packaging: convention plugin from buildSrc/ that owns the
     // jlink + jpackage tasks for distribution builds. Currently registers
     // `:client-ui:customRuntime` only -- the jpackage path lands in a
@@ -66,6 +67,7 @@ kotlin {
                 implementation(project(":client-config"))
                 implementation(project(":client-core"))
                 implementation(project(":client-launcher"))
+                implementation(project(":widget-api"))
 
                 implementation(libs.filekit.core)
                 implementation(libs.filekit.dialogs.compose)
@@ -110,6 +112,15 @@ kotlin {
             }
         }
     }
+}
+
+// KSP must be wired against the per-target source set on a Kotlin
+// Multiplatform project; `ksp(project(...))` alone (the JVM shape) is
+// silently ignored. The "kspDesktop" configuration is created by the
+// KSP plugin once the jvm("desktop") target above is configured -- one
+// configuration per target compilation, not per source set.
+dependencies {
+    add("kspDesktop", project(":widget-processor"))
 }
 
 // BUILD_TIME = Unix epoch millis of last commit (`git log -1 --format=%ct
