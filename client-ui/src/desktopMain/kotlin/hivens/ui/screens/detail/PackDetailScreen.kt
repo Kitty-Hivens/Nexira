@@ -79,6 +79,8 @@ fun PackDetailScreen(
     val repo: IPackRepository = koinInject()
     val paths: PlatformPaths = koinInject()
     val controller: LauncherController = koinInject()
+    val launchDriver: hivens.ui.notifications.drivers.PackLaunchDriver = koinInject()
+    val gameConsole: hivens.ui.utils.GameConsoleService = koinInject()
     var instance by remember { mutableStateOf<PackInstance?>(null) }
     var resolved by remember { mutableStateOf(false) }
     LaunchedEffect(instanceId) {
@@ -118,6 +120,15 @@ fun PackDetailScreen(
                 enabled = authedSession != null,
                 onPlay  = {
                     val session = authedSession ?: return@PlayBar
+                    // Start observing controller.state for THIS pack
+                    // BEFORE handing the launch to the controller so
+                    // the driver's first-non-Idle-await sees the
+                    // upcoming Prepare transition. Open the console
+                    // window so the user has stdout visibility from
+                    // the start; previous SC flow did the same on
+                    // tray-launched Play.
+                    launchDriver.observe(pack)
+                    gameConsole.show()
                     controller.launchPackInstance(session, pack)
                 },
             )

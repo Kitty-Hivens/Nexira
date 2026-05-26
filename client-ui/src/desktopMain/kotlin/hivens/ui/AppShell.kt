@@ -52,6 +52,7 @@ import hivens.ui.generated.resources.icon
 import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.i18n.LocaleProvider
+import hivens.ui.notifications.render.NotificationStack
 import hivens.ui.screens.ConsoleWindow
 import hivens.ui.screens.MigrationScreen
 import hivens.ui.theme.BrutStyle
@@ -777,6 +778,12 @@ fun AppRoot(
                 customization              = customization,
                 onCustomizationChanged     = onCustomizationChanged,
             )
+
+            // Notification stack overlays the AppLayout so toasts
+            // float above every screen. Inside af.WrapContent so the
+            // pixel-cursor / chaos-window effects share the layer
+            // order with launch state.
+            NotificationStack()
         }
     }
 }

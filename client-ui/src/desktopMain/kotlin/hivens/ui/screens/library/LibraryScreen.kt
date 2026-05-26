@@ -58,6 +58,8 @@ fun LibraryScreen(
 
     val repo: IPackRepository = koinInject()
     val controller: LauncherController = koinInject()
+    val launchDriver: hivens.ui.notifications.drivers.PackLaunchDriver = koinInject()
+    val gameConsole: hivens.ui.utils.GameConsoleService = koinInject()
     val instances by remember { repo.observe() }.collectAsState(initial = emptyList())
     val authedSession = (appState as? AppState.Authenticated)?.session
 
@@ -90,6 +92,12 @@ fun LibraryScreen(
                     if (session == null) {
                         onScreenChange(Screen.PackDetail(instance.id))
                     } else {
+                        // Same observer-then-launch + console-show
+                        // sequence as PackDetail's PlayBar so the
+                        // user gets identical feedback regardless of
+                        // which Play affordance they used.
+                        launchDriver.observe(instance)
+                        gameConsole.show()
                         controller.launchPackInstance(session, instance)
                     }
                 },
