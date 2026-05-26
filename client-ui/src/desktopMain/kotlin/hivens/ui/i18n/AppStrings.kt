@@ -667,6 +667,8 @@ interface AppStrings {
     /** Receives the instance dir name (a sanitized folder under `instances/`). */
     fun packDetailInstanceDirHint(dirName: String): String
     val packDetailPlay: String
+    /** Shown above the Play button when the user is not authenticated. */
+    val packDetailPlayLoginRequired: String
     val packDetailNotFoundTitle: String
     val packDetailNotFoundHint: String
     val packDetailNotFoundBack: String

@@ -41,7 +41,9 @@ import androidx.compose.ui.unit.dp
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
+import hivens.launcher.launch.LauncherController
 import hivens.launcher.platform.PlatformPaths
+import hivens.ui.AppState
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
@@ -68,6 +70,7 @@ import org.koin.compose.koinInject
 @Composable
 fun PackDetailScreen(
     instanceId: String,
+    appState: AppState,
     onBack: () -> Unit,
 ) {
     PuppetScreen("PackDetail.$instanceId")
@@ -75,6 +78,7 @@ fun PackDetailScreen(
 
     val repo: IPackRepository = koinInject()
     val paths: PlatformPaths = koinInject()
+    val controller: LauncherController = koinInject()
     var instance by remember { mutableStateOf<PackInstance?>(null) }
     var resolved by remember { mutableStateOf(false) }
     LaunchedEffect(instanceId) {
@@ -108,7 +112,15 @@ fun PackDetailScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             MetaRow(pack)
-            PlayBar(pack = pack, onPlay = { /* pack-centric launch flow lands in a follow-up PR */ })
+            val authedSession = (appState as? AppState.Authenticated)?.session
+            PlayBar(
+                pack    = pack,
+                enabled = authedSession != null,
+                onPlay  = {
+                    val session = authedSession ?: return@PlayBar
+                    controller.launchPackInstance(session, pack)
+                },
+            )
         }
 
         TabRow(
@@ -196,7 +208,11 @@ private fun MetaRow(pack: PackInstance) {
 }
 
 @Composable
-private fun PlayBar(pack: PackInstance, onPlay: () -> Unit) {
+private fun PlayBar(
+    pack: PackInstance,
+    enabled: Boolean,
+    onPlay: () -> Unit,
+) {
     val s = LocalStrings.current
     Box(
         modifier = Modifier
@@ -212,7 +228,7 @@ private fun PlayBar(pack: PackInstance, onPlay: () -> Unit) {
         ) {
             Column {
                 Text(
-                    text       = s.packDetailReadyTitle,
+                    text       = if (enabled) s.packDetailReadyTitle else s.packDetailPlayLoginRequired,
                     style      = MaterialTheme.typography.titleMedium,
                     color      = CelestiaTheme.colors.textPrimary,
                     fontWeight = FontWeight.SemiBold,
@@ -225,6 +241,7 @@ private fun PlayBar(pack: PackInstance, onPlay: () -> Unit) {
             }
             Button(
                 onClick        = onPlay,
+                enabled        = enabled,
                 shape          = RoundedCornerShape(12.dp),
                 contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
                 colors         = ButtonDefaults.buttonColors(

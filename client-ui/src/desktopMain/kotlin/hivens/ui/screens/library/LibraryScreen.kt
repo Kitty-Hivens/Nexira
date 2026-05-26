@@ -29,6 +29,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
+import hivens.launcher.launch.LauncherController
 import hivens.ui.AppState
 import hivens.ui.Screen
 import hivens.ui.puppet.PuppetScreen
@@ -39,28 +40,26 @@ import org.koin.compose.koinInject
  * Library = user's collection of installed [PackInstance]s.
  * Renders [PackCard] rows for each instance the [IPackRepository]
  * is aware of. Card click navigates to [hivens.ui.Screen.PackDetail];
- * quick-actions (Play / Settings / More) bypass the detail hop.
+ * per-card Play launches via [LauncherController.launchPackInstance]
+ * without the detail-screen hop; Settings / More still route to the
+ * detail surface (the per-pack settings window lands in a follow-up
+ * PR, [[project_pack_centric_direction]]).
  *
  * Empty state when the repository has nothing to show -- by design
  * this is the cold-start view for a fresh install (no packs yet);
  * the Browse screen is the entry point for installing.
- *
- * Currently the per-card Play / Settings / More actions only
- * navigate; the actual launch wiring goes through the existing
- * server-bound launch flow which the pack-centric installer hasn't
- * replaced yet. Wiring those to the real launch happens in the next
- * subtask of [project_pack_centric_direction]; for now they route
- * to PackDetail like the whole-card click.
  */
 @Composable
 fun LibraryScreen(
-    @Suppress("UNUSED_PARAMETER") appState: AppState,
+    appState: AppState,
     onScreenChange: (Screen) -> Unit,
 ) {
     PuppetScreen("Library")
 
     val repo: IPackRepository = koinInject()
+    val controller: LauncherController = koinInject()
     val instances by remember { repo.observe() }.collectAsState(initial = emptyList())
+    val authedSession = (appState as? AppState.Authenticated)?.session
 
     Column(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 20.dp)) {
         Text(
@@ -83,7 +82,17 @@ fun LibraryScreen(
             LibraryList(
                 instances = instances,
                 onOpenDetail = { onScreenChange(Screen.PackDetail(it.id)) },
-                onPlay = { /* TODO: pack-centric launch flow not wired yet */ onScreenChange(Screen.PackDetail(it.id)) },
+                onPlay = { instance ->
+                    // Unauthenticated state: defer to the detail screen
+                    // which renders an explicit "Sign in to play" prompt
+                    // instead of swallowing the click silently.
+                    val session = authedSession
+                    if (session == null) {
+                        onScreenChange(Screen.PackDetail(instance.id))
+                    } else {
+                        controller.launchPackInstance(session, instance)
+                    }
+                },
                 onSettings = { onScreenChange(Screen.PackDetail(it.id)) },
                 onMore = { onScreenChange(Screen.PackDetail(it.id)) },
             )

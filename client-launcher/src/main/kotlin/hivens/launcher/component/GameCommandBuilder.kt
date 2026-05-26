@@ -71,9 +71,9 @@ internal class GameCommandBuilder(
     }
 
     /**
-     * Collects a list of arguments for [ProcessBuilder].
-     *
-     * @return An ordered list of strings, ready to be passed to the OS process.
+     * Legacy SC server-centric entry point. Projects [serverProfile] +
+     * [userProfile] onto a [LaunchTarget] and delegates to the
+     * domain-agnostic [build] overload below.
      */
     fun build(
         javaExec: String,
@@ -83,8 +83,35 @@ internal class GameCommandBuilder(
         session: SessionData,
         userProfile: InstanceProfile,
         classpath: String
+    ): List<String> = build(
+        javaExec   = javaExec,
+        memoryMB   = memoryMB,
+        clientRoot = clientRoot,
+        target     = LaunchTarget(
+            mcVersion         = serverProfile.version,
+            neoForgeArgs      = serverProfile.neoForgeArgs,
+            ignoreModulesList = serverProfile.ignoreModulesList,
+            jvmArgsOverride   = userProfile.jvmArgs,
+            displayName       = serverProfile.name,
+        ),
+        session    = session,
+        classpath  = classpath,
+    )
+
+    /**
+     * Collects a list of arguments for [ProcessBuilder].
+     *
+     * @return An ordered list of strings, ready to be passed to the OS process.
+     */
+    fun build(
+        javaExec: String,
+        memoryMB: Int,
+        clientRoot: Path,
+        target: LaunchTarget,
+        session: SessionData,
+        classpath: String
     ): List<String> {
-        val version = serverProfile.version
+        val version = target.mcVersion
         val config = getConfig(version)
         val isModernEnvironment = config.mainClass.contains("BootstrapLauncher")
         val args = ArrayList<String>()
@@ -127,7 +154,7 @@ internal class GameCommandBuilder(
             args.add("-DlibraryDirectory=" + libDir.toAbsolutePath())
 
             val defaultIgnore = "client,securejarhandler,asm,bootstraplauncher,JarJarFileSystems,client-extra,neoforge-"
-            val ignoreList = serverProfile.ignoreModulesList?.takeIf { it.isNotBlank() } ?: defaultIgnore
+            val ignoreList = target.ignoreModulesList?.takeIf { it.isNotBlank() } ?: defaultIgnore
             args.add("-DignoreList=$ignoreList")
             args.add("-DmergeModules=jna-5.14.0.jar,jna-platform-5.14.0.jar")
         }
@@ -141,8 +168,8 @@ internal class GameCommandBuilder(
             args.add("--add-modules=jdk.incubator.vector")
         }
 
-        if (!userProfile.jvmArgs.isNullOrEmpty()) {
-            args.addAll(userProfile.jvmArgs!!.split(" "))
+        if (!target.jvmArgsOverride.isNullOrBlank()) {
+            args.addAll(target.jvmArgsOverride.trim().split(Regex("\\s+")))
         } else {
             args.addAll(gcArgs)
         }
@@ -205,7 +232,7 @@ internal class GameCommandBuilder(
         args.addAll(config.programArgs)
 
         // 9. Game Arguments
-        args.addAll(buildMinecraftArgs(session, serverProfile, clientRoot, config.assetIndex, isModernEnvironment))
+        args.addAll(buildMinecraftArgs(session, target, clientRoot, config.assetIndex, isModernEnvironment))
 
         if (config.tweakClass != null) {
             args.add("--tweakClass")
@@ -223,14 +250,14 @@ internal class GameCommandBuilder(
 
     private fun buildMinecraftArgs(
         session: SessionData,
-        profile: ServerProfile,
+        target: LaunchTarget,
         root: Path,
         assetIndex: String,
         isModernEnvironment: Boolean
     ): List<String> {
         val args = ArrayList<String>()
         args.add("--username"); args.add(session.playerName)
-        args.add("--version"); args.add("Forge ${profile.version}")
+        args.add("--version"); args.add("Forge ${target.mcVersion}")
         args.add("--gameDir"); args.add(root.toAbsolutePath().toString())
         args.add("--assetsDir"); args.add(root.resolve("assets").toAbsolutePath().toString())
         args.add("--assetIndex"); args.add(assetIndex)
@@ -259,7 +286,7 @@ internal class GameCommandBuilder(
             }
 
             // Backend arguments still win -- server can override what was detected.
-            val backendArgs = profile.neoForgeArgs ?: emptyMap()
+            val backendArgs = target.neoForgeArgs ?: emptyMap()
             val finalFmlArgs = defaultFmlArgs + backendArgs
 
             finalFmlArgs.forEach { (key, value) ->

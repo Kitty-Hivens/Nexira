@@ -59,4 +59,13 @@ data class PackInstance(
     val forkedFrom: PackReference? = null,
     /** User-editable free text. Shown on the instance detail surface. */
     val notes: String = "",
+    /**
+     * Snapshot of the fields the launch command builder needs from the
+     * mirror manifest (MC version, loader, Java major). Filled in by
+     * the install / sync flow so Play does not require a fresh
+     * manifest fetch. Null on instances created before the field
+     * existed; the launch path falls back to a one-shot fetch in that
+     * case, then writes the snapshot back.
+     */
+    val cachedManifest: CachedManifestSnapshot? = null,
 )

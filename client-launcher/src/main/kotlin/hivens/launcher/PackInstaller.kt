@@ -3,6 +3,7 @@ package hivens.launcher
 import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.dto.smrt.SmrtPackSummary
 import hivens.core.api.interfaces.IPackRepository
+import hivens.core.data.CachedManifestSnapshot
 import hivens.core.data.ContentToggle
 import hivens.core.data.InstanceRuntime
 import hivens.core.data.PackInstance
@@ -77,6 +78,12 @@ class PackInstaller(
             optionalContent       = emptyList<ContentToggle>(),
             forkedFrom            = null,
             notes                 = "",
+            cachedManifest        = CachedManifestSnapshot(
+                minecraftVersion = manifest.minecraft.version,
+                loaderName       = manifest.loader.name,
+                loaderVersion    = manifest.loader.version,
+                javaMajor        = manifest.java.major,
+            ),
         )
         repository.put(instance)
         log.info("install: registered instance {} in repository", instanceId)
