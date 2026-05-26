@@ -632,4 +632,20 @@ object EnglishStrings : AppStrings {
     override val packDetailNotFoundTitle        = "Instance not found"
     override val packDetailNotFoundHint         = "It may have been removed from another window."
     override val packDetailNotFoundBack         = "Back to Library"
+
+    // --- Notification subsystem ---
+    override val notificationExpandHistory   = "Expand notification history"
+    override val notificationCollapseHistory = "Collapse notification history"
+    override val notificationDismiss         = "Dismiss notification"
+    override fun notificationShowMore(count: Int)               = "+$count more"
+    override fun notificationAbsoluteTime(instant: java.time.Instant): String =
+        notificationTimeFormatter(java.util.Locale.ENGLISH).format(instant)
 }
+
+private val notificationTimeFormatterCache = java.util.concurrent.ConcurrentHashMap<java.util.Locale, java.time.format.DateTimeFormatter>()
+private fun notificationTimeFormatter(locale: java.util.Locale): java.time.format.DateTimeFormatter =
+    notificationTimeFormatterCache.computeIfAbsent(locale) {
+        java.time.format.DateTimeFormatter
+            .ofPattern("d MMM yyyy, HH:mm:ss", it)
+            .withZone(java.time.ZoneId.systemDefault())
+    }

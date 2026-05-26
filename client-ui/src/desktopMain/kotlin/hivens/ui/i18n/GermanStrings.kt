@@ -632,4 +632,15 @@ object GermanStrings : AppStrings {
     override val packDetailNotFoundTitle        = "Instanz nicht gefunden"
     override val packDetailNotFoundHint         = "Möglicherweise in einem anderen Fenster entfernt."
     override val packDetailNotFoundBack         = "Zurück zur Library"
+
+    // --- Notification subsystem ---
+    override val notificationExpandHistory   = "Benachrichtigungsverlauf einblenden"
+    override val notificationCollapseHistory = "Benachrichtigungsverlauf ausblenden"
+    override val notificationDismiss         = "Benachrichtigung schliessen"
+    override fun notificationShowMore(count: Int)               = "+$count weitere"
+    override fun notificationAbsoluteTime(instant: java.time.Instant): String =
+        java.time.format.DateTimeFormatter
+            .ofPattern("d. MMMM yyyy, HH:mm:ss", java.util.Locale.GERMAN)
+            .withZone(java.time.ZoneId.systemDefault())
+            .format(instant)
 }

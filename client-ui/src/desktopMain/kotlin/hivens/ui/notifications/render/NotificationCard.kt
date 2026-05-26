@@ -8,16 +8,18 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.TooltipArea
+import androidx.compose.foundation.TooltipPlacement
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -32,6 +34,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -44,7 +47,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
+import hivens.ui.i18n.LocalStrings
 import hivens.ui.notifications.NotifAction
 import hivens.ui.notifications.NotificationEvent
 import hivens.ui.notifications.NotificationGroup
@@ -118,6 +123,7 @@ fun NotificationCard(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun HeaderRow(
     group: NotificationGroup,
@@ -126,6 +132,7 @@ private fun HeaderRow(
     onToggle: () -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val strings = LocalStrings.current
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
         AvatarSlot(group)
         Spacer(Modifier.width(10.dp))
@@ -136,35 +143,59 @@ private fun HeaderRow(
             fontWeight = FontWeight.Medium,
             modifier   = Modifier.weight(1f),
         )
-        Text(
-            text  = relativeTime(group.latest.createdAt, now),
-            style = MaterialTheme.typography.labelSmall,
-            color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.6f),
-        )
+        // Hover-tooltip with absolute date; the inline label stays relative
+        // ("Now" / "5s" / "1d") so the card reads quickly. A 1d label loses
+        // the exact "yesterday at HH:mm" detail; the tooltip recovers it.
+        TooltipArea(
+            tooltip = {
+                Surface(
+                    color = CelestiaTheme.colors.surface,
+                    shape = RoundedCornerShape(4.dp),
+                ) {
+                    Text(
+                        text     = strings.notificationAbsoluteTime(group.latest.createdAt),
+                        style    = MaterialTheme.typography.labelSmall,
+                        color    = CelestiaTheme.colors.textPrimary,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    )
+                }
+            },
+            delayMillis = 400,
+            tooltipPlacement = TooltipPlacement.CursorPoint(offset = DpOffset(0.dp, 12.dp)),
+        ) {
+            Text(
+                text  = relativeTime(group.latest.createdAt, now),
+                style = MaterialTheme.typography.labelSmall,
+                color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.6f),
+            )
+        }
         if (group.count > 1) {
             Spacer(Modifier.width(6.dp))
-            Row(
-                modifier = Modifier.clickable(onClick = onToggle),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text  = group.count.toString(),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = CelestiaTheme.colors.textSecondary,
-                )
-                Icon(
-                    imageVector       = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                    contentDescription = null,
-                    modifier          = Modifier.size(16.dp),
-                    tint              = CelestiaTheme.colors.textSecondary,
-                )
+            // IconButton wraps the row so screen readers / keyboards see a
+            // single focusable target with a stable contentDescription; the
+            // expanded label flips so screen-reader output reflects state.
+            IconButton(onClick = onToggle, modifier = Modifier.size(28.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text  = group.count.toString(),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = CelestiaTheme.colors.textSecondary,
+                    )
+                    Icon(
+                        imageVector       = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        contentDescription = if (expanded) strings.notificationCollapseHistory
+                                             else strings.notificationExpandHistory,
+                        modifier          = Modifier.size(16.dp),
+                        tint              = CelestiaTheme.colors.textSecondary,
+                    )
+                }
             }
         } else {
             Spacer(Modifier.width(2.dp))
             IconButton(onClick = onDismiss, modifier = Modifier.size(20.dp)) {
                 Icon(
                     imageVector       = Icons.Default.Close,
-                    contentDescription = null,
+                    contentDescription = strings.notificationDismiss,
                     modifier          = Modifier.size(14.dp),
                     tint              = CelestiaTheme.colors.textSecondary.copy(alpha = 0.6f),
                 )

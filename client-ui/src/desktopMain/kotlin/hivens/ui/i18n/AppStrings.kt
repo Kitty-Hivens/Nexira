@@ -672,4 +672,13 @@ interface AppStrings {
     val packDetailNotFoundTitle: String
     val packDetailNotFoundHint: String
     val packDetailNotFoundBack: String
+
+    // --- Notification subsystem (a11y + minimal labels) ---
+    val notificationExpandHistory: String
+    val notificationCollapseHistory: String
+    val notificationDismiss: String
+    /** "+N more" footer text + screen-reader label. Receives the overflow count. */
+    fun notificationShowMore(count: Int): String
+    /** Absolute timestamp shown on hover tooltip over the relative-time label. */
+    fun notificationAbsoluteTime(instant: java.time.Instant): String
 }

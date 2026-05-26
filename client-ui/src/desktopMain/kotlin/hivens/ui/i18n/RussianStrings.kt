@@ -633,4 +633,15 @@ object RussianStrings : AppStrings {
     override val packDetailNotFoundTitle        = "Экземпляр не найден"
     override val packDetailNotFoundHint         = "Возможно, удалён в другом окне."
     override val packDetailNotFoundBack         = "Назад в Library"
+
+    // --- Notification subsystem ---
+    override val notificationExpandHistory   = "Раскрыть историю уведомления"
+    override val notificationCollapseHistory = "Свернуть историю уведомления"
+    override val notificationDismiss         = "Закрыть уведомление"
+    override fun notificationShowMore(count: Int)               = "ещё $count"
+    override fun notificationAbsoluteTime(instant: java.time.Instant): String =
+        java.time.format.DateTimeFormatter
+            .ofPattern("d MMMM yyyy, HH:mm:ss", java.util.Locale("ru", "RU"))
+            .withZone(java.time.ZoneId.systemDefault())
+            .format(instant)
 }
