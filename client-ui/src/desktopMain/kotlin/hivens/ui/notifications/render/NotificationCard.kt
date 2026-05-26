@@ -54,6 +54,7 @@ import hivens.ui.notifications.NotifAction
 import hivens.ui.notifications.NotificationEvent
 import hivens.ui.notifications.NotificationGroup
 import hivens.ui.notifications.Severity
+import hivens.ui.theme.CelestiaColors
 import hivens.ui.theme.CelestiaTheme
 import java.time.Duration
 import java.time.Instant
@@ -69,7 +70,8 @@ fun NotificationCard(
     // pushed Critical inherits the user's prior expanded=true and
     // appears already opened into stale history.
     var expanded by remember(group.sourceKey, group.count) { mutableStateOf(false) }
-    val accentColor = severityAccent(group.severity)
+    val palette = CelestiaTheme.colors
+    val accentColor = severityAccent(group.severity, palette)
     val accentAlpha = if (group.severity == Severity.Critical) criticalPulse() else 1f
 
     Box(
@@ -309,12 +311,14 @@ private fun criticalPulse(): Float {
     return v
 }
 
-private fun severityAccent(severity: Severity): Color = when (severity) {
+// Routes Severity onto the active palette. Info has no stripe -- caller
+// elides the side-bar -- so Color.Transparent is the safe sentinel.
+private fun severityAccent(severity: Severity, colors: CelestiaColors): Color = when (severity) {
     Severity.Info     -> Color.Transparent
-    Severity.Progress -> Color(0xFF6A84FF)
-    Severity.Success  -> Color(0xFF4FC76E)
-    Severity.Warn     -> Color(0xFFE0B341)
-    Severity.Critical -> Color(0xFFD8484A)
+    Severity.Progress -> colors.progressAccent
+    Severity.Success  -> colors.success
+    Severity.Warn     -> colors.warnAccent
+    Severity.Critical -> colors.criticalAccent
 }
 
 private fun relativeTime(created: Instant, now: Instant): String {
