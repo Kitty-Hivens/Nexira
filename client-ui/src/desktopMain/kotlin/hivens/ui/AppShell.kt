@@ -519,42 +519,73 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
             // Clamped against the user's native screen so a small laptop
             // can still drag the window edges. Floating WMs respect the
             // hint; tiling WMs ignore it, which is fine.
+            //
+            // Recompute on screen change. A LaunchedEffect(Unit) would
+            // only fire at composition entry, leaving the clamp stale
+            // when the user later drags the window to a smaller monitor
+            // (4K primary -> 1366x768 laptop panel via DisplayPort
+            // hot-plug). Listen for ComponentEvent.componentMoved and
+            // diff GraphicsConfiguration's device id so we recompute
+            // only on actual screen-change crossings, not on every
+            // pixel of a within-screen drag.
             val sizeDensity = LocalDensity.current
-            LaunchedEffect(Unit) {
-                val designPx = with(sizeDensity) {
-                    Dimension(
-                        MIN_WINDOW_WIDTH_DP.dp.toPx().toInt(),
-                        MIN_WINDOW_HEIGHT_DP.dp.toPx().toInt(),
-                    )
+            DisposableEffect(window, sizeDensity) {
+                val applyClamp: () -> Unit = {
+                    val designPx = with(sizeDensity) {
+                        Dimension(
+                            MIN_WINDOW_WIDTH_DP.dp.toPx().toInt(),
+                            MIN_WINDOW_HEIGHT_DP.dp.toPx().toInt(),
+                        )
+                    }
+                    // Prefer the bounds of the display this window is on;
+                    // the toolkit's screenSize is the PRIMARY monitor only,
+                    // and on a multi-monitor setup where the user restored
+                    // the launcher on a smaller secondary screen the
+                    // primary-derived clamp can exceed the actual display
+                    // and block resize to a usable size. GraphicsConfiguration
+                    // returns null before the window is realised, so fall
+                    // back to the toolkit for the initial placement pass.
+                    //
+                    // Wayland peer-init quirk: on Hyprland (and other
+                    // Wayland compositors) starting tray-resident, the
+                    // Compose Window is created but not yet displayable.
+                    // window.graphicsConfiguration is non-null (returns
+                    // the device's default GC) but its bounds are
+                    // Rectangle(0,0,0,0) until the surface negotiates.
+                    // Treating that as a valid screen yields minimumSize
+                    // = (0,0) and the WM can later shrink the window to
+                    // a 1px sliver. Guard on positive bounds and fall
+                    // through to the toolkit size otherwise.
+                    val gc = window.graphicsConfiguration
+                    val gcBounds = gc?.bounds
+                    val screen = if (gcBounds != null && gcBounds.width > 0 && gcBounds.height > 0) {
+                        Dimension(gcBounds.width, gcBounds.height)
+                    } else {
+                        Toolkit.getDefaultToolkit().screenSize
+                    }
+                    val safe = computeSafeWindowMinSize(designPx.width, designPx.height, screen)
+                    SwingUtilities.invokeLater { window.minimumSize = safe }
                 }
-                // Prefer the bounds of the display this window is on;
-                // the toolkit's screenSize is the PRIMARY monitor only,
-                // and on a multi-monitor setup where the user restored
-                // the launcher on a smaller secondary screen the
-                // primary-derived clamp can exceed the actual display
-                // and block resize to a usable size. GraphicsConfiguration
-                // returns null before the window is realised, so fall
-                // back to the toolkit for the initial placement pass.
-                //
-                // Wayland peer-init quirk: on Hyprland (and other
-                // Wayland compositors) starting tray-resident, the
-                // Compose Window is created but not yet displayable.
-                // window.graphicsConfiguration is non-null (returns the
-                // device's default GC) but its bounds are Rectangle(0,0,0,0)
-                // until the surface negotiates. Treating that as a
-                // valid screen yields minimumSize = (0,0) and the WM
-                // can later shrink the window to a 1px sliver. Guard
-                // on positive bounds and fall through to the toolkit
-                // size otherwise.
-                val gc = window.graphicsConfiguration
-                val gcBounds = gc?.bounds
-                val screen = if (gcBounds != null && gcBounds.width > 0 && gcBounds.height > 0) {
-                    Dimension(gcBounds.width, gcBounds.height)
-                } else {
-                    Toolkit.getDefaultToolkit().screenSize
+
+                // Track current display id; AWT fires componentMoved on
+                // every pixel of a drag, so diff first and only recompute
+                // when the window actually crossed onto a new GraphicsDevice.
+                var lastDeviceId: String? = window.graphicsConfiguration?.device?.iDstring
+                val moveListener = object : java.awt.event.ComponentAdapter() {
+                    override fun componentMoved(e: java.awt.event.ComponentEvent) {
+                        val current = window.graphicsConfiguration?.device?.iDstring
+                        if (current != lastDeviceId) {
+                            lastDeviceId = current
+                            applyClamp()
+                        }
+                    }
                 }
-                val safe = computeSafeWindowMinSize(designPx.width, designPx.height, screen)
-                SwingUtilities.invokeLater { window.minimumSize = safe }
+                window.addComponentListener(moveListener)
+                applyClamp()  // initial placement pass
+
+                onDispose {
+                    window.removeComponentListener(moveListener)
+                }
             }
 
             val baseDensity   = androidx.compose.ui.platform.LocalDensity.current

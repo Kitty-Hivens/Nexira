@@ -40,6 +40,17 @@ object AprilFoolsProgress {
             // (0, 0) = nothing started yet -> show empty.
             // (positive, 0) = bytes flowing, size unknown -> NaN sentinel
             // -> caller renders indeterminate.
+            //
+            // Also wipe displayProgress so the next determinate tick
+            // doesn't lerp from a stale carry-over. LaunchControlPanel
+            // calls resetProgress() only on Idle->Downloading edges,
+            // not on mid-session transitions through an unknown-total
+            // window (chunked HTTP without Content-Length, a
+            // pre-tally phase after a prior sync). Without this reset
+            // the bar visibly jerks from a near-1.0 carry-over down
+            // to a fresh small `real` value on the next tick with
+            // total > 0.
+            displayProgress = 0f
             return if (downloaded <= 0L) 0f else Float.NaN
         }
         if (!AprilFools.isActive()) {
