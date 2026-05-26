@@ -1,4 +1,4 @@
-package hivens.widget.api
+package hivens.widget.model
 
 import kotlin.test.Test
 import kotlin.test.assertEquals

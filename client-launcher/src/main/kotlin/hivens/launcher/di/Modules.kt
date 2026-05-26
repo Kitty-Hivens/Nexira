@@ -28,7 +28,7 @@ import hivens.launcher.smrt.SmrtSyncService
 import hivens.launcher.security.KeyringStorageFactory
 import hivens.launcher.update.UpdateApplicators
 import hivens.launcher.update.UpdateService
-import hivens.widget.api.DefaultLayout
+import hivens.widget.model.DefaultLayout
 import io.ktor.client.*
 import io.ktor.client.engine.okhttp.*
 import io.ktor.client.plugins.*

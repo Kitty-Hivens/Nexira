@@ -6,7 +6,7 @@ plugins {
 dependencies {
     implementation(project(":client-core"))
     implementation(project(":client-config"))
-    implementation(project(":widget-api"))
+    implementation(project(":widget-model"))
 
     implementation(libs.commons.compress)
     implementation(libs.koin.core)

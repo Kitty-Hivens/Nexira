@@ -1,6 +1,6 @@
 package hivens.launcher
 
-import hivens.widget.api.LayoutGraph
+import hivens.widget.model.LayoutGraph
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow

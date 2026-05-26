@@ -1,12 +1,12 @@
 package hivens.launcher
 
-import hivens.widget.api.LayoutGraph
-import hivens.widget.api.SlotContent
-import hivens.widget.api.SlotId
-import hivens.widget.api.SurfaceId
-import hivens.widget.api.SurfaceLayout
-import hivens.widget.api.WidgetInstance
-import hivens.widget.api.WidgetKind
+import hivens.widget.model.LayoutGraph
+import hivens.widget.model.SlotContent
+import hivens.widget.model.SlotId
+import hivens.widget.model.SurfaceId
+import hivens.widget.model.SurfaceLayout
+import hivens.widget.model.WidgetInstance
+import hivens.widget.model.WidgetKind
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
