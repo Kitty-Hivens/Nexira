@@ -29,7 +29,13 @@ data class CelestiaColors(
     val glassBackground: Color,
     val glassAlpha: Float,
     val success: Color,
-    val outline: Color
+    val outline: Color,
+    // Severity accents for notifications. `success` already doubles as
+    // Severity.Success; the other three are new tokens so each accent can
+    // drift per palette without dragging unrelated UI.
+    val progressAccent: Color,
+    val warnAccent: Color,
+    val criticalAccent: Color,
 )
 
 private val DarkColorPalette = CelestiaColors(
@@ -49,7 +55,10 @@ private val DarkColorPalette = CelestiaColors(
     glassBackground = Color(0xFF000000), // Base for glass
     glassAlpha = 0.60f, // Glass transparency (dark)
     success = Color(0xFF4CAF50),
-    outline = Color(0xFF444444)
+    outline = Color(0xFF444444),
+    progressAccent = Color(0xFF6A84FF),
+    warnAccent     = Color(0xFFE0B341),
+    criticalAccent = Color(0xFFD8484A),
 )
 
 private val LightColorPalette = CelestiaColors(
@@ -69,7 +78,10 @@ private val LightColorPalette = CelestiaColors(
     glassBackground = Color(0xFFFFFFFF),
     glassAlpha = 0.65f,                // Slightly more opacity for readability
     success = Color(0xFF66BB6A),
-    outline = Color(0xFFCCCCCC)
+    outline = Color(0xFFCCCCCC),
+    progressAccent = Color(0xFF3C5BD9),
+    warnAccent     = Color(0xFFB37A0E),
+    criticalAccent = Color(0xFFB3262A),
 )
 
 val LocalCelestiaColors = staticCompositionLocalOf<CelestiaColors> {
@@ -145,6 +157,9 @@ fun CelestiaTheme(
     val animatedOutline by animateColorAsState(targetColors.outline, colorAnimSpec)
     val animatedGlassBg by animateColorAsState(targetColors.glassBackground, colorAnimSpec)
     val animatedGlassAlpha by animateFloatAsState(targetColors.glassAlpha, TweenSpec(animDurationMs))
+    val animatedProgressAccent by animateColorAsState(targetColors.progressAccent, colorAnimSpec)
+    val animatedWarnAccent by animateColorAsState(targetColors.warnAccent, colorAnimSpec)
+    val animatedCriticalAccent by animateColorAsState(targetColors.criticalAccent, colorAnimSpec)
 
     // Assembling an animated palette
     val animatedPalette = targetColors.copy(
@@ -159,7 +174,10 @@ fun CelestiaTheme(
         textSecondary = animatedTextSecondary,
         outline = animatedOutline,
         glassBackground = animatedGlassBg,
-        glassAlpha = animatedGlassAlpha
+        glassAlpha = animatedGlassAlpha,
+        progressAccent = animatedProgressAccent,
+        warnAccent = animatedWarnAccent,
+        criticalAccent = animatedCriticalAccent,
     )
 
     // M3 ColorScheme

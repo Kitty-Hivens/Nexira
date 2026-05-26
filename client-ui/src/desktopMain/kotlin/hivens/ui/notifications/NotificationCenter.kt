@@ -19,8 +19,9 @@ class NotificationCenter(
     fun push(
         sourceKey: String,
         sender: String,
-        avatar: AvatarSource,
+        iconUrl: String?,
         severity: Severity,
+        kind: Kind,
         title: String,
         body: String? = null,
         progress: Float? = null,
@@ -29,6 +30,7 @@ class NotificationCenter(
         val event = NotificationEvent(
             id        = UUID.randomUUID(),
             severity  = severity,
+            kind      = kind,
             title     = title,
             body      = body,
             progress  = progress,
@@ -42,16 +44,16 @@ class NotificationCenter(
                     NotificationGroup(
                         sourceKey = sourceKey,
                         sender    = sender,
-                        avatar    = avatar,
+                        iconUrl   = iconUrl,
                         events    = listOf(event),
                     )
                 ) + current
             } else {
                 val existing = current[existingIndex]
                 val merged = existing.copy(
-                    sender = sender,
-                    avatar = avatar,
-                    events = (listOf(event) + existing.events).take(historyPerGroup),
+                    sender  = sender,
+                    iconUrl = iconUrl,
+                    events  = (listOf(event) + existing.events).take(historyPerGroup),
                 )
                 val others = current.toMutableList().also { it.removeAt(existingIndex) }
                 listOf(merged) + others

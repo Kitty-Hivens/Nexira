@@ -632,4 +632,47 @@ object EnglishStrings : AppStrings {
     override val packDetailNotFoundTitle        = "Instance not found"
     override val packDetailNotFoundHint         = "It may have been removed from another window."
     override val packDetailNotFoundBack         = "Back to Library"
+
+    // --- Notification subsystem ---
+    override val notificationExpandHistory   = "Expand notification history"
+    override val notificationCollapseHistory = "Collapse notification history"
+    override val notificationDismiss         = "Dismiss notification"
+    override fun notificationShowMore(count: Int)               = "+$count more"
+    override fun notificationAbsoluteTime(instant: java.time.Instant): String =
+        notificationTimeFormatter(java.util.Locale.ENGLISH).format(instant)
+
+    override fun notifPackPreparing(packName: String)   = "Preparing $packName"
+    override fun notifPackStage(stage: String)          = "Stage: $stage"
+    override fun notifPackSyncing(packName: String)     = "Syncing $packName"
+    override fun notifPackSyncBody(current: Int, total: Int, pctLabel: String) =
+        "$current/$total files, $pctLabel"
+    override val notifPackSyncIndeterminate             = "downloading..."
+    override fun notifPackSyncPercent(pct: Int)         = "$pct%"
+    override fun notifPackRunning(packName: String)     = "$packName is running"
+    override fun notifPackFailed(packName: String)      = "$packName failed to launch"
+    override fun notifPackSessionEnded(packName: String) = "$packName session ended"
+    override val notifActionShowConsole                 = "Show console"
+    override val notifActionStop                        = "Stop"
+    override fun notifReasonExitCode(code: Int)         = "Game exited with code $code"
+    override val notifReasonInternal                    = "Internal error"
+    override fun notifReasonInternalDetail(detail: String) = detail
+    override val notifReasonAuthFail                    = "Authentication failed"
+    override fun notifReasonAuthFailDetail(detail: String) = detail
+    override val notifReasonOfflineNoClient             = "Pack files missing on disk"
+    override val notifReasonOfflineNoManifest           = "No cached manifest; go online once to sync"
+    override val notifReasonTwoFactorExpired            = "Sign in again to refresh credentials"
+
+    override val notifTimeNow                           = "Now"
+    override fun notifTimeSeconds(seconds: Long)        = "${seconds}s"
+    override fun notifTimeMinutes(minutes: Long)        = "${minutes}m"
+    override fun notifTimeHours(hours: Long)            = "${hours}h"
+    override fun notifTimeDays(days: Long)              = "${days}d"
 }
+
+private val notificationTimeFormatterCache = java.util.concurrent.ConcurrentHashMap<java.util.Locale, java.time.format.DateTimeFormatter>()
+private fun notificationTimeFormatter(locale: java.util.Locale): java.time.format.DateTimeFormatter =
+    notificationTimeFormatterCache.computeIfAbsent(locale) {
+        java.time.format.DateTimeFormatter
+            .ofPattern("d MMM yyyy, HH:mm:ss", it)
+            .withZone(java.time.ZoneId.systemDefault())
+    }

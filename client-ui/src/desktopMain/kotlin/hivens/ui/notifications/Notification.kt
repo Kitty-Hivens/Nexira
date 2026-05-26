@@ -3,12 +3,6 @@ package hivens.ui.notifications
 import java.time.Instant
 import java.util.UUID
 
-sealed class AvatarSource {
-    data class Url(val url: String) : AvatarSource()
-    data class Glyph(val name: String) : AvatarSource()
-    data object Generic : AvatarSource()
-}
-
 // `id` is stable across i18n rebrands; tests + puppet observers key on it.
 data class NotifAction(
     val id: String,
@@ -21,6 +15,7 @@ data class NotifAction(
 data class NotificationEvent(
     val id: UUID,
     val severity: Severity,
+    val kind: Kind,
     val title: String,
     val body: String? = null,
     val progress: Float? = null,
@@ -31,7 +26,11 @@ data class NotificationEvent(
 data class NotificationGroup(
     val sourceKey: String,
     val sender: String,
-    val avatar: AvatarSource,
+    // Direct URL string; null = renderer falls back to a neutral
+    // placeholder. The previous sealed Url/Glyph/Generic carried
+    // future-extension shape without a real consumer; recover the
+    // indirection only when a second source type is needed.
+    val iconUrl: String?,
     val events: List<NotificationEvent>,
 ) {
     init {
@@ -45,6 +44,12 @@ data class NotificationGroup(
     // max across events, not events.first.severity -- a past Critical
     // must keep the group visually marked even after a later Info.
     val severity: Severity get() = events.maxOf { it.severity }
+
+    // Kind tracks the current lifecycle, so it follows the latest event.
+    // The auto-dismiss decision still consults `severity` (max across) so
+    // a group that ever held Critical keeps the longer window once it
+    // transitions to OneShot.
+    val kind: Kind get() = latest.kind
 
     val count: Int get() = events.size
 }

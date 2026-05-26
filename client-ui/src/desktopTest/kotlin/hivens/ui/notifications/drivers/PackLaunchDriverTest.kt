@@ -84,6 +84,6 @@ class PackLaunchDriverTest {
         // after subsequent Info/Success arrivals.
         assertTrue(Severity.Critical.ordinal > Severity.Warn.ordinal)
         assertTrue(Severity.Critical.ordinal > Severity.Success.ordinal)
-        assertTrue(Severity.Critical.ordinal > Severity.Progress.ordinal)
+        assertTrue(Severity.Critical.ordinal > Severity.Info.ordinal)
     }
 }
