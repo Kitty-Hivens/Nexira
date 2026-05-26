@@ -159,15 +159,23 @@ class SmrtSyncService(
     }
 
     private suspend fun syncAsset(asset: SmrtAssetEntry, clientDir: Path) {
+        // resolveSafe FIRST: a manifest entry like
+        // `../../config/servers.dat` happens to match the protected-
+        // suffix list (ProtectedPaths.isProtected lowercases + checks
+        // endsWith/contains on the raw string), so running the
+        // isProtected gate before path normalisation would silently
+        // skip a path-escape attempt as "protected" instead of loudly
+        // failing the manifest. The traversal IOException needs to
+        // win over the protected-path debug log.
+        val dest = resolveSafe(clientDir, asset.dest, "asset ${asset.dest}")
         // Protected paths (e.g. user-edited options.txt) are honored
         // here just like in the SC code path -- if the user has tuned
         // their FOV, sync must not overwrite. Protection only kicks in
         // when the file is already present and non-empty.
-        if (protectedPaths.isProtected(asset.dest) && fileIsPresentAndNonEmpty(clientDir.resolve(asset.dest))) {
+        if (protectedPaths.isProtected(asset.dest) && fileIsPresentAndNonEmpty(dest)) {
             log.debug("smrt sync: skipping protected {}", asset.dest)
             return
         }
-        val dest = resolveSafe(clientDir, asset.dest, "asset ${asset.dest}")
         downloadIfNeeded(dest, asset.sha1, asset.sizeBytes, asset.source, "asset ${asset.dest}")
     }
 
@@ -179,6 +187,18 @@ class SmrtSyncService(
      * files writable by the launcher process. The mirror is trusted
      * but the boundary check is cheap and means a single bad
      * manifest entry can never escape the per-instance directory.
+     *
+     * **Threat model**: defends against MANIFEST-DRIVEN traversal
+     * (a bad/hostile mirror manifest entry). Does NOT defend against
+     * a pre-existing symlink inside `root` that points outside --
+     * the lexical [Path.normalize] check is purely string-based, so
+     * `<root>/config -> /opt/shared-configs` followed by manifest
+     * entry `config/foo.cfg` writes to /opt/shared-configs/foo.cfg
+     * even though the lexical check passes. Symlinks under `<root>`
+     * are assumed user-installed and trusted; if the threat model
+     * ever broadens (multi-tenant installs, sandboxed sync), switch
+     * to `toRealPath(NOFOLLOW_LINKS)` per parent component before
+     * the startsWith comparison.
      */
     private fun resolveSafe(root: Path, relative: String, label: String): Path {
         val resolved = root.resolve(relative).normalize()

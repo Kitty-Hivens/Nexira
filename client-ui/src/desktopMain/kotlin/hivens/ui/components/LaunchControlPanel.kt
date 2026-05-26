@@ -107,17 +107,28 @@ fun LaunchControlPanel(
         }
 
         if (state !is LaunchState.Idle && state !is LaunchState.Error) {
-            LinearProgressIndicator(
-                progress        = { progress },
-                modifier        = Modifier
-                    .fillMaxWidth()
-                    .height(6.dp)
-                    .clip(RoundedCornerShape(3.dp)),
-                color           = CelestiaTheme.colors.primary,
-                trackColor      = CelestiaTheme.colors.surface,
-                gapSize         = 0.dp,
-                drawStopIndicator = {},
-            )
+            // NaN sentinel from wrapProgress = "size unknown but bytes
+            // flowing" -> indeterminate. Otherwise determinate fraction.
+            val barModifier = Modifier
+                .fillMaxWidth()
+                .height(6.dp)
+                .clip(RoundedCornerShape(3.dp))
+            if (progress.isNaN()) {
+                LinearProgressIndicator(
+                    modifier        = barModifier,
+                    color           = CelestiaTheme.colors.primary,
+                    trackColor      = CelestiaTheme.colors.surface,
+                )
+            } else {
+                LinearProgressIndicator(
+                    progress        = { progress },
+                    modifier        = barModifier,
+                    color           = CelestiaTheme.colors.primary,
+                    trackColor      = CelestiaTheme.colors.surface,
+                    gapSize         = 0.dp,
+                    drawStopIndicator = {},
+                )
+            }
         } else {
             Spacer(Modifier.height(6.dp))
         }

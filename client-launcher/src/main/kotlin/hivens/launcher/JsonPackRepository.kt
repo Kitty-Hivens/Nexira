@@ -2,6 +2,7 @@ package hivens.launcher
 
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -110,8 +111,37 @@ class JsonPackRepository(
             try {
                 Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
             } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
+                // Best-effort: the underlying filesystem (typically
+                // FAT32 / exFAT on a removable drive, or some SMB
+                // shares) does not support atomic rename. A non-
+                // atomic REPLACE_EXISTING move decomposes to
+                // delete-target-then-rename on those filesystems,
+                // and a power loss between the two steps leaves
+                // packs.json missing -- next launch loads emptyList()
+                // and the library appears wiped. We surface a WARN
+                // so a user who lands on this branch can correlate
+                // their data-dir choice with the weaker durability
+                // contract; full safety would require a fsync ladder
+                // that POSIX cannot guarantee on these filesystems.
+                log.warn(
+                    "Filesystem at {} does not support ATOMIC_MOVE; " +
+                    "falling back to non-atomic rename. A crash mid-rename " +
+                    "can lose packs.json. Move the data directory to a " +
+                    "filesystem that supports atomic rename (ext4, NTFS, " +
+                    "APFS) for full library durability.",
+                    file.parent,
+                )
                 Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING)
             }
+        } catch (e: CancellationException) {
+            // Today persist() has no suspension points inside the
+            // try-body, so withContext's cancellation check fires at
+            // entry/exit and we never land here under cancellation.
+            // The next refactor that introduces a suspending serializer
+            // OR an async IO call WILL trip cancellation inside the
+            // try -- pre-emptive rethrow keeps the structured-
+            // concurrency invariant intact across that hypothetical.
+            throw e
         } catch (e: Exception) {
             log.error("Failed to persist packs registry at {}", file, e)
         }
