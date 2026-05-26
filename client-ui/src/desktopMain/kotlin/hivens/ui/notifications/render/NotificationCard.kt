@@ -173,6 +173,10 @@ private fun HeaderRow(
                 color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.6f),
             )
         }
+        // Chevron is conditional on count; close is unconditional. Sticky
+        // kinds (Sticky, ActionRequired) never auto-dismiss, so grouped
+        // cards without a close leave the user trapped -- the action
+        // buttons all have side effects, none of them just "close this".
         if (group.count > 1) {
             Spacer(Modifier.width(6.dp))
             // IconButton wraps the row so screen readers / keyboards see a
@@ -194,16 +198,15 @@ private fun HeaderRow(
                     )
                 }
             }
-        } else {
-            Spacer(Modifier.width(2.dp))
-            IconButton(onClick = onDismiss, modifier = Modifier.size(20.dp)) {
-                Icon(
-                    imageVector       = Icons.Default.Close,
-                    contentDescription = strings.notificationDismiss,
-                    modifier          = Modifier.size(14.dp),
-                    tint              = CelestiaTheme.colors.textSecondary.copy(alpha = 0.6f),
-                )
-            }
+        }
+        Spacer(Modifier.width(2.dp))
+        IconButton(onClick = onDismiss, modifier = Modifier.size(20.dp)) {
+            Icon(
+                imageVector       = Icons.Default.Close,
+                contentDescription = strings.notificationDismiss,
+                modifier          = Modifier.size(14.dp),
+                tint              = CelestiaTheme.colors.textSecondary.copy(alpha = 0.6f),
+            )
         }
     }
 }
