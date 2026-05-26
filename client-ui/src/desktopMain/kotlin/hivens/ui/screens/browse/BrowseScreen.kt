@@ -72,6 +72,12 @@ fun BrowseScreen(onOpenPack: (packId: String) -> Unit) {
             val listing = withContext(Dispatchers.IO) { client.listPacks() }
             if (listing.packs.isEmpty()) BrowseState.Empty
             else BrowseState.Loaded(listing.packs)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            // Cooperatively cancel -- a fresh retryTick (or composition
+            // leave) restarts this LaunchedEffect, and converting the
+            // cancellation into an Error would surface spurious error UI
+            // for a click the user already overrode.
+            throw e
         } catch (e: Exception) {
             BrowseState.Error(e.message ?: s.browseErrorMessage)
         }

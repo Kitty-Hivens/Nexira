@@ -35,8 +35,16 @@ class ServersDatReader {
             // launcher passes gzipped=false; if a future MC release
             // changes that, NbtException at parse time would point
             // at the wrong call site here, easy to flip.
+            //
+            // Catch broadly: the in-tree Nbt parser also surfaces
+            // IOException on truncated payloads and the occasional
+            // EOFException / IllegalArgumentException on malformed
+            // tag headers. A corrupt servers.dat must not blow up
+            // the Worlds tab; the graceful path is "no servers".
             Files.newInputStream(file).use { Nbt.read(it, gzipped = false) }
-        } catch (e: NbtException) {
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
             log.warn("servers.dat at {} did not parse: {}", file, e.message)
             return@withContext emptyList()
         }
