@@ -22,6 +22,7 @@ import hivens.launcher.component.GameCommandBuilder
 import hivens.launcher.component.ProcessLogHandler
 import hivens.launcher.launch.LauncherController
 import hivens.launcher.platform.PlatformPaths
+import hivens.launcher.smrt.ModIconResolver
 import hivens.launcher.smrt.SmrtPackClient
 import hivens.launcher.smrt.SmrtSyncService
 import hivens.launcher.security.KeyringStorageFactory
@@ -387,6 +388,17 @@ val appModule = module {
     single { SmrtPackClient(get(named("direct"))) }
     single { SmrtSyncService(get(), get()) }
     single { PackInstaller(syncService = get(), repository = get(), dataDir = get()) }
+
+    // Per-mod icon URL resolver for the Library PackDetail Content tab.
+    // Direct iconUrl wins; otherwise resolves a Modrinth project's icon
+    // via SmrtPackClient. Results cached per project_id inside the
+    // resolver instance.
+    single {
+        val client: SmrtPackClient = get()
+        ModIconResolver { projectId ->
+            client.resolveModrinthProject(projectId).iconUrl
+        }
+    }
 
     single<IManifestProcessorService> { ManifestProcessorService(get()) }
     single { ProfileManager(get(), get()) }

@@ -1,6 +1,7 @@
 package hivens.launcher.smrt
 
 import hivens.core.api.HttpClientProvider
+import hivens.core.api.dto.smrt.ModrinthProject
 import hivens.core.api.dto.smrt.ModrinthVersion
 import hivens.core.api.dto.smrt.SmrtPackListing
 import hivens.core.api.dto.smrt.SmrtPackManifest
@@ -63,6 +64,15 @@ class SmrtPackClient(
      */
     suspend fun resolveModrinthVersion(projectId: String, versionId: String): ModrinthVersion =
         getJson("$MODRINTH_API_BASE/v2/project/$projectId/version/$versionId")
+
+    /**
+     * Fetch project metadata for a Modrinth-sourced mod -- used by the
+     * Library PackDetail icon resolver when the manifest entry doesn't
+     * carry its own `display.iconUrl`. One call per project_id is
+     * enough; callers cache the result.
+     */
+    suspend fun resolveModrinthProject(projectId: String): ModrinthProject =
+        getJson("$MODRINTH_API_BASE/v2/project/$projectId")
 
     /**
      * Stream a download through a caller-supplied consumer. The
