@@ -92,10 +92,6 @@ fun LibraryScreen(
                     if (session == null) {
                         onScreenChange(Screen.PackDetail(instance.id))
                     } else {
-                        // Same observer-then-launch + console-show
-                        // sequence as PackDetail's PlayBar so the
-                        // user gets identical feedback regardless of
-                        // which Play affordance they used.
                         launchDriver.observe(instance)
                         gameConsole.show()
                         controller.launchPackInstance(session, instance)

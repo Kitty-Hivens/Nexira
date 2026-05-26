@@ -34,18 +34,6 @@ import hivens.ui.theme.CelestiaTheme
 import org.koin.compose.koinInject
 import java.time.Duration
 
-/**
- * Active-sessions section, intended for the Library sidebar. Renders
- * one chip per running pack with a live uptime ticker, an open-
- * console button, and a stop button. Hidden when no sessions are
- * registered -- the section should not visually exist in the
- * sidebar during quiet times.
- *
- * Distinct from [NotificationStack] because session state is
- * persistent: a game may run for hours and the user wants the
- * control surface to stay reachable the whole time. A transient
- * toast cannot serve that role.
- */
 @Composable
 fun ActiveSessionsSection(registry: SessionRegistry = koinInject()) {
     val active by registry.active.collectAsState()
@@ -76,9 +64,6 @@ fun SessionChip(session: ActiveSession) {
             .padding(horizontal = 10.dp, vertical = 8.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            // Live indicator dot -- accent color, ambient (no pulse).
-            // Different from notification accent: this is a steady
-            // "running" signal, not "demands attention".
             Box(
                 modifier = Modifier
                     .size(8.dp)

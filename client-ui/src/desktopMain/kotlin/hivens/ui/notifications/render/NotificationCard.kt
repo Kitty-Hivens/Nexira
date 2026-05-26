@@ -49,16 +49,6 @@ import hivens.ui.theme.CelestiaTheme
 import java.time.Duration
 import java.time.Instant
 
-/**
- * One stacked notification group. Top row: avatar + sender + relative
- * time + (counter+chevron when history exists). Middle: title + body
- * of the latest event, optional progress bar inline with the accent.
- * Bottom: action chips, if any.
- *
- * Expanded view (chevron click) reveals previous events of the group
- * as tighter rows under the latest one. Severity above Info adds a
- * slim accent bar on the left; Critical pulses.
- */
 @Composable
 fun NotificationCard(
     group: NotificationGroup,
@@ -76,10 +66,6 @@ fun NotificationCard(
             .background(CelestiaTheme.colors.surface)
     ) {
         Row(modifier = Modifier.fillMaxWidth()) {
-            // Accent strip on the left. Hidden for Info to keep
-            // routine notifications visually quiet; promoted to a
-            // narrow vertical band for Warn / Progress / Success and
-            // a wider pulsing band for Critical.
             if (group.severity != Severity.Info) {
                 Box(
                     modifier = Modifier
@@ -107,9 +93,6 @@ fun NotificationCard(
                     ActionsRow(actions = group.latest.actions, onDismiss = onDismiss)
                 }
 
-                // History rows: collapsed by default; expanded shows
-                // every prior event (newest-first already; we skip
-                // index 0 which is the `latest` already rendered).
                 AnimatedVisibility(
                     visible = expanded,
                     enter   = expandVertically(),
@@ -224,11 +207,6 @@ private fun ActionsRow(actions: List<hivens.ui.notifications.NotifAction>, onDis
             TextButton(
                 onClick = {
                     action.onClick()
-                    // Action click implicitly dismisses unless the
-                    // action is a "show more" type. For simplicity in
-                    // v0 every action dismisses; explicit "keep open"
-                    // semantics can land later when a real driver
-                    // needs them.
                     onDismiss()
                 },
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 4.dp),
@@ -266,10 +244,7 @@ private fun HistoryRow(event: NotificationEvent, now: Instant) {
 
 @Composable
 private fun AvatarSlot(group: hivens.ui.notifications.NotificationGroup) {
-    // v0: solid neutral square placeholder. Wired to Coil + real
-    // pack icon URL when [[project_pack_rich_metadata]] propagates
-    // summary.icon_url into PackInstance.cachedManifest (or a
-    // sibling field).
+    // Neutral placeholder; wired to Coil + Url once PackInstance carries icon_url.
     Box(
         modifier = Modifier
             .size(28.dp)

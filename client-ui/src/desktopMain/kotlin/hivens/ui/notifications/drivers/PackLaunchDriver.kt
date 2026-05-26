@@ -16,27 +16,10 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
 
-/**
- * Bridge between [LauncherController] launch state and the three
- * notification-system surfaces. One driver instance per process; the
- * UI calls [observe] right after invoking
- * [LauncherController.launchPackInstance] and the driver mirrors
- * every state transition until the controller settles back to Idle
- * (or hits Error).
- *
- * Why a per-launch observer instead of a single global subscription
- * to `controller.state`: the controller's state is generic (Prepare /
- * Downloading / GameRunning / Error) and doesn't carry the pack
- * identity. Tying the observation lifecycle to the click that
- * triggered the launch lets us key every notification / indication /
- * session entry on the pack the user actually started, without
- * widening the controller's contract.
- *
- * The controller's re-entry guard prevents concurrent launches, so
- * at most one launch is observed at any time -- starting a second
- * launch while the first is still in flight is rejected at the
- * controller level before this driver sees anything.
- */
+// Per-launch observer rather than global controller.state subscription:
+// LaunchState doesn't carry pack identity, and binding the observer to
+// the click that started the launch is how we key the resulting
+// notification/indication/session entries on the right pack.
 class PackLaunchDriver(
     private val controller: LauncherController,
     private val notifications: NotificationCenter,
@@ -47,26 +30,13 @@ class PackLaunchDriver(
 ) {
     private val log = LoggerFactory.getLogger(PackLaunchDriver::class.java)
 
-    /**
-     * Begin observing the controller until the launch initiated for
-     * [pack] completes (Idle) or fails (Error). Safe to call before
-     * the click that triggers the launch reaches the controller --
-     * the observer waits for the first non-Idle state before
-     * binding, so a stale Idle from a previous launch does not
-     * cause a phantom completion event.
-     */
     fun observe(pack: PackInstance) {
         appScope.launch {
             try {
-                // Wait for the click's launchPackInstance to actually
-                // flip state away from Idle. Without this guard the
-                // first collect tick would see Idle (the residual
-                // state from any previous run) and the driver would
-                // immediately think the new launch finished.
+                // Wait for non-Idle so a residual Idle from a previous
+                // launch doesn't trigger a phantom completion.
                 controller.state.first { it !is LaunchState.Idle }
 
-                // Now mirror every transition. The collect ends when
-                // we hit a terminal state and explicitly return.
                 controller.state.collect { state ->
                     when (state) {
                         is LaunchState.Prepare       -> onPrepare(pack, state)
@@ -131,7 +101,7 @@ class PackLaunchDriver(
         sessions.register(
             packInstanceId  = pack.id,
             packDisplayName = pack.displayName,
-            packIconUrl     = null,  // wired when [[project_pack_rich_metadata]] lands
+            packIconUrl     = null,
             abort           = { controller.abort() },
             showConsole     = { gameConsole.show() },
         )
@@ -166,10 +136,8 @@ class PackLaunchDriver(
     }
 
     private fun onIdle(pack: PackInstance) {
-        // Idle reached after a non-Idle pass = the launch completed
-        // cleanly (exit code 0 path). Tear down the active session
-        // and let the indication fade. The notification group keeps
-        // its history so the user can scroll back through the run.
+        // Idle after non-Idle = clean exit (code 0). Group history stays
+        // so the user can scroll back through the run.
         indications.setLaunchIndication(pack.id, null)
         sessions.unregister(pack.id)
         notifications.push(
@@ -185,9 +153,7 @@ class PackLaunchDriver(
     private fun sourceKeyFor(pack: PackInstance): String = "pack:${pack.id}:launch"
 
     private fun avatarFor(pack: PackInstance): AvatarSource =
-        // PackInstance does not yet carry icon_url; once
-        // [[project_pack_rich_metadata]] propagates the cached
-        // summary url into PackInstance, swap to AvatarSource.Url.
+        // PackInstance does not carry icon_url yet; swap to Url when it does.
         AvatarSource.Generic
 
     private fun humanReason(reason: LaunchError): String = when (reason) {
