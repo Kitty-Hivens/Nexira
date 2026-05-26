@@ -69,23 +69,45 @@ object LauncherBootstrap {
         // BootstrapConf both have lazy log fields specifically so this
         // ordering works without their applyPending() / read() touching
         // logback first.
-        val paths = PlatformPaths.system()
-        System.setProperty("nexira.logs.dir", paths.logsDir.toString())
+        //
+        // The initial resolution is a temporary value: applyPending below
+        // can commit a brand-new `data-dir` into BootstrapConf, in which
+        // case the second PlatformPaths.system() call right after picks
+        // up the new path and that becomes [paths] for the rest of the
+        // session. Holding only [initialPaths] across applyPending was a
+        // race: the move would copy + commit, then the rest of preBoot
+        // (Files.createDirectories, NetworkState.initialize, Koin) used
+        // the stale captured path -- recreating an empty old dir and
+        // wiring every singleton against it. The user observed:
+        // "files moved but the launcher still uses the old (now empty)
+        // path", logged out, fresh-login surfaced trustAnchors / network
+        // errors because the cache / creds / ssl-bypasses landed at the
+        // wrong location. The re-resolve below is the fix.
+        val initialPaths = PlatformPaths.system()
+        System.setProperty("nexira.logs.dir", initialPaths.logsDir.toString())
 
         // NOW safe to apply any pending data-dir move scheduled from the
         // Settings UI. If user clicked "Move data directory" -> picker ->
         // restart, this is where the relocation actually happens. Operation
         // is idempotent; safe to call on every startup. The first log line
         // it produces (only in the actual-move case, no-op otherwise) lands
-        // in `paths.logsDir/launcher.log`, not `./logs/launcher.log`.
+        // in `initialPaths.logsDir/launcher.log`.
         //
-        // Edge case: if applyPending DOES move the data dir, paths.logsDir
+        // Edge case: if applyPending DOES move the data dir, initialPaths.logsDir
         // points at the old location and logback opens the file there --
         // log entries about the move itself stream to the old path right
-        // up until the source dir is deleted. Next startup uses the new
-        // path correctly. The user opted into this two-restart flow when
-        // they clicked Move, so the one-time misdirect is acceptable.
+        // up until the source dir is deleted. Logback's rolling-file
+        // appender keeps writing to the old (now-deleted on Linux /
+        // unlinked-but-handle-held on Windows) file for the rest of this
+        // session; the next launch starts fresh under the new path.
         DataDirMover.applyPending()
+
+        // Re-resolve so the rest of preBoot uses the post-move data-dir.
+        // No-op when applyPending didn't change anything (steady state).
+        val paths = PlatformPaths.system()
+        if (paths.dataDir != initialPaths.dataDir) {
+            System.setProperty("nexira.logs.dir", paths.logsDir.toString())
+        }
 
         // Pulse: tag every log line in this process with a stable 8-char sessionId
         // so a multi-launch user dump can be sliced per process invocation
