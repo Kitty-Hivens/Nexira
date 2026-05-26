@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "graph": {
+    "surfaces": {
+      "home.classic": {
+        "slots": {
+          "main": { "widgets": [] }
+        }
+      },
+      "home.libraryfirst": {
+        "slots": {
+          "main": { "widgets": [] }
+        }
+      },
+      "appshell.leftrail": {
+        "slots": {
+          "main": { "widgets": [] }
+        }
+      },
+      "appshell.rightrail": {
+        "slots": {
+          "main": { "widgets": [] }
+        }
+      }
+    }
+  }
+}

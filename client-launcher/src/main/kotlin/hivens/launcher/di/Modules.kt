@@ -28,6 +28,7 @@ import hivens.launcher.smrt.SmrtSyncService
 import hivens.launcher.security.KeyringStorageFactory
 import hivens.launcher.update.UpdateApplicators
 import hivens.launcher.update.UpdateService
+import hivens.widget.model.DefaultLayout
 import io.ktor.client.*
 import io.ktor.client.engine.okhttp.*
 import io.ktor.client.plugins.*
@@ -445,6 +446,20 @@ val appModule = module {
         JsonPackRepository(
             file = dataDir.resolve(Storage.PACKS_FILE),
             json = get(),
+        )
+    }
+
+    // Widget layout graph persistence (Phase 1 / kernel-2). Default
+    // graph lives at /widget/default-layout.json inside :widget-api;
+    // first run seeds the file, thereafter the on-disk copy is the
+    // source of truth. Reactive via StateFlow so the future editor
+    // mutates the graph live.
+    single {
+        val dataDir: Path = get()
+        LayoutGraphRepository(
+            file         = dataDir.resolve(Storage.LAYOUT_GRAPH_FILE),
+            json         = get(),
+            defaultGraph = { DefaultLayout.load(get()) },
         )
     }
 

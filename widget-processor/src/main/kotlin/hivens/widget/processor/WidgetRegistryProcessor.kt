@@ -9,9 +9,9 @@ import com.google.devtools.ksp.symbol.KSAnnotated
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.symbol.Modifier
 
-private const val WIDGET_ANNOTATION_FQN = "hivens.widget.api.Widget"
+private const val WIDGET_ANNOTATION_FQN = "hivens.widget.model.Widget"
 private const val COMPOSABLE_ANNOTATION_FQN = "androidx.compose.runtime.Composable"
-private const val WIDGET_INSTANCE_FQN = "hivens.widget.api.WidgetInstance"
+private const val WIDGET_INSTANCE_FQN = "hivens.widget.model.WidgetInstance"
 
 private const val GENERATED_PACKAGE = "hivens.widget.generated"
 private const val GENERATED_FILE_NAME = "GeneratedWidgetRegistry"
@@ -85,7 +85,7 @@ class WidgetRegistryProcessor(
         }
         val paramType = params[0].type.resolve().declaration.qualifiedName?.asString()
         if (paramType != WIDGET_INSTANCE_FQN) {
-            env.logger.error("@Widget composable parameter must be hivens.widget.api.WidgetInstance, got $paramType", symbol)
+            env.logger.error("@Widget composable parameter must be hivens.widget.model.WidgetInstance, got $paramType", symbol)
             return null
         }
 
@@ -143,9 +143,9 @@ class WidgetRegistryProcessor(
         appendLine()
         appendLine("import androidx.compose.runtime.Composable")
         appendLine("import hivens.widget.api.WidgetDescriptor")
-        appendLine("import hivens.widget.api.WidgetInstance")
-        appendLine("import hivens.widget.api.WidgetKind")
         appendLine("import hivens.widget.api.WidgetRegistry")
+        appendLine("import hivens.widget.model.WidgetInstance")
+        appendLine("import hivens.widget.model.WidgetKind")
         appendLine()
         appendLine("object $GENERATED_FILE_NAME : WidgetRegistry {")
         appendLine("    private val map: Map<WidgetKind, WidgetDescriptor> = buildMap {")

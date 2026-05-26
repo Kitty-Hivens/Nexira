@@ -1,4 +1,4 @@
-package hivens.widget.api
+package hivens.widget.model
 
 import kotlinx.serialization.Serializable
 

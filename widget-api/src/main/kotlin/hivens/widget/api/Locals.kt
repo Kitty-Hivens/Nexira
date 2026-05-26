@@ -2,6 +2,7 @@ package hivens.widget.api
 
 import androidx.compose.runtime.ProvidableCompositionLocal
 import androidx.compose.runtime.staticCompositionLocalOf
+import hivens.widget.model.LayoutGraph
 
 // Locals provided once near the application root. Static because the
 // graph and registry references swap on whole-tree events (layout

@@ -62,6 +62,10 @@ import hivens.ui.theme.CustomTheme
 import hivens.ui.theme.ThemeManager
 import hivens.ui.tray.TrayManager
 import hivens.ui.utils.GameConsoleService
+import hivens.launcher.LayoutGraphRepository
+import hivens.widget.api.LocalLayoutGraph
+import hivens.widget.api.LocalWidgetRegistry
+import hivens.widget.api.WidgetRegistry
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -161,6 +165,8 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
     val authService: IAuthService              = koinInject()
     val profileManager: ProfileManager         = koinInject()
     val gameConsole: GameConsoleService        = koinInject()
+    val layoutGraphRepo: LayoutGraphRepository = koinInject()
+    val widgetRegistry: WidgetRegistry         = koinInject()
     // Shared process-lifetime scope (createdAtStart in appModule; canceled
     // by AppCoroutineScopeHook on JVM shutdown). Same instance backs
     // LauncherController.appScope and any other fire-and-forget work.
@@ -563,9 +569,12 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
                     baseDensity.fontScale,
                 )
             }
+            val layoutGraph by layoutGraphRepo.observe().collectAsState()
             CompositionLocalProvider(
                 LocalCustomization                       provides customization,
                 androidx.compose.ui.platform.LocalDensity provides scaledDensity,
+                LocalLayoutGraph                         provides layoutGraph,
+                LocalWidgetRegistry                      provides widgetRegistry,
             ) {
             CelestiaTheme(
                 useDarkTheme = isDarkTheme,
