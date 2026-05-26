@@ -681,4 +681,33 @@ interface AppStrings {
     fun notificationShowMore(count: Int): String
     /** Absolute timestamp shown on hover tooltip over the relative-time label. */
     fun notificationAbsoluteTime(instant: java.time.Instant): String
+
+    // --- Notification driver templates (pack launch lifecycle) ---
+    fun notifPackPreparing(packName: String): String
+    fun notifPackStage(stage: String): String
+    fun notifPackSyncing(packName: String): String
+    /** "{current}/{total} files, 47%" or "...downloading...". `pctLabel` carries either. */
+    fun notifPackSyncBody(current: Int, total: Int, pctLabel: String): String
+    val notifPackSyncIndeterminate: String
+    fun notifPackSyncPercent(pct: Int): String
+    fun notifPackRunning(packName: String): String
+    fun notifPackFailed(packName: String): String
+    fun notifPackSessionEnded(packName: String): String
+    val notifActionShowConsole: String
+    val notifActionStop: String
+    fun notifReasonExitCode(code: Int): String
+    val notifReasonInternal: String
+    fun notifReasonInternalDetail(detail: String): String
+    val notifReasonAuthFail: String
+    fun notifReasonAuthFailDetail(detail: String): String
+    val notifReasonOfflineNoClient: String
+    val notifReasonOfflineNoManifest: String
+    val notifReasonTwoFactorExpired: String
+
+    // --- Notification relative-time formatter (header label) ---
+    val notifTimeNow: String
+    fun notifTimeSeconds(seconds: Long): String
+    fun notifTimeMinutes(minutes: Long): String
+    fun notifTimeHours(hours: Long): String
+    fun notifTimeDays(days: Long): String
 }

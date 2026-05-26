@@ -4,6 +4,7 @@ import hivens.core.data.PackInstance
 import hivens.launcher.launch.LaunchError
 import hivens.launcher.launch.LaunchState
 import hivens.launcher.launch.LauncherController
+import hivens.ui.i18n.AppStrings
 import hivens.ui.notifications.IndicationCenter
 import hivens.ui.notifications.IndicationCenter.LaunchIndication
 import hivens.ui.notifications.Kind
@@ -34,6 +35,9 @@ class PackLaunchDriver(
     private val sessions: SessionRegistry,
     private val gameConsole: GameConsoleService,
     private val appScope: CoroutineScope,
+    // Read on each push so a locale change in Settings is picked up
+    // mid-launch without restarting the driver.
+    private val stringsProvider: () -> AppStrings,
 ) {
     private val log = LoggerFactory.getLogger(PackLaunchDriver::class.java)
 
@@ -82,6 +86,7 @@ class PackLaunchDriver(
     }
 
     private fun onPrepare(pack: PackInstance, state: LaunchState.Prepare) {
+        val s = stringsProvider()
         indications.setLaunchIndication(pack.id, LaunchIndication.Preparing)
         notifications.push(
             sourceKey = sourceKeyFor(pack),
@@ -89,8 +94,8 @@ class PackLaunchDriver(
             iconUrl   = iconUrlFor(pack),
             severity  = Severity.Info,
             kind      = Kind.Progress,
-            title     = "Preparing ${pack.displayName}",
-            body      = "Stage: ${state.stage.name.lowercase()}",
+            title     = s.notifPackPreparing(pack.displayName),
+            body      = s.notifPackStage(state.stage.name.lowercase()),
             progress  = state.progress.coerceIn(0f, 1f),
         )
     }
@@ -106,22 +111,25 @@ class PackLaunchDriver(
         }
         indications.setLaunchIndication(pack.id, LaunchIndication.Downloading(fraction))
 
+        val s = stringsProvider()
         val notifProgress: Float = fraction ?: Float.NaN
         val displayPct =
-            if (fraction == null) "downloading..." else "${(fraction * 100).toInt()}%"
+            if (fraction == null) s.notifPackSyncIndeterminate
+            else s.notifPackSyncPercent((fraction * 100).toInt())
         notifications.push(
             sourceKey = sourceKeyFor(pack),
             sender    = pack.displayName,
             iconUrl   = iconUrlFor(pack),
             severity  = Severity.Info,
             kind      = Kind.Progress,
-            title     = "Syncing ${pack.displayName}",
-            body      = "${state.currentFileIdx}/${state.totalFiles} files, $displayPct",
+            title     = s.notifPackSyncing(pack.displayName),
+            body      = s.notifPackSyncBody(state.currentFileIdx, state.totalFiles, displayPct),
             progress  = notifProgress,
         )
     }
 
     private fun onRunning(pack: PackInstance, state: LaunchState.GameRunning) {
+        val s = stringsProvider()
         indications.setLaunchIndication(pack.id, LaunchIndication.Running)
         sessions.register(
             packInstanceId  = pack.id,
@@ -136,16 +144,17 @@ class PackLaunchDriver(
             iconUrl   = iconUrlFor(pack),
             severity  = Severity.Success,
             kind      = Kind.ActionRequired,
-            title     = "${pack.displayName} is running",
+            title     = s.notifPackRunning(pack.displayName),
             body      = null,
             actions   = listOf(
-                NotifAction("show_console", "Show console") { gameConsole.show() },
-                NotifAction("abort", "Stop") { controller.abort() },
+                NotifAction("show_console", s.notifActionShowConsole) { gameConsole.show() },
+                NotifAction("abort",        s.notifActionStop)        { controller.abort() },
             ),
         )
     }
 
     private fun onError(pack: PackInstance, reason: LaunchError) {
+        val s = stringsProvider()
         indications.setLaunchIndication(pack.id, LaunchIndication.Failed)
         sessions.unregister(pack.id)
         notifications.push(
@@ -154,15 +163,16 @@ class PackLaunchDriver(
             iconUrl   = iconUrlFor(pack),
             severity  = Severity.Critical,
             kind      = Kind.Sticky,
-            title     = "${pack.displayName} failed to launch",
-            body      = humanReason(reason),
+            title     = s.notifPackFailed(pack.displayName),
+            body      = humanReason(reason, s),
             actions   = listOf(
-                NotifAction("show_console", "Show console") { gameConsole.show() },
+                NotifAction("show_console", s.notifActionShowConsole) { gameConsole.show() },
             ),
         )
     }
 
     private fun onIdle(pack: PackInstance) {
+        val s = stringsProvider()
         // Idle after non-Idle = clean exit (code 0). Group history stays
         // so the user can scroll back through the run.
         indications.setLaunchIndication(pack.id, null)
@@ -173,7 +183,7 @@ class PackLaunchDriver(
             iconUrl   = iconUrlFor(pack),
             severity  = Severity.Success,
             kind      = Kind.OneShot,
-            title     = "${pack.displayName} session ended",
+            title     = s.notifPackSessionEnded(pack.displayName),
             body      = null,
         )
     }
@@ -184,12 +194,16 @@ class PackLaunchDriver(
     // project_pack_rich_metadata propagates summary.icon_url.
     private fun iconUrlFor(pack: PackInstance): String? = null
 
-    private fun humanReason(reason: LaunchError): String = when (reason) {
-        is LaunchError.ExitCode       -> "Game exited with code ${reason.code}"
-        is LaunchError.Internal       -> reason.message.ifBlank { "Internal error" }
-        is LaunchError.AuthFail       -> reason.cause?.ifBlank { null } ?: "Authentication failed"
-        LaunchError.OfflineNoClient   -> "Pack files missing on disk"
-        LaunchError.OfflineNoManifest -> "No cached manifest; go online once to sync"
-        LaunchError.TwoFactorExpired  -> "Sign in again to refresh credentials"
+    private fun humanReason(reason: LaunchError, s: AppStrings): String = when (reason) {
+        is LaunchError.ExitCode       -> s.notifReasonExitCode(reason.code)
+        is LaunchError.Internal       -> reason.message.ifBlank { null }
+                                            ?.let { s.notifReasonInternalDetail(it) }
+                                            ?: s.notifReasonInternal
+        is LaunchError.AuthFail       -> reason.cause?.ifBlank { null }
+                                            ?.let { s.notifReasonAuthFailDetail(it) }
+                                            ?: s.notifReasonAuthFail
+        LaunchError.OfflineNoClient   -> s.notifReasonOfflineNoClient
+        LaunchError.OfflineNoManifest -> s.notifReasonOfflineNoManifest
+        LaunchError.TwoFactorExpired  -> s.notifReasonTwoFactorExpired
     }
 }

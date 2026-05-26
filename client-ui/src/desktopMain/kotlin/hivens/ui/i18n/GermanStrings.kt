@@ -643,4 +643,31 @@ object GermanStrings : AppStrings {
             .ofPattern("d. MMMM yyyy, HH:mm:ss", java.util.Locale.GERMAN)
             .withZone(java.time.ZoneId.systemDefault())
             .format(instant)
+
+    override fun notifPackPreparing(packName: String)   = "Vorbereitung: $packName"
+    override fun notifPackStage(stage: String)          = "Phase: $stage"
+    override fun notifPackSyncing(packName: String)     = "Synchronisiere $packName"
+    override fun notifPackSyncBody(current: Int, total: Int, pctLabel: String) =
+        "$current/$total Dateien, $pctLabel"
+    override val notifPackSyncIndeterminate             = "wird heruntergeladen..."
+    override fun notifPackSyncPercent(pct: Int)         = "$pct %"
+    override fun notifPackRunning(packName: String)     = "$packName laeuft"
+    override fun notifPackFailed(packName: String)      = "$packName konnte nicht gestartet werden"
+    override fun notifPackSessionEnded(packName: String) = "Sitzung $packName beendet"
+    override val notifActionShowConsole                 = "Konsole anzeigen"
+    override val notifActionStop                        = "Stoppen"
+    override fun notifReasonExitCode(code: Int)         = "Spiel mit Code $code beendet"
+    override val notifReasonInternal                    = "Interner Fehler"
+    override fun notifReasonInternalDetail(detail: String) = detail
+    override val notifReasonAuthFail                    = "Anmeldung fehlgeschlagen"
+    override fun notifReasonAuthFailDetail(detail: String) = detail
+    override val notifReasonOfflineNoClient             = "Pack-Dateien fehlen auf der Platte"
+    override val notifReasonOfflineNoManifest           = "Kein Manifest im Cache; einmal online gehen, um zu synchronisieren"
+    override val notifReasonTwoFactorExpired            = "Bitte erneut anmelden, um die Anmeldedaten zu aktualisieren"
+
+    override val notifTimeNow                           = "Jetzt"
+    override fun notifTimeSeconds(seconds: Long)        = "${seconds} s"
+    override fun notifTimeMinutes(minutes: Long)        = "${minutes} min"
+    override fun notifTimeHours(hours: Long)            = "${hours} h"
+    override fun notifTimeDays(days: Long)              = "${days} T"
 }

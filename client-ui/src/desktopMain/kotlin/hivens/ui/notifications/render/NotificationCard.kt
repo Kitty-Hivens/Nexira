@@ -49,6 +49,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
+import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.notifications.Kind
 import hivens.ui.notifications.NotifAction
@@ -167,7 +168,7 @@ private fun HeaderRow(
             tooltipPlacement = TooltipPlacement.CursorPoint(offset = DpOffset(0.dp, 12.dp)),
         ) {
             Text(
-                text  = relativeTime(group.latest.createdAt, now),
+                text  = relativeTime(group.latest.createdAt, now, strings),
                 style = MaterialTheme.typography.labelSmall,
                 color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.6f),
             )
@@ -267,6 +268,7 @@ private fun ActionsRow(actions: List<NotifAction>, onDismiss: () -> Unit) {
 
 @Composable
 private fun HistoryRow(event: NotificationEvent, now: Instant) {
+    val strings = LocalStrings.current
     Row(
         modifier          = Modifier.fillMaxWidth().padding(vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -279,7 +281,7 @@ private fun HistoryRow(event: NotificationEvent, now: Instant) {
         )
         Spacer(Modifier.width(6.dp))
         Text(
-            text  = relativeTime(event.createdAt, now),
+            text  = relativeTime(event.createdAt, now, strings),
             style = MaterialTheme.typography.labelSmall,
             color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.55f),
         )
@@ -323,13 +325,13 @@ private fun severityAccent(severity: Severity, kind: Kind, colors: CelestiaColor
     Severity.Critical -> colors.criticalAccent
 }
 
-private fun relativeTime(created: Instant, now: Instant): String {
+private fun relativeTime(created: Instant, now: Instant, strings: AppStrings): String {
     val seconds = Duration.between(created, now).seconds
     return when {
-        seconds < 5         -> "Now"
-        seconds < 60        -> "${seconds}s"
-        seconds < 3600      -> "${seconds / 60}m"
-        seconds < 86_400    -> "${seconds / 3600}h"
-        else                -> "${seconds / 86_400}d"
+        seconds < 5      -> strings.notifTimeNow
+        seconds < 60     -> strings.notifTimeSeconds(seconds)
+        seconds < 3600   -> strings.notifTimeMinutes(seconds / 60)
+        seconds < 86_400 -> strings.notifTimeHours(seconds / 3600)
+        else             -> strings.notifTimeDays(seconds / 86_400)
     }
 }

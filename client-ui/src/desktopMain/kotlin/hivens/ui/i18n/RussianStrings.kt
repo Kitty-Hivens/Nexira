@@ -644,4 +644,31 @@ object RussianStrings : AppStrings {
             .ofPattern("d MMMM yyyy, HH:mm:ss", java.util.Locale("ru", "RU"))
             .withZone(java.time.ZoneId.systemDefault())
             .format(instant)
+
+    override fun notifPackPreparing(packName: String)   = "Подготовка $packName"
+    override fun notifPackStage(stage: String)          = "Этап: $stage"
+    override fun notifPackSyncing(packName: String)     = "Синхронизация $packName"
+    override fun notifPackSyncBody(current: Int, total: Int, pctLabel: String) =
+        "$current/$total файлов, $pctLabel"
+    override val notifPackSyncIndeterminate             = "загрузка..."
+    override fun notifPackSyncPercent(pct: Int)         = "$pct%"
+    override fun notifPackRunning(packName: String)     = "$packName запущен"
+    override fun notifPackFailed(packName: String)      = "$packName не удалось запустить"
+    override fun notifPackSessionEnded(packName: String) = "Сессия $packName завершена"
+    override val notifActionShowConsole                 = "Открыть консоль"
+    override val notifActionStop                        = "Остановить"
+    override fun notifReasonExitCode(code: Int)         = "Игра завершилась с кодом $code"
+    override val notifReasonInternal                    = "Внутренняя ошибка"
+    override fun notifReasonInternalDetail(detail: String) = detail
+    override val notifReasonAuthFail                    = "Не удалось войти"
+    override fun notifReasonAuthFailDetail(detail: String) = detail
+    override val notifReasonOfflineNoClient             = "Файлы сборки отсутствуют на диске"
+    override val notifReasonOfflineNoManifest           = "Нет кэша манифеста; выйди в сеть один раз для синхронизации"
+    override val notifReasonTwoFactorExpired            = "Войди ещё раз, чтобы обновить учётные данные"
+
+    override val notifTimeNow                           = "сейчас"
+    override fun notifTimeSeconds(seconds: Long)        = "${seconds} с"
+    override fun notifTimeMinutes(minutes: Long)        = "${minutes} мин"
+    override fun notifTimeHours(hours: Long)            = "${hours} ч"
+    override fun notifTimeDays(days: Long)              = "${days} дн"
 }
