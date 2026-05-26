@@ -154,7 +154,7 @@ class SmrtSyncService(
      * later iterations will respect a per-user opt-out map.
      */
     private suspend fun syncMod(mod: SmrtModEntry, clientDir: Path) {
-        val dest = clientDir.resolve("mods").resolve(mod.filename)
+        val dest = resolveSafe(clientDir.resolve("mods"), mod.filename, "mod ${mod.filename}")
         downloadIfNeeded(dest, mod.sha1, mod.sizeBytes, mod.source, "mod ${mod.filename}")
     }
 
@@ -167,8 +167,29 @@ class SmrtSyncService(
             log.debug("smrt sync: skipping protected {}", asset.dest)
             return
         }
-        val dest = clientDir.resolve(asset.dest)
+        val dest = resolveSafe(clientDir, asset.dest, "asset ${asset.dest}")
         downloadIfNeeded(dest, asset.sha1, asset.sizeBytes, asset.source, "asset ${asset.dest}")
+    }
+
+    /**
+     * Resolves [relative] against [root] and rejects entries that
+     * escape the root via `..` segments or absolute paths. A hostile
+     * or buggy manifest could otherwise hand the launcher
+     * `../../../etc/cron.d/payload` and end up overwriting arbitrary
+     * files writable by the launcher process. The mirror is trusted
+     * but the boundary check is cheap and means a single bad
+     * manifest entry can never escape the per-instance directory.
+     */
+    private fun resolveSafe(root: Path, relative: String, label: String): Path {
+        val resolved = root.resolve(relative).normalize()
+        val rootNormalized = root.normalize()
+        if (!resolved.startsWith(rootNormalized)) {
+            throw IOException(
+                "smrt manifest entry $label resolves outside the instance " +
+                    "directory ($resolved); refusing to write."
+            )
+        }
+        return resolved
     }
 
     private suspend fun downloadIfNeeded(

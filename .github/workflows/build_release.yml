@@ -90,8 +90,24 @@ jobs:
           # exclude self-reviews and detect Qodana's comment-API engagement.
           PR_JSON=$(gh pr view "$PR" --repo "$GH_REPO" --json author,reviews,comments)
           AUTHOR=$(echo "$PR_JSON" | jq -r '.author.login')
-          APPROVED=$(echo "$PR_JSON" | jq --arg author "$AUTHOR" \
-            '[.reviews[] | select(.state=="APPROVED" and .author.login != $author)] | length')
+          # Count only the LATEST review per reviewer in the APPROVED tally.
+          # gh pr view --json reviews returns every historical review event,
+          # so the naive `state=="APPROVED"` filter passes even when a
+          # reviewer later submitted CHANGES_REQUESTED that supersedes their
+          # earlier APPROVED. Group by reviewer login, take the
+          # most-recently-submitted entry per reviewer, then count APPROVED
+          # — mirrors GitHub's own "latest review per reviewer" UI rule.
+          APPROVED=$(echo "$PR_JSON" | jq --arg author "$AUTHOR" '
+            [ .reviews
+              | group_by(.author.login)
+              | map(max_by(.submittedAt))
+              | .[]
+              | select(.state == "APPROVED" and .author.login != $author)
+            ] | length
+          ')
+          # Weak signal stays "any non-author review entry of any kind",
+          # since Codex always lands a COMMENTED review and is the cheapest
+          # bot signal we have when no human approval exists.
           ANY_REVIEW=$(echo "$PR_JSON" | jq --arg author "$AUTHOR" \
             '[.reviews[] | select(.author.login != $author)] | length')
           # Qodana posts as `github-actions[bot]` (login `github-actions`)

@@ -27,7 +27,12 @@ object AprilFoolsProgress {
      * @param total       Total bytes expected (real value).
      */
     fun wrap(downloaded: Long, total: Long): Float {
-        if (!AprilFools.isActive() || total <= 0L) {
+        // Non-positive total is the "unknown size" signal the download
+        // callback emits early; coerceIn does not rescue NaN since NaN
+        // comparisons all return false, so naive `downloaded/total`
+        // propagates into UI state and breaks the progress bar render.
+        if (total <= 0L) return 0f
+        if (!AprilFools.isActive()) {
             return (downloaded.toFloat() / total).coerceIn(0f, 1f)
         }
  

@@ -386,14 +386,24 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
             }
 
             // ── Populate server list ───────────────────────────────────
+            // [SmartyCraftServerListService.fetchDashboardData] swallows
+            // network failures and returns `DashboardData(empty, empty)`
+            // rather than throwing, so an outage looks like a successful
+            // empty fetch from this call site. Treat an empty server
+            // list as "fetch failed, keep the seed" -- the disk cache
+            // [serverListCache] already populated the tray above and
+            // wiping it back to "(No servers)" during a transient
+            // outage is what Codex flagged on PR #244.
             val dashboardServers = try {
                 val data = withContext(Dispatchers.IO) {
                     serverListService.fetchDashboardData().get()
                 }
-                TrayManager.updateServers(data.servers)
+                if (data.servers.isNotEmpty()) {
+                    TrayManager.updateServers(data.servers)
+                }
                 data.servers
             } catch (_: Exception) {
-                /* tray shows empty list */
+                /* tray keeps the seeded cache from the IO init block */
                 emptyList()
             }
 
@@ -481,7 +491,21 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
                         MIN_WINDOW_HEIGHT_DP.dp.toPx().toInt(),
                     )
                 }
-                val screen = Toolkit.getDefaultToolkit().screenSize
+                // Prefer the bounds of the display this window is on;
+                // the toolkit's screenSize is the PRIMARY monitor only,
+                // and on a multi-monitor setup where the user restored
+                // the launcher on a smaller secondary screen the
+                // primary-derived clamp can exceed the actual display
+                // and block resize to a usable size. GraphicsConfiguration
+                // returns null before the window is realised, so fall
+                // back to the toolkit for the initial placement pass.
+                val gc = window.graphicsConfiguration
+                val screen = if (gc != null) {
+                    val b = gc.bounds
+                    Dimension(b.width, b.height)
+                } else {
+                    Toolkit.getDefaultToolkit().screenSize
+                }
                 val safe = computeSafeWindowMinSize(designPx.width, designPx.height, screen)
                 SwingUtilities.invokeLater { window.minimumSize = safe }
             }

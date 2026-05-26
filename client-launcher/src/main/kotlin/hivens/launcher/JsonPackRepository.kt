@@ -100,7 +100,18 @@ class JsonPackRepository(
             // leaves either the old or the new file, never a
             // half-written packs.json that the next load() would
             // reject as malformed and silently empty the library.
-            Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+            //
+            // Filesystems that do not support atomic rename (FAT32 on
+            // removable drives, some network shares) throw
+            // AtomicMoveNotSupportedException; without a fallback the
+            // outer catch then swallows it and the in-memory state
+            // diverges from disk indefinitely, so a restart would
+            // empty the library.
+            try {
+                Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+            } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
+                Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING)
+            }
         } catch (e: Exception) {
             log.error("Failed to persist packs registry at {}", file, e)
         }
