@@ -98,6 +98,17 @@ kotlin {
                 implementation(libs.ktor.serialization.json)
             }
         }
+
+        // First UI-side test source set. Compose-MP auto-creates the
+        // task `desktopTest`; explicit source-set wiring lets the
+        // module declare kotlin-test + coroutines-test deps and pull
+        // in fakes from sibling modules.
+        val desktopTest by getting {
+            dependencies {
+                implementation(kotlin("test"))
+                implementation(libs.kotlinx.coroutines.test)
+            }
+        }
     }
 }
 
