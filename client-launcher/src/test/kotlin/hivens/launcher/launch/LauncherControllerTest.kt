@@ -6,6 +6,7 @@ import hivens.core.api.interfaces.IFileDownloadService
 import hivens.core.api.interfaces.IJavaManager
 import hivens.core.api.interfaces.ILauncherService
 import hivens.core.api.interfaces.IManifestProcessorService
+import hivens.core.api.interfaces.IPackRepository
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.FileManifest
@@ -15,6 +16,7 @@ import hivens.core.security.IKeyringStorage
 import hivens.launcher.CredentialsManager
 import hivens.launcher.ManifestCache
 import hivens.launcher.ProfileManager
+import hivens.launcher.smrt.SmrtPackClient
 import io.mockk.coEvery
 import io.mockk.coJustRun
 import io.mockk.coVerify
@@ -22,6 +24,7 @@ import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
 import io.mockk.runs
+import io.mockk.slot
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
@@ -74,6 +77,8 @@ class LauncherControllerTest {
     private lateinit var credentialsManager: CredentialsManager
     private lateinit var manifestCache: ManifestCache
     private lateinit var profileManager: ProfileManager
+    private lateinit var packRepository: IPackRepository
+    private lateinit var smrtPackClient: SmrtPackClient
 
     private val server = ServerProfile(
         name     = "TestSrv",
@@ -103,6 +108,12 @@ class LauncherControllerTest {
         profileManager     = ProfileManager(sandbox, json)
         manifestCache      = ManifestCache(sandbox.resolve("manifest-cache"), json)
         credentialsManager = CredentialsManager(sandbox, json, mockk<IKeyringStorage>(relaxed = true))
+        // PackRepository + SmrtPackClient: pack-centric controller
+        // dependencies. SC-only tests do not call `launchPackInstance`,
+        // so a relaxed mockk on both is enough to satisfy the
+        // constructor without any stubbing.
+        packRepository     = mockk(relaxed = true)
+        smrtPackClient     = mockk(relaxed = true)
 
         every { manifestProcessor.calculateIgnoredFiles(any(), any()) } returns emptySet()
         coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/usr/bin/java")
@@ -124,6 +135,8 @@ class LauncherControllerTest {
         manifestProcessor  = manifestProcessor,
         manifestCache      = manifestCache,
         profileManager     = profileManager,
+        packRepository     = packRepository,
+        smrtPackClient     = smrtPackClient,
         dataDirectory      = sandbox,
         appScope           = scope,
     )
@@ -240,6 +253,72 @@ class LauncherControllerTest {
         )
 
         collectorJob.cancel()
+    }
+
+    @Test
+    fun `pack-centric launch with cached manifest spawns and bumps lastPlayed`() = runTest {
+        every { settingsService.getSettings() } returns SettingsData()
+        coEvery { javaManagerService.getJavaPath("1.12.2") } returns Path.of("/opt/jdk8/bin/java")
+
+        val process = mockk<Process>()
+        every { process.waitFor() } returns 0
+        coEvery {
+            launcherService.launchPackClient(
+                sessionData        = any(),
+                manifest           = any(),
+                runtime            = any(),
+                clientRootPath     = any(),
+                javaExecutablePath = any(),
+                allocatedMemoryMB  = any(),
+                displayName        = any(),
+                onLog              = any(),
+            )
+        } returns process
+
+        // PackInstance with cachedManifest already filled. Controller
+        // must skip the SmrtPackClient fetch entirely.
+        val instance = hivens.core.data.PackInstance(
+            id                    = "i-1",
+            packRef               = hivens.core.data.PackReference(
+                origin  = hivens.core.data.PackOrigin.Mirror,
+                id      = "Industrial",
+                version = "2026.05.26.1",
+            ),
+            displayName           = "Industrial",
+            instanceDirName       = "Industrial-i-1",
+            createdAtEpoch        = 0L,
+            lastPlayedEpochOrZero = 0L,
+            pinnedPackVersion     = "2026.05.26.1",
+            cachedManifest        = hivens.core.data.CachedManifestSnapshot(
+                minecraftVersion = "1.12.2",
+                loaderName       = "forge",
+                loaderVersion    = "14.23.5.2922",
+                javaMajor        = 8,
+            ),
+        )
+        // The clientDir is materialised by the install flow; the
+        // controller refuses to launch when it is missing, so the test
+        // pre-creates it.
+        Files.createDirectories(sandbox.resolve("instances").resolve(instance.instanceDirName))
+
+        val captured = slot<hivens.core.data.PackInstance>()
+        coJustRun { packRepository.put(capture(captured)) }
+
+        val controller = newController(this)
+        controller.launchPackInstance(
+            currentSession = SessionData(playerName = "tester", uuid = "u", accessToken = "tok"),
+            packInstance   = instance,
+        )
+        advanceUntilIdle()
+
+        assertEquals(LaunchState.Idle, controller.state.value)
+        // packRepository.put fires exactly once -- the lastPlayed bump.
+        // No cached-manifest write happens because the instance arrived
+        // pre-populated; if the fetch path had fired, mockk would not
+        // be able to stub SmrtPackClient under JDK 25 (per the file
+        // header) and the launch coroutine would have thrown.
+        coVerify(exactly = 1) { packRepository.put(any()) }
+        assertTrue(captured.captured.lastPlayedEpochOrZero > 0)
     }
 
     @Test

@@ -48,6 +48,18 @@ class SmrtPackClient(
     suspend fun fetchManifest(packId: String): SmrtPackManifest =
         getJson("$mirrorBase/v1/packs/$packId/manifest")
 
+    /**
+     * Fetch a specific historical manifest version. Pinned-version
+     * instances (the install-time `pack_version` is recorded on
+     * [hivens.core.data.PackInstance.pinnedPackVersion]) must call
+     * this rather than the latest endpoint, since the mirror may
+     * have bumped the pack since install and a divergent latest
+     * manifest's MC version / loader / Java major would not match
+     * the files that were synced to disk.
+     */
+    suspend fun fetchManifestVersion(packId: String, version: String): SmrtPackManifest =
+        getJson("$mirrorBase/v1/packs/$packId/manifest/$version")
+
     suspend fun fetchSummary(packId: String): SmrtPackSummary =
         getJson("$mirrorBase/v1/packs/$packId")
 

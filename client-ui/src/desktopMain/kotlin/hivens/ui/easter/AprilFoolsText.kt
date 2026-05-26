@@ -29,7 +29,7 @@ object AprilFoolsText {
         "at sun.reflect.NativeMethodAccessorImpl.invoke0",
         "FATAL: connection to server lost",
         "Warning: undefined behavior detected",
-        "TODO: fix this before release",
+        "TODO: Fix stability",
         "// this code was written at 3am",
         "Stack overflow in stack overflow handler",
         "OutOfMemoryError: Java heap space",
