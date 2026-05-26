@@ -148,6 +148,31 @@ class DataDirMoverTest {
     }
 
     @Test
+    fun `after applyPending, a fresh PlatformPaths reader sees the new data-dir`() {
+        // Regression for the stale-paths bug in LauncherBootstrap.preBoot:
+        // when a pending move applies, the rest of preBoot must re-resolve
+        // PlatformPaths so Files.createDirectories, NetworkState.initialize,
+        // SingleInstance.acquire, and Koin singletons all see the new dir
+        // instead of recreating + wiring against the now-empty old path.
+        // This test pins the underlying contract that the re-resolve relies
+        // on: applyPending commits the new dir into BootstrapConf, and a
+        // new PlatformPaths reader picks it up.
+        DataDirMover.schedule(source, target, confFile)
+        DataDirMover.applyPending(confFile)
+
+        val freshAfterApply = PlatformPaths(
+            osName = "Linux",
+            home = workDir,
+            env = { null },
+            bootstrapDataDir = { BootstrapConf.read(confFile)[BootstrapConf.KEY_DATA_DIR]?.let { java.nio.file.Paths.get(it) } },
+        )
+        assertEquals(
+            target.toAbsolutePath().normalize(),
+            freshAfterApply.dataDir.toAbsolutePath().normalize(),
+        )
+    }
+
+    @Test
     fun `NEXIRA_DATA_DIR env wins over bootstrap conf override`() {
         BootstrapConf.write(mapOf(BootstrapConf.KEY_DATA_DIR to "/tmp/conf-side"), confFile)
         val envOverride = workDir / "env-side"
