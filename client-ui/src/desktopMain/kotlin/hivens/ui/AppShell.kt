@@ -52,6 +52,7 @@ import hivens.ui.generated.resources.icon
 import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.i18n.LocaleProvider
+import hivens.ui.notifications.render.NotificationStack
 import hivens.ui.screens.ConsoleWindow
 import hivens.ui.screens.MigrationScreen
 import hivens.ui.theme.BrutStyle
@@ -775,6 +776,8 @@ fun AppRoot(
                 customization              = customization,
                 onCustomizationChanged     = onCustomizationChanged,
             )
+
+            NotificationStack()
         }
     }
 }
