@@ -11,4 +11,10 @@ dependencies {
     // a contracts module.
     implementation(libs.compose.runtime)
     implementation(libs.kotlinx.serialization.json)
+
+    testImplementation(kotlin("test"))
+}
+
+tasks.test {
+    useJUnitPlatform()
 }
