@@ -2,6 +2,7 @@ package hivens.ui.screens.library.content
 
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,13 +16,18 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -38,6 +44,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import hivens.core.api.dto.smrt.SmrtAssetEntry
+import hivens.core.api.dto.smrt.SmrtModEntry
 import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
@@ -160,14 +168,37 @@ private fun LoadedBody(
     val s = LocalStrings.current
     val listState = rememberLazyListState()
 
+    // Split ungrouped mods so libraries land in their own bucket.
+    // Mirror tags lib-only mods with display.category=lib (8 of 90 on
+    // Industrial today), and surfacing them inline pollutes the main
+    // list with rows the user doesn't care about for inspection.
+    val (libs, regularMods) = grouping.ungrouped.partition { it.libraryLike() }
+
+    // Split assets by dest-prefix. Config dir has 100+ entries on
+    // Industrial; the prefix groupings give the user a cleanly
+    // collapsible breakdown (resourcepacks / shaderpacks always open,
+    // configs collapsed by default since their volume drowns the rest).
+    val resourcePacks = manifest.assets.filter { it.dest.startsWith("resourcepacks/") }
+    val shaderPacks   = manifest.assets.filter { it.dest.startsWith("shaderpacks/") }
+    val configs       = manifest.assets.filter { it.dest.startsWith("config/") }
+    val otherAssets   = manifest.assets.filter { a ->
+        !a.dest.startsWith("resourcepacks/") &&
+        !a.dest.startsWith("shaderpacks/") &&
+        !a.dest.startsWith("config/")
+    }
+
+    // Per-section open state. Keyed on pack id so a swap to a different
+    // PackDetail resets to defaults.
+    var libsOpen          by remember(manifest.packId) { mutableStateOf(false) }
+    var resourcePacksOpen by remember(manifest.packId) { mutableStateOf(true) }
+    var shaderPacksOpen   by remember(manifest.packId) { mutableStateOf(true) }
+    var configsOpen       by remember(manifest.packId) { mutableStateOf(false) }
+    var otherAssetsOpen   by remember(manifest.packId) { mutableStateOf(true) }
+
     Box(modifier = modifier.fillMaxSize()) {
         LazyColumn(
             state               = listState,
             modifier            = Modifier.fillMaxSize().padding(start = 20.dp, end = 24.dp, top = 16.dp, bottom = 16.dp),
-            // Per-row component owns its own internal padding; section
-            // separation is the only thing this arrangement controls.
-            // 12dp gives sections breathing room without making a 50-mod
-            // list feel like an infinite rabbit hole.
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             if (graph.cycles.isNotEmpty() || graph.missingRequirements.isNotEmpty()) {
@@ -181,21 +212,44 @@ private fun LoadedBody(
                 }
             }
 
-            if (grouping.ungrouped.isNotEmpty()) {
-                item {
-                    SectionHeader(text = s.contentTabModsSection(grouping.ungrouped.size))
-                }
-                items(items = grouping.ungrouped, key = { it.filename }) { mod ->
+            if (regularMods.isNotEmpty()) {
+                item { SectionHeader(text = s.contentTabModsSection(regularMods.size)) }
+                items(items = regularMods, key = { it.filename }) { mod ->
                     ModRowPanel(mod = mod, graph = graph)
                 }
             }
 
-            if (manifest.assets.isNotEmpty()) {
-                item { SectionHeader(text = s.contentTabAssetsSection(manifest.assets.size)) }
-                items(items = manifest.assets, key = { it.dest }) { asset ->
-                    AssetRowPanel(asset = asset)
-                }
-            }
+            collapsibleModSection(
+                title = s.contentTabLibrariesSection(libs.size),
+                mods  = libs,
+                graph = graph,
+                isOpen = libsOpen,
+                onToggle = { libsOpen = !libsOpen },
+            )
+            collapsibleAssetSection(
+                title    = s.contentTabResourcePacksSection(resourcePacks.size),
+                assets   = resourcePacks,
+                isOpen   = resourcePacksOpen,
+                onToggle = { resourcePacksOpen = !resourcePacksOpen },
+            )
+            collapsibleAssetSection(
+                title    = s.contentTabShaderPacksSection(shaderPacks.size),
+                assets   = shaderPacks,
+                isOpen   = shaderPacksOpen,
+                onToggle = { shaderPacksOpen = !shaderPacksOpen },
+            )
+            collapsibleAssetSection(
+                title    = s.contentTabConfigsSection(configs.size),
+                assets   = configs,
+                isOpen   = configsOpen,
+                onToggle = { configsOpen = !configsOpen },
+            )
+            collapsibleAssetSection(
+                title    = s.contentTabOtherAssetsSection(otherAssets.size),
+                assets   = otherAssets,
+                isOpen   = otherAssetsOpen,
+                onToggle = { otherAssetsOpen = !otherAssetsOpen },
+            )
 
             item { Spacer(Modifier.height(8.dp)) }
         }
@@ -203,6 +257,40 @@ private fun LoadedBody(
             adapter  = rememberScrollbarAdapter(listState),
             modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
         )
+    }
+}
+
+private fun SmrtModEntry.libraryLike(): Boolean =
+    display?.category?.lowercase()?.let { it == "lib" || it == "library" } == true
+
+private fun LazyListScope.collapsibleModSection(
+    title: String,
+    mods: List<SmrtModEntry>,
+    graph: DepGraph,
+    isOpen: Boolean,
+    onToggle: () -> Unit,
+) {
+    if (mods.isEmpty()) return
+    item { CollapsibleSectionHeader(text = title, isOpen = isOpen, onToggle = onToggle) }
+    if (isOpen) {
+        items(items = mods, key = { "mod:${it.filename}" }) { mod ->
+            ModRowPanel(mod = mod, graph = graph)
+        }
+    }
+}
+
+private fun LazyListScope.collapsibleAssetSection(
+    title: String,
+    assets: List<SmrtAssetEntry>,
+    isOpen: Boolean,
+    onToggle: () -> Unit,
+) {
+    if (assets.isEmpty()) return
+    item { CollapsibleSectionHeader(text = title, isOpen = isOpen, onToggle = onToggle) }
+    if (isOpen) {
+        items(items = assets, key = { "asset:${it.dest}" }) { asset ->
+            AssetRowPanel(asset = asset)
+        }
     }
 }
 
@@ -214,6 +302,32 @@ private fun SectionHeader(text: String) {
         color      = CelestiaTheme.colors.primary,
         fontWeight = FontWeight.Bold,
     )
+}
+
+@Composable
+private fun CollapsibleSectionHeader(text: String, isOpen: Boolean, onToggle: () -> Unit) {
+    Row(
+        modifier              = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(6.dp))
+            .clickable(onClick = onToggle)
+            .padding(vertical = 2.dp),
+        verticalAlignment     = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Icon(
+            imageVector        = if (isOpen) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+            contentDescription = null,
+            tint               = CelestiaTheme.colors.primary,
+            modifier           = Modifier.size(18.dp),
+        )
+        Text(
+            text       = text,
+            style      = MaterialTheme.typography.titleSmall,
+            color      = CelestiaTheme.colors.primary,
+            fontWeight = FontWeight.Bold,
+        )
+    }
 }
 
 @Composable

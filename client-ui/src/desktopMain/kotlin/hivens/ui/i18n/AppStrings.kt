@@ -630,6 +630,11 @@ interface AppStrings {
     val contentTabDepOptional: String
     val contentTabDepMissing: String
     val contentTabModOptional: String
+    fun contentTabLibrariesSection(count: Int): String
+    fun contentTabResourcePacksSection(count: Int): String
+    fun contentTabShaderPacksSection(count: Int): String
+    fun contentTabConfigsSection(count: Int): String
+    fun contentTabOtherAssetsSection(count: Int): String
     fun contentTabAssetSizeLabel(kb: Long): String
     val contentTabAssetOptional: String
     val contentTabAssetNoDescription: String
