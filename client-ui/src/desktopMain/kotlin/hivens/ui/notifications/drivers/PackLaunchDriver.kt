@@ -4,7 +4,6 @@ import hivens.core.data.PackInstance
 import hivens.launcher.launch.LaunchError
 import hivens.launcher.launch.LaunchState
 import hivens.launcher.launch.LauncherController
-import hivens.ui.notifications.AvatarSource
 import hivens.ui.notifications.IndicationCenter
 import hivens.ui.notifications.IndicationCenter.LaunchIndication
 import hivens.ui.notifications.NotifAction
@@ -86,7 +85,7 @@ class PackLaunchDriver(
         notifications.push(
             sourceKey = sourceKeyFor(pack),
             sender    = pack.displayName,
-            avatar    = avatarFor(pack),
+            iconUrl   = iconUrlFor(pack),
             severity  = Severity.Progress,
             title     = "Preparing ${pack.displayName}",
             body      = "Stage: ${state.stage.name.lowercase()}",
@@ -111,7 +110,7 @@ class PackLaunchDriver(
         notifications.push(
             sourceKey = sourceKeyFor(pack),
             sender    = pack.displayName,
-            avatar    = avatarFor(pack),
+            iconUrl   = iconUrlFor(pack),
             severity  = Severity.Progress,
             title     = "Syncing ${pack.displayName}",
             body      = "${state.currentFileIdx}/${state.totalFiles} files, $displayPct",
@@ -131,7 +130,7 @@ class PackLaunchDriver(
         notifications.push(
             sourceKey = sourceKeyFor(pack),
             sender    = pack.displayName,
-            avatar    = avatarFor(pack),
+            iconUrl   = iconUrlFor(pack),
             severity  = Severity.Success,
             title     = "${pack.displayName} is running",
             body      = null,
@@ -148,7 +147,7 @@ class PackLaunchDriver(
         notifications.push(
             sourceKey = sourceKeyFor(pack),
             sender    = pack.displayName,
-            avatar    = avatarFor(pack),
+            iconUrl   = iconUrlFor(pack),
             severity  = Severity.Critical,
             title     = "${pack.displayName} failed to launch",
             body      = humanReason(reason),
@@ -166,7 +165,7 @@ class PackLaunchDriver(
         notifications.push(
             sourceKey = sourceKeyFor(pack),
             sender    = pack.displayName,
-            avatar    = avatarFor(pack),
+            iconUrl   = iconUrlFor(pack),
             severity  = Severity.Success,
             title     = "${pack.displayName} session ended",
             body      = null,
@@ -175,8 +174,9 @@ class PackLaunchDriver(
 
     private fun sourceKeyFor(pack: PackInstance): String = "pack:${pack.id}:launch"
 
-    // PackInstance does not carry icon_url yet; swap to Url when it does.
-    private fun avatarFor(pack: PackInstance): AvatarSource = AvatarSource.Generic
+    // PackInstance does not carry icon_url yet; returns null until
+    // project_pack_rich_metadata propagates summary.icon_url.
+    private fun iconUrlFor(pack: PackInstance): String? = null
 
     private fun humanReason(reason: LaunchError): String = when (reason) {
         is LaunchError.ExitCode       -> "Game exited with code ${reason.code}"

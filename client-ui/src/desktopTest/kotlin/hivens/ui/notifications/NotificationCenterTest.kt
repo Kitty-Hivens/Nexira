@@ -20,7 +20,7 @@ class NotificationCenterTest {
         center.push(
             sourceKey = "pack:Industrial:launch",
             sender    = "Industrial",
-            avatar    = AvatarSource.Generic,
+            iconUrl   = null,
             severity  = Severity.Progress,
             title     = "Preparing",
         )
@@ -38,11 +38,11 @@ class NotificationCenterTest {
     @Test
     fun `re-push with same sourceKey appends event to existing group`() = runTest {
         val center = newCenter()
-        center.push("pack:X", "X", AvatarSource.Generic, Severity.Progress, "Preparing")
+        center.push("pack:X", "X", null, Severity.Progress, "Preparing")
         clock.advance(seconds = 2)
-        center.push("pack:X", "X", AvatarSource.Generic, Severity.Progress, "Downloading 47%")
+        center.push("pack:X", "X", null, Severity.Progress, "Downloading 47%")
         clock.advance(seconds = 5)
-        center.push("pack:X", "X", AvatarSource.Generic, Severity.Success, "Done")
+        center.push("pack:X", "X", null, Severity.Success, "Done")
 
         val g = center.groups.first().single()
         assertEquals(3, g.count)
@@ -53,9 +53,9 @@ class NotificationCenterTest {
     @Test
     fun `group history is capped at historyPerGroup`() = runTest {
         val center = NotificationCenter(historyPerGroup = 2, clock = clock::now)
-        center.push("k", "X", AvatarSource.Generic, Severity.Info, "e1")
-        center.push("k", "X", AvatarSource.Generic, Severity.Info, "e2")
-        center.push("k", "X", AvatarSource.Generic, Severity.Info, "e3")
+        center.push("k", "X", null, Severity.Info, "e1")
+        center.push("k", "X", null, Severity.Info, "e2")
+        center.push("k", "X", null, Severity.Info, "e3")
 
         val g = center.groups.first().single()
         assertEquals(2, g.count, "oldest event dropped at the cap")
@@ -66,12 +66,12 @@ class NotificationCenterTest {
     @Test
     fun `severity is max across events`() = runTest {
         val center = newCenter()
-        center.push("k", "X", AvatarSource.Generic, Severity.Info, "info")
-        center.push("k", "X", AvatarSource.Generic, Severity.Critical, "boom")
+        center.push("k", "X", null, Severity.Info, "info")
+        center.push("k", "X", null, Severity.Critical, "boom")
         // A later non-critical event must NOT visually downgrade the
         // group -- max wins so the user does not lose track of the
         // earlier critical when scanning the stack.
-        center.push("k", "X", AvatarSource.Generic, Severity.Info, "muted recovery")
+        center.push("k", "X", null, Severity.Info, "muted recovery")
 
         val g = center.groups.first().single()
         assertEquals(Severity.Critical, g.severity)
@@ -80,11 +80,11 @@ class NotificationCenterTest {
     @Test
     fun `touched group floats to the front of the stack`() = runTest {
         val center = newCenter()
-        center.push("k1", "First",  AvatarSource.Generic, Severity.Info, "1")
-        center.push("k2", "Second", AvatarSource.Generic, Severity.Info, "2")
-        center.push("k3", "Third",  AvatarSource.Generic, Severity.Info, "3")
+        center.push("k1", "First",  null, Severity.Info, "1")
+        center.push("k2", "Second", null, Severity.Info, "2")
+        center.push("k3", "Third",  null, Severity.Info, "3")
         // Touch k1 -- it should float to the top, k3 / k2 follow.
-        center.push("k1", "First",  AvatarSource.Generic, Severity.Info, "1 again")
+        center.push("k1", "First",  null, Severity.Info, "1 again")
 
         val keys = center.groups.first().map { it.sourceKey }
         assertEquals(listOf("k1", "k3", "k2"), keys)
@@ -93,11 +93,10 @@ class NotificationCenterTest {
     @Test
     fun `dismiss removes the group and is idempotent on unknown key`() = runTest {
         val center = newCenter()
-        center.push("k", "X", AvatarSource.Generic, Severity.Info, "hi")
+        center.push("k", "X", null, Severity.Info, "hi")
         center.dismiss("k")
         assertTrue(center.groups.first().isEmpty())
 
-        // Second dismiss of the same (now-absent) key is a no-op.
         center.dismiss("k")
         center.dismiss("never-existed")
         assertTrue(center.groups.first().isEmpty())
@@ -106,8 +105,8 @@ class NotificationCenterTest {
     @Test
     fun `clear wipes the stack`() = runTest {
         val center = newCenter()
-        center.push("a", "A", AvatarSource.Generic, Severity.Info, "1")
-        center.push("b", "B", AvatarSource.Generic, Severity.Info, "2")
+        center.push("a", "A", null, Severity.Info, "1")
+        center.push("b", "B", null, Severity.Info, "2")
         center.clear()
         assertTrue(center.groups.first().isEmpty())
     }

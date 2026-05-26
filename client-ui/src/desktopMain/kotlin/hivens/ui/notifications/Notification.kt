@@ -3,12 +3,6 @@ package hivens.ui.notifications
 import java.time.Instant
 import java.util.UUID
 
-sealed class AvatarSource {
-    data class Url(val url: String) : AvatarSource()
-    data class Glyph(val name: String) : AvatarSource()
-    data object Generic : AvatarSource()
-}
-
 // `id` is stable across i18n rebrands; tests + puppet observers key on it.
 data class NotifAction(
     val id: String,
@@ -31,7 +25,11 @@ data class NotificationEvent(
 data class NotificationGroup(
     val sourceKey: String,
     val sender: String,
-    val avatar: AvatarSource,
+    // Direct URL string; null = renderer falls back to a neutral
+    // placeholder. The previous sealed Url/Glyph/Generic carried
+    // future-extension shape without a real consumer; recover the
+    // indirection only when a second source type is needed.
+    val iconUrl: String?,
     val events: List<NotificationEvent>,
 ) {
     init {
