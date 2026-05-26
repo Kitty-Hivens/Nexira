@@ -593,4 +593,81 @@ interface AppStrings {
     val browseDetailInstallOpenLibrary: String
     val browseDetailInstallFailedTitle: String
     val browseDetailInstallFailedGeneric: String
+
+    // ── Library / PackDetail / Files tab ────────────────────────────────
+    val fileBrowserNoRoot: String
+    val fileBrowserPickAFile: String
+    val fileBrowserBinaryHint: String
+    val fileBrowserOpenExternally: String
+    /** Receives the cap in KB, e.g. `Preview truncated to first 256 KB`. */
+    fun fileBrowserTextTruncated(maxKb: Long): String
+    val fileBrowserEmptyFolder: String
+
+    // ── Library / PackDetail / Content tab ──────────────────────────────
+    val contentTabUnsupportedOrigin: String
+    val contentTabFetchErrorTitle: String
+    val contentTabFetchErrorGeneric: String
+    val contentTabRetry: String
+    val contentTabRoleSection: String
+    fun contentTabModsSection(count: Int): String
+    fun contentTabAssetsSection(count: Int): String
+    val contentTabResolverIssuesTitle: String
+    fun contentTabResolverMissing(count: Int): String
+    fun contentTabResolverCycles(count: Int): String
+    val contentTabRoleRecipeViewer: String
+    val contentTabRoleMinimap: String
+    val contentTabRoleBlockInfo: String
+    val contentTabRolePerformance: String
+    val contentTabRoleInventorySearch: String
+    fun contentTabRoleAltCount(count: Int): String
+    val contentTabRoleAlternativesHeader: String
+    val contentTabModNoDescription: String
+    fun contentTabModLicensePrefix(license: String): String
+    val contentTabModUrlLabel: String
+    fun contentTabModSizeLabel(kb: Long): String
+    fun contentTabModDependencies(count: Int): String
+    fun contentTabModMissingCount(count: Int): String
+    val contentTabDepOptional: String
+    val contentTabDepMissing: String
+    val contentTabModOptional: String
+    fun contentTabLibrariesSection(count: Int): String
+    fun contentTabResourcePacksSection(count: Int): String
+    fun contentTabShaderPacksSection(count: Int): String
+    fun contentTabConfigsSection(count: Int): String
+    fun contentTabOtherAssetsSection(count: Int): String
+    fun contentTabAssetSizeLabel(kb: Long): String
+    val contentTabAssetOptional: String
+    val contentTabAssetNoDescription: String
+
+    // ── Library / PackDetail / Worlds tab ───────────────────────────────
+    fun worldsTabLocalSection(count: Int): String
+    val worldsTabLocalEmpty: String
+    fun worldsTabServersSection(count: Int): String
+    val worldsTabServersEmpty: String
+    /** Receives a short label like `5h`, `2d`, or `—` when never played. */
+    fun worldsTabLastPlayed(rel: String): String
+    val worldsTabServerHiddenLabel: String
+    val worldsTabGameSurvival: String
+    val worldsTabGameCreative: String
+    val worldsTabGameAdventure: String
+    val worldsTabGameSpectator: String
+    val worldsTabGameUnknown: String
+    val worldsTabDimOverworld: String
+    val worldsTabDimNether: String
+    val worldsTabDimEnd: String
+    val worldsTabDimOther: String
+
+    // ── Library / PackDetail / Tab labels ───────────────────────────────
+    val packDetailTabContent: String
+    val packDetailTabFiles: String
+    val packDetailTabWorlds: String
+
+    // ── Library / PackDetail / Hero + Play bar + Not found ──────────────
+    val packDetailReadyTitle: String
+    /** Receives the instance dir name (a sanitized folder under `instances/`). */
+    fun packDetailInstanceDirHint(dirName: String): String
+    val packDetailPlay: String
+    val packDetailNotFoundTitle: String
+    val packDetailNotFoundHint: String
+    val packDetailNotFoundBack: String
 }

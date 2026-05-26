@@ -12,9 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.PlayArrow
@@ -23,11 +21,13 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -41,26 +41,29 @@ import androidx.compose.ui.unit.dp
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
+import hivens.launcher.platform.PlatformPaths
 import hivens.ui.customization.glassSurfaceAlpha
+import hivens.ui.i18n.LocalStrings
+import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
-import hivens.ui.screens.library.PackLoaderChip
+import hivens.ui.screens.library.FileBrowserPane
 import hivens.ui.screens.library.PackMetaChip
+import hivens.ui.screens.library.content.ContentTabPane
+import hivens.ui.screens.library.worlds.WorldsTabPane
 import hivens.ui.theme.CelestiaTheme
 import kotlinx.coroutines.flow.firstOrNull
 import org.koin.compose.koinInject
 
 /**
- * Full-screen Modrinth-style detail page for one [PackInstance].
- * Banner-as-hero up top, identity + meta chips below, large Play
- * button, then placeholder sections for Mods / Servers / Runtime
- * settings that fill in once the manifest reader and per-instance
- * settings split land.
+ * Library PackDetail. Hero header + Play bar + tabs (Content / Files /
+ * Worlds). Resolves the instance lazily via [IPackRepository] from
+ * the [Screen.PackDetail.instanceId] in the navigation entry so the
+ * sealed Screen class stays small.
  *
- * Resolves the instance via [IPackRepository] from the
- * [Screen.PackDetail.instanceId] in the navigation entry, so the
- * Screen data class itself stays small (just a UUID string).
- * Renders a not-found placeholder for the brief race window where
- * the instance was deleted while the user was on its detail page.
+ * Tabs are scoped to a single per-instance dir (`<dataDir>/instances/
+ * <instance.instanceDirName>`) for Files / Worlds; the Content tab
+ * uses [PackInstance.packRef] to fetch the mirror manifest on each
+ * open. Logs tab deferred per [[project_logs_tab_open_question]].
  */
 @Composable
 fun PackDetailScreen(
@@ -68,8 +71,10 @@ fun PackDetailScreen(
     onBack: () -> Unit,
 ) {
     PuppetScreen("PackDetail.$instanceId")
+    PuppetClick("packDetail.back") { onBack() }
 
     val repo: IPackRepository = koinInject()
+    val paths: PlatformPaths = koinInject()
     var instance by remember { mutableStateOf<PackInstance?>(null) }
     var resolved by remember { mutableStateOf(false) }
     LaunchedEffect(instanceId) {
@@ -79,7 +84,6 @@ fun PackDetailScreen(
     }
 
     if (!resolved) {
-        // Cold fetch -- usually <1 frame. Plain empty box is fine.
         Box(Modifier.fillMaxSize())
         return
     }
@@ -89,34 +93,51 @@ fun PackDetailScreen(
         return
     }
 
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+    val instanceDir = remember(pack.instanceDirName) {
+        paths.dataDir.resolve("instances").resolve(pack.instanceDirName)
+    }
+
+    var tabIndex by remember(pack.id) { mutableIntStateOf(0) }
+    val s = LocalStrings.current
+
+    Column(Modifier.fillMaxSize()) {
         Hero(pack = pack, onBack = onBack)
 
         Column(
-            modifier            = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            modifier            = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             MetaRow(pack)
-            PlayBar(pack = pack, onPlay = { /* TODO pack-centric launch flow */ })
-            Section(title = "Описание") {
-                Text(
-                    text  = pack.notes.ifBlank { "(описание появится когда manifest reader подтянет данные из источника)" },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = CelestiaTheme.colors.textPrimary,
-                )
-            }
-            Section(title = "Моды") {
-                ComingSoon("Список модов с category / license / source-link рендерится " +
-                    "после того как manifest reader появится в следующем PR.")
-            }
-            Section(title = "Серверы") {
-                ComingSoon("Привязанные серверы (autoConnect + быстрый join) " +
-                    "появятся когда mirror server-list flow дойдёт до UI.")
-            }
-            Section(title = "Запуск") {
-                ComingSoon("Per-instance runtime overrides (RAM, JVM args, Java path, " +
-                    "window size) рендерятся в отдельной вкладке после миграции " +
-                    "ServerSettingsScreen на pack-centric.")
+            PlayBar(pack = pack, onPlay = { /* pack-centric launch flow lands in a follow-up PR */ })
+        }
+
+        TabRow(
+            selectedTabIndex = tabIndex,
+            containerColor   = Color.Transparent,
+            contentColor     = CelestiaTheme.colors.textPrimary,
+        ) {
+            Tab(
+                selected = tabIndex == 0,
+                onClick  = { tabIndex = 0 },
+                text     = { Text(s.packDetailTabContent, fontWeight = if (tabIndex == 0) FontWeight.Bold else FontWeight.Normal) },
+            )
+            Tab(
+                selected = tabIndex == 1,
+                onClick  = { tabIndex = 1 },
+                text     = { Text(s.packDetailTabFiles, fontWeight = if (tabIndex == 1) FontWeight.Bold else FontWeight.Normal) },
+            )
+            Tab(
+                selected = tabIndex == 2,
+                onClick  = { tabIndex = 2 },
+                text     = { Text(s.packDetailTabWorlds, fontWeight = if (tabIndex == 2) FontWeight.Bold else FontWeight.Normal) },
+            )
+        }
+
+        Box(modifier = Modifier.fillMaxSize().padding(top = 4.dp)) {
+            when (tabIndex) {
+                0 -> ContentTabPane(instance = pack)
+                1 -> FileBrowserPane(rootDir = instanceDir, modifier = Modifier.padding(16.dp))
+                2 -> WorldsTabPane(instanceDir = instanceDir)
             }
         }
     }
@@ -128,7 +149,7 @@ private fun Hero(pack: PackInstance, onBack: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(220.dp)
+            .height(180.dp)
             .background(bg),
     ) {
         Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.35f)))
@@ -137,7 +158,7 @@ private fun Hero(pack: PackInstance, onBack: () -> Unit) {
             onClick  = onBack,
             modifier = Modifier.padding(12.dp),
         ) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад", tint = Color.White)
+            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Color.White)
         }
 
         Column(
@@ -146,14 +167,14 @@ private fun Hero(pack: PackInstance, onBack: () -> Unit) {
         ) {
             Text(
                 text       = pack.displayName,
-                style      = MaterialTheme.typography.headlineLarge,
+                style      = MaterialTheme.typography.headlineMedium,
                 color      = Color.White,
                 fontWeight = FontWeight.Bold,
             )
             pack.forkedFrom?.let {
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(4.dp))
                 Text(
-                    text  = "Форк: ${it.origin.name} / ${it.id}" + (it.version?.let { v -> " @ $v" } ?: ""),
+                    text  = "Fork: ${it.origin.name} / ${it.id}" + (it.version?.let { v -> " @ $v" } ?: ""),
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.White.copy(alpha = 0.85f),
                 )
@@ -170,16 +191,13 @@ private fun MetaRow(pack: PackInstance) {
     ) {
         PackMetaChip(pack.packRef.origin.name)
         PackMetaChip(pack.packRef.version ?: "—")
-        // pack.packRef doesn't carry MC / loader / requiredJava on its
-        // own (those live on Pack, not PackInstance). Once the
-        // catalogue service can lookup Pack by ref we surface them
-        // here; for now the instance-side fields are what we have.
         PackMetaChip(pack.instanceDirName, emphasis = false)
     }
 }
 
 @Composable
 private fun PlayBar(pack: PackInstance, onPlay: () -> Unit) {
+    val s = LocalStrings.current
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -194,13 +212,13 @@ private fun PlayBar(pack: PackInstance, onPlay: () -> Unit) {
         ) {
             Column {
                 Text(
-                    text       = "Готов к запуску",
+                    text       = s.packDetailReadyTitle,
                     style      = MaterialTheme.typography.titleMedium,
                     color      = CelestiaTheme.colors.textPrimary,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
-                    text  = "Папка экземпляра: instances/${pack.instanceDirName}",
+                    text  = s.packDetailInstanceDirHint(pack.instanceDirName),
                     style = MaterialTheme.typography.bodySmall,
                     color = CelestiaTheme.colors.textSecondary,
                 )
@@ -216,49 +234,20 @@ private fun PlayBar(pack: PackInstance, onPlay: () -> Unit) {
             ) {
                 Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(22.dp))
                 Spacer(Modifier.size(8.dp))
-                Text("ИГРАТЬ", fontWeight = FontWeight.Bold)
+                Text(s.packDetailPlay, fontWeight = FontWeight.Bold)
             }
         }
     }
 }
 
 @Composable
-private fun Section(title: String, content: @Composable () -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            text       = title,
-            style      = MaterialTheme.typography.titleSmall,
-            color      = CelestiaTheme.colors.primary,
-            fontWeight = FontWeight.Bold,
-        )
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-                .background(glassSurfaceAlpha(0.6f))
-                .padding(16.dp),
-        ) {
-            content()
-        }
-    }
-}
-
-@Composable
-private fun ComingSoon(text: String) {
-    Text(
-        text  = text,
-        style = MaterialTheme.typography.bodySmall,
-        color = CelestiaTheme.colors.textSecondary,
-    )
-}
-
-@Composable
 private fun NotFound(onBack: () -> Unit) {
+    val s = LocalStrings.current
     Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("Экземпляр не найден", style = MaterialTheme.typography.titleLarge, color = CelestiaTheme.colors.textPrimary)
-            Text("Возможно, удалён в другой вкладке.", style = MaterialTheme.typography.bodyMedium, color = CelestiaTheme.colors.textSecondary)
-            Button(onClick = onBack) { Text("Назад в библиотеку") }
+            Text(s.packDetailNotFoundTitle, style = MaterialTheme.typography.titleLarge, color = CelestiaTheme.colors.textPrimary)
+            Text(s.packDetailNotFoundHint, style = MaterialTheme.typography.bodyMedium, color = CelestiaTheme.colors.textSecondary)
+            Button(onClick = onBack) { Text(s.packDetailNotFoundBack) }
         }
     }
 }
