@@ -1,6 +1,8 @@
 package hivens.widget.api
 
 import androidx.compose.runtime.Composable
+import hivens.widget.model.SlotId
+import hivens.widget.model.SurfaceId
 
 // Looks up the slot in the active LayoutGraph and emits its widgets in
 // order. The active graph is provided via LocalLayoutGraph from the

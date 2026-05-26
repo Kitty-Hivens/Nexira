@@ -1,6 +1,8 @@
 package hivens.widget.api
 
 import androidx.compose.runtime.Composable
+import hivens.widget.model.WidgetInstance
+import hivens.widget.model.WidgetKind
 
 interface WidgetDescriptor {
     val kind: WidgetKind
