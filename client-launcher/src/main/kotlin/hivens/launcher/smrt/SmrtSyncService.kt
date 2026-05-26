@@ -285,7 +285,28 @@ class SmrtSyncService(
                 }
             }
         }
-        Files.move(tmp, dest, java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+        // Non-atomic REPLACE_EXISTING on FAT32/SMB can leave a 0-byte
+        // dest after power loss; Forge then classloads garbage.
+        try {
+            Files.move(
+                tmp,
+                dest,
+                java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+                java.nio.file.StandardCopyOption.ATOMIC_MOVE,
+            )
+        } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
+            log.warn(
+                "Filesystem at {} does not support ATOMIC_MOVE; non-atomic fallback may leave a 0-byte file on crash",
+                dest.parent,
+            )
+            Files.move(tmp, dest, java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+        } catch (_: java.nio.file.FileAlreadyExistsException) {
+            // Java spec allows ATOMIC_MOVE to ignore REPLACE_EXISTING; some
+            // providers then refuse and raise FileAlreadyExistsException
+            // when dest already exists. Re-sync over an existing jar would
+            // hard-fail without this fallback.
+            Files.move(tmp, dest, java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+        }
     }
 
     private fun sha1Of(p: Path): String {

@@ -513,48 +513,46 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
                 }
             }
 
-            // Prophylactic minimum window size. Design intent is
-            // [MIN_WINDOW_WIDTH_DP] x [MIN_WINDOW_HEIGHT_DP] -- below
-            // those values multi-column screens collapse awkwardly.
-            // Clamped against the user's native screen so a small laptop
-            // can still drag the window edges. Floating WMs respect the
-            // hint; tiling WMs ignore it, which is fine.
+            // Prophylactic min-size clamped against the current display.
+            // Recomputes on display crossing (not every pixel of a drag).
+            // Wayland peer-init can return non-null GC with zero bounds
+            // before the surface negotiates -- guard on positive size.
             val sizeDensity = LocalDensity.current
-            LaunchedEffect(Unit) {
-                val designPx = with(sizeDensity) {
-                    Dimension(
-                        MIN_WINDOW_WIDTH_DP.dp.toPx().toInt(),
-                        MIN_WINDOW_HEIGHT_DP.dp.toPx().toInt(),
-                    )
+            DisposableEffect(window, sizeDensity) {
+                val applyClamp: () -> Unit = {
+                    val designPx = with(sizeDensity) {
+                        Dimension(
+                            MIN_WINDOW_WIDTH_DP.dp.toPx().toInt(),
+                            MIN_WINDOW_HEIGHT_DP.dp.toPx().toInt(),
+                        )
+                    }
+                    val gc = window.graphicsConfiguration
+                    val gcBounds = gc?.bounds
+                    val screen = if (gcBounds != null && gcBounds.width > 0 && gcBounds.height > 0) {
+                        Dimension(gcBounds.width, gcBounds.height)
+                    } else {
+                        Toolkit.getDefaultToolkit().screenSize
+                    }
+                    val safe = computeSafeWindowMinSize(designPx.width, designPx.height, screen)
+                    SwingUtilities.invokeLater { window.minimumSize = safe }
                 }
-                // Prefer the bounds of the display this window is on;
-                // the toolkit's screenSize is the PRIMARY monitor only,
-                // and on a multi-monitor setup where the user restored
-                // the launcher on a smaller secondary screen the
-                // primary-derived clamp can exceed the actual display
-                // and block resize to a usable size. GraphicsConfiguration
-                // returns null before the window is realised, so fall
-                // back to the toolkit for the initial placement pass.
-                //
-                // Wayland peer-init quirk: on Hyprland (and other
-                // Wayland compositors) starting tray-resident, the
-                // Compose Window is created but not yet displayable.
-                // window.graphicsConfiguration is non-null (returns the
-                // device's default GC) but its bounds are Rectangle(0,0,0,0)
-                // until the surface negotiates. Treating that as a
-                // valid screen yields minimumSize = (0,0) and the WM
-                // can later shrink the window to a 1px sliver. Guard
-                // on positive bounds and fall through to the toolkit
-                // size otherwise.
-                val gc = window.graphicsConfiguration
-                val gcBounds = gc?.bounds
-                val screen = if (gcBounds != null && gcBounds.width > 0 && gcBounds.height > 0) {
-                    Dimension(gcBounds.width, gcBounds.height)
-                } else {
-                    Toolkit.getDefaultToolkit().screenSize
+
+                var lastDeviceId: String? = window.graphicsConfiguration?.device?.iDstring
+                val moveListener = object : java.awt.event.ComponentAdapter() {
+                    override fun componentMoved(e: java.awt.event.ComponentEvent) {
+                        val current = window.graphicsConfiguration?.device?.iDstring
+                        if (current != lastDeviceId) {
+                            lastDeviceId = current
+                            applyClamp()
+                        }
+                    }
                 }
-                val safe = computeSafeWindowMinSize(designPx.width, designPx.height, screen)
-                SwingUtilities.invokeLater { window.minimumSize = safe }
+                window.addComponentListener(moveListener)
+                applyClamp()
+
+                onDispose {
+                    window.removeComponentListener(moveListener)
+                }
             }
 
             val baseDensity   = androidx.compose.ui.platform.LocalDensity.current

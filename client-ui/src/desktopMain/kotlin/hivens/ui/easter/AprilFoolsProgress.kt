@@ -20,26 +20,14 @@ object AprilFoolsProgress {
  
     fun reset() { displayProgress = 0f }
  
-    /**
-     * Returns a display progress value (0..1) that may occasionally regress.
-     *
-     * Sentinel: returns [Float.NaN] when bytes are flowing but the total
-     * is unknown (chunked HTTP without Content-Length, smrt sync's
-     * pre-tally phase). Callers must check [Float.isNaN] before binding
-     * the value to a determinate progress indicator; a NaN means
-     * "switch to indeterminate mode -- something is happening, but
-     * the bounded progress fraction is not yet computable". An earlier
-     * fix returned 0f for both (0,0) and (positive,0) which flatlined
-     * the bar during the pre-tally window even though bytes flowed.
-     *
-     * @param downloaded  Bytes actually downloaded so far (real value).
-     * @param total       Total bytes expected (real value).
-     */
+    // Returns 0..1 fraction, or Float.NaN when total is unknown but bytes
+    // flow (callers branch on isNaN to switch to indeterminate mode).
     fun wrap(downloaded: Long, total: Long): Float {
         if (total <= 0L) {
-            // (0, 0) = nothing started yet -> show empty.
-            // (positive, 0) = bytes flowing, size unknown -> NaN sentinel
-            // -> caller renders indeterminate.
+            // Reset prevents lerp-from-stale jerk on next determinate tick;
+            // resetProgress() fires only on Idle->Downloading edges, missing
+            // this case.
+            displayProgress = 0f
             return if (downloaded <= 0L) 0f else Float.NaN
         }
         if (!AprilFools.isActive()) {
