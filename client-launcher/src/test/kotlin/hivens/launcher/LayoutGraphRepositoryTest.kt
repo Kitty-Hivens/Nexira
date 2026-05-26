@@ -104,6 +104,23 @@ class LayoutGraphRepositoryTest {
     }
 
     @Test
+    fun `negative schema_version is rejected without spinning the migration loop`() = runBlocking {
+        // A corrupted or hand-edited envelope with Int.MIN_VALUE would
+        // make `fromVersion until CURRENT` iterate ~2 billion times and
+        // hang the launcher on startup. Migrations.apply must reject
+        // and let load()'s catch fall back to default.
+        Files.writeString(
+            file,
+            """{"schema_version":-2147483648,"graph":{"surfaces":{}}}""",
+        )
+        val started = System.nanoTime()
+        val repo = LayoutGraphRepository(file, json) { sampleDefault }
+        val elapsedMs = (System.nanoTime() - started) / 1_000_000
+        assertEquals(sampleDefault, repo.value())
+        assertTrue(elapsedMs < 1_000, "load must fail-fast, took ${elapsedMs}ms")
+    }
+
+    @Test
     fun `observe re-emits after update`() = runBlocking {
         val repo = LayoutGraphRepository(file, json) { sampleDefault }
         val flow = repo.observe()

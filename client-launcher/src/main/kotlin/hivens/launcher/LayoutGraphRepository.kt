@@ -131,10 +131,17 @@ class LayoutGraphRepository(
  */
 internal object Migrations {
     fun apply(fromVersion: Int, graph: LayoutGraph): LayoutGraph {
+        // Reject corrupted versions before entering the loop. A bogus
+        // `"schema_version": -2147483648` would otherwise spin through
+        // ~2 billion no-op iterations and hang the launcher on startup;
+        // throwing here routes through load()'s catch and falls back
+        // to the bundled default.
+        require(fromVersion >= 1) { "schema_version must be >= 1, got $fromVersion" }
         // Forward-only migration. fromVersion <= current SCHEMA_VERSION
         // is the only supported direction; reading a file written by a
         // newer launcher is treated as "ignore unknown fields, keep what
         // we understand" via the Json instance's `ignoreUnknownKeys`.
+        if (fromVersion >= CURRENT) return graph
         var current = graph
         for (step in fromVersion until CURRENT) {
             current = step(step + 1).apply(current)
