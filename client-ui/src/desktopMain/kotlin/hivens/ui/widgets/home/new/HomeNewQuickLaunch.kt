@@ -28,6 +28,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.core.api.interfaces.IPackRepository
+import hivens.core.data.PackInstance
 import hivens.launcher.launch.LaunchState
 import hivens.launcher.launch.LauncherController
 import hivens.ui.AppState
@@ -39,10 +40,10 @@ import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 import org.koin.compose.koinInject
 
-// One-click launch of the most-recently-played pack. Disabled when no
-// session is available or the repo has no played packs. While a launch
-// is in flight, the button reflects the current state rather than
-// firing duplicate launches.
+// Quick-launch target = most recently played, falling back to most
+// recently installed when nothing has been played. Empty repo elides
+// the widget entirely -- HomeNewRecent already shows the install CTA
+// in that state and two empty cards would be noisy.
 @Widget(id = "home.new.quicklaunch", displayName = "Quick launch")
 @Composable
 fun HomeNewQuickLaunch(instance: WidgetInstance) {
@@ -54,14 +55,16 @@ fun HomeNewQuickLaunch(instance: WidgetInstance) {
     val all by remember { repo.observe() }.collectAsState(initial = emptyList())
     val launchState by controller.state.collectAsState()
 
-    val mostRecent = remember(all) {
-        all.filter { it.lastPlayedEpochOrZero > 0L }
-            .maxByOrNull { it.lastPlayedEpochOrZero }
+    val target: PackInstance = remember(all) {
+        all.maxByOrNull { it.lastPlayedEpochOrZero }
+            ?: all.maxByOrNull { it.createdAtEpoch }
     } ?: return
     val session = (ctx.appState as? AppState.Authenticated)?.session
 
     val canLaunch = session != null &&
         (launchState is LaunchState.Idle || launchState is LaunchState.Error)
+
+    val label = if (target.lastPlayedEpochOrZero > 0L) "Продолжить" else "Запустить"
 
     Column(
         modifier = Modifier
@@ -73,7 +76,7 @@ fun HomeNewQuickLaunch(instance: WidgetInstance) {
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(
-            text       = "Быстрый запуск",
+            text       = label,
             style      = MaterialTheme.typography.labelLarge,
             color      = CelestiaTheme.colors.textSecondary,
             fontWeight = FontWeight.Medium,
@@ -85,13 +88,13 @@ fun HomeNewQuickLaunch(instance: WidgetInstance) {
         ) {
             Column(Modifier.weight(1f)) {
                 Text(
-                    text       = mostRecent.displayName,
+                    text       = target.displayName,
                     style      = MaterialTheme.typography.titleMedium,
                     color      = CelestiaTheme.colors.textPrimary,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
-                    text  = mostRecent.packRef.id,
+                    text  = target.packRef.id,
                     style = MaterialTheme.typography.bodySmall,
                     color = CelestiaTheme.colors.textSecondary,
                 )
@@ -100,9 +103,9 @@ fun HomeNewQuickLaunch(instance: WidgetInstance) {
             Button(
                 onClick = {
                     val s = session ?: return@Button
-                    launchDriver.observe(mostRecent)
+                    launchDriver.observe(target)
                     gameConsole.show()
-                    controller.launchPackInstance(s, mostRecent)
+                    controller.launchPackInstance(s, target)
                 },
                 enabled = canLaunch,
                 shape   = RoundedCornerShape(10.dp),

@@ -17,8 +17,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -41,39 +45,45 @@ import org.koin.compose.koinInject
 
 private const val MAX_RECENT = 5
 
-// Recent packs LRU row. Sorted by lastPlayedEpochOrZero descending;
-// packs that have never been played fall to the end. Empty repo
-// elides the whole widget so the slot does not show a stranded
-// section header.
-@Widget(id = "home.new.recent", displayName = "Recent packs")
+// Pack tiles row. Sort priority: played packs first by recency, then
+// unplayed packs by install order. A fresh install with packs but no
+// launches still shows the tiles (sorted by createdAt), so the new
+// home reads as populated rather than blank. Empty repo shows a CTA
+// pointing at Browse.
+@Widget(id = "home.new.recent", displayName = "Pack tiles")
 @Composable
 fun HomeNewRecent(instance: WidgetInstance) {
     val ctx = LocalHomeNewContext.current
     val repo: IPackRepository = koinInject()
     val all by remember { repo.observe() }.collectAsState(initial = emptyList())
 
-    val recent = remember(all) {
-        all.filter { it.lastPlayedEpochOrZero > 0L }
-            .sortedByDescending { it.lastPlayedEpochOrZero }
-            .take(MAX_RECENT)
+    if (all.isEmpty()) {
+        EmptyPacksCta(onBrowse = { ctx.onScreenChange(Screen.Browse) })
+        return
     }
-    if (recent.isEmpty()) return
+
+    val recent = remember(all) {
+        all.sortedWith(
+            compareByDescending<PackInstance> { it.lastPlayedEpochOrZero }
+                .thenByDescending { it.createdAtEpoch },
+        ).take(MAX_RECENT)
+    }
 
     Column(Modifier.fillMaxWidth().padding(top = 12.dp)) {
         Text(
-            text       = "Недавние сборки",
+            text       = "Твои сборки",
             style      = MaterialTheme.typography.titleSmall,
             color      = CelestiaTheme.colors.textPrimary,
             fontWeight = FontWeight.SemiBold,
             modifier   = Modifier.padding(bottom = 8.dp),
         )
         LazyRow(
-            modifier            = Modifier.fillMaxWidth(),
+            modifier              = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
-            contentPadding      = PaddingValues(vertical = 2.dp),
+            contentPadding        = PaddingValues(vertical = 2.dp),
         ) {
             items(items = recent, key = { it.id }) { pack ->
-                RecentPackTile(
+                PackTile(
                     pack    = pack,
                     onClick = { ctx.onScreenChange(Screen.PackDetail(pack.id)) },
                 )
@@ -83,7 +93,8 @@ fun HomeNewRecent(instance: WidgetInstance) {
 }
 
 @Composable
-private fun RecentPackTile(pack: PackInstance, onClick: () -> Unit) {
+private fun PackTile(pack: PackInstance, onClick: () -> Unit) {
+    val played = pack.lastPlayedEpochOrZero > 0L
     Column(
         modifier = Modifier
             .width(180.dp)
@@ -101,7 +112,7 @@ private fun RecentPackTile(pack: PackInstance, onClick: () -> Unit) {
             contentAlignment = Alignment.Center,
         ) {
             Icon(
-                imageVector        = Icons.Default.History,
+                imageVector        = if (played) Icons.Default.History else Icons.Default.Inventory2,
                 contentDescription = null,
                 tint               = CelestiaTheme.colors.textSecondary.copy(alpha = 0.75f),
                 modifier           = Modifier.size(18.dp),
@@ -122,5 +133,42 @@ private fun RecentPackTile(pack: PackInstance, onClick: () -> Unit) {
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
+    }
+}
+
+@Composable
+private fun EmptyPacksCta(onBrowse: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 12.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(glassSurfaceAlpha(0.40f))
+            .padding(horizontal = 18.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text       = "Сборок пока нет",
+            style      = MaterialTheme.typography.titleSmall,
+            color      = CelestiaTheme.colors.textPrimary,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Text(
+            text  = "Установи что-нибудь через Browse — твои сборки появятся здесь.",
+            style = MaterialTheme.typography.bodySmall,
+            color = CelestiaTheme.colors.textSecondary,
+        )
+        Spacer(Modifier.height(2.dp))
+        OutlinedButton(
+            onClick = onBrowse,
+            shape   = RoundedCornerShape(10.dp),
+            colors  = ButtonDefaults.outlinedButtonColors(
+                contentColor = CelestiaTheme.colors.primary,
+            ),
+        ) {
+            Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(6.dp))
+            Text("Открыть Browse", fontWeight = FontWeight.Medium)
+        }
     }
 }
