@@ -8,6 +8,7 @@ kotlin            = "2.3.21"
 compose           = "1.11.0"
 buildconfigPlugin = "6.0.9"
 versionsPlugin    = "0.54.0"
+ksp               = "2.3.9"
 
 # ── Core libraries ───────────────────────────────────────────────────────────
 ktor              = "3.4.3"
@@ -100,6 +101,10 @@ libtray                          = { group = "com.github.Kitty-Hivens", name = "
 # Test
 mockk                            = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
 
+# KSP processor API (used by :widget-processor to scan @Widget composables
+# and emit GeneratedWidgetRegistry at compile time).
+ksp-api                          = { group = "com.google.devtools.ksp", name = "symbol-processing-api", version.ref = "ksp" }
+
 [plugins]
 kotlin-jvm              = { id = "org.jetbrains.kotlin.jvm",                  version.ref = "kotlin" }
 kotlin-multiplatform    = { id = "org.jetbrains.kotlin.multiplatform",        version.ref = "kotlin" }
@@ -108,3 +113,4 @@ kotlin-compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose",       ve
 compose                 = { id = "org.jetbrains.compose",                     version.ref = "compose" }
 buildconfig             = { id = "com.github.gmazzo.buildconfig",             version.ref = "buildconfigPlugin" }
 versions                = { id = "com.github.ben-manes.versions",             version.ref = "versionsPlugin" }
+ksp                     = { id = "com.google.devtools.ksp",                   version.ref = "ksp" }

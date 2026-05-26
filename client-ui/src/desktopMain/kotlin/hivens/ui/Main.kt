@@ -12,6 +12,8 @@ import hivens.ui.notifications.SessionRegistry
 import hivens.ui.notifications.drivers.PackLaunchDriver
 import hivens.ui.puppet.PuppetServerLoader
 import hivens.ui.utils.GameConsoleService
+import hivens.widget.api.WidgetRegistry
+import hivens.widget.generated.GeneratedWidgetRegistry
 import org.jetbrains.compose.resources.ExperimentalResourceApi
 import org.koin.dsl.module
 
@@ -26,6 +28,11 @@ import org.koin.dsl.module
 val uiModule = module {
     single { SkinManager(get(), get()) }
     single { GameConsoleService(get()) }
+
+    // Widget kernel registry. KSP-generated; entries land as @Widget
+    // composables are added across the codebase. Kernel-1 starts the
+    // registry empty -- surface refactors arrive in kernel-3.
+    single<WidgetRegistry> { GeneratedWidgetRegistry }
 
     // Notification subsystem: data-only state holders (Center +
     // Registry) are pure singletons; PackLaunchDriver bridges them
