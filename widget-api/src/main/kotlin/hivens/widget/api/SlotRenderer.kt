@@ -23,8 +23,13 @@ fun SlotRenderer(surface: SurfaceId, slot: SlotId) {
     val graph = LocalLayoutGraph.current
     val registry = LocalWidgetRegistry.current
     val decorator = LocalWidgetDecorator.current
+    val emptyDecorator = LocalEmptySlotDecorator.current
     val widgets = graph.surfaces[surface]?.slots?.get(slot)?.widgets.orEmpty()
     val address = SlotAddress(surface, slot)
+    if (widgets.isEmpty()) {
+        emptyDecorator(address)
+        return
+    }
     widgets.forEachIndexed { index, instance ->
         val descriptor = registry[instance.kind] ?: return@forEachIndexed
         decorator(address, index, descriptor, instance) {

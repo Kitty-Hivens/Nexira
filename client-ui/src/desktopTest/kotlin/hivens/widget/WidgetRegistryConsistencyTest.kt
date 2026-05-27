@@ -31,7 +31,7 @@ class WidgetRegistryConsistencyTest {
     }
 
     @Test
-    fun `registry exposes the kernel-3 + editor-2 sample widget kinds`() {
+    fun `registry exposes the kernel-3 + editor sample widget kinds`() {
         val expected = setOf(
             // kernel-3 surface widgets
             "home.classic.content",
@@ -50,21 +50,33 @@ class WidgetRegistryConsistencyTest {
             "home.new.spacer",
             "home.new.progress",
             "home.new.launchbutton",
+            // editor-3.7 music + individual nav
+            "home.new.music",
+            "nav.home",
+            "nav.library",
+            "nav.browse",
+            "nav.profile",
+            "nav.settings",
+            "nav.about",
         )
         val actual = GeneratedWidgetRegistry.all().keys.map { it.value }.toSet()
-        assertEquals(expected, actual, "registry drift -- expected these 15 widgets")
+        assertEquals(expected, actual, "registry drift -- expected exactly these widgets")
     }
 
     @Test
-    fun `non-removable widgets are exactly the navigation + auth widgets`() {
+    fun `non-removable widgets cover the bundled-rail safety set`() {
         val nonRemovable = GeneratedWidgetRegistry.all().values
             .filterNot { it.removable }
             .map { it.kind.value }
             .toSet()
         assertEquals(
-            setOf("appshell.leftrail.navbuttons", "appshell.rightrail.authpanel"),
+            setOf(
+                "appshell.leftrail.navbuttons", // bundled rail variant
+                "appshell.rightrail.authpanel",
+                "nav.settings",                  // individual-nav safety: always reachable
+            ),
             nonRemovable,
-            "only nav buttons + auth panel may opt out of removable",
+            "non-removable set protects the launcher from being navigation-locked",
         )
     }
 }

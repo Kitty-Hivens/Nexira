@@ -110,6 +110,40 @@ class DropTargetRegistry {
         widgets[slot]?.remove(instanceId)
     }
 
+    // Locates which slot the pointer is currently over. Three passes:
+    // 1) exact rect hit on any widget, 2) the slot whose tracked
+    // widget rects most-nearly bracket the pointer Y, 3) empty-slot
+    // bounds registered by EmptySlotDecorator. Returns null when the
+    // pointer is outside every registered slot.
+    fun slotForPoint(pointInWindow: Offset): SlotAddress? {
+        widgets.forEach { (slot, byId) ->
+            byId.values.forEach { wb ->
+                if (wb.rect.contains(pointInWindow)) return slot
+            }
+        }
+        // Fallback: pick the slot whose vertical span covers the
+        // pointer, plus a 12px tolerance to make gap drops feel
+        // forgiving. Horizontal span must also cover the pointer.
+        val tolerance = 12f
+        widgets.forEach { (slot, byId) ->
+            val items = byId.values
+            if (items.isEmpty()) return@forEach
+            val minY = items.minOf { it.rect.top } - tolerance
+            val maxY = items.maxOf { it.rect.bottom } + tolerance
+            val minX = items.minOf { it.rect.left }
+            val maxX = items.maxOf { it.rect.right }
+            if (pointInWindow.y in minY..maxY && pointInWindow.x in minX..maxX) {
+                return slot
+            }
+        }
+        // Empty slot fallback: EmptySlotDecorator registers slot
+        // bounds; drop into the empty placeholder lands here.
+        slotBounds.forEach { (slot, rect) ->
+            if (rect.contains(pointInWindow)) return slot
+        }
+        return null
+    }
+
     // Insertion index for a pointer inside a known slot. Index is in
     // [0, count] -- count means "append at end". Algorithm: find the
     // widget whose vertical midpoint the pointer is above; insert at
@@ -123,9 +157,6 @@ class DropTargetRegistry {
         }
         return items.size
     }
-
-    // Editor-3 will add: slotForPoint(point): SlotAddress? for cross-
-    // slot drag. Editor-2 keeps drags within the source slot only.
 }
 
 // ── Composition locals ─────────────────────────────────────────────────────
