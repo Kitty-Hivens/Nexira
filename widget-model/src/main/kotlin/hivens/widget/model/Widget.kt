@@ -22,4 +22,9 @@ annotation class Widget(
     // buttons, the auth panel) -- the user can still rearrange but
     // cannot delete. Defaults true; opt-out is explicit.
     val removable: Boolean = true,
+    // Slot ids this widget exposes as drop targets for its own
+    // sub-widgets (container widgets). Empty for leaves. Walked by
+    // the editor's drop hit-test and by the KSP processor to validate
+    // that container.children references only declared slots.
+    val slots: Array<String> = [],
 )
