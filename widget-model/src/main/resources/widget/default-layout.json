@@ -16,6 +16,8 @@
           "main": {
             "widgets": [
               { "kind": "home.new.welcome",     "instance_id": "home-new-welcome-default" },
+              { "kind": "home.new.clock",       "instance_id": "home-new-clock-default" },
+              { "kind": "home.new.spacer",      "instance_id": "home-new-spacer-default" },
               { "kind": "home.new.recent",      "instance_id": "home-new-recent-default" },
               { "kind": "home.new.quicklaunch", "instance_id": "home-new-quicklaunch-default" }
             ]
