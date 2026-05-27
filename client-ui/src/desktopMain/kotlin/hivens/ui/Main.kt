@@ -11,6 +11,7 @@ import hivens.ui.notifications.NotificationCenter
 import hivens.ui.notifications.SessionRegistry
 import hivens.ui.notifications.drivers.PackLaunchDriver
 import hivens.ui.puppet.PuppetServerLoader
+import hivens.ui.editor.EditModeController
 import hivens.ui.utils.GameConsoleService
 import hivens.widget.api.WidgetRegistry
 import hivens.widget.generated.GeneratedWidgetRegistry
@@ -33,6 +34,11 @@ val uiModule = module {
     // composables are added across the codebase. Kernel-1 starts the
     // registry empty -- surface refactors arrive in kernel-3.
     single<WidgetRegistry> { GeneratedWidgetRegistry }
+
+    // Editor mutation facade. Holds no state itself; fires LayoutGraph
+    // updates into the shared CoroutineScope so callers stay
+    // fire-and-forget.
+    single { EditModeController(repo = get(), scope = get()) }
 
     // Notification subsystem: data-only state holders (Center +
     // Registry) are pure singletons; PackLaunchDriver bridges them

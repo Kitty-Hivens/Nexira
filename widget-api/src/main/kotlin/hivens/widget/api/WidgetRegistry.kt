@@ -8,6 +8,10 @@ interface WidgetDescriptor {
     val kind: WidgetKind
     val displayName: String
 
+    // false hides the remove affordance in the editor. Drives the
+    // safety check on nav rail / auth panel widgets.
+    val removable: Boolean
+
     @Composable
     fun Render(instance: WidgetInstance)
 }

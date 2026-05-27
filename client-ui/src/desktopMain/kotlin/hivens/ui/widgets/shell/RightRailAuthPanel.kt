@@ -13,7 +13,11 @@ import hivens.ui.customization.glassSurfaceAlpha
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 
-@Widget(id = "appshell.rightrail.authpanel", displayName = "Auth panel")
+@Widget(
+    id          = "appshell.rightrail.authpanel",
+    displayName = "Auth panel",
+    removable   = false,
+)
 @Composable
 fun RightRailAuthPanel(instance: WidgetInstance) {
     val ctx = LocalRightRailContext.current

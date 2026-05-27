@@ -103,6 +103,7 @@ class WidgetRegistryProcessor(
         val args = widgetAnnotation.arguments.associate { it.name?.asString() to it.value }
         val id = (args["id"] as? String).orEmpty()
         val displayName = (args["displayName"] as? String).orEmpty()
+        val removable = (args["removable"] as? Boolean) ?: true
         if (id.isBlank()) {
             env.logger.error("@Widget id must be non-blank", symbol)
             return null
@@ -113,6 +114,7 @@ class WidgetRegistryProcessor(
         return WidgetEntry(
             id = id,
             displayName = displayName.ifBlank { funcName },
+            removable = removable,
             functionFqn = if (packageName.isEmpty()) funcName else "$packageName.$funcName",
             containingFile = symbol.containingFile,
         )
@@ -154,6 +156,7 @@ class WidgetRegistryProcessor(
             appendLine("        put($kindLiteral, object : WidgetDescriptor {")
             appendLine("            override val kind: WidgetKind = $kindLiteral")
             appendLine("            override val displayName: String = \"${entry.displayName.kotlinEscape()}\"")
+            appendLine("            override val removable: Boolean = ${entry.removable}")
             appendLine("            @Composable override fun Render(instance: WidgetInstance) {")
             appendLine("                ${entry.functionFqn}(instance)")
             appendLine("            }")
@@ -173,6 +176,7 @@ class WidgetRegistryProcessor(
 private data class WidgetEntry(
     val id: String,
     val displayName: String,
+    val removable: Boolean,
     val functionFqn: String,
     val containingFile: com.google.devtools.ksp.symbol.KSFile?,
 )
