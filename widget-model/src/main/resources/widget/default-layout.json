@@ -67,6 +67,34 @@
           }
         }
       },
+      "bg.settings": {
+        "slots": {
+          "controls": {
+            "widgets": [
+              { "kind": "bg.enable.toggle",   "instance_id": "bg-enable-toggle-default" },
+              { "kind": "bg.image.picker",    "instance_id": "bg-image-picker-default" },
+              { "kind": "bg.scale.mode",      "instance_id": "bg-scale-mode-default" },
+              { "kind": "bg.position.x",      "instance_id": "bg-position-x-default" },
+              { "kind": "bg.position.y",      "instance_id": "bg-position-y-default" },
+              { "kind": "bg.fx.blur",         "instance_id": "bg-fx-blur-default" },
+              { "kind": "bg.fx.darken",       "instance_id": "bg-fx-darken-default" },
+              { "kind": "bg.fx.opacity",      "instance_id": "bg-fx-opacity-default" },
+              { "kind": "bg.fx.saturation",   "instance_id": "bg-fx-saturation-default" },
+              { "kind": "bg.fx.parallax",     "instance_id": "bg-fx-parallax-default" },
+              { "kind": "bg.fx.vignette",     "instance_id": "bg-fx-vignette-default" },
+              { "kind": "bg.fx.animspeed",    "instance_id": "bg-fx-animspeed-default" },
+              { "kind": "bg.loop.mode",       "instance_id": "bg-loop-mode-default" },
+              { "kind": "bg.tint",            "instance_id": "bg-tint-default" },
+              { "kind": "bg.reset",           "instance_id": "bg-reset-default" }
+            ]
+          },
+          "preview": {
+            "widgets": [
+              { "kind": "bg.preview", "instance_id": "bg-preview-default" }
+            ]
+          }
+        }
+      },
       "about": {
         "slots": {
           "left": {

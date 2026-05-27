@@ -41,6 +41,7 @@ import hivens.ui.screens.library.LibraryScreen
 import hivens.ui.widgets.profile.ProfileSurface
 import hivens.ui.screens.settings.SettingsScreen
 import hivens.ui.widgets.about.AboutSurface
+import hivens.ui.widgets.bgsettings.BgSettingsSurface
 import hivens.ui.widgets.serverdetails.ServerDetailsSurface
 import hivens.ui.widgets.themepicker.ThemePickerSurface
 import hivens.ui.theme.CelestiaTheme
@@ -205,10 +206,10 @@ fun AppLayout(
                         AboutSurface(onBack = { onScreenChange(Screen.Settings) })
 
                     Screen.BackgroundSettings ->
-                        BackgroundSettingsScreen(
+                        BgSettingsSurface(
                             currentSettings   = backgroundSettings,
                             onSettingsChanged = onBackgroundSettingsChanged,
-                            onBack            = { onScreenChange(Screen.Settings) }
+                            onBack            = { onScreenChange(Screen.Settings) },
                         )
 
                     is Screen.ServerSettings ->
