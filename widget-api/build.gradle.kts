@@ -10,4 +10,10 @@ plugins {
 dependencies {
     api(project(":widget-model"))
     implementation(libs.compose.runtime)
+
+    testImplementation(kotlin("test"))
+}
+
+tasks.test {
+    useJUnitPlatform()
 }

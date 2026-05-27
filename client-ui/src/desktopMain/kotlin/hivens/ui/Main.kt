@@ -18,6 +18,7 @@ import hivens.ui.editor.presets.PresetRepository
 import hivens.ui.utils.GameConsoleService
 import java.nio.file.Path
 import hivens.widget.api.WidgetRegistry
+import hivens.widget.api.WidgetServiceRegistry
 import hivens.widget.generated.GeneratedWidgetRegistry
 import org.jetbrains.compose.resources.ExperimentalResourceApi
 import org.koin.dsl.module
@@ -38,6 +39,14 @@ val uiModule = module {
     // composables are added across the codebase. Kernel-1 starts the
     // registry empty -- surface refactors arrive in kernel-3.
     single<WidgetRegistry> { GeneratedWidgetRegistry }
+
+    // Cross-widget service registry (Phase D). One global instance per
+    // launcher process. Provider widgets register via provideService
+    // from inside their composable body (DisposableEffect-driven
+    // lifecycle); consumer widgets read via useService<T>() / its
+    // siblings. Wired into the composition root from AppShell so
+    // LocalWidgetServiceRegistry resolves before any @Widget renders.
+    single { WidgetServiceRegistry() }
 
     // Editor mutation facade. Holds no state itself; fires LayoutGraph
     // updates into the shared CoroutineScope so callers stay

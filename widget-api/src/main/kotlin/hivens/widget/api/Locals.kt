@@ -59,3 +59,13 @@ val LocalSlotPath: ProvidableCompositionLocal<SlotPath> =
     staticCompositionLocalOf {
         error("LocalSlotPath not provided -- read inside a SlotRenderer body")
     }
+
+// Cross-widget service registry. Provided once at the launcher's
+// composition root from the Koin-bound singleton. Consumer widgets
+// read via useService<T>() / useServiceByInstance / useAllServices;
+// provider widgets register via provideService(...). Must be wired
+// before any widget that participates in services renders.
+val LocalWidgetServiceRegistry: ProvidableCompositionLocal<WidgetServiceRegistry> =
+    staticCompositionLocalOf {
+        error("LocalWidgetServiceRegistry not provided -- wire WidgetServiceRegistry in Koin and at the composition root")
+    }
