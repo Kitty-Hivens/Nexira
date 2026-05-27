@@ -112,7 +112,14 @@ fun AppLayout(
 
         // ── Main content ──────────────────────────────────────────────────
         Box(Modifier.weight(1f).fillMaxHeight()) {
-          EditorSurfaceHost(currentScreen = currentScreen, homeView = homeView) {
+          EditorSurfaceHost(
+              currentScreen          = currentScreen,
+              homeView               = homeView,
+              customization          = customization,
+              onCustomizationChanged = onCustomizationChanged,
+              uiStyle                = uiStyle,
+              onUiStyleChanged       = onUiStyleChanged,
+          ) {
             // Screen-to-screen Crossfade duration follows the active
             // style. Under Brut (animationMultiplier = 0) the swap is
             // effectively instant; under Celestia keeps the 180ms fade.

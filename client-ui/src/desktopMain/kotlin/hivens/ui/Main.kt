@@ -11,9 +11,12 @@ import hivens.ui.notifications.NotificationCenter
 import hivens.ui.notifications.SessionRegistry
 import hivens.ui.notifications.drivers.PackLaunchDriver
 import hivens.ui.puppet.PuppetServerLoader
+import hivens.config.Storage
 import hivens.ui.audio.AudioPlayer
 import hivens.ui.editor.EditModeController
+import hivens.ui.editor.presets.PresetRepository
 import hivens.ui.utils.GameConsoleService
+import java.nio.file.Path
 import hivens.widget.api.WidgetRegistry
 import hivens.widget.generated.GeneratedWidgetRegistry
 import org.jetbrains.compose.resources.ExperimentalResourceApi
@@ -45,6 +48,17 @@ val uiModule = module {
     // playback state lives in the singleton so swapping the widget
     // out of the layout does not stop playback.
     single { AudioPlayer(scope = get()) }
+
+    // Preset storage. One file per preset under <dataDir>/presets/.
+    // Atomic write + share-by-file design lets users export to
+    // anywhere.
+    single {
+        val dataDir: Path = get()
+        PresetRepository(
+            presetsDir = dataDir.resolve(Storage.PRESETS_DIR),
+            json       = get(),
+        )
+    }
 
     // Notification subsystem: data-only state holders (Center +
     // Registry) are pure singletons; PackLaunchDriver bridges them
