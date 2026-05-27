@@ -31,7 +31,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.ViewQuilt
+import androidx.compose.material.icons.filled.ViewSidebar
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Widgets
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -108,18 +113,23 @@ fun EditorSurfaceHost(
     homeView: HomeView,
     content: @Composable () -> Unit,
 ) {
-    val editableSurface: SurfaceId? = remember(currentScreen, homeView) {
-        editableSurfaceFor(currentScreen, homeView)
+    val availableSurfaces: List<SurfaceId> = remember(currentScreen, homeView) {
+        availableSurfacesFor(currentScreen, homeView)
     }
     val controller: EditModeController = koinInject()
 
-    var editing       by remember(editableSurface) { mutableStateOf(false) }
-    var paletteOpen   by remember(editableSurface) { mutableStateOf(true) }
+    var editing       by remember(availableSurfaces) { mutableStateOf(false) }
+    var paletteOpen   by remember(availableSurfaces) { mutableStateOf(true) }
+    var previewing    by remember(availableSurfaces) { mutableStateOf(false) }
+    var selectedSurface by remember(availableSurfaces) {
+        mutableStateOf(availableSurfaces.firstOrNull())
+    }
     // Leaving a surface drops edit mode -- avoids a stale edit state
     // pointed at the wrong surface after navigation.
-    val state: EditModeState = remember(editing, editableSurface) {
-        if (editing && editableSurface != null) {
-            EditModeState.On(editableSurface, controller)
+    val state: EditModeState = remember(editing, selectedSurface) {
+        val sel = selectedSurface
+        if (editing && sel != null) {
+            EditModeState.On(sel, controller)
         } else {
             EditModeState.Off
         }
@@ -130,12 +140,19 @@ fun EditorSurfaceHost(
     val focusManager   = LocalFocusManager.current
     val density        = LocalDensity.current
 
-    // Chrome decorator: identity when off, full chrome when on. The
-    // local is provided regardless so SlotRenderer always finds it;
-    // identity is zero-cost.
-    val chromeDecorator: WidgetDecorator = remember(state) {
-        if (state is EditModeState.On) {
-            { address, index, descriptor, instance, content ->
+    // Chrome decorator: identity when off OR previewing, full chrome
+    // only on widgets that belong to the currently-selected surface.
+    // Wrong-surface widgets render plain. Previewing temporarily
+    // suppresses all chrome so the user can see the real look without
+    // leaving edit mode.
+    val chromeDecorator: WidgetDecorator = remember(state, previewing) {
+        if (state is EditModeState.On && !previewing) {
+            val selected = state.surface
+            decorator@{ address, index, descriptor, instance, content ->
+                if (address.surface != selected) {
+                    content()
+                    return@decorator
+                }
                 EditableWidgetChrome(
                     address      = address,
                     index        = index,
@@ -184,12 +201,17 @@ fun EditorSurfaceHost(
         }
     }
 
-    // Empty-slot decorator only renders the "drop here" placeholder
-    // while edit mode is on -- otherwise empty slots stay invisible
-    // in normal use.
-    val emptyDecorator: EmptySlotDecorator = remember(state, registry) {
-        if (state is EditModeState.On) {
-            { address -> EmptySlotPlaceholder(address = address, registry = registry) }
+    // Empty-slot decorator: placeholder only on the selected surface
+    // and only when not previewing. Other surfaces' empty slots stay
+    // invisible (matches normal-mode behavior).
+    val emptyDecorator: EmptySlotDecorator = remember(state, registry, previewing) {
+        if (state is EditModeState.On && !previewing) {
+            val selected = state.surface
+            { address ->
+                if (address.surface == selected) {
+                    EmptySlotPlaceholder(address = address, registry = registry)
+                }
+            }
         } else {
             {}
         }
@@ -232,17 +254,21 @@ fun EditorSurfaceHost(
             // active.
             DragGhostOverlay(dragController = dragController)
 
-            if (editableSurface != null) {
+            if (availableSurfaces.isNotEmpty()) {
                 EditModePill(
                     active            = editing,
-                    surface           = editableSurface,
+                    surfaces          = availableSurfaces,
+                    selectedSurface   = selectedSurface,
+                    onSurfacePicked   = { selectedSurface = it },
                     paletteOpen       = paletteOpen,
                     onTogglePalette   = { paletteOpen = !paletteOpen },
+                    previewing        = previewing,
+                    onTogglePreview   = { previewing = !previewing },
                     modifier          = Modifier.align(Alignment.TopCenter).padding(top = 16.dp),
                 )
 
                 WidgetPalettePanel(
-                    visible        = editing && paletteOpen,
+                    visible        = editing && paletteOpen && !previewing,
                     onDismiss      = { paletteOpen = false },
                     controller     = dragController,
                     registry       = registry,
@@ -252,7 +278,10 @@ fun EditorSurfaceHost(
 
                 EditModeFab(
                     editing  = editing,
-                    onToggle = { editing = !editing },
+                    onToggle = {
+                        editing = !editing
+                        if (!editing) previewing = false
+                    },
                     modifier = Modifier.align(Alignment.BottomEnd).padding(24.dp),
                 )
             }
@@ -341,9 +370,13 @@ private fun EditModeFab(
 @Composable
 private fun EditModePill(
     active: Boolean,
-    surface: SurfaceId,
+    surfaces: List<SurfaceId>,
+    selectedSurface: SurfaceId?,
+    onSurfacePicked: (SurfaceId) -> Unit,
     paletteOpen: Boolean,
     onTogglePalette: () -> Unit,
+    previewing: Boolean,
+    onTogglePreview: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     AnimatedVisibility(
@@ -353,13 +386,13 @@ private fun EditModePill(
         modifier = modifier,
     ) {
         Surface(
-            color   = CelestiaTheme.colors.surface.copy(alpha = 0.92f),
+            color   = CelestiaTheme.colors.surface.copy(alpha = 0.94f),
             shape   = RoundedCornerShape(20.dp),
             shadowElevation = 6.dp,
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(start = 14.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
+                modifier = Modifier.padding(start = 12.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
             ) {
                 Icon(
                     imageVector        = Icons.Default.Tune,
@@ -368,51 +401,133 @@ private fun EditModePill(
                     modifier           = Modifier.size(16.dp),
                 )
                 Spacer(Modifier.width(8.dp))
-                Text(
-                    text       = "Редактирование: ${humanSurfaceName(surface)}",
-                    style      = MaterialTheme.typography.labelMedium,
-                    color      = CelestiaTheme.colors.textPrimary,
-                    fontWeight = FontWeight.Medium,
+
+                // Surface picker chips. One chip per available surface;
+                // the active surface has a primary tint.
+                surfaces.forEach { sid ->
+                    SurfaceChip(
+                        surface  = sid,
+                        active   = sid == selectedSurface,
+                        onClick  = { onSurfacePicked(sid) },
+                    )
+                    Spacer(Modifier.width(4.dp))
+                }
+
+                Spacer(Modifier.width(6.dp))
+
+                // Preview toggle -- hides chrome temporarily so the
+                // user can see the real look without leaving edit
+                // mode. Drag becomes impossible during preview (no
+                // handles), which matches user intent.
+                ToolChip(
+                    icon       = if (previewing) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                    label      = if (previewing) "Скрыто" else "Просмотр",
+                    selected   = previewing,
+                    onClick    = onTogglePreview,
+                )
+                Spacer(Modifier.width(4.dp))
+
+                // Palette toggle.
+                ToolChip(
+                    icon     = Icons.Default.Widgets,
+                    label    = if (paletteOpen) "Скрыть" else "Виджеты",
+                    selected = paletteOpen,
+                    onClick  = onTogglePalette,
                 )
                 Spacer(Modifier.width(10.dp))
+
                 Text(
                     text  = "Esc — выйти",
                     style = MaterialTheme.typography.labelSmall,
                     color = CelestiaTheme.colors.textSecondary,
+                    modifier = Modifier.padding(end = 8.dp),
                 )
-                Spacer(Modifier.width(10.dp))
-                Surface(
-                    color    = if (paletteOpen) CelestiaTheme.colors.primary.copy(alpha = 0.18f)
-                               else CelestiaTheme.colors.surfaceVariant,
-                    shape    = RoundedCornerShape(14.dp),
-                    modifier = Modifier.padding(start = 4.dp),
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .clickable { onTogglePalette() }
-                            .padding(horizontal = 10.dp, vertical = 4.dp),
-                    ) {
-                        Icon(
-                            imageVector        = Icons.Default.Widgets,
-                            contentDescription = null,
-                            tint               = if (paletteOpen) CelestiaTheme.colors.primary
-                                                 else CelestiaTheme.colors.textSecondary,
-                            modifier           = Modifier.size(14.dp),
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            text  = if (paletteOpen) "Скрыть" else "Виджеты",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (paletteOpen) CelestiaTheme.colors.primary
-                                    else CelestiaTheme.colors.textPrimary,
-                            fontWeight = FontWeight.Medium,
-                        )
-                    }
-                }
             }
         }
     }
+}
+
+@Composable
+private fun SurfaceChip(surface: SurfaceId, active: Boolean, onClick: () -> Unit) {
+    val bg = if (active) CelestiaTheme.colors.primary.copy(alpha = 0.18f)
+             else Color.Transparent
+    val fg = if (active) CelestiaTheme.colors.primary else CelestiaTheme.colors.textSecondary
+    Surface(
+        color    = bg,
+        shape    = RoundedCornerShape(12.dp),
+        modifier = Modifier,
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .clickable { onClick() }
+                .padding(horizontal = 10.dp, vertical = 5.dp),
+        ) {
+            Icon(
+                imageVector        = surfaceIcon(surface),
+                contentDescription = null,
+                tint               = fg,
+                modifier           = Modifier.size(14.dp),
+            )
+            Spacer(Modifier.width(5.dp))
+            Text(
+                text       = humanSurfaceShortName(surface),
+                style      = MaterialTheme.typography.labelSmall,
+                color      = fg,
+                fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ToolChip(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val bg = if (selected) CelestiaTheme.colors.primary.copy(alpha = 0.18f)
+             else CelestiaTheme.colors.surfaceVariant.copy(alpha = 0.6f)
+    val fg = if (selected) CelestiaTheme.colors.primary else CelestiaTheme.colors.textPrimary
+    Surface(color = bg, shape = RoundedCornerShape(12.dp)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .clickable { onClick() }
+                .padding(horizontal = 10.dp, vertical = 5.dp),
+        ) {
+            Icon(
+                imageVector        = icon,
+                contentDescription = null,
+                tint               = fg,
+                modifier           = Modifier.size(14.dp),
+            )
+            Spacer(Modifier.width(5.dp))
+            Text(
+                text       = label,
+                style      = MaterialTheme.typography.labelSmall,
+                color      = fg,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+            )
+        }
+    }
+}
+
+private fun surfaceIcon(surface: SurfaceId): androidx.compose.ui.graphics.vector.ImageVector =
+    when (surface.value) {
+        "appshell.leftrail"  -> Icons.Default.ViewSidebar
+        "appshell.rightrail" -> Icons.Default.ViewQuilt
+        else                 -> Icons.Default.Home
+    }
+
+private fun humanSurfaceShortName(surface: SurfaceId): String = when (surface.value) {
+    "home.classic"        -> "Главная"
+    "home.new"            -> "Главная"
+    "library"             -> "Library"
+    "appshell.leftrail"   -> "Лев. рейл"
+    "appshell.rightrail"  -> "Прав. рейл"
+    else                  -> surface.value
 }
 
 private fun humanSurfaceName(surface: SurfaceId): String = when (surface.value) {
@@ -479,12 +594,23 @@ private fun DragGhostOverlay(dragController: DragController) {
 
 // ── Surface routing ─────────────────────────────────────────────────────────
 
-private fun editableSurfaceFor(screen: Screen, homeView: HomeView): SurfaceId? = when (screen) {
-    Screen.Home -> when (homeView) {
-        HomeView.Classic      -> SurfaceId("home.classic")
-        HomeView.LibraryFirst -> SurfaceId("library")
-        HomeView.New          -> SurfaceId("home.new")
+// All surfaces editable on the given screen. The first entry is the
+// "main" content surface and is selected by default; the two rails
+// follow. Other screens (Settings, Profile, etc.) are not widget-
+// composed yet and return an empty list (FAB stays hidden).
+private fun availableSurfacesFor(screen: Screen, homeView: HomeView): List<SurfaceId> {
+    val main: SurfaceId = when (screen) {
+        Screen.Home -> when (homeView) {
+            HomeView.Classic      -> SurfaceId("home.classic")
+            HomeView.LibraryFirst -> SurfaceId("library")
+            HomeView.New          -> SurfaceId("home.new")
+        }
+        Screen.Library -> SurfaceId("library")
+        else           -> return emptyList()
     }
-    Screen.Library -> SurfaceId("library")
-    else           -> null
+    return listOf(
+        main,
+        SurfaceId("appshell.leftrail"),
+        SurfaceId("appshell.rightrail"),
+    )
 }
