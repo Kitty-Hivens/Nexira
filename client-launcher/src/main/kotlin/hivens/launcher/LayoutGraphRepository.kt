@@ -1,14 +1,17 @@
 package hivens.launcher
 
 import hivens.widget.model.LayoutGraph
+import hivens.widget.model.walkInstances
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -18,24 +21,33 @@ import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 
 /**
- * JSON-on-disk store for the widget [LayoutGraph]. Mirrors
- * [JsonPackRepository] in spirit -- single-file envelope with a
- * version tag, atomic write via `<file>.tmp` + ATOMIC_MOVE, malformed-
- * file falls back to the bundled default rather than crashing the
- * launcher.
+ * JSON-on-disk store for the widget [LayoutGraph]. Single-file envelope
+ * with a version tag, atomic write via `<file>.tmp` + ATOMIC_MOVE,
+ * malformed-file falls back to the bundled default rather than crashing
+ * the launcher.
  *
  * Wire format:
  * ```
  * { "schema_version": N, "graph": { "surfaces": { ... } } }
  * ```
  *
- * The wrapper exists so a schema bump can branch on `schema_version`
- * during load and apply migrations between graph shapes -- see
- * [Migrations].
+ * Disk writes are debounced ([DEBOUNCE_MS] after the last [update]) so
+ * a drag-thrash gesture across nested containers produces ~1 write per
+ * 200ms rather than dozens. [flush] forces the pending write
+ * synchronously and is called from a JVM shutdown hook so a SIGTERM
+ * mid-edit does not lose work.
+ *
+ * Each [update] also runs a tree-wide [instanceId] uniqueness check;
+ * a transform that produces duplicate ids (e.g. a buggy mixin in
+ * Phase C, or a paste-with-children that does not rewrite ids) is
+ * rejected with a warn log and identity return -- a single duplicate
+ * instanceId would otherwise corrupt every findByInstanceId-style
+ * traversal in the editor.
  */
 class LayoutGraphRepository(
     private val file: Path,
     private val json: Json,
+    private val scope: CoroutineScope,
     private val defaultGraph: () -> LayoutGraph,
 ) {
 
@@ -43,31 +55,86 @@ class LayoutGraphRepository(
     private val mutex = Mutex()
     private val state: MutableStateFlow<LayoutGraph> = MutableStateFlow(load())
 
+    // Pending debounced persist. Replaced on each update; cancelled by
+    // flush() which then persists synchronously under the same mutex.
+    private var pendingWrite: Job? = null
+
     fun observe(): StateFlow<LayoutGraph> = state.asStateFlow()
 
     fun value(): LayoutGraph = state.value
 
     /**
-     * Read-modify-write under [mutex]; the transform sees the current
-     * graph snapshot and returns the replacement. Persistence happens
-     * after the in-memory update so a write failure does not strand
-     * the observers with an applied-then-rolled-back value.
+     * Read-modify-write under [mutex]. The transform runs synchronously
+     * against the current snapshot; if it returns the same graph
+     * reference (no-op transform) or a graph with duplicate instance
+     * ids (invalid mutation), no state change and no disk write. On
+     * success the StateFlow re-emits immediately and a write is
+     * scheduled [DEBOUNCE_MS] in the future, replacing any previous
+     * pending write.
      */
     suspend fun update(transform: (LayoutGraph) -> LayoutGraph) {
         mutex.withLock {
             val next = transform(state.value)
             if (next == state.value) return@withLock
+
+            // Tree-wide instanceId uniqueness check. Walks the whole
+            // tree including nested children. Sequence-based so we
+            // short-circuit on the first dup.
+            val seen = HashSet<String>()
+            for (widget in next.walkInstances()) {
+                if (!seen.add(widget.instanceId)) {
+                    log.warn(
+                        "Layout update rejected: duplicate instanceId '{}' in tree. " +
+                        "Keeping previous graph to protect findByInstanceId-style traversals.",
+                        widget.instanceId,
+                    )
+                    return@withLock
+                }
+            }
+
             state.value = next
-            persist()
+
+            // Cancel-and-reschedule debounce. Coalesces drag-thrash
+            // gestures into ~1 write per DEBOUNCE_MS window.
+            pendingWrite?.cancel()
+            pendingWrite = scope.launch {
+                try {
+                    delay(DEBOUNCE_MS)
+                    mutex.withLock { writeNow() }
+                } catch (_: CancellationException) {
+                    // Superseded by a later update() or flushed
+                    // synchronously; either way no persist needed here.
+                }
+            }
+        }
+    }
+
+    /**
+     * Forces any pending debounced write to land on disk before
+     * returning. Cancels the in-flight debounce coroutine (if any) and
+     * persists the current state synchronously under [mutex]. Safe to
+     * call from a JVM shutdown hook (does no suspending I/O dispatch
+     * switch; the calling thread does the file write directly).
+     *
+     * No-op when nothing is pending and the on-disk file is already up
+     * to date.
+     */
+    suspend fun flush() {
+        mutex.withLock {
+            val pending = pendingWrite
+            pendingWrite = null
+            if (pending == null) return@withLock
+            pending.cancel()
+            writeNow()
         }
     }
 
     private fun load(): LayoutGraph {
         if (!Files.exists(file)) {
-            // First run: write the bundled default so subsequent
-            // loads operate on the user's editable copy, not the jar
-            // resource. Failure to write is non-fatal -- the launcher
-            // still runs against the in-memory default.
+            // First run: write the bundled default so subsequent loads
+            // operate on the user's editable copy, not the jar resource.
+            // Failure to write is non-fatal -- the launcher still runs
+            // against the in-memory default.
             val def = defaultGraph()
             try {
                 Files.createDirectories(file.parent)
@@ -87,7 +154,10 @@ class LayoutGraphRepository(
         }
     }
 
-    private suspend fun persist() = withContext(Dispatchers.IO) {
+    // Synchronous file ops. Caller MUST hold [mutex] when invoking.
+    // The debounce coroutine acquires the mutex inside its launched
+    // block; flush() invokes from inside its own mutex.withLock.
+    private fun writeNow() {
         try {
             Files.createDirectories(file.parent)
             val tmp = file.resolveSibling("${file.fileName}.tmp")
@@ -105,8 +175,6 @@ class LayoutGraphRepository(
                 )
                 Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING)
             }
-        } catch (e: CancellationException) {
-            throw e
         } catch (e: Exception) {
             log.error("Failed to persist layout graph at {}", file, e)
         }
@@ -119,15 +187,20 @@ class LayoutGraphRepository(
     )
 
     private companion object {
-        const val SCHEMA_VERSION = 1
+        const val SCHEMA_VERSION = 2
+
+        // 200ms catches a drag-thrash without delaying single drops
+        // noticeably. Verification target in the Phase A plan is "<=5
+        // disk writes over a 1s drag-thrash".
+        const val DEBOUNCE_MS = 200L
     }
 }
 
 /**
  * Schema migration ladder. Each step transforms a graph from version
- * N-1 to version N. Kernel-2 ships v1; the ladder is empty until a
- * future kernel-N introduces the first migration -- present so the
- * load path already routes through it.
+ * N-1 to version N. Phase A bumps to v2 (forward-compat marker for
+ * nested children -- the field defaults to empty, so v1 data parses
+ * transparently as v2).
  */
 internal object Migrations {
     fun apply(fromVersion: Int, graph: LayoutGraph): LayoutGraph {
@@ -137,10 +210,6 @@ internal object Migrations {
         // throwing here routes through load()'s catch and falls back
         // to the bundled default.
         require(fromVersion >= 1) { "schema_version must be >= 1, got $fromVersion" }
-        // Forward-only migration. fromVersion <= current SCHEMA_VERSION
-        // is the only supported direction; reading a file written by a
-        // newer launcher is treated as "ignore unknown fields, keep what
-        // we understand" via the Json instance's `ignoreUnknownKeys`.
         if (fromVersion >= CURRENT) return graph
         var current = graph
         for (step in fromVersion until CURRENT) {
@@ -149,10 +218,13 @@ internal object Migrations {
         return current
     }
 
-    private const val CURRENT = 1
+    private const val CURRENT = 2
 
     private fun step(toVersion: Int): Step = when (toVersion) {
-        // Future: 2 -> Step { graph -> ... merge new slots ... }
+        // v1 -> v2: WidgetInstance gained a children field. Default
+        // value handles backward compat on deserialization, so the
+        // step itself is identity.
+        2 -> Step.IDENTITY
         else -> Step.IDENTITY
     }
 

@@ -467,9 +467,17 @@ val appModule = module {
         LayoutGraphRepository(
             file         = dataDir.resolve(Storage.LAYOUT_GRAPH_FILE),
             json         = get(),
+            scope        = get(),
             defaultGraph = { DefaultLayout.load(get()) },
         )
     }
+
+    // Flush pending debounced layout writes on JVM shutdown. Lives as
+    // its own createdAtStart=true single so the hook is registered
+    // during startKoin{}. Runs in parallel with AppCoroutineScopeHook
+    // (JVM shutdown hooks run concurrently); flush() is mutex-locked
+    // and cancellation-safe, so racing with scope cancellation is OK.
+    single(createdAtStart = true) { LayoutGraphFlushHook(get()) }
 
     single {
         val dataDir: Path = get()
