@@ -1,7 +1,15 @@
-package hivens.ui.screens.profile
+package hivens.ui.widgets.profile
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
@@ -16,24 +24,27 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import hivens.core.data.SessionData
 import hivens.ui.easter.LocalAprilFools
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.platform.SystemActions
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.LocalStyle
+import hivens.widget.model.Widget
+import hivens.widget.model.WidgetInstance
 
-/**
- * Account info + balance + top-up action. Status pill turns
- * success/error based on whether the session looks online (token
- * length sniff).
- */
+// Account info + balance + top-up. Status pill switches success /
+// error based on token-length sniff (same heuristic as the legacy
+// AccountSection -- "online" means the active session looks signed
+// in). Reads session from LocalProfileContext.
+@Widget(id = "profile.account.section", displayName = "Аккаунт")
 @Composable
-internal fun AccountSection(session: SessionData) {
+fun ProfileAccountSectionWidget(instance: WidgetInstance) {
+    val ctx = LocalProfileContext.current
     val s = LocalStrings.current
     val af = LocalAprilFools.current
     val style = LocalStyle.current
+    val session = ctx.session
 
     PuppetClick("profile.topUp") {
         SystemActions.openUrl("http://smartycraft.ru/cabinet")

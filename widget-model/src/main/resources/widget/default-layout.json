@@ -67,6 +67,25 @@
           }
         }
       },
+      "profile": {
+        "slots": {
+          "nav": {
+            "widgets": [
+              { "kind": "profile.nav", "instance_id": "profile-nav-default" }
+            ]
+          },
+          "skin": {
+            "widgets": [
+              { "kind": "profile.skin.section", "instance_id": "profile-skin-section-default" }
+            ]
+          },
+          "account": {
+            "widgets": [
+              { "kind": "profile.account.section", "instance_id": "profile-account-section-default" }
+            ]
+          }
+        }
+      },
       "theme.picker": {
         "slots": {
           "grid": {

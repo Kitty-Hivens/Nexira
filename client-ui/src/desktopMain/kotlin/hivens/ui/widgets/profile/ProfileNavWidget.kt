@@ -1,4 +1,4 @@
-package hivens.ui.screens.profile
+package hivens.ui.widgets.profile
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -16,6 +16,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -25,31 +26,33 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.LocalStyle
+import hivens.widget.model.Widget
+import hivens.widget.model.WidgetInstance
 
-/**
- * Vertical category nav for the two-column Profile layout. Mirrors
- * [hivens.ui.screens.settings.SettingsCategoryNav] in shape and
- * behaviour -- fixed 200dp width, fillMaxWidth click area, primary
- * fill on the active row.
- */
+// Vertical category nav for the profile surface. Writes
+// `selectedCategory.value` on tap; the surface composable reads it
+// to pick which content slot to render. Removing this widget locks
+// the user on whichever category was last selected -- reset the
+// surface to bring nav back.
+@Widget(id = "profile.nav", displayName = "Навигация профиля")
 @Composable
-internal fun ProfileCategoryNav(
-    current: ProfileCategory,
-    onSelect: (ProfileCategory) -> Unit,
-    modifier: Modifier = Modifier,
-) {
+fun ProfileNavWidget(instance: WidgetInstance) {
+    val ctx = LocalProfileContext.current
     val s = LocalStrings.current
     val style = LocalStyle.current
+    val current by ctx.selectedCategory
+
     Column(
-        modifier = modifier
-            .width(200.dp)
+        modifier = Modifier
             .fillMaxHeight()
             .padding(end = 12.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         ProfileCategory.entries.forEach { category ->
             val isSelected = category == current
-            PuppetClick("profile.category.${category.name}") { onSelect(category) }
+            PuppetClick("profile.category.${category.name}") {
+                ctx.selectedCategory.value = category
+            }
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -58,7 +61,7 @@ internal fun ProfileCategoryNav(
                         if (isSelected) CelestiaTheme.colors.primary.copy(alpha = 0.18f)
                         else CelestiaTheme.colors.background.copy(alpha = 0.0f),
                     )
-                    .clickable { onSelect(category) }
+                    .clickable { ctx.selectedCategory.value = category }
                     .padding(horizontal = 12.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {

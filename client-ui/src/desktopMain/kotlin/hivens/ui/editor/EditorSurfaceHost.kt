@@ -102,6 +102,8 @@ import hivens.ui.widgets.home.new.LocalHomeNewContext
 import hivens.ui.widgets.library.LocalLibraryContext
 import hivens.ui.widgets.shell.LocalLeftRailContext
 import hivens.ui.widgets.shell.LocalRightRailContext
+import hivens.ui.widgets.profile.LocalProfileContext
+import hivens.ui.widgets.profile.STUB_PROFILE
 import hivens.ui.widgets.themepicker.LocalThemePickerContext
 import hivens.ui.widgets.themepicker.STUB_THEME_PICKER
 import hivens.widget.api.EmptySlotDecorator
@@ -271,6 +273,7 @@ fun EditorSurfaceHost(
         LocalLibraryContext     provides STUB_LIBRARY,
         LocalLeftRailContext    provides STUB_LEFTRAIL,
         LocalRightRailContext   provides STUB_RIGHTRAIL,
+        LocalProfileContext     provides STUB_PROFILE,
         LocalThemePickerContext provides STUB_THEME_PICKER,
     ) {
         Box(
@@ -687,6 +690,7 @@ private fun humanSurfaceShortName(surface: SurfaceId): String = when (surface.va
     "library"             -> "Library"
     "appshell.leftrail"   -> "Лев. рейл"
     "appshell.rightrail"  -> "Прав. рейл"
+    "profile"             -> "Профиль"
     "theme.picker"        -> "Темы"
     else                  -> surface.value
 }
@@ -697,6 +701,7 @@ private fun humanSurfaceName(surface: SurfaceId): String = when (surface.value) 
     "library"             -> "Library"
     "appshell.leftrail"   -> "Боковая панель"
     "appshell.rightrail"  -> "Правая панель"
+    "profile"             -> "Профиль"
     "theme.picker"        -> "Выбор темы"
     else                  -> surface.value
 }
@@ -789,6 +794,7 @@ private fun availableSurfacesFor(screen: Screen, homeView: HomeView): List<Surfa
             HomeView.New          -> SurfaceId("home.new")
         }
         Screen.Library     -> SurfaceId("library")
+        Screen.Profile     -> SurfaceId("profile")
         Screen.ThemePicker -> SurfaceId("theme.picker")
         // Other widget-composed surfaces from B.1 land here as the
         // rest of the screens migrate over.

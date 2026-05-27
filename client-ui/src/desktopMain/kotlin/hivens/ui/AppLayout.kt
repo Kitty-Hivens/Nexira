@@ -22,7 +22,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import hivens.core.api.SkinRepository
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.HomeView
 import hivens.core.data.SessionData
@@ -39,7 +38,7 @@ import hivens.ui.screens.*
 import hivens.ui.screens.browse.BrowseScreen
 import hivens.ui.screens.detail.PackDetailScreen
 import hivens.ui.screens.library.LibraryScreen
-import hivens.ui.screens.profile.ProfileScreen
+import hivens.ui.widgets.profile.ProfileSurface
 import hivens.ui.screens.settings.SettingsScreen
 import hivens.ui.widgets.themepicker.ThemePickerSurface
 import hivens.ui.theme.CelestiaTheme
@@ -79,7 +78,6 @@ fun AppLayout(
     customization: CustomizationSettings = CustomizationSettings(),
     onCustomizationChanged: (CustomizationSettings) -> Unit = {},
 ) {
-    val skinRepository: SkinRepository = koinInject()
     val protocolConfig: ServerProtocolConfig = koinInject()
 
     // Session can be refreshed by DashboardScreen on auth-retry
@@ -165,7 +163,7 @@ fun AppLayout(
 
                     Screen.Profile ->
                         currentSession?.let {
-                            ProfileScreen(session = it, skinRepository = skinRepository)
+                            ProfileSurface(session = it)
                         }
 
                     Screen.Settings ->
