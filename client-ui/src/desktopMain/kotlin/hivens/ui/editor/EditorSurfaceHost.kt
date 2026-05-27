@@ -69,6 +69,8 @@ import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
@@ -726,18 +728,30 @@ private fun DragGhostOverlay(dragController: DragController) {
     // overlay. pointerHoverIcon does not intercept pointer events, so
     // the underlying drag handler keeps receiving updates.
     val transparentCursor = remember { transparentPointerIcon() }
+    // graphicsLayer.translationX/Y translates relative to the host
+    // Box's natural untranslated position, NOT window (0, 0). When the
+    // EditorSurfaceHost mounts inside AppLayout after the left rail
+    // (~64dp wide), the host's local origin is at window (railWidth,
+    // topbarHeight) -- applying pointer-in-window coords directly as
+    // translation drags the ghost away from the cursor by exactly that
+    // offset. Track the overlay's own window origin and subtract it so
+    // the ghost lands at the real pointer position.
+    var overlayOriginInWindow by remember { mutableStateOf(Offset.Zero) }
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .pointerHoverIcon(icon = transparentCursor, overrideDescendants = true),
+            .pointerHoverIcon(icon = transparentCursor, overrideDescendants = true)
+            .onGloballyPositioned { coords ->
+                overlayOriginInWindow = coords.boundsInWindow().topLeft
+            },
     ) {
         Box(
             modifier = Modifier
                 .graphicsLayer {
-                    val x = (active.pointerInWindow.x - active.pickupOffset.x)
-                    val y = (active.pointerInWindow.y - active.pickupOffset.y)
-                    translationX = x
-                    translationY = y
+                    val targetWindowX = active.pointerInWindow.x - active.pickupOffset.x
+                    val targetWindowY = active.pointerInWindow.y - active.pickupOffset.y
+                    translationX = targetWindowX - overlayOriginInWindow.x
+                    translationY = targetWindowY - overlayOriginInWindow.y
                     alpha        = 0.78f
                     scaleX       = 1.04f
                     scaleY       = 1.04f
