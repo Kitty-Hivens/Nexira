@@ -68,6 +68,14 @@ val networkModule = module {
             prettyPrint = true
             isLenient = true
             encodeDefaults = true
+            // Coerce unknown enum values to the field's default instead
+            // of throwing. Without this, downgrading the launcher to a
+            // build that does not yet declare a recently-added enum
+            // variant (e.g. HomeView.New written by a newer build, read
+            // by an older one) blows up SettingsService.reload() and
+            // SilentlyResetsEverything to defaults -- the user loses
+            // every other setting because of one unknown value.
+            coerceInputValues = true
         }
     }
 
