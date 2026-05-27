@@ -44,6 +44,7 @@ import hivens.ui.screens.settings.SettingsScreen
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.CustomTheme
+import hivens.ui.editor.EditorSurfaceHost
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.widgets.shell.LeftRailContext
 import hivens.ui.widgets.shell.LocalLeftRailContext
@@ -111,6 +112,7 @@ fun AppLayout(
 
         // ── Main content ──────────────────────────────────────────────────
         Box(Modifier.weight(1f).fillMaxHeight()) {
+          EditorSurfaceHost(currentScreen = currentScreen, homeView = homeView) {
             // Screen-to-screen Crossfade duration follows the active
             // style. Under Brut (animationMultiplier = 0) the swap is
             // effectively instant; under Celestia keeps the 180ms fade.
@@ -239,6 +241,7 @@ fun AppLayout(
                         )
                 }
             }
+          } // end EditorSurfaceHost
         }
 
         VerticalDivider(
