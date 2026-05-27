@@ -66,6 +66,10 @@ class WidgetRegistryConsistencyTest {
             "profile.nav",
             "profile.skin.section",
             "profile.account.section",
+            "server.details.title",
+            "server.details.tagbar",
+            "server.details.description",
+            "server.details.banner",
             "theme.picker.grid",
             "theme.picker.preview",
         )

@@ -67,6 +67,22 @@
           }
         }
       },
+      "server.details": {
+        "slots": {
+          "text": {
+            "widgets": [
+              { "kind": "server.details.title",       "instance_id": "server-details-title-default" },
+              { "kind": "server.details.tagbar",      "instance_id": "server-details-tagbar-default" },
+              { "kind": "server.details.description", "instance_id": "server-details-description-default" }
+            ]
+          },
+          "image": {
+            "widgets": [
+              { "kind": "server.details.banner", "instance_id": "server-details-banner-default" }
+            ]
+          }
+        }
+      },
       "profile": {
         "slots": {
           "nav": {

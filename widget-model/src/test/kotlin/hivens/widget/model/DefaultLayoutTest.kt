@@ -18,6 +18,7 @@ class DefaultLayoutTest {
                 "appshell.leftrail", "appshell.rightrail",
                 // Phase B.1 widgetized screens (incremental landing)
                 "profile",
+                "server.details",
                 "theme.picker",
             ),
             surfaceIds,

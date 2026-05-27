@@ -104,6 +104,8 @@ import hivens.ui.widgets.shell.LocalLeftRailContext
 import hivens.ui.widgets.shell.LocalRightRailContext
 import hivens.ui.widgets.profile.LocalProfileContext
 import hivens.ui.widgets.profile.STUB_PROFILE
+import hivens.ui.widgets.serverdetails.LocalServerDetailsContext
+import hivens.ui.widgets.serverdetails.STUB_SERVER_DETAILS
 import hivens.ui.widgets.themepicker.LocalThemePickerContext
 import hivens.ui.widgets.themepicker.STUB_THEME_PICKER
 import hivens.widget.api.EmptySlotDecorator
@@ -272,9 +274,10 @@ fun EditorSurfaceHost(
         LocalHomeNewContext     provides STUB_HOME_NEW,
         LocalLibraryContext     provides STUB_LIBRARY,
         LocalLeftRailContext    provides STUB_LEFTRAIL,
-        LocalRightRailContext   provides STUB_RIGHTRAIL,
-        LocalProfileContext     provides STUB_PROFILE,
-        LocalThemePickerContext provides STUB_THEME_PICKER,
+        LocalRightRailContext     provides STUB_RIGHTRAIL,
+        LocalProfileContext       provides STUB_PROFILE,
+        LocalServerDetailsContext provides STUB_SERVER_DETAILS,
+        LocalThemePickerContext   provides STUB_THEME_PICKER,
     ) {
         Box(
             modifier = Modifier
@@ -691,6 +694,7 @@ private fun humanSurfaceShortName(surface: SurfaceId): String = when (surface.va
     "appshell.leftrail"   -> "Лев. рейл"
     "appshell.rightrail"  -> "Прав. рейл"
     "profile"             -> "Профиль"
+    "server.details"      -> "Сервер"
     "theme.picker"        -> "Темы"
     else                  -> surface.value
 }
@@ -702,6 +706,7 @@ private fun humanSurfaceName(surface: SurfaceId): String = when (surface.value) 
     "appshell.leftrail"   -> "Боковая панель"
     "appshell.rightrail"  -> "Правая панель"
     "profile"             -> "Профиль"
+    "server.details"      -> "Детали сервера"
     "theme.picker"        -> "Выбор темы"
     else                  -> surface.value
 }
@@ -793,9 +798,10 @@ private fun availableSurfacesFor(screen: Screen, homeView: HomeView): List<Surfa
             HomeView.LibraryFirst -> SurfaceId("library")
             HomeView.New          -> SurfaceId("home.new")
         }
-        Screen.Library     -> SurfaceId("library")
-        Screen.Profile     -> SurfaceId("profile")
-        Screen.ThemePicker -> SurfaceId("theme.picker")
+        Screen.Library          -> SurfaceId("library")
+        Screen.Profile          -> SurfaceId("profile")
+        is Screen.ServerDetails -> SurfaceId("server.details")
+        Screen.ThemePicker      -> SurfaceId("theme.picker")
         // Other widget-composed surfaces from B.1 land here as the
         // rest of the screens migrate over.
         else               -> return emptyList()
