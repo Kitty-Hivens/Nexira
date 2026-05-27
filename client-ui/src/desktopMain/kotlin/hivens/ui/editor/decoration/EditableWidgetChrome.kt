@@ -21,6 +21,8 @@ import androidx.compose.material.icons.filled.DragIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.currentCompositionLocalContext
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -73,6 +75,15 @@ fun EditableWidgetChrome(
     val isThisDragging = (activeDrag?.payload as? DragPayload.ExistingWidget)
         ?.instance?.instanceId == instance.instanceId
 
+    // The ghost lambda is invoked by DragGhostOverlay at the host
+    // level -- outside the surface composable's CompositionLocalProvider
+    // chain. Widgets like HomeNewRecent read surface-scoped locals
+    // (LocalHomeNewContext, LocalLibraryContext, ...) and would throw
+    // when the ghost recomposes them. Snapshot the locals here and
+    // restore them inside the ghost so the widget renders identically
+    // wherever it lands.
+    val capturedLocals = currentCompositionLocalContext
+
     // Source widget fades to 30% while being dragged -- the ghost is
     // doing the work on top. Once drag ends, we ramp back smoothly.
     val sourceAlpha by animateFloatAsState(
@@ -118,7 +129,9 @@ fun EditableWidgetChrome(
                     controller            = controller,
                     payload               = DragPayload.ExistingWidget(address, index, instance),
                     widgetBoundsProvider  = { widgetWindowBounds },
-                    ghost                 = { content() },
+                    ghost                 = {
+                        CompositionLocalProvider(capturedLocals) { content() }
+                    },
                     onDragEnd             = onCommitDrop,
                 ),
         ) {
