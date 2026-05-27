@@ -64,6 +64,10 @@ import hivens.ui.audio.AudioPlayer
 import hivens.ui.audio.PlaybackState
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.theme.CelestiaTheme
+import hivens.ui.widgets.services.MusicPlayerService
+import hivens.ui.widgets.services.MusicPlayerServiceImpl
+import hivens.widget.api.provideService
+import hivens.widget.model.ProvidesService
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 import io.github.vinceglb.filekit.FileKit
@@ -85,12 +89,23 @@ import kotlin.io.path.name
 // rail (or nothing). MP3 support arrives with Skinema (FFmpeg
 // via Panama).
 @Widget(id = "home.new.music", displayName = "Music player")
+@ProvidesService(MusicPlayerService::class)
 @Composable
 fun MusicPlayerWidget(instance: WidgetInstance) {
     val player: AudioPlayer = koinInject()
     val state by player.state.collectAsState()
     val volume by player.volume.collectAsState()
     val scope = rememberCoroutineScope()
+
+    // Expose this widget's AudioPlayer-backed playback through the
+    // cross-widget service registry. PlaybackMiniControlWidget (and
+    // future achievement watchers / music-ducking helpers) read this
+    // via useService<MusicPlayerService>(). The DisposableEffect
+    // unregisters on dispose so removing the widget cleanly drops
+    // the binding; re-adding it re-binds to the same AudioPlayer
+    // singleton.
+    val musicService = remember(player) { MusicPlayerServiceImpl(player) }
+    provideService(MusicPlayerService::class, instance.instanceId, musicService)
 
     val pickFile = {
         scope.launch {
