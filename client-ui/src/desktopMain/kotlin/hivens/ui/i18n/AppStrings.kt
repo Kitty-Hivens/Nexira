@@ -519,6 +519,7 @@ interface AppStrings {
     val settingsHomeViewSub: String
     val settingsHomeViewClassic: String
     val settingsHomeViewLibrary: String
+    val settingsHomeViewNew: String
 
     // --- UI style variant picker (in Settings -> Interface) ---
     val settingsUiStyleTitle: String

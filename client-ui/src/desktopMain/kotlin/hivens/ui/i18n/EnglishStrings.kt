@@ -489,6 +489,7 @@ object EnglishStrings : AppStrings {
     override val settingsHomeViewSub     = "Try the new Library-first surface alongside the classic Dashboard. Switch any time."
     override val settingsHomeViewClassic = "Classic"
     override val settingsHomeViewLibrary = "Library (alpha)"
+    override val settingsHomeViewNew     = "New (prototype)"
 
     override val settingsUiStyleTitle    = "UI style"
     override val settingsUiStyleSub      = "Switch the form / surface / motion approach independently from the color palette. Celestia is the current rounded-glass look; Brut is hard-edged and flat."

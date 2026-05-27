@@ -45,9 +45,12 @@ import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.CustomTheme
 import hivens.ui.utils.GameConsoleService
+import hivens.ui.widgets.shell.LeftRailContext
+import hivens.ui.widgets.shell.LocalLeftRailContext
+import hivens.widget.api.SlotRenderer
+import hivens.widget.model.SlotId
+import hivens.widget.model.SurfaceId
 import org.koin.compose.koinInject
-import kotlin.math.sin
-import kotlin.random.Random
 
 // ─── Layout ──────────────────────────────────────────────────────────────────
 
@@ -133,6 +136,11 @@ fun AppLayout(
                                 HomeView.LibraryFirst -> LibraryScreen(
                                     appState       = appState,
                                     onScreenChange = onScreenChange,
+                                )
+                                HomeView.New -> NewHomeScreen(
+                                    appState         = appState,
+                                    onScreenChange   = onScreenChange,
+                                    onSessionUpdated = { currentSession = it },
                                 )
                             }
                             // `Loading` is the brief window between startup and resolved
@@ -259,69 +267,10 @@ fun AppSidebar(
     onLogout: () -> Unit
 ) {
     val gameConsole: GameConsoleService = koinInject()
-    val af = LocalAprilFools.current
 
-    val homeActive = currentScreen is Screen.Home
-            || currentScreen is Screen.ServerSettings
-            || currentScreen is Screen.ServerDetails
-    val libraryActive  = currentScreen is Screen.Library
-            || currentScreen is Screen.PackDetail
-    val browseActive   = currentScreen is Screen.Browse
-            || currentScreen is Screen.BrowsePackDetail
-    val profileActive  = currentScreen is Screen.Profile
-    val settingsActive = currentScreen is Screen.Settings
-            || currentScreen is Screen.ThemePicker
-            || currentScreen is Screen.BackgroundSettings
-            || currentScreen is Screen.CustomizationExtension
-    val aboutActive    = currentScreen is Screen.About
-
-    // ── April Fools: nav clicks have a 30% chance of being silently swallowed ──
-    // The button doesn't move or react -- it just feels like the UI froze.
-    // Logout is intentionally excluded so the user can always escape.
-    fun chaosNavClick(originalClick: () -> Unit): () -> Unit {
-        if (!af.isActive()) return originalClick
-        return {
-            if (Random.nextFloat() > 0.30f) {
-                originalClick()
-            }
-            // else: click silently consumed -- simulates UI "lag"
-        }
-    }
-
-    // ── April Fools: bouncing nav buttons ────────────────────────────────────
-    // Each item has a unique sine phase so they bounce out of sync.
-    // Amplitude grows from 0px on day 1 to 18px on day 14.
-    val bounceAmplitude = if (af.isActive()) af.intensity() * 18f else 0f
-
-    val bounceTransition = rememberInfiniteTransition(label = "navBounce")
-    val bounceCycle by bounceTransition.animateFloat(
-        initialValue  = 0f,
-        targetValue   = (2f * Math.PI).toFloat(),
-        animationSpec = infiniteRepeatable(
-            animation = tween(
-                durationMillis = if (af.isActive())
-                    (2200 - af.intensity() * 1400).toInt().coerceAtLeast(600)
-                else
-                    2200,
-                easing = LinearEasing
-            ),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "bounceCycle"
-    )
-
-    // Different phase offset per button -- they never all peak at the same time
-    val homeOffset    = sin(bounceCycle + 0.0f) * bounceAmplitude
-    val libraryOffset = sin(bounceCycle + 0.55f) * bounceAmplitude
-    val browseOffset  = sin(bounceCycle + 1.65f) * bounceAmplitude
-    val profileOffset = sin(bounceCycle + 1.1f) * bounceAmplitude
-    val settingsOffset= sin(bounceCycle + 2.2f) * bounceAmplitude
-    val aboutOffset   = sin(bounceCycle + 3.3f) * bounceAmplitude
-
-    // Puppet: sidebar navigation. Puppet driver bypasses the AprilFools
-    // chaos wrapper -- those are user-facing pranks, not behavior we want
-    // to test against. Direct onScreenChange calls keep test runs
-    // deterministic regardless of the calendar.
+    // Puppet: sidebar navigation. Direct onScreenChange calls keep
+    // test runs deterministic regardless of the AprilFools chaos
+    // wrapper inside the nav-buttons widget.
     PuppetClick("nav.home")     { onScreenChange(Screen.Home) }
     PuppetClick("nav.library")  { onScreenChange(Screen.Library) }
     PuppetClick("nav.browse")   { onScreenChange(Screen.Browse) }
@@ -336,133 +285,32 @@ fun AppSidebar(
         PuppetClick("nav.logout") { onLogout() }
     }
 
-    NavigationRail(
-        modifier       = Modifier.width(64.dp).fillMaxHeight(),
-        containerColor = glassSurfaceAlpha(0.35f),
-        contentColor   = CelestiaTheme.colors.textSecondary
-    ) {
-        // ── Nav items ─────────────────────────────────────────────────────
-        Spacer(Modifier.height(8.dp))
-
-        // Each item wrapped in a Box that applies the vertical bounce offset
-        Box(Modifier.graphicsLayer { translationY = homeOffset }) {
-            SidebarNavItem(
-                icon     = Icons.Default.Home,
-                selected = homeActive,
-                onClick  = chaosNavClick { onScreenChange(Screen.Home) }
-            )
-        }
-
-        Box(Modifier.graphicsLayer { translationY = libraryOffset }) {
-            SidebarNavItem(
-                icon     = Icons.Default.Star,
-                selected = libraryActive,
-                onClick  = chaosNavClick { onScreenChange(Screen.Library) }
-            )
-        }
-
-        Box(Modifier.graphicsLayer { translationY = browseOffset }) {
-            SidebarNavItem(
-                icon     = Icons.Default.Search,
-                selected = browseActive,
-                onClick  = chaosNavClick { onScreenChange(Screen.Browse) }
-            )
-        }
-
-        Box(Modifier.graphicsLayer { translationY = profileOffset }) {
-            SidebarNavItem(
-                icon     = Icons.Default.Person,
-                selected = profileActive,
-                enabled  = isAuthenticated,
-                onClick  = chaosNavClick { onScreenChange(Screen.Profile) }
-            )
-        }
-
-        Box(Modifier.graphicsLayer { translationY = settingsOffset }) {
-            SidebarNavItem(
-                icon     = Icons.Default.Settings,
-                selected = settingsActive,
-                onClick  = chaosNavClick { onScreenChange(Screen.Settings) }
-            )
-        }
-
-        Box(Modifier.graphicsLayer { translationY = aboutOffset }) {
-            SidebarNavItem(
-                icon     = Icons.Default.Info,
-                selected = aboutActive,
-                onClick  = chaosNavClick { onScreenChange(Screen.About) }
-            )
-        }
-
-        // ── Bottom actions ────────────────────────────────────────────────
-        Spacer(Modifier.weight(1f))
-
-        // Console toggle -- not bouncing, user needs to be able to open it
-        IconButton(
-            onClick  = {
-                if (gameConsole.shouldShowConsole) gameConsole.hide()
-                else gameConsole.show()
-            },
-            modifier = Modifier.size(48.dp)
+    val ctx = remember(currentScreen, isAuthenticated, onScreenChange, onLogout) {
+        LeftRailContext(
+            currentScreen   = currentScreen,
+            isAuthenticated = isAuthenticated,
+            onScreenChange  = onScreenChange,
+            onLogout        = onLogout,
+        )
+    }
+    CompositionLocalProvider(LocalLeftRailContext provides ctx) {
+        NavigationRail(
+            modifier       = Modifier.width(64.dp).fillMaxHeight(),
+            containerColor = glassSurfaceAlpha(0.35f),
+            contentColor   = CelestiaTheme.colors.textSecondary
         ) {
-            Icon(
-                imageVector        = Icons.Default.Build,
-                contentDescription = null,
-                tint               = if (gameConsole.shouldShowConsole)
-                    CelestiaTheme.colors.primary
-                else
-                    CelestiaTheme.colors.textSecondary.copy(alpha = 0.55f),
-                modifier           = Modifier.size(22.dp)
-            )
+            SlotRenderer(SurfaceId(SIDEBAR_SURFACE), SlotId("top"))
+            // Spacer is layout, not content -- stays surface-owned so
+            // widgets in the top/bottom slots do not need ColumnScope
+            // for weight.
+            Spacer(Modifier.weight(1f))
+            SlotRenderer(SurfaceId(SIDEBAR_SURFACE), SlotId("bottom"))
+            Spacer(Modifier.height(8.dp))
         }
-
-        // Logout -- NOT chaos-wrapped, NOT bouncing -- user must always be able to log out
-        if (isAuthenticated) {
-            IconButton(onClick = onLogout, modifier = Modifier.size(48.dp)) {
-                Icon(
-                    imageVector        = Icons.AutoMirrored.Filled.ExitToApp,
-                    contentDescription = null,
-                    tint               = CelestiaTheme.colors.error.copy(alpha = 0.75f),
-                    modifier           = Modifier.size(22.dp)
-                )
-            }
-        }
-
-        Spacer(Modifier.height(8.dp))
     }
 }
 
-// ─── NavigationRailItem wrapper (icon-only, no label) ────────────────────────
-
-@Composable
-private fun SidebarNavItem(
-    icon: ImageVector,
-    selected: Boolean,
-    enabled: Boolean = true,
-    onClick: () -> Unit
-) {
-    NavigationRailItem(
-        icon = {
-            Icon(
-                imageVector        = icon,
-                contentDescription = null,
-                modifier           = Modifier.size(24.dp)
-            )
-        },
-        selected        = selected,
-        onClick         = onClick,
-        enabled         = enabled,
-        label           = null,
-        alwaysShowLabel = false,
-        colors          = NavigationRailItemDefaults.colors(
-            selectedIconColor   = CelestiaTheme.colors.primary,
-            unselectedIconColor = CelestiaTheme.colors.textSecondary.copy(
-                alpha = if (enabled) 0.70f else 0.20f
-            ),
-            indicatorColor      = CelestiaTheme.colors.primary.copy(alpha = 0.13f)
-        )
-    )
-}
+private const val SIDEBAR_SURFACE = "appshell.leftrail"
 
 // ─── Loading placeholder ──────────────────────────────────────────────────────
 

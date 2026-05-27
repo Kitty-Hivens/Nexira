@@ -150,6 +150,7 @@ internal fun HomeViewPicker(
     labelSub: String,
     classicLabel: String,
     libraryLabel: String,
+    newLabel: String,
 ) {
     val style = LocalStyle.current
     Column(
@@ -176,6 +177,11 @@ internal fun HomeViewPicker(
                 label    = libraryLabel,
                 selected = current == HomeView.LibraryFirst,
                 onClick  = { onChange(HomeView.LibraryFirst) },
+            )
+            VariantPill(
+                label    = newLabel,
+                selected = current == HomeView.New,
+                onClick  = { onChange(HomeView.New) },
             )
         }
     }
