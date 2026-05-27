@@ -1,0 +1,125 @@
+package hivens.ui.widgets.themepicker
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import hivens.ui.easter.LocalAprilFools
+import hivens.ui.i18n.LocalStrings
+import hivens.ui.puppet.PuppetClick
+import hivens.ui.puppet.PuppetScreen
+import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.CustomTheme
+import hivens.ui.theme.ThemePresets
+import hivens.widget.api.SlotRenderer
+import hivens.widget.model.SlotId
+import hivens.widget.model.SurfaceId
+
+// theme.picker surface composable. AppLayout routes
+// Screen.ThemePicker here. Provides LocalThemePickerContext for
+// child widgets, lays out two side-by-side slots (grid + preview),
+// keeps header chrome (back button, title, Apply) on the surface
+// itself rather than as widgets -- those three controls are
+// per-screen invariants the user cannot meaningfully remove without
+// losing access to the screen's whole purpose.
+@Composable
+fun ThemePickerSurface(
+    currentTheme: CustomTheme,
+    onThemeSelected: (CustomTheme) -> Unit,
+    onBack: () -> Unit,
+) {
+    val s = LocalStrings.current
+    val af = LocalAprilFools.current
+    val themes = remember { ThemePresets.getAll() }
+    val selectedTheme = remember(currentTheme) { mutableStateOf(currentTheme) }
+
+    val ctx = remember(themes, selectedTheme, onThemeSelected, onBack) {
+        ThemePickerContext(
+            themes        = themes,
+            selectedTheme = selectedTheme,
+            onApply       = onThemeSelected,
+            onBack        = onBack,
+        )
+    }
+
+    PuppetScreen("ThemePicker")
+    PuppetClick("themePicker.back") { onBack() }
+    PuppetClick("themePicker.apply") { onThemeSelected(selectedTheme.value) }
+    themes.forEach { theme ->
+        PuppetClick("themePicker.select.${theme.name}") { selectedTheme.value = theme }
+    }
+
+    CompositionLocalProvider(LocalThemePickerContext provides ctx) {
+        Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
+            // Header chrome: back + title left, apply right.
+            Row(
+                modifier              = Modifier.fillMaxWidth().padding(bottom = 24.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment     = Alignment.CenterVertically,
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector        = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = s.navBack,
+                            tint               = CelestiaTheme.colors.primary,
+                        )
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text       = s.themePickerTitle,
+                        style      = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Black,
+                        color      = CelestiaTheme.colors.textPrimary,
+                    )
+                }
+                af.ChaosButton(
+                    id      = "theme_picker_apply_btn",
+                    text    = s.themePickerApply,
+                    onClick = { onThemeSelected(selectedTheme.value) },
+                    colors  = ButtonDefaults.buttonColors(
+                        containerColor = CelestiaTheme.colors.primary,
+                    ),
+                )
+            }
+            // Body: two side-by-side slots. Grid is the editable
+            // panel; preview reads the same selectedTheme via the
+            // surface context so removing the preview widget hides
+            // the panel but does not break selection.
+            Row(
+                modifier              = Modifier.fillMaxSize(),
+                horizontalArrangement = Arrangement.spacedBy(24.dp),
+            ) {
+                Box(modifier = Modifier.weight(2f).fillMaxHeight()) {
+                    SlotRenderer(SurfaceId(SURFACE), SlotId("grid"))
+                }
+                Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                    SlotRenderer(SurfaceId(SURFACE), SlotId("preview"))
+                }
+            }
+        }
+    }
+}
+
+private const val SURFACE = "theme.picker"

@@ -8,13 +8,19 @@ import kotlin.test.assertTrue
 class DefaultLayoutTest {
 
     @Test
-    fun `bundled default decodes to the kernel-3 surface set`() {
+    fun `bundled default decodes to the kernel-3 + B-series surface set`() {
         val graph = DefaultLayout.load()
         val surfaceIds = graph.surfaces.keys.map { it.value }.toSet()
         assertEquals(
-            setOf("home.classic", "home.new", "library", "appshell.leftrail", "appshell.rightrail"),
+            setOf(
+                // kernel-3 originals
+                "home.classic", "home.new", "library",
+                "appshell.leftrail", "appshell.rightrail",
+                // Phase B.1 widgetized screens (incremental landing)
+                "theme.picker",
+            ),
             surfaceIds,
-            "kernel-3 ships five named surfaces; any drift means a refactor lost one",
+            "default-layout drift -- expected exactly these surfaces",
         )
     }
 

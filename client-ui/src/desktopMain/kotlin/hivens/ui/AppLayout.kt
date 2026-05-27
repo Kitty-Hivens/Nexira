@@ -184,7 +184,7 @@ fun AppLayout(
                         )
 
                     Screen.ThemePicker ->
-                        ThemePickerScreen(
+                        hivens.ui.widgets.themepicker.ThemePickerSurface(
                             currentTheme    = customTheme,
                             onThemeSelected = { newTheme ->
                                 onCustomThemeChanged(newTheme)

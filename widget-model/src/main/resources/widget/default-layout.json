@@ -66,6 +66,20 @@
             ]
           }
         }
+      },
+      "theme.picker": {
+        "slots": {
+          "grid": {
+            "widgets": [
+              { "kind": "theme.picker.grid", "instance_id": "theme-picker-grid-default" }
+            ]
+          },
+          "preview": {
+            "widgets": [
+              { "kind": "theme.picker.preview", "instance_id": "theme-picker-preview-default" }
+            ]
+          }
+        }
       }
     }
   }

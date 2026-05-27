@@ -62,6 +62,9 @@ class WidgetRegistryConsistencyTest {
             "container.group",
             // Phase D service-consumer sample
             "home.new.playback.mini",
+            // Phase B.1 widgetized screens (incremental landing)
+            "theme.picker.grid",
+            "theme.picker.preview",
         )
         val actual = GeneratedWidgetRegistry.all().keys.map { it.value }.toSet()
         assertEquals(expected, actual, "registry drift -- expected exactly these widgets")
