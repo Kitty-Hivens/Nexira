@@ -37,7 +37,6 @@ import hivens.core.api.SkinRepository
 import hivens.ui.easter.LocalAprilFools
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.identity.SkinManager
-import hivens.ui.puppet.PuppetClick
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.LocalStyle
 import hivens.widget.model.Widget
@@ -80,10 +79,6 @@ fun ProfileSkinSectionWidget(instance: WidgetInstance) {
     }
 
     LaunchedEffect(Unit) { loadSkins() }
-
-    PuppetClick("profile.refreshSkin") {
-        skinManager.invalidate(session.playerName)
-    }
 
     Column(Modifier.fillMaxWidth()) {
         Box(

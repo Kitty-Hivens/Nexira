@@ -27,7 +27,6 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.easter.LocalAprilFools
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.platform.SystemActions
-import hivens.ui.puppet.PuppetClick
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.LocalStyle
 import hivens.widget.model.Widget
@@ -45,10 +44,6 @@ fun ProfileAccountSectionWidget(instance: WidgetInstance) {
     val af = LocalAprilFools.current
     val style = LocalStyle.current
     val session = ctx.session
-
-    PuppetClick("profile.topUp") {
-        SystemActions.openUrl("http://smartycraft.ru/cabinet")
-    }
 
     Column(Modifier.fillMaxWidth()) {
         Text(

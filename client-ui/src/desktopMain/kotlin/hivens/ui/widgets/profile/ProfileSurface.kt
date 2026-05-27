@@ -23,11 +23,15 @@ import hivens.core.data.SessionData
 import hivens.ui.components.GlassCard
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.identity.SkinManager
+import hivens.ui.platform.SystemActions
+import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.theme.CelestiaTheme
 import hivens.widget.api.SlotRenderer
 import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId
+import org.koin.compose.koinInject
 
 private const val SURFACE = "profile"
 
@@ -57,6 +61,7 @@ private const val SURFACE = "profile"
 @Composable
 fun ProfileSurface(session: SessionData) {
     val s = LocalStrings.current
+    val skinManager: SkinManager = koinInject()
     val selectedCategory = remember { mutableStateOf(ProfileCategory.Skin) }
 
     val ctx = remember(session, selectedCategory) {
@@ -66,7 +71,15 @@ fun ProfileSurface(session: SessionData) {
         )
     }
 
+    // Puppet handlers stay at surface scope so automation drivers
+    // can invoke them regardless of which tab is active. The legacy
+    // ProfileScreen registered both at the screen body and the
+    // refresh / top-up effects are session-global -- not tab-bound.
+    // The visible buttons inside the per-tab widgets still call the
+    // same actions; this just keeps the automation contract stable.
     PuppetScreen("Profile")
+    PuppetClick("profile.refreshSkin") { skinManager.invalidate(session.playerName) }
+    PuppetClick("profile.topUp")       { SystemActions.openUrl("http://smartycraft.ru/cabinet") }
 
     CompositionLocalProvider(LocalProfileContext provides ctx) {
         Column(Modifier.fillMaxSize().padding(16.dp)) {
