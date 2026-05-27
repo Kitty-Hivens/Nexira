@@ -63,6 +63,11 @@ class WidgetRegistryConsistencyTest {
             // Phase D service-consumer sample
             "home.new.playback.mini",
             // Phase B.1 widgetized screens (incremental landing)
+            "about.logo",
+            "about.credits",
+            "about.update.panel",
+            "about.system.card",
+            "about.links.card",
             "profile.nav",
             "profile.skin.section",
             "profile.account.section",

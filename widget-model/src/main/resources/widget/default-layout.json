@@ -67,6 +67,23 @@
           }
         }
       },
+      "about": {
+        "slots": {
+          "left": {
+            "widgets": [
+              { "kind": "about.logo",    "instance_id": "about-logo-default" },
+              { "kind": "about.credits", "instance_id": "about-credits-default" }
+            ]
+          },
+          "right": {
+            "widgets": [
+              { "kind": "about.update.panel", "instance_id": "about-update-panel-default" },
+              { "kind": "about.system.card",  "instance_id": "about-system-card-default" },
+              { "kind": "about.links.card",   "instance_id": "about-links-card-default" }
+            ]
+          }
+        }
+      },
       "server.details": {
         "slots": {
           "text": {

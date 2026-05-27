@@ -386,6 +386,49 @@ class LayoutGraphRepositoryTest {
         assertFalse(SurfaceId("ghost") in repo.value().surfaces, "absent-from-default surface should be removed on reset")
     }
 
+    @Test
+    fun `bundled-default surface added in a later release auto-seeds into user graph`() = runBlocking {
+        // Persist a graph that pre-dates the surface getting added to
+        // default-layout in the next release.
+        val priorDefault = LayoutGraph(
+            surfaces = mapOf(
+                SurfaceId("home.classic") to SurfaceLayout(
+                    slots = mapOf(SlotId("main") to SlotContent(widgets = emptyList())),
+                ),
+            ),
+        )
+        val priorRepo = LayoutGraphRepository(file, json, scope) { priorDefault }
+        priorRepo.flush()
+        assertTrue(Files.exists(file))
+
+        // New release adds a `about` surface to the bundled default.
+        val nextDefault = LayoutGraph(
+            surfaces = priorDefault.surfaces + (
+                SurfaceId("about") to SurfaceLayout(
+                    slots = mapOf(
+                        SlotId("left")  to SlotContent(widgets = emptyList()),
+                        SlotId("right") to SlotContent(widgets = emptyList()),
+                    ),
+                )
+            ),
+        )
+        val nextRepo = LayoutGraphRepository(file, json, scope) { nextDefault }
+        val loaded = nextRepo.value()
+
+        assertTrue(SurfaceId("about") in loaded.surfaces, "new bundled-default surface must auto-seed on load")
+        assertEquals(
+            nextDefault.surfaces[SurfaceId("about")],
+            loaded.surfaces[SurfaceId("about")],
+            "seeded surface must match the bundled default",
+        )
+        // Existing user data on prior surface is preserved untouched.
+        assertEquals(
+            priorDefault.surfaces[SurfaceId("home.classic")],
+            loaded.surfaces[SurfaceId("home.classic")],
+            "pre-existing surface in user graph must not be re-seeded over",
+        )
+    }
+
     // SlotPath compile-touch: ensure tests can construct one without
     // relying on widget-model internals leaking.
     @Suppress("unused")
