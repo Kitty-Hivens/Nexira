@@ -4,8 +4,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
@@ -43,15 +41,16 @@ fun NewHomeScreen(
         )
     }
     CompositionLocalProvider(LocalHomeNewContext provides ctx) {
-        // verticalScroll so a tall widget (or a stack of widgets that
-        // overflows the viewport) does not push subsequent widgets
-        // off-screen with no way to reach them. The surface owns its
-        // own scroll state; SlotRenderer stays layout-neutral.
-        val scrollState = rememberScrollState()
+        // No verticalScroll. The scroll modifier passes maxHeight =
+        // Infinity to children, which breaks LazyList-based widgets
+        // the user may drop into the slot via the editor. Plain
+        // Column distributes its bounded height; Lazy widgets manage
+        // their own viewport. A stack of fixed-height widgets that
+        // exceeds the pane overflows -- the per-surface reset action
+        // is the recovery path.
         Column(
             modifier            = Modifier
                 .fillMaxSize()
-                .verticalScroll(scrollState)
                 .padding(horizontal = 24.dp, vertical = 20.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
