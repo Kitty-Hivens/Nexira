@@ -181,10 +181,19 @@ private fun mutateNested(
 }
 
 // ── Compat overloads ──────────────────────────────────────────────────
-// These delegate to the SlotPath form; callers that still hand flat
-// (surface, slot) pairs keep working. New code should construct
-// SlotPath directly.
+// Transitional flat-coords forms. Deprecated to nudge callers onto the
+// SlotPath canonical form -- nested containers in Phase A.3 onward
+// cannot be expressed as (SurfaceId, SlotId) alone. Compat lives until
+// every in-tree caller migrates (tracked in the LayoutGraphMutations
+// test suite, which exercises the SlotPath path directly).
 
+@Deprecated(
+    message     = "Use SlotPath -- (SurfaceId, SlotId) cannot address nested container slots.",
+    replaceWith = ReplaceWith(
+        "insertWidget(SlotPath(surface, slot), widget, index)",
+        "hivens.widget.model.SlotPath",
+    ),
+)
 fun LayoutGraph.insertWidget(
     surface: SurfaceId,
     slot: SlotId,
@@ -192,12 +201,26 @@ fun LayoutGraph.insertWidget(
     index: Int,
 ): LayoutGraph = insertWidget(SlotPath(surface, slot), widget, index)
 
+@Deprecated(
+    message     = "Use SlotPath -- (SurfaceId, SlotId) cannot address nested container slots.",
+    replaceWith = ReplaceWith(
+        "removeWidget(SlotPath(surface, slot), instanceId)",
+        "hivens.widget.model.SlotPath",
+    ),
+)
 fun LayoutGraph.removeWidget(
     surface: SurfaceId,
     slot: SlotId,
     instanceId: String,
 ): LayoutGraph = removeWidget(SlotPath(surface, slot), instanceId)
 
+@Deprecated(
+    message     = "Use SlotPath -- (SurfaceId, SlotId) cannot address nested container slots.",
+    replaceWith = ReplaceWith(
+        "reorderInSlot(SlotPath(surface, slot), fromIndex, toIndex)",
+        "hivens.widget.model.SlotPath",
+    ),
+)
 fun LayoutGraph.reorderInSlot(
     surface: SurfaceId,
     slot: SlotId,
@@ -205,6 +228,13 @@ fun LayoutGraph.reorderInSlot(
     toIndex: Int,
 ): LayoutGraph = reorderInSlot(SlotPath(surface, slot), fromIndex, toIndex)
 
+@Deprecated(
+    message     = "Use SlotPath -- SlotAddress cannot address nested container slots.",
+    replaceWith = ReplaceWith(
+        "moveWidget(from.toPath(), to.toPath(), instanceId, toIndex)",
+        "hivens.widget.model.toPath",
+    ),
+)
 fun LayoutGraph.moveWidget(
     from: SlotAddress,
     to: SlotAddress,

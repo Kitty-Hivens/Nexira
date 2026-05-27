@@ -29,21 +29,24 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ViewQuilt
+import androidx.compose.material.icons.automirrored.filled.ViewSidebar
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.filled.ViewQuilt
-import androidx.compose.material.icons.filled.ViewSidebar
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Widgets
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -66,6 +69,8 @@ import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
@@ -99,6 +104,7 @@ import hivens.ui.widgets.shell.LocalLeftRailContext
 import hivens.ui.widgets.shell.LocalRightRailContext
 import hivens.widget.api.EmptySlotDecorator
 import hivens.widget.api.LocalEmptySlotDecorator
+import hivens.widget.api.LocalSlotPath
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.LocalStyle
 import hivens.widget.api.LocalWidgetDecorator
@@ -143,6 +149,7 @@ fun EditorSurfaceHost(
     var paletteOpen   by remember(availableSurfaces) { mutableStateOf(true) }
     var previewing    by remember(availableSurfaces) { mutableStateOf(false) }
     var presetPanelOpen by remember(availableSurfaces) { mutableStateOf(false) }
+    var resetSurfaceConfirm by remember(availableSurfaces) { mutableStateOf(false) }
     var selectedSurface by remember(availableSurfaces) {
         mutableStateOf(availableSurfaces.firstOrNull())
     }
@@ -168,6 +175,13 @@ fun EditorSurfaceHost(
     // Wrong-surface widgets render plain. Previewing temporarily
     // suppresses all chrome so the user can see the real look without
     // leaving edit mode.
+    //
+    // The decorator reads LocalSlotPath inside the @Composable lambda
+    // body (the lambda runs in composition because it's invoked from
+    // SlotRenderer's render path). The path identifies the full nested
+    // address of the widget being rendered; chrome uses it both as the
+    // registry key for drop-target bounds and to compose into nested
+    // slots correctly.
     val chromeDecorator: WidgetDecorator = remember(state, previewing) {
         if (state is EditModeState.On && !previewing) {
             val selected = state.surface
@@ -176,29 +190,29 @@ fun EditorSurfaceHost(
                     content()
                     return@decorator
                 }
+                val path = LocalSlotPath.current
                 EditableWidgetChrome(
-                    address      = address,
+                    path         = path,
                     index        = index,
                     descriptor   = descriptor,
                     instance     = instance,
                     controller   = dragController,
                     registry     = registry,
                     onRemove     = {
-                        controller.removeWidget(address.surface, address.slot, instance.instanceId)
+                        controller.removeWidget(path, instance.instanceId)
                     },
                     onCommitDrop = { committedPointer ->
                         // Hit-test which slot received the drop. Null =
                         // pointer is off any slot; treat as cancel.
-                        val targetSlot = registry.slotForPoint(committedPointer)
+                        val targetPath = registry.slotForPoint(committedPointer)
                             ?: return@EditableWidgetChrome
-                        val targetIdx = registry.insertionIndexInSlot(targetSlot, committedPointer)
-                        if (targetSlot == address) {
+                        val targetIdx = registry.insertionIndexInSlot(targetPath, committedPointer)
+                        if (targetPath == path) {
                             // Same slot -- reorder. -1 when moving down
                             // because removing the source shifts indices.
                             if (targetIdx != index) {
                                 controller.reorderInSlot(
-                                    surface   = address.surface,
-                                    slot      = address.slot,
+                                    path      = path,
                                     fromIndex = index,
                                     toIndex   = if (targetIdx > index) targetIdx - 1 else targetIdx,
                                 )
@@ -209,8 +223,8 @@ fun EditorSurfaceHost(
                             // index adjustment needed since the source
                             // slot is different.
                             controller.moveWidget(
-                                from       = address,
-                                to         = targetSlot,
+                                from       = path,
+                                to         = targetPath,
                                 instanceId = instance.instanceId,
                                 toIndex    = targetIdx,
                             )
@@ -225,14 +239,15 @@ fun EditorSurfaceHost(
     }
 
     // Empty-slot decorator: placeholder on every editable surface
-    // while edit mode is on. Chrome filtering is keyed to selection
-    // (interaction focus), but a palette drop should be able to land
-    // on any visible empty slot regardless of which surface chip the
-    // user happens to have active.
+    // while edit mode is on. Reads LocalSlotPath so a nested empty
+    // slot (container with no children) registers its bounds against
+    // the nested path key rather than colliding with another container
+    // at the same (surface, slot) leaf coords.
     val emptyDecorator: EmptySlotDecorator = remember(state, registry, previewing) {
         if (state is EditModeState.On && !previewing) {
-            { address ->
-                EmptySlotPlaceholder(address = address, registry = registry)
+            { _ ->
+                val path = LocalSlotPath.current
+                EmptySlotPlaceholder(path = path, registry = registry)
             }
         } else {
             {}
@@ -287,8 +302,38 @@ fun EditorSurfaceHost(
                     previewing        = previewing,
                     onTogglePreview   = { previewing = !previewing },
                     onOpenPresets     = { presetPanelOpen = true },
+                    onRequestReset    = { if (selectedSurface != null) resetSurfaceConfirm = true },
                     modifier          = Modifier.align(Alignment.TopCenter).padding(top = 16.dp),
                 )
+
+                val surfaceForReset = selectedSurface
+                if (resetSurfaceConfirm && surfaceForReset != null) {
+                    AlertDialog(
+                        onDismissRequest = { resetSurfaceConfirm = false },
+                        title            = { Text("Сбросить поверхность к умолчанию?") },
+                        text             = {
+                            Text(
+                                text = buildString {
+                                    append("\"")
+                                    append(humanSurfaceName(surfaceForReset))
+                                    append("\" вернётся к расстановке виджетов из встроенного default-layout. ")
+                                    append("Все локальные изменения на этой поверхности (добавленные виджеты, ")
+                                    append("перестановки, удаления) пропадут. Другие поверхности не тронем.")
+                                },
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                controller.resetSurface(surfaceForReset)
+                                resetSurfaceConfirm = false
+                            }) { Text("Сбросить", color = CelestiaTheme.colors.error) }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { resetSurfaceConfirm = false }) { Text("Отмена") }
+                        },
+                    )
+                }
 
                 PresetManagerPanel(
                     visible       = editing && presetPanelOpen,
@@ -452,6 +497,7 @@ private fun EditModePill(
     previewing: Boolean,
     onTogglePreview: () -> Unit,
     onOpenPresets: () -> Unit,
+    onRequestReset: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     AnimatedVisibility(
@@ -518,6 +564,22 @@ private fun EditModePill(
                     selected = false,
                     onClick  = onOpenPresets,
                 )
+                Spacer(Modifier.width(4.dp))
+
+                // Escape hatch: reset the currently selected surface
+                // to its bundled default. Destructive tint signals it
+                // is a different class of action from the neutral
+                // toggles next to it; confirmation dialog handled at
+                // host level. Disabled when no surface is selected so
+                // the chip cannot pretend to be live.
+                ToolChip(
+                    icon        = Icons.Default.RestartAlt,
+                    label       = "Сбросить",
+                    selected    = false,
+                    onClick     = onRequestReset,
+                    destructive = true,
+                    enabled     = selectedSurface != null,
+                )
                 Spacer(Modifier.width(10.dp))
 
                 Text(
@@ -570,15 +632,26 @@ private fun ToolChip(
     label: String,
     selected: Boolean,
     onClick: () -> Unit,
+    destructive: Boolean = false,
+    enabled: Boolean = true,
 ) {
-    val bg = if (selected) CelestiaTheme.colors.primary.copy(alpha = 0.18f)
-             else CelestiaTheme.colors.surfaceVariant.copy(alpha = 0.6f)
-    val fg = if (selected) CelestiaTheme.colors.primary else CelestiaTheme.colors.textPrimary
+    val bg = when {
+        !enabled    -> CelestiaTheme.colors.surfaceVariant.copy(alpha = 0.3f)
+        destructive -> CelestiaTheme.colors.error.copy(alpha = 0.12f)
+        selected    -> CelestiaTheme.colors.primary.copy(alpha = 0.18f)
+        else        -> CelestiaTheme.colors.surfaceVariant.copy(alpha = 0.6f)
+    }
+    val fg = when {
+        !enabled    -> CelestiaTheme.colors.textSecondary.copy(alpha = 0.45f)
+        destructive -> CelestiaTheme.colors.error
+        selected    -> CelestiaTheme.colors.primary
+        else        -> CelestiaTheme.colors.textPrimary
+    }
     Surface(color = bg, shape = RoundedCornerShape(12.dp)) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
-                .clickable { onClick() }
+                .clickable(enabled = enabled) { onClick() }
                 .padding(horizontal = 10.dp, vertical = 5.dp),
         ) {
             Icon(
@@ -592,7 +665,7 @@ private fun ToolChip(
                 text       = label,
                 style      = MaterialTheme.typography.labelSmall,
                 color      = fg,
-                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                fontWeight = if (selected || destructive) FontWeight.SemiBold else FontWeight.Medium,
             )
         }
     }
@@ -600,8 +673,8 @@ private fun ToolChip(
 
 private fun surfaceIcon(surface: SurfaceId): androidx.compose.ui.graphics.vector.ImageVector =
     when (surface.value) {
-        "appshell.leftrail"  -> Icons.Default.ViewSidebar
-        "appshell.rightrail" -> Icons.Default.ViewQuilt
+        "appshell.leftrail"  -> Icons.AutoMirrored.Filled.ViewSidebar
+        "appshell.rightrail" -> Icons.AutoMirrored.Filled.ViewQuilt
         else                 -> Icons.Default.Home
     }
 
@@ -655,18 +728,30 @@ private fun DragGhostOverlay(dragController: DragController) {
     // overlay. pointerHoverIcon does not intercept pointer events, so
     // the underlying drag handler keeps receiving updates.
     val transparentCursor = remember { transparentPointerIcon() }
+    // graphicsLayer.translationX/Y translates relative to the host
+    // Box's natural untranslated position, NOT window (0, 0). When the
+    // EditorSurfaceHost mounts inside AppLayout after the left rail
+    // (~64dp wide), the host's local origin is at window (railWidth,
+    // topbarHeight) -- applying pointer-in-window coords directly as
+    // translation drags the ghost away from the cursor by exactly that
+    // offset. Track the overlay's own window origin and subtract it so
+    // the ghost lands at the real pointer position.
+    var overlayOriginInWindow by remember { mutableStateOf(Offset.Zero) }
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .pointerHoverIcon(icon = transparentCursor, overrideDescendants = true),
+            .pointerHoverIcon(icon = transparentCursor, overrideDescendants = true)
+            .onGloballyPositioned { coords ->
+                overlayOriginInWindow = coords.boundsInWindow().topLeft
+            },
     ) {
         Box(
             modifier = Modifier
                 .graphicsLayer {
-                    val x = (active.pointerInWindow.x - active.pickupOffset.x)
-                    val y = (active.pointerInWindow.y - active.pickupOffset.y)
-                    translationX = x
-                    translationY = y
+                    val targetWindowX = active.pointerInWindow.x - active.pickupOffset.x
+                    val targetWindowY = active.pointerInWindow.y - active.pickupOffset.y
+                    translationX = targetWindowX - overlayOriginInWindow.x
+                    translationY = targetWindowY - overlayOriginInWindow.y
                     alpha        = 0.78f
                     scaleX       = 1.04f
                     scaleY       = 1.04f

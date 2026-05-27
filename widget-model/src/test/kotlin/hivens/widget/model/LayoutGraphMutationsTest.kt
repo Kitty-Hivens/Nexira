@@ -264,4 +264,33 @@ class LayoutGraphMutationsTest {
         val ids = seedNested().walkInstances().map { it.instanceId }.toList()
         assertEquals(listOf("container1", "i1", "i2"), ids)
     }
+
+    @Test
+    fun `insertWidget into a nested slot the container did not declare is identity`() {
+        // Pin the contract: the LayoutGraph mutator does NOT auto-create
+        // missing child slot entries. The editor (EditModeController)
+        // is responsible for pre-seeding container children from the
+        // descriptor's declared slots when a container lands fresh from
+        // the palette. Without that pre-seed, dropping a widget INTO
+        // the freshly-added container would silently no-op here.
+        val bareContainer = WidgetInstance(
+            kind       = WidgetKind("container.group"),
+            instanceId = "ctr-without-body",
+            // children intentionally empty -- mimics a buggy editor
+            // path that forgot to pre-seed.
+        )
+        val graph = LayoutGraph(
+            surfaces = mapOf(
+                home to SurfaceLayout(slots = mapOf(
+                    main to SlotContent(listOf(bareContainer)),
+                )),
+            ),
+        )
+        val nestedPath = SlotPath(
+            surface  = home,
+            rootSlot = main,
+            nested   = listOf(NestedSegment("ctr-without-body", SlotId("body"))),
+        )
+        assertSame(graph, graph.insertWidget(nestedPath, w1, 0))
+    }
 }
