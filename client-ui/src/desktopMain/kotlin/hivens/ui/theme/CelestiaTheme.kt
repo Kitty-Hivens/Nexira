@@ -127,13 +127,22 @@ fun CelestiaTheme(
         if (customization.experimentalColorOverridesEnabled && customization.colorOverrides.isNotEmpty()) {
             val o = customization.colorOverrides
             c = c.copy(
-                primary    = o[ColorRole.PRIMARY]?.let(::parseHexColorOrNull)    ?: c.primary,
-                secondary  = o[ColorRole.SECONDARY]?.let(::parseHexColorOrNull)  ?: c.secondary,
-                background = o[ColorRole.BACKGROUND]?.let(::parseHexColorOrNull) ?: c.background,
-                surface    = o[ColorRole.SURFACE]?.let(::parseHexColorOrNull)    ?: c.surface,
-                success    = o[ColorRole.SUCCESS]?.let(::parseHexColorOrNull)    ?: c.success,
-                error      = o[ColorRole.ERROR]?.let(::parseHexColorOrNull)      ?: c.error,
-                outline    = o[ColorRole.OUTLINE]?.let(::parseHexColorOrNull)    ?: c.outline,
+                primary        = o[ColorRole.PRIMARY]?.let(::parseHexColorOrNull)        ?: c.primary,
+                secondary      = o[ColorRole.SECONDARY]?.let(::parseHexColorOrNull)      ?: c.secondary,
+                background     = o[ColorRole.BACKGROUND]?.let(::parseHexColorOrNull)     ?: c.background,
+                surface        = o[ColorRole.SURFACE]?.let(::parseHexColorOrNull)        ?: c.surface,
+                success        = o[ColorRole.SUCCESS]?.let(::parseHexColorOrNull)        ?: c.success,
+                error          = o[ColorRole.ERROR]?.let(::parseHexColorOrNull)          ?: c.error,
+                outline        = o[ColorRole.OUTLINE]?.let(::parseHexColorOrNull)        ?: c.outline,
+                // editor-4 additions
+                textPrimary    = o[ColorRole.TEXT_PRIMARY]?.let(::parseHexColorOrNull)   ?: c.textPrimary,
+                textSecondary  = o[ColorRole.TEXT_SECONDARY]?.let(::parseHexColorOrNull) ?: c.textSecondary,
+                progressAccent = o[ColorRole.PROGRESS_ACCENT]?.let(::parseHexColorOrNull) ?: c.progressAccent,
+                warnAccent     = o[ColorRole.WARN_ACCENT]?.let(::parseHexColorOrNull)    ?: c.warnAccent,
+                criticalAccent = o[ColorRole.CRITICAL_ACCENT]?.let(::parseHexColorOrNull) ?: c.criticalAccent,
+                // GLASS_ALPHA stored as plain "0.55" string in the
+                // overrides map; parse to Float and clamp.
+                glassAlpha     = o[ColorRole.GLASS_ALPHA]?.toFloatOrNull()?.coerceIn(0f, 1f) ?: c.glassAlpha,
             )
         }
         c

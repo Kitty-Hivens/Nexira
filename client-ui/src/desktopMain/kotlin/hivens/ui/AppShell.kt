@@ -57,6 +57,7 @@ import hivens.ui.screens.ConsoleWindow
 import hivens.ui.screens.MigrationScreen
 import hivens.ui.theme.BrutStyle
 import hivens.ui.theme.CelestiaStyle
+import hivens.ui.theme.applyOverrides
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.CustomTheme
 import hivens.ui.theme.ThemeManager
@@ -188,10 +189,16 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
     var homeView      by remember { mutableStateOf(settings.homeView) }
     var uiStyle       by remember { mutableStateOf(settings.uiStyle) }
 
-    val styleSpec = when (uiStyle) {
+    val basePresetStyle = when (uiStyle) {
         UiStyle.Celestia -> CelestiaStyle
         UiStyle.Brut     -> BrutStyle
     }
+    // Preset-only spec at this level -- customization (and the
+    // editor-4 style overrides) live inside AppRoot. AprilFools
+    // tracks the preset value; the overridden value flows through
+    // LocalStyle further down for composables that need the
+    // user-tweaked tokens.
+    val styleSpec = basePresetStyle
 
     // Push style coupling into AprilFools so the chaos engine (a plain
     // singleton, not a Composable) and chaos components pick up the
@@ -576,10 +583,15 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
                 LocalLayoutGraph                         provides layoutGraph,
                 LocalWidgetRegistry                      provides widgetRegistry,
             ) {
+            val effectiveStyle = if (customization.experimentalColorOverridesEnabled) {
+                styleSpec.applyOverrides(customization.styleOverrides)
+            } else {
+                styleSpec
+            }
             CelestiaTheme(
                 useDarkTheme = isDarkTheme,
                 customTheme  = customTheme,
-                style        = styleSpec,
+                style        = effectiveStyle,
             ) {
                 val migration = boot.pendingMigration
                 if (migration != null) {
