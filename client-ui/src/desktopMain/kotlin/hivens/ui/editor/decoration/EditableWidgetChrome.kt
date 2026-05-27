@@ -12,6 +12,9 @@ import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -45,6 +48,7 @@ import hivens.ui.editor.dnd.DropTargetRegistry
 import hivens.ui.editor.dnd.dragSource
 import hivens.ui.editor.dnd.widgetBounds
 import hivens.ui.theme.CelestiaTheme
+import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.WidgetDescriptor
 import hivens.widget.model.SlotAddress
 import hivens.widget.model.WidgetInstance
@@ -75,6 +79,20 @@ fun EditableWidgetChrome(
     val isThisDragging = (activeDrag?.payload as? DragPayload.ExistingWidget)
         ?.instance?.instanceId == instance.instanceId
 
+    // Drop-indicator hit test. Reading controller.active recomposes on
+    // every pointer update; the registry queries are O(widgets-in-slot)
+    // and cheap enough to do per-frame for the few dozen widgets a
+    // surface can hold.
+    val graph = LocalLayoutGraph.current
+    val slotCount = graph.surfaces[address.surface]?.slots?.get(address.slot)?.widgets?.size ?: 0
+    val isLastInSlot = index == slotCount - 1
+    val dropTargetSlot = activeDrag?.let { registry.slotForPoint(it.pointerInWindow) }
+    val dropInsertionIdx = if (activeDrag != null && dropTargetSlot == address) {
+        registry.insertionIndexInSlot(address, activeDrag.pointerInWindow)
+    } else -1
+    val showIndicatorBefore = dropInsertionIdx == index
+    val showIndicatorAfter  = isLastInSlot && dropInsertionIdx == slotCount
+
     // The ghost lambda is invoked by DragGhostOverlay at the host
     // level -- outside the surface composable's CompositionLocalProvider
     // chain. Widgets like HomeNewRecent read surface-scoped locals
@@ -97,84 +115,103 @@ fun EditableWidgetChrome(
         label         = "edit-border-alpha",
     )
 
-    Box(
-        modifier = Modifier
-            .hoverable(interaction)
-            .onGloballyPositioned { coords: LayoutCoordinates ->
-                val rect = coords.boundsInWindow()
-                widgetWindowBounds = rect
-                registry.registerWidget(address, instance.instanceId, index, rect)
-            }
-            .widgetBounds(registry, address, instance.instanceId, index)
-            .padding(2.dp)
-            .border(
-                width = 1.dp,
-                color = CelestiaTheme.colors.primary.copy(alpha = borderAlpha),
-                shape = RoundedCornerShape(8.dp),
-            ),
-    ) {
-        Box(Modifier.alpha(sourceAlpha)) { content() }
-
-        // Drag handle: always visible (so the user discovers it),
-        // brightens on hover. Attached pointerInput drives the drag.
-        Surface(
-            color    = CelestiaTheme.colors.surface.copy(alpha = if (isHovered) 0.95f else 0.65f),
-            shape    = RoundedCornerShape(6.dp),
-            shadowElevation = 0.dp,
+    Column(modifier = Modifier.fillMaxWidth()) {
+        if (showIndicatorBefore) DropIndicator()
+        Box(
             modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(4.dp)
-                .size(22.dp)
-                .dragSource(
-                    controller            = controller,
-                    payload               = DragPayload.ExistingWidget(address, index, instance),
-                    widgetBoundsProvider  = { widgetWindowBounds },
-                    ghost                 = {
-                        CompositionLocalProvider(capturedLocals) { content() }
-                    },
-                    onDragEnd             = onCommitDrop,
+                .padding(vertical = 4.dp)
+                .hoverable(interaction)
+                .onGloballyPositioned { coords: LayoutCoordinates ->
+                    val rect = coords.boundsInWindow()
+                    widgetWindowBounds = rect
+                    registry.registerWidget(address, instance.instanceId, index, rect)
+                }
+                .widgetBounds(registry, address, instance.instanceId, index)
+                .padding(2.dp)
+                .border(
+                    width = 1.dp,
+                    color = CelestiaTheme.colors.primary.copy(alpha = borderAlpha),
+                    shape = RoundedCornerShape(8.dp),
                 ),
         ) {
-            Icon(
-                imageVector        = Icons.Default.DragIndicator,
-                contentDescription = "Drag to reorder",
-                tint               = CelestiaTheme.colors.textSecondary,
-                modifier           = Modifier.size(16.dp).padding(0.dp),
-            )
-        }
+            Box(Modifier.alpha(sourceAlpha)) { content() }
 
-        // Remove button: hover-only, hidden on non-removable widgets.
-        // Animated fade so it does not pop in jarringly.
-        AnimatedVisibility(
-            visible  = isHovered && descriptor.removable,
-            enter    = fadeIn(spring(stiffness = Spring.StiffnessMedium)),
-            exit     = fadeOut(spring(stiffness = Spring.StiffnessMedium)),
-            modifier = Modifier.align(Alignment.TopEnd).padding(4.dp),
-        ) {
+            // Drag handle: always visible (so the user discovers it),
+            // brightens on hover. Attached pointerInput drives the drag.
             Surface(
-                color    = CelestiaTheme.colors.error.copy(alpha = 0.85f),
+                color    = CelestiaTheme.colors.surface.copy(alpha = if (isHovered) 0.95f else 0.65f),
                 shape    = RoundedCornerShape(6.dp),
+                shadowElevation = 0.dp,
                 modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(4.dp)
                     .size(22.dp)
-                    .pointerInput(instance.instanceId) {
-                        awaitPointerEventScope {
-                            while (true) {
-                                val event = awaitPointerEvent()
-                                if (event.type == PointerEventType.Release) {
-                                    onRemove()
-                                    event.changes.forEach { it.consume() }
-                                }
-                            }
-                        }
-                    },
+                    .dragSource(
+                        controller            = controller,
+                        payload               = DragPayload.ExistingWidget(address, index, instance),
+                        widgetBoundsProvider  = { widgetWindowBounds },
+                        ghost                 = {
+                            CompositionLocalProvider(capturedLocals) { content() }
+                        },
+                        onDragEnd             = onCommitDrop,
+                    ),
             ) {
                 Icon(
-                    imageVector        = Icons.Default.Close,
-                    contentDescription = "Remove widget",
-                    tint               = Color.White,
-                    modifier           = Modifier.size(14.dp).padding(0.dp).graphicsLayer { },
+                    imageVector        = Icons.Default.DragIndicator,
+                    contentDescription = "Drag to reorder",
+                    tint               = CelestiaTheme.colors.textSecondary,
+                    modifier           = Modifier.size(16.dp).padding(0.dp),
                 )
             }
+
+            // Remove button: hover-only, hidden on non-removable widgets.
+            // Animated fade so it does not pop in jarringly. Qualified
+            // with this@Column because the inner Box sits inside the
+            // outer drop-indicator Column, and Kotlin would otherwise
+            // try ColumnScope.AnimatedVisibility against a BoxScope `this`.
+            this@Column.AnimatedVisibility(
+                visible  = isHovered && descriptor.removable,
+                enter    = fadeIn(spring(stiffness = Spring.StiffnessMedium)),
+                exit     = fadeOut(spring(stiffness = Spring.StiffnessMedium)),
+                modifier = Modifier.align(Alignment.TopEnd).padding(4.dp),
+            ) {
+                Surface(
+                    color    = CelestiaTheme.colors.error.copy(alpha = 0.85f),
+                    shape    = RoundedCornerShape(6.dp),
+                    modifier = Modifier
+                        .size(22.dp)
+                        .pointerInput(instance.instanceId) {
+                            awaitPointerEventScope {
+                                while (true) {
+                                    val event = awaitPointerEvent()
+                                    if (event.type == PointerEventType.Release) {
+                                        onRemove()
+                                        event.changes.forEach { it.consume() }
+                                    }
+                                }
+                            }
+                        },
+                ) {
+                    Icon(
+                        imageVector        = Icons.Default.Close,
+                        contentDescription = "Remove widget",
+                        tint               = Color.White,
+                        modifier           = Modifier.size(14.dp).padding(0.dp).graphicsLayer { },
+                    )
+                }
+            }
         }
+        if (showIndicatorAfter) DropIndicator()
     }
+}
+
+@Composable
+private fun DropIndicator() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(2.dp)
+            .padding(horizontal = 4.dp)
+            .background(CelestiaTheme.colors.primary),
+    )
 }

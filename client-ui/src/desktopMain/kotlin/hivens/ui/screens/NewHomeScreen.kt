@@ -1,5 +1,6 @@
 package hivens.ui.screens
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -40,7 +41,10 @@ fun NewHomeScreen(
         )
     }
     CompositionLocalProvider(LocalHomeNewContext provides ctx) {
-        Column(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 20.dp)) {
+        Column(
+            modifier            = Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             SlotRenderer(SurfaceId(SURFACE), SlotId("main"))
         }
     }
