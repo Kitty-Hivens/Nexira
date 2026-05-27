@@ -9,4 +9,5 @@ object Storage {
     const val PACKS_FILE            = "packs.json"
     const val SERVERS_CACHE_FILE    = "servers-cache.json"
     const val LAYOUT_GRAPH_FILE     = "layout-graph.json"
+    const val PRESETS_DIR           = "presets"
 }

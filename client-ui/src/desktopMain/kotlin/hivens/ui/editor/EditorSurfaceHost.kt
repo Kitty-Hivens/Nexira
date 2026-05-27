@@ -32,6 +32,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.ViewQuilt
 import androidx.compose.material.icons.filled.ViewSidebar
@@ -69,7 +70,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import hivens.core.data.HomeView
+import hivens.core.data.UiStyle
+import hivens.launcher.LayoutGraphRepository
 import hivens.ui.Screen
+import hivens.ui.customization.CustomizationSettings
+import hivens.widget.api.LocalLayoutGraph
+import kotlinx.coroutines.CoroutineScope as KotlinCoroutineScope
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
 import hivens.ui.editor.decoration.EditableWidgetChrome
 import hivens.ui.editor.decoration.EmptySlotPlaceholder
 import hivens.ui.editor.dnd.DragController
@@ -78,6 +86,10 @@ import hivens.ui.editor.dnd.DropTargetRegistry
 import hivens.ui.editor.dnd.LocalDragController
 import hivens.ui.editor.dnd.LocalDropTargetRegistry
 import hivens.ui.editor.palette.WidgetPalettePanel
+import hivens.ui.editor.presets.PresetEnvelope
+import hivens.ui.editor.presets.PresetManagerPanel
+import hivens.ui.editor.presets.PresetMeta
+import hivens.ui.editor.presets.PresetRepository
 import hivens.ui.widgets.home.classic.LocalHomeClassicContext
 import hivens.ui.widgets.home.new.LocalHomeNewContext
 import hivens.ui.widgets.library.LocalLibraryContext
@@ -111,19 +123,28 @@ import org.koin.compose.koinInject
 fun EditorSurfaceHost(
     currentScreen: Screen,
     homeView: HomeView,
+    customization: CustomizationSettings = CustomizationSettings(),
+    onCustomizationChanged: (CustomizationSettings) -> Unit = {},
+    uiStyle: UiStyle = UiStyle.Celestia,
+    onUiStyleChanged: (UiStyle) -> Unit = {},
     content: @Composable () -> Unit,
 ) {
     val availableSurfaces: List<SurfaceId> = remember(currentScreen, homeView) {
         availableSurfacesFor(currentScreen, homeView)
     }
     val controller: EditModeController = koinInject()
+    val layoutRepo: LayoutGraphRepository = koinInject()
+    val presetRepo: PresetRepository      = koinInject()
+    val coroutineScope = rememberCoroutineScope()
 
     var editing       by remember(availableSurfaces) { mutableStateOf(false) }
     var paletteOpen   by remember(availableSurfaces) { mutableStateOf(true) }
     var previewing    by remember(availableSurfaces) { mutableStateOf(false) }
+    var presetPanelOpen by remember(availableSurfaces) { mutableStateOf(false) }
     var selectedSurface by remember(availableSurfaces) {
         mutableStateOf(availableSurfaces.firstOrNull())
     }
+    val currentGraph = LocalLayoutGraph.current
     // Leaving a surface drops edit mode -- avoids a stale edit state
     // pointed at the wrong surface after navigation.
     val state: EditModeState = remember(editing, selectedSurface) {
@@ -264,7 +285,59 @@ fun EditorSurfaceHost(
                     onTogglePalette   = { paletteOpen = !paletteOpen },
                     previewing        = previewing,
                     onTogglePreview   = { previewing = !previewing },
+                    onOpenPresets     = { presetPanelOpen = true },
                     modifier          = Modifier.align(Alignment.TopCenter).padding(top = 16.dp),
+                )
+
+                PresetManagerPanel(
+                    visible       = editing && presetPanelOpen,
+                    onDismiss     = { presetPanelOpen = false },
+                    onSaveCurrent = { name ->
+                        val envelope = PresetEnvelope(
+                            name          = name,
+                            createdAt     = System.currentTimeMillis(),
+                            graph         = currentGraph,
+                            customization = customization,
+                            uiStyle       = uiStyle,
+                        )
+                        coroutineScope.launch {
+                            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                presetRepo.save(envelope)
+                            }
+                        }
+                    },
+                    onLoad = { meta ->
+                        coroutineScope.launch {
+                            val env = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                presetRepo.load(meta.name)
+                            } ?: return@launch
+                            layoutRepo.update { env.graph }
+                            onCustomizationChanged(env.customization)
+                            onUiStyleChanged(env.uiStyle)
+                            presetPanelOpen = false
+                        }
+                    },
+                    onDelete = { meta ->
+                        coroutineScope.launch {
+                            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                presetRepo.delete(meta.name)
+                            }
+                        }
+                    },
+                    onExport = { meta ->
+                        // Open the parent dir in the OS file manager and
+                        // let the user copy from there. Avoids depending
+                        // on a save-file dialog API that the current
+                        // FileKit version does not expose.
+                        coroutineScope.launch {
+                            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                runCatching {
+                                    java.awt.Desktop.getDesktop().open(meta.sourcePath.parent.toFile())
+                                }
+                            }
+                        }
+                    },
+                    listProvider = { presetRepo.list() },
                 )
 
                 WidgetPalettePanel(
@@ -377,6 +450,7 @@ private fun EditModePill(
     onTogglePalette: () -> Unit,
     previewing: Boolean,
     onTogglePreview: () -> Unit,
+    onOpenPresets: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     AnimatedVisibility(
@@ -433,6 +507,15 @@ private fun EditModePill(
                     label    = if (paletteOpen) "Скрыть" else "Виджеты",
                     selected = paletteOpen,
                     onClick  = onTogglePalette,
+                )
+                Spacer(Modifier.width(4.dp))
+
+                // Presets dialog.
+                ToolChip(
+                    icon     = Icons.Default.Inventory2,
+                    label    = "Пресеты",
+                    selected = false,
+                    onClick  = onOpenPresets,
                 )
                 Spacer(Modifier.width(10.dp))
 
