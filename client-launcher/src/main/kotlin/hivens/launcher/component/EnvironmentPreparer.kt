@@ -29,6 +29,20 @@ class EnvironmentPreparer(private val clientProvider: HttpClientProvider) {
     )
     private val lwjgl3Version = "3.3.3"
 
+    // Mirrors tried in order until one succeeds. Mojang's libraries CDN
+    // is FIRST because Maven Central removed legacy LWJGL2 nightly
+    // SNAPSHOT artifacts (the 2.9.4-nightly-20150209 build that 1.12.x
+    // packs reference) from its public index; libraries.minecraft.net
+    // still serves them and matches the same /maven2/-style path layout
+    // that the rest of the Minecraft launcher ecosystem expects.
+    // repo1.maven.org stays as a fallback for the niche where Mojang's
+    // CDN ever blackouts and for the more modern LWJGL3 artifacts that
+    // Mojang doesn't itself rebroadcast.
+    private val nativesMirrors = listOf(
+        "https://libraries.minecraft.net",
+        "https://repo1.maven.org/maven2",
+    )
+
     suspend fun prepareNatives(clientRoot: Path, nativesDirName: String, version: String) = withContext(Dispatchers.IO) {
         val binDir = clientRoot.resolve("bin")
         val nativesDir = clientRoot.resolve(nativesDirName)
@@ -96,58 +110,77 @@ class EnvironmentPreparer(private val clientProvider: HttpClientProvider) {
     }
 
     /**
-     * Downloading for old versions (1.7.10, 1.12.2) -> LWJGL 2
+     * Downloading for old versions (1.7.10, 1.12.2) -> LWJGL 2.
+     *
+     * The 2.9.4-nightly-20150209 build that 1.12.x references is no
+     * longer on Maven Central (snapshot artifacts purged from the
+     * public index). libraries.minecraft.net mirrors the legacy native
+     * jars under the same /maven2/-style path layout and is the
+     * canonical source the wider Minecraft launcher ecosystem uses for
+     * exactly this case.
      */
     private suspend fun downloadLegacyLWJGL2(destDir: Path, os: String, version: String) {
         val mavenOs = if (os == "macos") "macosx" else os // LWJGL 2 used 'macosx'
 
-        // List of files for LWJGL 2
-        val artifacts = mapOf(
-            "https://repo1.maven.org/maven2/org/lwjgl/lwjgl/lwjgl-platform/$version/lwjgl-platform-$version-natives-$mavenOs.jar" to "lwjgl_platform",
-            "https://repo1.maven.org/maven2/net/java/jinput/jinput-platform/2.0.5/jinput-platform-2.0.5-natives-$mavenOs.jar" to "jinput_platform"
+        val artifactPaths = listOf(
+            "org/lwjgl/lwjgl/lwjgl-platform/$version/lwjgl-platform-$version-natives-$mavenOs.jar",
+            "net/java/jinput/jinput-platform/2.0.5/jinput-platform-2.0.5-natives-$mavenOs.jar",
         )
 
-
-        artifacts.keys.forEach { url ->
-            downloadAndUnzip(url, destDir)
+        artifactPaths.forEach { path ->
+            downloadAndUnzipFromMirrors(path, destDir)
         }
     }
 
     /**
-     * Download for new versions (1.13+) -> LWJGL 3
+     * Download for new versions (1.13+) -> LWJGL 3.
+     * Modern LWJGL3 lives on Maven Central; Mojang also rebroadcasts
+     * it via libraries.minecraft.net. Either mirror works.
      */
     private suspend fun downloadModernLWJGL3(destDir: Path, os: String) {
         val mavenOsClassifier = "natives-$os"
-        val baseUrl = "https://repo1.maven.org/maven2/org/lwjgl"
 
         log.info("Downloading LWJGL $lwjgl3Version natives...")
 
         for (module in lwjgl3Modules) {
             val fileName = "$module-$lwjgl3Version-$mavenOsClassifier.jar"
-            val url = "$baseUrl/$module/$lwjgl3Version/$fileName"
-            downloadAndUnzip(url, destDir)
+            val path = "org/lwjgl/$module/$lwjgl3Version/$fileName"
+            downloadAndUnzipFromMirrors(path, destDir)
         }
     }
 
-    private suspend fun downloadAndUnzip(urlStr: String, destDir: Path) {
-        try {
-            log.info("Downloading: $urlStr")
-            val tempJar = Files.createTempFile("aura_native_", ".jar")
+    /**
+     * Tries each mirror in order; returns once one succeeds. Logs
+     * every miss so a future infra change (mirror retired, certificate
+     * expired, geo-block) shows up clearly in launcher.log instead of
+     * looking like a transient network blip.
+     */
+    private suspend fun downloadAndUnzipFromMirrors(artifactPath: String, destDir: Path) {
+        for (mirror in nativesMirrors) {
+            val url = "$mirror/$artifactPath"
+            if (tryDownloadAndUnzip(url, destDir)) return
+        }
+        log.error("All mirrors exhausted for $artifactPath -- natives directory will be incomplete")
+    }
 
-            try {
-                httpClient.prepareGet(urlStr).execute { httpResponse ->
-                    if (!httpResponse.status.isSuccess()) throw IOException("HTTP ${httpResponse.status}")
-                    val channel = httpResponse.bodyAsChannel()
-                    FileOutputStream(tempJar.toFile()).use { fos ->
-                        channel.copyTo(fos)
-                    }
+    private suspend fun tryDownloadAndUnzip(urlStr: String, destDir: Path): Boolean {
+        log.info("Downloading: $urlStr")
+        val tempJar = Files.createTempFile("aura_native_", ".jar")
+        return try {
+            httpClient.prepareGet(urlStr).execute { httpResponse ->
+                if (!httpResponse.status.isSuccess()) throw IOException("HTTP ${httpResponse.status}")
+                val channel = httpResponse.bodyAsChannel()
+                FileOutputStream(tempJar.toFile()).use { fos ->
+                    channel.copyTo(fos)
                 }
-                ZipUtils.unzip(tempJar.toFile(), destDir.toFile())
-            } finally {
-                Files.deleteIfExists(tempJar)
             }
+            ZipUtils.unzip(tempJar.toFile(), destDir.toFile())
+            true
         } catch (e: Exception) {
-            log.error("Failed to fetch/unzip: $urlStr", e)
+            log.warn("Mirror miss: $urlStr ({})", e.message)
+            false
+        } finally {
+            Files.deleteIfExists(tempJar)
         }
     }
 
