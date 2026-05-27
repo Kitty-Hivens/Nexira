@@ -84,7 +84,7 @@ fun PaletteItem(
                 onDragEnd             = { pointer ->
                     val targetPath = registry.slotForPoint(pointer) ?: return@dragSource
                     val index = registry.insertionIndexInSlot(targetPath, pointer)
-                    editController.addWidget(targetPath, descriptor.kind, index)
+                    editController.addWidget(targetPath, descriptor.kind, descriptor.slots, index)
                 },
             )
             .padding(horizontal = 10.dp, vertical = 8.dp),

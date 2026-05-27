@@ -1,6 +1,8 @@
 package hivens.ui.editor
 
 import hivens.launcher.LayoutGraphRepository
+import hivens.widget.model.SlotContent
+import hivens.widget.model.SlotId
 import hivens.widget.model.SlotPath
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
@@ -26,9 +28,29 @@ class EditModeController(
     private val repo: LayoutGraphRepository,
     private val scope: CoroutineScope,
 ) {
-    fun addWidget(path: SlotPath, kind: WidgetKind, index: Int) {
+    // `slots` comes from the widget's descriptor and pre-seeds the
+    // WidgetInstance.children map with empty SlotContent for every
+    // declared slot. Without this, a freshly palette-added container
+    // ships with children == emptyMap; LayoutGraph.mutateNested then
+    // sees `container.children[slot] == null` and identity-returns
+    // when the user tries to drop something INTO the container --
+    // the container appears "alive" because the empty placeholder
+    // registers bounds, but nothing actually persists. Pre-seeding
+    // happens at the editor layer because the LayoutGraph layer
+    // intentionally rejects undeclared slots (no auto-create), so
+    // typo-protection stays at the model boundary.
+    fun addWidget(path: SlotPath, kind: WidgetKind, slots: List<SlotId>, index: Int) {
         scope.launch {
-            val widget = WidgetInstance(kind = kind, instanceId = newInstanceId())
+            val children = if (slots.isEmpty()) {
+                emptyMap()
+            } else {
+                slots.associateWith { SlotContent() }
+            }
+            val widget = WidgetInstance(
+                kind       = kind,
+                instanceId = newInstanceId(),
+                children   = children,
+            )
             repo.update { it.insertWidget(path, widget, index) }
         }
     }
