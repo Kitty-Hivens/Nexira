@@ -58,8 +58,16 @@ fun WidgetPalettePanel(
     modifier: Modifier = Modifier,
 ) {
     val registry0 = LocalWidgetRegistry.current
+    // Only removable descriptors enter the palette. Non-removable
+    // widgets (auth panel, nav.settings, bundled navbuttons) are
+    // surface-essential: shipping a default layout pins exactly one
+    // instance, and the chrome hides the remove button for them. If
+    // the palette also exposed them, the user could drop duplicates
+    // into arbitrary slots and never be able to remove them.
     val descriptors = remember(registry0) {
-        registry0.all().values.sortedBy { it.displayName.lowercase() }
+        registry0.all().values
+            .filter { it.removable }
+            .sortedBy { it.displayName.lowercase() }
     }
 
     AnimatedVisibility(
