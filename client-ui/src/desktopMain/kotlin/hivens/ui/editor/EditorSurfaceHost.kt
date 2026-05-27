@@ -565,13 +565,18 @@ private fun EditModePill(
                 Spacer(Modifier.width(4.dp))
 
                 // Escape hatch: reset the currently selected surface
-                // to its bundled default. Confirmation dialog handled
-                // at host level; the chip just signals intent.
+                // to its bundled default. Destructive tint signals it
+                // is a different class of action from the neutral
+                // toggles next to it; confirmation dialog handled at
+                // host level. Disabled when no surface is selected so
+                // the chip cannot pretend to be live.
                 ToolChip(
-                    icon     = Icons.Default.RestartAlt,
-                    label    = "Сбросить",
-                    selected = false,
-                    onClick  = onRequestReset,
+                    icon        = Icons.Default.RestartAlt,
+                    label       = "Сбросить",
+                    selected    = false,
+                    onClick     = onRequestReset,
+                    destructive = true,
+                    enabled     = selectedSurface != null,
                 )
                 Spacer(Modifier.width(10.dp))
 
@@ -625,15 +630,26 @@ private fun ToolChip(
     label: String,
     selected: Boolean,
     onClick: () -> Unit,
+    destructive: Boolean = false,
+    enabled: Boolean = true,
 ) {
-    val bg = if (selected) CelestiaTheme.colors.primary.copy(alpha = 0.18f)
-             else CelestiaTheme.colors.surfaceVariant.copy(alpha = 0.6f)
-    val fg = if (selected) CelestiaTheme.colors.primary else CelestiaTheme.colors.textPrimary
+    val bg = when {
+        !enabled    -> CelestiaTheme.colors.surfaceVariant.copy(alpha = 0.3f)
+        destructive -> CelestiaTheme.colors.error.copy(alpha = 0.12f)
+        selected    -> CelestiaTheme.colors.primary.copy(alpha = 0.18f)
+        else        -> CelestiaTheme.colors.surfaceVariant.copy(alpha = 0.6f)
+    }
+    val fg = when {
+        !enabled    -> CelestiaTheme.colors.textSecondary.copy(alpha = 0.45f)
+        destructive -> CelestiaTheme.colors.error
+        selected    -> CelestiaTheme.colors.primary
+        else        -> CelestiaTheme.colors.textPrimary
+    }
     Surface(color = bg, shape = RoundedCornerShape(12.dp)) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
-                .clickable { onClick() }
+                .clickable(enabled = enabled) { onClick() }
                 .padding(horizontal = 10.dp, vertical = 5.dp),
         ) {
             Icon(
@@ -647,7 +663,7 @@ private fun ToolChip(
                 text       = label,
                 style      = MaterialTheme.typography.labelSmall,
                 color      = fg,
-                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                fontWeight = if (selected || destructive) FontWeight.SemiBold else FontWeight.Medium,
             )
         }
     }

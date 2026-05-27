@@ -134,7 +134,14 @@ class DropTargetRegistry {
         fun consider(rect: Rect, path: SlotPath) {
             if (!rect.contains(pointInWindow)) return
             val area = rect.width * rect.height
-            if (area < bestArea) {
+            // Tie-break by nested depth so two overlapping rects of
+            // identical area resolve deterministically -- without this
+            // the winner depends on SnapshotStateMap iteration order
+            // (unspecified), and a hit-test that flickers between two
+            // candidates would feel like the editor is jumping.
+            val current = best
+            val currentDepth = current?.nested?.size ?: -1
+            if (area < bestArea || (area == bestArea && path.nested.size > currentDepth)) {
                 best = path
                 bestArea = area
             }

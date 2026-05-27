@@ -208,8 +208,8 @@ fun EditableWidgetChrome(
                 ) {
                     Icon(
                         imageVector        = Icons.Default.Close,
-                        contentDescription = "Remove widget",
-                        tint               = Color.White,
+                        contentDescription = "Удалить",
+                        tint               = CelestiaTheme.colors.onPrimary,
                         modifier           = Modifier.size(14.dp).padding(0.dp).graphicsLayer { },
                     )
                 }
@@ -249,8 +249,8 @@ fun EditableWidgetChrome(
                 ) {
                     Icon(
                         imageVector        = Icons.Default.DeleteForever,
-                        contentDescription = "Force remove non-removable widget",
-                        tint               = Color.White,
+                        contentDescription = "Удалить принудительно",
+                        tint               = CelestiaTheme.colors.onPrimary,
                         modifier           = Modifier.size(14.dp).padding(0.dp),
                     )
                 }
