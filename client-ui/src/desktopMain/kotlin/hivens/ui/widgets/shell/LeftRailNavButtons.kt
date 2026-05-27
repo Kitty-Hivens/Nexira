@@ -34,7 +34,11 @@ import hivens.widget.model.WidgetInstance
 import kotlin.math.sin
 import kotlin.random.Random
 
-@Widget(id = "appshell.leftrail.navbuttons", displayName = "Sidebar nav buttons")
+@Widget(
+    id          = "appshell.leftrail.navbuttons",
+    displayName = "Sidebar nav buttons",
+    removable   = false,
+)
 @Composable
 fun LeftRailNavButtons(instance: WidgetInstance) {
     val ctx = LocalLeftRailContext.current

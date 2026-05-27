@@ -17,4 +17,9 @@ package hivens.widget.model
 annotation class Widget(
     val id: String,
     val displayName: String = "",
+    // false hides the remove affordance on this widget in the editor.
+    // Use for widgets whose removal would brick a surface (nav rail
+    // buttons, the auth panel) -- the user can still rearrange but
+    // cannot delete. Defaults true; opt-out is explicit.
+    val removable: Boolean = true,
 )
