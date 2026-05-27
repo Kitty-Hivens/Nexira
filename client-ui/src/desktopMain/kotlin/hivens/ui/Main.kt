@@ -11,6 +11,7 @@ import hivens.ui.notifications.NotificationCenter
 import hivens.ui.notifications.SessionRegistry
 import hivens.ui.notifications.drivers.PackLaunchDriver
 import hivens.ui.puppet.PuppetServerLoader
+import hivens.ui.audio.AudioPlayer
 import hivens.ui.editor.EditModeController
 import hivens.ui.utils.GameConsoleService
 import hivens.widget.api.WidgetRegistry
@@ -39,6 +40,11 @@ val uiModule = module {
     // updates into the shared CoroutineScope so callers stay
     // fire-and-forget.
     single { EditModeController(repo = get(), scope = get()) }
+
+    // Audio engine for MusicPlayerWidget. Survives recomposition;
+    // playback state lives in the singleton so swapping the widget
+    // out of the layout does not stop playback.
+    single { AudioPlayer(scope = get()) }
 
     // Notification subsystem: data-only state holders (Center +
     // Registry) are pure singletons; PackLaunchDriver bridges them

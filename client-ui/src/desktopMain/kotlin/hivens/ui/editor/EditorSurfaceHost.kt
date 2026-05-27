@@ -16,6 +16,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -31,6 +32,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Widgets
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -64,11 +66,20 @@ import androidx.compose.ui.unit.dp
 import hivens.core.data.HomeView
 import hivens.ui.Screen
 import hivens.ui.editor.decoration.EditableWidgetChrome
+import hivens.ui.editor.decoration.EmptySlotPlaceholder
 import hivens.ui.editor.dnd.DragController
 import hivens.ui.editor.dnd.DragPayload
 import hivens.ui.editor.dnd.DropTargetRegistry
 import hivens.ui.editor.dnd.LocalDragController
 import hivens.ui.editor.dnd.LocalDropTargetRegistry
+import hivens.ui.editor.palette.WidgetPalettePanel
+import hivens.ui.widgets.home.classic.LocalHomeClassicContext
+import hivens.ui.widgets.home.new.LocalHomeNewContext
+import hivens.ui.widgets.library.LocalLibraryContext
+import hivens.ui.widgets.shell.LocalLeftRailContext
+import hivens.ui.widgets.shell.LocalRightRailContext
+import hivens.widget.api.EmptySlotDecorator
+import hivens.widget.api.LocalEmptySlotDecorator
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.LocalStyle
 import hivens.widget.api.LocalWidgetDecorator
@@ -102,7 +113,8 @@ fun EditorSurfaceHost(
     }
     val controller: EditModeController = koinInject()
 
-    var editing by remember(editableSurface) { mutableStateOf(false) }
+    var editing       by remember(editableSurface) { mutableStateOf(false) }
+    var paletteOpen   by remember(editableSurface) { mutableStateOf(true) }
     // Leaving a surface drops edit mode -- avoids a stale edit state
     // pointed at the wrong surface after navigation.
     val state: EditModeState = remember(editing, editableSurface) {
@@ -135,19 +147,32 @@ fun EditorSurfaceHost(
                         controller.removeWidget(address.surface, address.slot, instance.instanceId)
                     },
                     onCommitDrop = { committedPointer ->
-                        // Compute insertion index from registered widget
-                        // bounds; only commit if it actually moved.
-                        val targetIdx = registry.insertionIndexInSlot(address, committedPointer)
-                        // The registry counts the dragged widget too,
-                        // so a no-op drop returns the source index --
-                        // reorderInSlot will detect equality and short-
-                        // circuit, no extra guard needed here.
-                        if (targetIdx != index) {
-                            controller.reorderInSlot(
-                                surface   = address.surface,
-                                slot      = address.slot,
-                                fromIndex = index,
-                                toIndex   = if (targetIdx > index) targetIdx - 1 else targetIdx,
+                        // Hit-test which slot received the drop. Null =
+                        // pointer is off any slot; treat as cancel.
+                        val targetSlot = registry.slotForPoint(committedPointer)
+                            ?: return@EditableWidgetChrome
+                        val targetIdx = registry.insertionIndexInSlot(targetSlot, committedPointer)
+                        if (targetSlot == address) {
+                            // Same slot -- reorder. -1 when moving down
+                            // because removing the source shifts indices.
+                            if (targetIdx != index) {
+                                controller.reorderInSlot(
+                                    surface   = address.surface,
+                                    slot      = address.slot,
+                                    fromIndex = index,
+                                    toIndex   = if (targetIdx > index) targetIdx - 1 else targetIdx,
+                                )
+                            }
+                        } else {
+                            // Cross-slot move. moveWidget removes from
+                            // source then inserts at target index; no
+                            // index adjustment needed since the source
+                            // slot is different.
+                            controller.moveWidget(
+                                from       = address,
+                                to         = targetSlot,
+                                instanceId = instance.instanceId,
+                                toIndex    = targetIdx,
                             )
                         }
                     },
@@ -159,11 +184,32 @@ fun EditorSurfaceHost(
         }
     }
 
+    // Empty-slot decorator only renders the "drop here" placeholder
+    // while edit mode is on -- otherwise empty slots stay invisible
+    // in normal use.
+    val emptyDecorator: EmptySlotDecorator = remember(state, registry) {
+        if (state is EditModeState.On) {
+            { address -> EmptySlotPlaceholder(address = address, registry = registry) }
+        } else {
+            {}
+        }
+    }
+
     CompositionLocalProvider(
         LocalEditMode           provides state,
         LocalDragController     provides dragController,
         LocalDropTargetRegistry provides registry,
         LocalWidgetDecorator    provides chromeDecorator,
+        LocalEmptySlotDecorator provides emptyDecorator,
+        // Stub surface contexts. Surface composables that mount under
+        // content() override with the real values; widgets dropped on
+        // a foreign surface fall through to the stubs and render
+        // with no-op callbacks instead of crashing the launcher.
+        LocalHomeClassicContext provides STUB_HOME_CLASSIC,
+        LocalHomeNewContext     provides STUB_HOME_NEW,
+        LocalLibraryContext     provides STUB_LIBRARY,
+        LocalLeftRailContext    provides STUB_LEFTRAIL,
+        LocalRightRailContext   provides STUB_RIGHTRAIL,
     ) {
         Box(
             modifier = Modifier
@@ -188,9 +234,20 @@ fun EditorSurfaceHost(
 
             if (editableSurface != null) {
                 EditModePill(
-                    active   = editing,
-                    surface  = editableSurface,
-                    modifier = Modifier.align(Alignment.TopCenter).padding(top = 16.dp),
+                    active            = editing,
+                    surface           = editableSurface,
+                    paletteOpen       = paletteOpen,
+                    onTogglePalette   = { paletteOpen = !paletteOpen },
+                    modifier          = Modifier.align(Alignment.TopCenter).padding(top = 16.dp),
+                )
+
+                WidgetPalettePanel(
+                    visible        = editing && paletteOpen,
+                    onDismiss      = { paletteOpen = false },
+                    controller     = dragController,
+                    registry       = registry,
+                    editController = controller,
+                    modifier       = Modifier.align(Alignment.TopEnd),
                 )
 
                 EditModeFab(
@@ -285,6 +342,8 @@ private fun EditModeFab(
 private fun EditModePill(
     active: Boolean,
     surface: SurfaceId,
+    paletteOpen: Boolean,
+    onTogglePalette: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     AnimatedVisibility(
@@ -300,7 +359,7 @@ private fun EditModePill(
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                modifier = Modifier.padding(start = 14.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
             ) {
                 Icon(
                     imageVector        = Icons.Default.Tune,
@@ -321,6 +380,36 @@ private fun EditModePill(
                     style = MaterialTheme.typography.labelSmall,
                     color = CelestiaTheme.colors.textSecondary,
                 )
+                Spacer(Modifier.width(10.dp))
+                Surface(
+                    color    = if (paletteOpen) CelestiaTheme.colors.primary.copy(alpha = 0.18f)
+                               else CelestiaTheme.colors.surfaceVariant,
+                    shape    = RoundedCornerShape(14.dp),
+                    modifier = Modifier.padding(start = 4.dp),
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .clickable { onTogglePalette() }
+                            .padding(horizontal = 10.dp, vertical = 4.dp),
+                    ) {
+                        Icon(
+                            imageVector        = Icons.Default.Widgets,
+                            contentDescription = null,
+                            tint               = if (paletteOpen) CelestiaTheme.colors.primary
+                                                 else CelestiaTheme.colors.textSecondary,
+                            modifier           = Modifier.size(14.dp),
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text  = if (paletteOpen) "Скрыть" else "Виджеты",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (paletteOpen) CelestiaTheme.colors.primary
+                                    else CelestiaTheme.colors.textPrimary,
+                            fontWeight = FontWeight.Medium,
+                        )
+                    }
+                }
             }
         }
     }
