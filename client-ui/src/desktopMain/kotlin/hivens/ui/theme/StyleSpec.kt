@@ -90,3 +90,24 @@ val BrutStyle = StyleSpec(
 )
 
 val LocalStyle = staticCompositionLocalOf { CelestiaStyle }
+
+/**
+ * Layer per-token user overrides on top of this preset. Null fields
+ * in [overrides] keep the preset's value; non-null fields drift the
+ * named token only. Editor-4 wires this into the AppShell theme
+ * resolution chain so the user can fine-tune corner radius, border
+ * weight, animation speed, etc. without abandoning the active
+ * UiStyle preset entirely.
+ */
+fun StyleSpec.applyOverrides(
+    overrides: hivens.ui.customization.StyleOverrides?,
+): StyleSpec {
+    if (overrides == null) return this
+    return copy(
+        cardCorner          = overrides.cardCornerDp?.let { it.dp } ?: cardCorner,
+        cardBorder          = overrides.cardBorderDp?.let { it.dp } ?: cardBorder,
+        buttonCorner        = overrides.buttonCornerDp?.let { it.dp } ?: buttonCorner,
+        animationMultiplier = overrides.animationMultiplier ?: animationMultiplier,
+        softGlowEnabled     = overrides.softGlowEnabled ?: softGlowEnabled,
+    )
+}

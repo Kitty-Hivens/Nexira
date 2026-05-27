@@ -204,6 +204,105 @@ fun CustomizationExtensionScreen(
                             },
                         )
                     }
+
+                    Spacer(Modifier.height(12.dp))
+                    SectionTitle("Текст и акценты")
+                    listOf(
+                        ColorRole.TEXT_PRIMARY,
+                        ColorRole.TEXT_SECONDARY,
+                        ColorRole.PROGRESS_ACCENT,
+                        ColorRole.WARN_ACCENT,
+                        ColorRole.CRITICAL_ACCENT,
+                    ).forEach { role ->
+                        ColorRoleRow(
+                            role         = role,
+                            currentHex   = settings.colorOverrides[role],
+                            invalidLabel = s.customizationHexInvalid,
+                            onValidHex   = { hex ->
+                                update {
+                                    val newMap = colorOverrides.toMutableMap().also { it[role] = hex }
+                                    copy(colorOverrides = newMap)
+                                }
+                            },
+                            onClear = {
+                                update {
+                                    val newMap = colorOverrides.toMutableMap().also { it.remove(role) }
+                                    copy(colorOverrides = newMap)
+                                }
+                            },
+                        )
+                    }
+
+                    Spacer(Modifier.height(12.dp))
+                    SectionTitle("Прозрачность стекла")
+                    val glassAlphaValue = settings.colorOverrides[ColorRole.GLASS_ALPHA]?.toFloatOrNull() ?: 0.6f
+                    LabeledSlider(
+                        label  = "Glass alpha",
+                        value  = glassAlphaValue,
+                        range  = 0f..1f,
+                        format = "%.2f",
+                        onValueChange = { v ->
+                            update {
+                                val newMap = colorOverrides.toMutableMap().also {
+                                    it[ColorRole.GLASS_ALPHA] = "%.3f".format(v)
+                                }
+                                copy(colorOverrides = newMap)
+                            }
+                        },
+                    )
+
+                    Spacer(Modifier.height(12.dp))
+                    SectionTitle("Форма и движение")
+                    val so = settings.styleOverrides
+                    LabeledSlider(
+                        label  = "Card corner (dp)",
+                        value  = so.cardCornerDp ?: 12f,
+                        range  = 0f..24f,
+                        format = "%.0fdp",
+                        onValueChange = { v -> update { copy(styleOverrides = styleOverrides.copy(cardCornerDp = v)) } },
+                    )
+                    LabeledSlider(
+                        label  = "Card border (dp)",
+                        value  = so.cardBorderDp ?: 0f,
+                        range  = 0f..3f,
+                        format = "%.1fdp",
+                        onValueChange = { v -> update { copy(styleOverrides = styleOverrides.copy(cardBorderDp = v)) } },
+                    )
+                    LabeledSlider(
+                        label  = "Button corner (dp)",
+                        value  = so.buttonCornerDp ?: 8f,
+                        range  = 0f..20f,
+                        format = "%.0fdp",
+                        onValueChange = { v -> update { copy(styleOverrides = styleOverrides.copy(buttonCornerDp = v)) } },
+                    )
+                    LabeledSlider(
+                        label  = "Animation speed",
+                        value  = so.animationMultiplier ?: 1f,
+                        range  = 0f..2f,
+                        format = "x%.2f",
+                        onValueChange = { v -> update { copy(styleOverrides = styleOverrides.copy(animationMultiplier = v)) } },
+                    )
+                    Row(
+                        modifier              = Modifier.fillMaxWidth().padding(top = 6.dp),
+                        verticalAlignment     = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text(
+                            text  = "Decorative glow",
+                            color = CelestiaTheme.colors.textPrimary,
+                            fontWeight = FontWeight.Medium,
+                        )
+                        Switch(
+                            checked         = so.softGlowEnabled ?: true,
+                            onCheckedChange = { v ->
+                                update { copy(styleOverrides = styleOverrides.copy(softGlowEnabled = v)) }
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = CelestiaTheme.colors.primary,
+                                checkedTrackColor = CelestiaTheme.colors.primary.copy(alpha = 0.5f),
+                            ),
+                        )
+                    }
                 }
 
                 Spacer(Modifier.height(8.dp))
