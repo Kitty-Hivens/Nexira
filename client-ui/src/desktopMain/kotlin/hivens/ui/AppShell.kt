@@ -66,6 +66,8 @@ import hivens.ui.utils.GameConsoleService
 import hivens.launcher.LayoutGraphRepository
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalWidgetRegistry
+import hivens.widget.api.LocalWidgetServiceRegistry
+import hivens.widget.api.WidgetServiceRegistry
 import hivens.widget.api.WidgetRegistry
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -168,6 +170,7 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
     val gameConsole: GameConsoleService        = koinInject()
     val layoutGraphRepo: LayoutGraphRepository = koinInject()
     val widgetRegistry: WidgetRegistry         = koinInject()
+    val widgetServiceRegistry: WidgetServiceRegistry = koinInject()
     // Shared process-lifetime scope (createdAtStart in appModule; canceled
     // by AppCoroutineScopeHook on JVM shutdown). Same instance backs
     // LauncherController.appScope and any other fire-and-forget work.
@@ -582,6 +585,7 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
                 androidx.compose.ui.platform.LocalDensity provides scaledDensity,
                 LocalLayoutGraph                         provides layoutGraph,
                 LocalWidgetRegistry                      provides widgetRegistry,
+                LocalWidgetServiceRegistry               provides widgetServiceRegistry,
             ) {
             val effectiveStyle = if (customization.experimentalColorOverridesEnabled) {
                 styleSpec.applyOverrides(customization.styleOverrides)
