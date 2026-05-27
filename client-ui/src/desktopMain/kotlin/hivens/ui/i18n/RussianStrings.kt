@@ -641,7 +641,7 @@ object RussianStrings : AppStrings {
     override fun notificationShowMore(count: Int)               = "ещё $count"
     override fun notificationAbsoluteTime(instant: java.time.Instant): String =
         java.time.format.DateTimeFormatter
-            .ofPattern("d MMMM yyyy, HH:mm:ss", java.util.Locale("ru", "RU"))
+            .ofPattern("d MMMM yyyy, HH:mm:ss", java.util.Locale.of("ru", "RU"))
             .withZone(java.time.ZoneId.systemDefault())
             .format(instant)
 
