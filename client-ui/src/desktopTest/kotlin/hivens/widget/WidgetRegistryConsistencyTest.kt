@@ -31,8 +31,9 @@ class WidgetRegistryConsistencyTest {
     }
 
     @Test
-    fun `registry exposes the kernel-3 widget kinds`() {
+    fun `registry exposes the kernel-3 + editor-2 sample widget kinds`() {
         val expected = setOf(
+            // kernel-3 surface widgets
             "home.classic.content",
             "home.new.welcome",
             "home.new.recent",
@@ -44,8 +45,26 @@ class WidgetRegistryConsistencyTest {
             "appshell.leftrail.logout",
             "appshell.rightrail.authpanel",
             "appshell.rightrail.compactnews",
+            // editor-2 sample widgets
+            "home.new.clock",
+            "home.new.spacer",
+            "home.new.progress",
+            "home.new.launchbutton",
         )
         val actual = GeneratedWidgetRegistry.all().keys.map { it.value }.toSet()
-        assertEquals(expected, actual, "registry drift -- kernel-3 expected exactly these 11 widgets")
+        assertEquals(expected, actual, "registry drift -- expected these 15 widgets")
+    }
+
+    @Test
+    fun `non-removable widgets are exactly the navigation + auth widgets`() {
+        val nonRemovable = GeneratedWidgetRegistry.all().values
+            .filterNot { it.removable }
+            .map { it.kind.value }
+            .toSet()
+        assertEquals(
+            setOf("appshell.leftrail.navbuttons", "appshell.rightrail.authpanel"),
+            nonRemovable,
+            "only nav buttons + auth panel may opt out of removable",
+        )
     }
 }

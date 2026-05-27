@@ -1,8 +1,11 @@
 package hivens.widget.api
 
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ProvidableCompositionLocal
 import androidx.compose.runtime.staticCompositionLocalOf
 import hivens.widget.model.LayoutGraph
+import hivens.widget.model.SlotAddress
+import hivens.widget.model.WidgetInstance
 
 // Locals provided once near the application root. Static because the
 // graph and registry references swap on whole-tree events (layout
@@ -14,4 +17,24 @@ val LocalLayoutGraph: ProvidableCompositionLocal<LayoutGraph> =
 val LocalWidgetRegistry: ProvidableCompositionLocal<WidgetRegistry> =
     staticCompositionLocalOf {
         error("LocalWidgetRegistry not provided -- did you wire WidgetRegistry in Koin?")
+    }
+
+// Decorator wraps every widget rendered by SlotRenderer. Default is
+// the identity wrapper -- no overhead when nothing is provided. The
+// editor swaps this for a chrome wrapper that adds drag handles and
+// remove buttons. Keeps widget-api editor-agnostic; the implementation
+// lives in :client-ui.
+typealias WidgetDecorator = @Composable (
+    address: SlotAddress,
+    index: Int,
+    descriptor: WidgetDescriptor,
+    instance: WidgetInstance,
+    content: @Composable () -> Unit,
+) -> Unit
+
+val LocalWidgetDecorator: ProvidableCompositionLocal<WidgetDecorator> =
+    staticCompositionLocalOf {
+        // identity wrapper -- zero decoration cost when no editor is
+        // mounted (release builds, headless smoke, future TUI surface)
+        { _, _, _, _, content -> content() }
     }
