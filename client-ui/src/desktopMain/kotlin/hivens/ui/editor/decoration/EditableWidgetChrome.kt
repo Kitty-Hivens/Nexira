@@ -50,8 +50,9 @@ import hivens.ui.editor.dnd.widgetBounds
 import hivens.ui.theme.CelestiaTheme
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.WidgetDescriptor
-import hivens.widget.model.SlotAddress
+import hivens.widget.model.SlotPath
 import hivens.widget.model.WidgetInstance
+import hivens.widget.model.traverse
 
 // Wraps a single widget with edit-mode chrome: drag handle (always
 // visible, opacity boosts on hover), remove button (hover-only, hidden
@@ -62,7 +63,7 @@ import hivens.widget.model.WidgetInstance
 // during a drag.
 @Composable
 fun EditableWidgetChrome(
-    address: SlotAddress,
+    path: SlotPath,
     index: Int,
     descriptor: WidgetDescriptor,
     instance: WidgetInstance,
@@ -80,18 +81,23 @@ fun EditableWidgetChrome(
         ?.instance?.instanceId == instance.instanceId
 
     // Drop-indicator hit test. Reading controller.active recomposes on
-    // every pointer update; the registry queries are O(widgets-in-slot)
-    // and cheap enough to do per-frame for the few dozen widgets a
-    // surface can hold.
+    // every pointer update; traverse + registry queries are O(depth +
+    // widgets-in-slot) and cheap enough to do per-frame for the few
+    // dozen widgets a surface can hold.
     val graph = LocalLayoutGraph.current
-    val slotCount = graph.surfaces[address.surface]?.slots?.get(address.slot)?.widgets?.size ?: 0
+    val slotCount = graph.traverse(path)?.widgets?.size ?: 0
     val isLastInSlot = index == slotCount - 1
-    val dropTargetSlot = activeDrag?.let { registry.slotForPoint(it.pointerInWindow) }
-    val dropInsertionIdx = if (activeDrag != null && dropTargetSlot == address) {
-        registry.insertionIndexInSlot(address, activeDrag.pointerInWindow)
+    val dropTargetPath = activeDrag?.let { registry.slotForPoint(it.pointerInWindow) }
+    val dropInsertionIdx = if (activeDrag != null && dropTargetPath == path) {
+        registry.insertionIndexInSlot(path, activeDrag.pointerInWindow)
     } else -1
     val showIndicatorBefore = dropInsertionIdx == index
     val showIndicatorAfter  = isLastInSlot && dropInsertionIdx == slotCount
+
+    // Nesting depth -> subtle border alpha boost. Depth 0 (root surface
+    // slot) keeps the original 0.18/0.55 alpha; each level adds 0.06
+    // and we clip at 0.40/0.85 so deep stacks stay readable.
+    val depthBoost = (path.nested.size * 0.06f).coerceAtMost(0.22f)
 
     // The ghost lambda is invoked by DragGhostOverlay at the host
     // level -- outside the surface composable's CompositionLocalProvider
@@ -110,7 +116,7 @@ fun EditableWidgetChrome(
         label         = "edit-source-alpha",
     )
     val borderAlpha by animateFloatAsState(
-        targetValue   = if (isHovered) 0.55f else 0.18f,
+        targetValue   = if (isHovered) 0.55f + depthBoost else 0.18f + depthBoost,
         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
         label         = "edit-border-alpha",
     )
@@ -124,9 +130,9 @@ fun EditableWidgetChrome(
                 .onGloballyPositioned { coords: LayoutCoordinates ->
                     val rect = coords.boundsInWindow()
                     widgetWindowBounds = rect
-                    registry.registerWidget(address, instance.instanceId, index, rect)
+                    registry.registerWidget(path, instance.instanceId, index, rect)
                 }
-                .widgetBounds(registry, address, instance.instanceId, index)
+                .widgetBounds(registry, path, instance.instanceId, index)
                 .padding(2.dp)
                 .border(
                     width = 1.dp,
@@ -148,7 +154,7 @@ fun EditableWidgetChrome(
                     .size(22.dp)
                     .dragSource(
                         controller            = controller,
-                        payload               = DragPayload.ExistingWidget(address, index, instance),
+                        payload               = DragPayload.ExistingWidget(path, index, instance),
                         widgetBoundsProvider  = { widgetWindowBounds },
                         ghost                 = {
                             CompositionLocalProvider(capturedLocals) { content() }

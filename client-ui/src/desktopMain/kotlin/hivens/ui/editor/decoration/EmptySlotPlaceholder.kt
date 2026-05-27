@@ -33,7 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.ui.editor.dnd.DropTargetRegistry
 import hivens.ui.theme.CelestiaTheme
-import hivens.widget.model.SlotAddress
+import hivens.widget.model.SlotPath
 
 // Rendered by SlotRenderer when a slot has no widgets and the editor
 // has supplied this decorator. Two purposes:
@@ -48,7 +48,7 @@ import hivens.widget.model.SlotAddress
 // but not noisy".
 @Composable
 fun EmptySlotPlaceholder(
-    address: SlotAddress,
+    path: SlotPath,
     registry: DropTargetRegistry,
 ) {
     val breath by rememberInfiniteTransition(label = "empty-slot-breath").animateFloat(
@@ -67,7 +67,7 @@ fun EmptySlotPlaceholder(
             .height(80.dp)
             .padding(vertical = 6.dp)
             .onGloballyPositioned { c: LayoutCoordinates ->
-                registry.registerSlot(address, c.boundsInWindow())
+                registry.registerSlot(path, c.boundsInWindow())
             },
         contentAlignment = Alignment.Center,
     ) {

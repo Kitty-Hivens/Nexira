@@ -21,6 +21,7 @@ import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import hivens.widget.model.SlotAddress
+import hivens.widget.model.SlotPath
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
 
@@ -28,12 +29,13 @@ import hivens.widget.model.WidgetKind
 
 sealed class DragPayload {
     data class ExistingWidget(
-        val source: SlotAddress,
+        val source: SlotPath,
         val sourceIndex: Int,
         val instance: WidgetInstance,
     ) : DragPayload()
 
-    // Palette drag arrives in editor-3. ExistingWidget covers editor-2.
+    // Palette-originated drag. Resolves to an EditModeController.addWidget
+    // at drop time; the target SlotPath comes from the registry hit-test.
     data class PaletteWidget(val kind: WidgetKind) : DragPayload()
 }
 
@@ -81,75 +83,96 @@ class DragController {
 
 // ── Drop target registry ────────────────────────────────────────────────────
 
-// Per-widget bounds in window coords. Keyed by SlotAddress then by
-// position-in-slot (matches LayoutGraph ordering). Empty slots are
-// registered with an empty rect list so the registry knows the slot
-// exists but has no widgets to hit-test against.
 data class WidgetBounds(val index: Int, val rect: Rect)
 
+// Hierarchical drop targets. Keys are SlotPath (full address through
+// nested containers), so a drop into "container body" on home.new is
+// distinct from a drop into the same slot id on the right rail.
+//
+// slotForPoint returns the INNERMOST slot whose rect (widget rect,
+// vertical span fallback, or empty-slot placeholder rect) contains the
+// pointer -- "innermost" = smallest area. Without that ordering, a
+// container's outer rect would always win over its own children and
+// the user could never drop into a nested slot.
 class DropTargetRegistry {
-    private val widgets: SnapshotStateMap<SlotAddress, SnapshotStateMap<String, WidgetBounds>> =
+    private val widgets: SnapshotStateMap<SlotPath, SnapshotStateMap<String, WidgetBounds>> =
         mutableStateMapOf()
-    private val slotBounds: SnapshotStateMap<SlotAddress, Rect> = mutableStateMapOf()
+    private val slotBounds: SnapshotStateMap<SlotPath, Rect> = mutableStateMapOf()
 
-    fun registerSlot(slot: SlotAddress, rect: Rect) {
-        slotBounds[slot] = rect
+    fun registerSlot(path: SlotPath, rect: Rect) {
+        slotBounds[path] = rect
     }
 
-    fun unregisterSlot(slot: SlotAddress) {
-        slotBounds.remove(slot)
-        widgets.remove(slot)
+    fun unregisterSlot(path: SlotPath) {
+        slotBounds.remove(path)
+        widgets.remove(path)
     }
 
-    fun registerWidget(slot: SlotAddress, instanceId: String, index: Int, rect: Rect) {
-        val byId = widgets.getOrPut(slot) { mutableStateMapOf() }
+    fun registerWidget(path: SlotPath, instanceId: String, index: Int, rect: Rect) {
+        val byId = widgets.getOrPut(path) { mutableStateMapOf() }
         byId[instanceId] = WidgetBounds(index, rect)
     }
 
-    fun unregisterWidget(slot: SlotAddress, instanceId: String) {
-        widgets[slot]?.remove(instanceId)
+    fun unregisterWidget(path: SlotPath, instanceId: String) {
+        widgets[path]?.remove(instanceId)
     }
 
-    // Locates which slot the pointer is currently over. Three passes:
-    // 1) exact rect hit on any widget, 2) the slot whose tracked
-    // widget rects most-nearly bracket the pointer Y, 3) empty-slot
-    // bounds registered by EmptySlotDecorator. Returns null when the
-    // pointer is outside every registered slot.
-    fun slotForPoint(pointInWindow: Offset): SlotAddress? {
-        widgets.forEach { (slot, byId) ->
-            byId.values.forEach { wb ->
-                if (wb.rect.contains(pointInWindow)) return slot
+    // Two passes:
+    //   1) exact rect hit across all registered sources (widget rects +
+    //      empty-slot placeholder bounds), innermost (smallest area)
+    //      wins. Both kinds compete in the same pass so a nested empty
+    //      slot beats its enclosing container's widget rect.
+    //   2) vertical-span-with-12px-tolerance fallback for "in-between"
+    //      gap drops where the pointer is in a slot's vertical bracket
+    //      but not over any of its widgets. Only consulted when pass 1
+    //      finds no exact hit.
+    // Returns null when the pointer is outside every registered slot.
+    fun slotForPoint(pointInWindow: Offset): SlotPath? {
+        var best: SlotPath? = null
+        var bestArea = Float.POSITIVE_INFINITY
+
+        fun consider(rect: Rect, path: SlotPath) {
+            if (!rect.contains(pointInWindow)) return
+            val area = rect.width * rect.height
+            if (area < bestArea) {
+                best = path
+                bestArea = area
             }
         }
-        // Fallback: pick the slot whose vertical span covers the
-        // pointer, plus a 12px tolerance to make gap drops feel
-        // forgiving. Horizontal span must also cover the pointer.
+
+        // Pass 1: every exact rect competes by area. Crucially, the
+        // empty-slot placeholder rect of a container's child slot must
+        // be eligible against the container widget's own rect -- the
+        // child slot is strictly smaller and the user means to drop
+        // INTO it.
+        widgets.forEach { (path, byId) ->
+            byId.values.forEach { wb -> consider(wb.rect, path) }
+        }
+        slotBounds.forEach { (path, rect) -> consider(rect, path) }
+        if (best != null) return best
+
+        // Pass 2: vertical-span fallback. Per-slot virtual bounding
+        // rect across all that slot's widgets, with horizontal extent
+        // matching widest widget and vertical padding for gap drops.
         val tolerance = 12f
-        widgets.forEach { (slot, byId) ->
+        widgets.forEach { (path, byId) ->
             val items = byId.values
             if (items.isEmpty()) return@forEach
             val minY = items.minOf { it.rect.top } - tolerance
             val maxY = items.maxOf { it.rect.bottom } + tolerance
             val minX = items.minOf { it.rect.left }
             val maxX = items.maxOf { it.rect.right }
-            if (pointInWindow.y in minY..maxY && pointInWindow.x in minX..maxX) {
-                return slot
-            }
+            consider(Rect(minX, minY, maxX, maxY), path)
         }
-        // Empty slot fallback: EmptySlotDecorator registers slot
-        // bounds; drop into the empty placeholder lands here.
-        slotBounds.forEach { (slot, rect) ->
-            if (rect.contains(pointInWindow)) return slot
-        }
-        return null
+        return best
     }
 
     // Insertion index for a pointer inside a known slot. Index is in
     // [0, count] -- count means "append at end". Algorithm: find the
     // widget whose vertical midpoint the pointer is above; insert at
     // that widget's position. If pointer is below all widgets, append.
-    fun insertionIndexInSlot(slot: SlotAddress, pointInWindow: Offset): Int {
-        val items = widgets[slot]?.values?.sortedBy { it.index } ?: return 0
+    fun insertionIndexInSlot(path: SlotPath, pointInWindow: Offset): Int {
+        val items = widgets[path]?.values?.sortedBy { it.index } ?: return 0
         if (items.isEmpty()) return 0
         items.forEach { wb ->
             val midY = wb.rect.top + wb.rect.height / 2f
@@ -171,7 +194,7 @@ val LocalDropTargetRegistry: ProvidableCompositionLocal<DropTargetRegistry> =
 
 // Attach to the drag handle, not the whole widget -- prevents accidental
 // drag of an interactive control (button, slider). The lambda
-// `widgetBoundsProvider` returns the widget's window-coord bounds so the
+// widgetBoundsProvider returns the widget's window-coord bounds so the
 // ghost can position itself at the right pickup offset.
 fun Modifier.dragSource(
     controller: DragController,
@@ -185,7 +208,7 @@ fun Modifier.dragSource(
         val drag = awaitTouchSlopOrCancellation(down.id) { change, _ -> change.consume() }
             ?: return@awaitEachGesture
         val bounds = widgetBoundsProvider() ?: return@awaitEachGesture
-        val pickup = drag.position - Offset(0f, 0f)  // pointer offset within source
+        val pickup = drag.position - Offset(0f, 0f)
         controller.begin(
             payload         = payload,
             pointerInWindow = bounds.topLeft + drag.position,
@@ -209,24 +232,31 @@ fun Modifier.dragSource(
 
 // ── Drop-target modifier ────────────────────────────────────────────────────
 
-// Registers the slot's bounds with the registry. Per-widget bounds are
-// registered separately by EditableWidgetChrome via widgetBounds().
 fun Modifier.slotBounds(
     registry: DropTargetRegistry,
-    slot: SlotAddress,
+    path: SlotPath,
 ): Modifier = this.onGloballyPositioned { coords: LayoutCoordinates ->
-    registry.registerSlot(slot, coords.boundsInWindow())
+    registry.registerSlot(path, coords.boundsInWindow())
 }
 
 fun Modifier.widgetBounds(
     registry: DropTargetRegistry,
-    slot: SlotAddress,
+    path: SlotPath,
     instanceId: String,
     index: Int,
 ): Modifier = this.onGloballyPositioned { coords: LayoutCoordinates ->
-    registry.registerWidget(slot, instanceId, index, coords.boundsInWindow())
+    registry.registerWidget(path, instanceId, index, coords.boundsInWindow())
 }
 
-// derivedStateOf import suppression -- present for future shape stability
+// SlotAddress-keyed compat for callers that have not migrated yet.
+// Internally promotes to a root-level SlotPath -- safe for flat
+// surfaces, lossy for nested ones.
+@Deprecated(
+    message     = "Use the SlotPath form; SlotAddress loses nested context",
+    replaceWith = ReplaceWith("slotBounds(registry, SlotPath(slot.surface, slot.slot))"),
+)
+fun Modifier.slotBounds(registry: DropTargetRegistry, slot: SlotAddress): Modifier =
+    slotBounds(registry, SlotPath(slot.surface, slot.slot))
+
 @Suppress("unused") private fun touchDerivedStateOf() = derivedStateOf { 0 }
 @Suppress("unused") private fun touchSnapshot() = Snapshot.current

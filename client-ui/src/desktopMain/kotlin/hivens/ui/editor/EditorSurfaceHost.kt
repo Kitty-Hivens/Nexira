@@ -29,13 +29,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ViewQuilt
+import androidx.compose.material.icons.automirrored.filled.ViewSidebar
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.filled.ViewQuilt
-import androidx.compose.material.icons.filled.ViewSidebar
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Widgets
@@ -99,6 +99,7 @@ import hivens.ui.widgets.shell.LocalLeftRailContext
 import hivens.ui.widgets.shell.LocalRightRailContext
 import hivens.widget.api.EmptySlotDecorator
 import hivens.widget.api.LocalEmptySlotDecorator
+import hivens.widget.api.LocalSlotPath
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.LocalStyle
 import hivens.widget.api.LocalWidgetDecorator
@@ -168,6 +169,13 @@ fun EditorSurfaceHost(
     // Wrong-surface widgets render plain. Previewing temporarily
     // suppresses all chrome so the user can see the real look without
     // leaving edit mode.
+    //
+    // The decorator reads LocalSlotPath inside the @Composable lambda
+    // body (the lambda runs in composition because it's invoked from
+    // SlotRenderer's render path). The path identifies the full nested
+    // address of the widget being rendered; chrome uses it both as the
+    // registry key for drop-target bounds and to compose into nested
+    // slots correctly.
     val chromeDecorator: WidgetDecorator = remember(state, previewing) {
         if (state is EditModeState.On && !previewing) {
             val selected = state.surface
@@ -176,29 +184,29 @@ fun EditorSurfaceHost(
                     content()
                     return@decorator
                 }
+                val path = LocalSlotPath.current
                 EditableWidgetChrome(
-                    address      = address,
+                    path         = path,
                     index        = index,
                     descriptor   = descriptor,
                     instance     = instance,
                     controller   = dragController,
                     registry     = registry,
                     onRemove     = {
-                        controller.removeWidget(address.surface, address.slot, instance.instanceId)
+                        controller.removeWidget(path, instance.instanceId)
                     },
                     onCommitDrop = { committedPointer ->
                         // Hit-test which slot received the drop. Null =
                         // pointer is off any slot; treat as cancel.
-                        val targetSlot = registry.slotForPoint(committedPointer)
+                        val targetPath = registry.slotForPoint(committedPointer)
                             ?: return@EditableWidgetChrome
-                        val targetIdx = registry.insertionIndexInSlot(targetSlot, committedPointer)
-                        if (targetSlot == address) {
+                        val targetIdx = registry.insertionIndexInSlot(targetPath, committedPointer)
+                        if (targetPath == path) {
                             // Same slot -- reorder. -1 when moving down
                             // because removing the source shifts indices.
                             if (targetIdx != index) {
                                 controller.reorderInSlot(
-                                    surface   = address.surface,
-                                    slot      = address.slot,
+                                    path      = path,
                                     fromIndex = index,
                                     toIndex   = if (targetIdx > index) targetIdx - 1 else targetIdx,
                                 )
@@ -209,8 +217,8 @@ fun EditorSurfaceHost(
                             // index adjustment needed since the source
                             // slot is different.
                             controller.moveWidget(
-                                from       = address,
-                                to         = targetSlot,
+                                from       = path,
+                                to         = targetPath,
                                 instanceId = instance.instanceId,
                                 toIndex    = targetIdx,
                             )
@@ -225,14 +233,15 @@ fun EditorSurfaceHost(
     }
 
     // Empty-slot decorator: placeholder on every editable surface
-    // while edit mode is on. Chrome filtering is keyed to selection
-    // (interaction focus), but a palette drop should be able to land
-    // on any visible empty slot regardless of which surface chip the
-    // user happens to have active.
+    // while edit mode is on. Reads LocalSlotPath so a nested empty
+    // slot (container with no children) registers its bounds against
+    // the nested path key rather than colliding with another container
+    // at the same (surface, slot) leaf coords.
     val emptyDecorator: EmptySlotDecorator = remember(state, registry, previewing) {
         if (state is EditModeState.On && !previewing) {
-            { address ->
-                EmptySlotPlaceholder(address = address, registry = registry)
+            { _ ->
+                val path = LocalSlotPath.current
+                EmptySlotPlaceholder(path = path, registry = registry)
             }
         } else {
             {}
@@ -600,8 +609,8 @@ private fun ToolChip(
 
 private fun surfaceIcon(surface: SurfaceId): androidx.compose.ui.graphics.vector.ImageVector =
     when (surface.value) {
-        "appshell.leftrail"  -> Icons.Default.ViewSidebar
-        "appshell.rightrail" -> Icons.Default.ViewQuilt
+        "appshell.leftrail"  -> Icons.AutoMirrored.Filled.ViewSidebar
+        "appshell.rightrail" -> Icons.AutoMirrored.Filled.ViewQuilt
         else                 -> Icons.Default.Home
     }
 

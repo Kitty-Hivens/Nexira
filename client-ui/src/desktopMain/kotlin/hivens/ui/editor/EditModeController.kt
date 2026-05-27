@@ -1,9 +1,7 @@
 package hivens.ui.editor
 
 import hivens.launcher.LayoutGraphRepository
-import hivens.widget.model.SlotAddress
-import hivens.widget.model.SlotId
-import hivens.widget.model.SurfaceId
+import hivens.widget.model.SlotPath
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
 import hivens.widget.model.insertWidget
@@ -21,30 +19,33 @@ import java.util.UUID
 //
 // Methods fire-and-forget on the supplied scope. The repo's StateFlow
 // drives recomposition; the caller never awaits the write.
+//
+// SlotPath is the canonical form. Each call corresponds to one
+// LayoutGraph transform applied at the path's leaf SlotContent.
 class EditModeController(
     private val repo: LayoutGraphRepository,
     private val scope: CoroutineScope,
 ) {
-    fun addWidget(surface: SurfaceId, slot: SlotId, kind: WidgetKind, index: Int) {
+    fun addWidget(path: SlotPath, kind: WidgetKind, index: Int) {
         scope.launch {
             val widget = WidgetInstance(kind = kind, instanceId = newInstanceId())
-            repo.update { it.insertWidget(surface, slot, widget, index) }
+            repo.update { it.insertWidget(path, widget, index) }
         }
     }
 
-    fun removeWidget(surface: SurfaceId, slot: SlotId, instanceId: String) {
+    fun removeWidget(path: SlotPath, instanceId: String) {
         scope.launch {
-            repo.update { it.removeWidget(surface, slot, instanceId) }
+            repo.update { it.removeWidget(path, instanceId) }
         }
     }
 
-    fun reorderInSlot(surface: SurfaceId, slot: SlotId, fromIndex: Int, toIndex: Int) {
+    fun reorderInSlot(path: SlotPath, fromIndex: Int, toIndex: Int) {
         scope.launch {
-            repo.update { it.reorderInSlot(surface, slot, fromIndex, toIndex) }
+            repo.update { it.reorderInSlot(path, fromIndex, toIndex) }
         }
     }
 
-    fun moveWidget(from: SlotAddress, to: SlotAddress, instanceId: String, toIndex: Int) {
+    fun moveWidget(from: SlotPath, to: SlotPath, instanceId: String, toIndex: Int) {
         scope.launch {
             repo.update { it.moveWidget(from, to, instanceId, toIndex) }
         }

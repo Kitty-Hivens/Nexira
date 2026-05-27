@@ -80,21 +80,43 @@ internal object WidgetValidator {
         val id = (args["id"] as? String).orEmpty()
         val displayName = (args["displayName"] as? String).orEmpty()
         val removable = (args["removable"] as? Boolean) ?: true
-        // KSP reports Array<String> annotation values as List<*>. Filter
-        // defensively; an empty list is the leaf default.
-        val rawSlots = args["slots"] as? List<*>
-        val slots = rawSlots?.filterIsInstance<String>()?.filter { it.isNotBlank() }.orEmpty()
+        // KSP reports Array<String> annotation values as List<*>.
+        val rawSlots = (args["slots"] as? List<*>).orEmpty().filterIsInstance<String>()
 
         if (id.isBlank()) {
             env.logger.error("@Widget id must be non-blank", symbol)
             return null
         }
 
+        // Slot ids must be non-blank, free of whitespace (the editor
+        // uses them as JSON keys and CompositionLocal-resolved drop
+        // target keys; a slot id with a space deserializes fine but
+        // breaks any author who tries to write it back in source), and
+        // unique within a single descriptor. Reject loudly so a typo
+        // surfaces at build time, not as silent UI breakage.
+        val sanitized = mutableListOf<String>()
+        val seen = HashSet<String>()
+        for (raw in rawSlots) {
+            if (raw.isBlank()) {
+                env.logger.error("@Widget slot id must be non-blank", symbol)
+                return null
+            }
+            if (raw.any { it.isWhitespace() }) {
+                env.logger.error("@Widget slot id '$raw' must not contain whitespace", symbol)
+                return null
+            }
+            if (!seen.add(raw)) {
+                env.logger.error("@Widget slots contain duplicate id '$raw'", symbol)
+                return null
+            }
+            sanitized.add(raw)
+        }
+
         return Extracted(
             id = id,
             displayName = displayName,
             removable = removable,
-            slots = slots,
+            slots = sanitized,
         )
     }
 }

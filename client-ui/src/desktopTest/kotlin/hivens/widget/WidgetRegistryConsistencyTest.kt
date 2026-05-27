@@ -58,6 +58,8 @@ class WidgetRegistryConsistencyTest {
             "nav.profile",
             "nav.settings",
             "nav.about",
+            // Phase A.3 container sample
+            "container.group",
         )
         val actual = GeneratedWidgetRegistry.all().keys.map { it.value }.toSet()
         assertEquals(expected, actual, "registry drift -- expected exactly these widgets")
