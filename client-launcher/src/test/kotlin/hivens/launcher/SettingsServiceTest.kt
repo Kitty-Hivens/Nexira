@@ -25,7 +25,16 @@ import kotlin.test.assertEquals
 class SettingsServiceTest {
 
     private lateinit var workDir: Path
-    private val json = Json { encodeDefaults = true; ignoreUnknownKeys = true }
+    // Mirror the production Json config (see networkModule in
+    // hivens.launcher.di.Modules). coerceInputValues is what protects
+    // against the downgrade-after-new-enum-variant scenario covered
+    // below; the test pins the behavior so a future Json refactor
+    // cannot quietly strip the flag.
+    private val json = Json {
+        encodeDefaults    = true
+        ignoreUnknownKeys = true
+        coerceInputValues = true
+    }
 
     @BeforeTest
     fun setup() {
@@ -54,6 +63,38 @@ class SettingsServiceTest {
         val reloaded = SettingsService(json, file)
         assertEquals(8192, reloaded.getSettings().memoryMB)
         assertEquals("de", reloaded.getSettings().locale)
+    }
+
+    @Test
+    fun `unknown enum value coerces to default and preserves other fields`() {
+        // Scenario: launcher A writes settings with a new enum variant
+        // (HomeView.Future, say); launcher B (older binary, no Future
+        // variant) reads the same file. Without coerceInputValues this
+        // crashes reload(), which then silently resets EVERY OTHER
+        // field to defaults -- the user loses java path, memory, locale,
+        // etc. because of one unknown enum string.
+        val file = workDir / "settings.json"
+        Files.writeString(
+            file,
+            """
+            {
+              "memoryMB": 8192,
+              "locale": "de",
+              "homeView": "Future"
+            }
+            """.trimIndent(),
+        )
+
+        val svc = SettingsService(json, file)
+        val loaded = svc.getSettings()
+
+        assertEquals(8192, loaded.memoryMB, "non-enum fields must survive the coercion")
+        assertEquals("de", loaded.locale, "non-enum fields must survive the coercion")
+        assertEquals(
+            SettingsData().homeView,
+            loaded.homeView,
+            "unknown enum value must coerce to the field default",
+        )
     }
 
     @Test
