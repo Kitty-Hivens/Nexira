@@ -102,6 +102,8 @@ import hivens.ui.widgets.home.new.LocalHomeNewContext
 import hivens.ui.widgets.library.LocalLibraryContext
 import hivens.ui.widgets.shell.LocalLeftRailContext
 import hivens.ui.widgets.shell.LocalRightRailContext
+import hivens.ui.widgets.themepicker.LocalThemePickerContext
+import hivens.ui.widgets.themepicker.STUB_THEME_PICKER
 import hivens.widget.api.EmptySlotDecorator
 import hivens.widget.api.LocalEmptySlotDecorator
 import hivens.widget.api.LocalSlotPath
@@ -269,8 +271,7 @@ fun EditorSurfaceHost(
         LocalLibraryContext     provides STUB_LIBRARY,
         LocalLeftRailContext    provides STUB_LEFTRAIL,
         LocalRightRailContext   provides STUB_RIGHTRAIL,
-        hivens.ui.widgets.themepicker.LocalThemePickerContext
-            provides hivens.ui.widgets.themepicker.STUB_THEME_PICKER,
+        LocalThemePickerContext provides STUB_THEME_PICKER,
     ) {
         Box(
             modifier = Modifier

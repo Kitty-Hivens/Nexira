@@ -16,7 +16,11 @@ import hivens.ui.theme.ThemePresets
 //
 // Stub used by EditorSurfaceHost when a foreign-surface widget gets
 // dropped into theme.picker -- callbacks no-op rather than crash.
-data class ThemePickerContext(
+// Plain class, not data class -- holds a MutableState reference and
+// two lambdas, all reference-equality fields. Generated equals /
+// hashCode / toString would be misleading "value semantics" the
+// holder does not actually provide.
+class ThemePickerContext(
     val themes: List<CustomTheme>,
     val selectedTheme: MutableState<CustomTheme>,
     val onApply: (CustomTheme) -> Unit,

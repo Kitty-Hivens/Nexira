@@ -70,11 +70,19 @@ fun ThemePickerPreviewWidget(instance: WidgetInstance) {
                 ColorRow(s.themePickerColorError,      theme.error)
             }
             Spacer(Modifier.height(24.dp))
+            // Visual sample buttons. enabled = false so the
+            // cursor + click feedback signals "demo, not a
+            // control" -- a user who clicks expecting a real
+            // action gets the disabled grey cue. Container
+            // colors remain theme-driven so the preview still
+            // communicates the theme's filled/outlined look.
             Button(
                 onClick  = {},
+                enabled  = false,
                 modifier = Modifier.fillMaxWidth(),
                 colors   = ButtonDefaults.buttonColors(
-                    containerColor = CustomTheme.parseHexColor(theme.primary),
+                    containerColor         = CustomTheme.parseHexColor(theme.primary),
+                    disabledContainerColor = CustomTheme.parseHexColor(theme.primary),
                 ),
                 shape    = RoundedCornerShape(12.dp),
             ) {
@@ -83,6 +91,7 @@ fun ThemePickerPreviewWidget(instance: WidgetInstance) {
             Spacer(Modifier.height(12.dp))
             OutlinedButton(
                 onClick  = {},
+                enabled  = false,
                 modifier = Modifier.fillMaxWidth(),
                 border   = BorderStroke(2.dp, CustomTheme.parseHexColor(theme.primary)),
                 shape    = RoundedCornerShape(12.dp),

@@ -36,6 +36,8 @@ import hivens.widget.api.SlotRenderer
 import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId
 
+private const val SURFACE = "theme.picker"
+
 // theme.picker surface composable. AppLayout routes
 // Screen.ThemePicker here. Provides LocalThemePickerContext for
 // child widgets, lays out two side-by-side slots (grid + preview),
@@ -52,7 +54,11 @@ fun ThemePickerSurface(
     val s = LocalStrings.current
     val af = LocalAprilFools.current
     val themes = remember { ThemePresets.getAll() }
-    val selectedTheme = remember(currentTheme) { mutableStateOf(currentTheme) }
+    // Keyless remember: the local pending selection survives an
+    // external currentTheme change (system theme sync, preset
+    // load mid-edit). The legacy screen had the same shape; only
+    // an explicit Apply commits the selection upstream.
+    val selectedTheme = remember { mutableStateOf(currentTheme) }
 
     val ctx = remember(themes, selectedTheme, onThemeSelected, onBack) {
         ThemePickerContext(
@@ -121,5 +127,3 @@ fun ThemePickerSurface(
         }
     }
 }
-
-private const val SURFACE = "theme.picker"

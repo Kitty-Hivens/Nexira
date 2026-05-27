@@ -41,6 +41,7 @@ import hivens.ui.screens.detail.PackDetailScreen
 import hivens.ui.screens.library.LibraryScreen
 import hivens.ui.screens.profile.ProfileScreen
 import hivens.ui.screens.settings.SettingsScreen
+import hivens.ui.widgets.themepicker.ThemePickerSurface
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.CustomTheme
@@ -184,7 +185,7 @@ fun AppLayout(
                         )
 
                     Screen.ThemePicker ->
-                        hivens.ui.widgets.themepicker.ThemePickerSurface(
+                        ThemePickerSurface(
                             currentTheme    = customTheme,
                             onThemeSelected = { newTheme ->
                                 onCustomThemeChanged(newTheme)
