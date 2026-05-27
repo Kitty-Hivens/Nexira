@@ -1,7 +1,17 @@
 package hivens.ui.widgets.sample
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.drag
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,12 +19,17 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.VolumeDown
+import androidx.compose.material.icons.automirrored.filled.VolumeMute
+import androidx.compose.material.icons.automirrored.filled.VolumeOff
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
@@ -37,8 +52,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import hivens.ui.audio.AudioPlayer
 import hivens.ui.audio.PlaybackState
@@ -69,6 +89,7 @@ import kotlin.io.path.name
 fun MusicPlayerWidget(instance: WidgetInstance) {
     val player: AudioPlayer = koinInject()
     val state by player.state.collectAsState()
+    val volume by player.volume.collectAsState()
     val scope = rememberCoroutineScope()
 
     val pickFile = {
@@ -184,7 +205,122 @@ fun MusicPlayerWidget(instance: WidgetInstance) {
                 )
             }
         }
+
+        // Volume row: icon + bar. Bar is a custom thin track with a
+        // dot thumb that only appears on hover/drag -- the default
+        // Material slider's fat thumb reads as an out-of-place form
+        // control here.
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier          = Modifier.fillMaxWidth(),
+        ) {
+            Icon(
+                imageVector        = volumeIcon(volume),
+                contentDescription = "Громкость",
+                tint               = CelestiaTheme.colors.textSecondary,
+                modifier           = Modifier.size(16.dp),
+            )
+            Spacer(Modifier.width(10.dp))
+            VolumeBar(
+                value         = volume,
+                onValueChange = { player.setVolume(it) },
+                modifier      = Modifier.weight(1f),
+            )
+        }
     }
+}
+
+// Thin horizontal track + small dot thumb. Track grows from 3dp to
+// 4dp on hover; thumb fades in on hover/press. Drag updates the value
+// continuously; tap jumps to the tapped position. Designed to read as
+// a player slider rather than a generic form control.
+@Composable
+private fun VolumeBar(
+    value: Float,
+    onValueChange: (Float) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val isHovered by interaction.collectIsHoveredAsState()
+    var pressing by remember { mutableStateOf(false) }
+    val active = isHovered || pressing
+
+    val trackHeight by animateDpAsState(
+        targetValue   = if (active) 4.dp else 3.dp,
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        label         = "vol-track-height",
+    )
+    val thumbAlpha by animateFloatAsState(
+        targetValue   = if (active) 1f else 0f,
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        label         = "vol-thumb-alpha",
+    )
+    val thumbSizeDp by animateDpAsState(
+        targetValue   = if (pressing) 12.dp else 10.dp,
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        label         = "vol-thumb-size",
+    )
+
+    var widthPx by remember { mutableStateOf(0) }
+
+    Box(
+        modifier = modifier
+            .height(20.dp)
+            .hoverable(interaction)
+            .onSizeChanged { widthPx = it.width }
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    pressing = true
+                    val w = size.width.coerceAtLeast(1).toFloat()
+                    onValueChange((down.position.x / w).coerceIn(0f, 1f))
+                    drag(down.id) { change ->
+                        val newValue = (change.position.x / w).coerceIn(0f, 1f)
+                        onValueChange(newValue)
+                        change.consume()
+                    }
+                    pressing = false
+                }
+            },
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        // Inactive track (full bar background).
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(trackHeight)
+                .clip(RoundedCornerShape(50))
+                .background(CelestiaTheme.colors.outline.copy(alpha = 0.20f)),
+        )
+        // Active fill (left edge to current value).
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(value)
+                .height(trackHeight)
+                .clip(RoundedCornerShape(50))
+                .background(CelestiaTheme.colors.primary),
+        )
+        // Thumb dot at the active edge -- only visible on hover/press.
+        if (widthPx > 0 && thumbAlpha > 0.01f) {
+            val thumbHalfPx = with(LocalDensity.current) { thumbSizeDp.toPx() / 2f }
+            val xPx = (value * widthPx - thumbHalfPx).toInt()
+            Box(
+                modifier = Modifier
+                    .offset { IntOffset(xPx, 0) }
+                    .size(thumbSizeDp)
+                    .graphicsLayer { alpha = thumbAlpha }
+                    .clip(CircleShape)
+                    .background(CelestiaTheme.colors.primary),
+            )
+        }
+    }
+}
+
+private fun volumeIcon(volume: Float): androidx.compose.ui.graphics.vector.ImageVector = when {
+    volume <= 0.001f -> Icons.AutoMirrored.Filled.VolumeOff
+    volume < 0.34f   -> Icons.AutoMirrored.Filled.VolumeMute
+    volume < 0.67f   -> Icons.AutoMirrored.Filled.VolumeDown
+    else             -> Icons.AutoMirrored.Filled.VolumeUp
 }
 
 @Composable
