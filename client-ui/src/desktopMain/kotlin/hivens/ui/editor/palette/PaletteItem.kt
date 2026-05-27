@@ -82,9 +82,9 @@ fun PaletteItem(
                 widgetBoundsProvider  = { rowBounds },
                 ghost                 = { PaletteGhost(displayName = descriptor.displayName) },
                 onDragEnd             = { pointer ->
-                    val slot = registry.slotForPoint(pointer) ?: return@dragSource
-                    val index = registry.insertionIndexInSlot(slot, pointer)
-                    editController.addWidget(slot.surface, slot.slot, descriptor.kind, index)
+                    val targetPath = registry.slotForPoint(pointer) ?: return@dragSource
+                    val index = registry.insertionIndexInSlot(targetPath, pointer)
+                    editController.addWidget(targetPath, descriptor.kind, descriptor.slots, index)
                 },
             )
             .padding(horizontal = 10.dp, vertical = 8.dp),

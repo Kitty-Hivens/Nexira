@@ -20,9 +20,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.DragIndicator
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.currentCompositionLocalContext
@@ -50,8 +55,9 @@ import hivens.ui.editor.dnd.widgetBounds
 import hivens.ui.theme.CelestiaTheme
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.WidgetDescriptor
-import hivens.widget.model.SlotAddress
+import hivens.widget.model.SlotPath
 import hivens.widget.model.WidgetInstance
+import hivens.widget.model.traverse
 
 // Wraps a single widget with edit-mode chrome: drag handle (always
 // visible, opacity boosts on hover), remove button (hover-only, hidden
@@ -62,7 +68,7 @@ import hivens.widget.model.WidgetInstance
 // during a drag.
 @Composable
 fun EditableWidgetChrome(
-    address: SlotAddress,
+    path: SlotPath,
     index: Int,
     descriptor: WidgetDescriptor,
     instance: WidgetInstance,
@@ -75,23 +81,29 @@ fun EditableWidgetChrome(
     val interaction = remember { MutableInteractionSource() }
     val isHovered by interaction.collectIsHoveredAsState()
     var widgetWindowBounds by remember { mutableStateOf<Rect?>(null) }
+    var forceRemoveOpen by remember { mutableStateOf(false) }
     val activeDrag = controller.active
     val isThisDragging = (activeDrag?.payload as? DragPayload.ExistingWidget)
         ?.instance?.instanceId == instance.instanceId
 
     // Drop-indicator hit test. Reading controller.active recomposes on
-    // every pointer update; the registry queries are O(widgets-in-slot)
-    // and cheap enough to do per-frame for the few dozen widgets a
-    // surface can hold.
+    // every pointer update; traverse + registry queries are O(depth +
+    // widgets-in-slot) and cheap enough to do per-frame for the few
+    // dozen widgets a surface can hold.
     val graph = LocalLayoutGraph.current
-    val slotCount = graph.surfaces[address.surface]?.slots?.get(address.slot)?.widgets?.size ?: 0
+    val slotCount = graph.traverse(path)?.widgets?.size ?: 0
     val isLastInSlot = index == slotCount - 1
-    val dropTargetSlot = activeDrag?.let { registry.slotForPoint(it.pointerInWindow) }
-    val dropInsertionIdx = if (activeDrag != null && dropTargetSlot == address) {
-        registry.insertionIndexInSlot(address, activeDrag.pointerInWindow)
+    val dropTargetPath = activeDrag?.let { registry.slotForPoint(it.pointerInWindow) }
+    val dropInsertionIdx = if (activeDrag != null && dropTargetPath == path) {
+        registry.insertionIndexInSlot(path, activeDrag.pointerInWindow)
     } else -1
     val showIndicatorBefore = dropInsertionIdx == index
     val showIndicatorAfter  = isLastInSlot && dropInsertionIdx == slotCount
+
+    // Nesting depth -> subtle border alpha boost. Depth 0 (root surface
+    // slot) keeps the original 0.18/0.55 alpha; each level adds 0.06
+    // and we clip at 0.40/0.85 so deep stacks stay readable.
+    val depthBoost = (path.nested.size * 0.06f).coerceAtMost(0.22f)
 
     // The ghost lambda is invoked by DragGhostOverlay at the host
     // level -- outside the surface composable's CompositionLocalProvider
@@ -110,7 +122,7 @@ fun EditableWidgetChrome(
         label         = "edit-source-alpha",
     )
     val borderAlpha by animateFloatAsState(
-        targetValue   = if (isHovered) 0.55f else 0.18f,
+        targetValue   = if (isHovered) 0.55f + depthBoost else 0.18f + depthBoost,
         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
         label         = "edit-border-alpha",
     )
@@ -124,9 +136,9 @@ fun EditableWidgetChrome(
                 .onGloballyPositioned { coords: LayoutCoordinates ->
                     val rect = coords.boundsInWindow()
                     widgetWindowBounds = rect
-                    registry.registerWidget(address, instance.instanceId, index, rect)
+                    registry.registerWidget(path, instance.instanceId, index, rect)
                 }
-                .widgetBounds(registry, address, instance.instanceId, index)
+                .widgetBounds(registry, path, instance.instanceId, index)
                 .padding(2.dp)
                 .border(
                     width = 1.dp,
@@ -148,7 +160,7 @@ fun EditableWidgetChrome(
                     .size(22.dp)
                     .dragSource(
                         controller            = controller,
-                        payload               = DragPayload.ExistingWidget(address, index, instance),
+                        payload               = DragPayload.ExistingWidget(path, index, instance),
                         widgetBoundsProvider  = { widgetWindowBounds },
                         ghost                 = {
                             CompositionLocalProvider(capturedLocals) { content() }
@@ -164,11 +176,13 @@ fun EditableWidgetChrome(
                 )
             }
 
-            // Remove button: hover-only, hidden on non-removable widgets.
-            // Animated fade so it does not pop in jarringly. Qualified
-            // with this@Column because the inner Box sits inside the
-            // outer drop-indicator Column, and Kotlin would otherwise
-            // try ColumnScope.AnimatedVisibility against a BoxScope `this`.
+            // Remove button: hover-only, red close icon. Hidden on
+            // non-removable widgets (those get the force-remove
+            // affordance below instead). Animated fade so it does not
+            // pop in jarringly. Qualified with this@Column because the
+            // inner Box sits inside the outer drop-indicator Column,
+            // and Kotlin would otherwise try ColumnScope.AnimatedVisibility
+            // against a BoxScope `this`.
             this@Column.AnimatedVisibility(
                 visible  = isHovered && descriptor.removable,
                 enter    = fadeIn(spring(stiffness = Spring.StiffnessMedium)),
@@ -194,14 +208,85 @@ fun EditableWidgetChrome(
                 ) {
                     Icon(
                         imageVector        = Icons.Default.Close,
-                        contentDescription = "Remove widget",
-                        tint               = Color.White,
+                        contentDescription = "Удалить",
+                        tint               = CelestiaTheme.colors.onPrimary,
                         modifier           = Modifier.size(14.dp).padding(0.dp).graphicsLayer { },
+                    )
+                }
+            }
+
+            // Force-remove affordance for non-removable widgets. Same
+            // top-right slot as the regular remove button, but uses a
+            // warning-tinted DeleteForever icon and gates the action
+            // behind a confirmation dialog. Without this, a non-
+            // removable widget that ends up in the wrong slot (preset
+            // import, plugin install, or a user-driven move out of its
+            // home surface) has no exit path short of editing
+            // layout-graph.json by hand or invoking the per-surface
+            // reset on the edit pill.
+            this@Column.AnimatedVisibility(
+                visible  = isHovered && !descriptor.removable,
+                enter    = fadeIn(spring(stiffness = Spring.StiffnessMedium)),
+                exit     = fadeOut(spring(stiffness = Spring.StiffnessMedium)),
+                modifier = Modifier.align(Alignment.TopEnd).padding(4.dp),
+            ) {
+                Surface(
+                    color    = CelestiaTheme.colors.warnAccent.copy(alpha = 0.85f),
+                    shape    = RoundedCornerShape(6.dp),
+                    modifier = Modifier
+                        .size(22.dp)
+                        .pointerInput(instance.instanceId) {
+                            awaitPointerEventScope {
+                                while (true) {
+                                    val event = awaitPointerEvent()
+                                    if (event.type == PointerEventType.Release) {
+                                        forceRemoveOpen = true
+                                        event.changes.forEach { it.consume() }
+                                    }
+                                }
+                            }
+                        },
+                ) {
+                    Icon(
+                        imageVector        = Icons.Default.DeleteForever,
+                        contentDescription = "Удалить принудительно",
+                        tint               = CelestiaTheme.colors.onPrimary,
+                        modifier           = Modifier.size(14.dp).padding(0.dp),
                     )
                 }
             }
         }
         if (showIndicatorAfter) DropIndicator()
+    }
+
+    if (forceRemoveOpen) {
+        AlertDialog(
+            onDismissRequest = { forceRemoveOpen = false },
+            title            = { Text("Удалить виджет принудительно?") },
+            text             = {
+                Text(
+                    text = buildString {
+                        append("\"")
+                        append(descriptor.displayName)
+                        append("\" помечен как неудаляемый. ")
+                        append("Обычно такие виджеты держат на месте, чтобы пользователь не остался ")
+                        append("без навигации. Если ты уверен, что виджет тут не нужен, можно ")
+                        append("снести его прямо сейчас -- а если что, сбрось поверхность к умолчанию ")
+                        append("через меню справа от чипа поверхности.")
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    forceRemoveOpen = false
+                    onRemove()
+                }) { Text("Удалить", color = CelestiaTheme.colors.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { forceRemoveOpen = false }) { Text("Отмена") }
+            },
+        )
     }
 }
 

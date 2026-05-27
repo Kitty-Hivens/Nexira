@@ -1,36 +1,63 @@
 package hivens.widget.api
 
 import androidx.compose.runtime.Composable
-import hivens.widget.model.SlotAddress
+import androidx.compose.runtime.CompositionLocalProvider
+import hivens.widget.model.SlotContent
 import hivens.widget.model.SlotId
+import hivens.widget.model.SlotPath
 import hivens.widget.model.SurfaceId
+import hivens.widget.model.WidgetInstance
+import hivens.widget.model.traverse
 
-// Looks up the slot in the active LayoutGraph and emits its widgets in
-// order. The active graph is provided via LocalLayoutGraph from the
-// hosting application; the registry is provided via LocalWidgetRegistry.
-// Both locals are wired in the launcher's Koin bootstrap.
+// Renders every widget at the addressed slot. Two entry forms:
+//
+//   * Top-level: SlotRenderer(surface, slot) -- used by surface
+//     composables (NewHomeScreen, LibraryScreen, AppLayout rails, ...).
+//     Initialises LocalSlotPath at the surface root.
+//
+//   * Nested: SlotRenderer(parent, slot) -- used by container widgets
+//     inside their @Composable body. Extends LocalSlotPath with the
+//     container's instanceId so the editor's drop-target registry
+//     distinguishes "slot 'body' on container X" from "slot 'body' on
+//     container Y".
 //
 // Each widget renders through LocalWidgetDecorator. Default decorator
-// is identity -- zero decoration cost. The editor in :client-ui swaps
-// in a chrome wrapper that adds drag handles, remove buttons, and
-// pointer listeners. SlotRenderer itself stays editor-agnostic.
-//
-// An unknown WidgetKind (e.g. layout file refers to a plugin widget the
-// registry no longer ships) renders nothing -- the slot stays valid;
-// the diagnostic shows up in the --audit-widgets dev tool (kernel-4).
+// is identity -- zero cost when no editor is mounted. Unknown widget
+// kinds (layout file references a kind the registry no longer ships)
+// render nothing; the slot stays valid and the diagnostic surfaces in
+// the editor's --audit-widgets dev tool.
 @Composable
 fun SlotRenderer(surface: SurfaceId, slot: SlotId) {
+    val path = SlotPath(surface, slot)
+    CompositionLocalProvider(LocalSlotPath provides path) {
+        RenderSlotContent(path)
+    }
+}
+
+@Composable
+fun SlotRenderer(parent: WidgetInstance, slot: SlotId) {
+    val parentPath = LocalSlotPath.current
+    val childPath = parentPath.child(parent.instanceId, slot)
+    CompositionLocalProvider(LocalSlotPath provides childPath) {
+        RenderSlotContent(childPath)
+    }
+}
+
+@Composable
+private fun RenderSlotContent(path: SlotPath) {
     val graph = LocalLayoutGraph.current
     val registry = LocalWidgetRegistry.current
     val decorator = LocalWidgetDecorator.current
     val emptyDecorator = LocalEmptySlotDecorator.current
-    val widgets = graph.surfaces[surface]?.slots?.get(slot)?.widgets.orEmpty()
-    val address = SlotAddress(surface, slot)
-    if (widgets.isEmpty()) {
+
+    val content: SlotContent = graph.traverse(path) ?: SlotContent()
+    val address = path.leafAddress
+
+    if (content.widgets.isEmpty()) {
         emptyDecorator(address)
         return
     }
-    widgets.forEachIndexed { index, instance ->
+    content.widgets.forEachIndexed { index, instance ->
         val descriptor = registry[instance.kind] ?: return@forEachIndexed
         decorator(address, index, descriptor, instance) {
             descriptor.Render(instance)

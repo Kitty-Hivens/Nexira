@@ -333,6 +333,59 @@ class LayoutGraphRepositoryTest {
         assertEquals("c1", childLoaded.instanceId)
     }
 
+    // ── Surface reset ─────────────────────────────────────────────────
+
+    @Test
+    fun `resetSurface restores one surface from the bundled default without touching others`() = runBlocking {
+        val repo = repo()
+        repo.flush()
+
+        // Mutate two surfaces: home.classic gains a widget, plus a
+        // brand-new surface gets introduced.
+        val extra = WidgetInstance(WidgetKind("k"), "extra-w", JsonObject(emptyMap()))
+        repo.update { graph ->
+            graph.copy(
+                surfaces = graph.surfaces
+                    .mapValues { (sid, layout) ->
+                        if (sid == SurfaceId("home.classic")) {
+                            layout.copy(
+                                slots = layout.slots.mapValues { (_, content) ->
+                                    content.copy(widgets = content.widgets + extra)
+                                }
+                            )
+                        } else layout
+                    } + (SurfaceId("scratch") to SurfaceLayout()),
+            )
+        }
+        repo.flush()
+
+        // Reset home.classic. Surface should match the bundled default
+        // again; scratch surface must remain untouched.
+        repo.resetSurface(SurfaceId("home.classic"))
+        repo.flush()
+
+        val resetLayout = repo.value().surfaces[SurfaceId("home.classic")]
+        assertEquals(sampleDefault.surfaces[SurfaceId("home.classic")], resetLayout)
+        assertTrue(SurfaceId("scratch") in repo.value().surfaces, "non-target surface must be left alone")
+    }
+
+    @Test
+    fun `resetSurface removes a surface that is absent from the default`() = runBlocking {
+        val repo = repo()
+        repo.flush()
+
+        // Introduce a surface that the bundled default does NOT have.
+        repo.update { graph ->
+            graph.copy(surfaces = graph.surfaces + (SurfaceId("ghost") to SurfaceLayout()))
+        }
+        assertTrue(SurfaceId("ghost") in repo.value().surfaces)
+
+        repo.resetSurface(SurfaceId("ghost"))
+        repo.flush()
+
+        assertFalse(SurfaceId("ghost") in repo.value().surfaces, "absent-from-default surface should be removed on reset")
+    }
+
     // SlotPath compile-touch: ensure tests can construct one without
     // relying on widget-model internals leaking.
     @Suppress("unused")
