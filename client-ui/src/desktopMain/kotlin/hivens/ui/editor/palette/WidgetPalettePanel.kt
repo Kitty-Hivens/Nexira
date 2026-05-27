@@ -143,16 +143,8 @@ fun WidgetPalettePanel(
                     )
                 }
             } else {
-                // weight(1f) gives the LazyColumn a finite max height
-                // bounded by the panel Column's remaining space. Without
-                // it, Column passes maxHeight = Infinity to non-weighted
-                // children and LazyList refuses to be measured under an
-                // infinite vertical constraint.
                 LazyColumn(
-                    modifier            = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                    modifier            = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 2.dp),
                     verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
                     items(items = descriptors, key = { it.kind.value }) { descriptor ->

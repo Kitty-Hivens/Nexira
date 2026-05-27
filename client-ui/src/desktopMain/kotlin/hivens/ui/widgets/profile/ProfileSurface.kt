@@ -10,8 +10,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -46,6 +44,16 @@ private const val SURFACE = "profile"
 // inactive slot is unmounted entirely so the editor's chrome
 // decorator does not paint phantom chrome around the hidden section.
 // To edit the inactive section the user switches tabs via the nav.
+//
+// No verticalScroll on the right pane. A scroll modifier hands
+// children a maxHeight = Infinity constraint, and LazyList-based
+// widgets (CompactNewsFeed, LibraryBody, ...) abort with an
+// `infinity maximum height` IllegalStateException. Without scroll,
+// the parent Column distributes its bounded height among non-
+// weighted children, so any widget the user drops via the editor
+// renders. Trade-off: a stack of fixed-height widgets exceeding
+// the pane overflows off-screen; the user resets the surface to
+// recover.
 @Composable
 fun ProfileSurface(session: SessionData) {
     val s = LocalStrings.current
@@ -82,8 +90,7 @@ fun ProfileSurface(session: SessionData) {
                     Column(
                         modifier = Modifier
                             .weight(1f)
-                            .fillMaxHeight()
-                            .verticalScroll(rememberScrollState()),
+                            .fillMaxHeight(),
                     ) {
                         when (selectedCategory.value) {
                             ProfileCategory.Skin    -> SlotRenderer(SurfaceId(SURFACE), SlotId("skin"))
