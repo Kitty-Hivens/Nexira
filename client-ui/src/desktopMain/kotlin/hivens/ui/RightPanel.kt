@@ -1,18 +1,28 @@
 package hivens.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import hivens.core.data.SessionData
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.theme.CelestiaTheme
+import hivens.ui.widgets.shell.LocalRightRailContext
+import hivens.ui.widgets.shell.RightRailContext
+import hivens.widget.api.SlotRenderer
+import hivens.widget.model.SlotId
+import hivens.widget.model.SurfaceId
 
 /**
- * Right-side panel. Orchestrator only -- the auth panel (Loading /
- * Unauthenticated / Authenticated) and news feed live in their own files
- * (`LoginPanel.kt`, `AccountPanel.kt`, `CompactNewsFeed.kt`).
+ * Right-side panel. Surface composable: owns the column container and
+ * the divider between auth + news slots; widget content (auth panel,
+ * news feed) resolves through SlotRenderer against the layout graph.
  */
 @Composable
 fun RightPanel(
@@ -22,30 +32,25 @@ fun RightPanel(
     sslBypass: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier.background(CelestiaTheme.colors.background)) {
-
-        // ── Auth section (top) ────────────────────────────────────────────────
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(glassSurfaceAlpha(0.22f))
-        ) {
-            when (appState) {
-                AppState.Loading          -> AuthLoadingSlot()
-                AppState.Unauthenticated  -> LoginPanel(onLogin = onLogin)
-                is AppState.Authenticated -> AccountPanel(
-                    session  = appState.session,
-                    onLogout = onLogout,
-                )
-            }
-        }
-
-        HorizontalDivider(color = glassSurfaceAlpha(0.7f))
-
-        // ── News feed (bottom) ────────────────────────────────────────────────
-        CompactNewsFeed(
+    val ctx = remember(appState, onLogin, onLogout, sslBypass) {
+        RightRailContext(
+            appState  = appState,
+            onLogin   = onLogin,
+            onLogout  = onLogout,
             sslBypass = sslBypass,
-            modifier  = Modifier.weight(1f).fillMaxWidth(),
         )
     }
+    CompositionLocalProvider(LocalRightRailContext provides ctx) {
+        Column(modifier = modifier.background(CelestiaTheme.colors.background)) {
+            Box(Modifier.fillMaxWidth()) {
+                SlotRenderer(SurfaceId(SURFACE), SlotId("auth"))
+            }
+            HorizontalDivider(color = glassSurfaceAlpha(0.7f))
+            Box(Modifier.weight(1f).fillMaxWidth()) {
+                SlotRenderer(SurfaceId(SURFACE), SlotId("news"))
+            }
+        }
+    }
 }
+
+private const val SURFACE = "appshell.rightrail"

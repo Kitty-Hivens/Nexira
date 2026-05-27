@@ -4,22 +4,65 @@
     "surfaces": {
       "home.classic": {
         "slots": {
-          "main": { "widgets": [] }
+          "main": {
+            "widgets": [
+              { "kind": "home.classic.content", "instance_id": "home-classic-content-default" }
+            ]
+          }
         }
       },
-      "home.libraryfirst": {
+      "home.new": {
         "slots": {
-          "main": { "widgets": [] }
+          "main": {
+            "widgets": [
+              { "kind": "home.new.welcome",     "instance_id": "home-new-welcome-default" },
+              { "kind": "home.new.recent",      "instance_id": "home-new-recent-default" },
+              { "kind": "home.new.quicklaunch", "instance_id": "home-new-quicklaunch-default" }
+            ]
+          }
+        }
+      },
+      "library": {
+        "slots": {
+          "header": {
+            "widgets": [
+              { "kind": "library.header", "instance_id": "library-header-default" }
+            ]
+          },
+          "body": {
+            "widgets": [
+              { "kind": "library.body", "instance_id": "library-body-default" }
+            ]
+          }
         }
       },
       "appshell.leftrail": {
         "slots": {
-          "main": { "widgets": [] }
+          "top": {
+            "widgets": [
+              { "kind": "appshell.leftrail.navbuttons", "instance_id": "appshell-leftrail-navbuttons-default" }
+            ]
+          },
+          "bottom": {
+            "widgets": [
+              { "kind": "appshell.leftrail.consoletoggle", "instance_id": "appshell-leftrail-consoletoggle-default" },
+              { "kind": "appshell.leftrail.logout",        "instance_id": "appshell-leftrail-logout-default" }
+            ]
+          }
         }
       },
       "appshell.rightrail": {
         "slots": {
-          "main": { "widgets": [] }
+          "auth": {
+            "widgets": [
+              { "kind": "appshell.rightrail.authpanel", "instance_id": "appshell-rightrail-authpanel-default" }
+            ]
+          },
+          "news": {
+            "widgets": [
+              { "kind": "appshell.rightrail.compactnews", "instance_id": "appshell-rightrail-compactnews-default" }
+            ]
+          }
         }
       }
     }

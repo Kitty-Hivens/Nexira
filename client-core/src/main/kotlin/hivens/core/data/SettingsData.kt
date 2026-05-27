@@ -12,7 +12,14 @@ import kotlinx.serialization.Serializable
  * how the user explores the direction before it's finished.
  */
 @Serializable
-enum class HomeView { Classic, LibraryFirst }
+enum class HomeView {
+    Classic,
+    LibraryFirst,
+    // [New] -- widget-composed prototype home (Phase 1 / kernel-3). Carries
+    // the minimal welcome / recent-packs / quick-launch widgets; the
+    // expressive build-out happens as user customization in later phases.
+    New,
+}
 
 /**
  * Which visual style variant is active. Independent from palette

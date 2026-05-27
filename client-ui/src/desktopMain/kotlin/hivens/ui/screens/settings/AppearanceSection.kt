@@ -219,9 +219,11 @@ internal fun AppearanceSection(
         labelSub     = s.settingsHomeViewSub,
         classicLabel = s.settingsHomeViewClassic,
         libraryLabel = s.settingsHomeViewLibrary,
+        newLabel     = s.settingsHomeViewNew,
     )
     PuppetClick("settings.homeView.classic")      { onHomeViewChanged(HomeView.Classic) }
     PuppetClick("settings.homeView.libraryFirst") { onHomeViewChanged(HomeView.LibraryFirst) }
+    PuppetClick("settings.homeView.new")          { onHomeViewChanged(HomeView.New) }
 
     Spacer(Modifier.height(4.dp))
 

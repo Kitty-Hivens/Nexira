@@ -8,26 +8,60 @@ import kotlin.test.assertTrue
 class DefaultLayoutTest {
 
     @Test
-    fun `bundled default decodes to the four kernel surfaces`() {
+    fun `bundled default decodes to the kernel-3 surface set`() {
         val graph = DefaultLayout.load()
         val surfaceIds = graph.surfaces.keys.map { it.value }.toSet()
         assertEquals(
-            setOf("home.classic", "home.libraryfirst", "appshell.leftrail", "appshell.rightrail"),
+            setOf("home.classic", "home.new", "library", "appshell.leftrail", "appshell.rightrail"),
             surfaceIds,
-            "kernel-2 default ships four named surfaces; any drift means kernel-3 forgot to keep them",
+            "kernel-3 ships five named surfaces; any drift means a refactor lost one",
         )
     }
 
     @Test
-    fun `each kernel surface has a main slot with no widgets`() {
+    fun `every surface declares at least one slot with at least one widget`() {
         val graph = DefaultLayout.load()
         graph.surfaces.forEach { (surfaceId, layout) ->
-            val main = layout.slots[SlotId("main")]
-            assertNotNull(main, "surface ${surfaceId.value} must declare a `main` slot")
             assertTrue(
-                main.widgets.isEmpty(),
-                "kernel-2 ships empty slots; widget kinds come in kernel-3",
+                layout.slots.isNotEmpty(),
+                "surface ${surfaceId.value} declares no slots; SlotRenderer would render nothing",
             )
+            layout.slots.forEach { (slotId, content) ->
+                assertTrue(
+                    content.widgets.isNotEmpty(),
+                    "slot ${surfaceId.value}.${slotId.value} is empty; kernel-3 populates every slot",
+                )
+            }
         }
+    }
+
+    @Test
+    fun `every widget instance has a non-blank kind and unique instance_id`() {
+        val graph = DefaultLayout.load()
+        val instanceIds = mutableListOf<String>()
+        graph.surfaces.values.forEach { layout ->
+            layout.slots.values.forEach { content ->
+                content.widgets.forEach { widget ->
+                    assertTrue(widget.kind.value.isNotBlank(), "blank widget kind")
+                    assertTrue(widget.instanceId.isNotBlank(), "blank instance_id on ${widget.kind.value}")
+                    instanceIds += widget.instanceId
+                }
+            }
+        }
+        val dupes = instanceIds.groupingBy { it }.eachCount().filterValues { it > 1 }.keys
+        assertEquals(emptySet(), dupes, "instance_id values must be unique across the graph")
+    }
+
+    @Test
+    fun `kernel surface and slot identifiers match the documented map`() {
+        val graph = DefaultLayout.load()
+        fun slots(surface: String) = graph.surfaces[SurfaceId(surface)]?.slots?.keys?.map { it.value }?.toSet()
+            ?: emptySet()
+
+        assertEquals(setOf("main"),           slots("home.classic"))
+        assertEquals(setOf("main"),           slots("home.new"))
+        assertEquals(setOf("header", "body"), slots("library"))
+        assertEquals(setOf("top", "bottom"),  slots("appshell.leftrail"))
+        assertEquals(setOf("auth", "news"),   slots("appshell.rightrail"))
     }
 }
