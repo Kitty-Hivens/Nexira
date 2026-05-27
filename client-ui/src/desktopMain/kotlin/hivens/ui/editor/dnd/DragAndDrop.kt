@@ -110,10 +110,11 @@ class DropTargetRegistry {
         widgets[slot]?.remove(instanceId)
     }
 
-    // Locates which slot the pointer is currently over. Two passes:
-    // first an exact rect hit on any widget; second the slot whose
-    // tracked widget rects most-nearly bracket the pointer Y. Returns
-    // null when the pointer is outside every registered slot.
+    // Locates which slot the pointer is currently over. Three passes:
+    // 1) exact rect hit on any widget, 2) the slot whose tracked
+    // widget rects most-nearly bracket the pointer Y, 3) empty-slot
+    // bounds registered by EmptySlotDecorator. Returns null when the
+    // pointer is outside every registered slot.
     fun slotForPoint(pointInWindow: Offset): SlotAddress? {
         widgets.forEach { (slot, byId) ->
             byId.values.forEach { wb ->
@@ -134,6 +135,11 @@ class DropTargetRegistry {
             if (pointInWindow.y in minY..maxY && pointInWindow.x in minX..maxX) {
                 return slot
             }
+        }
+        // Empty slot fallback: EmptySlotDecorator registers slot
+        // bounds; drop into the empty placeholder lands here.
+        slotBounds.forEach { (slot, rect) ->
+            if (rect.contains(pointInWindow)) return slot
         }
         return null
     }

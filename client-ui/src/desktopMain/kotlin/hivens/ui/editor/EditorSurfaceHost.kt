@@ -66,12 +66,20 @@ import androidx.compose.ui.unit.dp
 import hivens.core.data.HomeView
 import hivens.ui.Screen
 import hivens.ui.editor.decoration.EditableWidgetChrome
+import hivens.ui.editor.decoration.EmptySlotPlaceholder
 import hivens.ui.editor.dnd.DragController
 import hivens.ui.editor.dnd.DragPayload
 import hivens.ui.editor.dnd.DropTargetRegistry
 import hivens.ui.editor.dnd.LocalDragController
 import hivens.ui.editor.dnd.LocalDropTargetRegistry
 import hivens.ui.editor.palette.WidgetPalettePanel
+import hivens.ui.widgets.home.classic.LocalHomeClassicContext
+import hivens.ui.widgets.home.new.LocalHomeNewContext
+import hivens.ui.widgets.library.LocalLibraryContext
+import hivens.ui.widgets.shell.LocalLeftRailContext
+import hivens.ui.widgets.shell.LocalRightRailContext
+import hivens.widget.api.EmptySlotDecorator
+import hivens.widget.api.LocalEmptySlotDecorator
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.LocalStyle
 import hivens.widget.api.LocalWidgetDecorator
@@ -176,11 +184,32 @@ fun EditorSurfaceHost(
         }
     }
 
+    // Empty-slot decorator only renders the "drop here" placeholder
+    // while edit mode is on -- otherwise empty slots stay invisible
+    // in normal use.
+    val emptyDecorator: EmptySlotDecorator = remember(state, registry) {
+        if (state is EditModeState.On) {
+            { address -> EmptySlotPlaceholder(address = address, registry = registry) }
+        } else {
+            {}
+        }
+    }
+
     CompositionLocalProvider(
         LocalEditMode           provides state,
         LocalDragController     provides dragController,
         LocalDropTargetRegistry provides registry,
         LocalWidgetDecorator    provides chromeDecorator,
+        LocalEmptySlotDecorator provides emptyDecorator,
+        // Stub surface contexts. Surface composables that mount under
+        // content() override with the real values; widgets dropped on
+        // a foreign surface fall through to the stubs and render
+        // with no-op callbacks instead of crashing the launcher.
+        LocalHomeClassicContext provides STUB_HOME_CLASSIC,
+        LocalHomeNewContext     provides STUB_HOME_NEW,
+        LocalLibraryContext     provides STUB_LIBRARY,
+        LocalLeftRailContext    provides STUB_LEFTRAIL,
+        LocalRightRailContext   provides STUB_RIGHTRAIL,
     ) {
         Box(
             modifier = Modifier

@@ -38,3 +38,12 @@ val LocalWidgetDecorator: ProvidableCompositionLocal<WidgetDecorator> =
         // mounted (release builds, headless smoke, future TUI surface)
         { _, _, _, _, content -> content() }
     }
+
+// Rendered by SlotRenderer when a slot has no widgets. Default = nothing
+// (production behavior: empty slot stays invisible). The editor swaps
+// in a placeholder that says "drop here" and registers the slot bounds
+// with the DropTargetRegistry, making empty slots valid drop targets.
+typealias EmptySlotDecorator = @Composable (address: SlotAddress) -> Unit
+
+val LocalEmptySlotDecorator: ProvidableCompositionLocal<EmptySlotDecorator> =
+    staticCompositionLocalOf { {} }
