@@ -106,6 +106,8 @@ import hivens.ui.widgets.about.LocalAboutContext
 import hivens.ui.widgets.about.STUB_ABOUT
 import hivens.ui.widgets.bgsettings.LocalBgSettingsContext
 import hivens.ui.widgets.bgsettings.STUB_BG_SETTINGS
+import hivens.ui.widgets.customization.LocalCustomizationContext
+import hivens.ui.widgets.customization.STUB_CUSTOMIZATION
 import hivens.ui.widgets.profile.LocalProfileContext
 import hivens.ui.widgets.profile.STUB_PROFILE
 import hivens.ui.widgets.serverdetails.LocalServerDetailsContext
@@ -281,6 +283,7 @@ fun EditorSurfaceHost(
         LocalRightRailContext     provides STUB_RIGHTRAIL,
         LocalAboutContext         provides STUB_ABOUT,
         LocalBgSettingsContext    provides STUB_BG_SETTINGS,
+        LocalCustomizationContext provides STUB_CUSTOMIZATION,
         LocalProfileContext       provides STUB_PROFILE,
         LocalServerDetailsContext provides STUB_SERVER_DETAILS,
         LocalThemePickerContext   provides STUB_THEME_PICKER,
@@ -701,6 +704,7 @@ private fun humanSurfaceShortName(surface: SurfaceId): String = when (surface.va
     "appshell.rightrail"  -> "Прав. рейл"
     "about"               -> "О приложении"
     "bg.settings"         -> "Фон"
+    "customization"       -> "Стиль"
     "profile"             -> "Профиль"
     "server.details"      -> "Сервер"
     "theme.picker"        -> "Темы"
@@ -715,6 +719,7 @@ private fun humanSurfaceName(surface: SurfaceId): String = when (surface.value) 
     "appshell.rightrail"  -> "Правая панель"
     "about"               -> "О приложении"
     "bg.settings"         -> "Настройки фона"
+    "customization"       -> "Кастомизация"
     "profile"             -> "Профиль"
     "server.details"      -> "Детали сервера"
     "theme.picker"        -> "Выбор темы"
@@ -808,12 +813,13 @@ private fun availableSurfacesFor(screen: Screen, homeView: HomeView): List<Surfa
             HomeView.LibraryFirst -> SurfaceId("library")
             HomeView.New          -> SurfaceId("home.new")
         }
-        Screen.About              -> SurfaceId("about")
-        Screen.BackgroundSettings -> SurfaceId("bg.settings")
-        Screen.Library            -> SurfaceId("library")
-        Screen.Profile          -> SurfaceId("profile")
-        is Screen.ServerDetails -> SurfaceId("server.details")
-        Screen.ThemePicker      -> SurfaceId("theme.picker")
+        Screen.About                  -> SurfaceId("about")
+        Screen.BackgroundSettings     -> SurfaceId("bg.settings")
+        Screen.CustomizationExtension -> SurfaceId("customization")
+        Screen.Library                -> SurfaceId("library")
+        Screen.Profile                -> SurfaceId("profile")
+        is Screen.ServerDetails       -> SurfaceId("server.details")
+        Screen.ThemePicker            -> SurfaceId("theme.picker")
         // Other widget-composed surfaces from B.1 land here as the
         // rest of the screens migrate over.
         else               -> return emptyList()

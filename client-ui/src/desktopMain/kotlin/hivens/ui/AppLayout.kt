@@ -42,6 +42,7 @@ import hivens.ui.widgets.profile.ProfileSurface
 import hivens.ui.screens.settings.SettingsScreen
 import hivens.ui.widgets.about.AboutSurface
 import hivens.ui.widgets.bgsettings.BgSettingsSurface
+import hivens.ui.widgets.customization.CustomizationSurface
 import hivens.ui.widgets.serverdetails.ServerDetailsSurface
 import hivens.ui.widgets.themepicker.ThemePickerSurface
 import hivens.ui.theme.CelestiaTheme
@@ -196,7 +197,7 @@ fun AppLayout(
                         )
 
                     Screen.CustomizationExtension ->
-                        hivens.ui.screens.customization.CustomizationExtensionScreen(
+                        CustomizationSurface(
                             currentSettings   = customization,
                             onSettingsChanged = onCustomizationChanged,
                             onBack            = { onScreenChange(Screen.Settings) },

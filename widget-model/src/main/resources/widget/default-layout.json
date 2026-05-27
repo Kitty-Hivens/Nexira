@@ -67,6 +67,49 @@
           }
         }
       },
+      "customization": {
+        "slots": {
+          "visual": {
+            "widgets": [
+              { "kind": "customization.density",                "instance_id": "cust-density-default" },
+              { "kind": "customization.glass.intensity",        "instance_id": "cust-glass-intensity-default" },
+              { "kind": "customization.accent.override",        "instance_id": "cust-accent-override-default" },
+              { "kind": "customization.experimental.toggle",    "instance_id": "cust-experimental-toggle-default" }
+            ]
+          },
+          "colors": {
+            "widgets": [
+              { "kind": "customization.color.primary",          "instance_id": "cust-color-primary-default" },
+              { "kind": "customization.color.secondary",        "instance_id": "cust-color-secondary-default" },
+              { "kind": "customization.color.background",       "instance_id": "cust-color-background-default" },
+              { "kind": "customization.color.surface",          "instance_id": "cust-color-surface-default" },
+              { "kind": "customization.color.success",          "instance_id": "cust-color-success-default" },
+              { "kind": "customization.color.error",            "instance_id": "cust-color-error-default" },
+              { "kind": "customization.color.outline",          "instance_id": "cust-color-outline-default" },
+              { "kind": "customization.color.textPrimary",      "instance_id": "cust-color-text-primary-default" },
+              { "kind": "customization.color.textSecondary",    "instance_id": "cust-color-text-secondary-default" },
+              { "kind": "customization.color.progressAccent",   "instance_id": "cust-color-progress-accent-default" },
+              { "kind": "customization.color.warnAccent",       "instance_id": "cust-color-warn-accent-default" },
+              { "kind": "customization.color.criticalAccent",   "instance_id": "cust-color-critical-accent-default" },
+              { "kind": "customization.glass.alpha",            "instance_id": "cust-glass-alpha-default" }
+            ]
+          },
+          "shape": {
+            "widgets": [
+              { "kind": "customization.shape.cardCorner",       "instance_id": "cust-shape-card-corner-default" },
+              { "kind": "customization.shape.cardBorder",       "instance_id": "cust-shape-card-border-default" },
+              { "kind": "customization.shape.buttonCorner",     "instance_id": "cust-shape-button-corner-default" },
+              { "kind": "customization.shape.animMultiplier",   "instance_id": "cust-shape-anim-multiplier-default" },
+              { "kind": "customization.shape.softGlow",         "instance_id": "cust-shape-soft-glow-default" }
+            ]
+          },
+          "actions": {
+            "widgets": [
+              { "kind": "customization.reset", "instance_id": "cust-reset-default" }
+            ]
+          }
+        }
+      },
       "bg.settings": {
         "slots": {
           "controls": {
