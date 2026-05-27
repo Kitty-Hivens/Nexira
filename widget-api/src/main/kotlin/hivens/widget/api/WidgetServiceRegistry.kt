@@ -37,6 +37,16 @@ class WidgetServiceRegistry {
         mutableStateMapOf()
 
     fun register(clazz: KClass<out WidgetService>, instanceId: String, service: WidgetService) {
+        // The reified provideService<T> wrapper is type-safe, but a
+        // direct register call from a future plugin / hand-written
+        // provider could store a service that does not actually
+        // implement clazz; failure would surface as a
+        // ClassCastException on the consumer's first<T>() call, with
+        // no breadcrumb back to the wrong provider. Reject loudly
+        // here instead.
+        require(clazz.isInstance(service)) {
+            "service does not implement ${clazz.qualifiedName} (got ${service::class.qualifiedName})"
+        }
         val perKind = byKind.getOrPut(clazz) { mutableStateMapOf() }
         perKind[instanceId] = service
     }
@@ -51,8 +61,17 @@ class WidgetServiceRegistry {
     fun <T : WidgetService> byInstance(clazz: KClass<T>, instanceId: String): T? =
         byKind[clazz]?.get(instanceId) as T?
 
-    fun <T : WidgetService> first(clazz: KClass<T>): T? =
-        all(clazz).firstOrNull()
+    @Suppress("UNCHECKED_CAST")
+    fun <T : WidgetService> first(clazz: KClass<T>): T? {
+        val perKind = byKind[clazz] ?: return null
+        // O(n) min-key scan instead of all().firstOrNull() which sorts
+        // the entire list just to drop everything but the first.
+        // SnapshotStateMap's iteration order is unspecified, so the
+        // sort was for determinism; min-by-instanceId gives the same
+        // deterministic winner without paying for the full sort.
+        val firstKey = perKind.keys.minOrNull() ?: return null
+        return perKind[firstKey] as T?
+    }
 
     @Suppress("UNCHECKED_CAST")
     fun <T : WidgetService> all(clazz: KClass<T>): List<T> {

@@ -2,6 +2,7 @@ package hivens.widget.api
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.SideEffect
 import hivens.widget.model.WidgetService
 import kotlin.reflect.KClass
 
@@ -38,15 +39,24 @@ inline fun <reified T : WidgetService> useAllServices(): List<T> {
 }
 
 // Register a service implementation for the lifetime of the
-// surrounding composition, scoped to one widget instance. Calls
-// register on enter and unregister on dispose. Keyed on (clazz,
-// instanceId, service) so a service-instance swap re-registers
-// cleanly without leaking the previous binding.
+// surrounding composition, scoped to one widget instance.
 //
-// Provider widgets call this from inside their composable body,
-// typically with `service` constructed via `remember(deps) {
-// MyServiceImpl(deps) }` so the impl outlives recompositions but
-// dies with the widget.
+// Two effects intentionally separated:
+//   * `DisposableEffect(registry, clazz, instanceId)` owns the
+//     registration LIFETIME -- onDispose fires only when the widget
+//     unmounts (or the registry/clazz/instanceId tuple changes,
+//     which in practice never happens for one widget).
+//   * `SideEffect { register(...) }` refreshes the bound impl ref on
+//     every successful composition. Idempotent map put; cheap.
+//
+// The split matters when a provider widget instantiates its impl
+// inline (`provideService(MusicPlayerService::class, id,
+// MusicPlayerServiceImpl(player))`) instead of wrapping in
+// `remember`. With the old keyed-on-service shape every recomposition
+// would unregister + register through snapshot state, and consumers
+// would see a one-frame null between the two halves. Decoupling the
+// effects keeps the binding live across recompositions; consumers
+// see a continuous service ref even from a remember-less provider.
 @Composable
 fun <T : WidgetService> provideService(
     clazz: KClass<T>,
@@ -54,10 +64,12 @@ fun <T : WidgetService> provideService(
     service: T,
 ) {
     val registry = LocalWidgetServiceRegistry.current
-    DisposableEffect(registry, clazz, instanceId, service) {
-        registry.register(clazz, instanceId, service)
+    DisposableEffect(registry, clazz, instanceId) {
         onDispose {
             registry.unregister(clazz, instanceId)
         }
+    }
+    SideEffect {
+        registry.register(clazz, instanceId, service)
     }
 }

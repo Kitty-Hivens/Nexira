@@ -41,7 +41,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
@@ -112,6 +111,11 @@ fun PlaybackMiniControlWidget(instance: WidgetInstance) {
         Spacer(Modifier.width(10.dp))
 
         val isPlaying = state is PlaybackState.Playing
+        // Idle (no file ever loaded) intentionally disables play here:
+        // the file-picker lives on the main MusicPlayer widget. The
+        // mini-control drives existing playback, it does not bootstrap
+        // it. Open the main widget once, pick a track, then the mini
+        // can transport it from anywhere on the surface.
         val canTransport = state is PlaybackState.Playing || state is PlaybackState.Paused || state is PlaybackState.Ready
         TransportButton(
             icon        = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
@@ -262,7 +266,7 @@ private fun MiniVolumeBar(
 }
 
 private fun currentTitleShort(state: PlaybackState): String = when (state) {
-    PlaybackState.Idle       -> "—"
+    PlaybackState.Idle       -> "Без файла"
     is PlaybackState.Ready   -> state.file.name
     is PlaybackState.Playing -> state.file.name
     is PlaybackState.Paused  -> state.file.name

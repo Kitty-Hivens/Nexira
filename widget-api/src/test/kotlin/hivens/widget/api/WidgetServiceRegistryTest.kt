@@ -3,6 +3,7 @@ package hivens.widget.api
 import hivens.widget.model.WidgetService
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
@@ -104,5 +105,18 @@ class WidgetServiceRegistryTest {
         val reg = WidgetServiceRegistry()
         reg.register(OtherService::class, "id", OtherImpl())
         assertTrue(reg.all(SampleService::class).isEmpty())
+    }
+
+    @Test
+    fun `register rejects an impl that does not implement the declared service kind`() {
+        val reg = WidgetServiceRegistry()
+        val ex = assertFailsWith<IllegalArgumentException> {
+            // A plugin / hand-written provider could pass the wrong
+            // KClass; the registry must catch the mismatch loud and
+            // local, not defer it to a ClassCastException on the
+            // consumer's first<T>() call.
+            reg.register(SampleService::class, "id", OtherImpl())
+        }
+        assertTrue("SampleService" in (ex.message ?: ""))
     }
 }

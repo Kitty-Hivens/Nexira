@@ -38,8 +38,14 @@ annotation class ProvidesService(
 // uses pairs of (provider, injector) to warn the user when an
 // injector is dropped onto a surface that has no provider for its
 // required service.
+//
+// vararg for symmetry with ProvidesService: a future achievement
+// watcher reasonably reads MusicPlayerService AND PackLifecycleService
+// in one widget, and the audit list should reflect that in a single
+// annotation rather than forcing the author to chain @Repeatable
+// instances.
 @Target(AnnotationTarget.FUNCTION)
 @Retention(AnnotationRetention.BINARY)
 annotation class InjectService(
-    val service: KClass<out WidgetService>,
+    vararg val services: KClass<out WidgetService>,
 )
