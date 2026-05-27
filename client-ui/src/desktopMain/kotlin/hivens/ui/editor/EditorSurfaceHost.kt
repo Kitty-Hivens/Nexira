@@ -64,6 +64,8 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
@@ -222,16 +224,15 @@ fun EditorSurfaceHost(
         }
     }
 
-    // Empty-slot decorator: placeholder only on the selected surface
-    // and only when not previewing. Other surfaces' empty slots stay
-    // invisible (matches normal-mode behavior).
+    // Empty-slot decorator: placeholder on every editable surface
+    // while edit mode is on. Chrome filtering is keyed to selection
+    // (interaction focus), but a palette drop should be able to land
+    // on any visible empty slot regardless of which surface chip the
+    // user happens to have active.
     val emptyDecorator: EmptySlotDecorator = remember(state, registry, previewing) {
         if (state is EditModeState.On && !previewing) {
-            val selected = state.surface
             { address ->
-                if (address.surface == selected) {
-                    EmptySlotPlaceholder(address = address, registry = registry)
-                }
+                EmptySlotPlaceholder(address = address, registry = registry)
             }
         } else {
             {}
@@ -649,13 +650,15 @@ private fun EditModeVignette(active: Boolean) {
 @Composable
 private fun DragGhostOverlay(dragController: DragController) {
     val active = dragController.active ?: return
-    val density = LocalDensity.current
-    // pointerInWindow + pickupOffset is the widget-origin in window
-    // coords; the ghost should sit there. We render through graphicsLayer
-    // to avoid layout invalidation when the offset changes.
+    // The OS cursor is hidden for the duration of the drag by attaching
+    // a transparent AWT cursor as the hover icon of this fullscreen
+    // overlay. pointerHoverIcon does not intercept pointer events, so
+    // the underlying drag handler keeps receiving updates.
+    val transparentCursor = remember { transparentPointerIcon() }
     Box(
         modifier = Modifier
-            .fillMaxSize(),
+            .fillMaxSize()
+            .pointerHoverIcon(icon = transparentCursor, overrideDescendants = true),
     ) {
         Box(
             modifier = Modifier
@@ -673,6 +676,13 @@ private fun DragGhostOverlay(dragController: DragController) {
             active.ghost()
         }
     }
+}
+
+private fun transparentPointerIcon(): PointerIcon {
+    val image = java.awt.image.BufferedImage(16, 16, java.awt.image.BufferedImage.TYPE_INT_ARGB)
+    val cursor = java.awt.Toolkit.getDefaultToolkit()
+        .createCustomCursor(image, java.awt.Point(0, 0), "drag-ghost")
+    return PointerIcon(cursor)
 }
 
 // ── Surface routing ─────────────────────────────────────────────────────────

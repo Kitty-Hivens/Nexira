@@ -1,6 +1,6 @@
 package hivens.ui.screens.library
 
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -37,10 +37,16 @@ fun LibraryScreen(
     }
     CompositionLocalProvider(LocalLibraryContext provides ctx) {
         Column(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 20.dp)) {
-            Box(Modifier.fillMaxWidth()) {
+            Column(
+                modifier            = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 SlotRenderer(SurfaceId(SURFACE), SlotId("header"))
             }
-            Box(Modifier.weight(1f).fillMaxWidth()) {
+            Column(
+                modifier            = Modifier.weight(1f).fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 SlotRenderer(SurfaceId(SURFACE), SlotId("body"))
             }
         }
