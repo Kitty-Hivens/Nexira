@@ -35,15 +35,18 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Widgets
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -144,6 +147,7 @@ fun EditorSurfaceHost(
     var paletteOpen   by remember(availableSurfaces) { mutableStateOf(true) }
     var previewing    by remember(availableSurfaces) { mutableStateOf(false) }
     var presetPanelOpen by remember(availableSurfaces) { mutableStateOf(false) }
+    var resetSurfaceConfirm by remember(availableSurfaces) { mutableStateOf(false) }
     var selectedSurface by remember(availableSurfaces) {
         mutableStateOf(availableSurfaces.firstOrNull())
     }
@@ -296,8 +300,38 @@ fun EditorSurfaceHost(
                     previewing        = previewing,
                     onTogglePreview   = { previewing = !previewing },
                     onOpenPresets     = { presetPanelOpen = true },
+                    onRequestReset    = { if (selectedSurface != null) resetSurfaceConfirm = true },
                     modifier          = Modifier.align(Alignment.TopCenter).padding(top = 16.dp),
                 )
+
+                val surfaceForReset = selectedSurface
+                if (resetSurfaceConfirm && surfaceForReset != null) {
+                    AlertDialog(
+                        onDismissRequest = { resetSurfaceConfirm = false },
+                        title            = { Text("Сбросить поверхность к умолчанию?") },
+                        text             = {
+                            Text(
+                                text = buildString {
+                                    append("\"")
+                                    append(humanSurfaceName(surfaceForReset))
+                                    append("\" вернётся к расстановке виджетов из встроенного default-layout. ")
+                                    append("Все локальные изменения на этой поверхности (добавленные виджеты, ")
+                                    append("перестановки, удаления) пропадут. Другие поверхности не тронем.")
+                                },
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                controller.resetSurface(surfaceForReset)
+                                resetSurfaceConfirm = false
+                            }) { Text("Сбросить", color = CelestiaTheme.colors.error) }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { resetSurfaceConfirm = false }) { Text("Отмена") }
+                        },
+                    )
+                }
 
                 PresetManagerPanel(
                     visible       = editing && presetPanelOpen,
@@ -461,6 +495,7 @@ private fun EditModePill(
     previewing: Boolean,
     onTogglePreview: () -> Unit,
     onOpenPresets: () -> Unit,
+    onRequestReset: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     AnimatedVisibility(
@@ -526,6 +561,17 @@ private fun EditModePill(
                     label    = "Пресеты",
                     selected = false,
                     onClick  = onOpenPresets,
+                )
+                Spacer(Modifier.width(4.dp))
+
+                // Escape hatch: reset the currently selected surface
+                // to its bundled default. Confirmation dialog handled
+                // at host level; the chip just signals intent.
+                ToolChip(
+                    icon     = Icons.Default.RestartAlt,
+                    label    = "Сбросить",
+                    selected = false,
+                    onClick  = onRequestReset,
                 )
                 Spacer(Modifier.width(10.dp))
 

@@ -20,9 +20,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.DragIndicator
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.currentCompositionLocalContext
@@ -76,6 +81,7 @@ fun EditableWidgetChrome(
     val interaction = remember { MutableInteractionSource() }
     val isHovered by interaction.collectIsHoveredAsState()
     var widgetWindowBounds by remember { mutableStateOf<Rect?>(null) }
+    var forceRemoveOpen by remember { mutableStateOf(false) }
     val activeDrag = controller.active
     val isThisDragging = (activeDrag?.payload as? DragPayload.ExistingWidget)
         ?.instance?.instanceId == instance.instanceId
@@ -170,11 +176,13 @@ fun EditableWidgetChrome(
                 )
             }
 
-            // Remove button: hover-only, hidden on non-removable widgets.
-            // Animated fade so it does not pop in jarringly. Qualified
-            // with this@Column because the inner Box sits inside the
-            // outer drop-indicator Column, and Kotlin would otherwise
-            // try ColumnScope.AnimatedVisibility against a BoxScope `this`.
+            // Remove button: hover-only, red close icon. Hidden on
+            // non-removable widgets (those get the force-remove
+            // affordance below instead). Animated fade so it does not
+            // pop in jarringly. Qualified with this@Column because the
+            // inner Box sits inside the outer drop-indicator Column,
+            // and Kotlin would otherwise try ColumnScope.AnimatedVisibility
+            // against a BoxScope `this`.
             this@Column.AnimatedVisibility(
                 visible  = isHovered && descriptor.removable,
                 enter    = fadeIn(spring(stiffness = Spring.StiffnessMedium)),
@@ -206,8 +214,79 @@ fun EditableWidgetChrome(
                     )
                 }
             }
+
+            // Force-remove affordance for non-removable widgets. Same
+            // top-right slot as the regular remove button, but uses a
+            // warning-tinted DeleteForever icon and gates the action
+            // behind a confirmation dialog. Without this, a non-
+            // removable widget that ends up in the wrong slot (preset
+            // import, plugin install, or a user-driven move out of its
+            // home surface) has no exit path short of editing
+            // layout-graph.json by hand or invoking the per-surface
+            // reset on the edit pill.
+            this@Column.AnimatedVisibility(
+                visible  = isHovered && !descriptor.removable,
+                enter    = fadeIn(spring(stiffness = Spring.StiffnessMedium)),
+                exit     = fadeOut(spring(stiffness = Spring.StiffnessMedium)),
+                modifier = Modifier.align(Alignment.TopEnd).padding(4.dp),
+            ) {
+                Surface(
+                    color    = CelestiaTheme.colors.warnAccent.copy(alpha = 0.85f),
+                    shape    = RoundedCornerShape(6.dp),
+                    modifier = Modifier
+                        .size(22.dp)
+                        .pointerInput(instance.instanceId) {
+                            awaitPointerEventScope {
+                                while (true) {
+                                    val event = awaitPointerEvent()
+                                    if (event.type == PointerEventType.Release) {
+                                        forceRemoveOpen = true
+                                        event.changes.forEach { it.consume() }
+                                    }
+                                }
+                            }
+                        },
+                ) {
+                    Icon(
+                        imageVector        = Icons.Default.DeleteForever,
+                        contentDescription = "Force remove non-removable widget",
+                        tint               = Color.White,
+                        modifier           = Modifier.size(14.dp).padding(0.dp),
+                    )
+                }
+            }
         }
         if (showIndicatorAfter) DropIndicator()
+    }
+
+    if (forceRemoveOpen) {
+        AlertDialog(
+            onDismissRequest = { forceRemoveOpen = false },
+            title            = { Text("Удалить виджет принудительно?") },
+            text             = {
+                Text(
+                    text = buildString {
+                        append("\"")
+                        append(descriptor.displayName)
+                        append("\" помечен как неудаляемый. ")
+                        append("Обычно такие виджеты держат на месте, чтобы пользователь не остался ")
+                        append("без навигации. Если ты уверен, что виджет тут не нужен, можно ")
+                        append("снести его прямо сейчас -- а если что, сбрось поверхность к умолчанию ")
+                        append("через меню справа от чипа поверхности.")
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    forceRemoveOpen = false
+                    onRemove()
+                }) { Text("Удалить", color = CelestiaTheme.colors.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { forceRemoveOpen = false }) { Text("Отмена") }
+            },
+        )
     }
 }
 

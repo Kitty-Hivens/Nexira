@@ -1,6 +1,7 @@
 package hivens.launcher
 
 import hivens.widget.model.LayoutGraph
+import hivens.widget.model.SurfaceId
 import hivens.widget.model.walkInstances
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -105,6 +106,31 @@ class LayoutGraphRepository(
                     // Superseded by a later update() or flushed
                     // synchronously; either way no persist needed here.
                 }
+            }
+        }
+    }
+
+    /**
+     * Resets one surface to its bundled default. Useful as an escape
+     * hatch when the user has dropped a non-removable widget into a
+     * surface it doesn't belong on, or wants to roll back accidental
+     * structural changes. Goes through the standard [update] path, so
+     * the tree-wide uniqueness check still runs, the StateFlow
+     * re-emits, and the disk write is debounced.
+     *
+     * Surface absent from the bundled default = removed entirely from
+     * the live graph (matches "this surface no longer exists in the
+     * default layout" semantics, e.g. a plugin-introduced surface that
+     * was uninstalled).
+     */
+    suspend fun resetSurface(surface: SurfaceId) {
+        val def = defaultGraph()
+        update { graph ->
+            val defaultLayout = def.surfaces[surface]
+            if (defaultLayout != null) {
+                graph.copy(surfaces = graph.surfaces + (surface to defaultLayout))
+            } else {
+                graph.copy(surfaces = graph.surfaces - surface)
             }
         }
     }

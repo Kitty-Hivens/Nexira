@@ -4,6 +4,7 @@ import hivens.launcher.LayoutGraphRepository
 import hivens.widget.model.SlotContent
 import hivens.widget.model.SlotId
 import hivens.widget.model.SlotPath
+import hivens.widget.model.SurfaceId
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
 import hivens.widget.model.insertWidget
@@ -70,6 +71,16 @@ class EditModeController(
     fun moveWidget(from: SlotPath, to: SlotPath, instanceId: String, toIndex: Int) {
         scope.launch {
             repo.update { it.moveWidget(from, to, instanceId, toIndex) }
+        }
+    }
+
+    // Surface reset = restore from bundled default. Escape hatch for
+    // when a non-removable widget ends up out-of-place, or the user
+    // wants to undo a chain of edits on one surface without nuking
+    // their whole layout.
+    fun resetSurface(surface: SurfaceId) {
+        scope.launch {
+            repo.resetSurface(surface)
         }
     }
 

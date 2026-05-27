@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
@@ -43,8 +45,15 @@ fun LibraryScreen(
             ) {
                 SlotRenderer(SurfaceId(SURFACE), SlotId("header"))
             }
+            // Body slot scrolls so a tall pack list or a stack of
+            // additional library widgets does not push content past
+            // the viewport with no way to reach it.
+            val bodyScroll = rememberScrollState()
             Column(
-                modifier            = Modifier.weight(1f).fillMaxWidth(),
+                modifier            = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .verticalScroll(bodyScroll),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 SlotRenderer(SurfaceId(SURFACE), SlotId("body"))
