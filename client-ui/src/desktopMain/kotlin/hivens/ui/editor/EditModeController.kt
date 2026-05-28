@@ -1,5 +1,7 @@
 package hivens.ui.editor
 
+import androidx.compose.runtime.State
+import androidx.compose.runtime.mutableStateOf
 import hivens.launcher.LayoutGraphRepository
 import hivens.widget.model.SlotContent
 import hivens.widget.model.SlotId
@@ -29,6 +31,21 @@ class EditModeController(
     private val repo: LayoutGraphRepository,
     private val scope: CoroutineScope,
 ) {
+    // Window-level Ctrl+E increments this tick. The EditorSurfaceHost
+    // observes it via snapshotFlow and flips its own edit state. The
+    // signal lives on the singleton controller because the keybind is
+    // handled at Window scope (focus-independent -- Modifier.onKeyEvent
+    // on the host Box only fires when a descendant holds focus, which
+    // the side rails steal), while the edit boolean is per-surface-host
+    // remember-state. The tick bridges the two. Read-only outward: only
+    // requestEditToggle mutates it.
+    private val _editToggleSignal = mutableStateOf(0)
+    val editToggleSignal: State<Int> = _editToggleSignal
+
+    fun requestEditToggle() {
+        _editToggleSignal.value++
+    }
+
     // `slots` comes from the widget's descriptor and pre-seeds the
     // WidgetInstance.children map with empty SlotContent for every
     // declared slot. Without this, a freshly palette-added container

@@ -50,10 +50,12 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -177,6 +179,32 @@ fun EditorSurfaceHost(
         }
     }
 
+    // Window-level Ctrl+E (AppShell onPreviewKeyEvent) bumps
+    // controller.editToggleSignal; this observer flips local edit
+    // state. `seen` initialises to the current tick before collecting
+    // so navigating into a fresh host (new remember, but the singleton
+    // tick may already be > 0) does not spuriously toggle on mount.
+    // Only editable surfaces react; leaving edit mode drops preview,
+    // matching the FAB + Escape paths.
+    //
+    // The signal sits on the singleton controller, so every mounted
+    // host observes it. Safe because AppLayout mounts exactly one host
+    // (its Crossfade swaps screen content *inside* the host, not the
+    // host itself) -- there is never a second, hidden host to flip into
+    // edit mode behind the user's back.
+    LaunchedEffect(availableSurfaces) {
+        var seen = controller.editToggleSignal.value
+        snapshotFlow { controller.editToggleSignal.value }.collect { tick ->
+            if (tick != seen) {
+                seen = tick
+                if (availableSurfaces.isNotEmpty()) {
+                    editing = !editing
+                    if (!editing) previewing = false
+                }
+            }
+        }
+    }
+
     val dragController = remember { DragController() }
     val registry       = remember { DropTargetRegistry() }
     val focusManager   = LocalFocusManager.current
@@ -292,6 +320,11 @@ fun EditorSurfaceHost(
             modifier = Modifier
                 .fillMaxSize()
                 .onKeyEvent { ev ->
+                    // Escape exits edit mode. Ctrl+E entry/toggle is
+                    // handled at Window scope (see AppShell) so it works
+                    // regardless of which descendant holds focus -- a
+                    // Box-level handler misses the chord when the side
+                    // rails own focus.
                     if (editing && ev.type == KeyEventType.KeyUp && ev.key == Key.Escape) {
                         editing = false
                         true
