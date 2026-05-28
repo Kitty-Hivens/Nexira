@@ -21,10 +21,25 @@ data class WidgetInstance(
     // future mixin hooks (transformProps in Phase C) must not be able
     // to corrupt the layout tree.
     val children: Map<SlotId, SlotContent> = emptyMap(),
+    // Phase G: relative size along the slot's main axis when the slot is
+    // Row/Column. 0 = natural/wrap size; > 0 = a weighted share. Set via
+    // the edit-mode drag-dividers.
+    val weight: Float = 0f,
 )
 
+// Phase G: how a slot arranges its widgets. Column (default) reproduces
+// the pre-Phase-G vertical stack; Row lays them horizontally; Grid flows
+// them into `gridColumns` uniform cells.
 @Serializable
-data class SlotContent(val widgets: List<WidgetInstance> = emptyList())
+enum class SlotOrientation { Column, Row, Grid }
+
+@Serializable
+data class SlotContent(
+    val widgets: List<WidgetInstance> = emptyList(),
+    val orientation: SlotOrientation = SlotOrientation.Column,
+    // Column count when orientation == Grid; ignored otherwise.
+    val gridColumns: Int = 2,
+)
 
 @Serializable
 data class SurfaceLayout(val slots: Map<SlotId, SlotContent> = emptyMap())
@@ -106,6 +121,34 @@ fun LayoutGraph.updateWidgetProps(
         else content.copy(
             widgets = content.widgets.map {
                 if (it.instanceId == instanceId) it.copy(props = props) else it
+            },
+        )
+    }
+
+// Phase G layout transforms. Slot orientation + grid column count are
+// slot-level; widget weight is per-instance. Each is a no-op (identity
+// return) when the value is unchanged or the slot/instance is missing --
+// same contract as the transforms above.
+fun LayoutGraph.setSlotOrientation(path: SlotPath, orientation: SlotOrientation): LayoutGraph =
+    mutate(path) { content ->
+        if (content.orientation == orientation) content
+        else content.copy(orientation = orientation)
+    }
+
+fun LayoutGraph.setGridColumns(path: SlotPath, columns: Int): LayoutGraph =
+    mutate(path) { content ->
+        val coerced = columns.coerceAtLeast(1)
+        if (content.gridColumns == coerced) content
+        else content.copy(gridColumns = coerced)
+    }
+
+fun LayoutGraph.setWidgetWeight(path: SlotPath, instanceId: String, weight: Float): LayoutGraph =
+    mutate(path) { content ->
+        val w = weight.coerceAtLeast(0f)
+        if (content.widgets.none { it.instanceId == instanceId }) content
+        else content.copy(
+            widgets = content.widgets.map {
+                if (it.instanceId == instanceId) it.copy(weight = w) else it
             },
         )
     }
