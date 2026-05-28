@@ -1,11 +1,14 @@
 package hivens.ui.widgets.shell
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import hivens.ui.theme.CelestiaTheme
@@ -18,21 +21,25 @@ import org.koin.compose.koinInject
 @Composable
 fun LeftRailConsoleToggle(instance: WidgetInstance) {
     val gameConsole: GameConsoleService = koinInject()
-    IconButton(
-        onClick  = {
-            if (gameConsole.shouldShowConsole) gameConsole.hide()
-            else gameConsole.show()
-        },
-        modifier = Modifier.size(48.dp),
-    ) {
-        Icon(
-            imageVector        = Icons.Default.Build,
-            contentDescription = null,
-            tint               = if (gameConsole.shouldShowConsole)
-                CelestiaTheme.colors.primary
-            else
-                CelestiaTheme.colors.textSecondary.copy(alpha = 0.55f),
-            modifier           = Modifier.size(22.dp),
-        )
+    // The slot's Column is start-aligned (Phase G), so a fixed-width button
+    // packs left; fill + center to sit under the nav items like the rest.
+    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        IconButton(
+            onClick  = {
+                if (gameConsole.shouldShowConsole) gameConsole.hide()
+                else gameConsole.show()
+            },
+            modifier = Modifier.size(48.dp),
+        ) {
+            Icon(
+                imageVector        = Icons.Default.Build,
+                contentDescription = null,
+                tint               = if (gameConsole.shouldShowConsole)
+                    CelestiaTheme.colors.primary
+                else
+                    CelestiaTheme.colors.textSecondary.copy(alpha = 0.55f),
+                modifier           = Modifier.size(22.dp),
+            )
+        }
     }
 }
