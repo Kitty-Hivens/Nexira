@@ -120,11 +120,13 @@ import hivens.ui.widgets.themepicker.STUB_THEME_PICKER
 import hivens.widget.api.EmptySlotDecorator
 import hivens.widget.api.LocalEmptySlotDecorator
 import hivens.widget.api.LocalSlotControlDecorator
+import hivens.widget.api.LocalSlotDividerDecorator
 import hivens.widget.api.LocalSlotPath
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.LocalStyle
 import hivens.widget.api.LocalWidgetDecorator
 import hivens.widget.api.SlotControlDecorator
+import hivens.widget.api.SlotDividerDecorator
 import hivens.widget.api.WidgetDecorator
 import hivens.widget.model.SlotOrientation
 import hivens.widget.model.SlotPath
@@ -336,6 +338,28 @@ fun EditorSurfaceHost(
         }
     }
 
+    // Slot divider decorator: a draggable handle between adjacent widgets
+    // in a Row/Column slot on the selected surface, redistributing their
+    // weight. Identity off / previewing / foreign surface.
+    val slotDividerDecorator: SlotDividerDecorator = remember(state, previewing) {
+        if (state is EditModeState.On && !previewing) {
+            val selected = state.surface
+            { path, content, leftIndex ->
+                if (path.surface == selected) {
+                    SlotDivider(
+                        path       = path,
+                        content    = content,
+                        leftIndex  = leftIndex,
+                        controller = controller,
+                        registry   = registry,
+                    )
+                }
+            }
+        } else {
+            { _, _, _ -> }
+        }
+    }
+
     CompositionLocalProvider(
         LocalEditMode           provides state,
         LocalDragController     provides dragController,
@@ -343,6 +367,7 @@ fun EditorSurfaceHost(
         LocalWidgetDecorator    provides chromeDecorator,
         LocalEmptySlotDecorator provides emptyDecorator,
         LocalSlotControlDecorator provides slotControlDecorator,
+        LocalSlotDividerDecorator provides slotDividerDecorator,
         // Stub surface contexts. Surface composables that mount under
         // content() override with the real values; widgets dropped on
         // a foreign surface fall through to the stubs and render

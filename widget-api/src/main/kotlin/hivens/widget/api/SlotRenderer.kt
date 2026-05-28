@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
@@ -76,6 +77,7 @@ private fun RenderSlotContent(path: SlotPath, modifier: Modifier, spacing: Dp) {
     val decorator = LocalWidgetDecorator.current
     val emptyDecorator = LocalEmptySlotDecorator.current
     val slotControl = LocalSlotControlDecorator.current
+    val slotDivider = LocalSlotDividerDecorator.current
 
     val content: SlotContent = graph.traverse(path) ?: SlotContent()
     val address = path.leafAddress
@@ -92,28 +94,56 @@ private fun RenderSlotContent(path: SlotPath, modifier: Modifier, spacing: Dp) {
         SlotOrientation.Row -> Row(modifier, horizontalArrangement = Arrangement.spacedBy(spacing)) {
             slotControl(path, content)
             content.widgets.forEachIndexed { index, instance ->
-                val descriptor = registry[instance.kind] ?: return@forEachIndexed
-                if (instance.weight > 0f) {
-                    Box(Modifier.weight(instance.weight)) {
+                val descriptor = registry[instance.kind]
+                if (descriptor != null) {
+                    if (instance.weight > 0f) {
+                        Box(Modifier.weight(instance.weight)) {
+                            decorator(address, index, descriptor, instance) { descriptor.Render(instance) }
+                        }
+                    } else {
                         decorator(address, index, descriptor, instance) { descriptor.Render(instance) }
                     }
-                } else {
-                    decorator(address, index, descriptor, instance) { descriptor.Render(instance) }
+                }
+                if (index < content.widgets.lastIndex) slotDivider(path, content, index)
+            }
+        }
+        SlotOrientation.Grid -> Column(modifier, verticalArrangement = Arrangement.spacedBy(spacing)) {
+            slotControl(path, content)
+            // Non-lazy chunked grid: a Column of equal-width Rows. Reuses the
+            // decorator path so chrome + DnD stay consistent; cells are uniform
+            // (per-widget weight is ignored in Grid) and the last row is padded
+            // with weighted spacers so the columns stay aligned. No dividers.
+            val cols = content.gridColumns.coerceAtLeast(1)
+            content.widgets.chunked(cols).forEachIndexed { rowIndex, rowWidgets ->
+                Row(horizontalArrangement = Arrangement.spacedBy(spacing)) {
+                    rowWidgets.forEachIndexed { colIndex, instance ->
+                        val index = rowIndex * cols + colIndex
+                        val descriptor = registry[instance.kind]
+                        Box(Modifier.weight(1f)) {
+                            if (descriptor != null) {
+                                decorator(address, index, descriptor, instance) { descriptor.Render(instance) }
+                            }
+                        }
+                    }
+                    repeat(cols - rowWidgets.size) { Spacer(Modifier.weight(1f)) }
                 }
             }
         }
-        // Column + Grid (Grid renders as a Column until G5).
+        // Column.
         else -> Column(modifier, verticalArrangement = Arrangement.spacedBy(spacing)) {
             slotControl(path, content)
             content.widgets.forEachIndexed { index, instance ->
-                val descriptor = registry[instance.kind] ?: return@forEachIndexed
-                if (instance.weight > 0f) {
-                    Box(Modifier.weight(instance.weight)) {
+                val descriptor = registry[instance.kind]
+                if (descriptor != null) {
+                    if (instance.weight > 0f) {
+                        Box(Modifier.weight(instance.weight)) {
+                            decorator(address, index, descriptor, instance) { descriptor.Render(instance) }
+                        }
+                    } else {
                         decorator(address, index, descriptor, instance) { descriptor.Render(instance) }
                     }
-                } else {
-                    decorator(address, index, descriptor, instance) { descriptor.Render(instance) }
                 }
+                if (index < content.widgets.lastIndex) slotDivider(path, content, index)
             }
         }
     }

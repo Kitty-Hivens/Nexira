@@ -118,6 +118,11 @@ class DropTargetRegistry {
         widgets[path]?.remove(instanceId)
     }
 
+    // Window-coord rect of one registered widget. Used by the Phase G
+    // slot dividers to read the two neighbors' main-axis px at drag start.
+    fun widgetRect(path: SlotPath, instanceId: String): Rect? =
+        widgets[path]?.get(instanceId)?.rect
+
     // Two passes:
     //   1) exact rect hit across all registered sources (widget rects +
     //      empty-slot placeholder bounds), innermost (smallest area)
@@ -187,6 +192,16 @@ class DropTargetRegistry {
     ): Int {
         val items = widgets[path]?.values?.sortedBy { it.index } ?: return 0
         if (items.isEmpty()) return 0
+        if (orientation == SlotOrientation.Grid) {
+            // Row-major: insert before the first cell the pointer sits above
+            // (an earlier row) or, within the same row band, left of center.
+            items.forEach { wb ->
+                val r = wb.rect
+                if (pointInWindow.y < r.top) return wb.index
+                if (pointInWindow.y <= r.bottom && pointInWindow.x < r.left + r.width / 2f) return wb.index
+            }
+            return items.size
+        }
         val horizontal = orientation == SlotOrientation.Row
         items.forEach { wb ->
             val mid = if (horizontal) wb.rect.left + wb.rect.width / 2f
