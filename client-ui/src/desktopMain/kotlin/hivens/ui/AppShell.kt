@@ -5,6 +5,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -47,6 +52,7 @@ import hivens.ui.customization.LocalCustomization
 import hivens.ui.easter.AprilFools
 import hivens.ui.easter.AprilFoolsLoader
 import hivens.ui.easter.LocalAprilFools
+import hivens.ui.editor.EditModeController
 import hivens.ui.generated.resources.Res
 import hivens.ui.generated.resources.icon
 import hivens.ui.i18n.AppLocale
@@ -171,6 +177,7 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
     val layoutGraphRepo: LayoutGraphRepository = koinInject()
     val widgetRegistry: WidgetRegistry         = koinInject()
     val widgetServiceRegistry: WidgetServiceRegistry = koinInject()
+    val editModeController: EditModeController  = koinInject()
     // Shared process-lifetime scope (createdAtStart in appModule; canceled
     // by AppCoroutineScopeHook on JVM shutdown). Same instance backs
     // LauncherController.appScope and any other fire-and-forget work.
@@ -510,7 +517,27 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
             visible   = isWindowVisible,
             title     = Branding.TITLE,
             resizable = true,
-            icon      = windowIcon
+            icon      = windowIcon,
+            onPreviewKeyEvent = { ev ->
+                // Ctrl+E toggles widget edit mode. Handled at Window
+                // scope (preview = before focus dispatch) so it fires no
+                // matter which composable holds focus -- the side rails
+                // own focus, so a host Box-level handler misses the chord.
+                // The EditorSurfaceHost observes the controller signal and
+                // gates on whether its surface is editable.
+                if (ev.isCtrlPressed && ev.key == Key.E) {
+                    // Consume both edges so the chord never reaches a
+                    // focused control (e.g. the palette search field); act
+                    // on release only, so holding the key toggles once
+                    // instead of repeating on auto-repeat KeyDowns.
+                    if (ev.type == KeyEventType.KeyUp) {
+                        editModeController.requestEditToggle()
+                    }
+                    true
+                } else {
+                    false
+                }
+            },
         ) {
             // Pulled-forward: triggered by the .show watcher above when a
             // second instance fires its signal. Skip on raiseTick == 0 so
