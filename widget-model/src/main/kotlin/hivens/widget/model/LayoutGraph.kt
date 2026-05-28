@@ -145,8 +145,9 @@ fun LayoutGraph.setGridColumns(path: SlotPath, columns: Int): LayoutGraph =
 fun LayoutGraph.setWidgetWeight(path: SlotPath, instanceId: String, weight: Float): LayoutGraph =
     mutate(path) { content ->
         val w = weight.coerceAtLeast(0f)
-        if (content.widgets.none { it.instanceId == instanceId }) content
-        else content.copy(
+        val target = content.widgets.firstOrNull { it.instanceId == instanceId } ?: return@mutate content
+        if (target.weight == w) return@mutate content
+        content.copy(
             widgets = content.widgets.map {
                 if (it.instanceId == instanceId) it.copy(weight = w) else it
             },

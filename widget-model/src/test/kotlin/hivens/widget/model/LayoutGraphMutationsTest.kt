@@ -118,6 +118,19 @@ class LayoutGraphMutationsTest {
     }
 
     @Test
+    fun `setWidgetWeight coerces a negative weight to zero`() {
+        val out = seed(w1).setWidgetWeight(rootPath, "i1", -5f)
+        assertEquals(0f, out.mainWidgets().first { it.instanceId == "i1" }.weight)
+    }
+
+    @Test
+    fun `setWidgetWeight to the same weight is identity`() {
+        // w1 defaults to weight 0f -- re-setting 0f must not allocate a new graph.
+        val graph = seed(w1)
+        assertSame(graph, graph.setWidgetWeight(rootPath, "i1", 0f))
+    }
+
+    @Test
     fun `reorderInSlot swaps positions`() {
         val out = seed(w1, w2, w3).reorderInSlot(rootPath, fromIndex = 0, toIndex = 2)
         assertEquals(listOf(w2, w3, w1), out.mainWidgets())

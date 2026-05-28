@@ -128,6 +128,8 @@ fun BgSettingsSurface(
                     SlotRenderer(
                         SurfaceId(SURFACE),
                         SlotId("controls"),
+                        // Scroll rides on the slot modifier: a Lazy-list widget dropped
+                        // into this slot would crash measurement (see file header).
                         modifier = Modifier
                             .fillMaxSize()
                             .verticalScroll(rememberScrollState())

@@ -41,7 +41,9 @@ internal fun SlotControl(path: SlotPath, content: SlotContent, controller: EditM
         OrientChip("Ряд", content.orientation == SlotOrientation.Row) {
             controller.setSlotOrientation(path, SlotOrientation.Row)
         }
-        OrientChip("Сетка", content.orientation == SlotOrientation.Grid) {
+        // Grid is selectable only once it renders as a real grid (Phase G5).
+        // In G1-G3 it would render as a Column, so the chip stays disabled.
+        OrientChip("Сетка", content.orientation == SlotOrientation.Grid, enabled = false) {
             controller.setSlotOrientation(path, SlotOrientation.Grid)
         }
         if (content.orientation == SlotOrientation.Grid) {
@@ -58,16 +60,20 @@ internal fun SlotControl(path: SlotPath, content: SlotContent, controller: EditM
 }
 
 @Composable
-private fun OrientChip(label: String, active: Boolean, onClick: () -> Unit) {
+private fun OrientChip(label: String, active: Boolean, enabled: Boolean = true, onClick: () -> Unit) {
     Text(
         text       = label,
         style      = MaterialTheme.typography.labelSmall,
-        color      = if (active) CelestiaTheme.colors.primary else CelestiaTheme.colors.textSecondary,
+        color      = when {
+            !enabled -> CelestiaTheme.colors.textSecondary.copy(alpha = 0.4f)
+            active   -> CelestiaTheme.colors.primary
+            else     -> CelestiaTheme.colors.textSecondary
+        },
         fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
         modifier   = Modifier
             .clip(RoundedCornerShape(6.dp))
-            .background(if (active) CelestiaTheme.colors.primary.copy(alpha = 0.22f) else Color.Transparent)
-            .clickable(onClick = onClick)
+            .background(if (active && enabled) CelestiaTheme.colors.primary.copy(alpha = 0.22f) else Color.Transparent)
+            .then(if (enabled) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(horizontal = 8.dp, vertical = 3.dp),
     )
 }
