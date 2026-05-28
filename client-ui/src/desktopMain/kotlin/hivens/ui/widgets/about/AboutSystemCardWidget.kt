@@ -16,23 +16,32 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import hivens.ui.components.GlassCard
 import hivens.ui.i18n.LocalStrings
+import hivens.widget.api.rememberProps
+import hivens.widget.model.PropLabel
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
+import kotlinx.serialization.Serializable
+
+@Serializable
+data class AboutSystemProps(
+    @PropLabel("Заголовок") val title: String = "",
+)
 
 // OS / CPU / RAM / Java / Display info rows in one card.
 // Per-row atomization would give the user editor freedom they would
 // not actually exercise (no one hides "RAM" but keeps "CPU"), and
 // would either explode into five mini-cards or leave bare rows
 // floating with no visual grouping.
-@Widget(id = "about.system.card", displayName = "Система")
+@Widget(id = "about.system.card", displayName = "Система", propsClass = AboutSystemProps::class)
 @Composable
 fun AboutSystemCardWidget(instance: WidgetInstance) {
+    val p = instance.rememberProps<AboutSystemProps>()
     val ctx = LocalAboutContext.current
     val s = LocalStrings.current
 
     GlassCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(20.dp)) {
-            SectionLabel(s.aboutSectionSystem)
+            SectionLabel(p.title.ifBlank { s.aboutSectionSystem })
             Spacer(Modifier.height(12.dp))
 
             val osName     = System.getProperty("os.name")

@@ -33,17 +33,28 @@ import hivens.ui.notifications.drivers.PackLaunchDriver
 import hivens.ui.screens.library.PackCard
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.utils.GameConsoleService
+import hivens.widget.api.rememberProps
+import hivens.widget.model.PropLabel
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
+import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
+
+@Serializable
+data class LibraryBodyProps(
+    @PropLabel("Заголовок пустого состояния") val emptyTitle: String = "Пока пусто",
+    @PropLabel("Текст пустого состояния")
+    val emptyText: String = "Установите сборку через Browse — она появится здесь.",
+)
 
 // Single widget covers both populated list and empty state. Slot-level
 // branching would force the layout graph to know about appState, which
 // belongs to navigation, not layout. Self-gating keeps the slot stable
 // across the empty -> populated transition.
-@Widget(id = "library.body", displayName = "Library Body")
+@Widget(id = "library.body", displayName = "Library Body", propsClass = LibraryBodyProps::class)
 @Composable
 fun LibraryBody(instance: WidgetInstance) {
+    val p = instance.rememberProps<LibraryBodyProps>()
     val ctx = LocalLibraryContext.current
     val repo: IPackRepository = koinInject()
     val controller: LauncherController = koinInject()
@@ -53,7 +64,11 @@ fun LibraryBody(instance: WidgetInstance) {
     val authedSession = (ctx.appState as? AppState.Authenticated)?.session
 
     if (instances.isEmpty()) {
-        LibraryEmpty(onBrowse = { ctx.onScreenChange(Screen.Browse) })
+        LibraryEmpty(
+            title    = p.emptyTitle,
+            body     = p.emptyText,
+            onBrowse = { ctx.onScreenChange(Screen.Browse) },
+        )
     } else {
         LibraryList(
             instances    = instances,
@@ -103,20 +118,20 @@ private fun LibraryList(
 }
 
 @Composable
-private fun LibraryEmpty(onBrowse: () -> Unit) {
+private fun LibraryEmpty(title: String, body: String, onBrowse: () -> Unit) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Text(
-                text       = "Пока пусто",
+                text       = title,
                 style      = MaterialTheme.typography.titleLarge,
                 color      = CelestiaTheme.colors.textPrimary,
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
-                text      = "Установите сборку через Browse — она появится здесь.",
+                text      = body,
                 style     = MaterialTheme.typography.bodyMedium,
                 color     = CelestiaTheme.colors.textSecondary,
                 textAlign = TextAlign.Center,

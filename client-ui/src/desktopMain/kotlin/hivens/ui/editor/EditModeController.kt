@@ -13,8 +13,10 @@ import hivens.widget.model.insertWidget
 import hivens.widget.model.moveWidget
 import hivens.widget.model.removeWidget
 import hivens.widget.model.reorderInSlot
+import hivens.widget.model.updateWidgetProps
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonObject
 import java.util.UUID
 
 // Single mutation entry point for the editor. Every operation resolves
@@ -76,6 +78,16 @@ class EditModeController(
     fun removeWidget(path: SlotPath, instanceId: String) {
         scope.launch {
             repo.update { it.removeWidget(path, instanceId) }
+        }
+    }
+
+    // Replaces the props of one widget. The editor's prop panel hands
+    // over the full JsonObject (default baseline overlaid with the
+    // user's edits); an empty object resets the widget to its declared
+    // defaults.
+    fun updateProps(path: SlotPath, instanceId: String, props: JsonObject) {
+        scope.launch {
+            repo.update { it.updateWidgetProps(path, instanceId, props) }
         }
     }
 

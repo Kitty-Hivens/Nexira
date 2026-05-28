@@ -95,6 +95,7 @@ import hivens.ui.editor.dnd.DropTargetRegistry
 import hivens.ui.editor.dnd.LocalDragController
 import hivens.ui.editor.dnd.LocalDropTargetRegistry
 import hivens.ui.editor.palette.WidgetPalettePanel
+import hivens.ui.editor.props.WidgetPropPanel
 import hivens.ui.editor.presets.PresetEnvelope
 import hivens.ui.editor.presets.PresetManagerPanel
 import hivens.ui.editor.presets.PresetMeta
@@ -123,6 +124,7 @@ import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.LocalStyle
 import hivens.widget.api.LocalWidgetDecorator
 import hivens.widget.api.WidgetDecorator
+import hivens.widget.model.SlotPath
 import hivens.widget.model.SurfaceId
 import kotlinx.coroutines.CoroutineScope
 import org.koin.compose.koinInject
@@ -141,6 +143,10 @@ import org.koin.compose.koinInject
 //
 // editor-3 will add palette panel + cross-slot drop. editor-2 keeps
 // drags within the source slot.
+
+// Which widget instance the prop panel is currently editing.
+private data class PropTarget(val path: SlotPath, val instanceId: String)
+
 @Composable
 fun EditorSurfaceHost(
     currentScreen: Screen,
@@ -167,6 +173,10 @@ fun EditorSurfaceHost(
     var selectedSurface by remember(availableSurfaces) {
         mutableStateOf(availableSurfaces.firstOrNull())
     }
+    // Prop editor target. Cleared on surface change (keyed remember) and
+    // on dismiss; while set, the palette hides so the two right-edge
+    // panels do not overlap.
+    var propTarget by remember(availableSurfaces) { mutableStateOf<PropTarget?>(null) }
     val currentGraph = LocalLayoutGraph.current
     // Leaving a surface drops edit mode -- avoids a stale edit state
     // pointed at the wrong surface after navigation.
@@ -241,6 +251,7 @@ fun EditorSurfaceHost(
                     onRemove     = {
                         controller.removeWidget(path, instance.instanceId)
                     },
+                    onEditProps  = { propTarget = PropTarget(path, instance.instanceId) },
                     onCommitDrop = { committedPointer ->
                         // Hit-test which slot received the drop. Null =
                         // pointer is off any slot; treat as cancel.
@@ -438,12 +449,21 @@ fun EditorSurfaceHost(
                 )
 
                 WidgetPalettePanel(
-                    visible        = editing && paletteOpen && !previewing,
+                    visible        = editing && paletteOpen && !previewing && propTarget == null,
                     onDismiss      = { paletteOpen = false },
                     controller     = dragController,
                     registry       = registry,
                     editController = controller,
                     modifier       = Modifier.align(Alignment.TopEnd),
+                )
+
+                WidgetPropPanel(
+                    visible    = editing && !previewing && propTarget != null,
+                    path       = propTarget?.path,
+                    instanceId = propTarget?.instanceId,
+                    controller = controller,
+                    onDismiss  = { propTarget = null },
+                    modifier   = Modifier.align(Alignment.TopEnd),
                 )
 
                 EditModeFab(

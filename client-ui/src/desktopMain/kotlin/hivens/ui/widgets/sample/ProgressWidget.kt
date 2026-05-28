@@ -24,17 +24,27 @@ import androidx.compose.ui.unit.dp
 import hivens.launcher.AutoSyncService
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.theme.CelestiaTheme
+import hivens.widget.api.rememberProps
+import hivens.widget.model.PropLabel
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
+import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
+
+@Serializable
+data class ProgressProps(
+    @PropLabel("Заголовок") val title: String = "Фоновая активность",
+    @PropLabel("Текст простоя") val idleText: String = "Сейчас ничего не качается.",
+)
 
 // Compact background-activity card. Shows AutoSyncService state when
 // a sync is in flight; collapses to a calm "idle" message otherwise.
 // Polished version of the dashboard's autosync strip, broken out so
 // the new home can host it independently.
-@Widget(id = "home.new.progress", displayName = "Background activity")
+@Widget(id = "home.new.progress", displayName = "Background activity", propsClass = ProgressProps::class)
 @Composable
 fun ProgressWidget(instance: WidgetInstance) {
+    val p = instance.rememberProps<ProgressProps>()
     val autoSyncService: AutoSyncService = koinInject()
     val snapshot by autoSyncService.snapshot.collectAsState()
     val overall  = snapshot.overall
@@ -48,7 +58,7 @@ fun ProgressWidget(instance: WidgetInstance) {
             .padding(horizontal = 16.dp, vertical = 14.dp),
     ) {
         Text(
-            text       = "Фоновая активность",
+            text       = p.title,
             style      = MaterialTheme.typography.labelLarge,
             color      = CelestiaTheme.colors.textSecondary,
             fontWeight = FontWeight.Medium,
@@ -57,7 +67,7 @@ fun ProgressWidget(instance: WidgetInstance) {
 
         when (val s = overall) {
             is AutoSyncService.OverallState.InProgress -> InProgressBody(s)
-            else                                       -> IdleBody()
+            else                                       -> IdleBody(p.idleText)
         }
     }
 }
@@ -102,14 +112,14 @@ private fun InProgressBody(state: AutoSyncService.OverallState.InProgress) {
 }
 
 @Composable
-private fun IdleBody() {
+private fun IdleBody(text: String) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 6.dp),
     ) {
         Text(
-            text  = "Сейчас ничего не качается.",
+            text  = text,
             style = MaterialTheme.typography.bodyMedium,
             color = CelestiaTheme.colors.textSecondary,
         )

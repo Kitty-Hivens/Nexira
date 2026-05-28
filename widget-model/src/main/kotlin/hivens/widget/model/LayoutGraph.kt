@@ -92,6 +92,24 @@ fun LayoutGraph.moveWidget(
     return removeWidget(from, instanceId).insertWidget(to, widget, toIndex)
 }
 
+// Replaces the props JsonObject on a single widget addressed by
+// (path, instanceId). No-op if the slot or the instance is gone --
+// editor prop edits race with disk reloads, same contract as the other
+// transforms.
+fun LayoutGraph.updateWidgetProps(
+    path: SlotPath,
+    instanceId: String,
+    props: JsonObject,
+): LayoutGraph =
+    mutate(path) { content ->
+        if (content.widgets.none { it.instanceId == instanceId }) content
+        else content.copy(
+            widgets = content.widgets.map {
+                if (it.instanceId == instanceId) it.copy(props = props) else it
+            },
+        )
+    }
+
 // Walks the path and returns the SlotContent at the leaf, or null if
 // any intermediate surface / slot / parent widget is missing.
 fun LayoutGraph.traverse(path: SlotPath): SlotContent? {

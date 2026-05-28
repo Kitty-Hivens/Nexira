@@ -2,10 +2,10 @@ package hivens.ui.widgets.sample
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -27,27 +27,60 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.theme.CelestiaTheme
+import hivens.ui.widgets.toWidgetColorOrNull
+import hivens.widget.api.rememberProps
+import hivens.widget.model.PropColor
+import hivens.widget.model.PropLabel
+import hivens.widget.model.PropRange
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 import kotlinx.coroutines.delay
+import kotlinx.serialization.Serializable
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import kotlin.math.cos
 import kotlin.math.min
 import kotlin.math.sin
 
-// Analog clock with smooth-sweeping seconds. Theme-aware: dial reads
-// surface, hands read textPrimary, accent ring reads primary. Per-
-// second tick recomposes only the Canvas + the digital time line; the
-// surrounding card stays still.
-@Widget(id = "home.new.clock", displayName = "Clock")
+@Serializable
+enum class ClockMode { Analog, Digital, Both }
+
+@Serializable
+data class ClockProps(
+    @PropLabel("Режим") val mode: ClockMode = ClockMode.Both,
+    @PropLabel("24-часовой формат") val format24h: Boolean = true,
+    @PropLabel("Секунды") val showSeconds: Boolean = true,
+    @PropLabel("Заголовок") val title: String = "Часы",
+    @PropLabel("Размер циферблата") @PropRange(80.0, 200.0) val faceSize: Int = 140,
+    @PropLabel("Цвет акцента") @PropColor val accent: String = "",
+)
+
+// Analog + digital clock with smooth-sweeping seconds. Theme-aware: dial
+// reads surface, hands read textPrimary, accent (second hand / hub) reads
+// the accent prop or falls back to primary. Per-second tick recomposes
+// only the Canvas + the digital time line; the surrounding card stays
+// still.
+@Widget(id = "home.new.clock", displayName = "Clock", propsClass = ClockProps::class)
 @Composable
 fun ClockWidget(instance: WidgetInstance) {
+    val p = instance.rememberProps<ClockProps>()
+    val accent = p.accent.toWidgetColorOrNull()
+    val timeFormatter = remember(p.format24h, p.showSeconds) {
+        DateTimeFormatter.ofPattern(
+            buildString {
+                append(if (p.format24h) "HH:mm" else "hh:mm")
+                if (p.showSeconds) append(":ss")
+                if (!p.format24h) append(" a")
+            },
+        )
+    }
+
     var now by remember { mutableStateOf(LocalDateTime.now()) }
     LaunchedEffect(Unit) {
         while (true) {
@@ -68,44 +101,56 @@ fun ClockWidget(instance: WidgetInstance) {
             .padding(horizontal = 16.dp, vertical = 14.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(
-            text       = "Часы",
-            style      = MaterialTheme.typography.labelLarge,
-            color      = CelestiaTheme.colors.textSecondary,
-            fontWeight = FontWeight.Medium,
-            modifier   = Modifier.align(Alignment.Start),
-        )
-        Spacer(Modifier.height(10.dp))
+        if (p.title.isNotBlank()) {
+            Text(
+                text       = p.title,
+                style      = MaterialTheme.typography.labelLarge,
+                color      = CelestiaTheme.colors.textSecondary,
+                fontWeight = FontWeight.Medium,
+                modifier   = Modifier.align(Alignment.Start),
+            )
+            Spacer(Modifier.height(10.dp))
+        }
 
-        ClockFace(
-            time     = now,
-            modifier = Modifier.size(140.dp),
-        )
+        if (p.mode != ClockMode.Digital) {
+            ClockFace(
+                time           = now,
+                showSeconds    = p.showSeconds,
+                accentOverride = accent,
+                modifier       = Modifier.size(p.faceSize.dp),
+            )
+            Spacer(Modifier.height(10.dp))
+        }
 
-        Spacer(Modifier.height(10.dp))
-
-        Text(
-            text       = TIME_FORMATTER.format(now),
-            style      = MaterialTheme.typography.titleLarge,
-            color      = CelestiaTheme.colors.textPrimary,
-            fontWeight = FontWeight.Light,
-        )
-        Text(
-            text  = DATE_FORMATTER.format(now),
-            style = MaterialTheme.typography.bodySmall,
-            color = CelestiaTheme.colors.textSecondary,
-        )
+        if (p.mode != ClockMode.Analog) {
+            Text(
+                text       = timeFormatter.format(now),
+                style      = MaterialTheme.typography.titleLarge,
+                color      = CelestiaTheme.colors.textPrimary,
+                fontWeight = FontWeight.Light,
+            )
+            Text(
+                text  = DATE_FORMATTER.format(now),
+                style = MaterialTheme.typography.bodySmall,
+                color = CelestiaTheme.colors.textSecondary,
+            )
+        }
     }
 }
 
 @Composable
-private fun ClockFace(time: LocalDateTime, modifier: Modifier = Modifier) {
+private fun ClockFace(
+    time: LocalDateTime,
+    showSeconds: Boolean,
+    accentOverride: Color?,
+    modifier: Modifier = Modifier,
+) {
     val dialColor   = CelestiaTheme.colors.surface
     val rimColor    = CelestiaTheme.colors.outline.copy(alpha = 0.50f)
     val markerColor = CelestiaTheme.colors.textSecondary.copy(alpha = 0.75f)
     val hourColor   = CelestiaTheme.colors.textPrimary
     val minuteColor = CelestiaTheme.colors.textPrimary
-    val secondColor = CelestiaTheme.colors.primary
+    val secondColor = accentOverride ?: CelestiaTheme.colors.primary
 
     Box(
         modifier = modifier
@@ -116,12 +161,12 @@ private fun ClockFace(time: LocalDateTime, modifier: Modifier = Modifier) {
                 ),
             ),
     ) {
-        Canvas(modifier = Modifier.fillMaxWidth().padding(0.dp).align(Alignment.Center).size(140.dp)) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
             val radius = min(size.width, size.height) / 2f
             val center = Offset(size.width / 2f, size.height / 2f)
 
             // Rim
-            drawCircle(color = rimColor, radius = radius - 1f, center = center, style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2f))
+            drawCircle(color = rimColor, radius = radius - 1f, center = center, style = Stroke(width = 2f))
 
             // Hour markers: long at 12/3/6/9, short elsewhere
             for (i in 0 until 12) {
@@ -167,15 +212,18 @@ private fun ClockFace(time: LocalDateTime, modifier: Modifier = Modifier) {
                     cap         = StrokeCap.Round,
                 )
             }
-            // Second hand (counter-weighted)
-            rotate(degrees = second * 6f - 90f, pivot = center) {
-                drawLine(
-                    color       = secondColor,
-                    start       = Offset(center.x - radius * 0.12f, center.y),
-                    end         = Offset(center.x + radius * 0.82f, center.y),
-                    strokeWidth = 1.5f,
-                    cap         = StrokeCap.Round,
-                )
+            // Second hand (counter-weighted) -- only when the showSeconds
+            // prop is on.
+            if (showSeconds) {
+                rotate(degrees = second * 6f - 90f, pivot = center) {
+                    drawLine(
+                        color       = secondColor,
+                        start       = Offset(center.x - radius * 0.12f, center.y),
+                        end         = Offset(center.x + radius * 0.82f, center.y),
+                        strokeWidth = 1.5f,
+                        cap         = StrokeCap.Round,
+                    )
+                }
             }
 
             // Hub
@@ -185,5 +233,4 @@ private fun ClockFace(time: LocalDateTime, modifier: Modifier = Modifier) {
     }
 }
 
-private val TIME_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss")
 private val DATE_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE, d MMM")

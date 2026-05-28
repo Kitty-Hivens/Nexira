@@ -1,5 +1,7 @@
 package hivens.widget.model
 
+import kotlin.reflect.KClass
+
 // Marker annotation scanned by the KSP processor in :widget-processor.
 // Apply to top-level @Composable functions with signature
 //   fun Name(instance: WidgetInstance)
@@ -27,4 +29,13 @@ annotation class Widget(
     // the editor's drop hit-test and by the KSP processor to validate
     // that container.children references only declared slots.
     val slots: Array<String> = [],
+    // The @Serializable data class holding this widget's tunable props,
+    // or Unit::class (the default) for a propless widget. Every field
+    // must have a default so the KSP-generated registry can construct
+    // an instance for the default-props baseline. The processor checks
+    // the class carries @kotlinx.serialization.Serializable and emits
+    // its serializer into the descriptor; the widget body reads typed
+    // values via instance.rememberProps<T>(), the editor builds its
+    // form from the serializer's descriptor.
+    val propsClass: KClass<*> = Unit::class,
 )
