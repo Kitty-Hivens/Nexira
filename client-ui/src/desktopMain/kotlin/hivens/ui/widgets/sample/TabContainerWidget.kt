@@ -1,0 +1,103 @@
+package hivens.ui.widgets.sample
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import hivens.ui.customization.glassSurfaceAlpha
+import hivens.ui.theme.CelestiaTheme
+import hivens.widget.api.SlotRenderer
+import hivens.widget.api.rememberProps
+import hivens.widget.model.PropLabel
+import hivens.widget.model.PropRange
+import hivens.widget.model.SlotId
+import hivens.widget.model.Widget
+import hivens.widget.model.WidgetInstance
+import kotlinx.serialization.Serializable
+
+// Tab container: a tab-bar header over a fixed set of child slots, showing
+// only the active tab's slot. Each tab is a full slot, so any widgets can
+// live inside it -- drop them in while that tab is selected in the editor.
+//
+// The active tab is EPHEMERAL view state: it survives recomposition but is
+// never written back to the layout graph, so flipping tabs at runtime does
+// not rewrite layout-graph.json. The tab count is bounded by the declared
+// slots (3); `tabCount` only hides the trailing tabs (their slot content is
+// preserved), and the labels are editable props.
+@Serializable
+data class TabContainerProps(
+    @PropLabel("Вкладок") @PropRange(1.0, 3.0) val tabCount: Int = 2,
+    @PropLabel("Вкладка 1") val label1: String = "Вкладка 1",
+    @PropLabel("Вкладка 2") val label2: String = "Вкладка 2",
+    @PropLabel("Вкладка 3") val label3: String = "Вкладка 3",
+)
+
+@Widget(
+    id          = "container.tabs",
+    displayName = "Вкладки",
+    slots       = ["tab_0", "tab_1", "tab_2"],
+    propsClass  = TabContainerProps::class,
+)
+@Composable
+fun TabContainerWidget(instance: WidgetInstance) {
+    val p = instance.rememberProps<TabContainerProps>()
+    val labels = listOf(p.label1, p.label2, p.label3)
+    val count = p.tabCount.coerceIn(1, labels.size)
+
+    // Keyed on instanceId so two tab containers keep independent selection.
+    var active by remember(instance.instanceId) { mutableStateOf(0) }
+    val activeIdx = active.coerceIn(0, count - 1)
+
+    Column(Modifier.fillMaxWidth()) {
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            repeat(count) { idx ->
+                TabChip(
+                    label    = labels[idx],
+                    selected = idx == activeIdx,
+                    onClick  = { active = idx },
+                )
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        SlotRenderer(
+            parent   = instance,
+            slot     = SlotId("tab_$activeIdx"),
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
+
+@Composable
+private fun TabChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    Text(
+        text       = label,
+        style      = MaterialTheme.typography.labelMedium,
+        color      = if (selected) CelestiaTheme.colors.primary else CelestiaTheme.colors.textSecondary,
+        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+        modifier   = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(
+                if (selected) CelestiaTheme.colors.primary.copy(alpha = 0.16f)
+                else glassSurfaceAlpha(0.4f),
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+    )
+}
