@@ -13,27 +13,35 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.editor.EditModeState
 import hivens.ui.editor.LocalEditMode
 import hivens.ui.theme.CelestiaTheme
+import hivens.widget.api.rememberProps
+import hivens.widget.model.PropLabel
+import hivens.widget.model.PropRange
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
+import kotlinx.serialization.Serializable
 
-// Layout primitive. Renders 32dp of empty vertical space; in edit
-// mode a faint dashed center line shows the widget is there and
-// grabbable. Props in Phase 5 will let the user pick the height; for
-// now it is fixed so the editor can demonstrate reorder without prop
-// UI.
-@Widget(id = "home.new.spacer", displayName = "Spacer")
+@Serializable
+data class SpacerProps(
+    @PropLabel("Высота") @PropRange(8.0, 160.0) val height: Int = 32,
+)
+
+// Layout primitive. Renders empty vertical space (height is a prop); in
+// edit mode a faint dashed center line shows the widget is there and
+// grabbable.
+@Widget(id = "home.new.spacer", displayName = "Spacer", propsClass = SpacerProps::class)
 @Composable
 fun SpacerWidget(instance: WidgetInstance) {
+    val h = instance.rememberProps<SpacerProps>().height.dp
     val edit = LocalEditMode.current is EditModeState.On
     if (!edit) {
-        Spacer(Modifier.fillMaxWidth().height(32.dp))
+        Spacer(Modifier.fillMaxWidth().height(h))
         return
     }
     val lineColor = CelestiaTheme.colors.outline.copy(alpha = 0.35f)
     Canvas(
         modifier = Modifier
             .fillMaxWidth()
-            .height(32.dp),
+            .height(h),
     ) {
         val y = size.height / 2f
         drawLine(

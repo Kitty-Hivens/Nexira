@@ -39,20 +39,29 @@ import hivens.core.data.PackInstance
 import hivens.ui.Screen
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.theme.CelestiaTheme
+import hivens.widget.api.rememberProps
+import hivens.widget.model.PropLabel
+import hivens.widget.model.PropRange
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
+import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
 
-private const val MAX_RECENT = 5
+@Serializable
+data class RecentProps(
+    @PropLabel("Заголовок") val title: String = "Твои сборки",
+    @PropLabel("Сколько плиток") @PropRange(1.0, 12.0) val maxTiles: Int = 5,
+)
 
 // Pack tiles row. Sort priority: played packs first by recency, then
 // unplayed packs by install order. A fresh install with packs but no
 // launches still shows the tiles (sorted by createdAt), so the new
 // home reads as populated rather than blank. Empty repo shows a CTA
 // pointing at Browse.
-@Widget(id = "home.new.recent", displayName = "Pack tiles")
+@Widget(id = "home.new.recent", displayName = "Pack tiles", propsClass = RecentProps::class)
 @Composable
 fun HomeNewRecent(instance: WidgetInstance) {
+    val p = instance.rememberProps<RecentProps>()
     val ctx = LocalHomeNewContext.current
     val repo: IPackRepository = koinInject()
     val all by remember { repo.observe() }.collectAsState(initial = emptyList())
@@ -62,16 +71,16 @@ fun HomeNewRecent(instance: WidgetInstance) {
         return
     }
 
-    val recent = remember(all) {
+    val recent = remember(all, p.maxTiles) {
         all.sortedWith(
             compareByDescending<PackInstance> { it.lastPlayedEpochOrZero }
                 .thenByDescending { it.createdAtEpoch },
-        ).take(MAX_RECENT)
+        ).take(p.maxTiles)
     }
 
     Column(Modifier.fillMaxWidth().padding(top = 12.dp)) {
         Text(
-            text       = "Твои сборки",
+            text       = p.title,
             style      = MaterialTheme.typography.titleSmall,
             color      = CelestiaTheme.colors.textPrimary,
             fontWeight = FontWeight.SemiBold,

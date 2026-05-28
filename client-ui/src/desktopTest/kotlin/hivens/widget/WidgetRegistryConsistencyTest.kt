@@ -137,4 +137,40 @@ class WidgetRegistryConsistencyTest {
             "non-removable set protects the launcher from being navigation-locked",
         )
     }
+
+    @Test
+    fun `widgets exposing props match the Phase 5 audited set`() {
+        val propful = GeneratedWidgetRegistry.all().values
+            .filter { it.propsSerializer != null }
+            .map { it.kind.value }
+            .toSet()
+        val expected = setOf(
+            // display widgets
+            "home.new.clock",
+            "home.new.spacer",
+            "home.new.progress",
+            "home.new.welcome",
+            "home.new.launchbutton",
+            "home.new.music",
+            "home.new.recent",
+            "home.new.quicklaunch",
+            // About surface (title overrides)
+            "about.logo",
+            "about.system.card",
+            "about.credits",
+            "about.links.card",
+            "about.update.panel",
+            // Library
+            "library.header",
+            "library.body",
+            // expressive knobs on otherwise data-driven sections
+            "server.details.banner",
+            "profile.skin.section",
+        )
+        assertEquals(
+            expected,
+            propful,
+            "prop-exposing widget set drifted -- a @Widget(propsClass=...) was added or dropped",
+        )
+    }
 }

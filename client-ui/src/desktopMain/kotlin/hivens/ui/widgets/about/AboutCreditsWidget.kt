@@ -29,17 +29,28 @@ import hivens.ui.easter.GibberishMode
 import hivens.ui.easter.LocalAprilFools
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
+import hivens.widget.api.rememberProps
+import hivens.widget.model.PropLabel
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
+import kotlinx.serialization.Serializable
 
 // Credits + technology list + license. Self-scrolls because the
 // content is long; the surface does not impose a verticalScroll on
 // the slot. AprilFools occasionally corrupts these strings (role
 // scramble, tech-name zalgo, license-text lorem) -- the left column
 // embraces the chaos.
-@Widget(id = "about.credits", displayName = "Авторы и технологии")
+@Serializable
+data class AboutCreditsProps(
+    // Overrides only the top "Авторы" section header; the Технологии and
+    // Лицензия sections stay localized.
+    @PropLabel("Заголовок (авторы)") val title: String = "",
+)
+
+@Widget(id = "about.credits", displayName = "Авторы и технологии", propsClass = AboutCreditsProps::class)
 @Composable
 fun AboutCreditsWidget(instance: WidgetInstance) {
+    val p = instance.rememberProps<AboutCreditsProps>()
     val af = LocalAprilFools.current
     val s = LocalStrings.current
 
@@ -49,7 +60,7 @@ fun AboutCreditsWidget(instance: WidgetInstance) {
                 .padding(20.dp)
                 .verticalScroll(rememberScrollState()),
         ) {
-            SectionLabel(s.aboutSectionCreator)
+            SectionLabel(p.title.ifBlank { s.aboutSectionCreator })
             Spacer(Modifier.height(12.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 AsyncImage(

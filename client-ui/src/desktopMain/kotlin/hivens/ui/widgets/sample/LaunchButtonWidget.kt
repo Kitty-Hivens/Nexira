@@ -38,17 +38,27 @@ import hivens.ui.notifications.drivers.PackLaunchDriver
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.widgets.home.new.LocalHomeNewContext
+import hivens.widget.api.rememberProps
+import hivens.widget.model.PropLabel
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
+import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
+
+@Serializable
+data class LaunchButtonProps(
+    // Blank falls back to the default "Запустить" label.
+    @PropLabel("Надпись") val label: String = "",
+)
 
 // Big "Continue last" launch tile. Decoupled from the QuickLaunch
 // card -- this one is a single full-width tap target with a gradient
 // background, no surrounding labels or metadata. Designed to feel
 // like a console "press to play" affordance.
-@Widget(id = "home.new.launchbutton", displayName = "Launch button")
+@Widget(id = "home.new.launchbutton", displayName = "Launch button", propsClass = LaunchButtonProps::class)
 @Composable
 fun LaunchButtonWidget(instance: WidgetInstance) {
+    val p = instance.rememberProps<LaunchButtonProps>()
     val ctx = LocalHomeNewContext.current
     val repo: IPackRepository = koinInject()
     val controller: LauncherController = koinInject()
@@ -111,7 +121,7 @@ fun LaunchButtonWidget(instance: WidgetInstance) {
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
                 Text(
-                    text       = if (ready) "Запустить" else "Играть нельзя",
+                    text       = if (ready) p.label.ifBlank { "Запустить" } else "Играть нельзя",
                     style      = MaterialTheme.typography.titleLarge,
                     color      = if (ready) Color.White else CelestiaTheme.colors.textSecondary,
                     fontWeight = FontWeight.SemiBold,

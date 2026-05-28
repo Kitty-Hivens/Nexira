@@ -67,9 +67,12 @@ import hivens.ui.theme.CelestiaTheme
 import hivens.ui.widgets.services.MusicPlayerService
 import hivens.ui.widgets.services.MusicPlayerServiceImpl
 import hivens.widget.api.provideService
+import hivens.widget.api.rememberProps
 import hivens.widget.model.ProvidesService
+import hivens.widget.model.PropLabel
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
+import kotlinx.serialization.Serializable
 import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
 import io.github.vinceglb.filekit.dialogs.FileKitType
@@ -88,10 +91,16 @@ import kotlin.io.path.name
 // removing every game widget and keeping this + a clock + the right
 // rail (or nothing). MP3 support arrives with Skinema (FFmpeg
 // via Panama).
-@Widget(id = "home.new.music", displayName = "Music player")
+@Serializable
+data class MusicProps(
+    @PropLabel("Заголовок") val title: String = "Музыкальный плеер",
+)
+
+@Widget(id = "home.new.music", displayName = "Music player", propsClass = MusicProps::class)
 @ProvidesService(MusicPlayerService::class)
 @Composable
 fun MusicPlayerWidget(instance: WidgetInstance) {
+    val p = instance.rememberProps<MusicProps>()
     val player: AudioPlayer = koinInject()
     val state by player.state.collectAsState()
     val volume by player.volume.collectAsState()
@@ -143,7 +152,7 @@ fun MusicPlayerWidget(instance: WidgetInstance) {
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(
-                    text       = "Музыкальный плеер",
+                    text       = p.title,
                     style      = MaterialTheme.typography.labelLarge,
                     color      = CelestiaTheme.colors.textSecondary,
                     fontWeight = FontWeight.Medium,

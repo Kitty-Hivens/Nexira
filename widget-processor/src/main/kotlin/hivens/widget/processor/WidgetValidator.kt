@@ -1,7 +1,9 @@
 package hivens.widget.processor
 
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
+import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
+import com.google.devtools.ksp.symbol.KSType
 import com.google.devtools.ksp.symbol.Modifier
 
 // Shared rule-set for what a @Widget composable must look like. The KSP
@@ -16,12 +18,17 @@ internal object WidgetValidator {
     private const val COMPOSABLE_ANNOTATION_FQN = "androidx.compose.runtime.Composable"
     private const val WIDGET_INSTANCE_FQN = "hivens.widget.model.WidgetInstance"
 
+    private const val SERIALIZABLE_ANNOTATION_FQN = "kotlinx.serialization.Serializable"
+
     // Annotation args extracted from a valid @Widget declaration.
     data class Extracted(
         val id: String,
         val displayName: String,
         val removable: Boolean,
         val slots: List<String>,
+        // FQN of the @Serializable props class, or null for Unit::class
+        // (a propless widget).
+        val propsClassFqn: String?,
     )
 
     // KSP entry point. Returns the extracted annotation args, or null
@@ -112,11 +119,44 @@ internal object WidgetValidator {
             sanitized.add(raw)
         }
 
+        // propsClass: a KClass<*> annotation arg arrives as a KSType.
+        // Unit::class (the default) means "no props". Anything else must
+        // be @Serializable with an all-default primary constructor, so
+        // the generated registry can build the zero-arg default-props
+        // baseline and the editor can read its serializer descriptor.
+        val propsType = args["propsClass"] as? KSType
+        val propsDecl = propsType?.declaration
+        val propsClassFqn = propsDecl?.qualifiedName?.asString()?.takeIf { it != "kotlin.Unit" }
+        if (propsClassFqn != null) {
+            val isSerializable = propsDecl!!.annotations.any {
+                it.shortName.asString() == "Serializable" &&
+                    it.annotationType.resolve().declaration.qualifiedName?.asString() ==
+                        SERIALIZABLE_ANNOTATION_FQN
+            }
+            if (!isSerializable) {
+                env.logger.error(
+                    "@Widget propsClass '$propsClassFqn' must be annotated @$SERIALIZABLE_ANNOTATION_FQN",
+                    symbol,
+                )
+                return null
+            }
+            val primaryCtor = (propsDecl as? KSClassDeclaration)?.primaryConstructor
+            if (primaryCtor != null && primaryCtor.parameters.any { !it.hasDefault }) {
+                env.logger.error(
+                    "@Widget propsClass '$propsClassFqn' must give every property a default " +
+                        "-- the registry needs a zero-arg baseline",
+                    symbol,
+                )
+                return null
+            }
+        }
+
         return Extracted(
             id = id,
             displayName = displayName,
             removable = removable,
             slots = sanitized,
+            propsClassFqn = propsClassFqn,
         )
     }
 }

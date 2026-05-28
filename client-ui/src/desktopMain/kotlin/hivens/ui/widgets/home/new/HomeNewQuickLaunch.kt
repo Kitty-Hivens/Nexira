@@ -36,17 +36,26 @@ import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.notifications.drivers.PackLaunchDriver
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.utils.GameConsoleService
+import hivens.widget.api.rememberProps
+import hivens.widget.model.PropLabel
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
+import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
+
+@Serializable
+data class QuickLaunchProps(
+    @PropLabel("Надпись кнопки") val buttonLabel: String = "Играть",
+)
 
 // Quick-launch target = most recently played, falling back to most
 // recently installed when nothing has been played. Empty repo elides
 // the widget entirely -- HomeNewRecent already shows the install CTA
 // in that state and two empty cards would be noisy.
-@Widget(id = "home.new.quicklaunch", displayName = "Quick launch")
+@Widget(id = "home.new.quicklaunch", displayName = "Quick launch", propsClass = QuickLaunchProps::class)
 @Composable
 fun HomeNewQuickLaunch(instance: WidgetInstance) {
+    val p = instance.rememberProps<QuickLaunchProps>()
     val ctx = LocalHomeNewContext.current
     val repo: IPackRepository = koinInject()
     val controller: LauncherController = koinInject()
@@ -116,7 +125,7 @@ fun HomeNewQuickLaunch(instance: WidgetInstance) {
             ) {
                 Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(6.dp))
-                Text("Играть", fontWeight = FontWeight.SemiBold)
+                Text(p.buttonLabel, fontWeight = FontWeight.SemiBold)
             }
         }
     }
