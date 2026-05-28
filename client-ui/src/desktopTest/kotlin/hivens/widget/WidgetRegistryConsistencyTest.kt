@@ -60,6 +60,8 @@ class WidgetRegistryConsistencyTest {
             "nav.about",
             // Phase A.3 container sample
             "container.group",
+            // tab container
+            "container.tabs",
             // Phase D service-consumer sample
             "home.new.playback.mini",
             // Phase B.1 widgetized screens (incremental landing)
@@ -166,6 +168,8 @@ class WidgetRegistryConsistencyTest {
             // expressive knobs on otherwise data-driven sections
             "server.details.banner",
             "profile.skin.section",
+            // tab container (tabCount + labels)
+            "container.tabs",
         )
         assertEquals(
             expected,
