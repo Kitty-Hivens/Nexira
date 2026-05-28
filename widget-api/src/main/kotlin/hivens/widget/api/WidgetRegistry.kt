@@ -4,6 +4,8 @@ import androidx.compose.runtime.Composable
 import hivens.widget.model.SlotId
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.json.JsonObject
 
 interface WidgetDescriptor {
     val kind: WidgetKind
@@ -20,6 +22,20 @@ interface WidgetDescriptor {
     // structural keys in WidgetInstance.children) to validate moves.
     val slots: List<SlotId>
         get() = emptyList()
+
+    // Typed-props support, populated by the KSP processor from
+    // @Widget(propsClass = ...). A null serializer means the widget is
+    // propless (the default) -- the editor shows no prop affordance.
+    // When non-null, the editor builds its form from
+    // propsSerializer.descriptor (element names / kinds / @SerialInfo
+    // annotations) and reads current values from defaultPropsJson
+    // overlaid with the instance's stored props. Widgets read typed
+    // values via WidgetInstance.rememberProps.
+    val propsSerializer: KSerializer<*>?
+        get() = null
+
+    val defaultPropsJson: JsonObject
+        get() = JsonObject(emptyMap())
 
     @Composable
     fun Render(instance: WidgetInstance)

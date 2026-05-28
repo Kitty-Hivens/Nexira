@@ -29,8 +29,11 @@ import hivens.ui.generated.resources.Res
 import hivens.ui.generated.resources.favicon
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
+import hivens.widget.api.rememberProps
+import hivens.widget.model.PropLabel
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
+import kotlinx.serialization.Serializable
 import org.jetbrains.compose.resources.painterResource
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -40,9 +43,15 @@ import java.util.Locale
 // AprilFools wrapper occasionally corrupts these strings -- left
 // column embraces the chaos. Right column (system info, links)
 // stays readable on purpose.
-@Widget(id = "about.logo", displayName = "Логотип и версия")
+@Serializable
+data class AboutLogoProps(
+    @PropLabel("Заголовок") val title: String = "",
+)
+
+@Widget(id = "about.logo", displayName = "Логотип и версия", propsClass = AboutLogoProps::class)
 @Composable
 fun AboutLogoWidget(instance: WidgetInstance) {
+    val p = instance.rememberProps<AboutLogoProps>()
     val af = LocalAprilFools.current
     val s = LocalStrings.current
 
@@ -59,7 +68,7 @@ fun AboutLogoWidget(instance: WidgetInstance) {
             Spacer(Modifier.height(16.dp))
 
             Text(
-                text       = af.maybeGibberish(Branding.TITLE, probability = 0.15f),
+                text       = af.maybeGibberish(p.title.ifBlank { Branding.TITLE }, probability = 0.15f),
                 style      = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Black,
                 color      = CelestiaTheme.colors.textPrimary,

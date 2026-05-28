@@ -37,8 +37,16 @@ import hivens.ui.components.GlassCard
 import hivens.ui.easter.LocalAprilFools
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
+import hivens.widget.api.rememberProps
+import hivens.widget.model.PropLabel
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
+import kotlinx.serialization.Serializable
+
+@Serializable
+data class AboutUpdateProps(
+    @PropLabel("Заголовок") val title: String = "",
+)
 
 // Update check + state machine: Idle (check button) -> Checking
 // (spinner) -> UpToDate / Available / Error. Reads + writes
@@ -46,9 +54,10 @@ import hivens.widget.model.WidgetInstance
 // ctx.showUpdateDialog. Removing this widget loses the in-pane
 // update affordance but the puppet check / dialog routes still
 // work because the state lives in the surface composable.
-@Widget(id = "about.update.panel", displayName = "Обновления")
+@Widget(id = "about.update.panel", displayName = "Обновления", propsClass = AboutUpdateProps::class)
 @Composable
 fun AboutUpdatePanelWidget(instance: WidgetInstance) {
+    val p = instance.rememberProps<AboutUpdateProps>()
     val ctx = LocalAboutContext.current
     val af = LocalAprilFools.current
     val s = LocalStrings.current
@@ -56,7 +65,7 @@ fun AboutUpdatePanelWidget(instance: WidgetInstance) {
 
     GlassCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(20.dp)) {
-            SectionLabel(s.aboutSectionUpdates)
+            SectionLabel(p.title.ifBlank { s.aboutSectionUpdates })
             Spacer(Modifier.height(16.dp))
             InfoRow(Icons.Default.Info, s.aboutCurrentVersion, "v${Branding.VERSION.removePrefix("v")}")
             Spacer(Modifier.height(16.dp))

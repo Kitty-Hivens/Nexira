@@ -1,6 +1,8 @@
 package hivens.widget.model
 
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -57,6 +59,29 @@ class LayoutGraphMutationsTest {
     fun `removeWidget of unknown id is identity`() {
         val graph = seed(w1)
         assertSame(graph, graph.removeWidget(rootPath, "ghost"))
+    }
+
+    @Test
+    fun `updateWidgetProps replaces props on the matching widget only`() {
+        val props = buildJsonObject { put("title", "Hi") }
+        val out = seed(w1, w2).updateWidgetProps(rootPath, "i2", props)
+        assertEquals(props, out.mainWidgets().first { it.instanceId == "i2" }.props)
+        assertEquals(JsonObject(emptyMap()), out.mainWidgets().first { it.instanceId == "i1" }.props)
+    }
+
+    @Test
+    fun `updateWidgetProps on unknown instance is identity`() {
+        val graph = seed(w1)
+        assertSame(graph, graph.updateWidgetProps(rootPath, "ghost", buildJsonObject { put("x", 1) }))
+    }
+
+    @Test
+    fun `updateWidgetProps on unknown slot is identity`() {
+        val graph = seed(w1)
+        assertSame(
+            graph,
+            graph.updateWidgetProps(SlotPath(home, SlotId("nope")), "i1", buildJsonObject { put("x", 1) }),
+        )
     }
 
     @Test

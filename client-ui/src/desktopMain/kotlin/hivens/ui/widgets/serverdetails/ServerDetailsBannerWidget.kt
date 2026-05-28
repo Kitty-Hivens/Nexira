@@ -22,15 +22,25 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
+import hivens.widget.api.rememberProps
+import hivens.widget.model.PropLabel
+import hivens.widget.model.PropRange
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
+import kotlinx.serialization.Serializable
+
+@Serializable
+data class ServerBannerProps(
+    @PropLabel("Скругление углов") @PropRange(0.0, 32.0) val cornerRadius: Int = 16,
+)
 
 // Banner image (banner.png from the pack assets dir) or a missing
 // hint when the file is absent. Fills its slot box, image scaled
 // to crop so framing is consistent across asset sizes.
-@Widget(id = "server.details.banner", displayName = "Баннер сервера")
+@Widget(id = "server.details.banner", displayName = "Баннер сервера", propsClass = ServerBannerProps::class)
 @Composable
 fun ServerDetailsBannerWidget(instance: WidgetInstance) {
+    val p = instance.rememberProps<ServerBannerProps>()
     val ctx = LocalServerDetailsContext.current
     val s = LocalStrings.current
     val banner by ctx.bannerImage
@@ -38,12 +48,12 @@ fun ServerDetailsBannerWidget(instance: WidgetInstance) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(p.cornerRadius.dp))
             .background(glassSurfaceAlpha(0.5f))
             .border(
                 width = 1.dp,
                 color = CelestiaTheme.colors.outline.copy(alpha = 0.2f),
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(p.cornerRadius.dp),
             ),
         contentAlignment = Alignment.Center,
     ) {

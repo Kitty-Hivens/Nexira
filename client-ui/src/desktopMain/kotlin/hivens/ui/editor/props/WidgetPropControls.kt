@@ -1,0 +1,213 @@
+package hivens.ui.editor.props
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import hivens.ui.customization.glassSurfaceAlpha
+import hivens.ui.theme.CelestiaTheme
+import hivens.ui.widgets.customization.HexField
+import hivens.ui.widgets.customization.LabeledSlider
+import hivens.widget.model.PropChoice
+import hivens.widget.model.PropColor
+import hivens.widget.model.PropRange
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.descriptors.SerialKind
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.floatOrNull
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonPrimitive
+import kotlin.math.roundToInt
+
+// Renders one editor control for a single prop field, dispatching on the
+// serial kind + @SerialInfo annotations. `current` is the effective
+// value (default baseline overlaid with the instance's override), so it
+// is never null. onChange emits the new value as a JsonElement. INT/FLOAT
+// fields without a @PropRange fall through to a text field -- a slider
+// needs bounds.
+@Composable
+internal fun PropFieldRow(
+    label: String,
+    element: SerialDescriptor,
+    annotations: List<Annotation>,
+    current: JsonElement,
+    onChange: (JsonElement) -> Unit,
+) {
+    val isColor = annotations.any { it is PropColor }
+    val choice  = annotations.filterIsInstance<PropChoice>().firstOrNull()
+    val range   = annotations.filterIsInstance<PropRange>().firstOrNull()
+    val cur     = current.jsonPrimitive
+
+    when {
+        element.kind == SerialKind.ENUM -> {
+            val options = (0 until element.elementsCount).map { element.getElementName(it) }
+            ChoiceRow(label, options, cur.content) { onChange(JsonPrimitive(it)) }
+        }
+        choice != null ->
+            ChoiceRow(label, choice.options.toList(), cur.content) { onChange(JsonPrimitive(it)) }
+        isColor ->
+            ColorRow(label, cur.content) { onChange(JsonPrimitive(it)) }
+        element.kind == PrimitiveKind.BOOLEAN ->
+            BoolRow(label, cur.booleanOrNull ?: false) { onChange(JsonPrimitive(it)) }
+        element.kind == PrimitiveKind.INT && range != null ->
+            LabeledSlider(
+                label         = label,
+                value         = (cur.intOrNull ?: range.min.toInt()).toFloat(),
+                range         = range.min.toFloat()..range.max.toFloat(),
+                format        = "%.0f",
+                onValueChange = { onChange(JsonPrimitive(it.roundToInt())) },
+            )
+        (element.kind == PrimitiveKind.FLOAT || element.kind == PrimitiveKind.DOUBLE) && range != null ->
+            LabeledSlider(
+                label         = label,
+                value         = cur.floatOrNull ?: range.min.toFloat(),
+                range         = range.min.toFloat()..range.max.toFloat(),
+                format        = "%.2f",
+                onValueChange = { onChange(JsonPrimitive(it)) },
+            )
+        else ->
+            StringRow(label, cur.content) { onChange(JsonPrimitive(it)) }
+    }
+}
+
+@Composable
+private fun BoolRow(label: String, value: Boolean, onChange: (Boolean) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text     = label,
+            style    = MaterialTheme.typography.bodySmall,
+            color    = CelestiaTheme.colors.textSecondary,
+            modifier = Modifier.weight(1f),
+        )
+        Switch(
+            checked         = value,
+            onCheckedChange = onChange,
+            colors          = SwitchDefaults.colors(checkedThumbColor = CelestiaTheme.colors.primary),
+        )
+    }
+}
+
+@Composable
+private fun ColorRow(label: String, hex: String, onChange: (String) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text     = label,
+            style    = MaterialTheme.typography.bodySmall,
+            color    = CelestiaTheme.colors.textSecondary,
+            modifier = Modifier.width(140.dp),
+        )
+        HexField(
+            initialHex   = hex,
+            invalidLabel = "hex",
+            onValidHex   = onChange,
+            modifier     = Modifier.weight(1f),
+        )
+    }
+}
+
+@Composable
+private fun StringRow(label: String, value: String, onChange: (String) -> Unit) {
+    var text by remember(value) { mutableStateOf(value) }
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text     = label,
+            style    = MaterialTheme.typography.bodySmall,
+            color    = CelestiaTheme.colors.textSecondary,
+            modifier = Modifier.width(140.dp),
+        )
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .height(36.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(glassSurfaceAlpha(0.4f))
+                .border(1.dp, CelestiaTheme.colors.outline.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
+                .padding(horizontal = 10.dp),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            BasicTextField(
+                value         = text,
+                onValueChange = { text = it; onChange(it) },
+                singleLine    = true,
+                textStyle     = TextStyle(color = CelestiaTheme.colors.textPrimary, fontSize = 13.sp),
+                cursorBrush   = SolidColor(CelestiaTheme.colors.primary),
+                modifier      = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+}
+
+@Composable
+private fun ChoiceRow(label: String, options: List<String>, selected: String, onChange: (String) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text     = label,
+            style    = MaterialTheme.typography.bodySmall,
+            color    = CelestiaTheme.colors.textSecondary,
+            modifier = Modifier.width(140.dp),
+        )
+        Box(modifier = Modifier.weight(1f)) {
+            Text(
+                text     = selected,
+                style    = MaterialTheme.typography.bodySmall,
+                color    = CelestiaTheme.colors.textPrimary,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(glassSurfaceAlpha(0.4f))
+                    .border(1.dp, CelestiaTheme.colors.outline.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
+                    .clickable { expanded = true }
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
+            )
+            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                options.forEach { opt ->
+                    DropdownMenuItem(
+                        text    = { Text(opt, style = MaterialTheme.typography.bodySmall) },
+                        onClick = { onChange(opt); expanded = false },
+                    )
+                }
+            }
+        }
+    }
+}

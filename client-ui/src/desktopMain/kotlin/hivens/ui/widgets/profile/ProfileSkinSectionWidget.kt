@@ -39,8 +39,12 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.identity.SkinManager
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.LocalStyle
+import hivens.widget.api.rememberProps
+import hivens.widget.model.PropLabel
+import hivens.widget.model.PropRange
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
+import kotlinx.serialization.Serializable
 import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
 import io.github.vinceglb.filekit.dialogs.FileKitType
@@ -55,9 +59,15 @@ import java.io.File
 // Skin preview + upload + refresh. Reads session from
 // LocalProfileContext; pulls SkinManager + SkinRepository from Koin
 // directly (services live per-widget, not in the surface context).
-@Widget(id = "profile.skin.section", displayName = "Скин")
+@Serializable
+data class ProfileSkinProps(
+    @PropLabel("Высота превью") @PropRange(200.0, 480.0) val previewHeight: Int = 360,
+)
+
+@Widget(id = "profile.skin.section", displayName = "Скин", propsClass = ProfileSkinProps::class)
 @Composable
 fun ProfileSkinSectionWidget(instance: WidgetInstance) {
+    val p = instance.rememberProps<ProfileSkinProps>()
     val ctx = LocalProfileContext.current
     val s = LocalStrings.current
     val af = LocalAprilFools.current
@@ -84,7 +94,7 @@ fun ProfileSkinSectionWidget(instance: WidgetInstance) {
         Box(
             Modifier
                 .fillMaxWidth()
-                .height(360.dp)
+                .height(p.previewHeight.dp)
                 .clip(RoundedCornerShape(style.cardCorner))
                 .background(CelestiaTheme.colors.background.copy(alpha = 0.4f)),
         ) {

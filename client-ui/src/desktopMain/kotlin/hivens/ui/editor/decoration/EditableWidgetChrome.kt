@@ -22,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.DragIndicator
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -75,6 +76,7 @@ fun EditableWidgetChrome(
     controller: DragController,
     registry: DropTargetRegistry,
     onRemove: () -> Unit,
+    onEditProps: () -> Unit,
     onCommitDrop: (committedPointer: androidx.compose.ui.geometry.Offset) -> Unit,
     content: @Composable () -> Unit,
 ) {
@@ -211,6 +213,43 @@ fun EditableWidgetChrome(
                         contentDescription = "Удалить",
                         tint               = CelestiaTheme.colors.onPrimary,
                         modifier           = Modifier.size(14.dp).padding(0.dp).graphicsLayer { },
+                    )
+                }
+            }
+
+            // Prop editor affordance: hover-only "tune" gear, shown only
+            // when the widget declares props (propsSerializer != null).
+            // Sits left of the remove/force-remove button at the top-end.
+            // Same Release-consume pattern as remove so the tap does not
+            // start a drag.
+            this@Column.AnimatedVisibility(
+                visible  = isHovered && descriptor.propsSerializer != null,
+                enter    = fadeIn(spring(stiffness = Spring.StiffnessMedium)),
+                exit     = fadeOut(spring(stiffness = Spring.StiffnessMedium)),
+                modifier = Modifier.align(Alignment.TopEnd).padding(top = 4.dp, end = 30.dp),
+            ) {
+                Surface(
+                    color    = CelestiaTheme.colors.primary.copy(alpha = 0.85f),
+                    shape    = RoundedCornerShape(6.dp),
+                    modifier = Modifier
+                        .size(22.dp)
+                        .pointerInput(instance.instanceId) {
+                            awaitPointerEventScope {
+                                while (true) {
+                                    val event = awaitPointerEvent()
+                                    if (event.type == PointerEventType.Release) {
+                                        onEditProps()
+                                        event.changes.forEach { it.consume() }
+                                    }
+                                }
+                            }
+                        },
+                ) {
+                    Icon(
+                        imageVector        = Icons.Default.Tune,
+                        contentDescription = "Настроить",
+                        tint               = CelestiaTheme.colors.onPrimary,
+                        modifier           = Modifier.size(14.dp).padding(0.dp),
                     )
                 }
             }

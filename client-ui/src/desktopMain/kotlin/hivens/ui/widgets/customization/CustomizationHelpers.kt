@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.theme.CelestiaTheme
+import hivens.ui.widgets.toWidgetColorOrNull
 
 @Composable
 internal fun SectionTitle(text: String) {
@@ -128,7 +129,7 @@ internal fun HexField(
     modifier: Modifier = Modifier,
 ) {
     var text by remember(initialHex) { mutableStateOf(initialHex) }
-    val parsed = parseHexOrNull(text)
+    val parsed = text.toWidgetColorOrNull()
     val valid  = text.isBlank() || parsed != null
 
     Row(
@@ -163,7 +164,7 @@ internal fun HexField(
                     text = t
                     if (t.isNotBlank()) {
                         val normalized = t.trim()
-                        parseHexOrNull(normalized)?.let { onValidHex(normalized) }
+                        normalized.toWidgetColorOrNull()?.let { onValidHex(normalized) }
                     }
                 },
                 singleLine    = true,
@@ -181,10 +182,3 @@ internal fun HexField(
         }
     }
 }
-
-private fun parseHexOrNull(hex: String): Color? = runCatching {
-    val clean = hex.removePrefix("#").trim()
-    if (clean.length != 6 && clean.length != 8) return@runCatching null
-    val full = if (clean.length == 6) "FF$clean" else clean
-    Color(full.toLong(16))
-}.getOrNull()

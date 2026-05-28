@@ -43,6 +43,7 @@ class WidgetRegistryProcessor(
                 displayName = extracted.displayName.ifBlank { funcName },
                 removable = extracted.removable,
                 slots = extracted.slots,
+                propsClassFqn = extracted.propsClassFqn,
                 functionFqn = if (packageName.isEmpty()) funcName else "$packageName.$funcName",
                 containingFile = symbol.containingFile,
             )
@@ -89,8 +90,23 @@ class WidgetRegistryProcessor(
         appendLine("import hivens.widget.model.SlotId")
         appendLine("import hivens.widget.model.WidgetInstance")
         appendLine("import hivens.widget.model.WidgetKind")
+        // Serialization imports + the shared Json only when at least one
+        // widget declares props -- otherwise they would be unused and
+        // warn on a props-free build.
+        val hasProps = widgets.any { it.propsClassFqn != null }
+        if (hasProps) {
+            appendLine("import kotlinx.serialization.KSerializer")
+            appendLine("import kotlinx.serialization.json.Json")
+            appendLine("import kotlinx.serialization.json.JsonObject")
+            appendLine("import kotlinx.serialization.json.jsonObject")
+        }
         appendLine()
         appendLine("object $GENERATED_FILE_NAME : WidgetRegistry {")
+        if (hasProps) {
+            // encodeDefaults so the default-props baseline carries every
+            // field; the editor overlays the instance's stored overrides.
+            appendLine("    private val propsJson: Json = Json { encodeDefaults = true; ignoreUnknownKeys = true }")
+        }
         appendLine("    private val map: Map<WidgetKind, WidgetDescriptor> = buildMap {")
         widgets.forEach { entry ->
             val kindLiteral = "WidgetKind(\"${entry.id.kotlinEscape()}\")"
@@ -99,6 +115,12 @@ class WidgetRegistryProcessor(
             appendLine("            override val displayName: String = \"${entry.displayName.kotlinEscape()}\"")
             appendLine("            override val removable: Boolean = ${entry.removable}")
             appendLine("            override val slots: List<SlotId> = ${entry.slots.toSlotIdListLiteral()}")
+            if (entry.propsClassFqn != null) {
+                val fqn = entry.propsClassFqn
+                appendLine("            override val propsSerializer: KSerializer<*>? = $fqn.serializer()")
+                appendLine("            override val defaultPropsJson: JsonObject =")
+                appendLine("                propsJson.encodeToJsonElement($fqn.serializer(), $fqn()).jsonObject")
+            }
             appendLine("            @Composable override fun Render(instance: WidgetInstance) {")
             appendLine("                ${entry.functionFqn}(instance)")
             appendLine("            }")
@@ -124,6 +146,7 @@ private data class WidgetEntry(
     val displayName: String,
     val removable: Boolean,
     val slots: List<String>,
+    val propsClassFqn: String?,
     val functionFqn: String,
     val containingFile: com.google.devtools.ksp.symbol.KSFile?,
 )
