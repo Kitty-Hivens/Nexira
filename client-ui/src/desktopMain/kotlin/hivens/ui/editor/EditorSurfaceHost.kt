@@ -173,10 +173,14 @@ fun EditorSurfaceHost(
     var selectedSurface by remember(availableSurfaces) {
         mutableStateOf(availableSurfaces.firstOrNull())
     }
-    // Prop editor target. Cleared on surface change (keyed remember) and
-    // on dismiss; while set, the palette hides so the two right-edge
-    // panels do not overlap.
+    // Prop editor target. Cleared on surface change (keyed remember), on
+    // dismiss, and on leaving edit mode; while set, the palette hides so
+    // the two right-edge panels do not overlap.
     var propTarget by remember(availableSurfaces) { mutableStateOf<PropTarget?>(null) }
+    // Any edit-mode exit (FAB / Escape / Ctrl+E) drops the prop target, so
+    // re-entering does not silently reopen the last panel with the palette
+    // still hidden.
+    LaunchedEffect(editing) { if (!editing) propTarget = null }
     val currentGraph = LocalLayoutGraph.current
     // Leaving a surface drops edit mode -- avoids a stale edit state
     // pointed at the wrong surface after navigation.

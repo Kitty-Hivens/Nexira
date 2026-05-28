@@ -42,7 +42,9 @@ import kotlinx.serialization.Serializable
 // embraces the chaos.
 @Serializable
 data class AboutCreditsProps(
-    @PropLabel("Заголовок") val title: String = "",
+    // Overrides only the top "Авторы" section header; the Технологии and
+    // Лицензия sections stay localized.
+    @PropLabel("Заголовок (авторы)") val title: String = "",
 )
 
 @Widget(id = "about.credits", displayName = "Авторы и технологии", propsClass = AboutCreditsProps::class)

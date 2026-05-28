@@ -20,7 +20,7 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class LibraryHeaderProps(
-    @PropLabel("Заголовок") val title: String = "БИБЛИОТЕКА",
+    @PropLabel("Заголовок") val title: String = "Библиотека",
     @PropLabel("Подзаголовок") val subtitle: String = "Установленные сборки",
 )
 

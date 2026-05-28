@@ -30,7 +30,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -69,8 +72,22 @@ fun WidgetPropPanel(
     val graph = LocalLayoutGraph.current
     val registry = LocalWidgetRegistry.current
 
-    val instance: WidgetInstance? = if (path != null && instanceId != null) {
-        graph.traverse(path)?.widgets?.firstOrNull { it.instanceId == instanceId }
+    // Latch the last real target so the slide-out animation still has
+    // content: on dismiss / edit-mode exit the host clears propTarget the
+    // same frame `visible` goes false, which would otherwise blank the
+    // panel mid-animation. The conditional write converges (same value on
+    // re-composition) and only updates while a target is set.
+    var lastPath by remember { mutableStateOf<SlotPath?>(null) }
+    var lastId   by remember { mutableStateOf<String?>(null) }
+    if (path != null && instanceId != null) {
+        lastPath = path
+        lastId   = instanceId
+    }
+    val resolvePath = path ?: lastPath
+    val resolveId   = instanceId ?: lastId
+
+    val instance: WidgetInstance? = if (resolvePath != null && resolveId != null) {
+        graph.traverse(resolvePath)?.widgets?.firstOrNull { it.instanceId == resolveId }
     } else {
         null
     }
@@ -85,16 +102,17 @@ fun WidgetPropPanel(
     ) {
         // All non-null inside the gate; an explicit check keeps smart-cast
         // happy and survives the exit frame where the target may have just
-        // vanished (widget removed while editing).
+        // vanished (dismiss / edit-mode exit / widget removed). Uses the
+        // latched resolve* so exit renders the last content.
         if (descriptor != null && serializer != null && instance != null &&
-            path != null && instanceId != null
+            resolvePath != null && resolveId != null
         ) {
             PropPanelBody(
                 descriptor = descriptor,
                 serializer = serializer,
                 instance   = instance,
-                path       = path,
-                instanceId = instanceId,
+                path       = resolvePath,
+                instanceId = resolveId,
                 controller = controller,
                 onDismiss  = onDismiss,
             )
