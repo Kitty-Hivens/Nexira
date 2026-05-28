@@ -186,6 +186,12 @@ fun EditorSurfaceHost(
     // tick may already be > 0) does not spuriously toggle on mount.
     // Only editable surfaces react; leaving edit mode drops preview,
     // matching the FAB + Escape paths.
+    //
+    // The signal sits on the singleton controller, so every mounted
+    // host observes it. Safe because AppLayout mounts exactly one host
+    // (its Crossfade swaps screen content *inside* the host, not the
+    // host itself) -- there is never a second, hidden host to flip into
+    // edit mode behind the user's back.
     LaunchedEffect(availableSurfaces) {
         var seen = controller.editToggleSignal.value
         snapshotFlow { controller.editToggleSignal.value }.collect { tick ->

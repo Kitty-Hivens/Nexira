@@ -523,11 +523,16 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
                 // scope (preview = before focus dispatch) so it fires no
                 // matter which composable holds focus -- the side rails
                 // own focus, so a host Box-level handler misses the chord.
-                // The active EditorSurfaceHost observes the controller
-                // signal and gates on whether its surface is editable.
-                // KeyUp so a held chord toggles once, not on repeat.
-                if (ev.type == KeyEventType.KeyUp && ev.isCtrlPressed && ev.key == Key.E) {
-                    editModeController.requestEditToggle()
+                // The EditorSurfaceHost observes the controller signal and
+                // gates on whether its surface is editable.
+                if (ev.isCtrlPressed && ev.key == Key.E) {
+                    // Consume both edges so the chord never reaches a
+                    // focused control (e.g. the palette search field); act
+                    // on release only, so holding the key toggles once
+                    // instead of repeating on auto-repeat KeyDowns.
+                    if (ev.type == KeyEventType.KeyUp) {
+                        editModeController.requestEditToggle()
+                    }
                     true
                 } else {
                     false
