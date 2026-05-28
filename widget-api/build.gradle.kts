@@ -14,6 +14,10 @@ plugins {
 dependencies {
     api(project(":widget-model"))
     implementation(libs.compose.runtime)
+    // Phase G: SlotRenderer owns the slot's intra-slot layout, so it
+    // needs the layout primitives (Column/Row/Box/Modifier). foundation
+    // pulls compose-ui (Modifier) transitively.
+    implementation(libs.compose.foundation)
 
     testImplementation(kotlin("test"))
 }
