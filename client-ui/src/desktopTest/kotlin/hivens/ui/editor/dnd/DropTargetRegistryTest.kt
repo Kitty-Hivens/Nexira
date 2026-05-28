@@ -4,6 +4,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import hivens.widget.model.NestedSegment
 import hivens.widget.model.SlotId
+import hivens.widget.model.SlotOrientation
 import hivens.widget.model.SlotPath
 import hivens.widget.model.SurfaceId
 import kotlin.test.Test
@@ -35,6 +36,38 @@ class DropTargetRegistryTest {
         assertEquals(1, r.insertionIndexInSlot(slot, Offset(50f, 70f)))
         // Below all -> append at 3
         assertEquals(3, r.insertionIndexInSlot(slot, Offset(50f, 200f)))
+    }
+
+    @Test
+    fun `insertionIndexInSlot uses the X axis for a Row slot`() {
+        val r = DropTargetRegistry()
+        // three cells side by side, 100 wide each
+        r.registerWidget(slot, "a", index = 0, rect = rect(top = 0f, height = 80f, left = 0f,   width = 100f)) // x [0,100], mid 50
+        r.registerWidget(slot, "b", index = 1, rect = rect(top = 0f, height = 80f, left = 110f, width = 100f)) // x [110,210], mid 160
+        r.registerWidget(slot, "c", index = 2, rect = rect(top = 0f, height = 80f, left = 220f, width = 100f)) // x [220,320]
+
+        val row = SlotOrientation.Row
+        assertEquals(0, r.insertionIndexInSlot(slot, Offset(10f, 40f), row))   // left of a's mid
+        assertEquals(1, r.insertionIndexInSlot(slot, Offset(120f, 40f), row))  // past a's mid, before b's mid
+        assertEquals(3, r.insertionIndexInSlot(slot, Offset(400f, 40f), row))  // past all -> append
+        assertEquals(1, r.insertionIndexInSlot(slot, Offset(120f, 999f), row)) // Y ignored for Row
+    }
+
+    @Test
+    fun `insertionIndexInSlot is row-major for a Grid slot`() {
+        val r = DropTargetRegistry()
+        // 2x2 grid: row 0 = [a,b] at y[0,80]; row 1 = [c,d] at y[100,180]
+        r.registerWidget(slot, "a", index = 0, rect = rect(top = 0f,   height = 80f, left = 0f,   width = 100f)) // r0c0, mid x50
+        r.registerWidget(slot, "b", index = 1, rect = rect(top = 0f,   height = 80f, left = 110f, width = 100f)) // r0c1, mid x160
+        r.registerWidget(slot, "c", index = 2, rect = rect(top = 100f, height = 80f, left = 0f,   width = 100f)) // r1c0
+        r.registerWidget(slot, "d", index = 3, rect = rect(top = 100f, height = 80f, left = 110f, width = 100f)) // r1c1
+
+        val grid = SlotOrientation.Grid
+        assertEquals(0, r.insertionIndexInSlot(slot, Offset(50f, -10f), grid)) // above everything
+        assertEquals(0, r.insertionIndexInSlot(slot, Offset(10f, 40f), grid))  // row 0, left of a's center
+        assertEquals(1, r.insertionIndexInSlot(slot, Offset(120f, 40f), grid)) // row 0, between a and b centers
+        assertEquals(2, r.insertionIndexInSlot(slot, Offset(10f, 140f), grid)) // row 1, left of c's center
+        assertEquals(4, r.insertionIndexInSlot(slot, Offset(400f, 400f), grid))// past all -> append
     }
 
     @Test

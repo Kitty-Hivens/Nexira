@@ -76,8 +76,7 @@ internal fun SlotDivider(
                 change.consume()
                 if (sumPx > 0f) {
                     accum += if (isRow) dragAmount.x else dragAmount.y
-                    val upper   = (sumPx - minPx).coerceAtLeast(minPx)
-                    val newLeft = (startLeftPx + accum).coerceIn(minPx.coerceAtMost(upper), upper)
+                    val newLeft = dividerLeftWeight(startLeftPx, sumPx, accum, minPx)
                     controller.setWidgetWeight(path, left.instanceId, newLeft)
                     controller.setWidgetWeight(path, right.instanceId, sumPx - newLeft)
                 }
@@ -101,4 +100,13 @@ internal fun SlotDivider(
             Box(Modifier.fillMaxWidth().height(2.dp).background(bar))
         }
     }
+}
+
+// New left-neighbor weight (px units) for a divider drag: the start px plus
+// the accumulated delta, clamped so neither side drops below minPx. The
+// right neighbor takes sumPx - this. Pure so the resize math is testable
+// without driving a real pointer gesture.
+internal fun dividerLeftWeight(startLeftPx: Float, sumPx: Float, accum: Float, minPx: Float): Float {
+    val upper = (sumPx - minPx).coerceAtLeast(minPx)
+    return (startLeftPx + accum).coerceIn(minPx.coerceAtMost(upper), upper)
 }
