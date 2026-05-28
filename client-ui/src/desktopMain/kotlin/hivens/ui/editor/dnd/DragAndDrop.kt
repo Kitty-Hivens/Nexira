@@ -21,6 +21,7 @@ import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import hivens.widget.model.SlotAddress
+import hivens.widget.model.SlotOrientation
 import hivens.widget.model.SlotPath
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
@@ -175,15 +176,23 @@ class DropTargetRegistry {
     }
 
     // Insertion index for a pointer inside a known slot. Index is in
-    // [0, count] -- count means "append at end". Algorithm: find the
-    // widget whose vertical midpoint the pointer is above; insert at
-    // that widget's position. If pointer is below all widgets, append.
-    fun insertionIndexInSlot(path: SlotPath, pointInWindow: Offset): Int {
+    // [0, count] -- count means "append at end". Finds the widget whose
+    // main-axis midpoint the pointer is before; inserts at that widget's
+    // position. Main axis = X for Row slots, Y for Column/Grid. If the
+    // pointer is past all widgets, append.
+    fun insertionIndexInSlot(
+        path: SlotPath,
+        pointInWindow: Offset,
+        orientation: SlotOrientation = SlotOrientation.Column,
+    ): Int {
         val items = widgets[path]?.values?.sortedBy { it.index } ?: return 0
         if (items.isEmpty()) return 0
+        val horizontal = orientation == SlotOrientation.Row
         items.forEach { wb ->
-            val midY = wb.rect.top + wb.rect.height / 2f
-            if (pointInWindow.y < midY) return wb.index
+            val mid = if (horizontal) wb.rect.left + wb.rect.width / 2f
+                      else wb.rect.top + wb.rect.height / 2f
+            val coord = if (horizontal) pointInWindow.x else pointInWindow.y
+            if (coord < mid) return wb.index
         }
         return items.size
     }
