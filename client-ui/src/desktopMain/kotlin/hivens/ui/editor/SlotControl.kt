@@ -64,15 +64,21 @@ private fun OrientChip(label: String, active: Boolean, enabled: Boolean = true, 
     Text(
         text       = label,
         style      = MaterialTheme.typography.labelSmall,
+        // A disabled-but-active chip still reads as the current orientation
+        // (dimmed primary), rather than collapsing to plain "greyed out".
         color      = when {
-            !enabled -> CelestiaTheme.colors.textSecondary.copy(alpha = 0.4f)
-            active   -> CelestiaTheme.colors.primary
-            else     -> CelestiaTheme.colors.textSecondary
+            active && !enabled -> CelestiaTheme.colors.primary.copy(alpha = 0.5f)
+            !enabled           -> CelestiaTheme.colors.textSecondary.copy(alpha = 0.4f)
+            active             -> CelestiaTheme.colors.primary
+            else               -> CelestiaTheme.colors.textSecondary
         },
         fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
         modifier   = Modifier
             .clip(RoundedCornerShape(6.dp))
-            .background(if (active && enabled) CelestiaTheme.colors.primary.copy(alpha = 0.22f) else Color.Transparent)
+            .background(
+                if (active) CelestiaTheme.colors.primary.copy(alpha = if (enabled) 0.22f else 0.12f)
+                else Color.Transparent,
+            )
             .then(if (enabled) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(horizontal = 8.dp, vertical = 3.dp),
     )
