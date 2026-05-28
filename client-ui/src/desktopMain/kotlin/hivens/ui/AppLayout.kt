@@ -22,7 +22,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import hivens.core.api.SkinRepository
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.HomeView
 import hivens.core.data.SessionData
@@ -39,8 +38,13 @@ import hivens.ui.screens.*
 import hivens.ui.screens.browse.BrowseScreen
 import hivens.ui.screens.detail.PackDetailScreen
 import hivens.ui.screens.library.LibraryScreen
-import hivens.ui.screens.profile.ProfileScreen
+import hivens.ui.widgets.profile.ProfileSurface
 import hivens.ui.screens.settings.SettingsScreen
+import hivens.ui.widgets.about.AboutSurface
+import hivens.ui.widgets.bgsettings.BgSettingsSurface
+import hivens.ui.widgets.customization.CustomizationSurface
+import hivens.ui.widgets.serverdetails.ServerDetailsSurface
+import hivens.ui.widgets.themepicker.ThemePickerSurface
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.CustomTheme
@@ -78,7 +82,6 @@ fun AppLayout(
     customization: CustomizationSettings = CustomizationSettings(),
     onCustomizationChanged: (CustomizationSettings) -> Unit = {},
 ) {
-    val skinRepository: SkinRepository = koinInject()
     val protocolConfig: ServerProtocolConfig = koinInject()
 
     // Session can be refreshed by DashboardScreen on auth-retry
@@ -164,7 +167,7 @@ fun AppLayout(
 
                     Screen.Profile ->
                         currentSession?.let {
-                            ProfileScreen(session = it, skinRepository = skinRepository)
+                            ProfileSurface(session = it)
                         }
 
                     Screen.Settings ->
@@ -184,7 +187,7 @@ fun AppLayout(
                         )
 
                     Screen.ThemePicker ->
-                        ThemePickerScreen(
+                        ThemePickerSurface(
                             currentTheme    = customTheme,
                             onThemeSelected = { newTheme ->
                                 onCustomThemeChanged(newTheme)
@@ -194,22 +197,20 @@ fun AppLayout(
                         )
 
                     Screen.CustomizationExtension ->
-                        hivens.ui.screens.customization.CustomizationExtensionScreen(
+                        CustomizationSurface(
                             currentSettings   = customization,
                             onSettingsChanged = onCustomizationChanged,
                             onBack            = { onScreenChange(Screen.Settings) },
                         )
 
                     Screen.About ->
-                        AboutScreen(
-                            onBack = { onScreenChange(Screen.Settings) }
-                        )
+                        AboutSurface(onBack = { onScreenChange(Screen.Settings) })
 
                     Screen.BackgroundSettings ->
-                        BackgroundSettingsScreen(
+                        BgSettingsSurface(
                             currentSettings   = backgroundSettings,
                             onSettingsChanged = onBackgroundSettingsChanged,
-                            onBack            = { onScreenChange(Screen.Settings) }
+                            onBack            = { onScreenChange(Screen.Settings) },
                         )
 
                     is Screen.ServerSettings ->
@@ -219,9 +220,9 @@ fun AppLayout(
                         )
 
                     is Screen.ServerDetails ->
-                        ServerDetailScreen(
+                        ServerDetailsSurface(
                             server = screen.server,
-                            onBack = { onScreenChange(Screen.Home) }
+                            onBack = { onScreenChange(Screen.Home) },
                         )
 
                     Screen.Library -> LibraryScreen(

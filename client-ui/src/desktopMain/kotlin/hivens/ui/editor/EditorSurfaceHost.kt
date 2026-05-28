@@ -102,6 +102,18 @@ import hivens.ui.widgets.home.new.LocalHomeNewContext
 import hivens.ui.widgets.library.LocalLibraryContext
 import hivens.ui.widgets.shell.LocalLeftRailContext
 import hivens.ui.widgets.shell.LocalRightRailContext
+import hivens.ui.widgets.about.LocalAboutContext
+import hivens.ui.widgets.about.STUB_ABOUT
+import hivens.ui.widgets.bgsettings.LocalBgSettingsContext
+import hivens.ui.widgets.bgsettings.STUB_BG_SETTINGS
+import hivens.ui.widgets.customization.LocalCustomizationContext
+import hivens.ui.widgets.customization.STUB_CUSTOMIZATION
+import hivens.ui.widgets.profile.LocalProfileContext
+import hivens.ui.widgets.profile.STUB_PROFILE
+import hivens.ui.widgets.serverdetails.LocalServerDetailsContext
+import hivens.ui.widgets.serverdetails.STUB_SERVER_DETAILS
+import hivens.ui.widgets.themepicker.LocalThemePickerContext
+import hivens.ui.widgets.themepicker.STUB_THEME_PICKER
 import hivens.widget.api.EmptySlotDecorator
 import hivens.widget.api.LocalEmptySlotDecorator
 import hivens.widget.api.LocalSlotPath
@@ -268,7 +280,13 @@ fun EditorSurfaceHost(
         LocalHomeNewContext     provides STUB_HOME_NEW,
         LocalLibraryContext     provides STUB_LIBRARY,
         LocalLeftRailContext    provides STUB_LEFTRAIL,
-        LocalRightRailContext   provides STUB_RIGHTRAIL,
+        LocalRightRailContext     provides STUB_RIGHTRAIL,
+        LocalAboutContext         provides STUB_ABOUT,
+        LocalBgSettingsContext    provides STUB_BG_SETTINGS,
+        LocalCustomizationContext provides STUB_CUSTOMIZATION,
+        LocalProfileContext       provides STUB_PROFILE,
+        LocalServerDetailsContext provides STUB_SERVER_DETAILS,
+        LocalThemePickerContext   provides STUB_THEME_PICKER,
     ) {
         Box(
             modifier = Modifier
@@ -684,6 +702,12 @@ private fun humanSurfaceShortName(surface: SurfaceId): String = when (surface.va
     "library"             -> "Library"
     "appshell.leftrail"   -> "Лев. рейл"
     "appshell.rightrail"  -> "Прав. рейл"
+    "about"               -> "О приложении"
+    "bg.settings"         -> "Фон"
+    "customization"       -> "Стиль"
+    "profile"             -> "Профиль"
+    "server.details"      -> "Сервер"
+    "theme.picker"        -> "Темы"
     else                  -> surface.value
 }
 
@@ -693,6 +717,12 @@ private fun humanSurfaceName(surface: SurfaceId): String = when (surface.value) 
     "library"             -> "Library"
     "appshell.leftrail"   -> "Боковая панель"
     "appshell.rightrail"  -> "Правая панель"
+    "about"               -> "О приложении"
+    "bg.settings"         -> "Настройки фона"
+    "customization"       -> "Кастомизация"
+    "profile"             -> "Профиль"
+    "server.details"      -> "Детали сервера"
+    "theme.picker"        -> "Выбор темы"
     else                  -> surface.value
 }
 
@@ -783,8 +813,16 @@ private fun availableSurfacesFor(screen: Screen, homeView: HomeView): List<Surfa
             HomeView.LibraryFirst -> SurfaceId("library")
             HomeView.New          -> SurfaceId("home.new")
         }
-        Screen.Library -> SurfaceId("library")
-        else           -> return emptyList()
+        Screen.About                  -> SurfaceId("about")
+        Screen.BackgroundSettings     -> SurfaceId("bg.settings")
+        Screen.CustomizationExtension -> SurfaceId("customization")
+        Screen.Library                -> SurfaceId("library")
+        Screen.Profile                -> SurfaceId("profile")
+        is Screen.ServerDetails       -> SurfaceId("server.details")
+        Screen.ThemePicker            -> SurfaceId("theme.picker")
+        // Other widget-composed surfaces from B.1 land here as the
+        // rest of the screens migrate over.
+        else               -> return emptyList()
     }
     return listOf(
         main,

@@ -66,6 +66,143 @@
             ]
           }
         }
+      },
+      "customization": {
+        "slots": {
+          "visual": {
+            "widgets": [
+              { "kind": "customization.density",                "instance_id": "cust-density-default" },
+              { "kind": "customization.glass.intensity",        "instance_id": "cust-glass-intensity-default" },
+              { "kind": "customization.accent.override",        "instance_id": "cust-accent-override-default" },
+              { "kind": "customization.experimental.toggle",    "instance_id": "cust-experimental-toggle-default" }
+            ]
+          },
+          "colors": {
+            "widgets": [
+              { "kind": "customization.color.primary",          "instance_id": "cust-color-primary-default" },
+              { "kind": "customization.color.secondary",        "instance_id": "cust-color-secondary-default" },
+              { "kind": "customization.color.background",       "instance_id": "cust-color-background-default" },
+              { "kind": "customization.color.surface",          "instance_id": "cust-color-surface-default" },
+              { "kind": "customization.color.success",          "instance_id": "cust-color-success-default" },
+              { "kind": "customization.color.error",            "instance_id": "cust-color-error-default" },
+              { "kind": "customization.color.outline",          "instance_id": "cust-color-outline-default" },
+              { "kind": "customization.color.textPrimary",      "instance_id": "cust-color-text-primary-default" },
+              { "kind": "customization.color.textSecondary",    "instance_id": "cust-color-text-secondary-default" },
+              { "kind": "customization.color.progressAccent",   "instance_id": "cust-color-progress-accent-default" },
+              { "kind": "customization.color.warnAccent",       "instance_id": "cust-color-warn-accent-default" },
+              { "kind": "customization.color.criticalAccent",   "instance_id": "cust-color-critical-accent-default" },
+              { "kind": "customization.glass.alpha",            "instance_id": "cust-glass-alpha-default" }
+            ]
+          },
+          "shape": {
+            "widgets": [
+              { "kind": "customization.shape.cardCorner",       "instance_id": "cust-shape-card-corner-default" },
+              { "kind": "customization.shape.cardBorder",       "instance_id": "cust-shape-card-border-default" },
+              { "kind": "customization.shape.buttonCorner",     "instance_id": "cust-shape-button-corner-default" },
+              { "kind": "customization.shape.animMultiplier",   "instance_id": "cust-shape-anim-multiplier-default" },
+              { "kind": "customization.shape.softGlow",         "instance_id": "cust-shape-soft-glow-default" }
+            ]
+          },
+          "actions": {
+            "widgets": [
+              { "kind": "customization.reset", "instance_id": "cust-reset-default" }
+            ]
+          }
+        }
+      },
+      "bg.settings": {
+        "slots": {
+          "controls": {
+            "widgets": [
+              { "kind": "bg.enable.toggle",   "instance_id": "bg-enable-toggle-default" },
+              { "kind": "bg.image.picker",    "instance_id": "bg-image-picker-default" },
+              { "kind": "bg.scale.mode",      "instance_id": "bg-scale-mode-default" },
+              { "kind": "bg.position.x",      "instance_id": "bg-position-x-default" },
+              { "kind": "bg.position.y",      "instance_id": "bg-position-y-default" },
+              { "kind": "bg.fx.blur",         "instance_id": "bg-fx-blur-default" },
+              { "kind": "bg.fx.darken",       "instance_id": "bg-fx-darken-default" },
+              { "kind": "bg.fx.opacity",      "instance_id": "bg-fx-opacity-default" },
+              { "kind": "bg.fx.saturation",   "instance_id": "bg-fx-saturation-default" },
+              { "kind": "bg.fx.parallax",     "instance_id": "bg-fx-parallax-default" },
+              { "kind": "bg.fx.vignette",     "instance_id": "bg-fx-vignette-default" },
+              { "kind": "bg.fx.animspeed",    "instance_id": "bg-fx-animspeed-default" },
+              { "kind": "bg.loop.mode",       "instance_id": "bg-loop-mode-default" },
+              { "kind": "bg.tint",            "instance_id": "bg-tint-default" },
+              { "kind": "bg.reset",           "instance_id": "bg-reset-default" }
+            ]
+          },
+          "preview": {
+            "widgets": [
+              { "kind": "bg.preview", "instance_id": "bg-preview-default" }
+            ]
+          }
+        }
+      },
+      "about": {
+        "slots": {
+          "left": {
+            "widgets": [
+              { "kind": "about.logo",    "instance_id": "about-logo-default" },
+              { "kind": "about.credits", "instance_id": "about-credits-default" }
+            ]
+          },
+          "right": {
+            "widgets": [
+              { "kind": "about.update.panel", "instance_id": "about-update-panel-default" },
+              { "kind": "about.system.card",  "instance_id": "about-system-card-default" },
+              { "kind": "about.links.card",   "instance_id": "about-links-card-default" }
+            ]
+          }
+        }
+      },
+      "server.details": {
+        "slots": {
+          "text": {
+            "widgets": [
+              { "kind": "server.details.title",       "instance_id": "server-details-title-default" },
+              { "kind": "server.details.tagbar",      "instance_id": "server-details-tagbar-default" },
+              { "kind": "server.details.description", "instance_id": "server-details-description-default" }
+            ]
+          },
+          "image": {
+            "widgets": [
+              { "kind": "server.details.banner", "instance_id": "server-details-banner-default" }
+            ]
+          }
+        }
+      },
+      "profile": {
+        "slots": {
+          "nav": {
+            "widgets": [
+              { "kind": "profile.nav", "instance_id": "profile-nav-default" }
+            ]
+          },
+          "skin": {
+            "widgets": [
+              { "kind": "profile.skin.section", "instance_id": "profile-skin-section-default" }
+            ]
+          },
+          "account": {
+            "widgets": [
+              { "kind": "profile.account.section", "instance_id": "profile-account-section-default" }
+            ]
+          }
+        }
+      },
+      "theme.picker": {
+        "slots": {
+          "grid": {
+            "widgets": [
+              { "kind": "theme.picker.grid", "instance_id": "theme-picker-grid-default" }
+            ]
+          },
+          "preview": {
+            "widgets": [
+              { "kind": "theme.picker.preview", "instance_id": "theme-picker-preview-default" }
+            ]
+          }
+        }
       }
     }
   }
