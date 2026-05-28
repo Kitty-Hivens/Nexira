@@ -1,9 +1,11 @@
 package hivens.ui.screens
 
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.Modifier
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.SessionData
 import hivens.ui.puppet.PuppetScreen
@@ -49,7 +51,7 @@ fun DashboardScreen(
         )
     }
     CompositionLocalProvider(LocalHomeClassicContext provides ctx) {
-        SlotRenderer(SurfaceId(SURFACE), SlotId("main"))
+        SlotRenderer(SurfaceId(SURFACE), SlotId("main"), Modifier.fillMaxSize())
     }
 }
 

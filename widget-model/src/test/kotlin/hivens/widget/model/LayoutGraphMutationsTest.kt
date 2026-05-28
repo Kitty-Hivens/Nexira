@@ -84,6 +84,52 @@ class LayoutGraphMutationsTest {
         )
     }
 
+    // ── Phase G: slot orientation + grid columns + widget weight ──────
+
+    @Test
+    fun `setSlotOrientation changes the slot orientation`() {
+        val out = seed(w1).setSlotOrientation(rootPath, SlotOrientation.Row)
+        assertEquals(SlotOrientation.Row, out.surfaces[home]?.slots?.get(main)?.orientation)
+    }
+
+    @Test
+    fun `setSlotOrientation to the same value is identity`() {
+        val graph = seed(w1)
+        assertSame(graph, graph.setSlotOrientation(rootPath, SlotOrientation.Column))
+    }
+
+    @Test
+    fun `setGridColumns updates and coerces to at least one`() {
+        assertEquals(3, seed(w1).setGridColumns(rootPath, 3).surfaces[home]?.slots?.get(main)?.gridColumns)
+        assertEquals(1, seed(w1).setGridColumns(rootPath, 0).surfaces[home]?.slots?.get(main)?.gridColumns)
+    }
+
+    @Test
+    fun `setWidgetWeight sets weight on the matching widget only`() {
+        val out = seed(w1, w2).setWidgetWeight(rootPath, "i2", 2f)
+        assertEquals(2f, out.mainWidgets().first { it.instanceId == "i2" }.weight)
+        assertEquals(0f, out.mainWidgets().first { it.instanceId == "i1" }.weight)
+    }
+
+    @Test
+    fun `setWidgetWeight on unknown instance is identity`() {
+        val graph = seed(w1)
+        assertSame(graph, graph.setWidgetWeight(rootPath, "ghost", 1f))
+    }
+
+    @Test
+    fun `setWidgetWeight coerces a negative weight to zero`() {
+        val out = seed(w1).setWidgetWeight(rootPath, "i1", -5f)
+        assertEquals(0f, out.mainWidgets().first { it.instanceId == "i1" }.weight)
+    }
+
+    @Test
+    fun `setWidgetWeight to the same weight is identity`() {
+        // w1 defaults to weight 0f -- re-setting 0f must not allocate a new graph.
+        val graph = seed(w1)
+        assertSame(graph, graph.setWidgetWeight(rootPath, "i1", 0f))
+    }
+
     @Test
     fun `reorderInSlot swaps positions`() {
         val out = seed(w1, w2, w3).reorderInSlot(rootPath, fromIndex = 0, toIndex = 2)

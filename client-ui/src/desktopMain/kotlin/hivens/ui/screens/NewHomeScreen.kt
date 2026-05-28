@@ -1,6 +1,4 @@
 package hivens.ui.screens
-
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -48,14 +46,14 @@ fun NewHomeScreen(
         // their own viewport. A stack of fixed-height widgets that
         // exceeds the pane overflows -- the per-surface reset action
         // is the recovery path.
-        Column(
-            modifier            = Modifier
+        SlotRenderer(
+            SurfaceId(SURFACE),
+            SlotId("main"),
+            modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 24.dp, vertical = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            SlotRenderer(SurfaceId(SURFACE), SlotId("main"))
-        }
+            spacing  = 8.dp,
+        )
     }
 }
 

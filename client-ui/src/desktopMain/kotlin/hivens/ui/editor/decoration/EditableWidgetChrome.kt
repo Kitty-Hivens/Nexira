@@ -13,10 +13,13 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -56,13 +59,21 @@ import hivens.ui.editor.dnd.widgetBounds
 import hivens.ui.theme.CelestiaTheme
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.WidgetDescriptor
+import hivens.widget.model.SlotOrientation
 import hivens.widget.model.SlotPath
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.traverse
 
 // Wraps a single widget with edit-mode chrome: drag handle (always
 // visible, opacity boosts on hover), remove button (hover-only, hidden
-// when descriptor says non-removable), faint border outline.
+// when descriptor says non-removable), prop "tune" gear (hover, only when
+// the widget has props), faint border outline, and a drop indicator.
+//
+// Phase G: the chrome follows the slot's orientation. In a Column slot it
+// wraps in a Column with horizontal drop bars above/below; in a Row slot
+// it wraps in a Row with vertical drop bars left/right. The hover buttons
+// live in a Box-scoped inner section so they use plain BoxScope `.align`
+// regardless of the outer Row/Column.
 //
 // The whole wrapper is also a drop-target bounds-reporter for its own
 // rect -- the registry uses this to compute insertion-index hit-tests
@@ -75,6 +86,7 @@ fun EditableWidgetChrome(
     instance: WidgetInstance,
     controller: DragController,
     registry: DropTargetRegistry,
+    orientation: SlotOrientation,
     onRemove: () -> Unit,
     onEditProps: () -> Unit,
     onCommitDrop: (committedPointer: androidx.compose.ui.geometry.Offset) -> Unit,
@@ -88,6 +100,8 @@ fun EditableWidgetChrome(
     val isThisDragging = (activeDrag?.payload as? DragPayload.ExistingWidget)
         ?.instance?.instanceId == instance.instanceId
 
+    val isRow = orientation == SlotOrientation.Row
+
     // Drop-indicator hit test. Reading controller.active recomposes on
     // every pointer update; traverse + registry queries are O(depth +
     // widgets-in-slot) and cheap enough to do per-frame for the few
@@ -97,7 +111,7 @@ fun EditableWidgetChrome(
     val isLastInSlot = index == slotCount - 1
     val dropTargetPath = activeDrag?.let { registry.slotForPoint(it.pointerInWindow) }
     val dropInsertionIdx = if (activeDrag != null && dropTargetPath == path) {
-        registry.insertionIndexInSlot(path, activeDrag.pointerInWindow)
+        registry.insertionIndexInSlot(path, activeDrag.pointerInWindow, orientation)
     } else -1
     val showIndicatorBefore = dropInsertionIdx == index
     val showIndicatorAfter  = isLastInSlot && dropInsertionIdx == slotCount
@@ -129,11 +143,13 @@ fun EditableWidgetChrome(
         label         = "edit-border-alpha",
     )
 
-    Column(modifier = Modifier.fillMaxWidth()) {
-        if (showIndicatorBefore) DropIndicator()
+    // Bordered widget + hover handles. Box-scoped so the AnimatedVisibility
+    // buttons use plain BoxScope `.align` -- no this@Column / this@Row
+    // qualifier, which lets the outer wrapper be either orientation.
+    val widgetBox: @Composable () -> Unit = {
         Box(
             modifier = Modifier
-                .padding(vertical = 4.dp)
+                .then(if (isRow) Modifier.padding(horizontal = 4.dp) else Modifier.padding(vertical = 4.dp))
                 .hoverable(interaction)
                 .onGloballyPositioned { coords: LayoutCoordinates ->
                     val rect = coords.boundsInWindow()
@@ -180,12 +196,8 @@ fun EditableWidgetChrome(
 
             // Remove button: hover-only, red close icon. Hidden on
             // non-removable widgets (those get the force-remove
-            // affordance below instead). Animated fade so it does not
-            // pop in jarringly. Qualified with this@Column because the
-            // inner Box sits inside the outer drop-indicator Column,
-            // and Kotlin would otherwise try ColumnScope.AnimatedVisibility
-            // against a BoxScope `this`.
-            this@Column.AnimatedVisibility(
+            // affordance below instead).
+            AnimatedVisibility(
                 visible  = isHovered && descriptor.removable,
                 enter    = fadeIn(spring(stiffness = Spring.StiffnessMedium)),
                 exit     = fadeOut(spring(stiffness = Spring.StiffnessMedium)),
@@ -222,7 +234,7 @@ fun EditableWidgetChrome(
             // Sits left of the remove/force-remove button at the top-end.
             // Same Release-consume pattern as remove so the tap does not
             // start a drag.
-            this@Column.AnimatedVisibility(
+            AnimatedVisibility(
                 visible  = isHovered && descriptor.propsSerializer != null,
                 enter    = fadeIn(spring(stiffness = Spring.StiffnessMedium)),
                 exit     = fadeOut(spring(stiffness = Spring.StiffnessMedium)),
@@ -263,7 +275,7 @@ fun EditableWidgetChrome(
             // home surface) has no exit path short of editing
             // layout-graph.json by hand or invoking the per-surface
             // reset on the edit pill.
-            this@Column.AnimatedVisibility(
+            AnimatedVisibility(
                 visible  = isHovered && !descriptor.removable,
                 enter    = fadeIn(spring(stiffness = Spring.StiffnessMedium)),
                 exit     = fadeOut(spring(stiffness = Spring.StiffnessMedium)),
@@ -295,7 +307,20 @@ fun EditableWidgetChrome(
                 }
             }
         }
-        if (showIndicatorAfter) DropIndicator()
+    }
+
+    if (isRow) {
+        Row(modifier = Modifier.fillMaxHeight(), verticalAlignment = Alignment.Top) {
+            if (showIndicatorBefore) DropIndicator(isRow = true)
+            widgetBox()
+            if (showIndicatorAfter) DropIndicator(isRow = true)
+        }
+    } else {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            if (showIndicatorBefore) DropIndicator(isRow = false)
+            widgetBox()
+            if (showIndicatorAfter) DropIndicator(isRow = false)
+        }
     }
 
     if (forceRemoveOpen) {
@@ -329,13 +354,25 @@ fun EditableWidgetChrome(
     }
 }
 
+// Drop insertion bar. Horizontal (full width, 2dp tall) for a Column
+// slot; vertical (full height, 2dp wide) for a Row slot.
 @Composable
-private fun DropIndicator() {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(2.dp)
-            .padding(horizontal = 4.dp)
-            .background(CelestiaTheme.colors.primary),
-    )
+private fun DropIndicator(isRow: Boolean) {
+    if (isRow) {
+        Box(
+            modifier = Modifier
+                .fillMaxHeight()
+                .width(2.dp)
+                .padding(vertical = 4.dp)
+                .background(CelestiaTheme.colors.primary),
+        )
+    } else {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(2.dp)
+                .padding(horizontal = 4.dp)
+                .background(CelestiaTheme.colors.primary),
+        )
+    }
 }

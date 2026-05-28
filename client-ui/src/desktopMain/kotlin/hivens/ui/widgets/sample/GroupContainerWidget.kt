@@ -2,7 +2,6 @@ package hivens.ui.widgets.sample
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -41,8 +40,6 @@ fun GroupContainerWidget(instance: WidgetInstance) {
             .background(glassSurfaceAlpha(0.55f))
             .padding(12.dp),
     ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            SlotRenderer(parent = instance, slot = SlotId("body"))
-        }
+        SlotRenderer(parent = instance, slot = SlotId("body"), modifier = Modifier.fillMaxWidth())
     }
 }

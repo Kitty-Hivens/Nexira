@@ -159,18 +159,18 @@ fun AboutSurface(onBack: () -> Unit) {
             Spacer(Modifier.height(20.dp))
 
             Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-                Column(
-                    modifier            = Modifier.weight(1f).fillMaxHeight(),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    SlotRenderer(SurfaceId(SURFACE), SlotId("left"))
-                }
-                Column(
-                    modifier            = Modifier.weight(1f).fillMaxHeight(),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    SlotRenderer(SurfaceId(SURFACE), SlotId("right"))
-                }
+                SlotRenderer(
+                    SurfaceId(SURFACE),
+                    SlotId("left"),
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                    spacing  = 16.dp,
+                )
+                SlotRenderer(
+                    SurfaceId(SURFACE),
+                    SlotId("right"),
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                    spacing  = 16.dp,
+                )
             }
         }
     }

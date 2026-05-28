@@ -1,7 +1,6 @@
 package hivens.ui.widgets.themepicker
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -117,12 +116,8 @@ fun ThemePickerSurface(
                 modifier              = Modifier.fillMaxSize(),
                 horizontalArrangement = Arrangement.spacedBy(24.dp),
             ) {
-                Box(modifier = Modifier.weight(2f).fillMaxHeight()) {
-                    SlotRenderer(SurfaceId(SURFACE), SlotId("grid"))
-                }
-                Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
-                    SlotRenderer(SurfaceId(SURFACE), SlotId("preview"))
-                }
+                SlotRenderer(SurfaceId(SURFACE), SlotId("grid"), Modifier.weight(2f).fillMaxHeight())
+                SlotRenderer(SurfaceId(SURFACE), SlotId("preview"), Modifier.weight(1f).fillMaxHeight())
             }
         }
     }

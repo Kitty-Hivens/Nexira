@@ -5,6 +5,7 @@ import androidx.compose.runtime.ProvidableCompositionLocal
 import androidx.compose.runtime.staticCompositionLocalOf
 import hivens.widget.model.LayoutGraph
 import hivens.widget.model.SlotAddress
+import hivens.widget.model.SlotContent
 import hivens.widget.model.SlotPath
 import hivens.widget.model.WidgetInstance
 
@@ -48,6 +49,17 @@ typealias EmptySlotDecorator = @Composable (address: SlotAddress) -> Unit
 
 val LocalEmptySlotDecorator: ProvidableCompositionLocal<EmptySlotDecorator> =
     staticCompositionLocalOf { {} }
+
+// Phase G: rendered by SlotRenderer at the start of a non-empty slot in
+// edit mode. Default = nothing (production: no control). The editor swaps
+// in a small control that changes the slot's orientation (Column/Row/Grid)
+// + grid columns. Receives the slot path + content so the control reads
+// the current orientation and dispatches the mutation. Kept editor-
+// agnostic here; the implementation lives in :client-ui.
+typealias SlotControlDecorator = @Composable (path: SlotPath, content: SlotContent) -> Unit
+
+val LocalSlotControlDecorator: ProvidableCompositionLocal<SlotControlDecorator> =
+    staticCompositionLocalOf { { _, _ -> } }
 
 // Current path the surrounding SlotRenderer is rendering. Container
 // widgets read this implicitly through the nested SlotRenderer

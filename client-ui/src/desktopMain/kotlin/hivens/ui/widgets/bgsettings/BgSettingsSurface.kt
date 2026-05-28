@@ -125,19 +125,21 @@ fun BgSettingsSurface(
 
             Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                 GlassCard(Modifier.weight(1f).fillMaxHeight()) {
-                    Column(
-                        modifier            = Modifier
+                    SlotRenderer(
+                        SurfaceId(SURFACE),
+                        SlotId("controls"),
+                        // Scroll rides on the slot modifier: a Lazy-list widget dropped
+                        // into this slot would crash measurement (see file header).
+                        modifier = Modifier
                             .fillMaxSize()
                             .verticalScroll(rememberScrollState())
                             .padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
-                    ) {
-                        SlotRenderer(SurfaceId(SURFACE), SlotId("controls"))
-                    }
+                        spacing  = 16.dp,
+                    )
                 }
 
                 GlassCard(Modifier.weight(1f).fillMaxHeight()) {
-                    SlotRenderer(SurfaceId(SURFACE), SlotId("preview"))
+                    SlotRenderer(SurfaceId(SURFACE), SlotId("preview"), Modifier.fillMaxSize())
                 }
             }
         }

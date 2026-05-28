@@ -136,17 +136,20 @@ fun CustomizationSurface(
                         .padding(20.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
-                    SlotRenderer(SurfaceId(SURFACE), SlotId("visual"))
+                    // Multi-slot scroll column: each slot keeps its own
+                    // 16dp intra-slot spacing via `spacing`; the outer
+                    // Column spaces the slot blocks + dividers.
+                    SlotRenderer(SurfaceId(SURFACE), SlotId("visual"), spacing = 16.dp)
                     HorizontalDivider(color = CelestiaTheme.colors.outline.copy(alpha = 0.15f))
 
                     if (settings.value.experimentalColorOverridesEnabled) {
-                        SlotRenderer(SurfaceId(SURFACE), SlotId("colors"))
+                        SlotRenderer(SurfaceId(SURFACE), SlotId("colors"), spacing = 16.dp)
                         HorizontalDivider(color = CelestiaTheme.colors.outline.copy(alpha = 0.15f))
-                        SlotRenderer(SurfaceId(SURFACE), SlotId("shape"))
+                        SlotRenderer(SurfaceId(SURFACE), SlotId("shape"), spacing = 16.dp)
                         HorizontalDivider(color = CelestiaTheme.colors.outline.copy(alpha = 0.15f))
                     }
 
-                    SlotRenderer(SurfaceId(SURFACE), SlotId("actions"))
+                    SlotRenderer(SurfaceId(SURFACE), SlotId("actions"), spacing = 16.dp)
                 }
             }
         }
