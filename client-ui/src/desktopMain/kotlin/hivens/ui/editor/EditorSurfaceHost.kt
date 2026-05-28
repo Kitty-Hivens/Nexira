@@ -124,8 +124,10 @@ import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.LocalStyle
 import hivens.widget.api.LocalWidgetDecorator
 import hivens.widget.api.WidgetDecorator
+import hivens.widget.model.SlotOrientation
 import hivens.widget.model.SlotPath
 import hivens.widget.model.SurfaceId
+import hivens.widget.model.traverse
 import kotlinx.coroutines.CoroutineScope
 import org.koin.compose.koinInject
 
@@ -245,6 +247,8 @@ fun EditorSurfaceHost(
                     return@decorator
                 }
                 val path = LocalSlotPath.current
+                val graph = LocalLayoutGraph.current
+                val orientation = graph.traverse(path)?.orientation ?: SlotOrientation.Column
                 EditableWidgetChrome(
                     path         = path,
                     index        = index,
@@ -252,6 +256,7 @@ fun EditorSurfaceHost(
                     instance     = instance,
                     controller   = dragController,
                     registry     = registry,
+                    orientation  = orientation,
                     onRemove     = {
                         controller.removeWidget(path, instance.instanceId)
                     },
@@ -261,7 +266,9 @@ fun EditorSurfaceHost(
                         // pointer is off any slot; treat as cancel.
                         val targetPath = registry.slotForPoint(committedPointer)
                             ?: return@EditableWidgetChrome
-                        val targetIdx = registry.insertionIndexInSlot(targetPath, committedPointer)
+                        val targetOrientation = graph.traverse(targetPath)?.orientation
+                            ?: SlotOrientation.Column
+                        val targetIdx = registry.insertionIndexInSlot(targetPath, committedPointer, targetOrientation)
                         if (targetPath == path) {
                             // Same slot -- reorder. -1 when moving down
                             // because removing the source shifts indices.
