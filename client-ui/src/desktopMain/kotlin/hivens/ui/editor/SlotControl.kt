@@ -41,9 +41,7 @@ internal fun SlotControl(path: SlotPath, content: SlotContent, controller: EditM
         OrientChip("Ряд", content.orientation == SlotOrientation.Row) {
             controller.setSlotOrientation(path, SlotOrientation.Row)
         }
-        // Grid is selectable only once it renders as a real grid (Phase G5).
-        // In G1-G3 it would render as a Column, so the chip stays disabled.
-        OrientChip("Сетка", content.orientation == SlotOrientation.Grid, enabled = false) {
+        OrientChip("Сетка", content.orientation == SlotOrientation.Grid) {
             controller.setSlotOrientation(path, SlotOrientation.Grid)
         }
         if (content.orientation == SlotOrientation.Grid) {
@@ -60,26 +58,16 @@ internal fun SlotControl(path: SlotPath, content: SlotContent, controller: EditM
 }
 
 @Composable
-private fun OrientChip(label: String, active: Boolean, enabled: Boolean = true, onClick: () -> Unit) {
+private fun OrientChip(label: String, active: Boolean, onClick: () -> Unit) {
     Text(
         text       = label,
         style      = MaterialTheme.typography.labelSmall,
-        // A disabled-but-active chip still reads as the current orientation
-        // (dimmed primary), rather than collapsing to plain "greyed out".
-        color      = when {
-            active && !enabled -> CelestiaTheme.colors.primary.copy(alpha = 0.5f)
-            !enabled           -> CelestiaTheme.colors.textSecondary.copy(alpha = 0.4f)
-            active             -> CelestiaTheme.colors.primary
-            else               -> CelestiaTheme.colors.textSecondary
-        },
+        color      = if (active) CelestiaTheme.colors.primary else CelestiaTheme.colors.textSecondary,
         fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
         modifier   = Modifier
             .clip(RoundedCornerShape(6.dp))
-            .background(
-                if (active) CelestiaTheme.colors.primary.copy(alpha = if (enabled) 0.22f else 0.12f)
-                else Color.Transparent,
-            )
-            .then(if (enabled) Modifier.clickable(onClick = onClick) else Modifier)
+            .background(if (active) CelestiaTheme.colors.primary.copy(alpha = 0.22f) else Color.Transparent)
+            .clickable(onClick = onClick)
             .padding(horizontal = 8.dp, vertical = 3.dp),
     )
 }
