@@ -1,6 +1,4 @@
 package hivens.ui.screens.library
-
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -37,26 +35,24 @@ fun LibraryScreen(
     }
     CompositionLocalProvider(LocalLibraryContext provides ctx) {
         Column(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 20.dp)) {
-            Column(
-                modifier            = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                SlotRenderer(SurfaceId(SURFACE), SlotId("header"))
-            }
+            SlotRenderer(
+                SurfaceId(SURFACE),
+                SlotId("header"),
+                modifier = Modifier.fillMaxWidth(),
+                spacing  = 8.dp,
+            )
             // No verticalScroll on the body slot. Wrapping a Lazy
             // widget (library.body LazyColumn, any future Lazy
             // user-dropped widget) in Column.verticalScroll hands the
             // child maxHeight = Infinity and Compose aborts measure.
             // library.body manages its own scroll via LazyColumn; the
-            // Column distributes its bounded height among children.
-            Column(
-                modifier            = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                SlotRenderer(SurfaceId(SURFACE), SlotId("body"))
-            }
+            // slot distributes its bounded height among children.
+            SlotRenderer(
+                SurfaceId(SURFACE),
+                SlotId("body"),
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                spacing  = 8.dp,
+            )
         }
     }
 }

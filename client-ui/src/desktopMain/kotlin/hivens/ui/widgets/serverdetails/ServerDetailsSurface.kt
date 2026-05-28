@@ -140,17 +140,12 @@ fun ServerDetailsSurface(
                     }
                 } else {
                     Row(Modifier.fillMaxSize()) {
-                        Column(modifier = Modifier.weight(1.5f).padding(32.dp)) {
-                            SlotRenderer(SurfaceId(SURFACE), SlotId("text"))
-                        }
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxHeight()
-                                .padding(16.dp),
-                        ) {
-                            SlotRenderer(SurfaceId(SURFACE), SlotId("image"))
-                        }
+                        SlotRenderer(SurfaceId(SURFACE), SlotId("text"), Modifier.weight(1.5f).padding(32.dp))
+                        SlotRenderer(
+                            SurfaceId(SURFACE),
+                            SlotId("image"),
+                            Modifier.weight(1f).fillMaxHeight().padding(16.dp),
+                        )
                     }
                 }
             }

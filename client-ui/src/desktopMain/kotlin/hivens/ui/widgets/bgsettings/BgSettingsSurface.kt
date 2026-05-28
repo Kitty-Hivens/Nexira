@@ -125,19 +125,19 @@ fun BgSettingsSurface(
 
             Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                 GlassCard(Modifier.weight(1f).fillMaxHeight()) {
-                    Column(
-                        modifier            = Modifier
+                    SlotRenderer(
+                        SurfaceId(SURFACE),
+                        SlotId("controls"),
+                        modifier = Modifier
                             .fillMaxSize()
                             .verticalScroll(rememberScrollState())
                             .padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
-                    ) {
-                        SlotRenderer(SurfaceId(SURFACE), SlotId("controls"))
-                    }
+                        spacing  = 16.dp,
+                    )
                 }
 
                 GlassCard(Modifier.weight(1f).fillMaxHeight()) {
-                    SlotRenderer(SurfaceId(SURFACE), SlotId("preview"))
+                    SlotRenderer(SurfaceId(SURFACE), SlotId("preview"), Modifier.fillMaxSize())
                 }
             }
         }
