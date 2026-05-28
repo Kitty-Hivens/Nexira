@@ -1,8 +1,17 @@
-package hivens.ui.screens.profile
+package hivens.ui.widgets.profile
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
@@ -11,54 +20,52 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.unit.dp
 import hivens.core.api.SkinRepository
-import hivens.core.data.SessionData
 import hivens.ui.easter.LocalAprilFools
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.identity.SkinManager
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.LocalStyle
+import hivens.widget.model.Widget
+import hivens.widget.model.WidgetInstance
 import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
 import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.dialogs.openFilePicker
 import io.github.vinceglb.filekit.path
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.koin.compose.koinInject
 import java.io.File
 
-/** Tri-state for the skin upload status so color is not determined by string content. */
-internal sealed class UploadStatus {
-    object None    : UploadStatus()
-    object Loading : UploadStatus()
-    data class Success(val message: String) : UploadStatus()
-    data class Error(val message: String)   : UploadStatus()
-}
-
-/**
- * Skin preview + upload + refresh. Front and back render side by side
- * when loaded; refresh button sits top-right of the preview frame.
- */
+// Skin preview + upload + refresh. Reads session from
+// LocalProfileContext; pulls SkinManager + SkinRepository from Koin
+// directly (services live per-widget, not in the surface context).
+@Widget(id = "profile.skin.section", displayName = "Скин")
 @Composable
-internal fun SkinSection(
-    session: SessionData,
-    skinRepository: SkinRepository,
-    skinManager: SkinManager,
-    scope: CoroutineScope,
-) {
+fun ProfileSkinSectionWidget(instance: WidgetInstance) {
+    val ctx = LocalProfileContext.current
     val s = LocalStrings.current
     val af = LocalAprilFools.current
     val style = LocalStyle.current
+    val skinManager: SkinManager       = koinInject()
+    val skinRepository: SkinRepository = koinInject()
+    val scope = rememberCoroutineScope()
+    val session = ctx.session
 
     var frontSkin    by remember { mutableStateOf<ImageBitmap?>(null) }
     var backSkin     by remember { mutableStateOf<ImageBitmap?>(null) }
@@ -79,7 +86,7 @@ internal fun SkinSection(
                 .fillMaxWidth()
                 .height(360.dp)
                 .clip(RoundedCornerShape(style.cardCorner))
-                .background(CelestiaTheme.colors.background.copy(alpha = 0.4f))
+                .background(CelestiaTheme.colors.background.copy(alpha = 0.4f)),
         ) {
             Column(
                 Modifier.fillMaxSize(),
@@ -134,7 +141,7 @@ internal fun SkinSection(
                 style    = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.padding(bottom = 4.dp),
             )
-            else -> Unit
+            UploadStatus.None -> Unit
         }
 
         af.ChaosButton(
@@ -175,4 +182,11 @@ internal fun SkinSection(
             ),
         )
     }
+}
+
+private sealed class UploadStatus {
+    object None    : UploadStatus()
+    object Loading : UploadStatus()
+    data class Success(val message: String) : UploadStatus()
+    data class Error(val message: String)   : UploadStatus()
 }

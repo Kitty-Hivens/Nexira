@@ -173,11 +173,31 @@ class LayoutGraphRepository(
         }
         return try {
             val envelope = json.decodeFromString<Envelope>(Files.readString(file))
-            Migrations.apply(envelope.schemaVersion, envelope.graph)
+            val migrated = Migrations.apply(envelope.schemaVersion, envelope.graph)
+            mergeMissingSurfaces(migrated, defaultGraph())
         } catch (e: Exception) {
             log.error("Failed to load layout graph at {} -- falling back to bundled default", file, e)
             defaultGraph()
         }
+    }
+
+    // Merge surfaces from the bundled default into the user's persisted
+    // graph when the user file pre-dates the surface. Without this, a
+    // surface added to default-layout.json in a later release stays
+    // invisible because the user file is the source of truth on load.
+    //
+    // Only ADDS missing surfaces. Surfaces the user has edited keep
+    // their persisted form; surfaces the user has reset-via-editor
+    // stay reset (the reset path writes the default explicitly). A
+    // surface dropped from default-layout in a later release likewise
+    // stays in the user file -- there is no automatic deletion path,
+    // because a removed-upstream surface may carry user data we cannot
+    // recreate.
+    private fun mergeMissingSurfaces(user: LayoutGraph, def: LayoutGraph): LayoutGraph {
+        val missing = def.surfaces.filterKeys { it !in user.surfaces }
+        if (missing.isEmpty()) return user
+        log.info("Layout graph: seeding {} new surface(s) from bundled default: {}", missing.size, missing.keys.map { it.value })
+        return user.copy(surfaces = user.surfaces + missing)
     }
 
     // Synchronous file ops. Caller MUST hold [mutex] when invoking.

@@ -1,0 +1,69 @@
+package hivens.ui.widgets.serverdetails
+
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.painter.BitmapPainter
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.unit.dp
+import hivens.ui.customization.glassSurfaceAlpha
+import hivens.ui.i18n.LocalStrings
+import hivens.ui.theme.CelestiaTheme
+import hivens.widget.model.Widget
+import hivens.widget.model.WidgetInstance
+
+// Banner image (banner.png from the pack assets dir) or a missing
+// hint when the file is absent. Fills its slot box, image scaled
+// to crop so framing is consistent across asset sizes.
+@Widget(id = "server.details.banner", displayName = "Баннер сервера")
+@Composable
+fun ServerDetailsBannerWidget(instance: WidgetInstance) {
+    val ctx = LocalServerDetailsContext.current
+    val s = LocalStrings.current
+    val banner by ctx.bannerImage
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .clip(RoundedCornerShape(16.dp))
+            .background(glassSurfaceAlpha(0.5f))
+            .border(
+                width = 1.dp,
+                color = CelestiaTheme.colors.outline.copy(alpha = 0.2f),
+                shape = RoundedCornerShape(16.dp),
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (banner != null) {
+            Image(
+                painter            = BitmapPainter(banner!!),
+                contentDescription = null,
+                contentScale       = ContentScale.Crop,
+                modifier           = Modifier.fillMaxSize(),
+            )
+        } else {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(s.serverDetailNoImage, color = CelestiaTheme.colors.textSecondary)
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text  = s.serverDetailNoImageHint,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.5f),
+                )
+            }
+        }
+    }
+}

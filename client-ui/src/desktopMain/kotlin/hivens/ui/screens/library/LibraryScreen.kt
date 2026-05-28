@@ -5,8 +5,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
@@ -45,15 +43,16 @@ fun LibraryScreen(
             ) {
                 SlotRenderer(SurfaceId(SURFACE), SlotId("header"))
             }
-            // Body slot scrolls so a tall pack list or a stack of
-            // additional library widgets does not push content past
-            // the viewport with no way to reach it.
-            val bodyScroll = rememberScrollState()
+            // No verticalScroll on the body slot. Wrapping a Lazy
+            // widget (library.body LazyColumn, any future Lazy
+            // user-dropped widget) in Column.verticalScroll hands the
+            // child maxHeight = Infinity and Compose aborts measure.
+            // library.body manages its own scroll via LazyColumn; the
+            // Column distributes its bounded height among children.
             Column(
                 modifier            = Modifier
                     .weight(1f)
-                    .fillMaxWidth()
-                    .verticalScroll(bodyScroll),
+                    .fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 SlotRenderer(SurfaceId(SURFACE), SlotId("body"))
