@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import hivens.launcher.LayoutGraphRepository
 import hivens.widget.model.SlotContent
 import hivens.widget.model.SlotId
+import hivens.widget.model.SlotOrientation
 import hivens.widget.model.SlotPath
 import hivens.widget.model.SurfaceId
 import hivens.widget.model.WidgetInstance
@@ -13,6 +14,9 @@ import hivens.widget.model.insertWidget
 import hivens.widget.model.moveWidget
 import hivens.widget.model.removeWidget
 import hivens.widget.model.reorderInSlot
+import hivens.widget.model.setGridColumns
+import hivens.widget.model.setSlotOrientation
+import hivens.widget.model.setWidgetWeight
 import hivens.widget.model.updateWidgetProps
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -95,6 +99,20 @@ class EditModeController(
         scope.launch {
             repo.update { it.reorderInSlot(path, fromIndex, toIndex) }
         }
+    }
+
+    // Phase G slot layout. Orientation + grid columns are slot-level;
+    // widget weight is per-instance (set by the drag-dividers in G4).
+    fun setSlotOrientation(path: SlotPath, orientation: SlotOrientation) {
+        scope.launch { repo.update { it.setSlotOrientation(path, orientation) } }
+    }
+
+    fun setGridColumns(path: SlotPath, columns: Int) {
+        scope.launch { repo.update { it.setGridColumns(path, columns) } }
+    }
+
+    fun setWidgetWeight(path: SlotPath, instanceId: String, weight: Float) {
+        scope.launch { repo.update { it.setWidgetWeight(path, instanceId, weight) } }
     }
 
     fun moveWidget(from: SlotPath, to: SlotPath, instanceId: String, toIndex: Int) {

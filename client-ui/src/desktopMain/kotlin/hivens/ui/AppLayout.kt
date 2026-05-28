@@ -310,12 +310,13 @@ fun AppSidebar(
             containerColor = glassSurfaceAlpha(0.35f),
             contentColor   = CelestiaTheme.colors.textSecondary
         ) {
-            SlotRenderer(SurfaceId(SIDEBAR_SURFACE), SlotId("top"))
+            SlotRenderer(SurfaceId(SIDEBAR_SURFACE), SlotId("top"), Modifier.fillMaxWidth())
             // Spacer is layout, not content -- stays surface-owned so
             // widgets in the top/bottom slots do not need ColumnScope
-            // for weight.
+            // for weight. fillMaxWidth keeps the slot's own Column at rail
+            // width so the NavigationRailItems stay centered.
             Spacer(Modifier.weight(1f))
-            SlotRenderer(SurfaceId(SIDEBAR_SURFACE), SlotId("bottom"))
+            SlotRenderer(SurfaceId(SIDEBAR_SURFACE), SlotId("bottom"), Modifier.fillMaxWidth())
             Spacer(Modifier.height(8.dp))
         }
     }

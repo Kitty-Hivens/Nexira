@@ -1,6 +1,4 @@
 package hivens.ui.widgets.profile
-
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -97,18 +95,12 @@ fun ProfileSurface(session: SessionData) {
                 backgroundColor = glassSurfaceAlpha(0.7f),
             ) {
                 Row(Modifier.fillMaxSize().padding(16.dp)) {
-                    Box(modifier = Modifier.width(200.dp).fillMaxHeight()) {
-                        SlotRenderer(SurfaceId(SURFACE), SlotId("nav"))
-                    }
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight(),
-                    ) {
-                        when (selectedCategory.value) {
-                            ProfileCategory.Skin    -> SlotRenderer(SurfaceId(SURFACE), SlotId("skin"))
-                            ProfileCategory.Account -> SlotRenderer(SurfaceId(SURFACE), SlotId("account"))
-                        }
+                    SlotRenderer(SurfaceId(SURFACE), SlotId("nav"), Modifier.width(200.dp).fillMaxHeight())
+                    when (selectedCategory.value) {
+                        ProfileCategory.Skin    ->
+                            SlotRenderer(SurfaceId(SURFACE), SlotId("skin"), Modifier.weight(1f).fillMaxHeight())
+                        ProfileCategory.Account ->
+                            SlotRenderer(SurfaceId(SURFACE), SlotId("account"), Modifier.weight(1f).fillMaxHeight())
                     }
                 }
             }

@@ -1,7 +1,6 @@
 package hivens.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -42,13 +41,9 @@ fun RightPanel(
     }
     CompositionLocalProvider(LocalRightRailContext provides ctx) {
         Column(modifier = modifier.background(CelestiaTheme.colors.background)) {
-            Box(Modifier.fillMaxWidth()) {
-                SlotRenderer(SurfaceId(SURFACE), SlotId("auth"))
-            }
+            SlotRenderer(SurfaceId(SURFACE), SlotId("auth"), Modifier.fillMaxWidth())
             HorizontalDivider(color = glassSurfaceAlpha(0.7f))
-            Box(Modifier.weight(1f).fillMaxWidth()) {
-                SlotRenderer(SurfaceId(SURFACE), SlotId("news"))
-            }
+            SlotRenderer(SurfaceId(SURFACE), SlotId("news"), Modifier.weight(1f).fillMaxWidth())
         }
     }
 }
