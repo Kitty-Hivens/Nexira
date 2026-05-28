@@ -119,10 +119,12 @@ import hivens.ui.widgets.themepicker.LocalThemePickerContext
 import hivens.ui.widgets.themepicker.STUB_THEME_PICKER
 import hivens.widget.api.EmptySlotDecorator
 import hivens.widget.api.LocalEmptySlotDecorator
+import hivens.widget.api.LocalSlotControlDecorator
 import hivens.widget.api.LocalSlotPath
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.LocalStyle
 import hivens.widget.api.LocalWidgetDecorator
+import hivens.widget.api.SlotControlDecorator
 import hivens.widget.api.WidgetDecorator
 import hivens.widget.model.SlotOrientation
 import hivens.widget.model.SlotPath
@@ -316,12 +318,31 @@ fun EditorSurfaceHost(
         }
     }
 
+    // Slot control decorator: a compact orientation + grid-columns
+    // control at the start of every non-empty slot on the selected
+    // surface. Identity (renders nothing) when off, previewing, or for a
+    // foreign surface -- so other surfaces and production builds pay
+    // nothing. SlotRenderer invokes this as the slot's first child.
+    val slotControlDecorator: SlotControlDecorator = remember(state, previewing) {
+        if (state is EditModeState.On && !previewing) {
+            val selected = state.surface
+            { path, content ->
+                if (path.surface == selected) {
+                    SlotControl(path = path, content = content, controller = controller)
+                }
+            }
+        } else {
+            { _, _ -> }
+        }
+    }
+
     CompositionLocalProvider(
         LocalEditMode           provides state,
         LocalDragController     provides dragController,
         LocalDropTargetRegistry provides registry,
         LocalWidgetDecorator    provides chromeDecorator,
         LocalEmptySlotDecorator provides emptyDecorator,
+        LocalSlotControlDecorator provides slotControlDecorator,
         // Stub surface contexts. Surface composables that mount under
         // content() override with the real values; widgets dropped on
         // a foreign surface fall through to the stubs and render

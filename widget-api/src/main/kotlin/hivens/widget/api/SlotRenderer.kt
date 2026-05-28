@@ -75,6 +75,7 @@ private fun RenderSlotContent(path: SlotPath, modifier: Modifier, spacing: Dp) {
     val registry = LocalWidgetRegistry.current
     val decorator = LocalWidgetDecorator.current
     val emptyDecorator = LocalEmptySlotDecorator.current
+    val slotControl = LocalSlotControlDecorator.current
 
     val content: SlotContent = graph.traverse(path) ?: SlotContent()
     val address = path.leafAddress
@@ -89,6 +90,7 @@ private fun RenderSlotContent(path: SlotPath, modifier: Modifier, spacing: Dp) {
 
     when (content.orientation) {
         SlotOrientation.Row -> Row(modifier, horizontalArrangement = Arrangement.spacedBy(spacing)) {
+            slotControl(path, content)
             content.widgets.forEachIndexed { index, instance ->
                 val descriptor = registry[instance.kind] ?: return@forEachIndexed
                 if (instance.weight > 0f) {
@@ -102,6 +104,7 @@ private fun RenderSlotContent(path: SlotPath, modifier: Modifier, spacing: Dp) {
         }
         // Column + Grid (Grid renders as a Column until G5).
         else -> Column(modifier, verticalArrangement = Arrangement.spacedBy(spacing)) {
+            slotControl(path, content)
             content.widgets.forEachIndexed { index, instance ->
                 val descriptor = registry[instance.kind] ?: return@forEachIndexed
                 if (instance.weight > 0f) {
