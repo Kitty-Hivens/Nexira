@@ -76,6 +76,7 @@ private fun RenderSlotContent(path: SlotPath, modifier: Modifier, spacing: Dp) {
     val decorator = LocalWidgetDecorator.current
     val emptyDecorator = LocalEmptySlotDecorator.current
     val slotControl = LocalSlotControlDecorator.current
+    val slotDivider = LocalSlotDividerDecorator.current
 
     val content: SlotContent = graph.traverse(path) ?: SlotContent()
     val address = path.leafAddress
@@ -92,28 +93,34 @@ private fun RenderSlotContent(path: SlotPath, modifier: Modifier, spacing: Dp) {
         SlotOrientation.Row -> Row(modifier, horizontalArrangement = Arrangement.spacedBy(spacing)) {
             slotControl(path, content)
             content.widgets.forEachIndexed { index, instance ->
-                val descriptor = registry[instance.kind] ?: return@forEachIndexed
-                if (instance.weight > 0f) {
-                    Box(Modifier.weight(instance.weight)) {
+                val descriptor = registry[instance.kind]
+                if (descriptor != null) {
+                    if (instance.weight > 0f) {
+                        Box(Modifier.weight(instance.weight)) {
+                            decorator(address, index, descriptor, instance) { descriptor.Render(instance) }
+                        }
+                    } else {
                         decorator(address, index, descriptor, instance) { descriptor.Render(instance) }
                     }
-                } else {
-                    decorator(address, index, descriptor, instance) { descriptor.Render(instance) }
                 }
+                if (index < content.widgets.lastIndex) slotDivider(path, content, index)
             }
         }
         // Column + Grid (Grid renders as a Column until G5).
         else -> Column(modifier, verticalArrangement = Arrangement.spacedBy(spacing)) {
             slotControl(path, content)
             content.widgets.forEachIndexed { index, instance ->
-                val descriptor = registry[instance.kind] ?: return@forEachIndexed
-                if (instance.weight > 0f) {
-                    Box(Modifier.weight(instance.weight)) {
+                val descriptor = registry[instance.kind]
+                if (descriptor != null) {
+                    if (instance.weight > 0f) {
+                        Box(Modifier.weight(instance.weight)) {
+                            decorator(address, index, descriptor, instance) { descriptor.Render(instance) }
+                        }
+                    } else {
                         decorator(address, index, descriptor, instance) { descriptor.Render(instance) }
                     }
-                } else {
-                    decorator(address, index, descriptor, instance) { descriptor.Render(instance) }
                 }
+                if (index < content.widgets.lastIndex) slotDivider(path, content, index)
             }
         }
     }

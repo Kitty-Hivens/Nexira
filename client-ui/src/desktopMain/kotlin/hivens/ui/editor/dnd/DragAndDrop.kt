@@ -118,6 +118,11 @@ class DropTargetRegistry {
         widgets[path]?.remove(instanceId)
     }
 
+    // Window-coord rect of one registered widget. Used by the Phase G
+    // slot dividers to read the two neighbors' main-axis px at drag start.
+    fun widgetRect(path: SlotPath, instanceId: String): Rect? =
+        widgets[path]?.get(instanceId)?.rect
+
     // Two passes:
     //   1) exact rect hit across all registered sources (widget rects +
     //      empty-slot placeholder bounds), innermost (smallest area)

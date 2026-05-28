@@ -61,6 +61,15 @@ typealias SlotControlDecorator = @Composable (path: SlotPath, content: SlotConte
 val LocalSlotControlDecorator: ProvidableCompositionLocal<SlotControlDecorator> =
     staticCompositionLocalOf { { _, _ -> } }
 
+// Phase G: rendered by SlotRenderer between two adjacent widgets in a
+// Row/Column slot in edit mode. Default = nothing. The editor swaps in a
+// draggable divider that redistributes weight between the widget at
+// `leftIndex` and the one after it. Kept editor-agnostic here.
+typealias SlotDividerDecorator = @Composable (path: SlotPath, content: SlotContent, leftIndex: Int) -> Unit
+
+val LocalSlotDividerDecorator: ProvidableCompositionLocal<SlotDividerDecorator> =
+    staticCompositionLocalOf { { _, _, _ -> } }
+
 // Current path the surrounding SlotRenderer is rendering. Container
 // widgets read this implicitly through the nested SlotRenderer
 // overload; chrome / empty-placeholder use it to register drop-target
