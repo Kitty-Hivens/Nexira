@@ -72,6 +72,16 @@ internal class GameCommandBuilder(
     }
 
     /**
+     * Per-instance natives directory for a PACK launch. Unlike [getNativesDir]
+     * (the SC server path, limited to the hardcoded [VersionConfig] map), this
+     * works for any Minecraft version: the pack runtime is resolved generically,
+     * so the natives folder is just the conventional `bin/natives-<version>`.
+     * Using getNativesDir here threw "Unsupported client version" for every MC
+     * version outside the SC map (1.7.10 / 1.12.2 / 1.21.1).
+     */
+    fun packNativesDir(mcVersion: String): String = "bin/natives-$mcVersion"
+
+    /**
      * Legacy SC server-centric entry point. Projects [serverProfile] +
      * [userProfile] onto a [LaunchTarget] and delegates to the
      * domain-agnostic [build] overload below.

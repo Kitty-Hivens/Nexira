@@ -138,7 +138,7 @@ internal class LauncherService(
         // 3. Canonical runtime: vanilla + loader libraries + client + assets into
         // the SHARED roots (idempotent). Throws clearly if it cannot provision --
         // no more "ready" followed by an empty-classpath crash.
-        val nativesDir = commandBuilder.getNativesDir(mcVersion)
+        val nativesDir = commandBuilder.packNativesDir(mcVersion)
         val resolved = runtimeProvisioner.ensureRuntime(
             mcVersion = mcVersion,
             loaderName = manifest.loaderName,

@@ -112,6 +112,15 @@ class GameCommandBuilderTest {
         }
     }
 
+    @Test
+    fun `packNativesDir works for any version, unlike the SC-map getNativesDir`() {
+        // The pack path must not route through the SC VersionConfig map -- doing
+        // so threw "Unsupported client version" for every MC outside 1.7/1.12/1.21.
+        assertEquals("bin/natives-1.20.1", builder.packNativesDir("1.20.1"))
+        assertEquals("bin/natives-1.19.4", builder.packNativesDir("1.19.4"))
+        assertEquals("bin/natives-1.21.1", builder.packNativesDir("1.21.1"))
+    }
+
     // ═══════════════════════════════════════════════════════════════════════════
     // Common structure -- applies to all versions
     // ═══════════════════════════════════════════════════════════════════════════
