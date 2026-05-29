@@ -27,6 +27,7 @@ import hivens.launcher.runtime.loader.LoaderRegistry
 import hivens.launcher.runtime.loader.ModernInstallerResolver
 import hivens.launcher.component.ProcessLogHandler
 import hivens.launcher.launch.LauncherController
+import hivens.launcher.mrpack.MrpackInstaller
 import hivens.launcher.platform.PlatformPaths
 import hivens.launcher.smrt.ModIconResolver
 import hivens.launcher.smrt.SmrtPackClient
@@ -403,6 +404,16 @@ val appModule = module {
     single { SmrtPackClient(get(named("direct"))) }
     single { SmrtSyncService(get(), get()) }
     single { PackInstaller(syncService = get(), runtimeProvisioner = get(), repository = get(), dataDir = get()) }
+    single {
+        MrpackInstaller(
+            clientProvider = get(named("direct")),
+            json = get(),
+            javaManager = get(),
+            runtimeProvisioner = get(),
+            repository = get(),
+            dataDir = get(),
+        )
+    }
 
     // Per-mod icon URL resolver for the Library PackDetail Content tab.
     // Direct iconUrl wins; otherwise resolves a Modrinth project's icon
