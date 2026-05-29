@@ -34,8 +34,10 @@ import java.security.MessageDigest
  * The mirror never hosts these copyrighted bits -- they flow straight
  * from the rights holder's CDN.
  *
- * Forge libraries are layered on top of this by a later step; natives are
- * handled separately by [hivens.launcher.component.EnvironmentPreparer].
+ * Forge libraries are layered on top of this by a later step. Native jars
+ * (lwjgl `.so`/`.dll`/`.dylib`) are resolved here too -- the host-matching set
+ * is picked from the same manifest as the classpath and extracted per-instance
+ * by [hivens.launcher.component.EnvironmentPreparer].
  *
  * Layout produced:
  * - `<librariesDir>/<maven-path>.jar`           vanilla libraries
@@ -57,6 +59,23 @@ class RuntimeProvisioner(
     private val httpClient get() = clientProvider.current
     private val mojangOs: String = toMojangOs(osName)
 
+    /**
+     * The Mojang native classifiers to extract for THIS host, matched exactly
+     * so a 64-bit machine never picks up an `-x86` / `-arm64` variant (and vice
+     * versa). Covers both wire shapes: a pre-1.19 `downloads.classifiers` key
+     * and a 1.19+ library coord classifier. macOS keeps both the modern
+     * (`natives-macos`) and legacy (`natives-osx`) spellings.
+     */
+    private val acceptedNativeClassifiers: Set<String> = run {
+        val arch = System.getProperty("os.arch", "").lowercase()
+        val arm64 = arch.contains("aarch64") || arch.contains("arm64")
+        when (mojangOs) {
+            "windows" -> if (arm64) setOf("natives-windows-arm64") else setOf("natives-windows")
+            "osx" -> if (arm64) setOf("natives-macos-arm64") else setOf("natives-macos", "natives-osx")
+            else -> setOf("natives-linux")
+        }
+    }
+
     /** Resolved vanilla layout: the client jar, the asset index id, the
      *  vanilla library set (with coords, for merging a loader overlay), and
      *  the modern jvm/game arg tokens (empty on legacy versions) that a
@@ -67,6 +86,9 @@ class RuntimeProvisioner(
         val libraries: List<ResolvedLibrary>,
         val jvmArgs: List<String> = emptyList(),
         val gameArgs: List<String> = emptyList(),
+        /** Host-matching native jars (lwjgl etc.) resolved from the manifest,
+         *  on disk in the shared root after [ensureVanilla]. */
+        val natives: List<Path> = emptyList(),
     )
 
     /** A single file to fetch into a shared root, verified against [sha1]. */
@@ -97,6 +119,7 @@ class RuntimeProvisioner(
                 clientJar = vanilla.clientJar,
                 mainClass = VANILLA_MAIN_CLASS,
                 assetIndexId = vanilla.assetIndexId,
+                natives = vanilla.natives,
             )
 
         log.info("resolving loader overlay: {} {}", resolver.loaderId, loaderVersion)
@@ -131,6 +154,7 @@ class RuntimeProvisioner(
             // (--launchTarget, --fml.*) come from the profile.
             jvmArgs = if (profile.inheritsVanillaArguments) vanilla.jvmArgs + profile.jvmArgs else profile.jvmArgs,
             gameArgs = profile.gameArgs,
+            natives = vanilla.natives,
         )
     }
 
@@ -166,6 +190,7 @@ class RuntimeProvisioner(
             libraries = vanillaLibraries(version),
             jvmArgs = version.arguments?.let { flattenArguments(it.jvm, mojangOs) } ?: emptyList(),
             gameArgs = version.arguments?.let { flattenArguments(it.game, mojangOs) } ?: emptyList(),
+            natives = nativeJarPaths(version),
         )
     }
 
@@ -180,6 +205,35 @@ class RuntimeProvisioner(
             if (artifact.path.isBlank()) return@mapNotNull null
             ResolvedLibrary(MavenCoord.parse(lib.name), librariesDir.resolve(artifact.path))
         }
+
+    /**
+     * The host's native jars for [version], resolved from the same manifest as
+     * the classpath. Two wire shapes are covered:
+     *  - pre-1.19: a library carries the native under
+     *    `downloads.classifiers["natives-<os>"]`.
+     *  - 1.19+: the native is its own library whose coord classifier is
+     *    `natives-<os>`, taken from `downloads.artifact`.
+     * Only [acceptedNativeClassifiers] (host OS + arch) are kept. Destinations
+     * match [planVanillaDownloads], so the jars are on disk by the time
+     * [hivens.launcher.component.EnvironmentPreparer] extracts them.
+     */
+    internal fun nativeJarPaths(version: MojangVersion): List<Path> {
+        val out = ArrayList<Path>()
+        for (lib in version.libraries) {
+            if (!isLibraryAllowed(lib.rules)) continue
+            val downloads = lib.downloads ?: continue
+            for ((classifier, art) in downloads.classifiers) {
+                if (classifier in acceptedNativeClassifiers && art.path.isNotBlank()) {
+                    out.add(librariesDir.resolve(art.path))
+                }
+            }
+            val coordClassifier = MavenCoord.parse(lib.name).classifier
+            if (coordClassifier != null && coordClassifier in acceptedNativeClassifiers) {
+                downloads.artifact?.takeIf { it.path.isNotBlank() }?.let { out.add(librariesDir.resolve(it.path)) }
+            }
+        }
+        return out.distinct()
+    }
 
     // -- pure planning (no IO) ------------------------------------------------
 
@@ -198,14 +252,28 @@ class RuntimeProvisioner(
 
         for (lib in version.libraries) {
             if (!isLibraryAllowed(lib.rules)) continue
-            val artifact = lib.downloads?.artifact ?: continue
-            if (artifact.path.isBlank()) continue
-            out += DownloadTask(
-                url = artifact.url,
-                dest = librariesDir.resolve(artifact.path),
-                sha1 = artifact.sha1,
-                size = artifact.size,
-            )
+            val downloads = lib.downloads ?: continue
+            downloads.artifact?.takeIf { it.path.isNotBlank() }?.let { artifact ->
+                out += DownloadTask(
+                    url = artifact.url,
+                    dest = librariesDir.resolve(artifact.path),
+                    sha1 = artifact.sha1,
+                    size = artifact.size,
+                )
+            }
+            // pre-1.19 natives live under classifiers, not the main artifact;
+            // fetch only the host-matching one (1.19+ natives are their own
+            // library and arrive via the artifact branch above).
+            for ((classifier, nativeArt) in downloads.classifiers) {
+                if (classifier in acceptedNativeClassifiers && nativeArt.path.isNotBlank()) {
+                    out += DownloadTask(
+                        url = nativeArt.url,
+                        dest = librariesDir.resolve(nativeArt.path),
+                        sha1 = nativeArt.sha1,
+                        size = nativeArt.size,
+                    )
+                }
+            }
         }
 
         version.downloads.client.let { client ->

@@ -96,6 +96,13 @@ data class ResolvedRuntime(
     val assetIndexId: String,
     val jvmArgs: List<String> = emptyList(),
     val gameArgs: List<String> = emptyList(),
+    /**
+     * Platform-native jars (lwjgl etc.) for the host, resolved from the same
+     * manifest as [libraries] -- so the natives extracted into an instance
+     * always match the LWJGL version on the classpath. A loader overlay adds
+     * none; this is the vanilla base's set.
+     */
+    val natives: List<Path> = emptyList(),
 )
 
 /**

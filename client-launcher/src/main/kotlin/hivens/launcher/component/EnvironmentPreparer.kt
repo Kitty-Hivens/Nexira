@@ -110,6 +110,54 @@ class EnvironmentPreparer(private val clientProvider: HttpClientProvider) {
     }
 
     /**
+     * Extracts the host natives from the jars the runtime provisioner resolved
+     * from the version manifest. Unlike [prepareNatives] (the SC path, which
+     * derives a hardcoded LWJGL version from the MC version), this matches the
+     * EXACT LWJGL version the resolved classpath references -- a fixed fallback
+     * version mismatches the bindings and LWJGL refuses to start. Idempotent: a
+     * valid natives dir short-circuits. The jars are already downloaded and
+     * sha1-verified by the provisioner; this only unpacks + flattens them, so
+     * it makes no network calls.
+     */
+    suspend fun prepareNativesFromManifest(
+        clientRoot: Path,
+        nativesDirName: String,
+        nativeJars: List<Path>,
+    ) = withContext(Dispatchers.IO) {
+        val nativesDir = clientRoot.resolve(nativesDirName)
+        val osSuffix = getOsSuffix()
+
+        if (isFolderValidForOs(nativesDir, osSuffix)) {
+            log.info("Natives valid for $osSuffix.")
+            return@withContext
+        }
+        if (Files.exists(nativesDir)) {
+            ClientFileHelper.cleanDirectory(nativesDir, emptySet(), log)
+        }
+        ClientFileHelper.ensureDirectoryExists(nativesDir)
+
+        if (nativeJars.isEmpty()) {
+            log.error("No native libraries resolved from the manifest for $osSuffix -- natives directory will be empty")
+            return@withContext
+        }
+        for (jar in nativeJars) {
+            if (!Files.isRegularFile(jar)) {
+                log.warn("Resolved native jar missing on disk, skipping: $jar")
+                continue
+            }
+            try {
+                ZipUtils.unzip(jar.toFile(), nativesDir.toFile())
+            } catch (e: Exception) {
+                log.error("Failed to unpack native jar $jar", e)
+            }
+        }
+        flattenNatives(nativesDir)
+        if (!isFolderValidForOs(nativesDir, osSuffix)) {
+            log.error("CRITICAL: manifest natives incomplete for $osSuffix")
+        }
+    }
+
+    /**
      * Downloading for old versions (1.7.10, 1.12.2) -> LWJGL 2.
      *
      * The 2.9.4-nightly-20150209 build that 1.12.x references is no

@@ -117,6 +117,83 @@ class RuntimeProvisionerTest {
         assertTrue(byDest.keys.none { it.toString().contains("win") }, "wrong-platform lib must be dropped")
     }
 
+    @Test
+    fun `native jar paths pick host-matching classifiers from both manifest shapes`() {
+        val p = provisioner(HttpClient(MockEngine { respond("", HttpStatusCode.OK) }), osName = "Linux")
+        val version = MojangVersion(
+            assetIndex = MojangAssetIndexRef(id = "x", sha1 = "x", url = "u"),
+            downloads = MojangDownloads(MojangArtifact(sha1 = "c", size = 1, url = "u")),
+            libraries = listOf(
+                // pre-1.19 shape: base artifact + per-os classifier natives. linux kept;
+                // windows dropped; the sources classifier ignored entirely.
+                MojangLibrary(
+                    name = "org.lwjgl.lwjgl:lwjgl:2.9.4",
+                    downloads = MojangLibraryDownloads(
+                        artifact = MojangArtifact("org/lwjgl/lwjgl/lwjgl/2.9.4/lwjgl-2.9.4.jar", "a", 1, "u"),
+                        classifiers = mapOf(
+                            "natives-linux" to MojangArtifact("org/lwjgl/lwjgl/lwjgl/2.9.4/lwjgl-2.9.4-natives-linux.jar", "n", 1, "u"),
+                            "natives-windows" to MojangArtifact("org/lwjgl/lwjgl/lwjgl/2.9.4/lwjgl-2.9.4-natives-windows.jar", "w", 1, "u"),
+                            "sources" to MojangArtifact("org/lwjgl/lwjgl/lwjgl/2.9.4/lwjgl-2.9.4-sources.jar", "s", 1, "u"),
+                        ),
+                    ),
+                ),
+                // 1.19+ shape: the native is its own library, classifier in the coord,
+                // gated by an os rule. linux kept.
+                MojangLibrary(
+                    name = "org.lwjgl:lwjgl:3.3.3:natives-linux",
+                    downloads = MojangLibraryDownloads(
+                        artifact = MojangArtifact("org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-linux.jar", "m", 1, "u"),
+                    ),
+                    rules = listOf(MojangRule("allow", MojangOs("linux"))),
+                ),
+                // 1.19+ windows native -- dropped on linux by the os rule.
+                MojangLibrary(
+                    name = "org.lwjgl:lwjgl:3.3.3:natives-windows",
+                    downloads = MojangLibraryDownloads(
+                        artifact = MojangArtifact("org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-windows.jar", "mw", 1, "u"),
+                    ),
+                    rules = listOf(MojangRule("allow", MojangOs("windows"))),
+                ),
+            ),
+        )
+
+        val natives = p.nativeJarPaths(version)
+
+        assertEquals(2, natives.size, "exactly the two linux natives, got $natives")
+        assertTrue(natives.contains(librariesDir.resolve("org/lwjgl/lwjgl/lwjgl/2.9.4/lwjgl-2.9.4-natives-linux.jar")))
+        assertTrue(natives.contains(librariesDir.resolve("org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-linux.jar")))
+        assertTrue(natives.none { it.toString().contains("windows") }, "wrong-OS natives must be dropped")
+        assertTrue(natives.none { it.toString().contains("sources") }, "non-native classifiers must be ignored")
+    }
+
+    @Test
+    fun `planner downloads the host classifier natives, not other platforms`() {
+        val p = provisioner(HttpClient(MockEngine { respond("", HttpStatusCode.OK) }), osName = "Linux")
+        val version = MojangVersion(
+            assetIndex = MojangAssetIndexRef(id = "x", sha1 = "x", url = "u"),
+            downloads = MojangDownloads(MojangArtifact(sha1 = "c", size = 1, url = "https://piston/client.jar")),
+            libraries = listOf(
+                MojangLibrary(
+                    name = "org.lwjgl.lwjgl:lwjgl:2.9.4",
+                    downloads = MojangLibraryDownloads(
+                        artifact = MojangArtifact("org/lwjgl/lwjgl/lwjgl/2.9.4/lwjgl-2.9.4.jar", "a", 1, "https://libs/base.jar"),
+                        classifiers = mapOf(
+                            "natives-linux" to MojangArtifact("org/lwjgl/lwjgl/lwjgl/2.9.4/lwjgl-2.9.4-natives-linux.jar", "n", 1, "https://libs/nat-linux.jar"),
+                            "natives-windows" to MojangArtifact("org/lwjgl/lwjgl/lwjgl/2.9.4/lwjgl-2.9.4-natives-windows.jar", "w", 1, "https://libs/nat-win.jar"),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        val index = MojangAssetIndex(objects = emptyMap())
+
+        val dests = p.planVanillaDownloads("2.9.4", version, index).map { it.dest }
+
+        assertTrue(dests.contains(librariesDir.resolve("org/lwjgl/lwjgl/lwjgl/2.9.4/lwjgl-2.9.4.jar")), "base jar downloaded")
+        assertTrue(dests.contains(librariesDir.resolve("org/lwjgl/lwjgl/lwjgl/2.9.4/lwjgl-2.9.4-natives-linux.jar")), "host natives downloaded")
+        assertTrue(dests.none { it.toString().contains("natives-windows") }, "wrong-OS natives must not be downloaded")
+    }
+
     // -- end to end (MockEngine) ----------------------------------------------
 
     @Test

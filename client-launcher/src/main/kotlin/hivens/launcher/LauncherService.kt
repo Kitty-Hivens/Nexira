@@ -145,9 +145,11 @@ internal class LauncherService(
             loaderVersion = manifest.loaderVersion,
         ) { current, total, file -> onLog("Runtime $current/$total: $file", LauncherLogType.INFO) }
 
-        // 4. Natives stay per-instance (LWJGL via EnvironmentPreparer); assets are
-        // the shared root the provisioner just populated.
-        envPreparer.prepareNatives(clientRootPath, nativesDir, mcVersion)
+        // 4. Natives stay per-instance, but are now extracted from the jars the
+        // provisioner resolved from the manifest -- so the LWJGL version matches
+        // the classpath for ANY MC version, not just the few the SC path hardcodes.
+        // Assets are the shared root the provisioner just populated.
+        envPreparer.prepareNativesFromManifest(clientRootPath, nativesDir, resolved.natives)
 
         // 5. Profile-driven command: main class / classpath / args come from the
         // resolved runtime; assets point at the shared root.

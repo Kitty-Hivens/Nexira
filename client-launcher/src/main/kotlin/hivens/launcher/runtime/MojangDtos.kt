@@ -93,14 +93,19 @@ data class MojangLibrary(
 )
 
 /**
- * Only [artifact] is taken -- the main jar that belongs on the classpath.
- * Native classifiers (lwjgl `.so`/`.dll`) are intentionally ignored here;
- * [hivens.launcher.component.EnvironmentPreparer] sources natives from
- * Mojang's CDN separately, per instance.
+ * [artifact] is the main jar that belongs on the classpath. [classifiers]
+ * carries the platform-native jars (lwjgl `.so`/`.dll`/`.dylib`) on pre-1.19
+ * versions, keyed by classifier (`natives-linux`, `natives-windows`,
+ * `natives-osx`, ...); 1.19+ instead lists each native as its own library
+ * whose `name` ends in a `natives-<os>` classifier. The provisioner picks the
+ * host-matching ones so [hivens.launcher.component.EnvironmentPreparer]
+ * extracts the exact LWJGL version the classpath references -- a fixed
+ * fallback version would mismatch the bindings and LWJGL refuses to start.
  */
 @Serializable
 data class MojangLibraryDownloads(
     val artifact: MojangArtifact? = null,
+    val classifiers: Map<String, MojangArtifact> = emptyMap(),
 )
 
 @Serializable
