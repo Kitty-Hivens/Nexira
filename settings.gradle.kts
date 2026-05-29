@@ -37,10 +37,8 @@ plugins {
 //     single-source-of-truth rule -- a new repo only enters the project
 //     by being added here, not by drifting into one subproject and
 //     surprising another.
-//   * mavenCentral covers the bulk of dependencies.
-//   * JitPack hosts libtray (Kitty-Hivens/libtray) until it ships a real
-//     Maven Central release; commit-sha-pinned in libs.versions.toml so
-//     an upstream main-branch break does not silently drift the build.
+//   * mavenCentral covers the bulk of dependencies (incl. libtray, now
+//     published as dev.hivens:libtray).
 //
 // JetBrains compose-dev maven was previously listed for Compose Multiplatform
 // alpha artifacts. Removed alongside the bump to 1.11.0 GA (commit d214466) --
@@ -59,7 +57,6 @@ dependencyResolutionManagement {
     repositories {
         mavenCentral()
         google()
-        maven { url = uri("https://jitpack.io") }
     }
 }
 
