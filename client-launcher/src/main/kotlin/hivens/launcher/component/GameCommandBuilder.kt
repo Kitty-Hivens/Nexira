@@ -293,7 +293,7 @@ internal class GameCommandBuilder(
         // substitution and a self-built classpath -- modlauncher 1.13-1.16 has
         // the template but no module path.
         val usesModulePath = runtime.mainClass.contains("bootstraplauncher", ignoreCase = true)
-        val usesModernArgs = usesModulePath || runtime.jvmArgs.any { it.contains("\${") }
+        val usesModernArgs = usesModulePath || runtime.jvmArgs.any { it.contains($$"${") }
         if (javaMajor <= 8) args.add("-noverify")
         if (System.getProperty("os.name").lowercase().contains("mac")) {
             args.add("-XstartOnFirstThread")

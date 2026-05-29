@@ -14,7 +14,7 @@ class MojangArgumentsTest {
     @Test
     fun `bare strings pass through and placeholders are preserved`() {
         val a = args("""{"jvm":["-Dfoo=bar","-cp","${'$'}{classpath}"]}""")
-        assertEquals(listOf("-Dfoo=bar", "-cp", "\${classpath}"), flattenArguments(a.jvm, "linux"))
+        assertEquals(listOf("-Dfoo=bar", "-cp", $$"${classpath}"), flattenArguments(a.jvm, "linux"))
     }
 
     @Test

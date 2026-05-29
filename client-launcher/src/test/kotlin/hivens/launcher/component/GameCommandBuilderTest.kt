@@ -614,11 +614,11 @@ class GameCommandBuilderTest {
         // `-Djava.library.path` (both must be dropped), an --add-opens to keep,
         // the loader's -p with placeholders, and -DlibraryDirectory.
         jvmArgs = listOf(
-            "-Djava.library.path=\${natives_directory}",
-            "-cp", "\${classpath}",
+            $$"-Djava.library.path=${natives_directory}",
+            "-cp", $$"${classpath}",
             "--add-opens=java.base/java.lang=ALL-UNNAMED",
-            "-p", "\${library_directory}/cpw/mods/bootstraplauncher/2.0.2/bootstraplauncher-2.0.2.jar\${classpath_separator}\${library_directory}/cpw/mods/securejarhandler/3.0.8/securejarhandler-3.0.8.jar",
-            "-DlibraryDirectory=\${library_directory}",
+            "-p", $$"${library_directory}/cpw/mods/bootstraplauncher/2.0.2/bootstraplauncher-2.0.2.jar${classpath_separator}${library_directory}/cpw/mods/securejarhandler/3.0.8/securejarhandler-3.0.8.jar",
+            $$"-DlibraryDirectory=${library_directory}",
             "-DignoreList=client-extra,neoforge-",
         ),
         gameArgs = listOf("--launchTarget", "neoforgeclient", "--fml.neoForgeVersion", "21.1.66"),
@@ -644,7 +644,7 @@ class GameCommandBuilderTest {
         // remains -- ours -- and it carries the client + libs, not ${classpath}.
         assertEquals(1, cmd.count { it == "-cp" }, "only the builder's own -cp survives")
         val cp = cmd[cmd.indexOf("-cp") + 1]
-        assertFalse(cp.contains("\${classpath}"), "the placeholder must be gone, got $cp")
+        assertFalse(cp.contains($$"${classpath}"), "the placeholder must be gone, got $cp")
         assertFalse(cp.contains("minecraft-1.21.1.jar"), "vanilla client NOT on a modern cp -- FML loads its processor client")
         assertTrue(cp.contains("neoforge-21.1.66.jar"), "loader libs on the classpath")
 
@@ -652,7 +652,7 @@ class GameCommandBuilderTest {
         val pValue = cmd[cmd.indexOf("-p") + 1]
         assertTrue(pValue.contains("bootstraplauncher-2.0.2.jar"), "boot module on -p")
         assertTrue(pValue.contains("/tmp/shared/libraries"), "library_directory substituted, got $pValue")
-        assertFalse(pValue.contains("\${"), "no placeholder left in -p, got $pValue")
+        assertFalse(pValue.contains($$"${"), "no placeholder left in -p, got $pValue")
         assertTrue(pValue.contains(File.pathSeparator), "two boot jars joined by the path separator, got $pValue")
 
         assertTrue(cmd.contains("-DlibraryDirectory=/tmp/shared/libraries"), "libraryDirectory substituted")
@@ -661,7 +661,7 @@ class GameCommandBuilderTest {
 
         // Inherited -Djava.library.path is dropped; the builder emits its own.
         assertEquals(1, cmd.count { it.startsWith("-Djava.library.path") }, "exactly one java.library.path -- the builder's")
-        assertFalse(cmd.any { it.contains("\${natives_directory}") }, "natives placeholder not left dangling")
+        assertFalse(cmd.any { it.contains($$"${natives_directory}") }, "natives placeholder not left dangling")
 
         // Loader game args land after the standard set.
         assertEquals("neoforgeclient", cmd[cmd.indexOf("--launchTarget") + 1])

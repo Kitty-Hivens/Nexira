@@ -140,13 +140,20 @@ internal class LauncherService(
             loaderVersion = manifest.loaderVersion,
         ) { current, total, file -> onLog("Runtime $current/$total: $file", LauncherLogType.INFO) }
 
-        // 3. Java. The resolved runtime declares the major (loader override wins
-        // over Mojang's per-version `javaVersion` over the heuristic). Precedence:
-        // instance override (runtime.javaPath) > caller override (javaPathOverride)
-        // > the loader-aware managed default.
-        val javaMajor = resolved.javaMajor ?: javaManager.detectJavaVersion(mcVersion)
-        val defaultJava = javaPathOverride ?: javaManager.getJavaPathForMajor(javaMajor)
-        val javaExec: String = resolvePackJavaPath(runtime, defaultJava)
+        // 3. Java. Major precedence: loader-resolved override -> the pack manifest's
+        // own declaration (authoritative for the pack) -> Mojang's per-version field
+        // (captured into the resolved runtime). The heuristic disappears here: the
+        // pack ALWAYS declares its major in the manifest. Path precedence: instance
+        // pin (runtime.javaPath) > caller override (javaPathOverride) > managed for
+        // the declared major. Skip provisioning a managed JDK we would discard --
+        // when the instance pins its own java, don't trigger the ~200 MB download.
+        val javaMajor = resolved.javaMajor ?: manifest.javaMajor
+        val javaExec: String = if (!runtime.javaPath.isNullOrEmpty()) {
+            runtime.javaPath!!
+        } else {
+            val defaultJava = javaPathOverride ?: javaManager.getJavaPathForMajor(javaMajor)
+            resolvePackJavaPath(runtime, defaultJava)
+        }
 
         log.info("Session initialization (pack): {}, Java: {} (major {}), Heap: {}MB", displayName, javaExec, javaMajor, memory)
 
