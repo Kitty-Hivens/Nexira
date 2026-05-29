@@ -571,6 +571,8 @@ object GermanStrings : AppStrings {
     override val contentTabFetchErrorGeneric    = "Das Mirror-Manifest konnte nicht geladen werden."
     override val contentTabRetry                = "Erneut versuchen"
     override val contentTabRoleSection          = "Rollen-Slots"
+    override fun contentTabOptionalSection(count: Int) = "Optionale Mods ($count)"
+    override fun contentTabIncompatibleWith(name: String) = "Inkompatibel mit $name"
     override fun contentTabModsSection(count: Int) = "Mods ($count)"
     override fun contentTabAssetsSection(count: Int) = "Assets ($count)"
     override val contentTabResolverIssuesTitle  = "Manifest-Probleme erkannt"

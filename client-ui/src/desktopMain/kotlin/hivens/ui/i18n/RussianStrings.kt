@@ -572,6 +572,8 @@ object RussianStrings : AppStrings {
     override val contentTabFetchErrorGeneric    = "Манифест с зеркала не загрузился."
     override val contentTabRetry                = "Повторить"
     override val contentTabRoleSection          = "Слоты по ролям"
+    override fun contentTabOptionalSection(count: Int) = "Опциональные моды ($count)"
+    override fun contentTabIncompatibleWith(name: String) = "Несовместим с $name"
     override fun contentTabModsSection(count: Int) = "Моды ($count)"
     override fun contentTabAssetsSection(count: Int) = "Ассеты ($count)"
     override val contentTabResolverIssuesTitle  = "Найдены проблемы в манифесте"

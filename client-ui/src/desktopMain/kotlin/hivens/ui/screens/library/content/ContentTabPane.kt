@@ -29,6 +29,8 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -36,6 +38,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,8 +50,11 @@ import androidx.compose.ui.unit.dp
 import hivens.core.api.dto.smrt.SmrtAssetEntry
 import hivens.core.api.dto.smrt.SmrtModEntry
 import hivens.core.api.dto.smrt.SmrtPackManifest
+import hivens.core.data.ContentToggle
+import hivens.core.data.OptionalContentRules
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
+import hivens.launcher.launch.LauncherController
 import hivens.launcher.smrt.DepGraph
 import hivens.launcher.smrt.DepGraphResolver
 import hivens.launcher.smrt.ModGrouping
@@ -58,6 +64,7 @@ import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 
@@ -92,6 +99,7 @@ fun ContentTabPane(instance: PackInstance, modifier: Modifier = Modifier) {
     }
 
     val client: SmrtPackClient = koinInject()
+    val controller: LauncherController = koinInject()
     var state by remember(instance.id) { mutableStateOf<ContentState>(ContentState.Loading) }
     var retryTick by remember(instance.id) { mutableIntStateOf(0) }
 
@@ -117,10 +125,12 @@ fun ContentTabPane(instance: PackInstance, modifier: Modifier = Modifier) {
         }
         is ContentState.Error -> ErrorBlock(modifier = modifier, message = st.message, onRetry = { retryTick++ })
         is ContentState.Loaded -> LoadedBody(
-            modifier = modifier,
-            manifest = st.manifest,
-            graph    = st.graph,
-            grouping = st.grouping,
+            modifier   = modifier,
+            instance   = instance,
+            controller = controller,
+            manifest   = st.manifest,
+            graph      = st.graph,
+            grouping   = st.grouping,
         )
     }
 }
@@ -161,12 +171,26 @@ private fun ErrorBlock(modifier: Modifier, message: String, onRetry: () -> Unit)
 @Composable
 private fun LoadedBody(
     modifier: Modifier,
+    instance: PackInstance,
+    controller: LauncherController,
     manifest: SmrtPackManifest,
     graph: DepGraph,
     grouping: ModGrouping,
 ) {
     val s = LocalStrings.current
     val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+
+    val optionalMods = OptionalContentRules.optionalMods(manifest.mods)
+    var enabledState by remember(manifest.packId) {
+        mutableStateOf(OptionalContentRules.enabledState(manifest.mods, instance.optionalContent))
+    }
+    val onToggleOptional: (String, Boolean) -> Unit = { filename, enable ->
+        val next = OptionalContentRules.applyToggle(manifest.mods, enabledState, filename, enable)
+        enabledState = next
+        val toggles = optionalMods.map { ContentToggle(it.filename, next[it.filename] ?: it.defaultEnabled) }
+        scope.launch { controller.setOptionalMods(instance, manifest, toggles) }
+    }
 
     // Split ungrouped mods so libraries land in their own bucket.
     // Mirror tags lib-only mods with display.category=lib (8 of 90 on
@@ -204,6 +228,14 @@ private fun LoadedBody(
             if (graph.cycles.isNotEmpty() || graph.missingRequirements.isNotEmpty()) {
                 item { ResolverWarnings(graph = graph) }
             }
+
+            optionalContentSection(
+                title         = s.contentTabOptionalSection(optionalMods.size),
+                mods          = optionalMods,
+                enabledState  = enabledState,
+                incompatLabel = { s.contentTabIncompatibleWith(it) },
+                onToggle      = onToggleOptional,
+            )
 
             if (grouping.byRole.isNotEmpty()) {
                 item { SectionHeader(text = s.contentTabRoleSection) }
@@ -262,6 +294,65 @@ private fun LoadedBody(
 
 private fun SmrtModEntry.libraryLike(): Boolean =
     display?.category?.lowercase()?.let { it == "lib" || it == "library" } == true
+
+private fun LazyListScope.optionalContentSection(
+    title: String,
+    mods: List<SmrtModEntry>,
+    enabledState: Map<String, Boolean>,
+    incompatLabel: (String) -> String,
+    onToggle: (String, Boolean) -> Unit,
+) {
+    if (mods.isEmpty()) return
+    item { SectionHeader(text = title) }
+    items(items = mods, key = { "opt:${it.filename}" }) { mod ->
+        OptionalModRow(
+            mod           = mod,
+            enabled       = enabledState[mod.filename] ?: mod.defaultEnabled,
+            incompatLabel = incompatLabel,
+            onToggle      = { onToggle(mod.filename, it) },
+        )
+    }
+}
+
+@Composable
+private fun OptionalModRow(
+    mod: SmrtModEntry,
+    enabled: Boolean,
+    incompatLabel: (String) -> String,
+    onToggle: (Boolean) -> Unit,
+) {
+    Row(
+        modifier          = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(CelestiaTheme.colors.primary.copy(alpha = 0.05f))
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text       = mod.display?.name ?: mod.filename,
+                style      = MaterialTheme.typography.bodyMedium,
+                color      = CelestiaTheme.colors.textPrimary,
+                fontWeight = FontWeight.SemiBold,
+            )
+            val incompatible = mod.display?.incompatibleWith.orEmpty()
+            if (incompatible.isNotEmpty()) {
+                Text(
+                    text  = incompatLabel(incompatible.joinToString(", ")),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = CelestiaTheme.colors.textSecondary,
+                )
+            }
+        }
+        Spacer(Modifier.size(12.dp))
+        Switch(
+            checked         = enabled,
+            onCheckedChange = onToggle,
+            colors          = SwitchDefaults.colors(checkedTrackColor = CelestiaTheme.colors.primary),
+        )
+    }
+}
 
 private fun LazyListScope.collapsibleModSection(
     title: String,

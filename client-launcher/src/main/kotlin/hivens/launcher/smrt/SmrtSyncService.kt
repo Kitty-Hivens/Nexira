@@ -104,6 +104,29 @@ class SmrtSyncService(
         writeSourceMarker(marker, SOURCE_MIRROR)
     }
 
+    /**
+     * Re-labels already-downloaded optional mods to match [enabledState] with NO
+     * network: an active jar that should be off becomes `.disabled` and vice
+     * versa. The toggle UI calls this -- the bytes are already on disk, only the
+     * name (and thus whether Forge loads it) changes. A variant that is missing
+     * on disk is left for the next full sync to fetch.
+     */
+    fun relabel(clientDir: Path, mods: List<SmrtModEntry>, enabledState: Map<String, Boolean>) {
+        val modsDir = clientDir.resolve("mods")
+        if (!Files.isDirectory(modsDir)) return
+        for (mod in mods) {
+            val enabled = enabledState[mod.filename] ?: (mod.required || mod.defaultEnabled)
+            val active = resolveSafe(modsDir, mod.filename, "mod ${mod.filename}")
+            val disabled = resolveSafe(modsDir, "${mod.filename}.disabled", "mod ${mod.filename}")
+            val from = if (enabled) disabled else active
+            val to = if (enabled) active else disabled
+            if (Files.exists(from) && !Files.exists(to)) {
+                runCatching { Files.move(from, to, StandardCopyOption.REPLACE_EXISTING) }
+                    .onFailure { log.warn("smrt relabel: failed to move {} -> {}", from, to, it) }
+            }
+        }
+    }
+
     private fun pruneOrphanMods(clientDir: Path, expected: Set<String>) {
         val modsDir = clientDir.resolve("mods")
         if (!Files.isDirectory(modsDir)) return

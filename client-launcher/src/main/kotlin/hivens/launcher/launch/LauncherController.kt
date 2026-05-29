@@ -3,7 +3,10 @@ package hivens.launcher.launch
 import hivens.core.api.TwoFactorRequiredException
 import hivens.core.api.interfaces.*
 import hivens.core.api.model.ServerProfile
+import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.data.CachedManifestSnapshot
+import hivens.core.data.ContentToggle
+import hivens.core.data.OptionalContentRules
 import hivens.core.data.PackInstance
 import hivens.core.data.SessionData
 import hivens.core.data.SettingsData
@@ -13,6 +16,7 @@ import hivens.launcher.ManifestCache
 import hivens.launcher.ProfileManager
 import hivens.launcher.di.AppCoroutineScopeHook
 import hivens.launcher.smrt.SmrtPackClient
+import hivens.launcher.smrt.SmrtSyncService
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -53,11 +57,37 @@ class LauncherController(
     private val profileManager: ProfileManager,
     private val packRepository: IPackRepository,
     private val smrtPackClient: SmrtPackClient,
+    private val smrtSyncService: SmrtSyncService,
     private val dataDirectory: Path,
     private val appScope: CoroutineScope,
 ) {
 
     private val logger = LoggerFactory.getLogger(LauncherController::class.java)
+
+    /**
+     * Persists a pack instance's optional-content [toggles] and re-labels the
+     * already-downloaded mods on disk to match -- no network, a flip is just a
+     * `.disabled` rename. The caller passes the [manifest] it already loaded for
+     * the Content tab. Returns the updated instance for the UI to adopt.
+     */
+    suspend fun setOptionalMods(
+        instance: PackInstance,
+        manifest: SmrtPackManifest,
+        toggles: List<ContentToggle>,
+    ): PackInstance {
+        val updated = instance.copy(optionalContent = toggles)
+        packRepository.put(updated)
+        val clientDir = dataDirectory.resolve("instances").resolve(instance.instanceDirName)
+        withContext(Dispatchers.IO) {
+            smrtSyncService.relabel(
+                clientDir,
+                manifest.mods,
+                OptionalContentRules.enabledState(manifest.mods, toggles),
+            )
+        }
+        ActionRing.record("Optional content updated: ${instance.displayName}")
+        return updated
+    }
 
     private val _state = MutableStateFlow<LaunchState>(LaunchState.Idle)
     val state: StateFlow<LaunchState> = _state.asStateFlow()
