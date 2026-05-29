@@ -2,6 +2,8 @@ package hivens.launcher
 
 import hivens.widget.model.LayoutGraph
 import hivens.widget.model.SurfaceId
+import hivens.widget.model.instanceIds
+import hivens.widget.model.removeInstanceIds
 import hivens.widget.model.walkInstances
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -127,11 +129,18 @@ class LayoutGraphRepository(
         val def = defaultGraph()
         update { graph ->
             val defaultLayout = def.surfaces[surface]
-            if (defaultLayout != null) {
-                graph.copy(surfaces = graph.surfaces + (surface to defaultLayout))
-            } else {
-                graph.copy(surfaces = graph.surfaces - surface)
+                ?: return@update graph.copy(surfaces = graph.surfaces - surface)
+            // Ids the restored default reintroduces. If any leaked onto
+            // OTHER surfaces via a cross-surface move, strip them there
+            // first -- otherwise the restored default id collides with the
+            // leaked copy and the tree-wide uniqueness check in update()
+            // rejects the whole reset, trapping the user. Reset is the
+            // escape hatch; it must always succeed.
+            val restoredIds = defaultLayout.instanceIds()
+            val cleaned = graph.surfaces.mapValues { (sid, layout) ->
+                if (sid == surface) layout else layout.removeInstanceIds(restoredIds)
             }
+            graph.copy(surfaces = cleaned + (surface to defaultLayout))
         }
     }
 
