@@ -394,15 +394,15 @@ internal class GameCommandBuilder(
         versionLabel: String,
     ): List<String> {
         val substitutions = mapOf(
-            "\${library_directory}" to sharedLibrariesDir.toAbsolutePath().toString(),
-            "\${classpath_separator}" to File.pathSeparator,
-            "\${version_name}" to versionLabel,
-            "\${natives_directory}" to nativesPath.toString(),
-            "\${assets_root}" to sharedAssetsDir.toAbsolutePath().toString(),
-            "\${game_directory}" to gameDir.toAbsolutePath().toString(),
-            "\${primary_jar}" to runtime.clientJar.toAbsolutePath().toString(),
-            "\${launcher_name}" to Branding.UPSTREAM_NAME,
-            "\${launcher_version}" to Protocol.MIMIC_LAUNCHER_VERSION,
+            $$"${library_directory}" to sharedLibrariesDir.toAbsolutePath().toString(),
+            $$"${classpath_separator}" to File.pathSeparator,
+            $$"${version_name}" to versionLabel,
+            $$"${natives_directory}" to nativesPath.toString(),
+            $$"${assets_root}" to sharedAssetsDir.toAbsolutePath().toString(),
+            $$"${game_directory}" to gameDir.toAbsolutePath().toString(),
+            $$"${primary_jar}" to runtime.clientJar.toAbsolutePath().toString(),
+            $$"${launcher_name}" to Branding.UPSTREAM_NAME,
+            $$"${launcher_version}" to Protocol.MIMIC_LAUNCHER_VERSION,
         )
         fun substitute(token: String): String {
             var result = token
@@ -425,7 +425,7 @@ internal class GameCommandBuilder(
                         i += 2
                     } else i += 1
                 }
-                token == "\${classpath}" || token.startsWith("-Djava.library.path") -> i += 1
+                token == $$"${classpath}" || token.startsWith("-Djava.library.path") -> i += 1
                 else -> {
                     out.add(substitute(token))
                     i += 1
