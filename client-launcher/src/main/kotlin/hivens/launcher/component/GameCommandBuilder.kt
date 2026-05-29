@@ -325,7 +325,10 @@ internal class GameCommandBuilder(
             val n = p.fileName.toString().lowercase()
             n.contains("launchwrapper") || n.contains("asm") || n.contains("bootstraplauncher")
         }
-        return (boot + runtime.clientJar + rest)
+        // listOf(clientJar), NOT `+ clientJar`: a Path is Iterable<Path> over its
+        // name segments, so `List<Path> + Path` would spread the client jar into
+        // its path components instead of appending it as one classpath entry.
+        return (boot + listOf(runtime.clientJar) + rest)
             .joinToString(File.pathSeparator) { it.toAbsolutePath().toString() }
     }
 

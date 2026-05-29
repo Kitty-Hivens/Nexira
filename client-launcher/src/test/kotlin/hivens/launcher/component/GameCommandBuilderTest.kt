@@ -539,10 +539,16 @@ class GameCommandBuilderTest {
     }
 
     @Test
-    fun `buildPackCommand classpath is bootstrap-first, includes client, excludes mods`() {
-        val parts = packCommand()[packCommand().indexOf("-cp") + 1].split(sep)
+    fun `buildPackCommand classpath is bootstrap-first, client is one entry, excludes mods`() {
+        val cmd = packCommand()
+        val parts = cmd[cmd.indexOf("-cp") + 1].split(sep)
         assertTrue(parts[0].contains("launchwrapper") || parts[0].contains("asm"), "bootstrap jar first, got ${parts[0]}")
-        assertTrue(parts.any { it.contains("minecraft-1.12.2.jar") }, "client jar on the classpath")
+        // The full client path must be ONE entry -- guards the Path-is-Iterable
+        // `+` gotcha that split the jar into its individual path segments.
+        assertTrue(
+            parts.contains(forgeRuntime().clientJar.toAbsolutePath().toString()),
+            "client jar must be a single full-path cp entry, got: $parts",
+        )
         assertTrue(parts.none { it.contains("${File.separator}mods${File.separator}") }, "mods stay off the classpath")
     }
 
