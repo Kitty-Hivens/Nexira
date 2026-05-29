@@ -52,8 +52,11 @@ class ForgeLegacyResolverTest {
         val zipBytes = installerZip(versionJson, forgePath, forgeBytes)
 
         val engine = MockEngine { req ->
-            if (req.url.toString() == INSTALLER_URL) respond(ByteReadChannel(zipBytes), HttpStatusCode.OK)
-            else respond("missing ${req.url}", HttpStatusCode.NotFound)
+            when (req.url.toString()) {
+                META_URL -> respond("<metadata><versioning><versions><version>1.12.2-14.23.5.2860</version></versions></versioning></metadata>", HttpStatusCode.OK)
+                INSTALLER_URL -> respond(ByteReadChannel(zipBytes), HttpStatusCode.OK)
+                else -> respond("missing ${req.url}", HttpStatusCode.NotFound)
+            }
         }
         val resolver = ForgeLegacyResolver(HttpClientProvider { HttpClient(engine) }, json, forgeMavenBase = MAVEN_BASE)
 
@@ -82,8 +85,43 @@ class ForgeLegacyResolverTest {
         assertEquals(ForgeLegacyResolver.DEFAULT_TWEAK_ARGS, resolver.extractTweakArgs("--username x --gameDir y"))
     }
 
+    @Test
+    fun `resolveForgeBuild keeps a published build`() = runTest {
+        val r = ForgeLegacyResolver(HttpClientProvider { HttpClient(metadataEngine()) }, json, forgeMavenBase = MAVEN_BASE)
+        assertEquals("14.23.5.2864", r.resolveForgeBuild("1.12.2", "14.23.5.2864"))
+    }
+
+    @Test
+    fun `resolveForgeBuild maps a non-published SC-custom build to latest official`() = runTest {
+        val r = ForgeLegacyResolver(HttpClientProvider { HttpClient(metadataEngine()) }, json, forgeMavenBase = MAVEN_BASE)
+        assertEquals("14.23.5.2864", r.resolveForgeBuild("1.12.2", "14.23.5.2922"))
+    }
+
+    @Test
+    fun `compareForgeBuilds orders by numeric tuple`() {
+        val r = ForgeLegacyResolver(HttpClientProvider { HttpClient(MockEngine { respond("", HttpStatusCode.OK) }) }, json)
+        assertTrue(r.compareForgeBuilds("14.23.5.2860", "14.23.5.2864") < 0)
+        assertTrue(r.compareForgeBuilds("14.23.5.2922", "14.23.5.2864") > 0)
+    }
+
+    private fun metadataEngine() = MockEngine { req ->
+        if (req.url.toString() == META_URL) {
+            respond(
+                """<metadata><versioning><versions>
+                   <version>1.12.2-14.23.5.2860</version>
+                   <version>1.12.2-14.23.5.2864</version>
+                   <version>1.16.5-36.2.39</version>
+                   </versions></versioning></metadata>""",
+                HttpStatusCode.OK,
+            )
+        } else {
+            respond("not found", HttpStatusCode.NotFound)
+        }
+    }
+
     private companion object {
         const val MAVEN_BASE = "https://forge.example"
+        const val META_URL = "https://forge.example/net/minecraftforge/forge/maven-metadata.xml"
         const val INSTALLER_URL =
             "https://forge.example/net/minecraftforge/forge/1.12.2-14.23.5.2860/forge-1.12.2-14.23.5.2860-installer.jar"
     }

@@ -5,6 +5,7 @@ import hivens.launcher.runtime.MavenCoord
 import hivens.launcher.runtime.MojangLibrary
 import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.bodyAsChannel
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.isSuccess
 import io.ktor.utils.io.jvm.javaio.copyTo
 import kotlinx.coroutines.Dispatchers
@@ -45,7 +46,8 @@ class ForgeLegacyResolver(
 
     override suspend fun resolve(mcVersion: String, loaderVersion: String): LoaderProfile =
         withContext(Dispatchers.IO) {
-            val slug = "$mcVersion-$loaderVersion"
+            val build = resolveForgeBuild(mcVersion, loaderVersion)
+            val slug = "$mcVersion-$build"
             val installerUrl =
                 "${forgeMavenBase.trimEnd('/')}/net/minecraftforge/forge/$slug/forge-$slug-installer.jar"
             log.info("forge: fetching installer {}", installerUrl)
@@ -106,6 +108,50 @@ class ForgeLegacyResolver(
             }
         }
         return out.ifEmpty { DEFAULT_TWEAK_ARGS }
+    }
+
+    /**
+     * The Forge build to actually install. Returns [requested] when it is
+     * published on Forge maven; otherwise the latest official build for
+     * [mcVersion]. SmartyCraft declares custom/patched build numbers that were
+     * never released (e.g. 1.12.2-14.23.5.2922; official 1.12.2 tops out at
+     * 2864) -- a nearby official build runs the same pack, since the FML
+     * handshake matches on the mod list, not the Forge build.
+     */
+    internal suspend fun resolveForgeBuild(mcVersion: String, requested: String): String {
+        val builds = forgeBuildsFor(mcVersion)
+        if (builds.isEmpty()) throw IOException("no Forge builds for Minecraft $mcVersion on Forge maven")
+        if (requested in builds) return requested
+        val latest = builds.maxWith { a, b -> compareForgeBuilds(a, b) }
+        log.warn(
+            "forge build {} is not published for {} (custom/non-official?); using nearest official {}",
+            requested, mcVersion, latest,
+        )
+        return latest
+    }
+
+    private suspend fun forgeBuildsFor(mcVersion: String): List<String> {
+        val url = "${forgeMavenBase.trimEnd('/')}/net/minecraftforge/forge/maven-metadata.xml"
+        val versionPattern = Regex("<version>${Regex.escape(mcVersion)}-([^<]+)</version>")
+        return versionPattern.findAll(fetchText(url)).map { it.groupValues[1] }.toList()
+    }
+
+    private suspend fun fetchText(url: String): String =
+        clientProvider.current.prepareGet(url).execute { resp ->
+            if (!resp.status.isSuccess()) throw IOException("GET $url -> HTTP ${resp.status}")
+            resp.bodyAsText()
+        }
+
+    /** Element-wise numeric compare of dotted Forge build strings (14.23.5.2864). */
+    internal fun compareForgeBuilds(a: String, b: String): Int {
+        val ai = a.split('.')
+        val bi = b.split('.')
+        for (i in 0 until maxOf(ai.size, bi.size)) {
+            val x = ai.getOrNull(i)?.toIntOrNull() ?: 0
+            val y = bi.getOrNull(i)?.toIntOrNull() ?: 0
+            if (x != y) return x - y
+        }
+        return 0
     }
 
     private suspend fun downloadTo(url: String, dest: Path) {
