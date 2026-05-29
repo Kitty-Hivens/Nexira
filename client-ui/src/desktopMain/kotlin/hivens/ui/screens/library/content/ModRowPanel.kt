@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -62,6 +63,7 @@ fun ModRowPanel(
     mod: SmrtModEntry,
     graph: DepGraph,
     emphasis: Emphasis = Emphasis.Primary,
+    toggle: ModToggle? = null,
     modifier: Modifier = Modifier,
 ) {
     val s = LocalStrings.current
@@ -84,6 +86,18 @@ fun ModRowPanel(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier              = Modifier.fillMaxWidth(),
         ) {
+            // Checkbox left of the avatar: optional mods toggle on/off here;
+            // required mods show it checked + locked so the column stays aligned
+            // and "required = always installed" reads at a glance.
+            if (toggle != null) {
+                Checkbox(
+                    checked         = toggle.checked,
+                    onCheckedChange = if (toggle.locked) null else toggle.onToggle,
+                    enabled         = !toggle.locked,
+                    modifier        = Modifier.size(24.dp),
+                )
+            }
+
             ModIconImage(mod = mod, size = 28.dp)
 
             Column(modifier = Modifier.weight(1f)) {
@@ -105,7 +119,6 @@ fun ModRowPanel(
                 }
             }
 
-            if (!mod.required) MetaChip(text = s.contentTabModOptional)
             SourceBadge(mod.source)
 
             Icon(
@@ -124,6 +137,18 @@ fun ModRowPanel(
 }
 
 enum class Emphasis { Primary, Alternative }
+
+/**
+ * Drives the leading checkbox on a mod row. [locked] (required mods) renders a
+ * checked, disabled box; otherwise [checked] is the optional mod's current state
+ * and [onToggle] flips it. Null on a [ModRowPanel] means no checkbox (e.g. a
+ * role-group alternative, where selection is its own UI).
+ */
+data class ModToggle(
+    val checked: Boolean,
+    val locked: Boolean,
+    val onToggle: (Boolean) -> Unit,
+)
 
 @Composable
 private fun ExpandedDetails(mod: SmrtModEntry, graph: DepGraph) {

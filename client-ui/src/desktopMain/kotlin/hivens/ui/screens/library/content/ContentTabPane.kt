@@ -29,8 +29,6 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -191,6 +189,18 @@ private fun LoadedBody(
         val toggles = optionalMods.map { ContentToggle(it.filename, next[it.filename] ?: it.defaultEnabled) }
         scope.launch { controller.setOptionalMods(instance, manifest, toggles) }
     }
+    // Leading checkbox per mod row: required mods are locked-on (checked +
+    // disabled, kept for column alignment), optional mods toggle here.
+    fun toggleFor(mod: SmrtModEntry): ModToggle =
+        if (mod.required) {
+            ModToggle(checked = true, locked = true, onToggle = {})
+        } else {
+            ModToggle(
+                checked = enabledState[mod.filename] ?: mod.defaultEnabled,
+                locked = false,
+                onToggle = { enable -> onToggleOptional(mod.filename, enable) },
+            )
+        }
 
     // Split ungrouped mods so libraries land in their own bucket.
     // Mirror tags lib-only mods with display.category=lib (8 of 90 on
@@ -229,14 +239,6 @@ private fun LoadedBody(
                 item { ResolverWarnings(graph = graph) }
             }
 
-            optionalContentSection(
-                title         = s.contentTabOptionalSection(optionalMods.size),
-                mods          = optionalMods,
-                enabledState  = enabledState,
-                incompatLabel = { s.contentTabIncompatibleWith(it) },
-                onToggle      = onToggleOptional,
-            )
-
             if (grouping.byRole.isNotEmpty()) {
                 item { SectionHeader(text = s.contentTabRoleSection) }
                 items(items = grouping.byRole, key = { it.role }) { group ->
@@ -247,7 +249,7 @@ private fun LoadedBody(
             if (regularMods.isNotEmpty()) {
                 item { SectionHeader(text = s.contentTabModsSection(regularMods.size)) }
                 items(items = regularMods, key = { it.filename }) { mod ->
-                    ModRowPanel(mod = mod, graph = graph)
+                    ModRowPanel(mod = mod, graph = graph, toggle = toggleFor(mod))
                 }
             }
 
@@ -257,6 +259,7 @@ private fun LoadedBody(
                 graph = graph,
                 isOpen = libsOpen,
                 onToggle = { libsOpen = !libsOpen },
+                toggleFor = ::toggleFor,
             )
             collapsibleAssetSection(
                 title    = s.contentTabResourcePacksSection(resourcePacks.size),
@@ -295,77 +298,19 @@ private fun LoadedBody(
 private fun SmrtModEntry.libraryLike(): Boolean =
     display?.category?.lowercase()?.let { it == "lib" || it == "library" } == true
 
-private fun LazyListScope.optionalContentSection(
-    title: String,
-    mods: List<SmrtModEntry>,
-    enabledState: Map<String, Boolean>,
-    incompatLabel: (String) -> String,
-    onToggle: (String, Boolean) -> Unit,
-) {
-    if (mods.isEmpty()) return
-    item { SectionHeader(text = title) }
-    items(items = mods, key = { "opt:${it.filename}" }) { mod ->
-        OptionalModRow(
-            mod           = mod,
-            enabled       = enabledState[mod.filename] ?: mod.defaultEnabled,
-            incompatLabel = incompatLabel,
-            onToggle      = { onToggle(mod.filename, it) },
-        )
-    }
-}
-
-@Composable
-private fun OptionalModRow(
-    mod: SmrtModEntry,
-    enabled: Boolean,
-    incompatLabel: (String) -> String,
-    onToggle: (Boolean) -> Unit,
-) {
-    Row(
-        modifier          = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
-            .background(CelestiaTheme.colors.primary.copy(alpha = 0.05f))
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text       = mod.display?.name ?: mod.filename,
-                style      = MaterialTheme.typography.bodyMedium,
-                color      = CelestiaTheme.colors.textPrimary,
-                fontWeight = FontWeight.SemiBold,
-            )
-            val incompatible = mod.display?.incompatibleWith.orEmpty()
-            if (incompatible.isNotEmpty()) {
-                Text(
-                    text  = incompatLabel(incompatible.joinToString(", ")),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = CelestiaTheme.colors.textSecondary,
-                )
-            }
-        }
-        Spacer(Modifier.size(12.dp))
-        Switch(
-            checked         = enabled,
-            onCheckedChange = onToggle,
-            colors          = SwitchDefaults.colors(checkedTrackColor = CelestiaTheme.colors.primary),
-        )
-    }
-}
-
 private fun LazyListScope.collapsibleModSection(
     title: String,
     mods: List<SmrtModEntry>,
     graph: DepGraph,
     isOpen: Boolean,
     onToggle: () -> Unit,
+    toggleFor: (SmrtModEntry) -> ModToggle,
 ) {
     if (mods.isEmpty()) return
     item { CollapsibleSectionHeader(text = title, isOpen = isOpen, onToggle = onToggle) }
     if (isOpen) {
         items(items = mods, key = { "mod:${it.filename}" }) { mod ->
-            ModRowPanel(mod = mod, graph = graph)
+            ModRowPanel(mod = mod, graph = graph, toggle = toggleFor(mod))
         }
     }
 }
