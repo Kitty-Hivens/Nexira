@@ -185,7 +185,7 @@ internal class GameCommandBuilder(
             args.addAll(gcArgs)
         }
 
-        args.add("-Xms512M")
+        args.add("-Xms${minOf(memoryMB, 512)}M")
         args.add("-Xmx${memoryMB}M")
 
         // 7. Java 9+ Module Path (NeoForge / Modern Forge) dynamically resolved
@@ -324,7 +324,7 @@ internal class GameCommandBuilder(
         } else {
             args.addAll(runtime.jvmArgs)
         }
-        args.add("-Xms512M")
+        args.add("-Xms${minOf(memoryMB, 512)}M")
         args.add("-Xmx${memoryMB}M")
 
         args.add("-cp")

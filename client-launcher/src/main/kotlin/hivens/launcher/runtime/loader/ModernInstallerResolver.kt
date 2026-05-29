@@ -112,6 +112,10 @@ class ModernInstallerResolver(
         Files.writeString(dotMinecraft.resolve("launcher_profiles.json"), LAUNCHER_PROFILES_STUB)
 
         val installer = dotMinecraft.resolve("installer.jar")
+        // Trust model: the installer jar is not sha-pinned (its version is chosen
+        // at runtime), so integrity rests on HTTPS to the official loader maven --
+        // the installerUrl factories hardcode maven.neoforged.net /
+        // maven.minecraftforge.net. Same trust the reference launchers (Prism) use.
         val url = installerUrl(mcVersion, loaderVersion)
         log.info("{}: downloading installer {}", loaderId, url)
         downloadTo(url, installer)

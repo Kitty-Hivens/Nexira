@@ -575,6 +575,32 @@ class GameCommandBuilderTest {
         assertFalse(packCommand(modern, javaMajor = 21).contains("-noverify"))
     }
 
+    private fun vanillaRuntime() = ResolvedRuntime(
+        libraries = listOf(
+            ResolvedLibrary(MavenCoord.parse("com.mojang:logging:1.1.1"), Path.of("/libs/com/mojang/logging/1.1.1/logging-1.1.1.jar")),
+            ResolvedLibrary(MavenCoord.parse("org.lwjgl:lwjgl:3.3.3"), Path.of("/libs/org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3.jar")),
+        ),
+        clientJar = Path.of("/libs/net/minecraft/minecraft/1.20.1/minecraft-1.20.1.jar"),
+        mainClass = "net.minecraft.client.main.Main",
+        assetIndexId = "5",
+        // No loader overlay: the vanilla ensureRuntime branch leaves jvmArgs empty.
+    )
+
+    @Test
+    fun `buildPackCommand keeps the vanilla client on -cp for a loaderless modern pack`() {
+        // A Modrinth/vanilla pack on 1.20 resolves to the vanilla main class with
+        // empty jvm args -> it must take the legacy (non-templated) path that puts
+        // the client jar on -cp. Guards a future vanilla-branch change (e.g. adding
+        // jvm args) from silently flipping it onto modernClasspath, which drops the
+        // client and would leave a vanilla launch with no minecraft on the classpath.
+        val cmd = packCommand(runtime = vanillaRuntime(), javaMajor = 17)
+        assertEquals(1, cmd.count { it == "-cp" })
+        val cp = cmd[cmd.indexOf("-cp") + 1]
+        assertTrue(cp.contains("minecraft-1.20.1.jar"), "vanilla pack must carry the client jar on -cp, got $cp")
+        assertTrue(cmd.contains("net.minecraft.client.main.Main"))
+        assertFalse(cmd.contains("-p"), "a vanilla launch has no module path")
+    }
+
     private fun neoForgeRuntime() = ResolvedRuntime(
         libraries = listOf(
             ResolvedLibrary(MavenCoord.parse("cpw.mods:bootstraplauncher:2.0.2"), Path.of("/libs/cpw/mods/bootstraplauncher/2.0.2/bootstraplauncher-2.0.2.jar")),
