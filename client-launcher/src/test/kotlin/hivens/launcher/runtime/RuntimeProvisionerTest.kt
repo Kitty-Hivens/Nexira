@@ -120,7 +120,7 @@ class RuntimeProvisionerTest {
     // -- end to end (MockEngine) ----------------------------------------------
 
     @Test
-    fun `ensureVanilla downloads runtime, verifies sha1, writes marker, then short-circuits`() = runTest {
+    fun `ensureVanilla downloads runtime, verifies sha1, returns libraries, idempotent`() = runTest {
         val libBytes = "PATCHY-JAR".toByteArray()
         val clientBytes = "CLIENT-JAR".toByteArray()
         val objBytes = "EN-US-LANG".toByteArray()
@@ -165,13 +165,17 @@ class RuntimeProvisionerTest {
         assertEquals("PATCHY-JAR", librariesDir.resolve("com/mojang/patchy/1.1/patchy-1.1.jar").readText())
         assertEquals("EN-US-LANG", assetsDir.resolve("objects/${objHash.take(2)}/$objHash").readText())
         assertTrue(assetsDir.resolve("indexes/1.12.json").exists(), "asset index persisted")
-        assertTrue(librariesDir.resolve(".nexira-runtime/1.12.2.vanilla").exists(), "marker written")
+        // Vanilla libraries returned with coord + on-disk path (the merge base).
+        assertEquals(1, result.libraries.size)
+        assertEquals("com.mojang:patchy", result.libraries[0].coord.groupArtifact)
+        assertEquals(librariesDir.resolve("com/mojang/patchy/1.1/patchy-1.1.jar"), result.libraries[0].path)
 
-        // Second call: marker short-circuits, zero network.
+        // Second call: metadata is re-read, but the heavy files are skipped (present + right size).
         requests.clear()
         val again = p.ensureVanilla("1.12.2")
         assertEquals("1.12", again.assetIndexId)
-        assertTrue(requests.isEmpty(), "provisioned runtime must not re-hit the network, got: $requests")
+        assertTrue(LIB_URL !in requests && CLIENT_URL !in requests, "downloaded jars must not be re-fetched, got: $requests")
+        assertTrue(requests.none { it.startsWith(RES_BASE) }, "asset objects must not be re-fetched, got: $requests")
     }
 
     @Test
@@ -204,7 +208,6 @@ class RuntimeProvisionerTest {
 
         assertFailsWith<IOException> { p.ensureVanilla("1.12.2") }
         assertTrue(!librariesDir.resolve("x/y/1/y-1.jar").exists(), "bad download must not leave a file")
-        assertTrue(!librariesDir.resolve(".nexira-runtime/1.12.2.vanilla").exists(), "failed provision writes no marker")
     }
 
     private companion object {

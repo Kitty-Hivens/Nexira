@@ -56,7 +56,7 @@ data class MojangArtifact(
     val path: String = "",
     val sha1: String,
     val size: Long = 0,
-    val url: String,
+    val url: String = "",
 )
 
 @Serializable

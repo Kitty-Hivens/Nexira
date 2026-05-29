@@ -1,6 +1,12 @@
 package hivens.launcher.runtime
 
 import hivens.core.api.HttpClientProvider
+import hivens.launcher.runtime.loader.DownloadProgress
+import hivens.launcher.runtime.loader.LibrarySpec
+import hivens.launcher.runtime.loader.LoaderRegistry
+import hivens.launcher.runtime.loader.ResolvedLibrary
+import hivens.launcher.runtime.loader.ResolvedRuntime
+import hivens.launcher.runtime.loader.mergeLibraries
 import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.client.statement.bodyAsText
@@ -42,6 +48,7 @@ class RuntimeProvisioner(
     private val assetsDir: Path,
     private val clientProvider: HttpClientProvider,
     private val json: Json,
+    private val loaderRegistry: LoaderRegistry = LoaderRegistry(emptyList()),
     osName: String = System.getProperty("os.name", ""),
     private val versionManifestUrl: String = VERSION_MANIFEST_URL,
     private val resourcesBaseUrl: String = RESOURCES_BASE,
@@ -50,10 +57,12 @@ class RuntimeProvisioner(
     private val httpClient get() = clientProvider.current
     private val mojangOs: String = toMojangOs(osName)
 
-    /** Resolved vanilla layout handed to the classpath builder / command builder. */
+    /** Resolved vanilla layout: the client jar, the asset index id, and the
+     *  vanilla library set (with coords, for merging a loader overlay). */
     data class VanillaRuntime(
         val clientJar: Path,
         val assetIndexId: String,
+        val libraries: List<ResolvedLibrary>,
     )
 
     /** A single file to fetch into a shared root, verified against [sha1]. */
@@ -65,25 +74,59 @@ class RuntimeProvisioner(
     )
 
     /**
+     * Ensures the full runtime for [mcVersion] + the given loader is present
+     * in the shared roots: the vanilla base, plus -- when [loaderName] names a
+     * known loader -- that loader's overlay merged on top (loader libraries win
+     * on a group:artifact collision). Idempotent; returns the merged,
+     * launch-ready runtime.
+     */
+    suspend fun ensureRuntime(
+        mcVersion: String,
+        loaderName: String?,
+        loaderVersion: String,
+        progress: DownloadProgress = { _, _, _ -> },
+    ): ResolvedRuntime = withContext(Dispatchers.IO) {
+        val vanilla = ensureVanilla(mcVersion, progress)
+        val resolver = loaderRegistry.resolverFor(loaderName)
+            ?: return@withContext ResolvedRuntime(
+                libraries = vanilla.libraries,
+                clientJar = vanilla.clientJar,
+                mainClass = VANILLA_MAIN_CLASS,
+                assetIndexId = vanilla.assetIndexId,
+            )
+
+        log.info("resolving loader overlay: {} {}", resolver.loaderId, loaderVersion)
+        val profile = resolver.resolve(mcVersion, loaderVersion)
+        val overlay = profile.libraries.map { spec ->
+            val dest = librariesDir.resolve(spec.coord.relativePath)
+            val bytes = spec.bundled
+            if (bytes != null) {
+                placeBundled(dest, bytes, spec.sha1)
+            } else {
+                val url = spec.url ?: throw IOException("library ${spec.coord.groupArtifact} has neither url nor bundled bytes")
+                fetchIfNeeded(DownloadTask(url, dest, spec.sha1.orEmpty(), spec.size))
+            }
+            ResolvedLibrary(spec.coord, dest)
+        }
+        ResolvedRuntime(
+            libraries = mergeLibraries(vanilla.libraries, overlay),
+            clientJar = vanilla.clientJar,
+            mainClass = profile.mainClass,
+            assetIndexId = vanilla.assetIndexId,
+            jvmArgs = profile.jvmArgs,
+            gameArgs = profile.gameArgs,
+        )
+    }
+
+    /**
      * Ensures the vanilla runtime for [mcVersion] is present in the shared
-     * roots, downloading only what is missing. Idempotent: a complete
-     * prior provision short-circuits via the marker without touching the
-     * network, which is what the launch-time safety-net call relies on.
+     * roots, downloading only what is missing (per-file skip on size). Returns
+     * the client jar, the asset index id, and the resolved vanilla libraries.
      */
     suspend fun ensureVanilla(
         mcVersion: String,
-        progress: (current: Int, total: Int, filename: String) -> Unit = { _, _, _ -> },
+        progress: DownloadProgress = { _, _, _ -> },
     ): VanillaRuntime = withContext(Dispatchers.IO) {
-        readMarker(mcVersion)?.let { cachedId ->
-            val clientJar = librariesDir.resolve(clientJarRelPath(mcVersion))
-            val index = assetsDir.resolve(assetIndexRelPath(cachedId))
-            if (Files.isRegularFile(clientJar) && Files.isRegularFile(index)) {
-                log.info("vanilla runtime {} already provisioned (assetIndex={})", mcVersion, cachedId)
-                return@withContext VanillaRuntime(clientJar, cachedId)
-            }
-            log.warn("vanilla runtime marker for {} present but files missing; re-provisioning", mcVersion)
-        }
-
         val versionUrl = resolveVersionUrl(mcVersion)
         val version = json.decodeFromString(MojangVersion.serializer(), fetchText(versionUrl))
         val assetIndexId = version.assetIndex.id
@@ -91,24 +134,34 @@ class RuntimeProvisioner(
         // Fetch + persist the asset index, then enumerate its objects.
         val indexBytes = fetchBytes(version.assetIndex.url)
         verifyOrThrow(indexBytes, version.assetIndex.sha1, "asset index $assetIndexId")
-        val indexDest = assetsDir.resolve(assetIndexRelPath(assetIndexId))
-        writeBytes(indexDest, indexBytes)
+        writeBytes(assetsDir.resolve(assetIndexRelPath(assetIndexId)), indexBytes)
         val assetIndex = json.decodeFromString(MojangAssetIndex.serializer(), indexBytes.decodeToString())
 
         val tasks = planVanillaDownloads(mcVersion, version, assetIndex)
         log.info("vanilla runtime {}: {} files to verify/fetch (assetIndex={})", mcVersion, tasks.size, assetIndexId)
-
-        val total = tasks.size
-        var current = 0
-        for (task in tasks) {
-            current++
-            progress(current, total, task.dest.fileName.toString())
+        tasks.forEachIndexed { i, task ->
+            progress(i + 1, tasks.size, task.dest.fileName.toString())
             fetchIfNeeded(task)
         }
 
-        writeMarker(mcVersion, assetIndexId)
-        VanillaRuntime(librariesDir.resolve(clientJarRelPath(mcVersion)), assetIndexId)
+        VanillaRuntime(
+            clientJar = librariesDir.resolve(clientJarRelPath(mcVersion)),
+            assetIndexId = assetIndexId,
+            libraries = vanillaLibraries(version),
+        )
     }
+
+    /**
+     * The rule-allowed vanilla libraries with maven coordinates -- the base of
+     * the merge. Paths match [planVanillaDownloads]'s library destinations.
+     */
+    internal fun vanillaLibraries(version: MojangVersion): List<ResolvedLibrary> =
+        version.libraries.mapNotNull { lib ->
+            if (!isLibraryAllowed(lib.rules)) return@mapNotNull null
+            val artifact = lib.downloads?.artifact ?: return@mapNotNull null
+            if (artifact.path.isBlank()) return@mapNotNull null
+            ResolvedLibrary(MavenCoord.parse(lib.name), librariesDir.resolve(artifact.path))
+        }
 
     // -- pure planning (no IO) ------------------------------------------------
 
@@ -225,10 +278,12 @@ class RuntimeProvisioner(
             if (!resp.status.isSuccess()) throw IOException("GET ${task.url} -> HTTP ${resp.status}")
             FileOutputStream(tmp.toFile()).use { out -> resp.bodyAsChannel().copyTo(out) }
         }
-        val actual = sha1Of(tmp)
-        if (!actual.equals(task.sha1, ignoreCase = true)) {
-            runCatching { Files.deleteIfExists(tmp) }
-            throw IOException("sha1 mismatch for ${task.url}: expected ${task.sha1}, got $actual")
+        if (task.sha1.isNotBlank()) {
+            val actual = sha1Of(tmp)
+            if (!actual.equals(task.sha1, ignoreCase = true)) {
+                runCatching { Files.deleteIfExists(tmp) }
+                throw IOException("sha1 mismatch for ${task.url}: expected ${task.sha1}, got $actual")
+            }
         }
         moveAtomic(tmp, task.dest)
     }
@@ -238,6 +293,15 @@ class RuntimeProvisioner(
         val tmp = dest.resolveSibling("${dest.fileName}.tmp")
         Files.write(tmp, bytes)
         moveAtomic(tmp, dest)
+    }
+
+    /** Places installer-bundled jar bytes into the shared root, skip-if-present. */
+    private fun placeBundled(dest: Path, bytes: ByteArray, sha1: String?) {
+        if (Files.isRegularFile(dest) && (sha1 == null || sha1Of(dest).equals(sha1, ignoreCase = true))) return
+        if (sha1 != null && !sha1Of(bytes).equals(sha1, ignoreCase = true)) {
+            throw IOException("bundled library sha1 mismatch at $dest: expected $sha1, got ${sha1Of(bytes)}")
+        }
+        writeBytes(dest, bytes)
     }
 
     private fun moveAtomic(tmp: Path, dest: Path) {
@@ -255,24 +319,6 @@ class RuntimeProvisioner(
         if (!actual.equals(expectedSha1, ignoreCase = true)) {
             throw IOException("sha1 mismatch for $label: expected $expectedSha1, got $actual")
         }
-    }
-
-    // -- provisioned marker ---------------------------------------------------
-
-    private fun markerPath(mcVersion: String): Path =
-        librariesDir.resolve(".nexira-runtime").resolve("$mcVersion.vanilla")
-
-    private fun readMarker(mcVersion: String): String? =
-        markerPath(mcVersion).takeIf { Files.isRegularFile(it) }
-            ?.let { runCatching { Files.readString(it).trim() }.getOrNull() }
-            ?.takeIf { it.isNotEmpty() }
-
-    private fun writeMarker(mcVersion: String, assetIndexId: String) {
-        val marker = markerPath(mcVersion)
-        runCatching {
-            Files.createDirectories(marker.parent)
-            Files.writeString(marker, assetIndexId)
-        }.onFailure { log.warn("failed to write runtime marker {}", marker, it) }
     }
 
     private fun sha1Of(path: Path): String {
@@ -294,6 +340,9 @@ class RuntimeProvisioner(
     companion object {
         const val VERSION_MANIFEST_URL = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"
         const val RESOURCES_BASE = "https://resources.download.minecraft.net"
+
+        /** Pure-vanilla launch entry point (no loader overlay). */
+        const val VANILLA_MAIN_CLASS = "net.minecraft.client.main.Main"
 
         internal fun toMojangOs(osName: String): String {
             val lower = osName.lowercase()
