@@ -210,12 +210,12 @@ class JavaManagerServiceTest {
 
     @Test
     fun `getDownloadUrl returns null for unknown Java major`() {
-        // Anything outside {8, 17, 21} -- e.g., a hypothetical 25 we
-        // haven't wired yet -- falls through to null. The download path
-        // surfaces this as a clear "no Java build for this system" error.
+        // Anything outside the wired-in matrix {8, 17, 21, 25} -- e.g. Java 11,
+        // which nothing in our target MC/loader graph needs -- falls through to
+        // null. The download path surfaces this as a clear "no Java build for
+        // this system" error.
         withSystemProp("os.name", "Linux") {
             withSystemProp("os.arch", "amd64") {
-                assertNull(svc.getDownloadUrl(25))
                 assertNull(svc.getDownloadUrl(11))
             }
         }

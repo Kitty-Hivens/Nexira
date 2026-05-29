@@ -385,6 +385,13 @@ class JavaManagerService(
                 "mac" if arch == "arm64" -> "https://download.bell-sw.com/java/21.0.9+15/bellsoft-jdk21.0.9+15-macos-aarch64-full.tar.gz"
                 else -> null
             }
+            25 -> when (os) {
+                "win" if arch == "x64" -> "https://download.bell-sw.com/java/25.0.3+11/bellsoft-jdk25.0.3+11-windows-amd64-full.zip"
+                "linux" if arch == "x64" -> "https://download.bell-sw.com/java/25.0.3+11/bellsoft-jdk25.0.3+11-linux-amd64-full.tar.gz"
+                "mac" if arch == "x64" -> "https://download.bell-sw.com/java/25.0.3+11/bellsoft-jdk25.0.3+11-macos-amd64-full.tar.gz"
+                "mac" if arch == "arm64" -> "https://download.bell-sw.com/java/25.0.3+11/bellsoft-jdk25.0.3+11-macos-aarch64-full.tar.gz"
+                else -> null
+            }
             else -> null
         }
     }
@@ -424,6 +431,13 @@ class JavaManagerService(
                 "linux" if arch == "x64"   -> adoptium(21, "21.0.5+11", "21.0.5_11", "x64",     "linux",   "tar.gz")
                 "mac"   if arch == "x64"   -> adoptium(21, "21.0.5+11", "21.0.5_11", "x64",     "mac",     "tar.gz")
                 "mac"   if arch == "arm64" -> adoptium(21, "21.0.5+11", "21.0.5_11", "aarch64", "mac",     "tar.gz")
+                else -> null
+            }
+            25 -> when (os) {
+                "win"   if arch == "x64"   -> adoptium(25, "25.0.3+9", "25.0.3_9", "x64",     "windows", "zip")
+                "linux" if arch == "x64"   -> adoptium(25, "25.0.3+9", "25.0.3_9", "x64",     "linux",   "tar.gz")
+                "mac"   if arch == "x64"   -> adoptium(25, "25.0.3+9", "25.0.3_9", "x64",     "mac",     "tar.gz")
+                "mac"   if arch == "arm64" -> adoptium(25, "25.0.3+9", "25.0.3_9", "aarch64", "mac",     "tar.gz")
                 else -> null
             }
             else -> null
