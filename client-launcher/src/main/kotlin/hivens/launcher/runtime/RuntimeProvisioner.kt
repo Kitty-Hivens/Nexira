@@ -60,11 +60,14 @@ class RuntimeProvisioner(
     private val mojangOs: String = toMojangOs(osName)
 
     /**
-     * The Mojang native classifiers to extract for THIS host, matched exactly
-     * so a 64-bit machine never picks up an `-x86` / `-arm64` variant (and vice
-     * versa). Covers both wire shapes: a pre-1.19 `downloads.classifiers` key
-     * and a 1.19+ library coord classifier. macOS keeps both the modern
-     * (`natives-macos`) and legacy (`natives-osx`) spellings.
+     * The Mojang native classifiers to keep for THIS host, matched exactly so a
+     * machine never picks up a foreign arch (`-arm64` on x64 and vice versa) --
+     * which on the module path would collide as a second `org.lwjgl.natives`.
+     * Arch-symmetric across all three OSes: an arm64 host (incl. Linux/ARM)
+     * takes the `-arm64` classifier, an x64 host the bare one. Covers both wire
+     * shapes (pre-1.19 `downloads.classifiers` key, 1.19+ coord classifier).
+     * macOS keeps both the modern (`natives-macos`) and legacy (`natives-osx`)
+     * x64 spellings.
      */
     private val acceptedNativeClassifiers: Set<String> = run {
         val arch = System.getProperty("os.arch", "").lowercase()
@@ -72,7 +75,7 @@ class RuntimeProvisioner(
         when (mojangOs) {
             "windows" -> if (arm64) setOf("natives-windows-arm64") else setOf("natives-windows")
             "osx" -> if (arm64) setOf("natives-macos-arm64") else setOf("natives-macos", "natives-osx")
-            else -> setOf("natives-linux")
+            else -> if (arm64) setOf("natives-linux-arm64") else setOf("natives-linux")
         }
     }
 
@@ -203,8 +206,24 @@ class RuntimeProvisioner(
             if (!isLibraryAllowed(lib.rules)) return@mapNotNull null
             val artifact = lib.downloads?.artifact ?: return@mapNotNull null
             if (artifact.path.isBlank()) return@mapNotNull null
-            ResolvedLibrary(MavenCoord.parse(lib.name), librariesDir.resolve(artifact.path))
+            val coord = MavenCoord.parse(lib.name)
+            if (isForeignNative(coord)) return@mapNotNull null
+            ResolvedLibrary(coord, librariesDir.resolve(artifact.path))
         }
+
+    /**
+     * A `natives-<os>[-<arch>]` library that does NOT match this host. Skipped
+     * everywhere -- download, classpath/module-path, extraction -- so a foreign
+     * platform's native module can't collide with the host's on the module path
+     * (two `org.lwjgl.natives`) or bloat `-cp`. The host's OWN native is kept:
+     * the modern (BootstrapLauncher) module graph requires it. `os.name` rules
+     * alone do not separate arch variants (mac x64 + arm64 both pass `osx`), so
+     * the gate is on the classifier, not on Mojang's inconsistent arch rules.
+     */
+    private fun isForeignNative(coord: MavenCoord): Boolean {
+        val classifier = coord.classifier ?: return false
+        return classifier.startsWith("natives") && classifier !in acceptedNativeClassifiers
+    }
 
     /**
      * The host's native jars for [version], resolved from the same manifest as
@@ -253,7 +272,8 @@ class RuntimeProvisioner(
         for (lib in version.libraries) {
             if (!isLibraryAllowed(lib.rules)) continue
             val downloads = lib.downloads ?: continue
-            downloads.artifact?.takeIf { it.path.isNotBlank() }?.let { artifact ->
+            val coord = MavenCoord.parse(lib.name)
+            downloads.artifact?.takeIf { it.path.isNotBlank() && !isForeignNative(coord) }?.let { artifact ->
                 out += DownloadTask(
                     url = artifact.url,
                     dest = librariesDir.resolve(artifact.path),

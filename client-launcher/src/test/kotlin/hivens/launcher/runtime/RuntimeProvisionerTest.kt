@@ -194,6 +194,40 @@ class RuntimeProvisionerTest {
         assertTrue(dests.none { it.toString().contains("natives-windows") }, "wrong-OS natives must not be downloaded")
     }
 
+    @Test
+    fun `vanilla libraries keep the host native and drop foreign-platform natives`() {
+        val p = provisioner(HttpClient(MockEngine { respond("", HttpStatusCode.OK) }), osName = "Linux")
+        val version = MojangVersion(
+            assetIndex = MojangAssetIndexRef(id = "x", sha1 = "x", url = "u"),
+            downloads = MojangDownloads(MojangArtifact(sha1 = "c", size = 1, url = "u")),
+            libraries = listOf(
+                MojangLibrary(
+                    name = "com.example:plain:1",
+                    downloads = MojangLibraryDownloads(MojangArtifact("com/example/plain/1/plain-1.jar", "p", 1, "u")),
+                ),
+                MojangLibrary(
+                    name = "org.lwjgl:lwjgl:3.3.3:natives-linux",
+                    downloads = MojangLibraryDownloads(MojangArtifact("org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-linux.jar", "l", 1, "u")),
+                    rules = listOf(MojangRule("allow", MojangOs("linux"))),
+                ),
+                // Same OS, foreign arch: passes the os.name rule but must NOT land on
+                // -cp -- on the module path it would collide as a second org.lwjgl.natives.
+                MojangLibrary(
+                    name = "org.lwjgl:lwjgl:3.3.3:natives-linux-arm64",
+                    downloads = MojangLibraryDownloads(MojangArtifact("org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-linux-arm64.jar", "a", 1, "u")),
+                    rules = listOf(MojangRule("allow", MojangOs("linux"))),
+                ),
+            ),
+        )
+
+        val libs = p.vanillaLibraries(version)
+        val classifiers = libs.map { it.coord.classifier }
+        assertEquals(2, libs.size, "plain lib + host native only, got $classifiers")
+        assertTrue(libs.any { it.coord.classifier == null && it.path.toString().contains("plain-1.jar") }, "normal lib kept")
+        assertTrue("natives-linux" in classifiers, "host native kept -- the module graph needs it")
+        assertTrue("natives-linux-arm64" !in classifiers, "foreign-arch native must be dropped from the classpath")
+    }
+
     // -- end to end (MockEngine) ----------------------------------------------
 
     @Test
