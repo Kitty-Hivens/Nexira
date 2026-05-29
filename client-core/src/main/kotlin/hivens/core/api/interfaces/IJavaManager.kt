@@ -27,8 +27,13 @@ interface IJavaManager {
      * different loader can need a different Java (e.g. Cleanroom-1.12.2 -> 25 vs
      * legacy-Forge-1.12.2 -> 8), so the pack path must pass the loader-declared
      * major directly instead of guessing from the version string.
+     *
+     * [onProgress] receives human-readable status lines for the launch UI -- a
+     * download of a missing JDK is ~200 MB and the caller may sit on a fixed
+     * progress stage while it runs; the default no-op keeps the SC server path
+     * silent.
      */
-    suspend fun getJavaPathForMajor(javaMajor: Int): Path
+    suspend fun getJavaPathForMajor(javaMajor: Int, onProgress: (String) -> Unit = {}): Path
 
     /**
      * Fallback Java major for a Minecraft version (8 / 17 / 21), used only when

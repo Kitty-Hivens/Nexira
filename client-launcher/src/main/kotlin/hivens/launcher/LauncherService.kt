@@ -151,7 +151,9 @@ internal class LauncherService(
         val javaExec: String = if (!runtime.javaPath.isNullOrEmpty()) {
             runtime.javaPath!!
         } else {
-            val defaultJava = javaPathOverride ?: javaManager.getJavaPathForMajor(javaMajor)
+            val defaultJava = javaPathOverride ?: javaManager.getJavaPathForMajor(javaMajor) { msg ->
+                onLog(msg, LauncherLogType.INFO)
+            }
             resolvePackJavaPath(runtime, defaultJava)
         }
 
