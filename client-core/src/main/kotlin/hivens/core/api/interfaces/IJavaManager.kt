@@ -19,4 +19,16 @@ interface IJavaManager {
      * directory if the required Liberica build is not already on disk.
      */
     suspend fun getJavaPath(version: String): Path
+
+    /**
+     * The Java major a given Minecraft version requires (8 / 17 / 21). Drives
+     * both which JDK [getJavaPath] provisions and launch-arg choices that
+     * depend on the JVM generation (e.g. `-noverify`, deprecated since 13).
+     */
+    fun detectJavaVersion(mcVersion: String): Int = when {
+        mcVersion.startsWith("1.21") || mcVersion.startsWith("1.20.5") || mcVersion.startsWith("1.20.6") -> 21
+        mcVersion.startsWith("1.17") || mcVersion.startsWith("1.18") ||
+            mcVersion.startsWith("1.19") || mcVersion.startsWith("1.20") -> 17
+        else -> 8
+    }
 }

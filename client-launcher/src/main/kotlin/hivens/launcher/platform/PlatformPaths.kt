@@ -48,6 +48,16 @@ class PlatformPaths(
     val clientsDir: Path get() = dataDir.resolve("clients")
 
     /**
+     * Shared canonical-runtime roots, deliberately OUTSIDE any single
+     * instance so libraries (maven layout) and game assets (vanilla
+     * `indexes/` + content-addressed `objects/`) dedupe across every
+     * pack of the same Minecraft version instead of being re-downloaded
+     * per instance. Populated from official Mojang/Forge CDNs.
+     */
+    val librariesDir: Path get() = dataDir.resolve("libraries")
+    val assetsDir: Path get() = dataDir.resolve("assets")
+
+    /**
      * @throws IllegalArgumentException when [assetDir] contains
      *         path-separator or traversal characters. Allowed charset
      *         is ASCII alnum + `._-`; anything else is treated as a

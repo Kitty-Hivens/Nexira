@@ -63,14 +63,6 @@ class JavaManagerService(
         return@withContext executable
     }
 
-    internal fun detectJavaVersion(mcVersion: String): Int {
-        return when {
-            mcVersion.startsWith("1.21") || mcVersion.startsWith("1.20.5") || mcVersion.startsWith("1.20.6") -> 21
-            mcVersion.startsWith("1.17") || mcVersion.startsWith("1.18") || mcVersion.startsWith("1.19") || mcVersion.startsWith("1.20") -> 17
-            else -> 8
-        }
-    }
-
     private suspend fun downloadAndUnpack(version: Int, targetDir: Path) {
         val urls = getDownloadUrls(version)
         if (urls.isEmpty()) {

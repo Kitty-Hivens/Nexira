@@ -21,11 +21,18 @@ import hivens.launcher.component.EnvironmentPreparer
 import hivens.launcher.component.GameCommandBuilder
 import hivens.launcher.component.ProcessLogHandler
 import hivens.launcher.launch.LauncherController
+import hivens.launcher.mrpack.MrpackInstaller
 import hivens.launcher.platform.PlatformPaths
+import hivens.launcher.runtime.RuntimeProvisioner
+import hivens.launcher.runtime.loader.FabricLikeResolver
+import hivens.launcher.runtime.loader.ForgeLegacyResolver
+import hivens.launcher.runtime.loader.ForgeResolver
+import hivens.launcher.runtime.loader.LoaderRegistry
+import hivens.launcher.runtime.loader.ModernInstallerResolver
+import hivens.launcher.security.KeyringStorageFactory
 import hivens.launcher.smrt.ModIconResolver
 import hivens.launcher.smrt.SmrtPackClient
 import hivens.launcher.smrt.SmrtSyncService
-import hivens.launcher.security.KeyringStorageFactory
 import hivens.launcher.update.UpdateApplicators
 import hivens.launcher.update.UpdateService
 import hivens.widget.model.DefaultLayout
@@ -396,7 +403,17 @@ val appModule = module {
     // Always wired so toggling on at runtime requires no graph rebuild.
     single { SmrtPackClient(get(named("direct"))) }
     single { SmrtSyncService(get(), get()) }
-    single { PackInstaller(syncService = get(), repository = get(), dataDir = get()) }
+    single { PackInstaller(syncService = get(), runtimeProvisioner = get(), repository = get(), dataDir = get()) }
+    single {
+        MrpackInstaller(
+            clientProvider = get(named("direct")),
+            json = get(),
+            javaManager = get(),
+            runtimeProvisioner = get(),
+            repository = get(),
+            dataDir = get(),
+        )
+    }
 
     // Per-mod icon URL resolver for the Library PackDetail Content tab.
     // Direct iconUrl wins; otherwise resolves a Modrinth project's icon
@@ -420,6 +437,37 @@ val appModule = module {
     single { ClasspathProvider(get()) }
     single { GameCommandBuilder(get()) }
     single { ProcessLogHandler() }
+
+    // Canonical runtime provisioner -- vanilla + loader libraries from the
+    // official Mojang/Forge CDNs into the shared roots. Direct channel: these
+    // CDNs do not use the SMARTYcraft proxy (same rationale as JavaManagerService).
+    single { ForgeLegacyResolver(get(named("direct")), get()) }
+    single {
+        // Modern loaders run the official installer headless, caching its
+        // output here so re-launches skip the multi-minute install.
+        val loaderCacheDir: Path = get<Path>().resolve("loader-cache")
+        LoaderRegistry(
+            listOf(
+                // "forge" routes to legacy (<=1.12.2) or the modern installer by MC version.
+                ForgeResolver(
+                    legacy = get<ForgeLegacyResolver>(),
+                    modern = ModernInstallerResolver.forge(get(named("direct")), get(), get(), loaderCacheDir),
+                ),
+                ModernInstallerResolver.neoforge(get(named("direct")), get(), get(), loaderCacheDir),
+                FabricLikeResolver(get(named("direct")), get(), "fabric", FabricLikeResolver.FABRIC_META),
+                FabricLikeResolver(get(named("direct")), get(), "quilt", FabricLikeResolver.QUILT_META),
+            ),
+        )
+    }
+    single {
+        RuntimeProvisioner(
+            librariesDir = get<PlatformPaths>().librariesDir,
+            assetsDir = get<PlatformPaths>().assetsDir,
+            clientProvider = get(named("direct")),
+            json = get(),
+            loaderRegistry = get(),
+        )
+    }
 
     single<IAuthService> { AuthService(get<IServerProtocol>()) }
 
@@ -502,12 +550,15 @@ val appModule = module {
      */
     single<ILauncherService> {
         LauncherService(
-            profileManager    = get(),
-            javaManager       = get(),
-            envPreparer       = get(),
-            classpathProvider = get(),
-            commandBuilder    = get(),
-            logHandler        = get()
+            profileManager     = get(),
+            javaManager        = get(),
+            envPreparer        = get(),
+            classpathProvider  = get(),
+            commandBuilder     = get(),
+            logHandler         = get(),
+            runtimeProvisioner = get(),
+            sharedAssetsDir    = get<PlatformPaths>().assetsDir,
+            sharedLibrariesDir = get<PlatformPaths>().librariesDir,
         )
     }
 

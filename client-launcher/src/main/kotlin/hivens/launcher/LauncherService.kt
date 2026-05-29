@@ -12,8 +12,8 @@ import hivens.core.data.SessionData
 import hivens.launcher.component.ClasspathProvider
 import hivens.launcher.component.EnvironmentPreparer
 import hivens.launcher.component.GameCommandBuilder
-import hivens.launcher.component.LaunchTarget
 import hivens.launcher.component.ProcessLogHandler
+import hivens.launcher.runtime.RuntimeProvisioner
 import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.nio.file.Files
@@ -33,7 +33,10 @@ internal class LauncherService(
     private val envPreparer: EnvironmentPreparer,
     private val classpathProvider: ClasspathProvider,
     private val commandBuilder: GameCommandBuilder,
-    private val logHandler: ProcessLogHandler
+    private val logHandler: ProcessLogHandler,
+    private val runtimeProvisioner: RuntimeProvisioner,
+    private val sharedAssetsDir: Path,
+    private val sharedLibrariesDir: Path,
 ) : ILauncherService {
 
     private val log = LoggerFactory.getLogger(LauncherService::class.java)
@@ -132,41 +135,36 @@ internal class LauncherService(
         log.info("Session initialization (pack): {}, Java: {}, Heap: {}MB", displayName, javaExec, memory)
         onLog("Running $displayName...", LauncherLogType.INFO)
 
-        // 3. Natives + assets layout. Reuse the same VersionConfig-keyed
-        // directory layout as the SC path; both flows write into the
-        // same canonical `<clientRoot>/bin/natives-<mcVersion>` shape.
-        val nativesDir = commandBuilder.getNativesDir(mcVersion)
-        envPreparer.prepareNatives(clientRootPath, nativesDir, mcVersion)
-        envPreparer.prepareAssets(clientRootPath, "assets-$mcVersion.zip")
+        // 3. Canonical runtime: vanilla + loader libraries + client + assets into
+        // the SHARED roots (idempotent). Throws clearly if it cannot provision --
+        // no more "ready" followed by an empty-classpath crash.
+        val nativesDir = commandBuilder.packNativesDir(mcVersion)
+        val resolved = runtimeProvisioner.ensureRuntime(
+            mcVersion = mcVersion,
+            loaderName = manifest.loaderName,
+            loaderVersion = manifest.loaderVersion,
+        ) { current, total, file -> onLog("Runtime $current/$total: $file", LauncherLogType.INFO) }
 
-        // 4. Classpath. Pack-centric sync writes the same on-disk
-        // layout the SC FileManifest classpath provider expects (mods/,
-        // libraries-{ver}/, bin/, core mods, etc), so the same provider
-        // walks the directory and assembles the classpath without
-        // needing a server-side FileManifest object.
-        val classpath = classpathProvider.buildClasspath(
-            clientRootPath,
-            FileManifest(),
-            excludedModules = emptyList(),
-        )
+        // 4. Natives stay per-instance, but are now extracted from the jars the
+        // provisioner resolved from the manifest -- so the LWJGL version matches
+        // the classpath for ANY MC version, not just the few the SC path hardcodes.
+        // Assets are the shared root the provisioner just populated.
+        envPreparer.prepareNativesFromManifest(clientRootPath, nativesDir, resolved.natives)
 
-        // 5. Build the JVM command via the domain-agnostic LaunchTarget
-        // overload. Pack-centric installs do not pre-fill neoForgeArgs /
-        // ignoreModulesList (those are SC-server-side overrides); the
-        // builder's auto-detector and baked defaults handle the rest.
-        val command = commandBuilder.build(
-            javaExec   = javaExec,
-            memoryMB   = memory,
-            clientRoot = clientRootPath,
-            target     = LaunchTarget(
-                mcVersion         = mcVersion,
-                neoForgeArgs      = null,
-                ignoreModulesList = null,
-                jvmArgsOverride   = runtime.jvmArgs,
-                displayName       = displayName,
-            ),
-            session    = sessionData,
-            classpath  = classpath,
+        // 5. Profile-driven command: main class / classpath / args come from the
+        // resolved runtime; assets point at the shared root.
+        val command = commandBuilder.buildPackCommand(
+            javaExec = javaExec,
+            memoryMB = memory,
+            gameDir = clientRootPath,
+            sharedAssetsDir = sharedAssetsDir,
+            sharedLibrariesDir = sharedLibrariesDir,
+            nativesDirName = nativesDir,
+            versionLabel = packVersionLabel(manifest.loaderName, mcVersion),
+            javaMajor = javaManager.detectJavaVersion(mcVersion),
+            runtime = resolved,
+            session = sessionData,
+            jvmArgsOverride = runtime.jvmArgs,
         )
 
         val pb = ProcessBuilder(command)
@@ -178,6 +176,12 @@ internal class LauncherService(
         val process = pb.start()
         logHandler.attach(process, onLog)
         return process
+    }
+
+    /** Display label for `--version`, e.g. "Forge 1.12.2" / "Fabric 1.20.1". */
+    private fun packVersionLabel(loaderName: String, mcVersion: String): String {
+        val loader = loaderName.trim().ifEmpty { "Minecraft" }.replaceFirstChar { it.uppercaseChar() }
+        return "$loader $mcVersion"
     }
 
     internal companion object {

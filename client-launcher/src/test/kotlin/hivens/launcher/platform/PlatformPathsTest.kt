@@ -136,6 +136,8 @@ class PlatformPathsTest {
         assertEquals(data.resolve("skin-cache"), paths.skinCacheDir)
         assertEquals(data.resolve("clients"), paths.clientsDir)
         assertEquals(data.resolve("clients").resolve("Industrial"), paths.clientDir("Industrial"))
+        assertEquals(data.resolve("libraries"), paths.librariesDir)
+        assertEquals(data.resolve("assets"), paths.assetsDir)
     }
 
     // ── assetDir whitelist gate ────────────────────────────────────────────

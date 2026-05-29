@@ -9,6 +9,7 @@ import hivens.core.data.InstanceRuntime
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.core.data.PackReference
+import hivens.launcher.runtime.RuntimeProvisioner
 import hivens.launcher.smrt.SmrtSyncService
 import org.slf4j.LoggerFactory
 import java.nio.file.Path
@@ -38,6 +39,7 @@ import java.util.UUID
  */
 class PackInstaller(
     private val syncService: SmrtSyncService,
+    private val runtimeProvisioner: RuntimeProvisioner,
     private val repository: IPackRepository,
     private val dataDir: Path,
 ) {
@@ -60,6 +62,16 @@ class PackInstaller(
             packId    = packId,
             clientDir = clientDir,
             progress  = progress,
+        )
+
+        // Provision the canonical runtime (vanilla + loader libraries + client +
+        // assets) into the shared roots -- once per MC version, shared across
+        // instances. Heavy first-run download with progress; idempotent after.
+        runtimeProvisioner.ensureRuntime(
+            mcVersion = manifest.minecraft.version,
+            loaderName = manifest.loader.name,
+            loaderVersion = manifest.loader.version,
+            progress = progress,
         )
 
         val instance = PackInstance(

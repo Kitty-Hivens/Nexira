@@ -14,6 +14,7 @@ import hivens.launcher.component.ClasspathProvider
 import hivens.launcher.component.EnvironmentPreparer
 import hivens.launcher.component.GameCommandBuilder
 import hivens.launcher.component.ProcessLogHandler
+import hivens.launcher.runtime.RuntimeProvisioner
 import hivens.test.buildMockClient
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -211,6 +212,15 @@ class LauncherServiceTest {
             classpathProvider = classpathProvider,
             commandBuilder = commandBuilder,
             logHandler = logHandler,
+            // SC path under test never invokes the provisioner; a dead one satisfies the ctor.
+            runtimeProvisioner = RuntimeProvisioner(
+                librariesDir = workDir / "libraries",
+                assetsDir = workDir / "assets",
+                clientProvider = deadHttpClientProvider(),
+                json = json,
+            ),
+            sharedAssetsDir = workDir / "assets",
+            sharedLibrariesDir = workDir / "libraries",
         )
 
         val session = SessionData(

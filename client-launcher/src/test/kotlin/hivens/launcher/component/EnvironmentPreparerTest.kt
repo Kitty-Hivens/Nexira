@@ -413,6 +413,82 @@ class EnvironmentPreparerTest {
         assertTrue(Files.exists(clientRoot / "bin" / "natives-1.21.1" / "liblwjgl.so"))
     }
 
+    // -- prepareNativesFromManifest: manifest-resolved, version-correct --
+
+    @Test
+    fun `prepareNativesFromManifest extracts host natives from resolved jars`() {
+        val clientRoot = workDir
+        val libs = (clientRoot / "libs").also { Files.createDirectories(it) }
+        val jar = libs / "lwjgl-natives-linux.jar"
+        writeZip(jar, mapOf(
+            "liblwjgl.so" to "elf".toByteArray(),
+            "META-INF/MANIFEST.MF" to "x".toByteArray(),
+        ))
+
+        withSystemProp("os.name", "Linux") {
+            runBlocking {
+                EnvironmentPreparer(deadHttpClientProvider()).prepareNativesFromManifest(
+                    clientRoot, "bin/natives-1.20.1", listOf(jar),
+                )
+            }
+        }
+
+        assertTrue(Files.exists(clientRoot / "bin" / "natives-1.20.1" / "liblwjgl.so"),
+            "the resolved native jar must be unpacked into the instance natives dir")
+    }
+
+    @Test
+    fun `prepareNativesFromManifest hoists nested natives to the root`() {
+        val clientRoot = workDir
+        val libs = (clientRoot / "libs").also { Files.createDirectories(it) }
+        val jar = libs / "lwjgl-natives-linux.jar"
+        // Real LWJGL jars nest the .so under an os/arch path.
+        writeZip(jar, mapOf("linux/x64/org/lwjgl/liblwjgl.so" to "elf".toByteArray()))
+
+        withSystemProp("os.name", "Linux") {
+            runBlocking {
+                EnvironmentPreparer(deadHttpClientProvider()).prepareNativesFromManifest(
+                    clientRoot, "bin/natives-1.20.1", listOf(jar),
+                )
+            }
+        }
+
+        assertTrue(Files.exists(clientRoot / "bin" / "natives-1.20.1" / "liblwjgl.so"),
+            "nested .so must be hoisted to the natives root for java.library.path")
+    }
+
+    @Test
+    fun `prepareNativesFromManifest short-circuits when the dir is already valid`() {
+        val clientRoot = workDir
+        val nativesDir = (clientRoot / "bin" / "natives-1.20.1").also { Files.createDirectories(it) }
+        Files.createFile(nativesDir / "liblwjgl.so")
+
+        withSystemProp("os.name", "Linux") {
+            runBlocking {
+                // Bogus jar path -- must NOT be consulted because the dir is already valid.
+                EnvironmentPreparer(deadHttpClientProvider()).prepareNativesFromManifest(
+                    clientRoot, "bin/natives-1.20.1", listOf(clientRoot / "does-not-exist.jar"),
+                )
+            }
+        }
+
+        assertTrue(Files.exists(nativesDir / "liblwjgl.so"))
+    }
+
+    @Test
+    fun `prepareNativesFromManifest does not throw on an empty native list`() {
+        val clientRoot = workDir
+        withSystemProp("os.name", "Linux") {
+            runBlocking {
+                EnvironmentPreparer(deadHttpClientProvider()).prepareNativesFromManifest(
+                    clientRoot, "bin/natives-1.20.1", emptyList(),
+                )
+            }
+        }
+        // Logged, not thrown -- and the empty dir is correctly reported invalid.
+        assertFalse(svc.isFolderValidForOs(clientRoot / "bin" / "natives-1.20.1", "linux"))
+    }
+
     // ── prepareAssets ─────────────────────────────────────────────────────
 
     @Test
