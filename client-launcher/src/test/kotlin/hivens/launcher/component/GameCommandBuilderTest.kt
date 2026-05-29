@@ -3,6 +3,9 @@ package hivens.launcher.component
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.InstanceProfile
 import hivens.core.data.SessionData
+import hivens.launcher.runtime.MavenCoord
+import hivens.launcher.runtime.loader.ResolvedLibrary
+import hivens.launcher.runtime.loader.ResolvedRuntime
 import java.io.File
 import java.nio.file.Path
 import kotlin.test.*
@@ -107,6 +110,15 @@ class GameCommandBuilderTest {
         assertFailsWith<IllegalArgumentException> {
             builder.getNativesDir("1.99.0")
         }
+    }
+
+    @Test
+    fun `packNativesDir works for any version, unlike the SC-map getNativesDir`() {
+        // The pack path must not route through the SC VersionConfig map -- doing
+        // so threw "Unsupported client version" for every MC outside 1.7/1.12/1.21.
+        assertEquals("bin/natives-1.20.1", builder.packNativesDir("1.20.1"))
+        assertEquals("bin/natives-1.19.4", builder.packNativesDir("1.19.4"))
+        assertEquals("bin/natives-1.21.1", builder.packNativesDir("1.21.1"))
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -493,5 +505,166 @@ class GameCommandBuilderTest {
         val ignoreArg = cmd.find { it.startsWith("-DignoreList=") }
         assertNotNull(ignoreArg)
         assertTrue(ignoreArg.contains("custom-module"))
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // buildPackCommand -- profile-driven pack launch (loader-resolved runtime)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    private fun forgeRuntime() = ResolvedRuntime(
+        libraries = listOf(
+            ResolvedLibrary(MavenCoord.parse("net.minecraft:launchwrapper:1.12"), Path.of("/libs/net/minecraft/launchwrapper/1.12/launchwrapper-1.12.jar")),
+            ResolvedLibrary(MavenCoord.parse("org.ow2.asm:asm-debug-all:5.2"), Path.of("/libs/org/ow2/asm/asm-debug-all/5.2/asm-debug-all-5.2.jar")),
+            ResolvedLibrary(MavenCoord.parse("com.google.guava:guava:21.0"), Path.of("/libs/com/google/guava/guava/21.0/guava-21.0.jar")),
+            ResolvedLibrary(MavenCoord.parse("net.minecraftforge:forge:1.12.2-14.23.5.2860"), Path.of("/libs/net/minecraftforge/forge/1.12.2-14.23.5.2860/forge-1.12.2-14.23.5.2860.jar")),
+        ),
+        clientJar = Path.of("/libs/net/minecraft/minecraft/1.12.2/minecraft-1.12.2.jar"),
+        mainClass = "net.minecraft.launchwrapper.Launch",
+        assetIndexId = "1.12",
+        gameArgs = listOf("--tweakClass", "net.minecraftforge.fml.common.launcher.FMLTweaker"),
+    )
+
+    private fun packCommand(
+        runtime: ResolvedRuntime = forgeRuntime(),
+        javaMajor: Int = 8,
+    ) = builder.buildPackCommand(
+        javaExec = "/usr/bin/java",
+        memoryMB = 4096,
+        gameDir = Path.of("/tmp/instances/Industrial"),
+        sharedAssetsDir = Path.of("/tmp/shared/assets"),
+        sharedLibrariesDir = Path.of("/tmp/shared/libraries"),
+        nativesDirName = "bin/natives-1.12.2",
+        versionLabel = "Forge 1.12.2",
+        javaMajor = javaMajor,
+        runtime = runtime,
+        session = session(),
+        jvmArgsOverride = null,
+    )
+
+    @Test
+    fun `buildPackCommand drives mainClass, assetIndex and tweak from the runtime`() {
+        val cmd = packCommand()
+        assertEquals("/usr/bin/java", cmd[0])
+        assertTrue(cmd.contains("-noverify"), "legacy launchwrapper runtime gets -noverify")
+        assertTrue(cmd.contains("net.minecraft.launchwrapper.Launch"))
+        assertEquals("1.12", cmd[cmd.indexOf("--assetIndex") + 1])
+        assertTrue(cmd[cmd.indexOf("--assetsDir") + 1].contains("shared/assets"), "assets from the shared root")
+        assertEquals("net.minecraftforge.fml.common.launcher.FMLTweaker", cmd[cmd.indexOf("--tweakClass") + 1])
+    }
+
+    @Test
+    fun `buildPackCommand classpath is bootstrap-first, client is one entry, excludes mods`() {
+        val cmd = packCommand()
+        val parts = cmd[cmd.indexOf("-cp") + 1].split(sep)
+        assertTrue(parts[0].contains("launchwrapper") || parts[0].contains("asm"), "bootstrap jar first, got ${parts[0]}")
+        // The full client path must be ONE entry -- guards the Path-is-Iterable
+        // `+` gotcha that split the jar into its individual path segments.
+        assertTrue(
+            parts.contains(forgeRuntime().clientJar.toAbsolutePath().toString()),
+            "client jar must be a single full-path cp entry, got: $parts",
+        )
+        assertTrue(parts.none { it.contains("${File.separator}mods${File.separator}") }, "mods stay off the classpath")
+    }
+
+    @Test
+    fun `buildPackCommand omits -noverify on Java 17+ even though it adds it on Java 8`() {
+        // -noverify is legitimate on Java 8 (broken legacy bytecode) but warns
+        // on 13+, so the choice is by Java major, not by main class.
+        assertTrue(packCommand(javaMajor = 8).contains("-noverify"))
+        val modern = forgeRuntime().copy(mainClass = "cpw.mods.bootstraplauncher.BootstrapLauncher")
+        assertFalse(packCommand(modern, javaMajor = 21).contains("-noverify"))
+    }
+
+    private fun vanillaRuntime() = ResolvedRuntime(
+        libraries = listOf(
+            ResolvedLibrary(MavenCoord.parse("com.mojang:logging:1.1.1"), Path.of("/libs/com/mojang/logging/1.1.1/logging-1.1.1.jar")),
+            ResolvedLibrary(MavenCoord.parse("org.lwjgl:lwjgl:3.3.3"), Path.of("/libs/org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3.jar")),
+        ),
+        clientJar = Path.of("/libs/net/minecraft/minecraft/1.20.1/minecraft-1.20.1.jar"),
+        mainClass = "net.minecraft.client.main.Main",
+        assetIndexId = "5",
+        // No loader overlay: the vanilla ensureRuntime branch leaves jvmArgs empty.
+    )
+
+    @Test
+    fun `buildPackCommand keeps the vanilla client on -cp for a loaderless modern pack`() {
+        // A Modrinth/vanilla pack on 1.20 resolves to the vanilla main class with
+        // empty jvm args -> it must take the legacy (non-templated) path that puts
+        // the client jar on -cp. Guards a future vanilla-branch change (e.g. adding
+        // jvm args) from silently flipping it onto modernClasspath, which drops the
+        // client and would leave a vanilla launch with no minecraft on the classpath.
+        val cmd = packCommand(runtime = vanillaRuntime(), javaMajor = 17)
+        assertEquals(1, cmd.count { it == "-cp" })
+        val cp = cmd[cmd.indexOf("-cp") + 1]
+        assertTrue(cp.contains("minecraft-1.20.1.jar"), "vanilla pack must carry the client jar on -cp, got $cp")
+        assertTrue(cmd.contains("net.minecraft.client.main.Main"))
+        assertFalse(cmd.contains("-p"), "a vanilla launch has no module path")
+    }
+
+    private fun neoForgeRuntime() = ResolvedRuntime(
+        libraries = listOf(
+            ResolvedLibrary(MavenCoord.parse("cpw.mods:bootstraplauncher:2.0.2"), Path.of("/libs/cpw/mods/bootstraplauncher/2.0.2/bootstraplauncher-2.0.2.jar")),
+            ResolvedLibrary(MavenCoord.parse("cpw.mods:securejarhandler:3.0.8"), Path.of("/libs/cpw/mods/securejarhandler/3.0.8/securejarhandler-3.0.8.jar")),
+            ResolvedLibrary(MavenCoord.parse("net.neoforged:neoforge:21.1.66"), Path.of("/libs/net/neoforged/neoforge/21.1.66/neoforge-21.1.66.jar")),
+        ),
+        clientJar = Path.of("/libs/net/minecraft/minecraft/1.21.1/minecraft-1.21.1.jar"),
+        mainClass = "cpw.mods.bootstraplauncher.BootstrapLauncher",
+        assetIndexId = "17",
+        // A representative modern arguments.jvm: vanilla's `-cp ${classpath}` +
+        // `-Djava.library.path` (both must be dropped), an --add-opens to keep,
+        // the loader's -p with placeholders, and -DlibraryDirectory.
+        jvmArgs = listOf(
+            "-Djava.library.path=\${natives_directory}",
+            "-cp", "\${classpath}",
+            "--add-opens=java.base/java.lang=ALL-UNNAMED",
+            "-p", "\${library_directory}/cpw/mods/bootstraplauncher/2.0.2/bootstraplauncher-2.0.2.jar\${classpath_separator}\${library_directory}/cpw/mods/securejarhandler/3.0.8/securejarhandler-3.0.8.jar",
+            "-DlibraryDirectory=\${library_directory}",
+            "-DignoreList=client-extra,neoforge-",
+        ),
+        gameArgs = listOf("--launchTarget", "neoforgeclient", "--fml.neoForgeVersion", "21.1.66"),
+    )
+
+    @Test
+    fun `buildPackCommand modern path substitutes placeholders and rebuilds cp`() {
+        val cmd = builder.buildPackCommand(
+            javaExec = "/usr/bin/java",
+            memoryMB = 4096,
+            gameDir = Path.of("/tmp/instances/NeoPack"),
+            sharedAssetsDir = Path.of("/tmp/shared/assets"),
+            sharedLibrariesDir = Path.of("/tmp/shared/libraries"),
+            nativesDirName = "bin/natives-1.21.1",
+            versionLabel = "NeoForge 1.21.1",
+            javaMajor = 21,
+            runtime = neoForgeRuntime(),
+            session = session(),
+            jvmArgsOverride = null,
+        )
+
+        // The inherited vanilla -cp ${classpath} pair is dropped; exactly one -cp
+        // remains -- ours -- and it carries the client + libs, not ${classpath}.
+        assertEquals(1, cmd.count { it == "-cp" }, "only the builder's own -cp survives")
+        val cp = cmd[cmd.indexOf("-cp") + 1]
+        assertFalse(cp.contains("\${classpath}"), "the placeholder must be gone, got $cp")
+        assertFalse(cp.contains("minecraft-1.21.1.jar"), "vanilla client NOT on a modern cp -- FML loads its processor client")
+        assertTrue(cp.contains("neoforge-21.1.66.jar"), "loader libs on the classpath")
+
+        // Module path kept, with ${library_directory}/${classpath_separator} resolved.
+        val pValue = cmd[cmd.indexOf("-p") + 1]
+        assertTrue(pValue.contains("bootstraplauncher-2.0.2.jar"), "boot module on -p")
+        assertTrue(pValue.contains("/tmp/shared/libraries"), "library_directory substituted, got $pValue")
+        assertFalse(pValue.contains("\${"), "no placeholder left in -p, got $pValue")
+        assertTrue(pValue.contains(File.pathSeparator), "two boot jars joined by the path separator, got $pValue")
+
+        assertTrue(cmd.contains("-DlibraryDirectory=/tmp/shared/libraries"), "libraryDirectory substituted")
+        assertTrue(cmd.contains("--add-opens=java.base/java.lang=ALL-UNNAMED"), "kept add-opens")
+        assertTrue(cmd.contains("--add-modules=jdk.incubator.vector"), "vector module added on the module path")
+
+        // Inherited -Djava.library.path is dropped; the builder emits its own.
+        assertEquals(1, cmd.count { it.startsWith("-Djava.library.path") }, "exactly one java.library.path -- the builder's")
+        assertFalse(cmd.any { it.contains("\${natives_directory}") }, "natives placeholder not left dangling")
+
+        // Loader game args land after the standard set.
+        assertEquals("neoforgeclient", cmd[cmd.indexOf("--launchTarget") + 1])
+        assertEquals("21.1.66", cmd[cmd.indexOf("--fml.neoForgeVersion") + 1])
     }
 }
