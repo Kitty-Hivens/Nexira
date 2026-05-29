@@ -185,6 +185,41 @@ private fun SlotContent.walkInstances(): Sequence<WidgetInstance> = sequence {
     }
 }
 
+// All instanceIds under one surface, tree-wide (including nested children).
+fun SurfaceLayout.instanceIds(): Set<String> =
+    slots.values.flatMap { content -> content.walkInstances().map { it.instanceId } }.toSet()
+
+// Removes every widget whose instanceId is in `ids`, tree-wide. resetSurface
+// uses this to clear ids that leaked onto OTHER surfaces (via a cross-surface
+// move) before restoring a default surface -- otherwise the restored default
+// ids collide with the leaked copies and the tree-wide uniqueness check
+// rejects the whole reset, trapping the user.
+fun SurfaceLayout.removeInstanceIds(ids: Set<String>): SurfaceLayout =
+    copy(slots = slots.mapValues { (_, content) -> content.removeInstanceIds(ids) })
+
+private fun SlotContent.removeInstanceIds(ids: Set<String>): SlotContent =
+    copy(
+        widgets = widgets
+            .filter { it.instanceId !in ids }
+            .map { w -> w.copy(children = w.children.mapValues { (_, c) -> c.removeInstanceIds(ids) }) },
+    )
+
+// Restores `surface` to `defaultLayout` (its bundled default), first stripping
+// any of the restored instanceIds that leaked onto OTHER surfaces (via a
+// cross-surface move) so the tree-wide uniqueness invariant holds and the reset
+// always succeeds -- otherwise the restored id collides with the leaked copy.
+// A null defaultLayout (surface absent from the bundled default) removes the
+// surface entirely. Pure so the escape-hatch path is unit-testable alongside
+// the other LayoutGraph transforms.
+fun LayoutGraph.resetSurface(surface: SurfaceId, defaultLayout: SurfaceLayout?): LayoutGraph {
+    if (defaultLayout == null) return copy(surfaces = surfaces - surface)
+    val restoredIds = defaultLayout.instanceIds()
+    val cleaned = surfaces.mapValues { (sid, layout) ->
+        if (sid == surface) layout else layout.removeInstanceIds(restoredIds)
+    }
+    return copy(surfaces = cleaned + (surface to defaultLayout))
+}
+
 // ── Internal traversal + rebuild ──────────────────────────────────────
 
 // Applies `mutator` to the SlotContent at `path`. If the mutator

@@ -337,6 +337,53 @@ class LayoutGraphMutationsTest {
     }
 
     @Test
+    fun `instanceIds collects ids tree-wide for a surface`() {
+        val layout = SurfaceLayout(slots = mapOf(main to SlotContent(listOf(container))))
+        assertEquals(setOf("container1", "i1", "i2"), layout.instanceIds())
+    }
+
+    @Test
+    fun `removeInstanceIds strips matching widgets tree-wide`() {
+        val layout = SurfaceLayout(
+            slots = mapOf(
+                SlotId("top") to SlotContent(listOf(w1, w2)),
+                SlotId("bot") to SlotContent(listOf(container)),
+            ),
+        )
+        val out = layout.removeInstanceIds(setOf("i1"))
+        assertEquals(listOf("i2"), out.slots[SlotId("top")]!!.widgets.map { it.instanceId })
+        // i1 nested inside the container's body slot is stripped too.
+        val body = out.slots[SlotId("bot")]!!.widgets[0].children[SlotId("body")]!!.widgets
+        assertEquals(listOf("i2"), body.map { it.instanceId })
+    }
+
+    @Test
+    fun `resetSurface restores default and strips ids leaked to other surfaces`() {
+        // The bug scenario: home's default widget (i1) was moved onto another
+        // surface; resetting home re-adds i1, which must not collide.
+        val defaultHome = SurfaceLayout(slots = mapOf(main to SlotContent(listOf(w1))))
+        val graph = LayoutGraph(
+            surfaces = mapOf(
+                home to SurfaceLayout(slots = mapOf(main to SlotContent(listOf(w2)))),       // home edited away from default
+                SurfaceId("library") to SurfaceLayout(slots = mapOf(                          // i1 leaked here
+                    SlotId("body") to SlotContent(listOf(w1)),
+                )),
+            ),
+        )
+        val out = graph.resetSurface(home, defaultHome)
+        assertEquals(listOf("i1"), out.surfaces[home]!!.slots[main]!!.widgets.map { it.instanceId })
+        assertEquals(emptyList<String>(), out.surfaces[SurfaceId("library")]!!.slots[SlotId("body")]!!.widgets.map { it.instanceId })
+        // The pre-fix bug would have produced two "i1" tree-wide -> uniqueness must hold.
+        val ids = out.walkInstances().map { it.instanceId }.toList()
+        assertEquals(ids.toSet().size, ids.size, "no duplicate instanceIds after reset")
+    }
+
+    @Test
+    fun `resetSurface with a null default removes the surface entirely`() {
+        assertNull(seed(w1).resetSurface(home, null).surfaces[home])
+    }
+
+    @Test
     fun `insertWidget into a nested slot the container did not declare is identity`() {
         // Pin the contract: the LayoutGraph mutator does NOT auto-create
         // missing child slot entries. The editor (EditModeController)
