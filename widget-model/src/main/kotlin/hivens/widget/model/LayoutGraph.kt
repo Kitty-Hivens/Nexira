@@ -204,6 +204,22 @@ private fun SlotContent.removeInstanceIds(ids: Set<String>): SlotContent =
             .map { w -> w.copy(children = w.children.mapValues { (_, c) -> c.removeInstanceIds(ids) }) },
     )
 
+// Restores `surface` to `defaultLayout` (its bundled default), first stripping
+// any of the restored instanceIds that leaked onto OTHER surfaces (via a
+// cross-surface move) so the tree-wide uniqueness invariant holds and the reset
+// always succeeds -- otherwise the restored id collides with the leaked copy.
+// A null defaultLayout (surface absent from the bundled default) removes the
+// surface entirely. Pure so the escape-hatch path is unit-testable alongside
+// the other LayoutGraph transforms.
+fun LayoutGraph.resetSurface(surface: SurfaceId, defaultLayout: SurfaceLayout?): LayoutGraph {
+    if (defaultLayout == null) return copy(surfaces = surfaces - surface)
+    val restoredIds = defaultLayout.instanceIds()
+    val cleaned = surfaces.mapValues { (sid, layout) ->
+        if (sid == surface) layout else layout.removeInstanceIds(restoredIds)
+    }
+    return copy(surfaces = cleaned + (surface to defaultLayout))
+}
+
 // ── Internal traversal + rebuild ──────────────────────────────────────
 
 // Applies `mutator` to the SlotContent at `path`. If the mutator
