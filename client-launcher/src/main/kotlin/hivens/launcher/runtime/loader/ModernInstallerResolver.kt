@@ -48,6 +48,14 @@ class ModernInstallerResolver(
     private val javaManager: IJavaManager,
     private val cacheDir: Path,
     override val loaderId: String,
+    /**
+     * Java major to run the official installer under. Null means derive from the
+     * MC version via [IJavaManager.detectJavaVersion] -- matches every current
+     * loader (Forge / NeoForge target the MC version's own JDK). Pass the
+     * loader's declared major when a future loader needs a different one
+     * (e.g. Cleanroom -> 25) so the installer JDK matches the GAME's JDK.
+     */
+    private val installerJavaMajor: Int? = null,
     private val installerUrl: (mcVersion: String, loaderVersion: String) -> String,
 ) : LoaderResolver {
 
@@ -120,7 +128,8 @@ class ModernInstallerResolver(
         log.info("{}: downloading installer {}", loaderId, url)
         downloadTo(url, installer)
 
-        val java = javaManager.getJavaPath(mcVersion)
+        val major = installerJavaMajor ?: javaManager.detectJavaVersion(mcVersion)
+        val java = javaManager.getJavaPathForMajor(major)
         runInstaller(java, installer, dotMinecraft)
 
         Files.deleteIfExists(installer)

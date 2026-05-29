@@ -268,7 +268,7 @@ class LauncherControllerTest {
                 manifest           = any(),
                 runtime            = any(),
                 clientRootPath     = any(),
-                javaExecutablePath = any(),
+                javaPathOverride   = any(),
                 allocatedMemoryMB  = any(),
                 displayName        = any(),
                 onLog              = any(),

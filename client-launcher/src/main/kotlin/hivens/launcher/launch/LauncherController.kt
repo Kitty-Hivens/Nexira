@@ -365,15 +365,16 @@ class LauncherController(
                 val (manifestSnapshot, refreshedInstance) =
                     resolveOrFetchManifest(packInstance)
 
-                // 2. Java. Same JavaManager path as the SC flow --
-                // pack manifest's declared MC version drives the
-                // managed Liberica selection.
+                // 2. Java override. The pack launch path picks the LOADER-declared
+                // Java itself (resolved.javaMajor) from the resolved runtime --
+                // same MC + different loader can need different Java (Cleanroom-
+                // 1.12.2 -> 25 vs legacy-Forge-1.12.2 -> 8), so the version-keyed
+                // heuristic moves out of the controller. We only pass the user's
+                // explicit global setting; null means "let the service provision."
                 setStage(PrepareStage.JVM, 0.7f)
-                val javaPath = if (!settings.javaPath.isNullOrEmpty()) {
-                    Path.of(settings.javaPath!!)
-                } else {
-                    javaManagerService.getJavaPath(manifestSnapshot.minecraftVersion)
-                }
+                val javaOverride: Path? = settings.javaPath
+                    ?.takeIf { it.isNotEmpty() }
+                    ?.let { Path.of(it) }
 
                 // 3. Spawn. Pack-centric clientRoot lives under
                 // `<dataDir>/instances/<instanceDirName>`, not under
@@ -395,7 +396,7 @@ class LauncherController(
                     manifest             = manifestSnapshot,
                     runtime              = refreshedInstance.runtime,
                     clientRootPath       = clientDir,
-                    javaExecutablePath   = javaPath,
+                    javaPathOverride     = javaOverride,
                     allocatedMemoryMB    = settings.memoryMB,
                     displayName          = refreshedInstance.displayName,
                 ) { text, type ->

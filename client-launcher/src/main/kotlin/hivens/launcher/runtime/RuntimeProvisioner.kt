@@ -92,6 +92,9 @@ class RuntimeProvisioner(
         /** Host-matching native jars (lwjgl etc.) resolved from the manifest,
          *  on disk in the shared root after [ensureVanilla]. */
         val natives: List<Path> = emptyList(),
+        /** Mojang's declared Java major (1.17+ vanilla json carries
+         *  `javaVersion.majorVersion`); null on legacy / when absent. */
+        val javaMajor: Int? = null,
     )
 
     /** A single file to fetch into a shared root, verified against [sha1]. */
@@ -123,6 +126,7 @@ class RuntimeProvisioner(
                 mainClass = VANILLA_MAIN_CLASS,
                 assetIndexId = vanilla.assetIndexId,
                 natives = vanilla.natives,
+                javaMajor = vanilla.javaMajor,
             )
 
         log.info("resolving loader overlay: {} {}", resolver.loaderId, loaderVersion)
@@ -158,6 +162,8 @@ class RuntimeProvisioner(
             jvmArgs = if (profile.inheritsVanillaArguments) vanilla.jvmArgs + profile.jvmArgs else profile.jvmArgs,
             gameArgs = profile.gameArgs,
             natives = vanilla.natives,
+            // Loader override (Cleanroom -> 25) wins; else inherit vanilla's declared.
+            javaMajor = profile.javaMajor ?: vanilla.javaMajor,
         )
     }
 
@@ -194,6 +200,7 @@ class RuntimeProvisioner(
             jvmArgs = version.arguments?.let { flattenArguments(it.jvm, mojangOs) } ?: emptyList(),
             gameArgs = version.arguments?.let { flattenArguments(it.game, mojangOs) } ?: emptyList(),
             natives = nativeJarPaths(version),
+            javaMajor = version.javaVersion?.majorVersion,
         )
     }
 

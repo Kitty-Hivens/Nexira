@@ -26,16 +26,14 @@ class JavaManagerService(
     private val httpClient get() = clientProvider.current
     private val runtimesDir: Path = baseDir.resolve("runtimes")
 
-    /**
-     * Returns the path to the Java executable.
-     * If the required version is not available, it downloads it.
-     */
-    override suspend fun getJavaPath(version: String): Path = withContext(Dispatchers.IO) {
-        val javaVersion = detectJavaVersion(version)
+    override suspend fun getJavaPath(version: String): Path =
+        getJavaPathForMajor(detectJavaVersion(version))
+
+    override suspend fun getJavaPathForMajor(javaMajor: Int, onProgress: (String) -> Unit): Path = withContext(Dispatchers.IO) {
         val os = getOsName()
         val arch = getArchName()
 
-        val folderName = "java-$javaVersion-$os-$arch"
+        val folderName = "java-$javaMajor-$os-$arch"
         val targetDir = runtimesDir.resolve(folderName)
 
         val existing = findJavaExecutable(targetDir)
@@ -45,9 +43,10 @@ class JavaManagerService(
         if (existing != null) {
             log.warn("Java at {} failed -version check, treating as broken and re-downloading", existing)
         } else {
-            log.info("Java {} ({}/{}) was not found locally. We are starting to download...", javaVersion, os, arch)
+            log.info("Java {} ({}/{}) was not found locally. We are starting to download...", javaMajor, os, arch)
         }
-        downloadAndUnpack(javaVersion, targetDir)
+        onProgress("Downloading Java $javaMajor ($os/$arch)...")
+        downloadAndUnpack(javaMajor, targetDir, onProgress)
 
         val executable = findJavaExecutable(targetDir)
             ?: throw IOException("Java was downloaded, but the executable file was not found!")
@@ -60,10 +59,11 @@ class JavaManagerService(
             throw IOException("Java was downloaded and extracted, but $executable failed -version check. Archive may be corrupt or missing native loader files (e.g. libjli.so).")
         }
 
+        onProgress("Java $javaMajor ready")
         return@withContext executable
     }
 
-    private suspend fun downloadAndUnpack(version: Int, targetDir: Path) {
+    private suspend fun downloadAndUnpack(version: Int, targetDir: Path, onProgress: (String) -> Unit = {}) {
         val urls = getDownloadUrls(version)
         if (urls.isEmpty()) {
             throw IOException("There is no Java build for this system (${getOsName()} ${getArchName()})")
@@ -96,12 +96,21 @@ class JavaManagerService(
                     if (!httpResponse.status.isSuccess()) {
                         throw IOException("Loading error: ${httpResponse.status}")
                     }
+                    val total = httpResponse.contentLength() ?: -1L
                     val channel = httpResponse.bodyAsChannel()
                     FileOutputStream(archive.toFile()).use { fileStream ->
-                        channel.copyTo(fileStream)
+                        // Wrap to count bytes and emit progress every 5% -- a fresh
+                        // Java 25 download is ~200 MB and the UI sits on PrepareStage.JVM
+                        // otherwise.
+                        val counting = ProgressOutputStream(fileStream, total) { pct ->
+                            onProgress("Downloading Java $version: $pct%")
+                        }
+                        channel.copyTo(counting)
+                        counting.flush()
                     }
                 }
 
+                onProgress("Unpacking Java $version archive...")
                 log.info("Unpacking to {}", targetDir)
                 deleteDirectoryRecursively(targetDir)
                 Files.createDirectories(targetDir)
@@ -387,6 +396,13 @@ class JavaManagerService(
                 "mac" if arch == "arm64" -> "https://download.bell-sw.com/java/21.0.9+15/bellsoft-jdk21.0.9+15-macos-aarch64-full.tar.gz"
                 else -> null
             }
+            25 -> when (os) {
+                "win" if arch == "x64" -> "https://download.bell-sw.com/java/25.0.3+11/bellsoft-jdk25.0.3+11-windows-amd64-full.zip"
+                "linux" if arch == "x64" -> "https://download.bell-sw.com/java/25.0.3+11/bellsoft-jdk25.0.3+11-linux-amd64-full.tar.gz"
+                "mac" if arch == "x64" -> "https://download.bell-sw.com/java/25.0.3+11/bellsoft-jdk25.0.3+11-macos-amd64-full.tar.gz"
+                "mac" if arch == "arm64" -> "https://download.bell-sw.com/java/25.0.3+11/bellsoft-jdk25.0.3+11-macos-aarch64-full.tar.gz"
+                else -> null
+            }
             else -> null
         }
     }
@@ -428,6 +444,13 @@ class JavaManagerService(
                 "mac"   if arch == "arm64" -> adoptium(21, "21.0.5+11", "21.0.5_11", "aarch64", "mac",     "tar.gz")
                 else -> null
             }
+            25 -> when (os) {
+                "win"   if arch == "x64"   -> adoptium(25, "25.0.3+9", "25.0.3_9", "x64",     "windows", "zip")
+                "linux" if arch == "x64"   -> adoptium(25, "25.0.3+9", "25.0.3_9", "x64",     "linux",   "tar.gz")
+                "mac"   if arch == "x64"   -> adoptium(25, "25.0.3+9", "25.0.3_9", "x64",     "mac",     "tar.gz")
+                "mac"   if arch == "arm64" -> adoptium(25, "25.0.3+9", "25.0.3_9", "aarch64", "mac",     "tar.gz")
+                else -> null
+            }
             else -> null
         }
     }
@@ -446,6 +469,42 @@ class JavaManagerService(
         val tagPrefix = if (major == 8) "jdk" else "jdk-"
         return "https://github.com/adoptium/temurin${major}-binaries/releases/download/" +
             "$tagPrefix$tagEncoded/OpenJDK${major}U-jdk_${arch}_${os}_hotspot_$fileVersion.$ext"
+    }
+
+    /**
+     * Counting [java.io.OutputStream] wrapper that emits a percent-progress
+     * callback every 5 percentage points (and once at 100). Used for the JDK
+     * download so the launch UI can show meaningful status during the ~200 MB
+     * first-run download instead of sitting silent on PrepareStage.JVM. The
+     * close() is a no-op -- the wrapped stream is owned by an outer `use` block.
+     */
+    private class ProgressOutputStream(
+        private val delegate: java.io.OutputStream,
+        private val totalBytes: Long,
+        private val onPct: (Int) -> Unit,
+    ) : java.io.OutputStream() {
+        private var written = 0L
+        private var lastPct = -1
+        override fun write(b: Int) {
+            delegate.write(b)
+            written++
+            emitMaybe()
+        }
+        override fun write(b: ByteArray, off: Int, len: Int) {
+            delegate.write(b, off, len)
+            written += len
+            emitMaybe()
+        }
+        override fun flush() { delegate.flush() }
+        override fun close() { /* delegate is owned by an outer `use` */ }
+        private fun emitMaybe() {
+            if (totalBytes <= 0) return
+            val pct = ((written * 100) / totalBytes).toInt().coerceIn(0, 100)
+            if (pct >= lastPct + 5 || pct == 100) {
+                lastPct = pct
+                onPct(pct)
+            }
+        }
     }
 
     companion object {

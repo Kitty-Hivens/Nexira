@@ -56,6 +56,7 @@ class MrpackInstallerTest {
 
     private val fakeJava = object : IJavaManager {
         override suspend fun getJavaPath(version: String): Path = Path.of("/bin/java")
+        override suspend fun getJavaPathForMajor(javaMajor: Int, onProgress: (String) -> Unit): Path = Path.of("/bin/java")
     }
 
     // -- pure helpers ---------------------------------------------------------
