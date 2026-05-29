@@ -38,12 +38,11 @@ logback           = "1.5.32"
 commonsCompress   = "1.28.0"
 proguard          = "7.8.2"
 
-# Pure-Panama tray library (Kitty-Hivens/libtray) — replaces dorkbox/SystemTray
-# for the native tray icon. Pulled via JitPack (root build.gradle.kts
-# repositories chain) until libtray cuts its first Maven Central release;
-# pinned to a commit sha rather than a branch so upstream main-branch
-# changes don't silently land in our build.
-libtray           = "e86f497"
+# Pure-Panama tray library (Kitty-Hivens/libtray) -- replaces dorkbox/SystemTray
+# for the native tray icon. Now on Maven Central as dev.hivens:libtray
+# (resolved from mavenCentral; the jitpack repo is no longer needed for it).
+# Pinned to a released semver so upstream changes don't silently land here.
+libtray           = "0.1.0"
 
 # ── Test ─────────────────────────────────────────────────────────────────────
 mockk             = "1.13.12"
@@ -93,7 +92,7 @@ filekit-dialogs-compose         = { group = "io.github.vinceglb", name = "fileki
 
 # Misc
 commons-compress                = { group = "org.apache.commons", name = "commons-compress", version.ref = "commonsCompress" }
-libtray                          = { group = "com.github.Kitty-Hivens", name = "libtray",      version.ref = "libtray" }
+libtray                          = { group = "dev.hivens", name = "libtray", version.ref = "libtray" }
 
 # JNA dropped — was only present for dorkbox/SystemTray. libtray is
 # pure java.lang.foreign (Project Panama) and pulls no JNA transitively.
