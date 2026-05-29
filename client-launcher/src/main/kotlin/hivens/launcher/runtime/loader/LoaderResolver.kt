@@ -25,6 +25,13 @@ class LibrarySpec(
      * instead of downloading [url].
      */
     val bundled: ByteArray? = null,
+    /**
+     * A file already on local disk (a modern installer's output in the loader
+     * cache) for the provisioner to copy into the shared root. Preferred over
+     * [bundled] for large artifacts (the patched client) so jar bytes never
+     * sit in memory. Takes precedence over [bundled] and [url] when set.
+     */
+    val localFile: Path? = null,
 )
 
 /**
@@ -47,6 +54,14 @@ data class LoaderProfile(
     val mainClass: String,
     val jvmArgs: List<String> = emptyList(),
     val gameArgs: List<String> = emptyList(),
+    /**
+     * True when this is a modern `inheritsFrom` overlay (Forge 1.13+ /
+     * NeoForge): the launch needs vanilla's jvm/game args (the `--add-opens`
+     * macros, `-cp ${classpath}`, ...) PREPENDED to these. Launchwrapper /
+     * Knot loaders (Forge <=1.12.2, Fabric, Quilt) build their command from
+     * the legacy path and set this false.
+     */
+    val inheritsVanillaArguments: Boolean = false,
 )
 
 /**

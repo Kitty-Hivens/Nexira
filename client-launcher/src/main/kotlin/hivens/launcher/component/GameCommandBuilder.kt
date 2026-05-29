@@ -247,20 +247,30 @@ internal class GameCommandBuilder(
      * Profile-driven command for a pack-centric launch. Everything that varies
      * by loader -- main class, classpath, jvm/game args (e.g. the FML tweak) --
      * comes from the resolved [runtime], NOT the hardcoded [VersionConfig] map
-     * (which stays the SC server path's domain). Assets come from the SHARED
-     * root; natives stay per-instance.
+     * (which stays the SC server path's domain). Assets + libraries come from
+     * the SHARED roots; natives stay per-instance.
      *
-     * Covers the launchwrapper / Knot style (vanilla, Forge <=1.12.2, Fabric,
-     * Quilt). Modern Forge / NeoForge (BootstrapLauncher + module path) is a
-     * later extension.
+     * Handles all three launch eras:
+     * - launchwrapper / Knot (vanilla, Forge <=1.12.2, Fabric, Quilt): plain
+     *   `-cp` + main class + game args; no arg templating.
+     * - modlauncher Forge 1.13-1.16: the modern `arguments` template (inherited
+     *   from vanilla) with `${...}` substitution, but launched off the classpath
+     *   with no JPMS module path.
+     * - BootstrapLauncher (Forge 1.17+, all NeoForge): same templating plus the
+     *   module path (`-p`) carried in the version json's jvm args.
+     *
+     * [javaMajor] decides `-noverify` (legitimate on Java 8, warns on 17+).
+     * [sharedLibrariesDir] backs the `${library_directory}` placeholder.
      */
     fun buildPackCommand(
         javaExec: String,
         memoryMB: Int,
         gameDir: Path,
         sharedAssetsDir: Path,
+        sharedLibrariesDir: Path,
         nativesDirName: String,
         versionLabel: String,
+        javaMajor: Int,
         runtime: ResolvedRuntime,
         session: SessionData,
         jvmArgsOverride: String?,
@@ -268,8 +278,13 @@ internal class GameCommandBuilder(
         val args = ArrayList<String>()
         args.add(javaExec)
 
-        val isModern = runtime.mainClass.contains("bootstraplauncher", ignoreCase = true)
-        if (!isModern) args.add("-noverify")
+        // BootstrapLauncher (1.17+/NeoForge) carries a JPMS module path; the
+        // modern `arguments` template (anything with a ${placeholder}) needs
+        // substitution and a self-built classpath -- modlauncher 1.13-1.16 has
+        // the template but no module path.
+        val usesModulePath = runtime.mainClass.contains("bootstraplauncher", ignoreCase = true)
+        val usesModernArgs = usesModulePath || runtime.jvmArgs.any { it.contains("\${") }
+        if (javaMajor <= 8) args.add("-noverify")
         if (System.getProperty("os.name").lowercase().contains("mac")) {
             args.add("-XstartOnFirstThread")
             args.add("-Djava.awt.headless=false")
@@ -291,12 +306,19 @@ internal class GameCommandBuilder(
         if (!jvmArgsOverride.isNullOrBlank()) {
             args.addAll(jvmArgsOverride.trim().split(Regex("\\s+")))
         }
-        args.addAll(runtime.jvmArgs)
+        if (usesModernArgs) {
+            args.addAll(modernJvmArgs(runtime, gameDir, sharedAssetsDir, sharedLibrariesDir, nativesPath, versionLabel))
+            // Java 9+ Vector API speeds up some mods (JEI, Ars Nouveau); only
+            // meaningful where the module path is in play.
+            if (usesModulePath) args.add("--add-modules=jdk.incubator.vector")
+        } else {
+            args.addAll(runtime.jvmArgs)
+        }
         args.add("-Xms512M")
         args.add("-Xmx${memoryMB}M")
 
         args.add("-cp")
-        args.add(packClasspath(runtime))
+        args.add(if (usesModernArgs) modernClasspath(runtime) else packClasspath(runtime))
         args.add(runtime.mainClass)
 
         args.add("--username"); args.add(session.playerName)
@@ -330,6 +352,75 @@ internal class GameCommandBuilder(
         // its path components instead of appending it as one classpath entry.
         return (boot + listOf(runtime.clientJar) + rest)
             .joinToString(File.pathSeparator) { it.toAbsolutePath().toString() }
+    }
+
+    /**
+     * Full `-cp` for a modern (templated) launch: every resolved library plus
+     * the client jar, in resolution order. Boot modules stay here too -- the
+     * version json's `-DignoreList` tells BootstrapLauncher which entries to
+     * keep on the classpath versus promote to the module layer, mirroring the
+     * official launcher.
+     */
+    private fun modernClasspath(runtime: ResolvedRuntime): String =
+        (runtime.libraries.map { it.path } + listOf(runtime.clientJar))
+            .joinToString(File.pathSeparator) { it.toAbsolutePath().toString() }
+
+    /**
+     * Resolves the modern `arguments.jvm` template to concrete tokens. The
+     * version json's `${...}` placeholders are substituted from the known
+     * paths; the `-cp ${classpath}` pair and any `-Djava.library.path` are
+     * dropped because the builder emits its own, while `-p <module path>` is
+     * kept (its value substituted) so BootstrapLauncher gets the exact boot
+     * module set the installer chose.
+     */
+    private fun modernJvmArgs(
+        runtime: ResolvedRuntime,
+        gameDir: Path,
+        sharedAssetsDir: Path,
+        sharedLibrariesDir: Path,
+        nativesPath: Path,
+        versionLabel: String,
+    ): List<String> {
+        val substitutions = mapOf(
+            "\${library_directory}" to sharedLibrariesDir.toAbsolutePath().toString(),
+            "\${classpath_separator}" to File.pathSeparator,
+            "\${version_name}" to versionLabel,
+            "\${natives_directory}" to nativesPath.toString(),
+            "\${assets_root}" to sharedAssetsDir.toAbsolutePath().toString(),
+            "\${game_directory}" to gameDir.toAbsolutePath().toString(),
+            "\${primary_jar}" to runtime.clientJar.toAbsolutePath().toString(),
+            "\${launcher_name}" to Branding.UPSTREAM_NAME,
+            "\${launcher_version}" to Protocol.MIMIC_LAUNCHER_VERSION,
+        )
+        fun substitute(token: String): String {
+            var result = token
+            for ((placeholder, value) in substitutions) result = result.replace(placeholder, value)
+            return result
+        }
+
+        val jvm = runtime.jvmArgs
+        val out = ArrayList<String>(jvm.size)
+        var i = 0
+        while (i < jvm.size) {
+            val token = jvm[i]
+            when {
+                token == "-cp" || token == "-classpath" || token == "--class-path" ->
+                    i += if (i + 1 < jvm.size) 2 else 1
+                token == "-p" || token == "--module-path" -> {
+                    if (i + 1 < jvm.size) {
+                        out.add(token)
+                        out.add(substitute(jvm[i + 1]))
+                        i += 2
+                    } else i += 1
+                }
+                token == "\${classpath}" || token.startsWith("-Djava.library.path") -> i += 1
+                else -> {
+                    out.add(substitute(token))
+                    i += 1
+                }
+            }
+        }
+        return out
     }
 
     private fun getConfig(version: String): VersionConfig {

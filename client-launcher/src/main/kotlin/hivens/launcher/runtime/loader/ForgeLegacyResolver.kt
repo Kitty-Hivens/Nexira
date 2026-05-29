@@ -2,6 +2,7 @@ package hivens.launcher.runtime.loader
 
 import hivens.core.api.HttpClientProvider
 import hivens.launcher.runtime.MavenCoord
+import hivens.launcher.runtime.MojangArguments
 import hivens.launcher.runtime.MojangLibrary
 import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.bodyAsChannel
@@ -171,11 +172,15 @@ class ForgeLegacyResolver(
  * The launch-profile subset of a loader installer's `version.json` -- a vanilla
  * overlay. Distinct from [hivens.launcher.runtime.MojangVersion] (the full
  * vanilla profile) because an overlay omits `assetIndex` / `downloads`
- * (inherited from vanilla) but carries `mainClass` + `minecraftArguments`.
+ * (inherited from vanilla). Legacy (<=1.12.2) overlays carry a flat
+ * `minecraftArguments` string; modern (1.13+) overlays carry the structured
+ * `arguments` block + `inheritsFrom` instead.
  */
 @Serializable
 data class LoaderVersionJson(
     val mainClass: String,
     val libraries: List<MojangLibrary> = emptyList(),
     val minecraftArguments: String? = null,
+    val inheritsFrom: String? = null,
+    val arguments: MojangArguments? = null,
 )

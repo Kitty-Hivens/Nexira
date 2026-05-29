@@ -36,6 +36,7 @@ internal class LauncherService(
     private val logHandler: ProcessLogHandler,
     private val runtimeProvisioner: RuntimeProvisioner,
     private val sharedAssetsDir: Path,
+    private val sharedLibrariesDir: Path,
 ) : ILauncherService {
 
     private val log = LoggerFactory.getLogger(LauncherService::class.java)
@@ -155,8 +156,10 @@ internal class LauncherService(
             memoryMB = memory,
             gameDir = clientRootPath,
             sharedAssetsDir = sharedAssetsDir,
+            sharedLibrariesDir = sharedLibrariesDir,
             nativesDirName = nativesDir,
             versionLabel = packVersionLabel(manifest.loaderName, mcVersion),
+            javaMajor = javaManager.detectJavaVersion(mcVersion),
             runtime = resolved,
             session = sessionData,
             jvmArgsOverride = runtime.jvmArgs,

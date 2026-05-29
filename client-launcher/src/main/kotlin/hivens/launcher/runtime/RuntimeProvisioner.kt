@@ -57,12 +57,16 @@ class RuntimeProvisioner(
     private val httpClient get() = clientProvider.current
     private val mojangOs: String = toMojangOs(osName)
 
-    /** Resolved vanilla layout: the client jar, the asset index id, and the
-     *  vanilla library set (with coords, for merging a loader overlay). */
+    /** Resolved vanilla layout: the client jar, the asset index id, the
+     *  vanilla library set (with coords, for merging a loader overlay), and
+     *  the modern jvm/game arg tokens (empty on legacy versions) that a
+     *  modern loader overlay inherits. */
     data class VanillaRuntime(
         val clientJar: Path,
         val assetIndexId: String,
         val libraries: List<ResolvedLibrary>,
+        val jvmArgs: List<String> = emptyList(),
+        val gameArgs: List<String> = emptyList(),
     )
 
     /** A single file to fetch into a shared root, verified against [sha1]. */
@@ -99,12 +103,13 @@ class RuntimeProvisioner(
         val profile = resolver.resolve(mcVersion, loaderVersion)
         val overlay = profile.libraries.map { spec ->
             val dest = librariesDir.resolve(spec.coord.relativePath)
-            val bytes = spec.bundled
-            if (bytes != null) {
-                placeBundled(dest, bytes, spec.sha1)
-            } else {
-                val url = spec.url ?: throw IOException("library ${spec.coord.groupArtifact} has neither url nor bundled bytes")
-                fetchIfNeeded(DownloadTask(url, dest, spec.sha1.orEmpty(), spec.size))
+            when {
+                spec.localFile != null -> placeLocal(dest, spec.localFile, spec.sha1)
+                spec.bundled != null -> placeBundled(dest, spec.bundled, spec.sha1)
+                else -> {
+                    val url = spec.url ?: throw IOException("library ${spec.coord.groupArtifact} has neither url, bundled bytes, nor a local file")
+                    fetchIfNeeded(DownloadTask(url, dest, spec.sha1.orEmpty(), spec.size))
+                }
             }
             ResolvedLibrary(spec.coord, dest)
         }
@@ -113,7 +118,13 @@ class RuntimeProvisioner(
             clientJar = vanilla.clientJar,
             mainClass = profile.mainClass,
             assetIndexId = vanilla.assetIndexId,
-            jvmArgs = profile.jvmArgs,
+            // Modern (BootstrapLauncher) overlays need vanilla's jvm args (the
+            // --add-opens macros etc.); the command builder strips the inherited
+            // -cp/-p/-Djava.library.path it rebuilds. Game args are NEVER
+            // inherited -- the standard --username/--uuid/... set is emitted by
+            // the command builder, and only the loader's own additions
+            // (--launchTarget, --fml.*) come from the profile.
+            jvmArgs = if (profile.inheritsVanillaArguments) vanilla.jvmArgs + profile.jvmArgs else profile.jvmArgs,
             gameArgs = profile.gameArgs,
         )
     }
@@ -148,6 +159,8 @@ class RuntimeProvisioner(
             clientJar = librariesDir.resolve(clientJarRelPath(mcVersion)),
             assetIndexId = assetIndexId,
             libraries = vanillaLibraries(version),
+            jvmArgs = version.arguments?.let { flattenArguments(it.jvm, mojangOs) } ?: emptyList(),
+            gameArgs = version.arguments?.let { flattenArguments(it.game, mojangOs) } ?: emptyList(),
         )
     }
 
@@ -302,6 +315,19 @@ class RuntimeProvisioner(
             throw IOException("bundled library sha1 mismatch at $dest: expected $sha1, got ${sha1Of(bytes)}")
         }
         writeBytes(dest, bytes)
+    }
+
+    /** Copies an installer-produced jar from the loader cache into the shared
+     *  root, skip-if-present, verifying [sha1] against the source when known. */
+    private fun placeLocal(dest: Path, src: Path, sha1: String?) {
+        if (Files.isRegularFile(dest) && (sha1 == null || sha1Of(dest).equals(sha1, ignoreCase = true))) return
+        if (sha1 != null && !sha1Of(src).equals(sha1, ignoreCase = true)) {
+            throw IOException("local library sha1 mismatch at $src: expected $sha1, got ${sha1Of(src)}")
+        }
+        Files.createDirectories(dest.parent)
+        val tmp = dest.resolveSibling("${dest.fileName}.tmp")
+        Files.copy(src, tmp, StandardCopyOption.REPLACE_EXISTING)
+        moveAtomic(tmp, dest)
     }
 
     private fun moveAtomic(tmp: Path, dest: Path) {

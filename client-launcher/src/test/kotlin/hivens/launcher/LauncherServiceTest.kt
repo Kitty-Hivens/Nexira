@@ -220,6 +220,7 @@ class LauncherServiceTest {
                 json = json,
             ),
             sharedAssetsDir = workDir / "assets",
+            sharedLibrariesDir = workDir / "libraries",
         )
 
         val session = SessionData(

@@ -515,13 +515,18 @@ class GameCommandBuilderTest {
         gameArgs = listOf("--tweakClass", "net.minecraftforge.fml.common.launcher.FMLTweaker"),
     )
 
-    private fun packCommand(runtime: ResolvedRuntime = forgeRuntime()) = builder.buildPackCommand(
+    private fun packCommand(
+        runtime: ResolvedRuntime = forgeRuntime(),
+        javaMajor: Int = 8,
+    ) = builder.buildPackCommand(
         javaExec = "/usr/bin/java",
         memoryMB = 4096,
         gameDir = Path.of("/tmp/instances/Industrial"),
         sharedAssetsDir = Path.of("/tmp/shared/assets"),
+        sharedLibrariesDir = Path.of("/tmp/shared/libraries"),
         nativesDirName = "bin/natives-1.12.2",
         versionLabel = "Forge 1.12.2",
+        javaMajor = javaMajor,
         runtime = runtime,
         session = session(),
         jvmArgsOverride = null,
@@ -553,8 +558,78 @@ class GameCommandBuilderTest {
     }
 
     @Test
-    fun `buildPackCommand omits -noverify for a modern (BootstrapLauncher) runtime`() {
+    fun `buildPackCommand omits -noverify on Java 17+ even though it adds it on Java 8`() {
+        // -noverify is legitimate on Java 8 (broken legacy bytecode) but warns
+        // on 13+, so the choice is by Java major, not by main class.
+        assertTrue(packCommand(javaMajor = 8).contains("-noverify"))
         val modern = forgeRuntime().copy(mainClass = "cpw.mods.bootstraplauncher.BootstrapLauncher")
-        assertFalse(packCommand(modern).contains("-noverify"))
+        assertFalse(packCommand(modern, javaMajor = 21).contains("-noverify"))
+    }
+
+    private fun neoForgeRuntime() = ResolvedRuntime(
+        libraries = listOf(
+            ResolvedLibrary(MavenCoord.parse("cpw.mods:bootstraplauncher:2.0.2"), Path.of("/libs/cpw/mods/bootstraplauncher/2.0.2/bootstraplauncher-2.0.2.jar")),
+            ResolvedLibrary(MavenCoord.parse("cpw.mods:securejarhandler:3.0.8"), Path.of("/libs/cpw/mods/securejarhandler/3.0.8/securejarhandler-3.0.8.jar")),
+            ResolvedLibrary(MavenCoord.parse("net.neoforged:neoforge:21.1.66"), Path.of("/libs/net/neoforged/neoforge/21.1.66/neoforge-21.1.66.jar")),
+        ),
+        clientJar = Path.of("/libs/net/minecraft/minecraft/1.21.1/minecraft-1.21.1.jar"),
+        mainClass = "cpw.mods.bootstraplauncher.BootstrapLauncher",
+        assetIndexId = "17",
+        // A representative modern arguments.jvm: vanilla's `-cp ${classpath}` +
+        // `-Djava.library.path` (both must be dropped), an --add-opens to keep,
+        // the loader's -p with placeholders, and -DlibraryDirectory.
+        jvmArgs = listOf(
+            "-Djava.library.path=\${natives_directory}",
+            "-cp", "\${classpath}",
+            "--add-opens=java.base/java.lang=ALL-UNNAMED",
+            "-p", "\${library_directory}/cpw/mods/bootstraplauncher/2.0.2/bootstraplauncher-2.0.2.jar\${classpath_separator}\${library_directory}/cpw/mods/securejarhandler/3.0.8/securejarhandler-3.0.8.jar",
+            "-DlibraryDirectory=\${library_directory}",
+            "-DignoreList=client-extra,neoforge-",
+        ),
+        gameArgs = listOf("--launchTarget", "neoforgeclient", "--fml.neoForgeVersion", "21.1.66"),
+    )
+
+    @Test
+    fun `buildPackCommand modern path substitutes placeholders and rebuilds cp`() {
+        val cmd = builder.buildPackCommand(
+            javaExec = "/usr/bin/java",
+            memoryMB = 4096,
+            gameDir = Path.of("/tmp/instances/NeoPack"),
+            sharedAssetsDir = Path.of("/tmp/shared/assets"),
+            sharedLibrariesDir = Path.of("/tmp/shared/libraries"),
+            nativesDirName = "bin/natives-1.21.1",
+            versionLabel = "NeoForge 1.21.1",
+            javaMajor = 21,
+            runtime = neoForgeRuntime(),
+            session = session(),
+            jvmArgsOverride = null,
+        )
+
+        // The inherited vanilla -cp ${classpath} pair is dropped; exactly one -cp
+        // remains -- ours -- and it carries the client + libs, not ${classpath}.
+        assertEquals(1, cmd.count { it == "-cp" }, "only the builder's own -cp survives")
+        val cp = cmd[cmd.indexOf("-cp") + 1]
+        assertFalse(cp.contains("\${classpath}"), "the placeholder must be gone, got $cp")
+        assertTrue(cp.contains("minecraft-1.21.1.jar"), "client on the classpath")
+        assertTrue(cp.contains("neoforge-21.1.66.jar"), "loader libs on the classpath")
+
+        // Module path kept, with ${library_directory}/${classpath_separator} resolved.
+        val pValue = cmd[cmd.indexOf("-p") + 1]
+        assertTrue(pValue.contains("bootstraplauncher-2.0.2.jar"), "boot module on -p")
+        assertTrue(pValue.contains("/tmp/shared/libraries"), "library_directory substituted, got $pValue")
+        assertFalse(pValue.contains("\${"), "no placeholder left in -p, got $pValue")
+        assertTrue(pValue.contains(File.pathSeparator), "two boot jars joined by the path separator, got $pValue")
+
+        assertTrue(cmd.contains("-DlibraryDirectory=/tmp/shared/libraries"), "libraryDirectory substituted")
+        assertTrue(cmd.contains("--add-opens=java.base/java.lang=ALL-UNNAMED"), "kept add-opens")
+        assertTrue(cmd.contains("--add-modules=jdk.incubator.vector"), "vector module added on the module path")
+
+        // Inherited -Djava.library.path is dropped; the builder emits its own.
+        assertEquals(1, cmd.count { it.startsWith("-Djava.library.path") }, "exactly one java.library.path -- the builder's")
+        assertFalse(cmd.any { it.contains("\${natives_directory}") }, "natives placeholder not left dangling")
+
+        // Loader game args land after the standard set.
+        assertEquals("neoforgeclient", cmd[cmd.indexOf("--launchTarget") + 1])
+        assertEquals("21.1.66", cmd[cmd.indexOf("--fml.neoForgeVersion") + 1])
     }
 }

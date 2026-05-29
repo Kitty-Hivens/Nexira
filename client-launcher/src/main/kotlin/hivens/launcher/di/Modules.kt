@@ -22,7 +22,9 @@ import hivens.launcher.component.GameCommandBuilder
 import hivens.launcher.runtime.RuntimeProvisioner
 import hivens.launcher.runtime.loader.FabricLikeResolver
 import hivens.launcher.runtime.loader.ForgeLegacyResolver
+import hivens.launcher.runtime.loader.ForgeResolver
 import hivens.launcher.runtime.loader.LoaderRegistry
+import hivens.launcher.runtime.loader.ModernInstallerResolver
 import hivens.launcher.component.ProcessLogHandler
 import hivens.launcher.launch.LauncherController
 import hivens.launcher.platform.PlatformPaths
@@ -430,9 +432,17 @@ val appModule = module {
     // CDNs do not use the SMARTYcraft proxy (same rationale as JavaManagerService).
     single { ForgeLegacyResolver(get(named("direct")), get()) }
     single {
+        // Modern loaders run the official installer headless, caching its
+        // output here so re-launches skip the multi-minute install.
+        val loaderCacheDir: Path = get<Path>().resolve("loader-cache")
         LoaderRegistry(
             listOf(
-                get<ForgeLegacyResolver>(),
+                // "forge" routes to legacy (<=1.12.2) or the modern installer by MC version.
+                ForgeResolver(
+                    legacy = get<ForgeLegacyResolver>(),
+                    modern = ModernInstallerResolver.forge(get(named("direct")), get(), get(), loaderCacheDir),
+                ),
+                ModernInstallerResolver.neoforge(get(named("direct")), get(), get(), loaderCacheDir),
                 FabricLikeResolver(get(named("direct")), get(), "fabric", FabricLikeResolver.FABRIC_META),
                 FabricLikeResolver(get(named("direct")), get(), "quilt", FabricLikeResolver.QUILT_META),
             ),
@@ -537,6 +547,7 @@ val appModule = module {
             logHandler         = get(),
             runtimeProvisioner = get(),
             sharedAssetsDir    = get<PlatformPaths>().assetsDir,
+            sharedLibrariesDir = get<PlatformPaths>().librariesDir,
         )
     }
 
