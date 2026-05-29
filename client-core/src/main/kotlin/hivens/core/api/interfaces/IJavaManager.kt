@@ -14,16 +14,27 @@ import java.nio.file.Path
 interface IJavaManager {
 
     /**
-     * Returns the absolute path to the `java` executable suitable for the
-     * given Minecraft version. Triggers a download into the runtimes
-     * directory if the required Liberica build is not already on disk.
+     * Version-keyed shortcut: derives the Java major via [detectJavaVersion] and
+     * provisions the JDK for it. Suitable for the SC server path which has no
+     * concept of a loader-declared Java. Pack-centric callers should use
+     * [getJavaPathForMajor] instead, with the major from the resolved runtime --
+     * the JDK is fundamentally major-keyed; MC version is only a heuristic input.
      */
     suspend fun getJavaPath(version: String): Path
 
     /**
-     * The Java major a given Minecraft version requires (8 / 17 / 21). Drives
-     * both which JDK [getJavaPath] provisions and launch-arg choices that
-     * depend on the JVM generation (e.g. `-noverify`, deprecated since 13).
+     * Major-keyed entry point used by the pack path. Same Minecraft version on a
+     * different loader can need a different Java (e.g. Cleanroom-1.12.2 -> 25 vs
+     * legacy-Forge-1.12.2 -> 8), so the pack path must pass the loader-declared
+     * major directly instead of guessing from the version string.
+     */
+    suspend fun getJavaPathForMajor(javaMajor: Int): Path
+
+    /**
+     * Fallback Java major for a Minecraft version (8 / 17 / 21), used only when
+     * nothing more authoritative declares it (Mojang's per-version `javaVersion`
+     * absent + no loader override). Also drives launch-arg choices that depend
+     * on the JVM generation (e.g. `-noverify`, deprecated since 13).
      */
     fun detectJavaVersion(mcVersion: String): Int = when {
         mcVersion.startsWith("1.21") || mcVersion.startsWith("1.20.5") || mcVersion.startsWith("1.20.6") -> 21

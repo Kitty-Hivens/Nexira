@@ -26,16 +26,14 @@ class JavaManagerService(
     private val httpClient get() = clientProvider.current
     private val runtimesDir: Path = baseDir.resolve("runtimes")
 
-    /**
-     * Returns the path to the Java executable.
-     * If the required version is not available, it downloads it.
-     */
-    override suspend fun getJavaPath(version: String): Path = withContext(Dispatchers.IO) {
-        val javaVersion = detectJavaVersion(version)
+    override suspend fun getJavaPath(version: String): Path =
+        getJavaPathForMajor(detectJavaVersion(version))
+
+    override suspend fun getJavaPathForMajor(javaMajor: Int): Path = withContext(Dispatchers.IO) {
         val os = getOsName()
         val arch = getArchName()
 
-        val folderName = "java-$javaVersion-$os-$arch"
+        val folderName = "java-$javaMajor-$os-$arch"
         val targetDir = runtimesDir.resolve(folderName)
 
         val existing = findJavaExecutable(targetDir)
@@ -45,9 +43,9 @@ class JavaManagerService(
         if (existing != null) {
             log.warn("Java at {} failed -version check, treating as broken and re-downloading", existing)
         } else {
-            log.info("Java {} ({}/{}) was not found locally. We are starting to download...", javaVersion, os, arch)
+            log.info("Java {} ({}/{}) was not found locally. We are starting to download...", javaMajor, os, arch)
         }
-        downloadAndUnpack(javaVersion, targetDir)
+        downloadAndUnpack(javaMajor, targetDir)
 
         val executable = findJavaExecutable(targetDir)
             ?: throw IOException("Java was downloaded, but the executable file was not found!")

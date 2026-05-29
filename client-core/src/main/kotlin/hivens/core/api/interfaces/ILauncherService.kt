@@ -58,9 +58,15 @@ interface ILauncherService {
      *                         java path).
      * @param clientRootPath   Absolute path to the instance's directory
      *                         (`<dataDir>/instances/<instanceDirName>`).
-     * @param javaExecutablePath Default Java executable. Used when the
-     *                         instance's [InstanceRuntime.javaPath] is
-     *                         null or empty.
+     * @param javaPathOverride Optional global Java override (the user's
+     *                         `settings.javaPath`). When null, the launcher
+     *                         provisions the loader-declared Java itself
+     *                         from the resolved runtime's `javaMajor`, which
+     *                         beats the version heuristic (same MC + different
+     *                         loader can need different Java -- Cleanroom-1.12.2
+     *                         wants 25, legacy-Forge-1.12.2 wants 8). The
+     *                         per-instance [InstanceRuntime.javaPath] still wins
+     *                         over both override and managed default.
      * @param allocatedMemoryMB Fallback heap (MB) when the instance's
      *                         own [InstanceRuntime.memoryMb] is 0 or
      *                         below the launcher floor.
@@ -73,7 +79,7 @@ interface ILauncherService {
         manifest: CachedManifestSnapshot,
         runtime: InstanceRuntime,
         clientRootPath: Path,
-        javaExecutablePath: Path,
+        javaPathOverride: Path?,
         allocatedMemoryMB: Int,
         displayName: String,
         onLog: (String, LauncherLogType) -> Unit,

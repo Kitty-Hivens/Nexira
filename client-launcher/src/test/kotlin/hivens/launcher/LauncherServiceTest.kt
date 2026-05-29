@@ -80,6 +80,9 @@ class LauncherServiceTest {
         override suspend fun getJavaPath(version: String): Path =
             if (throws) throw IOException("simulated download failure")
             else result ?: throw IOException("not available")
+        override suspend fun getJavaPathForMajor(javaMajor: Int): Path =
+            if (throws) throw IOException("simulated download failure")
+            else result ?: throw IOException("not available")
     }
 
     @Test
