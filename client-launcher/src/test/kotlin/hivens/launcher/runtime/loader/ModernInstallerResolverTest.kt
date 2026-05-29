@@ -100,6 +100,25 @@ class ModernInstallerResolverTest {
     }
 
     @Test
+    fun `collectPlaceOnly returns every jar under the cache libraries tree`() {
+        val staging = Files.createTempDirectory("modern-placeonly")
+        try {
+            val srg = staging.resolve("libraries/net/minecraft/client/1.21.1-x/client-1.21.1-x-srg.jar")
+            val universal = staging.resolve("libraries/net/neoforged/neoforge/21.1.232/neoforge-21.1.232-universal.jar")
+            Files.createDirectories(srg.parent); Files.writeString(srg, "A")
+            Files.createDirectories(universal.parent); Files.writeString(universal, "B")
+
+            val rels = resolver().collectPlaceOnly(staging).map { it.relPath }.toSet()
+
+            assertEquals(2, rels.size)
+            assertTrue(rels.contains("net/minecraft/client/1.21.1-x/client-1.21.1-x-srg.jar"))
+            assertTrue(rels.contains("net/neoforged/neoforge/21.1.232/neoforge-21.1.232-universal.jar"))
+        } finally {
+            staging.toFile().deleteRecursively()
+        }
+    }
+
+    @Test
     fun `ForgeResolver splits launchwrapper era at Minecraft 1_12`() {
         assertTrue(ForgeResolver.isLaunchwrapperEra("1.12.2"))
         assertTrue(ForgeResolver.isLaunchwrapperEra("1.7.10"))

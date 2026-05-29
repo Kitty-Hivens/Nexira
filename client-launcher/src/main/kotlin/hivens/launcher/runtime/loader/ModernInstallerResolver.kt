@@ -69,9 +69,32 @@ class ModernInstallerResolver(
                 mainClass = version.mainClass,
                 jvmArgs = version.arguments?.let { flattenArguments(it.jvm, os) } ?: emptyList(),
                 gameArgs = version.arguments?.let { flattenArguments(it.game, os) } ?: emptyList(),
+                placeOnlyFiles = collectPlaceOnly(dotMinecraft),
                 inheritsVanillaArguments = true,
             )
         }
+
+    /**
+     * Every jar the installer placed under `<dotMinecraft>/libraries/`, as
+     * place-only files. This is a superset of the version json's libraries: it
+     * also carries the processor outputs (SRG/slim/extra client, neoforge
+     * universal/client) that FML resolves by path at runtime but never lists as
+     * classpath libraries. Copying the whole tree (skip-if-present) guarantees
+     * the loader finds everything under `libraryDirectory`; the cp set still
+     * comes only from [harvest]ed version.libraries.
+     */
+    internal fun collectPlaceOnly(dotMinecraft: Path): List<PlaceOnlyFile> {
+        val libsRoot = dotMinecraft.resolve("libraries")
+        if (!Files.isDirectory(libsRoot)) return emptyList()
+        val out = ArrayList<PlaceOnlyFile>()
+        Files.walkFileTree(libsRoot, object : SimpleFileVisitor<Path>() {
+            override fun visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult {
+                out.add(PlaceOnlyFile(libsRoot.relativize(file).toString().replace('\\', '/'), file))
+                return FileVisitResult.CONTINUE
+            }
+        })
+        return out
+    }
 
     /** Runs the installer into [dotMinecraft] unless a prior run completed. */
     private suspend fun ensureInstalled(mcVersion: String, loaderVersion: String, dotMinecraft: Path) {

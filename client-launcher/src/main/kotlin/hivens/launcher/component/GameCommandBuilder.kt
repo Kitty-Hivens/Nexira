@@ -355,15 +355,17 @@ internal class GameCommandBuilder(
     }
 
     /**
-     * Full `-cp` for a modern (templated) launch: every resolved library plus
-     * the client jar, in resolution order. Boot modules stay here too -- the
-     * version json's `-DignoreList` tells BootstrapLauncher which entries to
-     * keep on the classpath versus promote to the module layer, mirroring the
-     * official launcher.
+     * Full `-cp` for a modern (templated) launch: the resolved libraries only,
+     * NOT the vanilla client jar. Modern Forge/NeoForge load minecraft from the
+     * installer's processor output (the slim/srg client) through FML's own path
+     * locator; putting the vanilla client on `-cp` too yields a second module
+     * named `minecraft` and "reads more than one module named minecraft". Boot
+     * modules stay on `-cp` -- the version json's `-DignoreList` tells
+     * BootstrapLauncher which entries to keep flat versus promote to modules,
+     * mirroring the official launcher.
      */
     private fun modernClasspath(runtime: ResolvedRuntime): String =
-        (runtime.libraries.map { it.path } + listOf(runtime.clientJar))
-            .joinToString(File.pathSeparator) { it.toAbsolutePath().toString() }
+        runtime.libraries.joinToString(File.pathSeparator) { it.path.toAbsolutePath().toString() }
 
     /**
      * Resolves the modern `arguments.jvm` template to concrete tokens. The

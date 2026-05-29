@@ -49,11 +49,29 @@ data class ResolvedLibrary(
  * Fabric/Quilt return it from their meta API directly; Forge/NeoForge derive
  * it from the installer's `version.json`.
  */
+/**
+ * A file to copy into the shared libraries root that is NOT a classpath entry.
+ * Modern Forge/NeoForge install processors emit jars (the SRG/slim/extra client,
+ * the neoforge universal/client) that the version json does NOT list as
+ * libraries -- FML's own locator finds them by path under `libraryDirectory` at
+ * runtime. They must exist on disk there, but must stay OFF `-cp` (the minecraft
+ * classes would otherwise load twice, in the system layer and FML's game layer).
+ */
+data class PlaceOnlyFile(
+    val relPath: String,
+    val source: Path,
+)
+
 data class LoaderProfile(
     val libraries: List<LibrarySpec>,
     val mainClass: String,
     val jvmArgs: List<String> = emptyList(),
     val gameArgs: List<String> = emptyList(),
+    /**
+     * Files to materialise in the shared root without adding them to the
+     * classpath -- see [PlaceOnlyFile]. Empty for loaders with no install step.
+     */
+    val placeOnlyFiles: List<PlaceOnlyFile> = emptyList(),
     /**
      * True when this is a modern `inheritsFrom` overlay (Forge 1.13+ /
      * NeoForge): the launch needs vanilla's jvm/game args (the `--add-opens`
@@ -110,17 +128,26 @@ class LoaderRegistry(resolvers: List<LoaderResolver>) {
 
 /**
  * Merges a loader's libraries onto the vanilla base, the loader winning on a
- * `group:artifact` collision -- Forge ships its own asm / launchwrapper that
- * must replace vanilla's older copies. Preserves a stable order (base first,
- * then loader-only additions); the final `-cp` ordering (bootstrap jars first)
- * is applied by the command builder.
+ * collision -- Forge ships its own asm / launchwrapper that must replace
+ * vanilla's older copies. Preserves a stable order (base first, then loader-only
+ * additions); the final `-cp` ordering (bootstrap jars first) is applied by the
+ * command builder.
+ *
+ * The dedup key is `group:artifact:classifier`, NOT bare `group:artifact`:
+ * modern Minecraft lists a library's base jar and its natives jar as two
+ * separate entries with the same group:artifact but different classifiers
+ * (`org.lwjgl:lwjgl:3.3.3` + `org.lwjgl:lwjgl:3.3.3:natives-linux`). Keying on
+ * group:artifact alone makes the natives entry clobber the base, dropping
+ * `org.lwjgl` from the module graph -- BootstrapLauncher then fails with
+ * "Module org.lwjgl not found, required by org.lwjgl.natives".
  */
 fun mergeLibraries(
     base: List<ResolvedLibrary>,
     overlay: List<ResolvedLibrary>,
 ): List<ResolvedLibrary> {
-    val byGroupArtifact = LinkedHashMap<String, ResolvedLibrary>()
-    for (lib in base) byGroupArtifact[lib.coord.groupArtifact] = lib
-    for (lib in overlay) byGroupArtifact[lib.coord.groupArtifact] = lib
-    return byGroupArtifact.values.toList()
+    fun key(coord: MavenCoord) = "${coord.groupArtifact}:${coord.classifier ?: ""}"
+    val merged = LinkedHashMap<String, ResolvedLibrary>()
+    for (lib in base) merged[key(lib.coord)] = lib
+    for (lib in overlay) merged[key(lib.coord)] = lib
+    return merged.values.toList()
 }

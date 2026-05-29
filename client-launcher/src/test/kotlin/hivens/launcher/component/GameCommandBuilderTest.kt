@@ -610,7 +610,7 @@ class GameCommandBuilderTest {
         assertEquals(1, cmd.count { it == "-cp" }, "only the builder's own -cp survives")
         val cp = cmd[cmd.indexOf("-cp") + 1]
         assertFalse(cp.contains("\${classpath}"), "the placeholder must be gone, got $cp")
-        assertTrue(cp.contains("minecraft-1.21.1.jar"), "client on the classpath")
+        assertFalse(cp.contains("minecraft-1.21.1.jar"), "vanilla client NOT on a modern cp -- FML loads its processor client")
         assertTrue(cp.contains("neoforge-21.1.66.jar"), "loader libs on the classpath")
 
         // Module path kept, with ${library_directory}/${classpath_separator} resolved.

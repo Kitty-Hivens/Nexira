@@ -113,6 +113,11 @@ class RuntimeProvisioner(
             }
             ResolvedLibrary(spec.coord, dest)
         }
+        // Processor outputs FML resolves by path under libraryDirectory (the
+        // patched/SRG client, neoforge universal) -- on disk, never on -cp.
+        profile.placeOnlyFiles.forEach { pf ->
+            placeLocal(librariesDir.resolve(pf.relPath), pf.source, null)
+        }
         ResolvedRuntime(
             libraries = mergeLibraries(vanilla.libraries, overlay),
             clientJar = vanilla.clientJar,

@@ -60,6 +60,25 @@ class RuntimeLoaderTest {
         assertTrue(merged.any { it.coord.groupArtifact == "net.fabricmc:fabric-loader" })
     }
 
+    @Test
+    fun `keeps a library and its natives classifier as separate entries`() {
+        // Modern MC lists a lib's base jar and its natives jar as two entries
+        // with the same group:artifact. Keying dedup on group:artifact alone
+        // drops the base -> "Module org.lwjgl not found, required by
+        // org.lwjgl.natives" at BootstrapLauncher. The classifier must be in
+        // the key so both survive.
+        val base = listOf(
+            lib("org.lwjgl:lwjgl:3.3.3", "/v/lwjgl.jar"),
+            lib("org.lwjgl:lwjgl:3.3.3:natives-linux", "/v/lwjgl-natives.jar"),
+        )
+
+        val merged = mergeLibraries(base, emptyList())
+
+        assertEquals(2, merged.size, "base jar and natives jar must both survive")
+        assertTrue(merged.any { it.coord.classifier == null }, "base lwjgl present")
+        assertTrue(merged.any { it.coord.classifier == "natives-linux" }, "natives lwjgl present")
+    }
+
     // -- ensureRuntime dispatch (MockEngine + fake resolver) ------------------
 
     private val patchyBytes = "PATCHY".toByteArray()
