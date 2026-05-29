@@ -6,6 +6,7 @@ import hivens.core.api.model.ServerProfile
 import hivens.core.data.InstanceProfile
 import hivens.core.data.SessionData
 import hivens.launcher.network.ServerProtocolConfig
+import hivens.launcher.runtime.loader.ResolvedRuntime
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.nio.file.Path
@@ -240,6 +241,92 @@ internal class GameCommandBuilder(
         }
 
         return args
+    }
+
+    /**
+     * Profile-driven command for a pack-centric launch. Everything that varies
+     * by loader -- main class, classpath, jvm/game args (e.g. the FML tweak) --
+     * comes from the resolved [runtime], NOT the hardcoded [VersionConfig] map
+     * (which stays the SC server path's domain). Assets come from the SHARED
+     * root; natives stay per-instance.
+     *
+     * Covers the launchwrapper / Knot style (vanilla, Forge <=1.12.2, Fabric,
+     * Quilt). Modern Forge / NeoForge (BootstrapLauncher + module path) is a
+     * later extension.
+     */
+    fun buildPackCommand(
+        javaExec: String,
+        memoryMB: Int,
+        gameDir: Path,
+        sharedAssetsDir: Path,
+        nativesDirName: String,
+        versionLabel: String,
+        runtime: ResolvedRuntime,
+        session: SessionData,
+        jvmArgsOverride: String?,
+    ): List<String> {
+        val args = ArrayList<String>()
+        args.add(javaExec)
+
+        val isModern = runtime.mainClass.contains("bootstraplauncher", ignoreCase = true)
+        if (!isModern) args.add("-noverify")
+        if (System.getProperty("os.name").lowercase().contains("mac")) {
+            args.add("-XstartOnFirstThread")
+            args.add("-Djava.awt.headless=false")
+        }
+
+        // Launcher identity + authlib redirect. Reaching the menu does not need
+        // it; joining an SC-derived server does (the redirect points auth at the
+        // configured host, same as the SC path).
+        args.add("-Dminecraft.api.auth.host=${protocolConfig.baseUrl}/launcher/")
+        args.add("-Dminecraft.api.account.host=${protocolConfig.baseUrl}/launcher/")
+        args.add("-Dminecraft.api.session.host=${protocolConfig.baseUrl}/launcher/")
+        args.add("-Dminecraft.launcher.brand=${Branding.UPSTREAM_NAME}")
+        args.add("-Dminecraft.launcher.version=${Protocol.MIMIC_LAUNCHER_VERSION}")
+
+        val nativesPath = gameDir.resolve(nativesDirName).toAbsolutePath()
+        args.add("-Djava.library.path=$nativesPath")
+        args.add("-Dfml.ignoreInvalidMinecraftCertificates=true")
+
+        if (!jvmArgsOverride.isNullOrBlank()) {
+            args.addAll(jvmArgsOverride.trim().split(Regex("\\s+")))
+        }
+        args.addAll(runtime.jvmArgs)
+        args.add("-Xms512M")
+        args.add("-Xmx${memoryMB}M")
+
+        args.add("-cp")
+        args.add(packClasspath(runtime))
+        args.add(runtime.mainClass)
+
+        args.add("--username"); args.add(session.playerName)
+        args.add("--version"); args.add(versionLabel)
+        args.add("--gameDir"); args.add(gameDir.toAbsolutePath().toString())
+        args.add("--assetsDir"); args.add(sharedAssetsDir.toAbsolutePath().toString())
+        args.add("--assetIndex"); args.add(runtime.assetIndexId)
+        args.add("--uuid"); args.add(session.uuid)
+        args.add("--accessToken"); args.add(session.accessToken)
+        args.add("--userProperties"); args.add("{}")
+        args.add("--userType"); args.add("mojang")
+        args.addAll(runtime.gameArgs)
+
+        return args
+    }
+
+    /**
+     * Ordered `-cp` for a pack: bootstrap jars (launchwrapper / asm /
+     * bootstraplauncher) first, then the client jar, then the rest -- mirrors
+     * the proven legacy Forge classpath ordering. Mods are NOT here; the loader
+     * scans the per-instance mods/ dir.
+     */
+    private fun packClasspath(runtime: ResolvedRuntime): String {
+        val libPaths = runtime.libraries.map { it.path }
+        val (boot, rest) = libPaths.partition { p ->
+            val n = p.fileName.toString().lowercase()
+            n.contains("launchwrapper") || n.contains("asm") || n.contains("bootstraplauncher")
+        }
+        return (boot + runtime.clientJar + rest)
+            .joinToString(File.pathSeparator) { it.toAbsolutePath().toString() }
     }
 
     private fun getConfig(version: String): VersionConfig {

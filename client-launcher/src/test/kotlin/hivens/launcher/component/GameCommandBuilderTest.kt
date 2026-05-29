@@ -3,6 +3,9 @@ package hivens.launcher.component
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.InstanceProfile
 import hivens.core.data.SessionData
+import hivens.launcher.runtime.MavenCoord
+import hivens.launcher.runtime.loader.ResolvedLibrary
+import hivens.launcher.runtime.loader.ResolvedRuntime
 import java.io.File
 import java.nio.file.Path
 import kotlin.test.*
@@ -493,5 +496,59 @@ class GameCommandBuilderTest {
         val ignoreArg = cmd.find { it.startsWith("-DignoreList=") }
         assertNotNull(ignoreArg)
         assertTrue(ignoreArg.contains("custom-module"))
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // buildPackCommand -- profile-driven pack launch (loader-resolved runtime)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    private fun forgeRuntime() = ResolvedRuntime(
+        libraries = listOf(
+            ResolvedLibrary(MavenCoord.parse("net.minecraft:launchwrapper:1.12"), Path.of("/libs/net/minecraft/launchwrapper/1.12/launchwrapper-1.12.jar")),
+            ResolvedLibrary(MavenCoord.parse("org.ow2.asm:asm-debug-all:5.2"), Path.of("/libs/org/ow2/asm/asm-debug-all/5.2/asm-debug-all-5.2.jar")),
+            ResolvedLibrary(MavenCoord.parse("com.google.guava:guava:21.0"), Path.of("/libs/com/google/guava/guava/21.0/guava-21.0.jar")),
+            ResolvedLibrary(MavenCoord.parse("net.minecraftforge:forge:1.12.2-14.23.5.2860"), Path.of("/libs/net/minecraftforge/forge/1.12.2-14.23.5.2860/forge-1.12.2-14.23.5.2860.jar")),
+        ),
+        clientJar = Path.of("/libs/net/minecraft/minecraft/1.12.2/minecraft-1.12.2.jar"),
+        mainClass = "net.minecraft.launchwrapper.Launch",
+        assetIndexId = "1.12",
+        gameArgs = listOf("--tweakClass", "net.minecraftforge.fml.common.launcher.FMLTweaker"),
+    )
+
+    private fun packCommand(runtime: ResolvedRuntime = forgeRuntime()) = builder.buildPackCommand(
+        javaExec = "/usr/bin/java",
+        memoryMB = 4096,
+        gameDir = Path.of("/tmp/instances/Industrial"),
+        sharedAssetsDir = Path.of("/tmp/shared/assets"),
+        nativesDirName = "bin/natives-1.12.2",
+        versionLabel = "Forge 1.12.2",
+        runtime = runtime,
+        session = session(),
+        jvmArgsOverride = null,
+    )
+
+    @Test
+    fun `buildPackCommand drives mainClass, assetIndex and tweak from the runtime`() {
+        val cmd = packCommand()
+        assertEquals("/usr/bin/java", cmd[0])
+        assertTrue(cmd.contains("-noverify"), "legacy launchwrapper runtime gets -noverify")
+        assertTrue(cmd.contains("net.minecraft.launchwrapper.Launch"))
+        assertEquals("1.12", cmd[cmd.indexOf("--assetIndex") + 1])
+        assertTrue(cmd[cmd.indexOf("--assetsDir") + 1].contains("shared/assets"), "assets from the shared root")
+        assertEquals("net.minecraftforge.fml.common.launcher.FMLTweaker", cmd[cmd.indexOf("--tweakClass") + 1])
+    }
+
+    @Test
+    fun `buildPackCommand classpath is bootstrap-first, includes client, excludes mods`() {
+        val parts = packCommand()[packCommand().indexOf("-cp") + 1].split(sep)
+        assertTrue(parts[0].contains("launchwrapper") || parts[0].contains("asm"), "bootstrap jar first, got ${parts[0]}")
+        assertTrue(parts.any { it.contains("minecraft-1.12.2.jar") }, "client jar on the classpath")
+        assertTrue(parts.none { it.contains("${File.separator}mods${File.separator}") }, "mods stay off the classpath")
+    }
+
+    @Test
+    fun `buildPackCommand omits -noverify for a modern (BootstrapLauncher) runtime`() {
+        val modern = forgeRuntime().copy(mainClass = "cpw.mods.bootstraplauncher.BootstrapLauncher")
+        assertFalse(packCommand(modern).contains("-noverify"))
     }
 }
