@@ -4,8 +4,8 @@ import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.dto.smrt.SmrtPackSummary
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.CachedManifestSnapshot
-import hivens.core.data.ContentToggle
 import hivens.core.data.InstanceRuntime
+import hivens.core.data.OptionalContentRules
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.core.data.PackReference
@@ -58,10 +58,15 @@ class PackInstaller(
         log.info("install: pack={} version={} -> instance={} dir={}",
             packId, manifest.packVersion, instanceId, clientDir)
 
+        // Optional-content defaults from the manifest: each optional mod
+        // (required=false) seeds at its default_enabled. Sync places toggled-off
+        // optionals as `.disabled` so a later flip is a rename, not a re-download.
+        val optionalToggles = OptionalContentRules.defaultToggles(manifest.mods)
         syncService.sync(
             packId    = packId,
             clientDir = clientDir,
             progress  = progress,
+            enabledState = OptionalContentRules.enabledState(manifest.mods, optionalToggles),
         )
 
         // Provision the canonical runtime (vanilla + loader libraries + client +
@@ -87,7 +92,7 @@ class PackInstaller(
             lastPlayedEpochOrZero = 0L,
             pinnedPackVersion     = manifest.packVersion,
             runtime               = InstanceRuntime(),
-            optionalContent       = emptyList<ContentToggle>(),
+            optionalContent       = optionalToggles,
             forkedFrom            = null,
             notes                 = "",
             cachedManifest        = CachedManifestSnapshot(
