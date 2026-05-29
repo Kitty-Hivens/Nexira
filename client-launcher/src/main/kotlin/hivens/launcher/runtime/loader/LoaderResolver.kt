@@ -80,6 +80,13 @@ data class LoaderProfile(
      * the legacy path and set this false.
      */
     val inheritsVanillaArguments: Boolean = false,
+    /**
+     * The Java major this loader requires (e.g. Cleanroom declares 25). Null
+     * means "no override -- inherit the vanilla MC's declared Java." Loaders
+     * that don't change Java requirements (Forge legacy/modern, NeoForge,
+     * Fabric, Quilt today) leave this null.
+     */
+    val javaMajor: Int? = null,
 )
 
 /**
@@ -103,6 +110,17 @@ data class ResolvedRuntime(
      * none; this is the vanilla base's set.
      */
     val natives: List<Path> = emptyList(),
+    /**
+     * Declared Java major for this (MC version, loader): loader override
+     * ([LoaderProfile.javaMajor]) wins over Mojang's per-version `javaVersion`
+     * declaration, which wins over the launcher's heuristic. Null when nothing
+     * declares it (legacy MC pre-1.17 + no loader override) -- the launcher
+     * falls back to [hivens.core.api.interfaces.IJavaManager.detectJavaVersion].
+     * This is what should drive JDK provisioning, NOT the MC version alone --
+     * same MC, different loaders can need different Java majors (Cleanroom-
+     * 1.12.2 wants 25, legacy-Forge-1.12.2 wants 8).
+     */
+    val javaMajor: Int? = null,
 )
 
 /**

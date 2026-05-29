@@ -27,6 +27,7 @@ class ModernInstallerResolverTest {
         json = Json { ignoreUnknownKeys = true },
         javaManager = object : IJavaManager {
             override suspend fun getJavaPath(version: String): Path = Path.of("/bin/java")
+            override suspend fun getJavaPathForMajor(javaMajor: Int, onProgress: (String) -> Unit): Path = Path.of("/bin/java")
         },
         cacheDir = Files.createTempDirectory("modern-cache"),
         loaderId = "neoforge",

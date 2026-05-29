@@ -44,6 +44,17 @@ data class MojangVersion(
      * vanilla's (here) + the loader's.
      */
     val arguments: MojangArguments? = null,
+    /**
+     * Mojang's declared Java major (present 1.17+; absent on legacy versions
+     * -> null, where the launcher falls back to its version heuristic).
+     * Authoritative when present -- we should not guess what Mojang already states.
+     */
+    val javaVersion: MojangJavaVersion? = null,
+)
+
+@Serializable
+data class MojangJavaVersion(
+    val majorVersion: Int,
 )
 
 /**

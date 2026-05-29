@@ -116,7 +116,7 @@ internal class LauncherService(
         manifest: CachedManifestSnapshot,
         runtime: InstanceRuntime,
         clientRootPath: Path,
-        javaExecutablePath: Path,
+        javaPathOverride: Path?,
         allocatedMemoryMB: Int,
         displayName: String,
         onLog: (String, LauncherLogType) -> Unit
@@ -127,23 +127,37 @@ internal class LauncherService(
         // SC path; the InstanceRuntime value wins when positive.
         val memory = normalizeMemory(runtime.memoryMb, allocatedMemoryMB)
 
-        // 2. Java path. Pack-centric runtime carries an optional
-        // explicit override; without it the caller's resolved default
-        // wins (LauncherController already consulted JavaManager).
-        val javaExec: String = resolvePackJavaPath(runtime, javaExecutablePath)
-
-        log.info("Session initialization (pack): {}, Java: {}, Heap: {}MB", displayName, javaExec, memory)
         onLog("Running $displayName...", LauncherLogType.INFO)
 
-        // 3. Canonical runtime: vanilla + loader libraries + client + assets into
-        // the SHARED roots (idempotent). Throws clearly if it cannot provision --
-        // no more "ready" followed by an empty-classpath crash.
+        // 2. Canonical runtime: vanilla + loader libraries + client + assets into
+        // the SHARED roots (idempotent). Resolved FIRST so the loader-declared
+        // Java major can drive JDK provisioning -- same MC version on a different
+        // loader needs a different JDK (Cleanroom-1.12.2 wants 25, not 8).
         val nativesDir = commandBuilder.packNativesDir(mcVersion)
         val resolved = runtimeProvisioner.ensureRuntime(
             mcVersion = mcVersion,
             loaderName = manifest.loaderName,
             loaderVersion = manifest.loaderVersion,
         ) { current, total, file -> onLog("Runtime $current/$total: $file", LauncherLogType.INFO) }
+
+        // 3. Java. Major precedence: loader-resolved override -> the pack manifest's
+        // own declaration (authoritative for the pack) -> Mojang's per-version field
+        // (captured into the resolved runtime). The heuristic disappears here: the
+        // pack ALWAYS declares its major in the manifest. Path precedence: instance
+        // pin (runtime.javaPath) > caller override (javaPathOverride) > managed for
+        // the declared major. Skip provisioning a managed JDK we would discard --
+        // when the instance pins its own java, don't trigger the ~200 MB download.
+        val javaMajor = resolved.javaMajor ?: manifest.javaMajor
+        val javaExec: String = if (!runtime.javaPath.isNullOrEmpty()) {
+            runtime.javaPath!!
+        } else {
+            val defaultJava = javaPathOverride ?: javaManager.getJavaPathForMajor(javaMajor) { msg ->
+                onLog(msg, LauncherLogType.INFO)
+            }
+            resolvePackJavaPath(runtime, defaultJava)
+        }
+
+        log.info("Session initialization (pack): {}, Java: {} (major {}), Heap: {}MB", displayName, javaExec, javaMajor, memory)
 
         // 4. Natives stay per-instance, but are now extracted from the jars the
         // provisioner resolved from the manifest -- so the LWJGL version matches
@@ -161,7 +175,7 @@ internal class LauncherService(
             sharedLibrariesDir = sharedLibrariesDir,
             nativesDirName = nativesDir,
             versionLabel = packVersionLabel(manifest.loaderName, mcVersion),
-            javaMajor = javaManager.detectJavaVersion(mcVersion),
+            javaMajor = javaMajor,
             runtime = resolved,
             session = sessionData,
             jvmArgsOverride = runtime.jvmArgs,

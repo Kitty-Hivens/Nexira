@@ -1,6 +1,9 @@
 package hivens.launcher.runtime
 
 import hivens.core.api.HttpClientProvider
+import hivens.launcher.runtime.loader.LoaderProfile
+import hivens.launcher.runtime.loader.LoaderRegistry
+import hivens.launcher.runtime.loader.LoaderResolver
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -319,6 +322,89 @@ class RuntimeProvisionerTest {
 
         assertFailsWith<IOException> { p.ensureVanilla("1.12.2") }
         assertTrue(!librariesDir.resolve("x/y/1/y-1.jar").exists(), "bad download must not leave a file")
+    }
+
+    // -- javaMajor declare-model (loader > vanilla > heuristic precedence) ----
+
+    @Test
+    fun `ensureVanilla captures Mojang javaVersion (and no-loader runtime inherits it)`() = runTest {
+        val clientBytes = "C".toByteArray()
+        val indexJson = """{"objects":{}}"""
+        val indexSha = sha1(indexJson)
+        // 1.17+ vanilla json shape: carries `javaVersion.majorVersion` directly.
+        val versionJson = """
+            {
+              "assetIndex": {"id":"17","sha1":"$indexSha","size":${indexJson.length},"url":"$INDEX_URL"},
+              "downloads": {"client": {"sha1":"${sha1(clientBytes)}","size":${clientBytes.size},"url":"$CLIENT_URL"}},
+              "javaVersion": {"majorVersion": 21},
+              "libraries": []
+            }
+        """.trimIndent()
+        val manifestJson = """{"versions":[{"id":"1.21.1","url":"$VERSION_URL"}]}"""
+
+        val engine = MockEngine { req ->
+            when (req.url.toString()) {
+                MANIFEST_URL -> respond(manifestJson, HttpStatusCode.OK, jsonHeaders)
+                VERSION_URL -> respond(versionJson, HttpStatusCode.OK, jsonHeaders)
+                INDEX_URL -> respond(indexJson, HttpStatusCode.OK, jsonHeaders)
+                CLIENT_URL -> respond(ByteReadChannel(clientBytes), HttpStatusCode.OK)
+                else -> respond("missing", HttpStatusCode.NotFound)
+            }
+        }
+        val p = provisioner(HttpClient(engine))
+
+        val vanilla = p.ensureVanilla("1.21.1")
+        assertEquals(21, vanilla.javaMajor, "Mojang's javaVersion.majorVersion captured from the version json")
+
+        val resolved = p.ensureRuntime(mcVersion = "1.21.1", loaderName = null, loaderVersion = "")
+        assertEquals(21, resolved.javaMajor, "no-loader runtime inherits vanilla's declared major")
+    }
+
+    @Test
+    fun `loader profile declared javaMajor wins over Mojang's vanilla declaration`() = runTest {
+        val clientBytes = "C".toByteArray()
+        val indexJson = """{"objects":{}}"""
+        val indexSha = sha1(indexJson)
+        // Vanilla declares 21; a loader profile declares 25 -- loader wins. This is
+        // the forward shape Cleanroom needs (1.12.2 on Cleanroom -> Java 25, not 8).
+        val versionJson = """
+            {
+              "assetIndex": {"id":"17","sha1":"$indexSha","size":${indexJson.length},"url":"$INDEX_URL"},
+              "downloads": {"client": {"sha1":"${sha1(clientBytes)}","size":${clientBytes.size},"url":"$CLIENT_URL"}},
+              "javaVersion": {"majorVersion": 21},
+              "libraries": []
+            }
+        """.trimIndent()
+        val manifestJson = """{"versions":[{"id":"1.21.1","url":"$VERSION_URL"}]}"""
+
+        val engine = MockEngine { req ->
+            when (req.url.toString()) {
+                MANIFEST_URL -> respond(manifestJson, HttpStatusCode.OK, jsonHeaders)
+                VERSION_URL -> respond(versionJson, HttpStatusCode.OK, jsonHeaders)
+                INDEX_URL -> respond(indexJson, HttpStatusCode.OK, jsonHeaders)
+                CLIENT_URL -> respond(ByteReadChannel(clientBytes), HttpStatusCode.OK)
+                else -> respond("missing", HttpStatusCode.NotFound)
+            }
+        }
+        // Stub resolver returns a profile declaring Java 25; empty libraries -> no extra HTTP.
+        val stub = object : LoaderResolver {
+            override val loaderId = "stub"
+            override suspend fun resolve(mcVersion: String, loaderVersion: String) =
+                LoaderProfile(libraries = emptyList(), mainClass = "fake.Main", javaMajor = 25)
+        }
+        val p = RuntimeProvisioner(
+            librariesDir = librariesDir,
+            assetsDir = assetsDir,
+            clientProvider = HttpClientProvider { HttpClient(engine) },
+            json = json,
+            loaderRegistry = LoaderRegistry(listOf(stub)),
+            osName = "Linux",
+            versionManifestUrl = MANIFEST_URL,
+            resourcesBaseUrl = RES_BASE,
+        )
+
+        val resolved = p.ensureRuntime(mcVersion = "1.21.1", loaderName = "stub", loaderVersion = "any")
+        assertEquals(25, resolved.javaMajor, "loader profile.javaMajor must win over vanilla.javaMajor")
     }
 
     private companion object {
