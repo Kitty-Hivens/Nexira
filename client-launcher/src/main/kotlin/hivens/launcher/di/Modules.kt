@@ -20,6 +20,7 @@ import hivens.launcher.component.ClasspathProvider
 import hivens.launcher.component.EnvironmentPreparer
 import hivens.launcher.component.GameCommandBuilder
 import hivens.launcher.runtime.RuntimeProvisioner
+import hivens.launcher.runtime.loader.FabricLikeResolver
 import hivens.launcher.runtime.loader.ForgeLegacyResolver
 import hivens.launcher.runtime.loader.LoaderRegistry
 import hivens.launcher.component.ProcessLogHandler
@@ -428,7 +429,15 @@ val appModule = module {
     // official Mojang/Forge CDNs into the shared roots. Direct channel: these
     // CDNs do not use the SMARTYcraft proxy (same rationale as JavaManagerService).
     single { ForgeLegacyResolver(get(named("direct")), get()) }
-    single { LoaderRegistry(listOf(get<ForgeLegacyResolver>())) }
+    single {
+        LoaderRegistry(
+            listOf(
+                get<ForgeLegacyResolver>(),
+                FabricLikeResolver(get(named("direct")), get(), "fabric", FabricLikeResolver.FABRIC_META),
+                FabricLikeResolver(get(named("direct")), get(), "quilt", FabricLikeResolver.QUILT_META),
+            ),
+        )
+    }
     single {
         RuntimeProvisioner(
             librariesDir = get<PlatformPaths>().librariesDir,
