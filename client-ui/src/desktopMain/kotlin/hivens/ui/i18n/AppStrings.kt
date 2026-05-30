@@ -46,6 +46,7 @@ interface AppStrings {
     val stateLaunching: String
     fun stateExitCode(code: Int): String
     fun stateError(msg: String): String
+    fun stateMissingAuthProvider(providerKey: String): String
 
     // --- Auth Success ---
     fun authSuccess(uuid: String): String
@@ -706,6 +707,7 @@ interface AppStrings {
     val notifReasonOfflineNoClient: String
     val notifReasonOfflineNoManifest: String
     val notifReasonTwoFactorExpired: String
+    fun notifReasonMissingAuthProvider(providerKey: String): String
 
     // --- Notification relative-time formatter (header label) ---
     val notifTimeNow: String

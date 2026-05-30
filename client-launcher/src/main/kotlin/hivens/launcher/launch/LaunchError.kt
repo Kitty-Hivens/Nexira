@@ -27,4 +27,14 @@ sealed class LaunchError {
 
     /** Auth call failed for a non-2FA reason (network, server reject, etc.). */
     data class AuthFail(val cause: String?) : LaunchError()
+
+    /**
+     * Pack declares an auth requirement the user has no live session
+     * for. The UI renders a "sign in with <provider> to play this
+     * pack" hint -- distinct from [AuthFail] (where the user IS
+     * signed in but the call failed) and [TwoFactorExpired] (where
+     * the cached session is unusable). [providerKey] is a stable
+     * identifier the UI maps to a localized provider name.
+     */
+    data class MissingAuthProvider(val providerKey: String) : LaunchError()
 }

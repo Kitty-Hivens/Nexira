@@ -1,5 +1,7 @@
 package hivens.ui.i18n
 
+import hivens.core.data.PackAuthRequirement
+
 object RussianStrings : AppStrings {
 
     // App
@@ -44,6 +46,12 @@ object RussianStrings : AppStrings {
     override val stateLaunching   = "Запуск процесса..."
     override fun stateExitCode(code: Int)  = "Игра закрылась с кодом $code"
     override fun stateError(msg: String)   = "Ошибка: $msg"
+    override fun stateMissingAuthProvider(providerKey: String) = when (providerKey) {
+        PackAuthRequirement.SmartyCraft.PROVIDER_KEY ->
+            "Этой сборке нужен аккаунт SmartyCraft. Войдите, чтобы играть."
+        else ->
+            "Этой сборке нужен вход в '$providerKey'."
+    }
     override fun authSuccess(uuid: String) = "Успешный вход. UUID: $uuid"
 
     // Profile
@@ -668,6 +676,10 @@ object RussianStrings : AppStrings {
     override val notifReasonOfflineNoClient             = "Файлы сборки отсутствуют на диске"
     override val notifReasonOfflineNoManifest           = "Нет кэша манифеста; выйди в сеть один раз для синхронизации"
     override val notifReasonTwoFactorExpired            = "Войди ещё раз, чтобы обновить учётные данные"
+    override fun notifReasonMissingAuthProvider(providerKey: String) = when (providerKey) {
+        PackAuthRequirement.SmartyCraft.PROVIDER_KEY -> "Войдите в SmartyCraft, чтобы играть на этой сборке"
+        else                                          -> "Нужен вход в '$providerKey', чтобы играть"
+    }
 
     override val notifTimeNow                           = "сейчас"
     override fun notifTimeSeconds(seconds: Long)        = "${seconds} с"

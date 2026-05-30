@@ -1,5 +1,6 @@
 package hivens.launcher.smrt
 
+import hivens.core.api.dto.smrt.SmrtAuth
 import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.dto.smrt.SmrtPackSummary
 import hivens.core.api.dto.smrt.SmrtSource
@@ -116,6 +117,92 @@ class SmrtManifestParseTest {
         assertNull(s.bannerUrl)
         assertTrue(s.galleryUrls.isEmpty())
         assertNull(s.descriptionMd)
+    }
+
+    @Test
+    fun `parses smartycraft auth block on a manifest`() {
+        val payload = """
+        {
+            "schema_version": 2,
+            "pack_id": "Industrial",
+            "pack_version": "2026.05.30.1",
+            "generated_at": "2026-05-30T00:00:00Z",
+            "minecraft": {"version": "1.12.2"},
+            "loader": {"name": "forge", "version": "14.23.5.2922"},
+            "java": {"major": 8},
+            "auth": {"kind": "smartycraft", "server_id": "Industrial"}
+        }
+        """.trimIndent()
+        val pm: SmrtPackManifest = json.decodeFromString(payload)
+        val auth = pm.auth
+        assertIs<SmrtAuth.Smartycraft>(auth)
+        assertEquals("Industrial", auth.serverId)
+    }
+
+    @Test
+    fun `unknown auth kind decodes as null without failing the whole manifest`() {
+        // Forward-compat: a mirror manifest carrying a future provider
+        // (mojang / elyby / etc.) must NOT abort the entire parse on
+        // older clients -- the launcher would lose browse + install.
+        // SmrtAuthLenientSerializer folds unknown kinds to null so the
+        // pack just appears unrestricted to the older client.
+        val payload = """
+        {
+            "schema_version": 2,
+            "pack_id": "FutureBound",
+            "pack_version": "2027.01.01",
+            "generated_at": "2027-01-01T00:00:00Z",
+            "minecraft": {"version": "1.21.4"},
+            "loader": {"name": "neoforge", "version": "21.4.99"},
+            "java": {"major": 21},
+            "auth": {"kind": "mojang", "client_id": "abcd1234"}
+        }
+        """.trimIndent()
+        val pm: SmrtPackManifest = json.decodeFromString(payload)
+        assertNull(pm.auth, "unknown auth.kind must decode as null, not throw")
+        assertEquals("FutureBound", pm.packId, "the rest of the manifest must decode normally")
+    }
+
+    @Test
+    fun `manifest without auth block parses with null and round-trips`() {
+        val payload = """
+        {
+            "schema_version": 2,
+            "pack_id": "Vanilla",
+            "pack_version": "2026.05.30.1",
+            "generated_at": "2026-05-30T00:00:00Z",
+            "minecraft": {"version": "1.21.1"},
+            "loader": {"name": "vanilla", "version": "1.21.1"},
+            "java": {"major": 21}
+        }
+        """.trimIndent()
+        val pm: SmrtPackManifest = json.decodeFromString(payload)
+        assertNull(pm.auth)
+
+        // Round-trip: a vanilla manifest stays vanilla.
+        val encoded = json.encodeToString(SmrtPackManifest.serializer(), pm)
+        val decoded: SmrtPackManifest = json.decodeFromString(encoded)
+        assertEquals(pm, decoded)
+    }
+
+    @Test
+    fun `smartycraft auth block round-trips byte-identically`() {
+        // Lock the encode path: writing a known requirement and reading
+        // it back yields the same object. Catches accidental regressions
+        // in SmrtAuthLenientSerializer.serialize.
+        val original = SmrtPackManifest(
+            schemaVersion = 2,
+            packId        = "Industrial",
+            packVersion   = "2026.05.30.1",
+            generatedAt   = "2026-05-30T00:00:00Z",
+            minecraft     = hivens.core.api.dto.smrt.SmrtMinecraft("1.12.2"),
+            loader        = hivens.core.api.dto.smrt.SmrtLoader("forge", "14.23.5.2922"),
+            java          = hivens.core.api.dto.smrt.SmrtJava(8),
+            auth          = SmrtAuth.Smartycraft("Industrial"),
+        )
+        val encoded = json.encodeToString(SmrtPackManifest.serializer(), original)
+        val decoded: SmrtPackManifest = json.decodeFromString(encoded)
+        assertEquals(original, decoded)
     }
 
     @Test

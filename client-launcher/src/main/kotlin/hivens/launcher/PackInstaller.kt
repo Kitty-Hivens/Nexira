@@ -2,6 +2,7 @@ package hivens.launcher
 
 import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.dto.smrt.SmrtPackSummary
+import hivens.core.api.dto.smrt.toDomain
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.CachedManifestSnapshot
 import hivens.core.data.InstanceRuntime
@@ -100,6 +101,7 @@ class PackInstaller(
                 loaderName       = manifest.loader.name,
                 loaderVersion    = manifest.loader.version,
                 javaMajor        = manifest.java.major,
+                authRequirement  = manifest.auth?.toDomain(),
             ),
         )
         repository.put(instance)
