@@ -130,10 +130,13 @@ private val CONSOLE_SEARCH_MATCH_FG = Color(0xFF212121)
 private val CONSOLE_PAUSE_ACCENT   = Color(0xFFFFA726)
 
 // ── Match index for F3/n navigation ─────────────────────────────────────────
+// `ranges` carries each match's [start, endExclusive) so regex hits with
+// per-match variable length highlight the actual matched text instead of a
+// zero-width caret (plain substring hits all share the same query length,
+// but the range form keeps the call site uniform).
 private data class MatchIndex(
-    val annotated:    AnnotatedString,
-    val offsets:      List<Int>,           // char offsets of every match in annotated
-    val queryLength:  Int,
+    val annotated: AnnotatedString,
+    val ranges:    List<IntRange>,
 )
 
 // ── Main composable ─────────────────────────────────────────────────────────
@@ -271,8 +274,8 @@ private fun ConsoleContent() {
     }
 
     // Clamp current match index when the match set shrinks past it.
-    LaunchedEffect(matchIndex.offsets.size) {
-        if (currentMatch >= matchIndex.offsets.size) currentMatch = 0
+    LaunchedEffect(matchIndex.ranges.size) {
+        if (currentMatch >= matchIndex.ranges.size) currentMatch = 0
     }
 
     // Initial focus on the log area: BasicTextField is read-only but still
@@ -336,33 +339,38 @@ private fun ConsoleContent() {
 
     // ── Match jumping ──────────────────────────────────────────────────────
     // The layout result may be from the PREVIOUS frame's BasicTextField measure
-    // while matchIndex.offsets references char positions in the JUST-rebuilt
+    // while matchIndex.ranges references char positions in the JUST-rebuilt
     // annotated string. Under flood, an offset can exceed the old layout's
     // text length -- MultiParagraph.getLineForOffset would throw. Guard on
     // text length first, then runCatching the layout call so a transient
     // out-of-range only loses one F3 press instead of crashing.
     fun scrollToMatch(idx: Int) {
         val layout = layoutResult ?: return
-        if (idx !in matchIndex.offsets.indices) return
-        val offset = matchIndex.offsets[idx]
-        if (offset >= layout.layoutInput.text.length) return
-        val line = runCatching { layout.getLineForOffset(offset) }.getOrNull() ?: return
+        if (idx !in matchIndex.ranges.indices) return
+        val range = matchIndex.ranges[idx]
+        val start = range.first
+        val end   = range.last + 1
+        if (start >= layout.layoutInput.text.length) return
+        val line = runCatching { layout.getLineForOffset(start) }.getOrNull() ?: return
         val top = runCatching { layout.getLineTop(line).toInt() }.getOrNull() ?: return
         val target = (top - scrollState.viewportSize / 3).coerceAtLeast(0)
         scope.launch { scrollState.animateScrollTo(target) }
-        val endOffset = (offset + matchIndex.queryLength).coerceAtMost(matchIndex.annotated.length)
-        selection = TextRange(offset, endOffset)
+        // Selection mirrors the match span exactly -- in regex mode this
+        // visualises the full matched text rather than collapsing to a
+        // zero-width caret as the prior queryLength-based form did.
+        val safeEnd = end.coerceAtMost(matchIndex.annotated.length)
+        selection = TextRange(start, safeEnd)
     }
 
     fun jumpNext() {
-        if (matchIndex.offsets.isEmpty()) return
-        currentMatch = (currentMatch + 1) % matchIndex.offsets.size
+        if (matchIndex.ranges.isEmpty()) return
+        currentMatch = (currentMatch + 1) % matchIndex.ranges.size
         scrollToMatch(currentMatch)
     }
 
     fun jumpPrev() {
-        if (matchIndex.offsets.isEmpty()) return
-        currentMatch = if (currentMatch == 0) matchIndex.offsets.lastIndex
+        if (matchIndex.ranges.isEmpty()) return
+        currentMatch = if (currentMatch == 0) matchIndex.ranges.lastIndex
                        else currentMatch - 1
         scrollToMatch(currentMatch)
     }
@@ -401,8 +409,8 @@ private fun ConsoleContent() {
     PuppetClick ("console.jumpToBottom", enabled = filtered.isNotEmpty()) {
         scope.launch { scrollState.animateScrollTo(scrollState.maxValue) }
     }
-    PuppetClick ("console.matchNext",    enabled = matchIndex.offsets.isNotEmpty()) { jumpNext() }
-    PuppetClick ("console.matchPrev",    enabled = matchIndex.offsets.isNotEmpty()) { jumpPrev() }
+    PuppetClick ("console.matchNext",    enabled = matchIndex.ranges.isNotEmpty()) { jumpNext() }
+    PuppetClick ("console.matchPrev",    enabled = matchIndex.ranges.isNotEmpty()) { jumpPrev() }
     FONT_SIZES.forEach { sz ->
         PuppetClick("console.fontSize.$sz") { fontSize = sz }
     }
@@ -416,7 +424,7 @@ private fun ConsoleContent() {
                 handleKey(
                     ev          = ev,
                     searchFocus = searchHasFocus,
-                    matchCount  = matchIndex.offsets.size,
+                    matchCount  = matchIndex.ranges.size,
                     onOpenSearch = { openSearch() },
                     onCloseSearch = {
                         if (searchQuery.isNotEmpty()) searchQuery = "" else closeSearch()
@@ -524,7 +532,13 @@ private fun ConsoleContent() {
         if (searchOpen) {
             SearchPrompt(
                 query          = searchQuery,
-                onQueryChange  = { searchQuery = it; currentMatch = 0 },
+                // Position preserved across query refinements; the
+                // LaunchedEffect(matchIndex.ranges.size) clamp resets
+                // currentMatch only when the new match set has fewer
+                // entries than the cursor position. Refining 'NullPoint'
+                // to 'NullPointer' keeps the user at hit 5 of 12 instead
+                // of teleporting them back to the top.
+                onQueryChange  = { searchQuery = it },
                 regexMode      = regexMode,
                 regexValid     = !regexMode || searchQuery.isBlank() || searchRegex != null,
                 onToggleRegex  = { regexMode = !regexMode },
@@ -545,8 +559,8 @@ private fun ConsoleContent() {
             errorCount     = errorCount,
             following      = isAtBottom,
             searchActive   = effectiveQuery.isNotBlank(),
-            matchCurrent   = if (matchIndex.offsets.isNotEmpty()) currentMatch + 1 else 0,
-            matchTotal     = matchIndex.offsets.size,
+            matchCurrent   = if (matchIndex.ranges.isNotEmpty()) currentMatch + 1 else 0,
+            matchTotal     = matchIndex.ranges.size,
             onResumeFollow = {
                 scope.launch { scrollState.animateScrollTo(scrollState.maxValue) }
             },
@@ -856,33 +870,44 @@ private fun handleKey(
         }
     }
 
-    // Log-area-focused chords.
+    // Log-area-focused chords. Shift-modified keys are passed through so
+    // BasicTextField selection extension (Shift+Arrow, Shift+End, etc.)
+    // continues to work -- a chord with Shift always means "extend
+    // selection" first, "navigate" only when Shift is up.
+    val shift = ev.isShiftPressed
+    val ctrl  = ev.isCtrlPressed
     return when {
-        // Open search prompt.
-        key == Key.F && ev.isCtrlPressed -> { onOpenSearch(); true }
-        key == Key.Slash                 -> { onOpenSearch(); true }
+        // Open search prompt. `?` (Shift+Slash) reserved for future
+        // backward-search; today it falls through to the field.
+        key == Key.F     && ctrl                -> { onOpenSearch(); true }
+        key == Key.Slash && !shift              -> { onOpenSearch(); true }
 
-        // Match nav (when there are matches).
-        matchCount > 0 && key == Key.F3 && ev.isShiftPressed -> { onPrevMatch(); true }
-        matchCount > 0 && key == Key.F3                       -> { onNextMatch(); true }
-        matchCount > 0 && key == Key.N && ev.isShiftPressed   -> { onPrevMatch(); true }
-        matchCount > 0 && key == Key.N                        -> { onNextMatch(); true }
+        // Match nav (when there are matches). F3 + Shift+F3 always work;
+        // bare n/N intercepted only when search has registered matches.
+        key == Key.F3 && shift                            -> { onPrevMatch(); true }
+        key == Key.F3                                     -> { onNextMatch(); true }
+        matchCount > 0 && key == Key.N && shift           -> { onPrevMatch(); true }
+        matchCount > 0 && key == Key.N && !shift          -> { onNextMatch(); true }
 
-        // Scroll anchors.
-        key == Key.MoveHome && ev.isCtrlPressed  -> { onScrollTop(); true }
-        key == Key.MoveEnd  && ev.isCtrlPressed  -> { onScrollBottom(); true }
-        key == Key.G        && ev.isShiftPressed -> { onScrollBottom(); true }   // G
-        key == Key.G                             -> { onScrollTop(); true }      // g
+        // Scroll anchors. Ctrl+Home / Ctrl+End never conflict with
+        // selection-extension since BasicTextField only honors plain
+        // Home / End / Shift+Home / Shift+End on selection.
+        key == Key.MoveHome && ctrl && !shift  -> { onScrollTop(); true }
+        key == Key.MoveEnd  && ctrl && !shift  -> { onScrollBottom(); true }
+        key == Key.G        && shift           -> { onScrollBottom(); true }
+        key == Key.G        && !shift          -> { onScrollTop(); true }
 
-        // Pagewise scroll.
-        key == Key.PageUp                     -> { onPageUp(); true }
-        key == Key.PageDown                   -> { onPageDown(); true }
-        key == Key.U && ev.isCtrlPressed      -> { onPageUp(); true }
-        key == Key.D && ev.isCtrlPressed      -> { onPageDown(); true }
+        // Pagewise scroll. Page keys with Shift extend selection -- pass
+        // through. Ctrl+u/d are vim-style halfpage; same Shift guard.
+        key == Key.PageUp     && !shift        -> { onPageUp(); true }
+        key == Key.PageDown   && !shift        -> { onPageDown(); true }
+        key == Key.U && ctrl  && !shift        -> { onPageUp(); true }
+        key == Key.D && ctrl  && !shift        -> { onPageDown(); true }
 
-        // Linewise scroll.
-        key == Key.K || key == Key.DirectionUp   -> { onLineUp(); true }
-        key == Key.J || key == Key.DirectionDown -> { onLineDown(); true }
+        // Linewise scroll. Arrow keys with Shift are selection-extension
+        // chords -- pass through unmodified. Vim j/k bare-key only.
+        (key == Key.K || key == Key.DirectionUp)   && !shift -> { onLineUp(); true }
+        (key == Key.J || key == Key.DirectionDown) && !shift -> { onLineDown(); true }
 
         else -> false
     }
@@ -901,9 +926,8 @@ private fun buildConsoleAnnotated(
     regexCompiled: Regex?,
     palette: ConsolePalette,
 ): MatchIndex {
-    val offsets = mutableListOf<Int>()
+    val matches = mutableListOf<IntRange>()
     val query = rawQuery
-    val queryLen = query.length
 
     val annotated = buildAnnotatedString {
         for ((idx, e) in entries.withIndex()) {
@@ -948,6 +972,7 @@ private fun buildConsoleAnnotated(
                     findAllSubstring(lineText, query, ignoreCase = true)
                 }
                 matchRanges.forEach { range ->
+                    if (range.isEmpty()) return@forEach
                     val absStart = lineStart + range.first
                     val absEnd   = lineStart + range.last + 1
                     addStyle(
@@ -959,7 +984,8 @@ private fun buildConsoleAnnotated(
                         absStart,
                         absEnd,
                     )
-                    offsets.add(absStart)
+                    // Inclusive end so the IntRange size mirrors the match span.
+                    matches.add(absStart until absEnd)
                 }
             }
 
@@ -967,11 +993,7 @@ private fun buildConsoleAnnotated(
         }
     }
 
-    return MatchIndex(
-        annotated   = annotated,
-        offsets     = offsets,
-        queryLength = if (regexMode) 0 else queryLen,
-    )
+    return MatchIndex(annotated = annotated, ranges = matches)
 }
 
 private fun findAllSubstring(text: String, query: String, ignoreCase: Boolean): List<IntRange> {
@@ -980,7 +1002,9 @@ private fun findAllSubstring(text: String, query: String, ignoreCase: Boolean): 
     var i = text.indexOf(query, ignoreCase = ignoreCase)
     while (i >= 0) {
         out.add(i until i + query.length)
-        i = text.indexOf(query, startIndex = i + 1, ignoreCase = ignoreCase)
+        // Non-overlapping (matches less / grep / IDE find semantics):
+        // "aa" in "aaaa" -> hits (0..1) and (2..3), not (0..1)(1..2)(2..3).
+        i = text.indexOf(query, startIndex = i + query.length, ignoreCase = ignoreCase)
     }
     return out
 }
