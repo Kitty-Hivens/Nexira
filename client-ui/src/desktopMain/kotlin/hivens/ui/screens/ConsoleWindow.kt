@@ -1,13 +1,16 @@
 package hivens.ui.screens
 
 import androidx.compose.foundation.HorizontalScrollbar
+import androidx.compose.foundation.ScrollbarStyle
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ContextMenuArea
 import androidx.compose.foundation.ContextMenuItem
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.layout.Arrangement
@@ -55,6 +58,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -667,14 +671,29 @@ private fun ConsoleContent(
             }
             } // end ContextMenuArea
 
+            // Console-local scrollbar style: Compose Desktop's default is
+            // 4 dp thick at 12% alpha, effectively invisible against the
+            // console background. Bump to 8 dp + 40% unhover / 75% hover
+            // so the bar is parseable peripherally without dominating the
+            // text column.
+            val scrollbarStyle = ScrollbarStyle(
+                minimalHeight       = 24.dp,
+                thickness           = 8.dp,
+                shape               = RoundedCornerShape(4.dp),
+                hoverDurationMillis = 250,
+                unhoverColor        = themeColors.textSecondary.copy(alpha = 0.40f),
+                hoverColor          = themeColors.textSecondary.copy(alpha = 0.75f),
+            )
             VerticalScrollbar(
                 adapter  = rememberScrollbarAdapter(scrollState),
                 modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
+                style    = scrollbarStyle,
             )
             if (!wrapText) {
                 HorizontalScrollbar(
                     adapter  = rememberScrollbarAdapter(hScroll),
                     modifier = Modifier.align(Alignment.BottomStart).fillMaxWidth(),
+                    style    = scrollbarStyle,
                 )
             }
 
@@ -882,9 +901,13 @@ private fun Toolbar(
     }
 }
 
-// Flat severity toggle: no Material FilterChip border, a 2dp left accent
-// when active, monochrome when not. Stays terse in the toolbar at low font
-// sizes; Slice B may refine the visual but the API stays the same.
+// Flat severity toggle. Material3 TextButton injects its own content-color
+// CompositionLocal that overrides Text(color = ...) in this codebase's
+// theme stack, making the labels read as monochrome at low contrast. A
+// raw Box + clickable bypasses that pipeline and gives us full control
+// over both the chip background tint (active state) and the text color.
+// Active chip carries a 14% accent wash so the toggle reads ON without
+// needing a border; inactive label drops to 45% alpha for clear hierarchy.
 @Composable
 private fun SeverityToggle(
     label: String,
@@ -894,14 +917,20 @@ private fun SeverityToggle(
     onToggle: (Boolean) -> Unit,
 ) {
     val text = if (count != null && count > 0) "$label $count" else label
-    TextButton(
-        onClick = { onToggle(!active) },
-        modifier = Modifier.height(24.dp),
+    val bg   = if (active) accent.copy(alpha = 0.14f) else Color.Transparent
+    Box(
+        modifier = Modifier
+            .height(24.dp)
+            .clip(RoundedCornerShape(4.dp))
+            .background(bg)
+            .clickable { onToggle(!active) }
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        contentAlignment = Alignment.Center,
     ) {
         Text(
             text       = text,
-            color      = if (active) accent else accent.copy(alpha = 0.35f),
-            fontSize   = 10.sp,
+            color      = if (active) accent else accent.copy(alpha = 0.45f),
+            fontSize   = 11.sp,
             fontFamily = FontFamily.Monospace,
             fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
         )
