@@ -155,6 +155,7 @@ interface AppStrings {
     val consoleCopied: String
     val consoleMenuCopyLine: String
     val consoleMenuCopySelection: String
+    val consoleSelectAll: String
     val consoleSettingsLabel: String
     val consoleShowGutter: String
     val consoleHideGutter: String

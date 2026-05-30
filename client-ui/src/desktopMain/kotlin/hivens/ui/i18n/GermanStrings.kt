@@ -157,6 +157,7 @@ object GermanStrings : AppStrings {
     override val consoleCopied = "Kopiert"
     override val consoleMenuCopyLine = "Zeile kopieren"
     override val consoleMenuCopySelection = "Auswahl kopieren"
+    override val consoleSelectAll = "Alles auswählen"
     override val consoleSettingsLabel = "Konsole-Einstellungen"
     override val consoleShowGutter = "Schweregradleiste anzeigen"
     override val consoleHideGutter = "Schweregradleiste ausblenden"

@@ -7,6 +7,11 @@ import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ContextMenuArea
 import androidx.compose.foundation.ContextMenuItem
+import androidx.compose.foundation.ContextMenuState
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.text.TextContextMenu
+import androidx.compose.foundation.text.LocalTextContextMenu
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
@@ -77,6 +82,8 @@ import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalFocusManager
@@ -205,7 +212,7 @@ fun ConsoleWindow(
     }
 }
 
-@OptIn(ExperimentalComposeUiApi::class)
+@OptIn(ExperimentalComposeUiApi::class, ExperimentalFoundationApi::class)
 @Composable
 private fun ConsoleContent(
     settings: ConsoleSettings,
@@ -607,6 +614,19 @@ private fun ConsoleContent(
                 Modifier
             }
 
+            // Override BasicTextField's built-in LocalTextContextMenu so
+            // the right-click popup drops Cut / Paste (we are read-only)
+            // and picks up our Copy line + Copy all entries. Keeps the
+            // field's native Copy / Select-all so OS shortcuts and the
+            // menu agree on behaviour.
+            val customContextMenu = remember(s) {
+                ConsoleTextContextMenu(
+                    strings        = s,
+                    onCopyLine     = ::copyLine,
+                    onCopyAll      = ::copyAll,
+                )
+            }
+            CompositionLocalProvider(LocalTextContextMenu provides customContextMenu) {
             ContextMenuArea(
                 items = {
                     listOf(
@@ -670,6 +690,7 @@ private fun ConsoleContent(
                 }
             }
             } // end ContextMenuArea
+            } // end CompositionLocalProvider(LocalTextContextMenu)
 
             // Console-local scrollbar style: Compose Desktop's default is
             // 4 dp thick at 12% alpha, effectively invisible against the
@@ -776,6 +797,7 @@ private fun ConsoleContent(
 
 // ── Toolbar ─────────────────────────────────────────────────────────────────
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 private fun Toolbar(
     strings: AppStrings,
@@ -833,15 +855,40 @@ private fun Toolbar(
             )
             Spacer(Modifier.width(4.dp))
 
-            // Font size cycle: tap to advance through FONT_SIZES.
-            TextButton(onClick = {
-                val idx = FONT_SIZES.indexOf(fontSize).takeIf { it >= 0 } ?: 0
-                onFontSize(FONT_SIZES[(idx + 1) % FONT_SIZES.size])
-            }) {
+            // Font size: click cycles through FONT_SIZES, scroll-wheel
+            // increments / decrements by 1 sp. Wheel-over-control is the
+            // pattern used by Hyprland / Discord / mpv -- intuitive for
+            // users who reach for the mouse to adjust. The 1-sp step also
+            // exposes the full 8..22 range, not just the three FONT_SIZES
+            // presets.
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(4.dp))
+                    .clickable {
+                        val idx = FONT_SIZES.indexOf(fontSize).takeIf { it >= 0 } ?: 0
+                        onFontSize(FONT_SIZES[(idx + 1) % FONT_SIZES.size])
+                    }
+                    .onPointerEvent(PointerEventType.Scroll) { ev ->
+                        val delta = ev.changes.firstOrNull()?.scrollDelta?.y ?: 0f
+                        if (delta == 0f) return@onPointerEvent
+                        // scrollDelta.y is positive for wheel-down on most
+                        // platforms; invert so up = bigger text.
+                        val step = if (delta < 0) 1 else -1
+                        onFontSize(
+                            (fontSize + step).coerceIn(
+                                ConsoleSettings.MIN_FONT_SIZE,
+                                ConsoleSettings.MAX_FONT_SIZE,
+                            ),
+                        )
+                    }
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                contentAlignment = Alignment.Center,
+            ) {
                 Text(
                     text       = "${fontSize}px",
                     color      = colors.textSecondary,
                     fontSize   = 11.sp,
+                    lineHeight = 13.sp,
                     fontFamily = FontFamily.Monospace,
                 )
             }
@@ -918,19 +965,24 @@ private fun SeverityToggle(
 ) {
     val text = if (count != null && count > 0) "$label $count" else label
     val bg   = if (active) accent.copy(alpha = 0.14f) else Color.Transparent
+    // Wrap-content height + symmetric padding centers the text optically.
+    // The prior fixed 24 dp height pushed all-caps mono labels visually
+    // below the chip center because font ascent reserves space above the
+    // caps that no glyph fills. Letting the box hug the text gives an
+    // even top / bottom margin around the actual ink.
     Box(
         modifier = Modifier
-            .height(24.dp)
             .clip(RoundedCornerShape(4.dp))
             .background(bg)
             .clickable { onToggle(!active) }
-            .padding(horizontal = 8.dp, vertical = 4.dp),
+            .padding(horizontal = 8.dp, vertical = 3.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             text       = text,
             color      = if (active) accent else accent.copy(alpha = 0.45f),
             fontSize   = 11.sp,
+            lineHeight = 13.sp,
             fontFamily = FontFamily.Monospace,
             fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
         )
@@ -1002,11 +1054,12 @@ private fun SearchPrompt(
             !regexValid -> colors.criticalAccent
             else        -> colors.success
         }
-        TextButton(onClick = onToggleRegex, modifier = Modifier.height(24.dp)) {
+        PromptButton(onClick = onToggleRegex) {
             Text(
                 text       = ".*",
                 color      = regexTint,
                 fontSize   = 12.sp,
+                lineHeight = 14.sp,
                 fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Bold,
             )
@@ -1016,22 +1069,35 @@ private fun SearchPrompt(
         // dividers). 'f|' glyph reads as "filter on" without needing an
         // icon import. Active state is the same accent as a confirmed
         // regex toggle so the two related controls share a visual.
-        TextButton(onClick = onToggleFilter, modifier = Modifier.height(24.dp)) {
+        PromptButton(onClick = onToggleFilter) {
             Text(
                 text       = "f|",
                 color      = if (filterMode) colors.success else colors.textSecondary.copy(alpha = 0.4f),
                 fontSize   = 12.sp,
+                lineHeight = 14.sp,
                 fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Bold,
             )
         }
-        TextButton(onClick = onPrev, modifier = Modifier.height(24.dp)) {
-            Text("<", color = colors.textSecondary, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
+        PromptButton(onClick = onPrev) {
+            Text(
+                text       = "<",
+                color      = colors.textSecondary,
+                fontSize   = 12.sp,
+                lineHeight = 14.sp,
+                fontFamily = FontFamily.Monospace,
+            )
         }
-        TextButton(onClick = onNext, modifier = Modifier.height(24.dp)) {
-            Text(">", color = colors.textSecondary, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
+        PromptButton(onClick = onNext) {
+            Text(
+                text       = ">",
+                color      = colors.textSecondary,
+                fontSize   = 12.sp,
+                lineHeight = 14.sp,
+                fontFamily = FontFamily.Monospace,
+            )
         }
-        IconButton(onClick = onClose, modifier = Modifier.size(24.dp)) {
+        PromptButton(onClick = onClose) {
             Icon(
                 imageVector        = Icons.Default.Close,
                 contentDescription = null,
@@ -1039,6 +1105,28 @@ private fun SearchPrompt(
                 modifier           = Modifier.size(14.dp),
             )
         }
+    }
+}
+
+// Material3 TextButton injects a contentColor CompositionLocal that
+// overrides our explicit Text(color = ...) settings in this theme stack;
+// the regex / filter / prev / next labels on the SearchPrompt rendered
+// as illegible smears the same way the severity toggles did. Bare
+// Box + clickable hands us back full control over typography colors and
+// fits the slim 24 dp footer height without TextButton's hidden minWidth.
+@Composable
+private fun PromptButton(
+    onClick: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(4.dp))
+            .clickable { onClick() }
+            .padding(horizontal = 6.dp, vertical = 3.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        content()
     }
 }
 
@@ -1272,6 +1360,45 @@ private fun buildConsoleAnnotated(
         ranges         = matches,
         lineSeverities = severities,
     )
+}
+
+// Replaces the default BasicTextField right-click menu (Cut / Copy /
+// Paste / Select all) with one that drops Cut + Paste (the field is
+// read-only, those are useless) and adds Copy line / Copy all + keeps
+// native Copy + Select all. The styling still flows through Compose
+// Desktop's ContextMenuRepresentation; further visual polish lives on
+// Phase 7.5.
+@OptIn(ExperimentalFoundationApi::class)
+private class ConsoleTextContextMenu(
+    private val strings: AppStrings,
+    private val onCopyLine: () -> Unit,
+    private val onCopyAll: () -> Unit,
+) : TextContextMenu {
+    @Composable
+    override fun Area(
+        textManager: TextContextMenu.TextManager,
+        state: ContextMenuState,
+        content: @Composable () -> Unit,
+    ) {
+        ContextMenuArea(
+            items = {
+                buildList {
+                    val copyAction = textManager.copy
+                    if (copyAction != null && copyAction.enabled) {
+                        add(ContextMenuItem(strings.consoleMenuCopySelection) { copyAction.execute() })
+                    }
+                    add(ContextMenuItem(strings.consoleMenuCopyLine) { onCopyLine() })
+                    add(ContextMenuItem(strings.consoleCopyAll) { onCopyAll() })
+                    val selectAllAction = textManager.selectAll
+                    if (selectAllAction != null && selectAllAction.enabled) {
+                        add(ContextMenuItem(strings.consoleSelectAll) { selectAllAction.execute() })
+                    }
+                }
+            },
+            state   = state,
+            content = content,
+        )
+    }
 }
 
 // Paint a thin vertical strip at the left edge of each rendered line whose

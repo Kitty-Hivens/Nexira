@@ -157,6 +157,7 @@ object RussianStrings : AppStrings {
     override val consoleCopied = "Скопировано"
     override val consoleMenuCopyLine = "Скопировать строку"
     override val consoleMenuCopySelection = "Скопировать выделение"
+    override val consoleSelectAll = "Выделить всё"
     override val consoleSettingsLabel = "Настройки консоли"
     override val consoleShowGutter = "Показывать полосу severity"
     override val consoleHideGutter = "Скрыть полосу severity"

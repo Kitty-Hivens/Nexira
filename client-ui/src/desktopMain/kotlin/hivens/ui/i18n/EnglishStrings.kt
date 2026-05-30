@@ -157,6 +157,7 @@ object EnglishStrings : AppStrings {
     override val consoleCopied = "Copied"
     override val consoleMenuCopyLine = "Copy line"
     override val consoleMenuCopySelection = "Copy selection"
+    override val consoleSelectAll = "Select all"
     override val consoleSettingsLabel = "Console settings"
     override val consoleShowGutter = "Show severity strip"
     override val consoleHideGutter = "Hide severity strip"
