@@ -2,6 +2,8 @@ package hivens.ui.screens
 
 import androidx.compose.foundation.HorizontalScrollbar
 import androidx.compose.foundation.VerticalScrollbar
+import androidx.compose.foundation.ContextMenuArea
+import androidx.compose.foundation.ContextMenuItem
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.horizontalScroll
@@ -215,6 +217,7 @@ private fun ConsoleContent() {
     var searchOpen      by remember { mutableStateOf(false) }
     var searchHasFocus  by remember { mutableStateOf(false) }
     var pendingSearchFocus by remember { mutableStateOf(false) }
+    var searchAsFilter  by remember { mutableStateOf(false) }
     var currentMatch    by remember { mutableIntStateOf(0) }
     var copiedFlash     by remember { mutableStateOf(false) }
     var selection       by remember { mutableStateOf(TextRange.Zero) }
@@ -257,8 +260,17 @@ private fun ConsoleContent() {
     }
 
     // ── Filtered + annotated buffer ────────────────────────────────────────
-    val filtered = remember(logsCopy, filterInfo, filterWarn, filterError) {
-        logsCopy.filter { entry ->
+    // Two-stage filter: severity gates first, then optional query-narrowing
+    // when search-as-filter is on. The default (filter off) leaves search
+    // purely a highlight + F3 navigation aid; turning the mode on collapses
+    // the buffer to just lines containing the active query, the same shape
+    // less-grep gives. Dividers are kept verbatim either way so session
+    // boundaries stay visible.
+    val filtered = remember(
+        logsCopy, filterInfo, filterWarn, filterError,
+        searchAsFilter, effectiveQuery, regexMode, searchRegex,
+    ) {
+        val severityOk: (LogEntry) -> Boolean = { entry ->
             when (entry.type) {
                 LogType.INFO    -> filterInfo
                 LogType.WARN    -> filterWarn
@@ -266,6 +278,17 @@ private fun ConsoleContent() {
                 LogType.DIVIDER -> true
             }
         }
+        val queryOk: (LogEntry) -> Boolean = q@{ entry ->
+            if (!searchAsFilter || effectiveQuery.isBlank()) return@q true
+            if (entry.type == LogType.DIVIDER) return@q true
+            val haystack = entry.text
+            if (regexMode) {
+                searchRegex?.containsMatchIn(haystack) ?: false
+            } else {
+                haystack.contains(effectiveQuery, ignoreCase = true)
+            }
+        }
+        logsCopy.filter { severityOk(it) && queryOk(it) }
     }
 
     val warnCount  = remember(logsCopy) { logsCopy.count { it.type == LogType.WARN } }
@@ -339,6 +362,46 @@ private fun ConsoleContent() {
         }
     }
 
+    // Copy the line under the current caret (selection.start). Right-click
+    // menu uses this; the bare gesture is gone but explicit menu access
+    // keeps the workflow alive. Falls back to no-op when the layout has
+    // not measured yet or the offset coerce lands outside the rendered
+    // text -- one missed click is cheaper than a partial-line copy.
+    fun copyLine() {
+        val layout = layoutResult ?: return
+        val annotated = matchIndex.annotated
+        if (annotated.isEmpty()) return
+        val pos = selection.start.coerceIn(0, annotated.length - 1)
+        val line = runCatching { layout.getLineForOffset(pos) }.getOrNull() ?: return
+        val lineStart = runCatching { layout.getLineStart(line) }.getOrNull() ?: return
+        val lineEnd   = runCatching { layout.getLineEnd(line, visibleEnd = true) }.getOrNull() ?: return
+        if (lineStart < 0 || lineEnd > annotated.length || lineStart > lineEnd) return
+        val text = annotated.substring(lineStart, lineEnd)
+        scope.launch { clipboard.setClipEntry(ClipEntry(StringSelection(text))) }
+        copiedFlash = true
+        scope.launch {
+            delay(900)
+            copiedFlash = false
+        }
+    }
+
+    // Copy the active selection. Collapsed selection (no drag) -> no-op;
+    // the user can switch to copy-line for that case via the same menu.
+    fun copySelection() {
+        if (selection.collapsed) return
+        val annotated = matchIndex.annotated
+        val start = selection.start.coerceIn(0, annotated.length)
+        val end   = selection.end.coerceIn(0, annotated.length)
+        if (start >= end) return
+        val text = annotated.substring(start, end)
+        scope.launch { clipboard.setClipEntry(ClipEntry(StringSelection(text))) }
+        copiedFlash = true
+        scope.launch {
+            delay(900)
+            copiedFlash = false
+        }
+    }
+
     // ── Match jumping ──────────────────────────────────────────────────────
     // The layout result may be from the PREVIOUS frame's BasicTextField measure
     // while matchIndex.ranges references char positions in the JUST-rebuilt
@@ -402,6 +465,7 @@ private fun ConsoleContent() {
     PuppetToggle("console.filterError", filterError) { filterError = it }
     PuppetToggle("console.wrap",        wrapText)    { wrapText = it }
     PuppetToggle("console.regexMode",   regexMode)   { regexMode = it }
+    PuppetToggle("console.searchAsFilter", searchAsFilter) { searchAsFilter = it }
     PuppetToggle("console.searchOpen",  searchOpen)  { if (it) openSearch() else closeSearch() }
     PuppetField ("console.search", searchQuery)      { searchQuery = it }
     PuppetClick ("console.clearSearch", enabled = searchQuery.isNotEmpty()) { searchQuery = "" }
@@ -475,6 +539,15 @@ private fun ConsoleContent() {
                 color      = themeColors.textPrimary,
             )
 
+            ContextMenuArea(
+                items = {
+                    listOf(
+                        ContextMenuItem(s.consoleMenuCopyLine) { copyLine() },
+                        ContextMenuItem(s.consoleMenuCopySelection) { copySelection() },
+                        ContextMenuItem(s.consoleCopyAll) { copyAll() },
+                    )
+                },
+            ) {
             if (wrapText) {
                 // Wrap-on path: BasicTextField inherits its width from the
                 // parent verticalScroll Column at fillMaxWidth, which is
@@ -525,6 +598,7 @@ private fun ConsoleContent() {
                     }
                 }
             }
+            } // end ContextMenuArea
 
             VerticalScrollbar(
                 adapter  = rememberScrollbarAdapter(scrollState),
@@ -577,6 +651,8 @@ private fun ConsoleContent() {
                 regexMode      = regexMode,
                 regexValid     = !regexMode || searchQuery.isBlank() || searchRegex != null,
                 onToggleRegex  = { regexMode = !regexMode },
+                filterMode     = searchAsFilter,
+                onToggleFilter = { searchAsFilter = !searchAsFilter },
                 onClose        = { closeSearch() },
                 focusRequester = searchFocus,
                 onFocusChanged = { searchHasFocus = it },
@@ -726,6 +802,8 @@ private fun SearchPrompt(
     regexMode: Boolean,
     regexValid: Boolean,
     onToggleRegex: () -> Unit,
+    filterMode: Boolean,
+    onToggleFilter: () -> Unit,
     onClose: () -> Unit,
     focusRequester: FocusRequester,
     onFocusChanged: (Boolean) -> Unit,
@@ -784,6 +862,20 @@ private fun SearchPrompt(
             Text(
                 text       = ".*",
                 color      = regexTint,
+                fontSize   = 12.sp,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold,
+            )
+        }
+        // Filter toggle: off = search highlights + F3-navigates the full
+        // buffer; on = buffer collapses to only matching lines (plus
+        // dividers). 'f|' glyph reads as "filter on" without needing an
+        // icon import. Active state is the same accent as a confirmed
+        // regex toggle so the two related controls share a visual.
+        TextButton(onClick = onToggleFilter, modifier = Modifier.height(24.dp)) {
+            Text(
+                text       = "f|",
+                color      = if (filterMode) colors.success else colors.textSecondary.copy(alpha = 0.4f),
                 fontSize   = 12.sp,
                 fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Bold,
