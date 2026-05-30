@@ -138,6 +138,7 @@ class LauncherControllerTest {
         profileManager     = profileManager,
         packRepository     = packRepository,
         smrtPackClient     = smrtPackClient,
+        smrtSyncService    = mockk(relaxed = true),
         dataDirectory      = sandbox,
         appScope           = scope,
     )

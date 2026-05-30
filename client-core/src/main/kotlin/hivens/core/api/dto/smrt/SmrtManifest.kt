@@ -126,6 +126,14 @@ data class SmrtModEntry(
     val sha1: String,
     @SerialName("size_bytes") val sizeBytes: Long,
     val required: Boolean = true,
+    /**
+     * Install-time default for an OPTIONAL entry (`required = false`): whether
+     * it is enabled before the user touches it. Absent defaults to true, so an
+     * optional mod installs unless the curator explicitly opts it out (e.g. a
+     * mod that conflicts with a default-on one). Ignored for required entries,
+     * which are always installed.
+     */
+    @SerialName("default_enabled") val defaultEnabled: Boolean = true,
     val source: SmrtSource,
     val display: SmrtDisplay? = null,
 )

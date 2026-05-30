@@ -13,6 +13,7 @@ import java.io.FileOutputStream
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 import java.util.Comparator
 
@@ -33,10 +34,17 @@ class SmrtSyncService(
 ) {
     private val log = LoggerFactory.getLogger(SmrtSyncService::class.java)
 
+    /**
+     * [enabledState] maps a mod `filename` to whether it should be active.
+     * Required mods are always active regardless; an optional absent from the
+     * map falls back to its manifest `default_enabled`. Empty map = install
+     * every mod at its manifest default (the pre-toggle behaviour).
+     */
     suspend fun sync(
         packId: String,
         clientDir: Path,
         progress: ((current: Int, total: Int, filename: String) -> Unit)? = null,
+        enabledState: Map<String, Boolean> = emptyMap(),
     ) = withContext(Dispatchers.IO) {
         val manifest = client.fetchManifest(packId)
         log.info(
@@ -77,7 +85,8 @@ class SmrtSyncService(
         for (mod in manifest.mods) {
             current++
             progress?.invoke(current, total, mod.filename)
-            syncMod(mod, clientDir)
+            val enabled = enabledState[mod.filename] ?: (mod.required || mod.defaultEnabled)
+            syncMod(mod, clientDir, enabled)
         }
         for (asset in manifest.assets) {
             current++
@@ -90,9 +99,32 @@ class SmrtSyncService(
         // without touching the marker, so the wipe gate saw a stale
         // "mirror" value). Only top-level mods/{expected_filename}
         // entries survive.
-        pruneOrphanMods(clientDir, manifest.mods.map { it.filename }.toSet())
+        pruneOrphanMods(clientDir, manifest.mods.flatMap { listOf(it.filename, "${it.filename}.disabled") }.toSet())
 
         writeSourceMarker(marker, SOURCE_MIRROR)
+    }
+
+    /**
+     * Re-labels already-downloaded optional mods to match [enabledState] with NO
+     * network: an active jar that should be off becomes `.disabled` and vice
+     * versa. The toggle UI calls this -- the bytes are already on disk, only the
+     * name (and thus whether Forge loads it) changes. A variant that is missing
+     * on disk is left for the next full sync to fetch.
+     */
+    fun relabel(clientDir: Path, mods: List<SmrtModEntry>, enabledState: Map<String, Boolean>) {
+        val modsDir = clientDir.resolve("mods")
+        if (!Files.isDirectory(modsDir)) return
+        for (mod in mods) {
+            val enabled = enabledState[mod.filename] ?: (mod.required || mod.defaultEnabled)
+            val active = resolveSafe(modsDir, mod.filename, "mod ${mod.filename}")
+            val disabled = resolveSafe(modsDir, "${mod.filename}.disabled", "mod ${mod.filename}")
+            val from = if (enabled) disabled else active
+            val to = if (enabled) active else disabled
+            if (Files.exists(from) && !Files.exists(to)) {
+                runCatching { Files.move(from, to, StandardCopyOption.REPLACE_EXISTING) }
+                    .onFailure { log.warn("smrt relabel: failed to move {} -> {}", from, to, it) }
+            }
+        }
     }
 
     private fun pruneOrphanMods(clientDir: Path, expected: Set<String>) {
@@ -146,15 +178,26 @@ class SmrtSyncService(
     }
 
     /**
-     * Mods land at `mods/{filename}` regardless of SC's dual-tier
-     * convention. Forge 1.12.2 scans both `mods/` and
-     * `mods/{mcversion}/`, so flat placement still loads. Optional
-     * mods that the user didn't enable (required=false and no future
-     * toggle infrastructure yet) are still pulled in this v0 cut --
-     * later iterations will respect a per-user opt-out map.
+     * Mods land at `mods/{filename}`; an optional mod toggled OFF lands at
+     * `mods/{filename}.disabled` (Forge ignores non-`.jar` names), so flipping a
+     * toggle is a rename rather than a re-download. When the stale variant
+     * already holds the right bytes it is moved into place; otherwise it is
+     * removed and the active variant fetched. Forge 1.12.2 scans both `mods/`
+     * and `mods/{mcversion}/`, so flat placement still loads.
      */
-    private suspend fun syncMod(mod: SmrtModEntry, clientDir: Path) {
-        val dest = resolveSafe(clientDir.resolve("mods"), mod.filename, "mod ${mod.filename}")
+    private suspend fun syncMod(mod: SmrtModEntry, clientDir: Path, enabled: Boolean) {
+        val modsDir = clientDir.resolve("mods")
+        val activeDest = resolveSafe(modsDir, mod.filename, "mod ${mod.filename}")
+        val disabledDest = resolveSafe(modsDir, "${mod.filename}.disabled", "mod ${mod.filename}")
+        val dest = if (enabled) activeDest else disabledDest
+        val stale = if (enabled) disabledDest else activeDest
+
+        if (!isUpToDate(dest, mod.sha1, mod.sizeBytes) && isUpToDate(stale, mod.sha1, mod.sizeBytes)) {
+            Files.createDirectories(dest.parent)
+            Files.move(stale, dest, StandardCopyOption.REPLACE_EXISTING)
+            return
+        }
+        runCatching { Files.deleteIfExists(stale) }
         downloadIfNeeded(dest, mod.sha1, mod.sizeBytes, mod.source, "mod ${mod.filename}")
     }
 
