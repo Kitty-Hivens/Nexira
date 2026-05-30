@@ -28,14 +28,11 @@ import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.foundation.rememberScrollbarAdapter
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -83,6 +80,10 @@ import androidx.compose.ui.window.rememberWindowState
 import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
+import hivens.ui.theme.CelestiaStyle
+import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.CustomTheme
+import hivens.ui.theme.StyleSpec
 import hivens.ui.puppet.PuppetField
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.puppet.PuppetToggle
@@ -103,56 +104,30 @@ private val ERROR_MARKERS = Regex("(Exception|Error|FATAL|SEVERE|Caused by:|\\ba
 private val FONT_SIZES = listOf(11, 12, 14)
 
 // ── Palette ──────────────────────────────────────────────────────────────────
-// Single source of truth for every color in the console. Slice C will plug
-// user overrides into the same factory; Slice B will reshape the palette
-// itself but keep this hand-off intact.
+// Theme-derived colors flow through CelestiaTheme.colors at every composable
+// call site; this small record carries the subset that pure helpers (the
+// AnnotatedString builder) consume off the composition. Only console-only
+// tokens (the yellow search highlight, the orange pause accent) live as
+// constants -- everything else maps to a CelestiaColors role and follows
+// the user's theme + customization overrides.
 private data class ConsolePalette(
-    val background:       Color,
-    val toolbarBackground: Color,
-    val textPrimary:      Color,
-    val textSecondary:    Color,
-    val severityInfo:     Color,
-    val severityWarn:     Color,
-    val severityError:    Color,
-    val divider:          Color,
-    val searchMatch:      Color,
-    val searchMatchBg:    Color,
-    val searchActive:     Color,
-    val followAccent:     Color,
-    val pauseAccent:      Color,
+    val textPrimary:    Color,
+    val textSecondary:  Color,
+    val severityInfo:   Color,
+    val severityWarn:   Color,
+    val severityError:  Color,
+    val divider:        Color,
+    val searchMatch:    Color,
+    val searchMatchBg:  Color,
 )
 
-private fun darkPalette() = ConsolePalette(
-    background        = Color(0xFF121212),
-    toolbarBackground = Color(0xFF1E1E1E),
-    textPrimary       = Color(0xFFCCCCCC),
-    textSecondary     = Color(0xFF888888),
-    severityInfo      = Color(0xFFCCCCCC),
-    severityWarn      = Color(0xFFFFD54F),
-    severityError     = Color(0xFFEF5350),
-    divider           = Color(0xFF444444),
-    searchMatch       = Color(0xFF212121),
-    searchMatchBg     = Color(0xFFFFEB3B),
-    searchActive      = Color(0xFF4CAF50),
-    followAccent      = Color(0xFF4CAF50),
-    pauseAccent       = Color(0xFFFFA726),
-)
-
-private fun lightPalette() = ConsolePalette(
-    background        = Color(0xFFF5F5F5),
-    toolbarBackground = Color(0xFFE0E0E0),
-    textPrimary       = Color(0xFF212121),
-    textSecondary     = Color(0xFF666666),
-    severityInfo      = Color(0xFF212121),
-    severityWarn      = Color(0xFFB57500),
-    severityError     = Color(0xFFC62828),
-    divider           = Color(0xFFBBBBBB),
-    searchMatch       = Color(0xFF212121),
-    searchMatchBg     = Color(0xFFFFEB3B),
-    searchActive      = Color(0xFF2E7D32),
-    followAccent      = Color(0xFF2E7D32),
-    pauseAccent       = Color(0xFFEF6C00),
-)
+// Console-only accents that have no CelestiaColors counterpart. Yellow
+// search-match background is universally legible on either light or dark
+// surfaces; pause-accent uses warm orange to read as "intentional halt"
+// rather than failure (criticalAccent would conflate with ERROR severity).
+private val CONSOLE_SEARCH_MATCH_BG = Color(0xFFFFEB3B)
+private val CONSOLE_SEARCH_MATCH_FG = Color(0xFF212121)
+private val CONSOLE_PAUSE_ACCENT   = Color(0xFFFFA726)
 
 // ── Match index for F3/n navigation ─────────────────────────────────────────
 private data class MatchIndex(
@@ -164,7 +139,12 @@ private data class MatchIndex(
 // ── Main composable ─────────────────────────────────────────────────────────
 
 @Composable
-fun ConsoleWindow(isDarkTheme: Boolean, onClose: () -> Unit) {
+fun ConsoleWindow(
+    isDarkTheme: Boolean,
+    onClose: () -> Unit,
+    customTheme: CustomTheme? = null,
+    style: StyleSpec = CelestiaStyle,
+) {
     val title = LocalStrings.current.consoleTitle
     val windowState = rememberWindowState(width = 960.dp, height = 620.dp)
 
@@ -175,12 +155,19 @@ fun ConsoleWindow(isDarkTheme: Boolean, onClose: () -> Unit) {
         alwaysOnTop    = false,
         undecorated    = false,
     ) {
-        val palette = if (isDarkTheme) darkPalette() else lightPalette()
-        MaterialTheme(
-            colorScheme = if (isDarkTheme) darkColorScheme() else lightColorScheme(),
+        // CelestiaTheme handles both the Material colorScheme + the
+        // launcher's CelestiaColors composition local; child composables
+        // read CelestiaTheme.colors directly. Accent / role overrides
+        // from LocalCustomization propagate in if the caller wrapped the
+        // ConsoleWindow site in a CustomizationProvider; otherwise the
+        // default settings yield the same palette as the main shell.
+        CelestiaTheme(
+            useDarkTheme = isDarkTheme,
+            customTheme  = customTheme,
+            style        = style,
         ) {
-            Surface(modifier = Modifier.fillMaxSize(), color = palette.background) {
-                ConsoleContent(palette = palette)
+            Surface(modifier = Modifier.fillMaxSize(), color = CelestiaTheme.colors.background) {
+                ConsoleContent()
             }
         }
     }
@@ -188,12 +175,29 @@ fun ConsoleWindow(isDarkTheme: Boolean, onClose: () -> Unit) {
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-private fun ConsoleContent(palette: ConsolePalette) {
+private fun ConsoleContent() {
     val s = LocalStrings.current
     val clipboard = LocalClipboard.current
     val focusManager = LocalFocusManager.current
     val scope = rememberCoroutineScope()
     val gameConsole: GameConsoleService = koinInject()
+    val themeColors = CelestiaTheme.colors
+
+    // Pure-function helpers (the AnnotatedString builder) consume a value-
+    // type palette off the composition; build it once per theme change so
+    // the builder stays @Composable-free.
+    val palette = remember(themeColors) {
+        ConsolePalette(
+            textPrimary    = themeColors.textPrimary,
+            textSecondary  = themeColors.textSecondary,
+            severityInfo   = themeColors.textPrimary,
+            severityWarn   = themeColors.warnAccent,
+            severityError  = themeColors.criticalAccent,
+            divider        = themeColors.outline,
+            searchMatch    = CONSOLE_SEARCH_MATCH_FG,
+            searchMatchBg  = CONSOLE_SEARCH_MATCH_BG,
+        )
+    }
 
     // ── State ──────────────────────────────────────────────────────────────
     var searchQuery     by remember { mutableStateOf("") }
@@ -430,7 +434,6 @@ private fun ConsoleContent(palette: ConsolePalette) {
     ) {
         // ── Toolbar ─────────────────────────────────────────────────────────
         Toolbar(
-            palette       = palette,
             strings       = s,
             filtered      = filtered.size,
             total         = logsCopy.size,
@@ -451,7 +454,7 @@ private fun ConsoleContent(palette: ConsolePalette) {
             onClear       = { gameConsole.clear() },
         )
 
-        HorizontalDivider(thickness = 1.dp, color = palette.divider.copy(alpha = 0.4f))
+        HorizontalDivider(thickness = 1.dp, color = themeColors.outline.copy(alpha = 0.4f))
 
         // ── Log area ────────────────────────────────────────────────────────
         Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -459,7 +462,7 @@ private fun ConsoleContent(palette: ConsolePalette) {
             val baseStyle = TextStyle(
                 fontFamily = FontFamily.Monospace,
                 fontSize   = fontSize.sp,
-                color      = palette.textPrimary,
+                color      = themeColors.textPrimary,
             )
 
             Column(Modifier.fillMaxSize().verticalScroll(scrollState)) {
@@ -473,7 +476,7 @@ private fun ConsoleContent(palette: ConsolePalette) {
                     onValueChange = { tfv -> selection = tfv.selection },
                     readOnly      = true,
                     textStyle     = baseStyle,
-                    cursorBrush   = SolidColor(palette.textPrimary),
+                    cursorBrush   = SolidColor(themeColors.textPrimary),
                     onTextLayout  = { layoutResult = it },
                     modifier      = if (wrapText) fieldModifier
                                     else fieldModifier.horizontalScroll(hScroll),
@@ -496,13 +499,17 @@ private fun ConsoleContent(palette: ConsolePalette) {
             // once the wider visual refresh lands.
             if (copiedFlash) {
                 Surface(
-                    color = palette.followAccent.copy(alpha = 0.9f),
+                    color = themeColors.success.copy(alpha = 0.9f),
                     modifier = Modifier
                         .align(Alignment.TopCenter)
                         .padding(top = 12.dp),
                 ) {
                     Text(
                         text     = s.consoleCopied,
+                        // White text reads against both light- and dark-success
+                        // surfaces in CelestiaColors as currently defined; revisit
+                        // in Slice 6 customization if a contrast pairing becomes
+                        // necessary under user-supplied overrides.
                         color    = Color.White,
                         fontSize = 11.sp,
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
@@ -512,11 +519,10 @@ private fun ConsoleContent(palette: ConsolePalette) {
         }
 
         // ── Footer: search prompt + status ─────────────────────────────────
-        HorizontalDivider(thickness = 1.dp, color = palette.divider.copy(alpha = 0.4f))
+        HorizontalDivider(thickness = 1.dp, color = themeColors.outline.copy(alpha = 0.4f))
 
         if (searchOpen) {
             SearchPrompt(
-                palette        = palette,
                 query          = searchQuery,
                 onQueryChange  = { searchQuery = it; currentMatch = 0 },
                 regexMode      = regexMode,
@@ -532,7 +538,6 @@ private fun ConsoleContent(palette: ConsolePalette) {
         }
 
         StatusFooter(
-            palette        = palette,
             strings        = s,
             filtered       = filtered.size,
             total          = logsCopy.size,
@@ -553,7 +558,6 @@ private fun ConsoleContent(palette: ConsolePalette) {
 
 @Composable
 private fun Toolbar(
-    palette: ConsolePalette,
     strings: AppStrings,
     filtered: Int,
     total: Int,
@@ -573,17 +577,18 @@ private fun Toolbar(
     onSave: () -> Unit,
     onClear: () -> Unit,
 ) {
+    val colors = CelestiaTheme.colors
     Row(
         Modifier
             .fillMaxWidth()
-            .background(palette.toolbarBackground)
+            .background(colors.surface)
             .padding(horizontal = 8.dp, vertical = 4.dp),
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Text(
             text       = strings.consoleHeaderCount(filtered, total),
-            color      = palette.textPrimary,
+            color      = colors.textPrimary,
             fontWeight = FontWeight.Bold,
             fontFamily = FontFamily.Monospace,
             fontSize   = 11.sp,
@@ -591,16 +596,16 @@ private fun Toolbar(
         )
 
         Row(verticalAlignment = Alignment.CenterVertically) {
-            SeverityToggle("INFO",     filterInfo,  palette.severityInfo,  null,        onFilterInfo)
+            SeverityToggle("INFO",  filterInfo,  colors.textPrimary,    null,       onFilterInfo)
             Spacer(Modifier.width(4.dp))
-            SeverityToggle("WARN",     filterWarn,  palette.severityWarn,  warnCount,   onFilterWarn)
+            SeverityToggle("WARN",  filterWarn,  colors.warnAccent,     warnCount,  onFilterWarn)
             Spacer(Modifier.width(4.dp))
-            SeverityToggle("ERROR",    filterError, palette.severityError, errorCount,  onFilterError)
+            SeverityToggle("ERROR", filterError, colors.criticalAccent, errorCount, onFilterError)
 
             Spacer(Modifier.width(8.dp))
             VerticalDivider(
                 modifier = Modifier.height(20.dp).width(1.dp),
-                color    = palette.textSecondary.copy(alpha = 0.3f),
+                color    = colors.textSecondary.copy(alpha = 0.3f),
             )
             Spacer(Modifier.width(4.dp))
 
@@ -611,7 +616,7 @@ private fun Toolbar(
             }) {
                 Text(
                     text       = "${fontSize}px",
-                    color      = palette.textSecondary,
+                    color      = colors.textSecondary,
                     fontSize   = 11.sp,
                     fontFamily = FontFamily.Monospace,
                 )
@@ -621,17 +626,17 @@ private fun Toolbar(
                 Icon(
                     Icons.AutoMirrored.Filled.WrapText,
                     contentDescription = strings.consoleWrap,
-                    tint = if (wrapText) palette.searchActive else palette.textSecondary,
+                    tint = if (wrapText) colors.success else colors.textSecondary,
                 )
             }
             IconButton(onClick = onSave, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Default.Save, strings.consoleSaveToFile, tint = palette.textSecondary)
+                Icon(Icons.Default.Save, strings.consoleSaveToFile, tint = colors.textSecondary)
             }
             IconButton(onClick = onCopyAll, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Default.ContentCopy, strings.consoleCopyAll, tint = palette.textSecondary)
+                Icon(Icons.Default.ContentCopy, strings.consoleCopyAll, tint = colors.textSecondary)
             }
             IconButton(onClick = onClear, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Default.Delete, strings.consoleClear, tint = palette.textSecondary)
+                Icon(Icons.Default.Delete, strings.consoleClear, tint = colors.textSecondary)
             }
         }
     }
@@ -667,7 +672,6 @@ private fun SeverityToggle(
 
 @Composable
 private fun SearchPrompt(
-    palette: ConsolePalette,
     query: String,
     onQueryChange: (String) -> Unit,
     regexMode: Boolean,
@@ -680,16 +684,17 @@ private fun SearchPrompt(
     onNext: () -> Unit,
     onPrev: () -> Unit,
 ) {
+    val colors = CelestiaTheme.colors
     Row(
         Modifier
             .fillMaxWidth()
-            .background(palette.toolbarBackground)
+            .background(colors.surface)
             .padding(horizontal = 8.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             text       = "/",
-            color      = palette.textSecondary,
+            color      = colors.textSecondary,
             fontFamily = FontFamily.Monospace,
             fontWeight = FontWeight.Bold,
             fontSize   = 12.sp,
@@ -700,11 +705,11 @@ private fun SearchPrompt(
             onValueChange = onQueryChange,
             singleLine    = true,
             textStyle     = TextStyle(
-                color      = palette.textPrimary,
+                color      = colors.textPrimary,
                 fontSize   = 12.sp,
                 fontFamily = FontFamily.Monospace,
             ),
-            cursorBrush   = SolidColor(palette.textPrimary),
+            cursorBrush   = SolidColor(colors.textPrimary),
             modifier      = Modifier
                 .weight(1f)
                 .focusRequester(focusRequester)
@@ -713,7 +718,7 @@ private fun SearchPrompt(
                 if (query.isEmpty()) {
                     Text(
                         text       = strings.consoleSearchPlaceholder,
-                        color      = palette.textSecondary.copy(alpha = 0.5f),
+                        color      = colors.textSecondary.copy(alpha = 0.5f),
                         fontSize   = 12.sp,
                         fontFamily = FontFamily.Monospace,
                     )
@@ -722,9 +727,9 @@ private fun SearchPrompt(
             },
         )
         val regexTint = when {
-            !regexMode  -> palette.textSecondary.copy(alpha = 0.4f)
-            !regexValid -> palette.severityError
-            else        -> palette.searchActive
+            !regexMode  -> colors.textSecondary.copy(alpha = 0.4f)
+            !regexValid -> colors.criticalAccent
+            else        -> colors.success
         }
         TextButton(onClick = onToggleRegex, modifier = Modifier.height(24.dp)) {
             Text(
@@ -736,16 +741,16 @@ private fun SearchPrompt(
             )
         }
         TextButton(onClick = onPrev, modifier = Modifier.height(24.dp)) {
-            Text("<", color = palette.textSecondary, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
+            Text("<", color = colors.textSecondary, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
         }
         TextButton(onClick = onNext, modifier = Modifier.height(24.dp)) {
-            Text(">", color = palette.textSecondary, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
+            Text(">", color = colors.textSecondary, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
         }
         IconButton(onClick = onClose, modifier = Modifier.size(24.dp)) {
             Icon(
                 imageVector        = Icons.Default.Close,
                 contentDescription = null,
-                tint               = palette.textSecondary,
+                tint               = colors.textSecondary,
                 modifier           = Modifier.size(14.dp),
             )
         }
@@ -756,7 +761,6 @@ private fun SearchPrompt(
 
 @Composable
 private fun StatusFooter(
-    palette: ConsolePalette,
     strings: AppStrings,
     filtered: Int,
     total: Int,
@@ -768,23 +772,24 @@ private fun StatusFooter(
     matchTotal: Int,
     onResumeFollow: () -> Unit,
 ) {
+    val colors = CelestiaTheme.colors
     Row(
         Modifier
             .fillMaxWidth()
-            .background(palette.toolbarBackground)
+            .background(colors.surface)
             .padding(horizontal = 8.dp, vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             text       = strings.consoleStatusLines(filtered, total),
-            color      = palette.textSecondary,
+            color      = colors.textSecondary,
             fontFamily = FontFamily.Monospace,
             fontSize   = 10.sp,
         )
         Spacer(Modifier.width(12.dp))
         Text(
             text       = strings.consoleStatusFiltered(warnCount, errorCount),
-            color      = palette.textSecondary,
+            color      = colors.textSecondary,
             fontFamily = FontFamily.Monospace,
             fontSize   = 10.sp,
         )
@@ -794,16 +799,19 @@ private fun StatusFooter(
         if (searchActive) {
             Text(
                 text       = strings.consoleStatusMatch(matchCurrent, matchTotal),
-                color      = palette.textSecondary,
+                color      = colors.textSecondary,
                 fontFamily = FontFamily.Monospace,
                 fontSize   = 10.sp,
             )
             Spacer(Modifier.width(12.dp))
         }
 
-        // Follow/paused chip: clickable when paused to resume tailing.
+        // Follow / paused chip: clickable when paused to resume tailing.
+        // success doubles as "everything is on track"; pause uses warm
+        // orange so the chip reads as a deliberate halt rather than an
+        // error -- criticalAccent would conflate with ERROR severity.
         val followText  = if (following) strings.consoleStatusFollow else strings.consoleStatusPaused
-        val followColor = if (following) palette.followAccent else palette.pauseAccent
+        val followColor = if (following) colors.success else CONSOLE_PAUSE_ACCENT
         TextButton(onClick = onResumeFollow, modifier = Modifier.height(20.dp)) {
             Text(
                 text       = followText,

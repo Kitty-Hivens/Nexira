@@ -490,10 +490,11 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
             }
         }
 
-        // ── Console window ─────────────────────────────────────────────
-        if (gameConsole.shouldShowConsole) {
-            ConsoleWindow(isDarkTheme = isDarkTheme, onClose = { gameConsole.hide() })
-        }
+        // Console window moved inside the CompositionLocalProvider /
+        // CelestiaTheme block below so it inherits the active theme +
+        // customization (accent override, role overrides). The window
+        // itself is a separate OS surface, but Compose Desktop propagates
+        // CompositionLocals down through the Window composable.
 
         // ── Main window ────────────────────────────────────────────────
         Window(
@@ -622,6 +623,21 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
             } else {
                 styleSpec
             }
+
+            // Console runs as its own OS window but is composed from here so
+            // it inherits LocalCustomization + LocalCelestiaColors via the
+            // Compose composition tree. The internal CelestiaTheme wrap is
+            // what actually projects the palette into the window's surface;
+            // this site only ensures the composition locals are in scope.
+            if (gameConsole.shouldShowConsole) {
+                ConsoleWindow(
+                    isDarkTheme = isDarkTheme,
+                    onClose     = { gameConsole.hide() },
+                    customTheme = customTheme,
+                    style       = effectiveStyle,
+                )
+            }
+
             CelestiaTheme(
                 useDarkTheme = isDarkTheme,
                 customTheme  = customTheme,
