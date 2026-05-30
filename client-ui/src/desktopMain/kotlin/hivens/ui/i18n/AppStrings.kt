@@ -611,6 +611,8 @@ interface AppStrings {
     val contentTabFetchErrorGeneric: String
     val contentTabRetry: String
     val contentTabRoleSection: String
+    fun contentTabOptionalSection(count: Int): String
+    fun contentTabIncompatibleWith(name: String): String
     fun contentTabModsSection(count: Int): String
     fun contentTabAssetsSection(count: Int): String
     val contentTabResolverIssuesTitle: String
