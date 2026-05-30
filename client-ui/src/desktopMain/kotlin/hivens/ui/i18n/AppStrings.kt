@@ -164,6 +164,7 @@ interface AppStrings {
     val consoleStatusFollow: String
     val consoleStatusPaused: String
     fun consoleStatusLines(filtered: Int, total: Int): String
+    fun consoleStatusLinesWithHistory(filtered: Int, total: Int, history: Int): String
     fun consoleStatusFiltered(warn: Int, error: Int): String
     fun consoleStatusMatch(current: Int, total: Int): String
 

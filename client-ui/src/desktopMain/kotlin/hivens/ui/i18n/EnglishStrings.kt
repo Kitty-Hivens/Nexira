@@ -166,6 +166,8 @@ object EnglishStrings : AppStrings {
     override val consoleStatusFollow = "follow"
     override val consoleStatusPaused = "paused"
     override fun consoleStatusLines(filtered: Int, total: Int) = "lines: $filtered/$total"
+    override fun consoleStatusLinesWithHistory(filtered: Int, total: Int, history: Int) =
+        "lines: $filtered/$total  +$history in history"
     override fun consoleStatusFiltered(warn: Int, error: Int) = "WARN $warn  ERROR $error"
     override fun consoleStatusMatch(current: Int, total: Int) = "match $current/$total"
 

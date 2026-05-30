@@ -33,17 +33,31 @@ data class ConsoleSettings(
     /** `[HH:MM:SS]` prefix on non-divider entries. Disabling helps when timestamps
      *  are noise (e.g. a single short capture session). */
     val showTimestamps: Boolean = true,
+
+    /**
+     * In-memory sliding-window size (lines kept live for the
+     * AnnotatedString builder; everything older lives in the per-
+     * session log file and pages back in on scroll-up). Capped at
+     * [MAX_IN_MEMORY_LINES] so the rebuild cost on a flood stays
+     * bounded; floor is [MIN_IN_MEMORY_LINES] to keep enough
+     * context in the live view to be useful.
+     */
+    val maxInMemoryLines: Int = 5000,
 ) {
     companion object {
         const val MIN_FONT_SIZE = 8
         const val MAX_FONT_SIZE = 22
+
+        const val MIN_IN_MEMORY_LINES = 1000
+        const val MAX_IN_MEMORY_LINES = 50000
     }
 
-    /** Clamp font size into the supported range; the in-window slider is
-     *  bound to this range too, but a malformed JSON file should not break
-     *  rendering. */
+    /** Clamp every bounded knob into its supported range; the in-window
+     *  gear UI honors the same bounds, but a malformed JSON file should
+     *  not break rendering. */
     fun coerced(): ConsoleSettings = copy(
-        fontSize = fontSize.coerceIn(MIN_FONT_SIZE, MAX_FONT_SIZE),
+        fontSize         = fontSize.coerceIn(MIN_FONT_SIZE, MAX_FONT_SIZE),
+        maxInMemoryLines = maxInMemoryLines.coerceIn(MIN_IN_MEMORY_LINES, MAX_IN_MEMORY_LINES),
     )
 }
 

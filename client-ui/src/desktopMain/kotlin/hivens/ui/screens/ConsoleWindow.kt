@@ -86,6 +86,7 @@ import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -250,6 +251,16 @@ private fun ConsoleContent(
     val showGutter      = settings.showGutterStrip
     val showTimestamps  = settings.showTimestamps
 
+    // Apply the sliding-window cap to the service eagerly so changes to
+    // the setting take effect on the next append rather than waiting for
+    // the next session start.
+    LaunchedEffect(settings.maxInMemoryLines) {
+        gameConsole.maxLines = settings.maxInMemoryLines.coerceIn(
+            ConsoleSettings.MIN_IN_MEMORY_LINES,
+            ConsoleSettings.MAX_IN_MEMORY_LINES,
+        )
+    }
+
     var searchQuery     by remember { mutableStateOf("") }
     var regexMode       by remember { mutableStateOf(false) }
     var filterInfo      by remember { mutableStateOf(true) }
@@ -267,6 +278,7 @@ private fun ConsoleContent(
     val scrollState     = rememberScrollState()
     val searchFocus     = remember { FocusRequester() }
     val logFocus        = remember { FocusRequester() }
+    val density         = LocalDensity.current
 
     // ── Frame-bounded log coalescer ────────────────────────────────────────
     // Modded MC startup floods 5k+ lines in ~2s. Rebuilding the whole
@@ -379,6 +391,44 @@ private fun ConsoleContent(
     }
     LaunchedEffect(matchIndex.annotated) {
         if (isAtBottom) scrollState.scrollTo(scrollState.maxValue)
+    }
+
+    // ── Lazy history page-in (sliding window upper edge) ───────────────────
+    // When the user scrolls within 80 px of the top AND the service has
+    // entries dropped past the window, page the older entries back in.
+    // The load is one-shot: a `loading` flag suppresses re-entry while the
+    // batch is in flight, otherwise rapid scroll-to-top events would queue
+    // overlapping reads. Loaded entries land at the start of logs.toList()
+    // (the next snapshotFlow tick rebuilds the AnnotatedString), and we
+    // shift scrollState by the approximate height of the loaded block so
+    // the user's visual line stays put.
+    var historyLoading by remember { mutableStateOf(false) }
+    val historyOffset by remember {
+        derivedStateOf { gameConsole.historyOffset }
+    }
+    LaunchedEffect(scrollState.value, historyOffset) {
+        if (historyLoading) return@LaunchedEffect
+        if (historyOffset <= 0) return@LaunchedEffect
+        if (scrollState.value > 80) return@LaunchedEffect
+        historyLoading = true
+        try {
+            val loaded = gameConsole.loadHistoryBefore(count = 500)
+            if (loaded.isNotEmpty()) {
+                // SnapshotStateList.addAll(0, ...) prepends; the next
+                // snapshotFlow{logs.size} emit rebuilds matchIndex via
+                // logsCopy, so the AnnotatedString picks the new front
+                // automatically. ScrollState shifts by an approximate
+                // line height per loaded entry; not exact because line
+                // height under wrap depends on glyph metrics, but the
+                // miss is sub-100 px and unnoticeable in practice.
+                gameConsole.logs.addAll(0, loaded)
+                val approxLineHeightPx = with(density) { (fontSize * 1.4f).sp.toPx() }
+                val shift = (loaded.size * approxLineHeightPx).toInt()
+                scrollState.scrollTo((scrollState.value + shift).coerceAtMost(scrollState.maxValue))
+            }
+        } finally {
+            historyLoading = false
+        }
     }
 
     // ── TextFieldValue source of truth ─────────────────────────────────────
@@ -595,7 +645,6 @@ private fun ConsoleContent(
             // leaving a clean gap. yOffsetPx folds the field's top
             // padding into each line's getLineTop so the bar aligns with
             // the actual rendered baseline rather than the canvas top.
-            val density = androidx.compose.ui.platform.LocalDensity.current
             val gutterWidthPx = with(density) { 3.dp.toPx() }
             val verticalPaddingPx = with(density) { 4.dp.toPx() }
             val gutterModifier = if (showGutter) {
@@ -782,6 +831,7 @@ private fun ConsoleContent(
             strings        = s,
             filtered       = filtered.size,
             total          = logsCopy.size,
+            historyOffset  = historyOffset,
             warnCount      = warnCount,
             errorCount     = errorCount,
             following      = isAtBottom,
@@ -1137,6 +1187,7 @@ private fun StatusFooter(
     strings: AppStrings,
     filtered: Int,
     total: Int,
+    historyOffset: Int,
     warnCount: Int,
     errorCount: Int,
     following: Boolean,
@@ -1153,8 +1204,16 @@ private fun StatusFooter(
             .padding(horizontal = 8.dp, vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        // When the sliding window has dropped entries to disk, report
+        // both the live count and the on-disk total so the user knows
+        // scrolling up will reach further than the in-memory size.
+        val linesText = if (historyOffset > 0) {
+            strings.consoleStatusLinesWithHistory(filtered, total, historyOffset)
+        } else {
+            strings.consoleStatusLines(filtered, total)
+        }
         Text(
-            text       = strings.consoleStatusLines(filtered, total),
+            text       = linesText,
             color      = colors.textSecondary,
             fontFamily = FontFamily.Monospace,
             fontSize   = 10.sp,

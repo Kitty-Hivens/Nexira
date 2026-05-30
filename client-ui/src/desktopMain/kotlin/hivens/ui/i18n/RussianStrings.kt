@@ -166,6 +166,8 @@ object RussianStrings : AppStrings {
     override val consoleStatusFollow = "следую"
     override val consoleStatusPaused = "пауза"
     override fun consoleStatusLines(filtered: Int, total: Int) = "строк: $filtered/$total"
+    override fun consoleStatusLinesWithHistory(filtered: Int, total: Int, history: Int) =
+        "строк: $filtered/$total  +$history в истории"
     override fun consoleStatusFiltered(warn: Int, error: Int) = "WARN $warn  ERROR $error"
     override fun consoleStatusMatch(current: Int, total: Int) = "совп. $current/$total"
 

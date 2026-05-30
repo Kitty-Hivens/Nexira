@@ -166,6 +166,8 @@ object GermanStrings : AppStrings {
     override val consoleStatusFollow = "folgt"
     override val consoleStatusPaused = "pausiert"
     override fun consoleStatusLines(filtered: Int, total: Int) = "Zeilen: $filtered/$total"
+    override fun consoleStatusLinesWithHistory(filtered: Int, total: Int, history: Int) =
+        "Zeilen: $filtered/$total  +$history Verlauf"
     override fun consoleStatusFiltered(warn: Int, error: Int) = "WARN $warn  ERROR $error"
     override fun consoleStatusMatch(current: Int, total: Int) = "Treffer $current/$total"
 
