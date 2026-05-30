@@ -78,7 +78,6 @@ fun ModRowPanel(
             .fillMaxWidth()
             .clip(RoundedCornerShape(10.dp))
             .background(glassSurfaceAlpha(0.45f * rowAlpha))
-            .clickable { expanded = !expanded }
             .padding(horizontal = 12.dp, vertical = 6.dp),
     ) {
         Row(
@@ -89,6 +88,10 @@ fun ModRowPanel(
             // Checkbox left of the avatar: optional mods toggle on/off here;
             // required mods show it checked + locked so the column stays aligned
             // and "required = always installed" reads at a glance.
+            //
+            // The expand-click below lives on the rest of the row only -- earlier
+            // it sat on the surrounding Column and ate the checkbox click before
+            // the Checkbox saw it, so toggles appeared to do nothing.
             if (toggle != null) {
                 Checkbox(
                     checked         = toggle.checked,
@@ -98,35 +101,43 @@ fun ModRowPanel(
                 )
             }
 
-            ModIconImage(mod = mod, size = 28.dp)
+            Row(
+                modifier              = Modifier
+                    .weight(1f)
+                    .clickable { expanded = !expanded },
+                verticalAlignment     = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                ModIconImage(mod = mod, size = 28.dp)
 
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text           = mod.display?.name ?: mod.filename.removeSuffix(".jar"),
-                    style          = MaterialTheme.typography.bodyMedium,
-                    color          = CelestiaTheme.colors.textPrimary.copy(alpha = rowAlpha),
-                    fontWeight     = if (emphasis == Emphasis.Primary) FontWeight.SemiBold else FontWeight.Normal,
-                    textDecoration = titleDecoration,
-                    maxLines       = 1,
-                    overflow       = TextOverflow.Ellipsis,
-                )
-                mod.display?.category?.takeIf { it.isNotBlank() }?.let { cat ->
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text  = cat,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = CelestiaTheme.colors.textSecondary.copy(alpha = rowAlpha),
+                        text           = mod.display?.name ?: mod.filename.removeSuffix(".jar"),
+                        style          = MaterialTheme.typography.bodyMedium,
+                        color          = CelestiaTheme.colors.textPrimary.copy(alpha = rowAlpha),
+                        fontWeight     = if (emphasis == Emphasis.Primary) FontWeight.SemiBold else FontWeight.Normal,
+                        textDecoration = titleDecoration,
+                        maxLines       = 1,
+                        overflow       = TextOverflow.Ellipsis,
                     )
+                    mod.display?.category?.takeIf { it.isNotBlank() }?.let { cat ->
+                        Text(
+                            text  = cat,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = CelestiaTheme.colors.textSecondary.copy(alpha = rowAlpha),
+                        )
+                    }
                 }
+
+                SourceBadge(mod.source)
+
+                Icon(
+                    imageVector        = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = null,
+                    tint               = CelestiaTheme.colors.textSecondary,
+                    modifier           = Modifier.size(20.dp),
+                )
             }
-
-            SourceBadge(mod.source)
-
-            Icon(
-                imageVector        = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                contentDescription = null,
-                tint               = CelestiaTheme.colors.textSecondary,
-                modifier           = Modifier.size(20.dp),
-            )
         }
 
         if (expanded) {

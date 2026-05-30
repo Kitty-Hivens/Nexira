@@ -36,7 +36,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -62,7 +61,6 @@ import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 
@@ -177,7 +175,6 @@ private fun LoadedBody(
 ) {
     val s = LocalStrings.current
     val listState = rememberLazyListState()
-    val scope = rememberCoroutineScope()
 
     val optionalMods = OptionalContentRules.optionalMods(manifest.mods)
     // Key on instance.id, not manifest.packId: two installed instances of the
@@ -191,7 +188,10 @@ private fun LoadedBody(
         val next = OptionalContentRules.applyToggle(manifest.mods, enabledState, filename, enable)
         enabledState = next
         val toggles = optionalMods.map { ContentToggle(it.filename, next[it.filename] ?: it.defaultEnabled) }
-        scope.launch { controller.setOptionalMods(instance, manifest, toggles) }
+        // Hand the write to the controller's long-lived scope. Doing this on a
+        // rememberCoroutineScope() one cancelled mid-flight when the user
+        // navigated away from the Content tab, so the toggle silently reverted.
+        controller.setOptionalModsAsync(instance, manifest, toggles)
     }
     // Leading checkbox per mod row: required mods are locked-on (checked +
     // disabled, kept for column alignment), optional mods toggle here.

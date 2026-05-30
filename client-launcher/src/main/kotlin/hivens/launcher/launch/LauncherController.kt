@@ -91,6 +91,23 @@ class LauncherController(
         return updated
     }
 
+    /**
+     * Fire-and-forget variant that runs the toggle persistence on the
+     * shared [appScope] instead of the caller's. The Content tab's
+     * `rememberCoroutineScope` is tied to the composable lifecycle, so
+     * a user clicking a checkbox and immediately navigating away
+     * cancelled the persistence mid-flight and the toggle silently
+     * reverted on next load. The launcher-side scope outlives the UI
+     * so the write always reaches disk.
+     */
+    fun setOptionalModsAsync(
+        instance: PackInstance,
+        manifest: SmrtPackManifest,
+        toggles: List<ContentToggle>,
+    ) {
+        appScope.launch { setOptionalMods(instance, manifest, toggles) }
+    }
+
     private val _state = MutableStateFlow<LaunchState>(LaunchState.Idle)
     val state: StateFlow<LaunchState> = _state.asStateFlow()
 
