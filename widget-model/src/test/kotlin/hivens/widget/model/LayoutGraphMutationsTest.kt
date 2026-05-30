@@ -130,6 +130,51 @@ class LayoutGraphMutationsTest {
         assertSame(graph, graph.setWidgetWeight(rootPath, "i1", 0f))
     }
 
+    // ── Canvas placement (Canvas slot mode) ───────────────────────────
+
+    @Test
+    fun `setCanvasPlacement sets placement on the matching widget only`() {
+        val out = seed(w1, w2).setCanvasPlacement(rootPath, "i2", CanvasPlacement(10f, 20f, 100f, 50f, 3))
+        assertEquals(CanvasPlacement(10f, 20f, 100f, 50f, 3), out.mainWidgets().first { it.instanceId == "i2" }.canvas)
+        assertNull(out.mainWidgets().first { it.instanceId == "i1" }.canvas)
+    }
+
+    @Test
+    fun `setCanvasPlacement to the same placement is identity`() {
+        val placed = seed(w1).setCanvasPlacement(rootPath, "i1", CanvasPlacement(x = 5f))
+        assertSame(placed, placed.setCanvasPlacement(rootPath, "i1", CanvasPlacement(x = 5f)))
+    }
+
+    @Test
+    fun `setCanvasPlacement on unknown instance is identity`() {
+        val graph = seed(w1)
+        assertSame(graph, graph.setCanvasPlacement(rootPath, "ghost", CanvasPlacement(x = 1f)))
+    }
+
+    @Test
+    fun `setWidgetOffset then setWidgetSize compose without clobbering`() {
+        val out = seed(w1)
+            .setWidgetOffset(rootPath, "i1", 40f, 60f)
+            .setWidgetSize(rootPath, "i1", 200f, 120f)
+        assertEquals(
+            CanvasPlacement(x = 40f, y = 60f, width = 200f, height = 120f),
+            out.mainWidgets().first { it.instanceId == "i1" }.canvas,
+        )
+    }
+
+    @Test
+    fun `setWidgetSize coerces negatives to zero`() {
+        val p = seed(w1).setWidgetSize(rootPath, "i1", -10f, -5f).mainWidgets().first { it.instanceId == "i1" }.canvas
+        assertEquals(0f, p?.width)
+        assertEquals(0f, p?.height)
+    }
+
+    @Test
+    fun `setWidgetZ sets the layer`() {
+        val out = seed(w1).setWidgetZ(rootPath, "i1", 5)
+        assertEquals(5, out.mainWidgets().first { it.instanceId == "i1" }.canvas?.z)
+    }
+
     @Test
     fun `reorderInSlot swaps positions`() {
         val out = seed(w1, w2, w3).reorderInSlot(rootPath, fromIndex = 0, toIndex = 2)

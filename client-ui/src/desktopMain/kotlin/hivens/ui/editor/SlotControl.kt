@@ -44,6 +44,9 @@ internal fun SlotControl(path: SlotPath, content: SlotContent, controller: EditM
         OrientChip("Сетка", content.orientation == SlotOrientation.Grid) {
             controller.setSlotOrientation(path, SlotOrientation.Grid)
         }
+        OrientChip("Холст", content.orientation == SlotOrientation.Canvas) {
+            controller.setSlotOrientation(path, SlotOrientation.Canvas)
+        }
         if (content.orientation == SlotOrientation.Grid) {
             StepChip("-") { controller.setGridColumns(path, content.gridColumns - 1) }
             Text(
