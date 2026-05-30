@@ -58,6 +58,8 @@ import hivens.ui.generated.resources.icon
 import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.i18n.LocaleProvider
+import hivens.ui.notifications.LaunchTarget
+import hivens.ui.notifications.drivers.LaunchDriver
 import hivens.ui.notifications.render.NotificationStack
 import hivens.ui.screens.ConsoleWindow
 import hivens.ui.screens.MigrationScreen
@@ -170,6 +172,7 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
     val serverListService: IServerListService  = koinInject()
     val serverListCache: ServerListCacheStore  = koinInject()
     val controller: LauncherController         = koinInject()
+    val launchDriver: LaunchDriver             = koinInject()
     val credentialsManager: CredentialsManager = koinInject()
     val authService: IAuthService              = koinInject()
     val profileManager: ProfileManager         = koinInject()
@@ -396,6 +399,7 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
                                 // empty, which is its job).
                                 credentials.copy(serverId = server.assetDir)
                             }
+                            launchDriver.observe(LaunchTarget.Server(server))
                             controller.launch(session, server)
                         } catch (e: Exception) {
                             LoggerFactory.getLogger("Main").warn(

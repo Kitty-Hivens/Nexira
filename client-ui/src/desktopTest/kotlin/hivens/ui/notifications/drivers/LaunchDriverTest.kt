@@ -22,7 +22,7 @@ import kotlin.test.assertTrue
 // dropWhile / transformWhile pipeline breaks, both the driver and its
 // review-flagged stale-terminal / leak bugs come back.
 @OptIn(ExperimentalCoroutinesApi::class)
-class PackLaunchDriverTest {
+class LaunchDriverTest {
 
     @Test
     fun `dropWhile gate ignores stale terminal until Prepare arrives`() = runTest {

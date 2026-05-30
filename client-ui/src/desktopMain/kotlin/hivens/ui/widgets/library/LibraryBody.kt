@@ -29,7 +29,8 @@ import hivens.core.data.PackInstance
 import hivens.launcher.launch.LauncherController
 import hivens.ui.AppState
 import hivens.ui.Screen
-import hivens.ui.notifications.drivers.PackLaunchDriver
+import hivens.ui.notifications.LaunchTarget
+import hivens.ui.notifications.drivers.LaunchDriver
 import hivens.ui.screens.library.PackCard
 import hivens.ui.theme.CelestiaTheme
 import hivens.widget.api.rememberProps
@@ -57,7 +58,7 @@ fun LibraryBody(instance: WidgetInstance) {
     val ctx = LocalLibraryContext.current
     val repo: IPackRepository = koinInject()
     val controller: LauncherController = koinInject()
-    val launchDriver: PackLaunchDriver = koinInject()
+    val launchDriver: LaunchDriver = koinInject()
     val instances by remember { repo.observe() }.collectAsState(initial = emptyList())
     val authedSession = (ctx.appState as? AppState.Authenticated)?.session
 
@@ -79,7 +80,7 @@ fun LibraryBody(instance: WidgetInstance) {
                 if (session == null) {
                     ctx.onScreenChange(Screen.PackDetail(pack.id))
                 } else {
-                    launchDriver.observe(pack)
+                    launchDriver.observe(LaunchTarget.Pack(pack))
                     controller.launchPackInstance(session, pack)
                 }
             },
