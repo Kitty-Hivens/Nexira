@@ -3,7 +3,9 @@ package hivens.ui.screens
 import androidx.compose.foundation.HorizontalScrollbar
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -473,22 +475,55 @@ private fun ConsoleContent() {
                 color      = themeColors.textPrimary,
             )
 
-            Column(Modifier.fillMaxSize().verticalScroll(scrollState)) {
-                val fieldModifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
-                    .focusRequester(logFocus)
-
-                BasicTextField(
-                    value         = textFieldValue,
-                    onValueChange = { tfv -> selection = tfv.selection },
-                    readOnly      = true,
-                    textStyle     = baseStyle,
-                    cursorBrush   = SolidColor(themeColors.textPrimary),
-                    onTextLayout  = { layoutResult = it },
-                    modifier      = if (wrapText) fieldModifier
-                                    else fieldModifier.horizontalScroll(hScroll),
-                )
+            if (wrapText) {
+                // Wrap-on path: BasicTextField inherits its width from the
+                // parent verticalScroll Column at fillMaxWidth, which is
+                // exactly what enables wrap. Drag-select, Ctrl+A, Ctrl+C,
+                // and F3 visual selection band all work natively.
+                Column(Modifier.fillMaxSize().verticalScroll(scrollState)) {
+                    BasicTextField(
+                        value         = textFieldValue,
+                        onValueChange = { tfv -> selection = tfv.selection },
+                        readOnly      = true,
+                        textStyle     = baseStyle,
+                        cursorBrush   = SolidColor(themeColors.textPrimary),
+                        onTextLayout  = { layoutResult = it },
+                        modifier      = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                            .focusRequester(logFocus),
+                    )
+                }
+            } else {
+                // Wrap-off path: BasicTextField has no softWrap parameter
+                // and cannot escape its parent's fillMaxWidth constraint,
+                // so a no-wrap rendering needs a different host. Text(
+                // softWrap = false) measures at its intrinsic line width
+                // and a horizontalScroll around the column then exposes
+                // the overflow to scrolling. SelectionContainer gives
+                // drag-select; the focusable outer Column carries the
+                // kbd-chord focus the chord handler relies on. Ctrl+A
+                // and the F3 selection band are unavailable in this
+                // mode -- the yellow span highlights still mark every
+                // match so navigation remains usable.
+                Column(
+                    Modifier
+                        .fillMaxSize()
+                        .verticalScroll(scrollState)
+                        .horizontalScroll(hScroll)
+                        .focusRequester(logFocus)
+                        .focusable(),
+                ) {
+                    SelectionContainer {
+                        Text(
+                            text         = matchIndex.annotated,
+                            softWrap     = false,
+                            style        = baseStyle,
+                            onTextLayout = { layoutResult = it },
+                            modifier     = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        )
+                    }
+                }
             }
 
             VerticalScrollbar(
