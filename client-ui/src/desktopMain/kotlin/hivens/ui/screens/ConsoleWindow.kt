@@ -8,7 +8,9 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ContextMenuArea
 import androidx.compose.foundation.ContextMenuItem
 import androidx.compose.foundation.ContextMenuState
+import androidx.compose.foundation.DefaultContextMenuRepresentation
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.LocalContextMenuRepresentation
 import androidx.compose.foundation.text.TextContextMenu
 import androidx.compose.foundation.text.LocalTextContextMenu
 import androidx.compose.runtime.CompositionLocalProvider
@@ -707,7 +709,24 @@ private fun ConsoleContent(
                     onCopyAll      = ::copyAll,
                 )
             }
-            CompositionLocalProvider(LocalTextContextMenu provides customContextMenu) {
+            // Replace Compose Desktop's native-JPopupMenu representation
+            // with a Compose-rendered one painted from CelestiaTheme.
+            // Default on Linux pulls a Swing popup (dated, ignores theme,
+            // user reported as ugly); the DefaultContextMenuRepresentation
+            // constructor draws via Compose primitives and lets us pick
+            // surface / text / hover colours straight from the active
+            // palette. Atelier accent overrides flow through naturally.
+            val menuRepresentation = remember(themeColors) {
+                DefaultContextMenuRepresentation(
+                    backgroundColor = themeColors.surface,
+                    textColor       = themeColors.textPrimary,
+                    itemHoverColor  = themeColors.primary.copy(alpha = 0.14f),
+                )
+            }
+            CompositionLocalProvider(
+                LocalTextContextMenu          provides customContextMenu,
+                LocalContextMenuRepresentation provides menuRepresentation,
+            ) {
             ContextMenuArea(
                 items = {
                     listOf(
