@@ -25,13 +25,29 @@ data class WidgetInstance(
     // Row/Column. 0 = natural/wrap size; > 0 = a weighted share. Set via
     // the edit-mode drag-dividers.
     val weight: Float = 0f,
+    // Absolute placement when the enclosing slot is Canvas. Null for flow
+    // slots (Column/Row/Grid) -- back-compat default for old layouts.
+    val canvas: CanvasPlacement? = null,
 )
 
 // Phase G: how a slot arranges its widgets. Column (default) reproduces
 // the pre-Phase-G vertical stack; Row lays them horizontally; Grid flows
-// them into `gridColumns` uniform cells.
+// them into `gridColumns` uniform cells; Canvas places each widget at an
+// absolute offset + size (free-canvas mode).
 @Serializable
-enum class SlotOrientation { Column, Row, Grid }
+enum class SlotOrientation { Column, Row, Grid, Canvas }
+
+// Absolute placement of a widget inside a Canvas slot. x/y are dp offsets
+// from the slot's top-left; width/height 0 means intrinsic/wrap (dp when set);
+// z is the paint order (higher renders in front). Used only on Canvas slots.
+@Serializable
+data class CanvasPlacement(
+    val x: Float = 0f,
+    val y: Float = 0f,
+    val width: Float = 0f,
+    val height: Float = 0f,
+    val z: Int = 0,
+)
 
 @Serializable
 data class SlotContent(
@@ -153,6 +169,47 @@ fun LayoutGraph.setWidgetWeight(path: SlotPath, instanceId: String, weight: Floa
             },
         )
     }
+
+// Canvas placement transforms (used when the slot is Canvas). Same no-op /
+// missing-instance identity contract as the Phase G transforms above.
+fun LayoutGraph.setCanvasPlacement(path: SlotPath, instanceId: String, placement: CanvasPlacement): LayoutGraph =
+    mutate(path) { content ->
+        val target = content.widgets.firstOrNull { it.instanceId == instanceId } ?: return@mutate content
+        if (target.canvas == placement) return@mutate content
+        content.copy(
+            widgets = content.widgets.map {
+                if (it.instanceId == instanceId) it.copy(canvas = placement) else it
+            },
+        )
+    }
+
+fun LayoutGraph.setWidgetOffset(path: SlotPath, instanceId: String, x: Float, y: Float): LayoutGraph =
+    updateCanvas(path, instanceId) { it.copy(x = x, y = y) }
+
+fun LayoutGraph.setWidgetSize(path: SlotPath, instanceId: String, width: Float, height: Float): LayoutGraph =
+    updateCanvas(path, instanceId) { it.copy(width = width.coerceAtLeast(0f), height = height.coerceAtLeast(0f)) }
+
+fun LayoutGraph.setWidgetZ(path: SlotPath, instanceId: String, z: Int): LayoutGraph =
+    updateCanvas(path, instanceId) { it.copy(z = z) }
+
+// Reads the widget's current placement (or the default when null), applies
+// `edit`, and writes it back -- so offset / size / z edits compose without
+// clobbering each other. No-op when the result is unchanged.
+private fun LayoutGraph.updateCanvas(
+    path: SlotPath,
+    instanceId: String,
+    edit: (CanvasPlacement) -> CanvasPlacement,
+): LayoutGraph = mutate(path) { content ->
+    val target = content.widgets.firstOrNull { it.instanceId == instanceId } ?: return@mutate content
+    val current = target.canvas ?: CanvasPlacement()
+    val next = edit(current)
+    if (next == target.canvas) return@mutate content
+    content.copy(
+        widgets = content.widgets.map {
+            if (it.instanceId == instanceId) it.copy(canvas = next) else it
+        },
+    )
+}
 
 // Walks the path and returns the SlotContent at the leaf, or null if
 // any intermediate surface / slot / parent widget is missing.

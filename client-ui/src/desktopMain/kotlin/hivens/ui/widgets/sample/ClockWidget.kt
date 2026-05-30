@@ -2,6 +2,7 @@ package hivens.ui.widgets.sample
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -33,6 +34,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.theme.CelestiaTheme
+import hivens.ui.widgets.AdaptiveWidget
+import hivens.ui.widgets.scaled
 import hivens.ui.widgets.toWidgetColorOrNull
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropColor
@@ -92,48 +95,51 @@ fun ClockWidget(instance: WidgetInstance) {
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 12.dp)
-            .clip(RoundedCornerShape(14.dp))
-            .background(glassSurfaceAlpha(0.45f))
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        if (p.title.isNotBlank()) {
-            Text(
-                text       = p.title,
-                style      = MaterialTheme.typography.labelLarge,
-                color      = CelestiaTheme.colors.textSecondary,
-                fontWeight = FontWeight.Medium,
-                modifier   = Modifier.align(Alignment.Start),
-            )
-            Spacer(Modifier.height(10.dp))
-        }
+    AdaptiveWidget(referenceWidth = 200.dp, referenceHeight = 230.dp) { scale ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(top = 12.dp * scale)
+                .clip(RoundedCornerShape(14.dp * scale))
+                .background(glassSurfaceAlpha(0.45f))
+                .padding(horizontal = 16.dp * scale, vertical = 14.dp * scale),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            if (p.title.isNotBlank()) {
+                Text(
+                    text       = p.title,
+                    style      = MaterialTheme.typography.labelLarge.scaled(scale),
+                    color      = CelestiaTheme.colors.textSecondary,
+                    fontWeight = FontWeight.Medium,
+                    modifier   = Modifier.align(Alignment.Start),
+                )
+                Spacer(Modifier.height(10.dp * scale))
+            }
 
-        if (p.mode != ClockMode.Digital) {
-            ClockFace(
-                time           = now,
-                showSeconds    = p.showSeconds,
-                accentOverride = accent,
-                modifier       = Modifier.size(p.faceSize.dp),
-            )
-            Spacer(Modifier.height(10.dp))
-        }
+            if (p.mode != ClockMode.Digital) {
+                ClockFace(
+                    time           = now,
+                    showSeconds    = p.showSeconds,
+                    accentOverride = accent,
+                    modifier       = Modifier.size(p.faceSize.dp * scale),
+                )
+                Spacer(Modifier.height(10.dp * scale))
+            }
 
-        if (p.mode != ClockMode.Analog) {
-            Text(
-                text       = timeFormatter.format(now),
-                style      = MaterialTheme.typography.titleLarge,
-                color      = CelestiaTheme.colors.textPrimary,
-                fontWeight = FontWeight.Light,
-            )
-            Text(
-                text  = DATE_FORMATTER.format(now),
-                style = MaterialTheme.typography.bodySmall,
-                color = CelestiaTheme.colors.textSecondary,
-            )
+            if (p.mode != ClockMode.Analog) {
+                Text(
+                    text       = timeFormatter.format(now),
+                    style      = MaterialTheme.typography.titleLarge.scaled(scale),
+                    color      = CelestiaTheme.colors.textPrimary,
+                    fontWeight = FontWeight.Light,
+                )
+                Text(
+                    text  = DATE_FORMATTER.format(now),
+                    style = MaterialTheme.typography.bodySmall.scaled(scale),
+                    color = CelestiaTheme.colors.textSecondary,
+                )
+            }
         }
     }
 }

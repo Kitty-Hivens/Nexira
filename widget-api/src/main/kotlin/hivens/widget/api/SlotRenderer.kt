@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
@@ -128,6 +130,22 @@ private fun RenderSlotContent(path: SlotPath, modifier: Modifier, spacing: Dp) {
                     repeat(cols - rowWidgets.size) { Spacer(Modifier.weight(1f)) }
                 }
             }
+        }
+        SlotOrientation.Canvas -> Box(modifier) {
+            slotControl(path, content)
+            // Free canvas: each widget at its absolute dp offset + size, painted
+            // in z-order then index. Overlap is natural in a Box. No dividers.
+            content.widgets.withIndex()
+                .sortedWith(compareBy({ it.value.canvas?.z ?: 0 }, { it.index }))
+                .forEach { (index, instance) ->
+                    val descriptor = registry[instance.kind] ?: return@forEach
+                    val cp = instance.canvas
+                    val sizeMod = if (cp != null && cp.width > 0f && cp.height > 0f)
+                        Modifier.size(cp.width.dp, cp.height.dp) else Modifier
+                    Box(Modifier.offset((cp?.x ?: 0f).dp, (cp?.y ?: 0f).dp).then(sizeMod)) {
+                        decorator(address, index, descriptor, instance) { descriptor.Render(instance) }
+                    }
+                }
         }
         // Column.
         else -> Column(modifier, verticalArrangement = Arrangement.spacedBy(spacing)) {
