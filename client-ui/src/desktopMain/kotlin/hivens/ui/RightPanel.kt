@@ -20,8 +20,8 @@ import hivens.widget.model.SurfaceId
 
 /**
  * Right-side panel. Surface composable: owns the column container and
- * the divider between auth + news slots; widget content (auth panel,
- * news feed) resolves through SlotRenderer against the layout graph.
+ * the dividers between slots; widget content (auth panel, news feed,
+ * console) resolves through SlotRenderer against the layout graph.
  */
 @Composable
 fun RightPanel(
@@ -43,7 +43,15 @@ fun RightPanel(
         Column(modifier = modifier.background(CelestiaTheme.colors.background)) {
             SlotRenderer(SurfaceId(SURFACE), SlotId("auth"), Modifier.fillMaxWidth())
             HorizontalDivider(color = glassSurfaceAlpha(0.7f))
+            // News fills the middle; console sits at the bottom and grows
+            // with its own intrinsic height (badge collapsed -> tiny, panel
+            // expanded -> ~400 dp). News loses height while console is
+            // expanded, which is the right priority for the Atelier-style
+            // "diagnostic overlay" -- when the user opens the console,
+            // news takes a back seat.
             SlotRenderer(SurfaceId(SURFACE), SlotId("news"), Modifier.weight(1f).fillMaxWidth())
+            HorizontalDivider(color = glassSurfaceAlpha(0.7f))
+            SlotRenderer(SurfaceId(SURFACE), SlotId("console"), Modifier.fillMaxWidth())
         }
     }
 }

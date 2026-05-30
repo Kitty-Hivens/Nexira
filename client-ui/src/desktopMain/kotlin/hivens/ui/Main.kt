@@ -10,6 +10,7 @@ import hivens.ui.notifications.IndicationCenter
 import hivens.ui.notifications.NotificationCenter
 import hivens.ui.notifications.SessionRegistry
 import hivens.ui.notifications.drivers.LaunchDriver
+import hivens.ui.utils.ConsoleAlertState
 import hivens.ui.puppet.PuppetServerLoader
 import hivens.config.Storage
 import hivens.ui.audio.AudioPlayer
@@ -77,6 +78,11 @@ val uiModule = module {
     single { NotificationCenter() }
     single { IndicationCenter() }
     single { SessionRegistry(appScope = get()) }
+    // Right-rail console widget reads this; LaunchDriver writes it on
+    // abnormal exit so the widget knows to auto-expand. Independent of
+    // NotificationCenter -- a separate channel keeps the widget free
+    // of notification-channel introspection.
+    single { ConsoleAlertState() }
     single {
         val settingsService: ISettingsService = get()
         LaunchDriver(
@@ -85,6 +91,7 @@ val uiModule = module {
             indications     = get(),
             sessions        = get(),
             gameConsole     = get(),
+            alertState      = get(),
             appScope        = get(),
             stringsProvider = { stringsFor(AppLocale.fromTag(settingsService.getSettings().locale)) },
         )

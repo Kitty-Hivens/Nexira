@@ -12,6 +12,8 @@ import hivens.ui.notifications.NotifAction
 import hivens.ui.notifications.NotificationCenter
 import hivens.ui.notifications.SessionRegistry
 import hivens.ui.notifications.Severity
+import hivens.ui.utils.ConsoleAlertLevel
+import hivens.ui.utils.ConsoleAlertState
 import hivens.ui.utils.GameConsoleService
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -38,6 +40,7 @@ class LaunchDriver(
     private val indications: IndicationCenter,
     private val sessions: SessionRegistry,
     private val gameConsole: GameConsoleService,
+    private val alertState: ConsoleAlertState,
     private val appScope: CoroutineScope,
     // Read on each push so a locale change in Settings is picked up
     // mid-launch without restarting the driver.
@@ -177,6 +180,16 @@ class LaunchDriver(
         indications.setLaunchIndication(target.id, LaunchIndication.Failed)
         sessions.unregister(target.id)
         gameConsole.detachCommandSink()
+        // Raise the right-rail console alert so the widget auto-expands.
+        // ExitCode failures (non-zero exit, crash, kill -9) are Critical;
+        // other launch errors (auth fail, sync fail, JVM missing) are
+        // Warn -- the user can still investigate via the badge but the
+        // widget does not steal focus.
+        val level = when (reason) {
+            is LaunchError.ExitCode -> ConsoleAlertLevel.Critical
+            else                    -> ConsoleAlertLevel.Warn
+        }
+        alertState.raise(level)
         notifications.push(
             sourceKey = target.sourceKey,
             sender    = target.displayName,

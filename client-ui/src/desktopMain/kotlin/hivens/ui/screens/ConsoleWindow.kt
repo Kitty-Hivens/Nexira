@@ -221,7 +221,7 @@ fun ConsoleWindow(
 
 @OptIn(ExperimentalComposeUiApi::class, ExperimentalFoundationApi::class)
 @Composable
-private fun ConsoleContent(
+internal fun ConsoleContent(
     settings: ConsoleSettings,
     onSettingsChange: (ConsoleSettings) -> Unit,
 ) {

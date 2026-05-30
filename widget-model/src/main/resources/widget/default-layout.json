@@ -64,6 +64,11 @@
             "widgets": [
               { "kind": "appshell.rightrail.compactnews", "instance_id": "appshell-rightrail-compactnews-default" }
             ]
+          },
+          "console": {
+            "widgets": [
+              { "kind": "appshell.rightrail.console", "instance_id": "appshell-rightrail-console-default" }
+            ]
           }
         }
       },
