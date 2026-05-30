@@ -2,6 +2,8 @@ package hivens.ui.screens
 
 import androidx.compose.foundation.HorizontalScrollbar
 import androidx.compose.foundation.VerticalScrollbar
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ContextMenuArea
 import androidx.compose.foundation.ContextMenuItem
 import androidx.compose.foundation.background
@@ -50,11 +52,15 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEvent
@@ -136,11 +142,20 @@ private val CONSOLE_PAUSE_ACCENT   = Color(0xFFFFA726)
 // ── Match index for F3/n navigation ─────────────────────────────────────────
 // `ranges` carries each match's [start, endExclusive) so regex hits with
 // per-match variable length highlight the actual matched text instead of a
-// zero-width caret (plain substring hits all share the same query length,
-// but the range form keeps the call site uniform).
+// zero-width caret. `lineSeverities` is the parallel per-entry record the
+// severity gutter strip needs -- one entry per LogEntry, carrying the char
+// range it occupies in `annotated` so the painter can ask layoutResult for
+// the y-extent of each visual line that range spans.
 private data class MatchIndex(
-    val annotated: AnnotatedString,
-    val ranges:    List<IntRange>,
+    val annotated:      AnnotatedString,
+    val ranges:         List<IntRange>,
+    val lineSeverities: List<LineSeverity>,
+)
+
+private data class LineSeverity(
+    val startOffset: Int,
+    val endOffset:   Int,
+    val type:        LogType,
 )
 
 // ── Main composable ─────────────────────────────────────────────────────────
@@ -539,6 +554,30 @@ private fun ConsoleContent() {
                 color      = themeColors.textPrimary,
             )
 
+            // Gutter strip pixel width is independent of font size; 3 dp
+            // reads as a clear severity tag without competing with the
+            // text column for horizontal space. drawBehind sits BEFORE
+            // padding in the modifier chain so its canvas covers the
+            // field's outer box -- the bar lands flush with the window's
+            // left edge while the text starts after the start padding,
+            // leaving a clean gap. yOffsetPx folds the field's top
+            // padding into each line's getLineTop so the bar aligns with
+            // the actual rendered baseline rather than the canvas top.
+            val density = androidx.compose.ui.platform.LocalDensity.current
+            val gutterWidthPx = with(density) { 3.dp.toPx() }
+            val verticalPaddingPx = with(density) { 4.dp.toPx() }
+            val gutterModifier = Modifier.drawBehind {
+                val layout = layoutResult ?: return@drawBehind
+                drawSeverityGutter(
+                    layout         = layout,
+                    severities     = matchIndex.lineSeverities,
+                    warnColor      = themeColors.warnAccent,
+                    errorColor     = themeColors.criticalAccent,
+                    gutterWidthPx  = gutterWidthPx,
+                    yOffsetPx      = verticalPaddingPx,
+                )
+            }
+
             ContextMenuArea(
                 items = {
                     listOf(
@@ -563,7 +602,8 @@ private fun ConsoleContent() {
                         onTextLayout  = { layoutResult = it },
                         modifier      = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                            .then(gutterModifier)
+                            .padding(start = 10.dp, end = 8.dp, top = 4.dp, bottom = 4.dp)
                             .focusRequester(logFocus),
                     )
                 }
@@ -593,7 +633,9 @@ private fun ConsoleContent() {
                             softWrap     = false,
                             style        = baseStyle,
                             onTextLayout = { layoutResult = it },
-                            modifier     = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            modifier     = Modifier
+                                .then(gutterModifier)
+                                .padding(start = 10.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
                         )
                     }
                 }
@@ -611,26 +653,35 @@ private fun ConsoleContent() {
                 )
             }
 
-            // Ephemeral "copied" overlay. Plain conditional rendering for
-            // Slice A; Slice B will wrap in a Crossfade / AnimatedVisibility
-            // once the wider visual refresh lands.
-            if (copiedFlash) {
-                Surface(
-                    color = themeColors.success.copy(alpha = 0.9f),
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .padding(top = 12.dp),
-                ) {
-                    Text(
-                        text     = s.consoleCopied,
-                        // White text reads against both light- and dark-success
-                        // surfaces in CelestiaColors as currently defined; revisit
-                        // in Slice 6 customization if a contrast pairing becomes
-                        // necessary under user-supplied overrides.
-                        color    = Color.White,
-                        fontSize = 11.sp,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                    )
+            // Ephemeral "copied" toast. Crossfade keeps a steady boxshape
+            // while the content swaps between "showing" and "hidden" --
+            // AnimatedVisibility's scope-resolution issue avoided because
+            // Crossfade has no scoped overload. Animation duration mirrors
+            // the StyleSpec's idea of a quick microinteraction (mpv-OSD
+            // style: appear on action, dissolve when idle).
+            Crossfade(
+                targetState   = copiedFlash,
+                animationSpec = tween(180),
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 12.dp),
+            ) { showing ->
+                if (showing) {
+                    Surface(color = themeColors.success.copy(alpha = 0.9f)) {
+                        Text(
+                            text     = s.consoleCopied,
+                            // White text reads against both light- and dark-
+                            // success surfaces in CelestiaColors as currently
+                            // defined; revisit in customization slice if a
+                            // contrast pairing becomes necessary under
+                            // user-supplied overrides.
+                            color    = Color.White,
+                            fontSize = 11.sp,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        )
+                    }
+                } else {
+                    Spacer(Modifier.size(0.dp))
                 }
             }
         }
@@ -1054,6 +1105,7 @@ private fun buildConsoleAnnotated(
     palette: ConsolePalette,
 ): MatchIndex {
     val matches = mutableListOf<IntRange>()
+    val severities = mutableListOf<LineSeverity>()
     val query = rawQuery
 
     val annotated = buildAnnotatedString {
@@ -1089,6 +1141,7 @@ private fun buildConsoleAnnotated(
                     }
                 }
             }
+            severities.add(LineSeverity(lineStart, length, e.type))
 
             // Search highlight + match-offset collection, scanning the
             // just-appended line text directly (no builder readback).
@@ -1120,7 +1173,47 @@ private fun buildConsoleAnnotated(
         }
     }
 
-    return MatchIndex(annotated = annotated, ranges = matches)
+    return MatchIndex(
+        annotated      = annotated,
+        ranges         = matches,
+        lineSeverities = severities,
+    )
+}
+
+// Paint a thin vertical strip at the left edge of each rendered line whose
+// severity isn't INFO / DIVIDER. WARN / ERROR each get their own accent.
+// Layout-source-of-truth: the TextLayoutResult captured by the field /
+// Text's onTextLayout; runCatching guards keep a transient stale layout
+// from crashing the paint pass while the buffer catches up.
+private fun DrawScope.drawSeverityGutter(
+    layout: TextLayoutResult,
+    severities: List<LineSeverity>,
+    warnColor: Color,
+    errorColor: Color,
+    gutterWidthPx: Float,
+    yOffsetPx: Float,
+) {
+    if (severities.isEmpty()) return
+    val textLen = layout.layoutInput.text.length
+    if (textLen == 0) return
+    for (sev in severities) {
+        if (sev.type == LogType.INFO || sev.type == LogType.DIVIDER) continue
+        val color = if (sev.type == LogType.ERROR) errorColor else warnColor
+        val safeStart = sev.startOffset.coerceIn(0, textLen - 1)
+        val safeEnd   = (sev.endOffset - 1).coerceIn(0, textLen - 1)
+        if (safeStart > safeEnd) continue
+        val startLine = runCatching { layout.getLineForOffset(safeStart) }.getOrNull() ?: continue
+        val endLine   = runCatching { layout.getLineForOffset(safeEnd) }.getOrNull() ?: continue
+        for (line in startLine..endLine) {
+            val top    = runCatching { layout.getLineTop(line) }.getOrNull() ?: continue
+            val bottom = runCatching { layout.getLineBottom(line) }.getOrNull() ?: continue
+            drawRect(
+                color   = color,
+                topLeft = Offset(0f, yOffsetPx + top),
+                size    = Size(gutterWidthPx, bottom - top),
+            )
+        }
+    }
 }
 
 private fun findAllSubstring(text: String, query: String, ignoreCase: Boolean): List<IntRange> {
