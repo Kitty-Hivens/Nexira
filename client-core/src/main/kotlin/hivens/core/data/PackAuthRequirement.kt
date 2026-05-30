@@ -35,11 +35,14 @@ sealed interface PackAuthRequirement {
     data class SmartyCraft(val serverId: String) : PackAuthRequirement {
         companion object {
             /**
-             * Stable provider identifier the UI uses to look up a
-             * localized name (`AppStrings.providerSmartycraft`) and
-             * the launcher logs to tag missing-provider errors.
-             * Lives here so the launcher, UI, and tests reference one
-             * source of truth.
+             * Stable provider identifier shared by the launcher and
+             * the UI. Carried on `LaunchError.MissingAuthProvider`;
+             * each locale's `stateMissingAuthProvider(providerKey)`
+             * and `notifReasonMissingAuthProvider(providerKey)` keys
+             * the localized string off this constant. Lives here so
+             * the three sites (launcher controller, UI rendering,
+             * tests) reference one source of truth instead of
+             * trading bare strings.
              */
             const val PROVIDER_KEY: String = "smartycraft"
         }

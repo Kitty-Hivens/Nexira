@@ -367,7 +367,19 @@ class LauncherController(
                 val (manifestSnapshot, refreshedInstance) =
                     resolveOrFetchManifest(packInstance)
 
-                // 2. Auth requirement: refresh the session right before
+                // 2. Local sanity: instance directory must exist before
+                // we run a network auth round. A broken instance would
+                // otherwise burn an SC login (and on 2FA accounts a
+                // prompt) only to bail right after with the same error.
+                val clientDir = dataDirectory
+                    .resolve("instances")
+                    .resolve(refreshedInstance.instanceDirName)
+                if (!Files.exists(clientDir)) {
+                    fail(LaunchError.OfflineNoClient)
+                    return@launch
+                }
+
+                // 3. Auth requirement: refresh the session right before
                 // spawn so a cold mod-load (server-side SC tokens age out
                 // in ~minutes) does not invalidate the join. Mirrors the
                 // SC server path's pre-spawn re-auth. Packs that declare
@@ -382,7 +394,7 @@ class LauncherController(
                         ?: return@launch
                 }
 
-                // 3. Java override. The pack launch path picks the LOADER-declared
+                // 4. Java override. The pack launch path picks the LOADER-declared
                 // Java itself (resolved.javaMajor) from the resolved runtime --
                 // same MC + different loader can need different Java (Cleanroom-
                 // 1.12.2 -> 25 vs legacy-Forge-1.12.2 -> 8), so the version-keyed
@@ -393,20 +405,10 @@ class LauncherController(
                     ?.takeIf { it.isNotEmpty() }
                     ?.let { Path.of(it) }
 
-                // 4. Spawn. Pack-centric clientRoot lives under
-                // `<dataDir>/instances/<instanceDirName>`, not under
-                // `<dataDir>/clients/<serverId>` like the SC flow.
+                // 5. Spawn. clientDir was validated up front (step 2).
                 setStage(PrepareStage.LAUNCH, 0.95f)
                 ActionRing.record("Game running: ${packInstance.displayName}")
                 emit(LaunchLogEvent.Launching)
-
-                val clientDir = dataDirectory
-                    .resolve("instances")
-                    .resolve(refreshedInstance.instanceDirName)
-                if (!Files.exists(clientDir)) {
-                    fail(LaunchError.OfflineNoClient)
-                    return@launch
-                }
 
                 val process = launcherService.launchPackClient(
                     sessionData          = session,
