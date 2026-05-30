@@ -155,6 +155,12 @@ object EnglishStrings : AppStrings {
     override val consoleSaveToFile = "Save to file"
     override val consoleSearchPlaceholder = "Search…"
     override val consoleJumpToBottom = "↓ Jump to bottom"
+    override val consoleCopied = "Copied"
+    override val consoleStatusFollow = "follow"
+    override val consoleStatusPaused = "paused"
+    override fun consoleStatusLines(filtered: Int, total: Int) = "lines: $filtered/$total"
+    override fun consoleStatusFiltered(warn: Int, error: Int) = "WARN $warn  ERROR $error"
+    override fun consoleStatusMatch(current: Int, total: Int) = "match $current/$total"
 
     // Tray
     override val trayConsole  = "Open console"

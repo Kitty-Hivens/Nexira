@@ -155,6 +155,12 @@ object RussianStrings : AppStrings {
     override val consoleSaveToFile = "Сохранить в файл"
     override val consoleSearchPlaceholder = "Поиск…"
     override val consoleJumpToBottom = "↓ К концу"
+    override val consoleCopied = "Скопировано"
+    override val consoleStatusFollow = "следую"
+    override val consoleStatusPaused = "пауза"
+    override fun consoleStatusLines(filtered: Int, total: Int) = "строк: $filtered/$total"
+    override fun consoleStatusFiltered(warn: Int, error: Int) = "WARN $warn  ERROR $error"
+    override fun consoleStatusMatch(current: Int, total: Int) = "совп. $current/$total"
 
     // Tray
     override val trayConsole  = "Открыть консоль"

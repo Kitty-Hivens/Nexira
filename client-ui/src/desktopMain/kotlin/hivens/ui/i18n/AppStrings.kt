@@ -153,6 +153,12 @@ interface AppStrings {
     val consoleSaveToFile: String
     val consoleSearchPlaceholder: String
     val consoleJumpToBottom: String
+    val consoleCopied: String
+    val consoleStatusFollow: String
+    val consoleStatusPaused: String
+    fun consoleStatusLines(filtered: Int, total: Int): String
+    fun consoleStatusFiltered(warn: Int, error: Int): String
+    fun consoleStatusMatch(current: Int, total: Int): String
 
     // --- Tray ---
     val trayConsole: String
