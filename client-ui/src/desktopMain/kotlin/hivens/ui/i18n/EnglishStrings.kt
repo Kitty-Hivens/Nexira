@@ -1,5 +1,7 @@
 package hivens.ui.i18n
 
+import hivens.core.data.PackAuthRequirement
+
 object EnglishStrings : AppStrings {
 
     // App
@@ -44,6 +46,12 @@ object EnglishStrings : AppStrings {
     override val stateLaunching   = "Starting process..."
     override fun stateExitCode(code: Int)  = "Game exited with code $code"
     override fun stateError(msg: String)   = "Error: $msg"
+    override fun stateMissingAuthProvider(providerKey: String) = when (providerKey) {
+        PackAuthRequirement.SmartyCraft.PROVIDER_KEY ->
+            "This pack needs a SmartyCraft account. Sign in to play."
+        else ->
+            "This pack needs to sign in with '$providerKey'."
+    }
     override fun authSuccess(uuid: String) = "Login successful. UUID: $uuid"
 
     // Profile
@@ -662,6 +670,10 @@ object EnglishStrings : AppStrings {
     override val notifReasonOfflineNoClient             = "Pack files missing on disk"
     override val notifReasonOfflineNoManifest           = "No cached manifest; go online once to sync"
     override val notifReasonTwoFactorExpired            = "Sign in again to refresh credentials"
+    override fun notifReasonMissingAuthProvider(providerKey: String) = when (providerKey) {
+        PackAuthRequirement.SmartyCraft.PROVIDER_KEY -> "Sign in to SmartyCraft to play this pack"
+        else                                          -> "Sign in with '$providerKey' to play this pack"
+    }
 
     override val notifTimeNow                           = "Now"
     override fun notifTimeSeconds(seconds: Long)        = "${seconds}s"

@@ -20,4 +20,11 @@ data class CachedManifestSnapshot(
     val loaderName: String,
     val loaderVersion: String,
     val javaMajor: Int,
+    /**
+     * Which auth provider the launcher must have a live session for
+     * before spawning this pack. Null = no precondition (vanilla,
+     * future offline-only packs); existing serialized instances
+     * predate this field and read back as null cleanly.
+     */
+    val authRequirement: PackAuthRequirement? = null,
 )

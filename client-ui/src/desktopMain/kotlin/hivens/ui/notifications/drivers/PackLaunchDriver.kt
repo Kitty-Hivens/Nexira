@@ -195,15 +195,16 @@ class PackLaunchDriver(
     private fun iconUrlFor(pack: PackInstance): String? = null
 
     private fun humanReason(reason: LaunchError, s: AppStrings): String = when (reason) {
-        is LaunchError.ExitCode       -> s.notifReasonExitCode(reason.code)
-        is LaunchError.Internal       -> reason.message.ifBlank { null }
-                                            ?.let { s.notifReasonInternalDetail(it) }
-                                            ?: s.notifReasonInternal
-        is LaunchError.AuthFail       -> reason.cause?.ifBlank { null }
-                                            ?.let { s.notifReasonAuthFailDetail(it) }
-                                            ?: s.notifReasonAuthFail
-        LaunchError.OfflineNoClient   -> s.notifReasonOfflineNoClient
-        LaunchError.OfflineNoManifest -> s.notifReasonOfflineNoManifest
-        LaunchError.TwoFactorExpired  -> s.notifReasonTwoFactorExpired
+        is LaunchError.ExitCode            -> s.notifReasonExitCode(reason.code)
+        is LaunchError.Internal            -> reason.message.ifBlank { null }
+                                                ?.let { s.notifReasonInternalDetail(it) }
+                                                ?: s.notifReasonInternal
+        is LaunchError.AuthFail            -> reason.cause?.ifBlank { null }
+                                                ?.let { s.notifReasonAuthFailDetail(it) }
+                                                ?: s.notifReasonAuthFail
+        is LaunchError.MissingAuthProvider -> s.notifReasonMissingAuthProvider(reason.providerKey)
+        LaunchError.OfflineNoClient        -> s.notifReasonOfflineNoClient
+        LaunchError.OfflineNoManifest      -> s.notifReasonOfflineNoManifest
+        LaunchError.TwoFactorExpired       -> s.notifReasonTwoFactorExpired
     }
 }
