@@ -4,9 +4,11 @@ import hivens.core.api.TwoFactorRequiredException
 import hivens.core.api.interfaces.*
 import hivens.core.api.model.ServerProfile
 import hivens.core.api.dto.smrt.SmrtPackManifest
+import hivens.core.api.dto.smrt.toDomain
 import hivens.core.data.CachedManifestSnapshot
 import hivens.core.data.ContentToggle
 import hivens.core.data.OptionalContentRules
+import hivens.core.data.PackAuthRequirement
 import hivens.core.data.PackInstance
 import hivens.core.data.SessionData
 import hivens.core.data.SettingsData
