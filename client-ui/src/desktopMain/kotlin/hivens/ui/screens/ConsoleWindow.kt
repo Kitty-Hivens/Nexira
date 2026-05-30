@@ -56,6 +56,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -117,10 +118,12 @@ import hivens.ui.utils.GameConsoleService
 import hivens.ui.utils.LogEntry
 import hivens.ui.utils.LogType
 import java.awt.datatransfer.StringSelection
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 
 // Severity-only highlight + the exception markers that survive Slice A.
@@ -347,8 +350,24 @@ private fun ConsoleContent(
     val warnCount  = remember(logsCopy) { logsCopy.count { it.type == LogType.WARN } }
     val errorCount = remember(logsCopy) { logsCopy.count { it.type == LogType.ERROR } }
 
-    val matchIndex = remember(filtered, effectiveQuery, regexMode, searchRegex, palette, showTimestamps) {
-        buildConsoleAnnotated(filtered, effectiveQuery, regexMode, searchRegex, palette, showTimestamps)
+    // Async rebuild on Dispatchers.Default: the prior synchronous
+    // `remember(...) { buildConsoleAnnotated(...) }` blocked the UI
+    // thread for ~30-50 ms on 5000-line buffers under spammed filter
+    // toggles, producing the user-reported lag. produceState swaps the
+    // value in once the background coroutine returns; in-flight builds
+    // are cancelled when the input keys change, so rapid clicks
+    // collapse to one rebuild for the final state.
+    //
+    // First-render fallback is an empty MatchIndex; the gap is
+    // sub-frame on a cold open (~30 ms) and visually negligible against
+    // the window's own paint.
+    val matchIndex by produceState(
+        initialValue = remember { MatchIndex(AnnotatedString(""), emptyList(), emptyList()) },
+        filtered, effectiveQuery, regexMode, searchRegex, palette, showTimestamps,
+    ) {
+        value = withContext(Dispatchers.Default) {
+            buildConsoleAnnotated(filtered, effectiveQuery, regexMode, searchRegex, palette, showTimestamps)
+        }
     }
 
     // Clamp current match index when the match set shrinks past it.
@@ -453,22 +472,26 @@ private fun ConsoleContent(
         }
     }
 
-    // Copy the line under the current caret (selection.start). Right-click
-    // menu uses this; the bare gesture is gone but explicit menu access
-    // keeps the workflow alive. Falls back to no-op when the layout has
-    // not measured yet or the offset coerce lands outside the rendered
-    // text -- one missed click is cheaper than a partial-line copy.
+    // Copy the LOGICAL line under the current caret. Works off the
+    // annotated text's '\n' boundaries directly, not the field's
+    // TextLayoutResult -- the context-menu callback can fire before
+    // layoutResult is populated (or after a buffer-rebuild swaps it
+    // out), and the prior "layout ?: return" guard silently swallowed
+    // the click + the toast that goes with it. One entry equals one
+    // logical line in our builder, so '\n' bounds are authoritative.
     fun copyLine() {
-        val layout = layoutResult ?: return
         val annotated = matchIndex.annotated
         if (annotated.isEmpty()) return
-        val pos = selection.start.coerceIn(0, annotated.length - 1)
-        val line = runCatching { layout.getLineForOffset(pos) }.getOrNull() ?: return
-        val lineStart = runCatching { layout.getLineStart(line) }.getOrNull() ?: return
-        val lineEnd   = runCatching { layout.getLineEnd(line, visibleEnd = true) }.getOrNull() ?: return
-        if (lineStart < 0 || lineEnd > annotated.length || lineStart > lineEnd) return
-        val text = annotated.substring(lineStart, lineEnd)
-        scope.launch { clipboard.setClipEntry(ClipEntry(StringSelection(text))) }
+        val text = annotated.text
+        val pos = selection.start.coerceIn(0, text.length)
+        val lineStart = if (pos == 0) 0
+                        else text.lastIndexOf('\n', startIndex = pos - 1) + 1
+        val rawEnd = text.indexOf('\n', pos)
+        val lineEnd = if (rawEnd < 0) text.length else rawEnd
+        if (lineStart > lineEnd) return
+        val lineText = text.substring(lineStart, lineEnd)
+        if (lineText.isBlank()) return
+        scope.launch { clipboard.setClipEntry(ClipEntry(StringSelection(lineText))) }
         copiedFlash = true
         scope.launch {
             delay(900)
