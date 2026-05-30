@@ -10,6 +10,7 @@ import hivens.core.api.interfaces.IPackRepository
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.FileManifest
+import hivens.core.data.PackAuthRequirement
 import hivens.core.data.SessionData
 import hivens.core.data.SettingsData
 import hivens.core.security.IKeyringStorage
@@ -275,17 +276,20 @@ class LauncherControllerTest {
             )
         } returns process
 
-        // PackInstance with cachedManifest already filled. Controller
-        // must skip the SmrtPackClient fetch entirely.
+        // PackInstance with cachedManifest already filled AND no auth
+        // requirement -- the pass-through case. SC-bound packs are
+        // covered separately further down; this test asserts the
+        // launch flow for vanilla / future offline-only packs lands
+        // in Idle without ever calling authService.
         val instance = hivens.core.data.PackInstance(
             id                    = "i-1",
             packRef               = hivens.core.data.PackReference(
                 origin  = hivens.core.data.PackOrigin.Mirror,
-                id      = "Industrial",
+                id      = "modern-explorer",
                 version = "2026.05.26.1",
             ),
-            displayName           = "Industrial",
-            instanceDirName       = "Industrial-i-1",
+            displayName           = "Modern Explorer",
+            instanceDirName       = "modern-explorer-i-1",
             createdAtEpoch        = 0L,
             lastPlayedEpochOrZero = 0L,
             pinnedPackVersion     = "2026.05.26.1",
@@ -319,6 +323,187 @@ class LauncherControllerTest {
         // header) and the launch coroutine would have thrown.
         coVerify(exactly = 1) { packRepository.put(any()) }
         assertTrue(captured.captured.lastPlayedEpochOrZero > 0)
+    }
+
+    /**
+     * Build an SC-bound mirror pack with a cached manifest declaring
+     * an explicit [PackAuthRequirement.SmartyCraft] target. The
+     * matching instance dir is materialised in the sandbox so the
+     * controller's "client dir missing" guard passes.
+     */
+    private fun scBoundPackInstance(
+        id: String = "i-sc",
+        displayName: String = "TestSC",
+        packId: String = "test-sc",
+        serverId: String = "Industrial",
+        authRequirement: PackAuthRequirement? = PackAuthRequirement.SmartyCraft(serverId),
+    ): hivens.core.data.PackInstance {
+        val instance = hivens.core.data.PackInstance(
+            id                    = id,
+            packRef               = hivens.core.data.PackReference(
+                origin  = hivens.core.data.PackOrigin.Mirror,
+                id      = packId,
+                version = "v1",
+            ),
+            displayName           = displayName,
+            instanceDirName       = "$packId-$id",
+            createdAtEpoch        = 0L,
+            lastPlayedEpochOrZero = 0L,
+            pinnedPackVersion     = "v1",
+            cachedManifest        = hivens.core.data.CachedManifestSnapshot(
+                minecraftVersion = "1.12.2",
+                loaderName       = "forge",
+                loaderVersion    = "14.23.5.2922",
+                javaMajor        = 8,
+                authRequirement  = authRequirement,
+            ),
+        )
+        Files.createDirectories(sandbox.resolve("instances").resolve(instance.instanceDirName))
+        return instance
+    }
+
+    @Test
+    fun `pack with SC requirement re-auths before spawn and uses the refreshed session`() = runTest {
+        every { settingsService.getSettings() } returns SettingsData()
+        coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk8/bin/java")
+
+        // Pre-populate the on-disk credentials so launchPackInstance
+        // resolves a cached password without round-tripping the
+        // keyring (relaxed mockk -> AES file fallback).
+        credentialsManager.save(
+            SessionData(
+                playerName     = "tester",
+                uuid           = "u",
+                accessToken    = "stale-token",
+                cachedPassword = "pw",
+            ),
+        )
+
+        val refreshed = SessionData(
+            playerName  = "tester",
+            uuid        = "u",
+            accessToken = "fresh-token",
+        )
+        coEvery { authService.login("tester", "pw", "Industrial") } returns refreshed
+
+        val process = mockk<Process>()
+        every { process.waitFor() } returns 0
+        val sessionPassed = slot<SessionData>()
+        coEvery {
+            launcherService.launchPackClient(
+                sessionData        = capture(sessionPassed),
+                manifest           = any(),
+                runtime            = any(),
+                clientRootPath     = any(),
+                javaPathOverride   = any(),
+                allocatedMemoryMB  = any(),
+                displayName        = any(),
+                onLog              = any(),
+            )
+        } returns process
+        coJustRun { packRepository.put(any()) }
+
+        val instance = scBoundPackInstance()
+        val controller = newController(this)
+        controller.launchPackInstance(
+            currentSession = SessionData(playerName = "tester", uuid = "u", accessToken = "stale-token"),
+            packInstance   = instance,
+        )
+        advanceUntilIdle()
+
+        assertEquals(LaunchState.Idle, controller.state.value)
+        assertEquals("fresh-token", sessionPassed.captured.accessToken, "spawn must use the refreshed session")
+        coVerify(exactly = 1) { authService.login("tester", "pw", "Industrial") }
+    }
+
+    @Test
+    fun `pack with SC requirement and no cached password fails with MissingAuthProvider`() = runTest {
+        every { settingsService.getSettings() } returns SettingsData()
+
+        // No credentialsManager.save() -- on-disk file does not
+        // exist, so load() returns null. The in-session also has no
+        // cachedPassword. The precondition must fail.
+
+        val instance = scBoundPackInstance()
+        val controller = newController(this)
+        controller.launchPackInstance(
+            currentSession = SessionData(playerName = "tester", uuid = "u", accessToken = "tok"),
+            packInstance   = instance,
+        )
+        advanceUntilIdle()
+
+        val state = controller.state.value
+        assertIs<LaunchState.Error>(state)
+        assertEquals(
+            LaunchError.MissingAuthProvider(PackAuthRequirement.SmartyCraft.PROVIDER_KEY),
+            state.reason,
+        )
+        coVerify(exactly = 0) {
+            launcherService.launchPackClient(any(), any(), any(), any(), any(), any(), any(), any())
+        }
+        coVerify(exactly = 0) { authService.login(any(), any(), any()) }
+    }
+
+    @Test
+    fun `pack with Industrial display name synthesizes SC requirement when manifest has none`() = runTest {
+        every { settingsService.getSettings() } returns SettingsData()
+
+        // No authRequirement on the manifest; the name-based fallback
+        // recognises "Industrial" and synthesizes SC("Industrial").
+        // Same no-password setup, so the precondition surfaces.
+        val instance = scBoundPackInstance(
+            packId          = "industrial",
+            displayName     = "Industrial",
+            authRequirement = null,
+        )
+        val controller = newController(this)
+        controller.launchPackInstance(
+            currentSession = SessionData(playerName = "tester", uuid = "u", accessToken = "tok"),
+            packInstance   = instance,
+        )
+        advanceUntilIdle()
+
+        val state = controller.state.value
+        assertIs<LaunchState.Error>(state)
+        assertEquals(
+            LaunchError.MissingAuthProvider(PackAuthRequirement.SmartyCraft.PROVIDER_KEY),
+            state.reason,
+            "Industrial fallback must drive the same precondition surface as an explicit requirement",
+        )
+    }
+
+    @Test
+    fun `pack with SC requirement and 2FA without cached manifest fails with TwoFactorExpired`() = runTest {
+        every { settingsService.getSettings() } returns SettingsData()
+        coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk8/bin/java")
+        credentialsManager.save(
+            SessionData(
+                playerName     = "tester",
+                uuid           = "u",
+                accessToken    = "stale-token",
+                cachedPassword = "pw",
+            ),
+        )
+        coEvery {
+            authService.login("tester", "pw", "Industrial")
+        } throws TwoFactorRequiredException(uid = "uid-stub", login = "tester")
+        // Real ManifestCache returns null for "Industrial" since no
+        // file was saved -- exactly the "no cached manifest" branch.
+
+        val instance = scBoundPackInstance()
+        val controller = newController(this)
+        controller.launchPackInstance(
+            currentSession = SessionData(playerName = "tester", uuid = "u", accessToken = "stale-token"),
+            packInstance   = instance,
+        )
+        advanceUntilIdle()
+
+        val state = controller.state.value
+        assertIs<LaunchState.Error>(state)
+        assertEquals(LaunchError.TwoFactorExpired, state.reason)
+        coVerify(exactly = 0) {
+            launcherService.launchPackClient(any(), any(), any(), any(), any(), any(), any(), any())
+        }
     }
 
     @Test

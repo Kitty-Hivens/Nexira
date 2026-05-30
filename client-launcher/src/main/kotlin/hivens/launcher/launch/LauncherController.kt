@@ -3,7 +3,9 @@ package hivens.launcher.launch
 import hivens.core.api.TwoFactorRequiredException
 import hivens.core.api.interfaces.*
 import hivens.core.api.model.ServerProfile
+import hivens.core.api.dto.smrt.toDomain
 import hivens.core.data.CachedManifestSnapshot
+import hivens.core.data.PackAuthRequirement
 import hivens.core.data.PackInstance
 import hivens.core.data.SessionData
 import hivens.core.data.SettingsData
@@ -361,11 +363,26 @@ class LauncherController(
                 // 1. Resolve the manifest snapshot. Stored on the
                 // instance after install; one-shot fetch + write-back
                 // covers instances that predate the field.
-                setStage(PrepareStage.SYNC, 0.3f)
+                setStage(PrepareStage.SYNC, 0.2f)
                 val (manifestSnapshot, refreshedInstance) =
                     resolveOrFetchManifest(packInstance)
 
-                // 2. Java override. The pack launch path picks the LOADER-declared
+                // 2. Auth requirement: refresh the session right before
+                // spawn so a cold mod-load (server-side SC tokens age out
+                // in ~minutes) does not invalidate the join. Mirrors the
+                // SC server path's pre-spawn re-auth. Packs that declare
+                // no requirement (vanilla, future offline-only) pass
+                // through untouched.
+                val authRequirement = manifestSnapshot.authRequirement
+                    ?: fallbackAuthRequirement(refreshedInstance)
+                var session = currentSession
+                if (authRequirement != null) {
+                    setStage(PrepareStage.AUTH, 0.4f)
+                    session = preparePackAuth(authRequirement, currentSession, refreshedInstance)
+                        ?: return@launch
+                }
+
+                // 3. Java override. The pack launch path picks the LOADER-declared
                 // Java itself (resolved.javaMajor) from the resolved runtime --
                 // same MC + different loader can need different Java (Cleanroom-
                 // 1.12.2 -> 25 vs legacy-Forge-1.12.2 -> 8), so the version-keyed
@@ -376,7 +393,7 @@ class LauncherController(
                     ?.takeIf { it.isNotEmpty() }
                     ?.let { Path.of(it) }
 
-                // 3. Spawn. Pack-centric clientRoot lives under
+                // 4. Spawn. Pack-centric clientRoot lives under
                 // `<dataDir>/instances/<instanceDirName>`, not under
                 // `<dataDir>/clients/<serverId>` like the SC flow.
                 setStage(PrepareStage.LAUNCH, 0.95f)
@@ -392,7 +409,7 @@ class LauncherController(
                 }
 
                 val process = launcherService.launchPackClient(
-                    sessionData          = currentSession,
+                    sessionData          = session,
                     manifest             = manifestSnapshot,
                     runtime              = refreshedInstance.runtime,
                     clientRootPath       = clientDir,
@@ -473,11 +490,90 @@ class LauncherController(
             loaderName       = manifest.loader.name,
             loaderVersion    = manifest.loader.version,
             javaMajor        = manifest.java.major,
+            authRequirement  = manifest.auth?.toDomain(),
         )
         val refreshed = instance.copy(cachedManifest = snapshot)
         runCatching { packRepository.put(refreshed) }
             .onFailure { logger.warn("Failed to persist cachedManifest for ${instance.id}", it) }
         return snapshot to refreshed
+    }
+
+    /**
+     * Run the pack-side auth refresh, mirroring the SC server-list
+     * path's pre-spawn re-auth (see [launch], around the AUTH stage).
+     * Returns the refreshed [SessionData], a 2FA-fallback session
+     * with the cached manifest attached, or null after [fail] has
+     * already set the error state -- the caller bails on null.
+     *
+     * Precondition: missing player + password for an SC requirement
+     * fails with [LaunchError.MissingAuthProvider] rather than
+     * spawning the game and waiting for the SC join to reject the
+     * stale token; the surface is friendlier and the diagnosis is
+     * unambiguous.
+     */
+    private suspend fun preparePackAuth(
+        requirement: PackAuthRequirement,
+        currentSession: SessionData,
+        instance: PackInstance,
+    ): SessionData? {
+        when (requirement) {
+            is PackAuthRequirement.SmartyCraft -> {
+                val saved = credentialsManager.load()
+                val pass = saved?.cachedPassword ?: currentSession.cachedPassword
+                val playerName = currentSession.playerName.ifBlank { saved?.playerName ?: "" }
+                if (playerName.isBlank() || pass.isNullOrEmpty()) {
+                    ActionRing.record(
+                        "Pack launch ${instance.displayName}: missing SC credentials for '${requirement.serverId}'",
+                    )
+                    fail(LaunchError.MissingAuthProvider(PackAuthRequirement.SmartyCraft.PROVIDER_KEY))
+                    return null
+                }
+                return try {
+                    val fresh = authService.login(playerName, pass, requirement.serverId)
+                    emit(LaunchLogEvent.AuthSucceeded(fresh.uuid))
+                    fresh
+                } catch (_: TwoFactorRequiredException) {
+                    val cached = manifestCache.loadManifest(requirement.serverId)
+                    if (cached != null) {
+                        ActionRing.record(
+                            "Pack launch ${instance.displayName}: 2FA account, using cached manifest for '${requirement.serverId}'",
+                        )
+                        currentSession.copy(fileManifest = cached)
+                    } else {
+                        ActionRing.record(
+                            "Pack launch ${instance.displayName}: 2FA + no cached manifest for '${requirement.serverId}' -- re-login required",
+                        )
+                        fail(LaunchError.TwoFactorExpired)
+                        null
+                    }
+                } catch (e: Exception) {
+                    // Non-2FA login failure: log + keep the existing
+                    // session. Same graceful-degradation as the SC
+                    // server path -- a real expired token surfaces as
+                    // a more specific reject from the game itself.
+                    emit(LaunchLogEvent.AuthFailed(e.message))
+                    currentSession
+                }
+            }
+        }
+    }
+
+    /**
+     * Synthesize an [PackAuthRequirement] for SC-bound packs whose
+     * mirror manifest has not yet been updated with an explicit
+     * `auth` block. Recognises the shipping SC pack identities by
+     * name; new packs added here as they go live until the mirror
+     * authors fill in `auth: { kind: smartycraft, server_id: ... }`
+     * and this map drains naturally.
+     */
+    private fun fallbackAuthRequirement(instance: PackInstance): PackAuthRequirement? {
+        val matchesIndustrial = listOf(instance.displayName, instance.packRef.id)
+            .any { it.equals("Industrial", ignoreCase = true) }
+        return if (matchesIndustrial) {
+            PackAuthRequirement.SmartyCraft("Industrial")
+        } else {
+            null
+        }
     }
 
     /**

@@ -75,10 +75,11 @@ fun LaunchLogCollector(
  * a global) so the caller controls which locale snapshot is used.
  */
 private fun localizeError(error: LaunchError, s: AppStrings): String = when (error) {
-    is LaunchError.ExitCode          -> s.stateExitCode(error.code)
-    is LaunchError.Internal          -> s.stateError(error.message)
-    is LaunchError.OfflineNoClient   -> s.stateOfflineNoClient
-    is LaunchError.OfflineNoManifest -> s.stateOfflineNoManifest
-    is LaunchError.TwoFactorExpired  -> s.auth2faExpired
-    is LaunchError.AuthFail          -> "${s.stateAuthFail}: ${error.cause ?: ""}"
+    is LaunchError.ExitCode             -> s.stateExitCode(error.code)
+    is LaunchError.Internal             -> s.stateError(error.message)
+    is LaunchError.OfflineNoClient      -> s.stateOfflineNoClient
+    is LaunchError.OfflineNoManifest    -> s.stateOfflineNoManifest
+    is LaunchError.TwoFactorExpired     -> s.auth2faExpired
+    is LaunchError.AuthFail             -> "${s.stateAuthFail}: ${error.cause ?: ""}"
+    is LaunchError.MissingAuthProvider  -> s.stateMissingAuthProvider(error.providerKey)
 }
