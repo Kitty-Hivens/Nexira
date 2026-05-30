@@ -79,15 +79,21 @@ class GameConsoleService(
     }
 
     fun append(text: String, type: LogType = LogType.INFO) {
-        if (logs.size >= maxLines) {
-            logs.removeAt(0)
-        }
         // Redact at append time: the in-memory buffer (which feeds ConsoleWindow,
         // the auto-save file, and `Save to file` exports) NEVER carries raw
         // accessTokens / passwords / UUIDs. Means a screenshot of the console or
         // a Ctrl+C copy of a log line is safe to share for support.
         val entry = LogEntry(Redactor.redact(text), type)
+        // Append-then-trim ordering matters: a UI observer that keys off
+        // `logs.size` via snapshotFlow.distinctUntilChanged needs a size delta
+        // on every append. The cap-and-then-add variant briefly held a steady
+        // size at the cap, which silenced the observer and froze the console
+        // view at the 2000th line. Add first (size = cap+1), trim second
+        // (size = cap) so every append produces an observable transition.
         logs.add(entry)
+        if (logs.size > maxLines) {
+            logs.removeAt(0)
+        }
 
         // Auto-save to disk. BufferedWriter is NOT thread-safe -- two
         // ProcessLogHandler daemon threads (stdout + stderr) hammer this

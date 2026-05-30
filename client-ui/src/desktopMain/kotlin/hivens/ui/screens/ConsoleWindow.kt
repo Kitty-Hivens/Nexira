@@ -1,7 +1,6 @@
 package hivens.ui.screens
 
 import androidx.compose.foundation.HorizontalScrollbar
-import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
@@ -22,6 +21,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.WrapText
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Save
@@ -101,7 +101,6 @@ import org.koin.compose.koinInject
 // formats shifted; cut. User-extensible rule list arrives with Slice C.
 private val ERROR_MARKERS = Regex("(Exception|Error|FATAL|SEVERE|Caused by:|\\bat )")
 private val FONT_SIZES = listOf(11, 12, 14)
-private val LOG_LINE_LIMIT = 2000  // mirrors GameConsoleService.maxLines
 
 // ── Palette ──────────────────────────────────────────────────────────────────
 // Single source of truth for every color in the console. Slice C will plug
@@ -206,6 +205,7 @@ private fun ConsoleContent(palette: ConsolePalette) {
     var filterError     by remember { mutableStateOf(true) }
     var searchOpen      by remember { mutableStateOf(false) }
     var searchHasFocus  by remember { mutableStateOf(false) }
+    var pendingSearchFocus by remember { mutableStateOf(false) }
     var currentMatch    by remember { mutableIntStateOf(0) }
     var copiedFlash     by remember { mutableStateOf(false) }
     var selection       by remember { mutableStateOf(TextRange.Zero) }
@@ -271,6 +271,30 @@ private fun ConsoleContent(palette: ConsolePalette) {
         if (currentMatch >= matchIndex.offsets.size) currentMatch = 0
     }
 
+    // Initial focus on the log area: BasicTextField is read-only but still
+    // focusable, and onPreviewKeyEvent at the Column root needs SOME node in
+    // its subtree to hold focus before chord events route through. Without
+    // this, Ctrl+F / F3 / j / k / g / G are dead until the user clicks
+    // inside the (visually empty) text field. runCatching swallows the
+    // pre-composition exception in the rare race where the field has not
+    // attached yet -- the next attempt via user click resolves it.
+    LaunchedEffect(Unit) {
+        runCatching { logFocus.requestFocus() }
+    }
+
+    // Deferred focus request for the search prompt. openSearch() raises a
+    // flag because the FocusRequester target (BasicTextField inside the
+    // search-prompt Row) does not exist on the first composition pass --
+    // requesting focus before the node is attached throws. Once
+    // searchOpen=true triggers the SearchPrompt composable, this effect
+    // fires on the next frame with the target alive.
+    LaunchedEffect(pendingSearchFocus, searchOpen) {
+        if (pendingSearchFocus && searchOpen) {
+            runCatching { searchFocus.requestFocus() }
+            pendingSearchFocus = false
+        }
+    }
+
     // ── Sticky-bottom follow ───────────────────────────────────────────────
     // User scrolling up naturally pauses follow because isAtBottom flips
     // false. Scrolling back to the bottom (or pressing G) flips it true
@@ -307,16 +331,23 @@ private fun ConsoleContent(palette: ConsolePalette) {
     }
 
     // ── Match jumping ──────────────────────────────────────────────────────
+    // The layout result may be from the PREVIOUS frame's BasicTextField measure
+    // while matchIndex.offsets references char positions in the JUST-rebuilt
+    // annotated string. Under flood, an offset can exceed the old layout's
+    // text length -- MultiParagraph.getLineForOffset would throw. Guard on
+    // text length first, then runCatching the layout call so a transient
+    // out-of-range only loses one F3 press instead of crashing.
     fun scrollToMatch(idx: Int) {
         val layout = layoutResult ?: return
         if (idx !in matchIndex.offsets.indices) return
         val offset = matchIndex.offsets[idx]
-        // Center the match line in the viewport when possible.
-        val line = layout.getLineForOffset(offset)
-        val top = layout.getLineTop(line).toInt()
+        if (offset >= layout.layoutInput.text.length) return
+        val line = runCatching { layout.getLineForOffset(offset) }.getOrNull() ?: return
+        val top = runCatching { layout.getLineTop(line).toInt() }.getOrNull() ?: return
         val target = (top - scrollState.viewportSize / 3).coerceAtLeast(0)
         scope.launch { scrollState.animateScrollTo(target) }
-        selection = TextRange(offset, offset + matchIndex.queryLength)
+        val endOffset = (offset + matchIndex.queryLength).coerceAtMost(matchIndex.annotated.length)
+        selection = TextRange(offset, endOffset)
     }
 
     fun jumpNext() {
@@ -334,12 +365,18 @@ private fun ConsoleContent(palette: ConsolePalette) {
 
     fun openSearch() {
         searchOpen = true
-        searchFocus.requestFocus()
+        // Compose can't focus a node before its first composition pass; defer
+        // the focus request to the next frame via a side-effect flag.
+        pendingSearchFocus = true
     }
     fun closeSearch() {
         searchOpen = false
         searchHasFocus = false
-        focusManager.clearFocus()
+        // Returning focus to the log area (not clearing) keeps the root
+        // onPreviewKeyEvent live so j/k/g/G/Ctrl+End/etc. continue to work
+        // after dismissing the prompt. clearFocus() leaves no owner in the
+        // window's focus tree -- chords go dead until the user clicks.
+        runCatching { logFocus.requestFocus() }
     }
 
     // ── Puppet hooks ────────────────────────────────────────────────────────
@@ -704,8 +741,13 @@ private fun SearchPrompt(
         TextButton(onClick = onNext, modifier = Modifier.height(24.dp)) {
             Text(">", color = palette.textSecondary, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
         }
-        TextButton(onClick = onClose, modifier = Modifier.height(24.dp)) {
-            Text("x", color = palette.textSecondary, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+        IconButton(onClick = onClose, modifier = Modifier.size(24.dp)) {
+            Icon(
+                imageVector        = Icons.Default.Close,
+                contentDescription = null,
+                tint               = palette.textSecondary,
+                modifier           = Modifier.size(14.dp),
+            )
         }
     }
 }

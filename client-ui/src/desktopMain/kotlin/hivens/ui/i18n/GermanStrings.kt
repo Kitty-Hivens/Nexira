@@ -154,7 +154,6 @@ object GermanStrings : AppStrings {
     override val consoleWrap    = "Zeilenumbruch"
     override val consoleSaveToFile = "In Datei speichern"
     override val consoleSearchPlaceholder = "Suchen…"
-    override val consoleJumpToBottom = "↓ Zum Ende"
     override val consoleCopied = "Kopiert"
     override val consoleStatusFollow = "folgt"
     override val consoleStatusPaused = "pausiert"

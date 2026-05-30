@@ -154,7 +154,6 @@ object RussianStrings : AppStrings {
     override val consoleWrap    = "Перенос строк"
     override val consoleSaveToFile = "Сохранить в файл"
     override val consoleSearchPlaceholder = "Поиск…"
-    override val consoleJumpToBottom = "↓ К концу"
     override val consoleCopied = "Скопировано"
     override val consoleStatusFollow = "следую"
     override val consoleStatusPaused = "пауза"

@@ -154,7 +154,6 @@ object EnglishStrings : AppStrings {
     override val consoleWrap    = "Wrap"
     override val consoleSaveToFile = "Save to file"
     override val consoleSearchPlaceholder = "Search…"
-    override val consoleJumpToBottom = "↓ Jump to bottom"
     override val consoleCopied = "Copied"
     override val consoleStatusFollow = "follow"
     override val consoleStatusPaused = "paused"

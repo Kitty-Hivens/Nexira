@@ -152,7 +152,6 @@ interface AppStrings {
     val consoleWrap: String
     val consoleSaveToFile: String
     val consoleSearchPlaceholder: String
-    val consoleJumpToBottom: String
     val consoleCopied: String
     val consoleStatusFollow: String
     val consoleStatusPaused: String
