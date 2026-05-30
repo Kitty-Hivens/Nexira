@@ -55,6 +55,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -273,6 +274,10 @@ private fun ConsoleContent(
     var searchHasFocus  by remember { mutableStateOf(false) }
     var pendingSearchFocus by remember { mutableStateOf(false) }
     var searchAsFilter  by remember { mutableStateOf(false) }
+    var cmdInput        by remember { mutableStateOf("") }
+    var cmdHasFocus     by remember { mutableStateOf(false) }
+    val cmdHistory      = remember { mutableStateListOf<String>() }
+    var cmdHistoryIdx   by remember { mutableIntStateOf(-1) }
     var currentMatch    by remember { mutableIntStateOf(0) }
     var copiedFlash     by remember { mutableStateOf(false) }
     var selection       by remember { mutableStateOf(TextRange.Zero) }
@@ -603,6 +608,10 @@ private fun ConsoleContent(
             .fillMaxSize()
             .onPreviewKeyEvent { ev ->
                 if (ev.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                // Command input owns its own keyboard handling (Enter / Up /
+                // Down / Esc). When it has focus, the root passes ALL keys
+                // through so typing isn't intercepted.
+                if (cmdHasFocus) return@onPreviewKeyEvent false
                 handleKey(
                     ev          = ev,
                     searchFocus = searchHasFocus,
@@ -847,6 +856,59 @@ private fun ConsoleContent(
                 strings        = s,
                 onNext         = ::jumpNext,
                 onPrev         = ::jumpPrev,
+            )
+        }
+
+        // Command-input row: visible only while a game process is alive
+        // (gameConsole.canSendCommands tracks the LaunchDriver's
+        // attach / detach lifecycle). Enter sends the line to the game
+        // process's stdin via gameConsole.sendCommand, pushes it onto
+        // cmdHistory, clears the input. Up / Down step through history
+        // (most-recent first). Esc clears or blurs.
+        if (gameConsole.canSendCommands) {
+            CommandInputRow(
+                value            = cmdInput,
+                onValueChange    = { cmdInput = it; cmdHistoryIdx = -1 },
+                onSubmit         = {
+                    val txt = cmdInput.trim()
+                    if (txt.isNotEmpty()) {
+                        gameConsole.sendCommand(txt)
+                        // Echo the command into the buffer so the user
+                        // sees what they typed -- the game's stdout
+                        // reply lands on its own subsequent lines.
+                        gameConsole.append("> $txt", LogType.INFO)
+                        cmdHistory.add(0, txt)
+                        if (cmdHistory.size > 200) cmdHistory.removeAt(cmdHistory.size - 1)
+                        cmdInput = ""
+                        cmdHistoryIdx = -1
+                    }
+                },
+                onHistoryPrev    = {
+                    if (cmdHistory.isEmpty()) return@CommandInputRow
+                    val next = (cmdHistoryIdx + 1).coerceAtMost(cmdHistory.size - 1)
+                    cmdHistoryIdx = next
+                    cmdInput = cmdHistory[next]
+                },
+                onHistoryNext    = {
+                    if (cmdHistoryIdx <= 0) {
+                        cmdHistoryIdx = -1
+                        cmdInput = ""
+                    } else {
+                        cmdHistoryIdx -= 1
+                        cmdInput = cmdHistory[cmdHistoryIdx]
+                    }
+                },
+                onEscape         = {
+                    if (cmdInput.isNotEmpty()) {
+                        cmdInput = ""
+                        cmdHistoryIdx = -1
+                    } else {
+                        focusManager.clearFocus()
+                        runCatching { logFocus.requestFocus() }
+                    }
+                },
+                onFocusChanged   = { cmdHasFocus = it },
+                strings          = s,
             )
         }
 
@@ -1200,6 +1262,76 @@ private fun PromptButton(
         contentAlignment = Alignment.Center,
     ) {
         content()
+    }
+}
+
+// ── Command input row (live while game process is running) ─────────────────
+
+@Composable
+private fun CommandInputRow(
+    value: String,
+    onValueChange: (String) -> Unit,
+    onSubmit: () -> Unit,
+    onHistoryPrev: () -> Unit,
+    onHistoryNext: () -> Unit,
+    onEscape: () -> Unit,
+    onFocusChanged: (Boolean) -> Unit,
+    strings: AppStrings,
+) {
+    val colors = CelestiaTheme.colors
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .background(colors.surface)
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // Right-arrow prompt glyph reads as "you type here, it goes
+        // into the process". Mirrors the search prompt's '/' affordance
+        // so the two footer rows look like a family.
+        Text(
+            text       = ">",
+            color      = colors.success,
+            fontFamily = FontFamily.Monospace,
+            fontWeight = FontWeight.Bold,
+            fontSize   = 12.sp,
+            modifier   = Modifier.padding(end = 8.dp),
+        )
+        BasicTextField(
+            value         = value,
+            onValueChange = onValueChange,
+            singleLine    = true,
+            textStyle     = TextStyle(
+                color      = colors.textPrimary,
+                fontSize   = 12.sp,
+                fontFamily = FontFamily.Monospace,
+            ),
+            cursorBrush   = SolidColor(colors.textPrimary),
+            modifier      = Modifier
+                .weight(1f)
+                .onFocusChanged { onFocusChanged(it.isFocused) }
+                .onPreviewKeyEvent { ev ->
+                    if (ev.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                    when (ev.key) {
+                        Key.Enter, Key.NumPadEnter -> { onSubmit(); true }
+                        Key.DirectionUp            -> { onHistoryPrev(); true }
+                        Key.DirectionDown          -> { onHistoryNext(); true }
+                        Key.Escape                 -> { onEscape(); true }
+                        else                       -> false
+                    }
+                },
+            decorationBox = { inner ->
+                if (value.isEmpty()) {
+                    Text(
+                        text       = strings.consoleCommandPlaceholder,
+                        color      = colors.textSecondary.copy(alpha = 0.45f),
+                        fontSize   = 12.sp,
+                        fontFamily = FontFamily.Monospace,
+                    )
+                }
+                inner()
+            },
+        )
     }
 }
 

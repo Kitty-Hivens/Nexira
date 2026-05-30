@@ -155,6 +155,7 @@ object EnglishStrings : AppStrings {
     override val consoleSaveToFile = "Save to file"
     override val consoleSearchPlaceholder = "Search…"
     override val consoleCopied = "Copied"
+    override val consoleCommandPlaceholder = "command to game (Enter, ↑↓ history, Esc)"
     override val consoleMenuCopyLine = "Copy line"
     override val consoleMenuCopySelection = "Copy selection"
     override val consoleSelectAll = "Select all"

@@ -54,6 +54,21 @@ class GameConsoleService(
     var shouldShowConsole by mutableStateOf(false)
 
     /**
+     * Command sink: set by the [LaunchDriver] when a game process
+     * spawns, cleared on error / clean exit. UI calls [sendCommand]
+     * which routes through the sink to the process stdin. The state
+     * field is observable so the input row can show / hide itself
+     * without polling.
+     *
+     * Backed by mutableStateOf so the canSendCommands flag is a
+     * regular Compose state read; the actual sink is the lambda the
+     * driver stuffs in. Null = no game running, sendCommand is a
+     * no-op.
+     */
+    private var _commandSink by mutableStateOf<((String) -> Unit)?>(null)
+    val canSendCommands: Boolean get() = _commandSink != null
+
+    /**
      * In-memory sliding-window cap. ConsoleSettings.maxInMemoryLines
      * drives this at runtime; the default is 5000 to give plenty of
      * scrollback in memory before the user has to page back from disk.
@@ -265,4 +280,32 @@ class GameConsoleService(
 
     fun show() { shouldShowConsole = true }
     fun hide() { shouldShowConsole = false }
+
+    /**
+     * Attach a stdin writer for the currently running game process.
+     * Called by [LaunchDriver] on the [LaunchState.GameRunning]
+     * transition. Subsequent [sendCommand] calls route through this
+     * lambda. The driver replaces the sink on each launch, so the
+     * UI never holds a stale reference across game restarts.
+     */
+    fun attachCommandSink(sink: (String) -> Unit) {
+        _commandSink = sink
+    }
+
+    fun detachCommandSink() {
+        _commandSink = null
+    }
+
+    /**
+     * Best-effort write to the game process's stdin. Newline-suffixed
+     * so each call lands as a complete command on the receiver side.
+     * No-op when no process is running; the UI is expected to gate
+     * the input affordance on [canSendCommands] but this is the
+     * defensive backstop.
+     */
+    fun sendCommand(text: String) {
+        val payload = text.trimEnd('\n', '\r')
+        if (payload.isEmpty()) return
+        _commandSink?.invoke(payload)
+    }
 }

@@ -142,6 +142,21 @@ class LaunchDriver(
             abort           = { controller.abort() },
             showConsole     = { gameConsole.show() },
         )
+        // Wire command-input -> process stdin while the game is alive.
+        // The console UI surfaces an input row once canSendCommands is
+        // true; each Enter routes here, writes utf-8 + newline, flushes.
+        // Best-effort: IOExceptions on a dead process surface as warn
+        // logs without halting the driver. onError / onIdle both
+        // detach so a stale sink doesn't outlive the process.
+        val stdin = state.process.outputStream
+        gameConsole.attachCommandSink { text ->
+            try {
+                stdin.write((text + "\n").toByteArray(Charsets.UTF_8))
+                stdin.flush()
+            } catch (e: Exception) {
+                log.warn("Failed to send command to game process for ${target.id}", e)
+            }
+        }
         notifications.push(
             sourceKey = target.sourceKey,
             sender    = target.displayName,
@@ -161,6 +176,7 @@ class LaunchDriver(
         val s = stringsProvider()
         indications.setLaunchIndication(target.id, LaunchIndication.Failed)
         sessions.unregister(target.id)
+        gameConsole.detachCommandSink()
         notifications.push(
             sourceKey = target.sourceKey,
             sender    = target.displayName,
@@ -181,6 +197,7 @@ class LaunchDriver(
         // so the user can scroll back through the run.
         indications.setLaunchIndication(target.id, null)
         sessions.unregister(target.id)
+        gameConsole.detachCommandSink()
         notifications.push(
             sourceKey = target.sourceKey,
             sender    = target.displayName,

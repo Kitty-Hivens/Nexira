@@ -155,6 +155,7 @@ object RussianStrings : AppStrings {
     override val consoleSaveToFile = "Сохранить в файл"
     override val consoleSearchPlaceholder = "Поиск…"
     override val consoleCopied = "Скопировано"
+    override val consoleCommandPlaceholder = "команда для игры (Enter, ↑↓ история, Esc)"
     override val consoleMenuCopyLine = "Скопировать строку"
     override val consoleMenuCopySelection = "Скопировать выделение"
     override val consoleSelectAll = "Выделить всё"

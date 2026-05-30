@@ -155,6 +155,7 @@ object GermanStrings : AppStrings {
     override val consoleSaveToFile = "In Datei speichern"
     override val consoleSearchPlaceholder = "Suchen…"
     override val consoleCopied = "Kopiert"
+    override val consoleCommandPlaceholder = "Befehl an Spiel (Enter, ↑↓ Verlauf, Esc)"
     override val consoleMenuCopyLine = "Zeile kopieren"
     override val consoleMenuCopySelection = "Auswahl kopieren"
     override val consoleSelectAll = "Alles auswählen"
