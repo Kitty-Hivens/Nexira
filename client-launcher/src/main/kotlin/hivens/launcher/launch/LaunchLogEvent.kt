@@ -49,11 +49,10 @@ sealed class LaunchLogEvent {
     /**
      * Terminal-state error has just been announced via [LaunchState.Error].
      * Emitted alongside the state change so the UI's console pane can show
-     * the localized reason; backend stays free of i18n. Pairs with
-     * [RequestConsoleVisible] in every failure path.
+     * the localized reason; backend stays free of i18n. The console is no
+     * longer auto-shown on error -- the right-panel notification carries
+     * the diagnosis and a "Show console" action the user invokes when
+     * (and only when) they want the full log.
      */
     data class Error(val reason: LaunchError) : LaunchLogEvent()
-
-    /** Controller asks the UI to make the console window visible (post-error / launch). */
-    data object RequestConsoleVisible : LaunchLogEvent()
 }

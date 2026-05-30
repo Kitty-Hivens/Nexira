@@ -62,7 +62,6 @@ fun LaunchLogCollector(
                     gameConsole.append(event.text, uiType)
                 }
                 is LaunchLogEvent.Error -> gameConsole.append(localizeError(event.reason, s), LogType.ERROR)
-                is LaunchLogEvent.RequestConsoleVisible -> gameConsole.show()
             }
         }
     }

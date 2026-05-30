@@ -36,7 +36,6 @@ import hivens.launcher.launch.LauncherController
 import hivens.ui.AppState
 import hivens.ui.notifications.drivers.PackLaunchDriver
 import hivens.ui.theme.CelestiaTheme
-import hivens.ui.utils.GameConsoleService
 import hivens.ui.widgets.home.new.LocalHomeNewContext
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
@@ -63,7 +62,6 @@ fun LaunchButtonWidget(instance: WidgetInstance) {
     val repo: IPackRepository = koinInject()
     val controller: LauncherController = koinInject()
     val launchDriver: PackLaunchDriver = koinInject()
-    val gameConsole: GameConsoleService = koinInject()
     val all by remember { repo.observe() }.collectAsState(initial = emptyList())
     val launchState by controller.state.collectAsState()
 
@@ -95,7 +93,6 @@ fun LaunchButtonWidget(instance: WidgetInstance) {
             .clickable(enabled = ready) {
                 val s = session ?: return@clickable
                 launchDriver.observe(target)
-                gameConsole.show()
                 controller.launchPackInstance(s, target)
             }
             .padding(horizontal = 20.dp, vertical = 18.dp),

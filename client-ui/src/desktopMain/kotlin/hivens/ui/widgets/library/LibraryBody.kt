@@ -32,7 +32,6 @@ import hivens.ui.Screen
 import hivens.ui.notifications.drivers.PackLaunchDriver
 import hivens.ui.screens.library.PackCard
 import hivens.ui.theme.CelestiaTheme
-import hivens.ui.utils.GameConsoleService
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
 import hivens.widget.model.Widget
@@ -59,7 +58,6 @@ fun LibraryBody(instance: WidgetInstance) {
     val repo: IPackRepository = koinInject()
     val controller: LauncherController = koinInject()
     val launchDriver: PackLaunchDriver = koinInject()
-    val gameConsole: GameConsoleService = koinInject()
     val instances by remember { repo.observe() }.collectAsState(initial = emptyList())
     val authedSession = (ctx.appState as? AppState.Authenticated)?.session
 
@@ -82,7 +80,6 @@ fun LibraryBody(instance: WidgetInstance) {
                     ctx.onScreenChange(Screen.PackDetail(pack.id))
                 } else {
                     launchDriver.observe(pack)
-                    gameConsole.show()
                     controller.launchPackInstance(session, pack)
                 }
             },

@@ -397,7 +397,6 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
                                 credentials.copy(serverId = server.assetDir)
                             }
                             controller.launch(session, server)
-                            SwingUtilities.invokeLater { gameConsole.show() }
                         } catch (e: Exception) {
                             LoggerFactory.getLogger("Main").warn(
                                 "Tray-launched login failed for ${server.assetDir}", e

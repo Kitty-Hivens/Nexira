@@ -136,7 +136,6 @@ class LauncherController(
     private fun fail(reason: LaunchError, cause: Throwable? = null) {
         _state.value = LaunchState.Error(reason, cause)
         emit(LaunchLogEvent.Error(reason))
-        emit(LaunchLogEvent.RequestConsoleVisible)
     }
 
     private var launchJob: Job? = null
