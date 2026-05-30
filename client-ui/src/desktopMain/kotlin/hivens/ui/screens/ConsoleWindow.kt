@@ -31,6 +31,9 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -97,6 +100,7 @@ import hivens.ui.theme.StyleSpec
 import hivens.ui.puppet.PuppetField
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.puppet.PuppetToggle
+import hivens.ui.utils.ConsoleSettings
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.utils.LogEntry
 import hivens.ui.utils.LogType
@@ -166,6 +170,8 @@ fun ConsoleWindow(
     onClose: () -> Unit,
     customTheme: CustomTheme? = null,
     style: StyleSpec = CelestiaStyle,
+    settings: ConsoleSettings = ConsoleSettings(),
+    onSettingsChange: (ConsoleSettings) -> Unit = {},
 ) {
     val title = LocalStrings.current.consoleTitle
     val windowState = rememberWindowState(width = 960.dp, height = 620.dp)
@@ -189,7 +195,7 @@ fun ConsoleWindow(
             style        = style,
         ) {
             Surface(modifier = Modifier.fillMaxSize(), color = CelestiaTheme.colors.background) {
-                ConsoleContent()
+                ConsoleContent(settings = settings, onSettingsChange = onSettingsChange)
             }
         }
     }
@@ -197,7 +203,10 @@ fun ConsoleWindow(
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-private fun ConsoleContent() {
+private fun ConsoleContent(
+    settings: ConsoleSettings,
+    onSettingsChange: (ConsoleSettings) -> Unit,
+) {
     val s = LocalStrings.current
     val clipboard = LocalClipboard.current
     val focusManager = LocalFocusManager.current
@@ -222,10 +231,16 @@ private fun ConsoleContent() {
     }
 
     // ── State ──────────────────────────────────────────────────────────────
+    // Settings-derived shorthands. Changes flow back through onSettingsChange
+    // so the persistence file stays the source of truth; local var reads
+    // stay terse for the toolbar / kbd handler / context menu sites.
+    val fontSize        = settings.fontSize.coerceIn(ConsoleSettings.MIN_FONT_SIZE, ConsoleSettings.MAX_FONT_SIZE)
+    val wrapText        = settings.wrapText
+    val showGutter      = settings.showGutterStrip
+    val showTimestamps  = settings.showTimestamps
+
     var searchQuery     by remember { mutableStateOf("") }
     var regexMode       by remember { mutableStateOf(false) }
-    var wrapText        by remember { mutableStateOf(true) }
-    var fontSize        by remember { mutableIntStateOf(12) }
     var filterInfo      by remember { mutableStateOf(true) }
     var filterWarn      by remember { mutableStateOf(true) }
     var filterError     by remember { mutableStateOf(true) }
@@ -309,8 +324,8 @@ private fun ConsoleContent() {
     val warnCount  = remember(logsCopy) { logsCopy.count { it.type == LogType.WARN } }
     val errorCount = remember(logsCopy) { logsCopy.count { it.type == LogType.ERROR } }
 
-    val matchIndex = remember(filtered, effectiveQuery, regexMode, searchRegex, palette) {
-        buildConsoleAnnotated(filtered, effectiveQuery, regexMode, searchRegex, palette)
+    val matchIndex = remember(filtered, effectiveQuery, regexMode, searchRegex, palette, showTimestamps) {
+        buildConsoleAnnotated(filtered, effectiveQuery, regexMode, searchRegex, palette, showTimestamps)
     }
 
     // Clamp current match index when the match set shrinks past it.
@@ -478,7 +493,9 @@ private fun ConsoleContent() {
     PuppetToggle("console.filterInfo",  filterInfo)  { filterInfo = it }
     PuppetToggle("console.filterWarn",  filterWarn)  { filterWarn = it }
     PuppetToggle("console.filterError", filterError) { filterError = it }
-    PuppetToggle("console.wrap",        wrapText)    { wrapText = it }
+    PuppetToggle("console.wrap",        wrapText)    { onSettingsChange(settings.copy(wrapText = it)) }
+    PuppetToggle("console.gutter",      showGutter)  { onSettingsChange(settings.copy(showGutterStrip = it)) }
+    PuppetToggle("console.timestamps",  showTimestamps) { onSettingsChange(settings.copy(showTimestamps = it)) }
     PuppetToggle("console.regexMode",   regexMode)   { regexMode = it }
     PuppetToggle("console.searchAsFilter", searchAsFilter) { searchAsFilter = it }
     PuppetToggle("console.searchOpen",  searchOpen)  { if (it) openSearch() else closeSearch() }
@@ -493,7 +510,7 @@ private fun ConsoleContent() {
     PuppetClick ("console.matchNext",    enabled = matchIndex.ranges.isNotEmpty()) { jumpNext() }
     PuppetClick ("console.matchPrev",    enabled = matchIndex.ranges.isNotEmpty()) { jumpPrev() }
     FONT_SIZES.forEach { sz ->
-        PuppetClick("console.fontSize.$sz") { fontSize = sz }
+        PuppetClick("console.fontSize.$sz") { onSettingsChange(settings.copy(fontSize = sz)) }
     }
 
     // ── Root layout + key handler ───────────────────────────────────────────
@@ -535,9 +552,13 @@ private fun ConsoleContent() {
             onFilterWarn  = { filterWarn = it },
             onFilterError = { filterError = it },
             wrapText      = wrapText,
-            onToggleWrap  = { wrapText = !wrapText },
+            onToggleWrap  = { onSettingsChange(settings.copy(wrapText = !wrapText)) },
             fontSize      = fontSize,
-            onFontSize    = { fontSize = it },
+            onFontSize    = { onSettingsChange(settings.copy(fontSize = it)) },
+            showGutter    = showGutter,
+            onToggleGutter = { onSettingsChange(settings.copy(showGutterStrip = !showGutter)) },
+            showTimestamps = showTimestamps,
+            onToggleTimestamps = { onSettingsChange(settings.copy(showTimestamps = !showTimestamps)) },
             onCopyAll     = { copyAll() },
             onSave        = { gameConsole.saveToFile() },
             onClear       = { gameConsole.clear() },
@@ -566,16 +587,20 @@ private fun ConsoleContent() {
             val density = androidx.compose.ui.platform.LocalDensity.current
             val gutterWidthPx = with(density) { 3.dp.toPx() }
             val verticalPaddingPx = with(density) { 4.dp.toPx() }
-            val gutterModifier = Modifier.drawBehind {
-                val layout = layoutResult ?: return@drawBehind
-                drawSeverityGutter(
-                    layout         = layout,
-                    severities     = matchIndex.lineSeverities,
-                    warnColor      = themeColors.warnAccent,
-                    errorColor     = themeColors.criticalAccent,
-                    gutterWidthPx  = gutterWidthPx,
-                    yOffsetPx      = verticalPaddingPx,
-                )
+            val gutterModifier = if (showGutter) {
+                Modifier.drawBehind {
+                    val layout = layoutResult ?: return@drawBehind
+                    drawSeverityGutter(
+                        layout         = layout,
+                        severities     = matchIndex.lineSeverities,
+                        warnColor      = themeColors.warnAccent,
+                        errorColor     = themeColors.criticalAccent,
+                        gutterWidthPx  = gutterWidthPx,
+                        yOffsetPx      = verticalPaddingPx,
+                    )
+                }
+            } else {
+                Modifier
             }
 
             ContextMenuArea(
@@ -749,6 +774,10 @@ private fun Toolbar(
     onToggleWrap: () -> Unit,
     fontSize: Int,
     onFontSize: (Int) -> Unit,
+    showGutter: Boolean,
+    onToggleGutter: () -> Unit,
+    showTimestamps: Boolean,
+    onToggleTimestamps: () -> Unit,
     onCopyAll: () -> Unit,
     onSave: () -> Unit,
     onClear: () -> Unit,
@@ -813,6 +842,41 @@ private fun Toolbar(
             }
             IconButton(onClick = onClear, modifier = Modifier.size(32.dp)) {
                 Icon(Icons.Default.Delete, strings.consoleClear, tint = colors.textSecondary)
+            }
+
+            // In-window gear: quick-access menu for the persisted toggles
+            // (gutter strip, timestamps) that don't belong on the main
+            // toolbar bar but should be one click away.
+            var gearOpen by remember { mutableStateOf(false) }
+            Box {
+                IconButton(onClick = { gearOpen = true }, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Default.Settings, strings.consoleSettingsLabel, tint = colors.textSecondary)
+                }
+                DropdownMenu(
+                    expanded         = gearOpen,
+                    onDismissRequest = { gearOpen = false },
+                ) {
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                text = if (showGutter) strings.consoleHideGutter else strings.consoleShowGutter,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize   = 11.sp,
+                            )
+                        },
+                        onClick = { onToggleGutter(); gearOpen = false },
+                    )
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                text = if (showTimestamps) strings.consoleHideTimestamps else strings.consoleShowTimestamps,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize   = 11.sp,
+                            )
+                        },
+                        onClick = { onToggleTimestamps(); gearOpen = false },
+                    )
+                }
             }
         }
     }
@@ -1103,6 +1167,7 @@ private fun buildConsoleAnnotated(
     regexMode: Boolean,
     regexCompiled: Regex?,
     palette: ConsolePalette,
+    showTimestamps: Boolean,
 ): MatchIndex {
     val matches = mutableListOf<IntRange>()
     val severities = mutableListOf<LineSeverity>()
@@ -1127,7 +1192,7 @@ private fun buildConsoleAnnotated(
                     LogType.ERROR -> palette.severityError
                     LogType.DIVIDER -> palette.divider
                 }
-                lineText = "[${e.timestamp}] ${e.text}"
+                lineText = if (showTimestamps) "[${e.timestamp}] ${e.text}" else e.text
                 withStyle(SpanStyle(color = severityColor)) {
                     append(lineText)
                 }

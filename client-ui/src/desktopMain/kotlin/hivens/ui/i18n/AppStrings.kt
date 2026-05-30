@@ -155,6 +155,11 @@ interface AppStrings {
     val consoleCopied: String
     val consoleMenuCopyLine: String
     val consoleMenuCopySelection: String
+    val consoleSettingsLabel: String
+    val consoleShowGutter: String
+    val consoleHideGutter: String
+    val consoleShowTimestamps: String
+    val consoleHideTimestamps: String
     val consoleStatusFollow: String
     val consoleStatusPaused: String
     fun consoleStatusLines(filtered: Int, total: Int): String

@@ -70,6 +70,7 @@ import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.CustomTheme
 import hivens.ui.theme.ThemeManager
 import hivens.ui.tray.TrayManager
+import hivens.ui.utils.ConsoleSettingsManager
 import hivens.ui.utils.GameConsoleService
 import hivens.launcher.LayoutGraphRepository
 import hivens.widget.api.LocalLayoutGraph
@@ -292,6 +293,12 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
         val customizationJson    = remember { Json { ignoreUnknownKeys = true; encodeDefaults = true } }
         val customizationManager = remember { CustomizationManager(dataDirectory, customizationJson) }
         var customization        by remember { mutableStateOf(customizationManager.load()) }
+
+        // Per-domain console preferences -- the same JSON-file-per-manager
+        // shape as customization / background. Loaded eagerly so the
+        // first render uses persisted font / wrap / gutter choices.
+        val consoleSettingsManager = remember { ConsoleSettingsManager(dataDirectory, customizationJson) }
+        var consoleSettings        by remember { mutableStateOf(consoleSettingsManager.load()) }
 
         // Window chrome icon -- KDE overview / Hyprland switcher / macOS
         // dock want the detailed hi-res asset so they can be downscale
@@ -631,10 +638,15 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
             // this site only ensures the composition locals are in scope.
             if (gameConsole.shouldShowConsole) {
                 ConsoleWindow(
-                    isDarkTheme = isDarkTheme,
-                    onClose     = { gameConsole.hide() },
-                    customTheme = customTheme,
-                    style       = effectiveStyle,
+                    isDarkTheme    = isDarkTheme,
+                    onClose        = { gameConsole.hide() },
+                    customTheme    = customTheme,
+                    style          = effectiveStyle,
+                    settings       = consoleSettings,
+                    onSettingsChange = { updated ->
+                        consoleSettings = updated
+                        consoleSettingsManager.save(updated)
+                    },
                 )
             }
 
