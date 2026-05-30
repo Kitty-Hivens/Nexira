@@ -180,7 +180,11 @@ private fun LoadedBody(
     val scope = rememberCoroutineScope()
 
     val optionalMods = OptionalContentRules.optionalMods(manifest.mods)
-    var enabledState by remember(manifest.packId) {
+    // Key on instance.id, not manifest.packId: two installed instances of the
+    // same pack reuse this composable but carry independent optionalContent;
+    // keying on the pack id would leak the previous instance's checkbox state
+    // into the second instance and persist it on the next click.
+    var enabledState by remember(instance.id) {
         mutableStateOf(OptionalContentRules.enabledState(manifest.mods, instance.optionalContent))
     }
     val onToggleOptional: (String, Boolean) -> Unit = { filename, enable ->
