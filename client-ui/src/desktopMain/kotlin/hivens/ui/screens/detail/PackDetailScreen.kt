@@ -21,6 +21,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Text
@@ -173,13 +174,23 @@ fun PackDetailScreen(
                 0 -> ContentTabPane(instance = pack)
                 1 -> FileBrowserPane(rootDir = instanceDir, modifier = Modifier.padding(16.dp))
                 2 -> WorldsTabPane(instanceDir = instanceDir)
-                3 -> ConsoleContent(
-                    settings = consoleSettings,
-                    onSettingsChange = { new ->
-                        consoleSettings = new
-                        consoleSettingsManager.save(new)
-                    },
-                )
+                3 -> Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color    = CelestiaTheme.colors.background,
+                ) {
+                    // Surface wrap matches the standalone ConsoleWindow's
+                    // own composition -- without it the user's wallpaper
+                    // bleeds through the console's monospace text + the
+                    // session divider's contrast collapses against the
+                    // background art.
+                    ConsoleContent(
+                        settings = consoleSettings,
+                        onSettingsChange = { new ->
+                            consoleSettings = new
+                            consoleSettingsManager.save(new)
+                        },
+                    )
+                }
             }
         }
     }
