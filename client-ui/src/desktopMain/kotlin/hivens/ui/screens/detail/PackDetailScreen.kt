@@ -176,13 +176,18 @@ fun PackDetailScreen(
                 2 -> WorldsTabPane(instanceDir = instanceDir)
                 3 -> Surface(
                     modifier = Modifier.fillMaxSize(),
-                    color    = CelestiaTheme.colors.background,
+                    // Glass tint, not the solid theme background: a solid
+                    // fill broke the app's translucent aesthetic and left
+                    // a hard seam ("шлейф") between this tab and the glass
+                    // divider + right panel beside it. glassSurfaceAlpha
+                    // keeps the wallpaper softly visible (honoring the
+                    // user's glass-intensity knob) while still tinting the
+                    // surface enough that dense monospace stays readable.
+                    // The other tabs render straight over the wallpaper;
+                    // the console needs the extra tint because its text is
+                    // far denser than their card layouts.
+                    color    = glassSurfaceAlpha(0.85f),
                 ) {
-                    // Surface wrap matches the standalone ConsoleWindow's
-                    // own composition -- without it the user's wallpaper
-                    // bleeds through the console's monospace text + the
-                    // session divider's contrast collapses against the
-                    // background art.
                     ConsoleContent(
                         settings = consoleSettings,
                         onSettingsChange = { new ->

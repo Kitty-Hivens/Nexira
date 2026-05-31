@@ -980,9 +980,7 @@ private fun Toolbar(
     val colors = CelestiaTheme.colors
     Row(
         Modifier
-            .fillMaxWidth()
-            .background(colors.surface)
-            .padding(horizontal = 8.dp, vertical = 4.dp),
+            .fillMaxWidth()            .padding(horizontal = 8.dp, vertical = 4.dp),
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
@@ -1164,9 +1162,7 @@ private fun SearchPrompt(
     val colors = CelestiaTheme.colors
     Row(
         Modifier
-            .fillMaxWidth()
-            .background(colors.surface)
-            .padding(horizontal = 8.dp, vertical = 4.dp),
+            .fillMaxWidth()            .padding(horizontal = 8.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -1300,9 +1296,7 @@ private fun CommandInputRow(
     val colors = CelestiaTheme.colors
     Row(
         Modifier
-            .fillMaxWidth()
-            .background(colors.surface)
-            .padding(horizontal = 8.dp, vertical = 4.dp),
+            .fillMaxWidth()            .padding(horizontal = 8.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // Right-arrow prompt glyph reads as "you type here, it goes
@@ -1373,9 +1367,7 @@ private fun StatusFooter(
     val colors = CelestiaTheme.colors
     Row(
         Modifier
-            .fillMaxWidth()
-            .background(colors.surface)
-            .padding(horizontal = 8.dp, vertical = 3.dp),
+            .fillMaxWidth()            .padding(horizontal = 8.dp, vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // When the sliding window has dropped entries to disk, report
