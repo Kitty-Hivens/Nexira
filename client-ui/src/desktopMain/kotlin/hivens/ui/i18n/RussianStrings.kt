@@ -652,6 +652,7 @@ object RussianStrings : AppStrings {
     override val packDetailTabContent           = "Содержимое"
     override val packDetailTabFiles             = "Файлы"
     override val packDetailTabWorlds            = "Миры"
+    override val packDetailTabLogs              = "Логи"
 
     override val packDetailReadyTitle           = "Готов к запуску"
     override fun packDetailInstanceDirHint(dirName: String) = "Папка экземпляра: instances/$dirName"

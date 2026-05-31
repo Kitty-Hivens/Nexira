@@ -680,6 +680,7 @@ interface AppStrings {
     val packDetailTabContent: String
     val packDetailTabFiles: String
     val packDetailTabWorlds: String
+    val packDetailTabLogs: String
 
     // ── Library / PackDetail / Hero + Play bar + Not found ──────────────
     val packDetailReadyTitle: String

@@ -45,7 +45,6 @@ class WidgetRegistryConsistencyTest {
             "appshell.leftrail.logout",
             "appshell.rightrail.authpanel",
             "appshell.rightrail.compactnews",
-            "appshell.rightrail.console",
             // editor-2 sample widgets
             "home.new.clock",
             "home.new.spacer",

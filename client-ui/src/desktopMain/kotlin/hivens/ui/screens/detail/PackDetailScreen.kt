@@ -50,12 +50,15 @@ import hivens.ui.notifications.drivers.LaunchDriver
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
+import hivens.ui.screens.ConsoleContent
 import hivens.ui.screens.library.FileBrowserPane
 import hivens.ui.screens.library.PackMetaChip
 import hivens.ui.screens.library.content.ContentTabPane
 import hivens.ui.screens.library.worlds.WorldsTabPane
 import hivens.ui.theme.CelestiaTheme
+import hivens.ui.utils.ConsoleSettingsManager
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.serialization.json.Json
 import org.koin.compose.koinInject
 
 /**
@@ -149,13 +152,34 @@ fun PackDetailScreen(
                 onClick  = { tabIndex = 2 },
                 text     = { Text(s.packDetailTabWorlds, fontWeight = if (tabIndex == 2) FontWeight.Bold else FontWeight.Normal) },
             )
+            Tab(
+                selected = tabIndex == 3,
+                onClick  = { tabIndex = 3 },
+                text     = { Text(s.packDetailTabLogs, fontWeight = if (tabIndex == 3) FontWeight.Bold else FontWeight.Normal) },
+            )
         }
+
+        // Logs tab loads its own ConsoleSettings via the same manager
+        // pattern AppShell uses, so the on-disk console.json stays the
+        // single source of truth for font / wrap / gutter / timestamps
+        // / max-in-memory-lines whether the user opens the tab here or
+        // the standalone ConsoleWindow.
+        val consoleJson = remember { Json { ignoreUnknownKeys = true; encodeDefaults = true } }
+        val consoleSettingsManager = remember { ConsoleSettingsManager(paths.dataDir, consoleJson) }
+        var consoleSettings by remember { mutableStateOf(consoleSettingsManager.load()) }
 
         Box(modifier = Modifier.fillMaxSize().padding(top = 4.dp)) {
             when (tabIndex) {
                 0 -> ContentTabPane(instance = pack)
                 1 -> FileBrowserPane(rootDir = instanceDir, modifier = Modifier.padding(16.dp))
                 2 -> WorldsTabPane(instanceDir = instanceDir)
+                3 -> ConsoleContent(
+                    settings = consoleSettings,
+                    onSettingsChange = { new ->
+                        consoleSettings = new
+                        consoleSettingsManager.save(new)
+                    },
+                )
             }
         }
     }

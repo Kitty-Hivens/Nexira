@@ -651,6 +651,7 @@ object GermanStrings : AppStrings {
     override val packDetailTabContent           = "Inhalt"
     override val packDetailTabFiles             = "Dateien"
     override val packDetailTabWorlds            = "Welten"
+    override val packDetailTabLogs              = "Logs"
 
     override val packDetailReadyTitle           = "Bereit zum Spielen"
     override fun packDetailInstanceDirHint(dirName: String) = "Instanz-Ordner: instances/$dirName"
