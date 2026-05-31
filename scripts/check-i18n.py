@@ -1,0 +1,134 @@
+#!/usr/bin/env python3
+# Fails when a user-facing string is hardcoded in Compose UI code instead of
+# going through AppStrings / LocalStrings.
+#
+# Why this exists: AppStrings enforces COMPLETENESS -- the Kotlin compiler
+# requires every key to be implemented in en/ru/de, so a missing translation
+# does not build. It does NOT enforce USAGE: nothing stops a literal from
+# bypassing LocalStrings entirely. Compose Desktop has no Android-style
+# HardcodedText lint, so without this gate a hardcoded string sails through
+# the compiler, the tests, and review unnoticed. This is the call-site guard.
+#
+# High-precision heuristic: a Cyrillic run inside a string literal in
+# client-ui code is almost always a hardcoded RU UI string. The locale files
+# and build output are excluded by path; comments may carry Cyrillic notes
+# and are skipped; and the deferred @PropLabel / @Widget(displayName)
+# annotation values are skipped -- those are compile-time constants that
+# cannot read LocalStrings and need a separate key-indirection pass (see
+# memory project_i18n_annotation_gap). Drop the annotation skip once that
+# lands. English literals are a lower-precision second layer and are left to
+# a future allowlist-backed rule.
+
+from __future__ import annotations
+
+import argparse
+import re
+import sys
+from dataclasses import dataclass
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+SCAN_ROOT = ROOT / "client-ui" / "src" / "desktopMain"
+SCAN_EXT = ".kt"
+EXCLUDE_PATH_FRAGMENTS = ("/build/", "/i18n/")
+
+# A string literal containing at least one Cyrillic code point. The boundary
+# chars (U+0400..U+04FF, the Russian alphabet plus YO) are built with chr()
+# so this file stays strictly ASCII -- no literal Cyrillic and no backslash-u
+# in source.
+_CYRILLIC_CLASS = "[" + chr(0x0400) + "-" + chr(0x04FF) + "]"
+CYRILLIC_LITERAL = re.compile('"[^"]*' + _CYRILLIC_CLASS + '[^"]*"')
+
+# Whole-line comment (// or KDoc * / block-open). Cyrillic inside a comment is
+# a developer note, not user-facing text.
+COMMENT_LINE = re.compile(r"^\s*(?://|\*|/\*)")
+
+# Annotation context (category C, deferred): the value is a compile-time
+# constant and cannot be localized without key-indirection.
+ANNOTATION_CTX = re.compile(r"@PropLabel\(|@Widget\(|\bdisplayName\s*=")
+
+
+@dataclass
+class Hit:
+    path: Path
+    line_no: int
+    line: str
+
+
+def scan_file(path: Path) -> list[Hit]:
+    hits: list[Hit] = []
+    try:
+        with path.open("r", encoding="utf-8", errors="replace") as fh:
+            for line_no, line in enumerate(fh, start=1):
+                if COMMENT_LINE.match(line):
+                    continue
+                if ANNOTATION_CTX.search(line):
+                    continue
+                if CYRILLIC_LITERAL.search(line):
+                    hits.append(Hit(path=path, line_no=line_no, line=line.rstrip()))
+    except OSError as e:
+        print(f"warn: cannot read {path}: {e}", file=sys.stderr)
+    return hits
+
+
+def walk_targets() -> list[Path]:
+    if not SCAN_ROOT.is_dir():
+        return []
+    return [
+        p
+        for p in SCAN_ROOT.rglob("*" + SCAN_EXT)
+        if not any(frag in str(p) for frag in EXCLUDE_PATH_FRAGMENTS)
+    ]
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="i18n hardcoded-string gate (Compose UI).")
+    parser.add_argument(
+        "--strict",
+        action="store_true",
+        help="exit 1 if any hits found (CI uses this; baseline is zero).",
+    )
+    parser.add_argument(
+        "paths",
+        nargs="*",
+        type=Path,
+        help="restrict scan to these paths (default: client-ui desktopMain).",
+    )
+    args = parser.parse_args()
+
+    if args.paths:
+        targets: list[Path] = []
+        for p in args.paths:
+            p = p if p.is_absolute() else (Path.cwd() / p).resolve()
+            if p.is_file() and p.suffix == SCAN_EXT:
+                targets.append(p)
+            elif p.is_dir():
+                targets.extend(
+                    sub
+                    for sub in p.rglob("*" + SCAN_EXT)
+                    if not any(frag in str(sub) for frag in EXCLUDE_PATH_FRAGMENTS)
+                )
+    else:
+        targets = walk_targets()
+
+    hits: list[Hit] = []
+    for path in targets:
+        hits.extend(scan_file(path))
+
+    if not hits:
+        print(f"check-i18n: 0 hardcoded UI strings across {len(targets)} files.")
+        return 0
+
+    print(f"check-i18n: {len(hits)} hardcoded UI string(s) across {len(targets)} files.")
+    print("Route each through LocalStrings: add a key to AppStrings + en/ru/de, render s.key.")
+    print()
+    for hit in hits:
+        rel = hit.path.relative_to(ROOT)
+        print(f"  {rel}:{hit.line_no}: {hit.line.strip()[:120]}")
+    print()
+
+    return 1 if args.strict else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
