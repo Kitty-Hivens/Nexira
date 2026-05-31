@@ -2,6 +2,7 @@ package hivens.ui.widgets.customization
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import hivens.ui.i18n.LocalStrings
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 
@@ -10,8 +11,9 @@ import hivens.widget.model.WidgetInstance
 fun CustomShapeCardCornerWidget(instance: WidgetInstance) {
     val ctx = LocalCustomizationContext.current
     val settings by ctx.settings
+    val s = LocalStrings.current
     LabeledSlider(
-        label  = "Card corner (dp)",
+        label  = s.customCardCorner,
         value  = settings.styleOverrides.cardCornerDp ?: 12f,
         range  = 0f..24f,
         format = "%.0fdp",

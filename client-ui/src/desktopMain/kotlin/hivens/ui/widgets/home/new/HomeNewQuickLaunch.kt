@@ -33,6 +33,7 @@ import hivens.launcher.launch.LaunchState
 import hivens.launcher.launch.LauncherController
 import hivens.ui.AppState
 import hivens.ui.customization.glassSurfaceAlpha
+import hivens.ui.i18n.LocalStrings
 import hivens.ui.notifications.LaunchTarget
 import hivens.ui.notifications.drivers.LaunchDriver
 import hivens.ui.theme.CelestiaTheme
@@ -45,7 +46,7 @@ import org.koin.compose.koinInject
 
 @Serializable
 data class QuickLaunchProps(
-    @PropLabel("Надпись кнопки") val buttonLabel: String = "Играть",
+    @PropLabel("Надпись кнопки") val buttonLabel: String = "",
 )
 
 // Quick-launch target = most recently played, falling back to most
@@ -57,6 +58,7 @@ data class QuickLaunchProps(
 fun HomeNewQuickLaunch(instance: WidgetInstance) {
     val p = instance.rememberProps<QuickLaunchProps>()
     val ctx = LocalHomeNewContext.current
+    val s = LocalStrings.current
     val repo: IPackRepository = koinInject()
     val controller: LauncherController = koinInject()
     val launchDriver: LaunchDriver = koinInject()
@@ -72,7 +74,7 @@ fun HomeNewQuickLaunch(instance: WidgetInstance) {
     val canLaunch = session != null &&
         (launchState is LaunchState.Idle || launchState is LaunchState.Error)
 
-    val label = if (target.lastPlayedEpochOrZero > 0L) "Продолжить" else "Запустить"
+    val label = if (target.lastPlayedEpochOrZero > 0L) s.homeQuickContinue else s.homeQuickStart
 
     Column(
         modifier = Modifier
@@ -123,7 +125,7 @@ fun HomeNewQuickLaunch(instance: WidgetInstance) {
             ) {
                 Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(6.dp))
-                Text(p.buttonLabel, fontWeight = FontWeight.SemiBold)
+                Text(p.buttonLabel.ifBlank { s.homeQuickButton }, fontWeight = FontWeight.SemiBold)
             }
         }
     }

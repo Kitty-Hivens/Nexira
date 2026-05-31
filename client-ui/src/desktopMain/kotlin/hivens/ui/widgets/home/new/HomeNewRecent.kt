@@ -38,6 +38,7 @@ import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
 import hivens.ui.Screen
 import hivens.ui.customization.glassSurfaceAlpha
+import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
@@ -49,7 +50,7 @@ import org.koin.compose.koinInject
 
 @Serializable
 data class RecentProps(
-    @PropLabel("Заголовок") val title: String = "Твои сборки",
+    @PropLabel("Заголовок") val title: String = "",
     @PropLabel("Сколько плиток") @PropRange(1.0, 12.0) val maxTiles: Int = 5,
 )
 
@@ -63,6 +64,7 @@ data class RecentProps(
 fun HomeNewRecent(instance: WidgetInstance) {
     val p = instance.rememberProps<RecentProps>()
     val ctx = LocalHomeNewContext.current
+    val s = LocalStrings.current
     val repo: IPackRepository = koinInject()
     val all by remember { repo.observe() }.collectAsState(initial = emptyList())
 
@@ -80,7 +82,7 @@ fun HomeNewRecent(instance: WidgetInstance) {
 
     Column(Modifier.fillMaxWidth().padding(top = 12.dp)) {
         Text(
-            text       = p.title,
+            text       = p.title.ifBlank { s.homeRecentTitle },
             style      = MaterialTheme.typography.titleSmall,
             color      = CelestiaTheme.colors.textPrimary,
             fontWeight = FontWeight.SemiBold,
@@ -147,6 +149,7 @@ private fun PackTile(pack: PackInstance, onClick: () -> Unit) {
 
 @Composable
 private fun EmptyPacksCta(onBrowse: () -> Unit) {
+    val s = LocalStrings.current
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -157,13 +160,13 @@ private fun EmptyPacksCta(onBrowse: () -> Unit) {
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(
-            text       = "Сборок пока нет",
+            text       = s.homeNoPacksTitle,
             style      = MaterialTheme.typography.titleSmall,
             color      = CelestiaTheme.colors.textPrimary,
             fontWeight = FontWeight.SemiBold,
         )
         Text(
-            text  = "Установи что-нибудь через Browse — твои сборки появятся здесь.",
+            text  = s.homeNoPacksBody,
             style = MaterialTheme.typography.bodySmall,
             color = CelestiaTheme.colors.textSecondary,
         )
@@ -177,7 +180,7 @@ private fun EmptyPacksCta(onBrowse: () -> Unit) {
         ) {
             Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(6.dp))
-            Text("Открыть Browse", fontWeight = FontWeight.Medium)
+            Text(s.browseOpen, fontWeight = FontWeight.Medium)
         }
     }
 }

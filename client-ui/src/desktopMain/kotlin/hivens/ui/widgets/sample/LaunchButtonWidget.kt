@@ -34,6 +34,7 @@ import hivens.core.data.PackInstance
 import hivens.launcher.launch.LaunchState
 import hivens.launcher.launch.LauncherController
 import hivens.ui.AppState
+import hivens.ui.i18n.LocalStrings
 import hivens.ui.notifications.LaunchTarget
 import hivens.ui.notifications.drivers.LaunchDriver
 import hivens.ui.theme.CelestiaTheme
@@ -47,7 +48,7 @@ import org.koin.compose.koinInject
 
 @Serializable
 data class LaunchButtonProps(
-    // Blank falls back to the default "Запустить" label.
+    // Blank falls back to the localized ready label.
     @PropLabel("Надпись") val label: String = "",
 )
 
@@ -60,6 +61,7 @@ data class LaunchButtonProps(
 fun LaunchButtonWidget(instance: WidgetInstance) {
     val p = instance.rememberProps<LaunchButtonProps>()
     val ctx = LocalHomeNewContext.current
+    val s = LocalStrings.current
     val repo: IPackRepository = koinInject()
     val controller: LauncherController = koinInject()
     val launchDriver: LaunchDriver = koinInject()
@@ -119,7 +121,7 @@ fun LaunchButtonWidget(instance: WidgetInstance) {
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
                 Text(
-                    text       = if (ready) p.label.ifBlank { "Запустить" } else "Играть нельзя",
+                    text       = if (ready) p.label.ifBlank { s.launchTileReady } else s.launchTileBlocked,
                     style      = MaterialTheme.typography.titleLarge,
                     color      = if (ready) Color.White else CelestiaTheme.colors.textSecondary,
                     fontWeight = FontWeight.SemiBold,

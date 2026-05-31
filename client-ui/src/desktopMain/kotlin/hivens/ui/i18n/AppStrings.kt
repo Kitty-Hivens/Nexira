@@ -733,4 +733,103 @@ interface AppStrings {
     fun notifTimeMinutes(minutes: Long): String
     fun notifTimeHours(hours: Long): String
     fun notifTimeDays(days: Long): String
+
+    // --- Home (new) + launch tiles ---
+    val homeRecentTitle: String
+    val homeNoPacksTitle: String
+    val homeNoPacksBody: String
+    val browseOpen: String
+    val homeQuickContinue: String
+    val homeQuickStart: String
+    val homeQuickButton: String
+    val launchTileReady: String
+    val launchTileBlocked: String
+
+    // --- Library widgets ---
+    val libraryEmptyTitle: String
+    val libraryEmptyBody: String
+    val libraryHeaderTitle: String
+    val libraryHeaderSubtitle: String
+
+    // --- Customization widget labels ---
+    val customGlassAlpha: String
+    val customCardCorner: String
+    val customCardBorder: String
+    val customButtonCorner: String
+    val customAnimSpeed: String
+    val customSoftGlow: String
+
+    // --- Layout editor: common actions ---
+    val editorClose: String
+    val editorCancel: String
+    val editorDelete: String
+    val editorReset: String
+    val editorSave: String
+    val editorApply: String
+    val editorExport: String
+    val editorWidgets: String
+
+    // --- Layout editor: slot orientation ---
+    val editorSlotStack: String
+    val editorSlotRow: String
+    val editorSlotGrid: String
+    val editorSlotCanvas: String
+
+    // --- Layout editor: prop panel ---
+    val editorResetToDefault: String
+
+    // --- Layout editor: presets ---
+    val editorPresetsTitle: String
+    val editorPresetsIntro: String
+    val editorPresetNamePlaceholder: String
+    fun editorPresetsSaved(count: Int): String
+    val editorPresetsEmpty: String
+
+    // --- Layout editor: palette ---
+    val editorPaletteHide: String
+    val editorPaletteHint: String
+    val editorPaletteEmpty: String
+
+    // --- Layout editor: empty slot + chrome ---
+    val editorDragWidgetHere: String
+    val editorDragReorder: String
+    val editorConfigure: String
+    val editorForceRemove: String
+    val editorForceRemoveTitle: String
+    fun editorForceRemoveBody(name: String): String
+
+    // --- Layout editor: host (reset / pill / fab) ---
+    val editorResetSurfaceTitle: String
+    fun editorResetSurfaceBody(name: String): String
+    val editorPreview: String
+    val editorPreviewHidden: String
+    val editorPaletteToggleHide: String
+    val editorEscHint: String
+    val editorFabEdit: String
+    val editorFabDone: String
+
+    // --- Layout editor: surface short names ---
+    val editorSurfShortHome: String
+    val editorSurfShortLibrary: String
+    val editorSurfShortLeftRail: String
+    val editorSurfShortRightRail: String
+    val editorSurfShortAbout: String
+    val editorSurfShortBg: String
+    val editorSurfShortStyle: String
+    val editorSurfShortProfile: String
+    val editorSurfShortServer: String
+    val editorSurfShortTheme: String
+
+    // --- Layout editor: surface long names ---
+    val editorSurfHomeClassic: String
+    val editorSurfHomeNew: String
+    val editorSurfLibrary: String
+    val editorSurfLeftRail: String
+    val editorSurfRightRail: String
+    val editorSurfAbout: String
+    val editorSurfBg: String
+    val editorSurfStyle: String
+    val editorSurfProfile: String
+    val editorSurfServer: String
+    val editorSurfTheme: String
 }

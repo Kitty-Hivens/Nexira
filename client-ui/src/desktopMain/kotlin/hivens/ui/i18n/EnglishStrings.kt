@@ -701,6 +701,107 @@ object EnglishStrings : AppStrings {
     override fun notifTimeMinutes(minutes: Long)        = "${minutes}m"
     override fun notifTimeHours(hours: Long)            = "${hours}h"
     override fun notifTimeDays(days: Long)              = "${days}d"
+
+    // --- Home (new) + launch tiles ---
+    override val homeRecentTitle    = "Your packs"
+    override val homeNoPacksTitle   = "No packs yet"
+    override val homeNoPacksBody    = "Install something from Browse and your packs will show up here."
+    override val browseOpen         = "Open Browse"
+    override val homeQuickContinue  = "Continue"
+    override val homeQuickStart     = "Launch"
+    override val homeQuickButton    = "Play"
+    override val launchTileReady    = "Launch"
+    override val launchTileBlocked  = "Can't play yet"
+
+    // --- Library widgets ---
+    override val libraryEmptyTitle     = "Empty for now"
+    override val libraryEmptyBody      = "Install a pack from Browse and it'll show up here."
+    override val libraryHeaderTitle    = "Library"
+    override val libraryHeaderSubtitle = "Installed packs"
+
+    // --- Customization widget labels ---
+    override val customGlassAlpha   = "Glass alpha"
+    override val customCardCorner   = "Card corner (dp)"
+    override val customCardBorder   = "Card border (dp)"
+    override val customButtonCorner = "Button corner (dp)"
+    override val customAnimSpeed    = "Animation speed"
+    override val customSoftGlow     = "Decorative glow"
+
+    // --- Layout editor: common actions ---
+    override val editorClose   = "Close"
+    override val editorCancel  = "Cancel"
+    override val editorDelete  = "Delete"
+    override val editorReset   = "Reset"
+    override val editorSave    = "Save"
+    override val editorApply   = "Apply"
+    override val editorExport  = "Export"
+    override val editorWidgets = "Widgets"
+
+    // --- Layout editor: slot orientation ---
+    override val editorSlotStack  = "Stack"
+    override val editorSlotRow    = "Row"
+    override val editorSlotGrid   = "Grid"
+    override val editorSlotCanvas = "Canvas"
+
+    // --- Layout editor: prop panel ---
+    override val editorResetToDefault = "Reset to default"
+
+    // --- Layout editor: presets ---
+    override val editorPresetsTitle          = "Presets"
+    override val editorPresetsIntro          = "A snapshot of layout, theme and style. Save now, load anytime."
+    override val editorPresetNamePlaceholder = "Preset name..."
+    override fun editorPresetsSaved(count: Int) = "Saved ($count)"
+    override val editorPresetsEmpty          = "Empty. Save the current layout as your first preset."
+
+    // --- Layout editor: palette ---
+    override val editorPaletteHide  = "Hide palette"
+    override val editorPaletteHint  = "Drag into a slot"
+    override val editorPaletteEmpty = "Widget registry is empty (build issue)."
+
+    // --- Layout editor: empty slot + chrome ---
+    override val editorDragWidgetHere   = "Drag a widget here"
+    override val editorDragReorder      = "Drag to reorder"
+    override val editorConfigure        = "Configure"
+    override val editorForceRemove      = "Force-remove"
+    override val editorForceRemoveTitle = "Force-remove widget?"
+    override fun editorForceRemoveBody(name: String) =
+        "\"$name\" is marked as non-removable. Such widgets usually stay put so you are not left without navigation. If you are sure it is not needed here, you can remove it now. If anything goes wrong, reset the surface to default from the menu next to the surface chip."
+
+    // --- Layout editor: host (reset / pill / fab) ---
+    override val editorResetSurfaceTitle = "Reset surface to default?"
+    override fun editorResetSurfaceBody(name: String) =
+        "\"$name\" will return to the widget arrangement from the built-in default layout. All local changes on this surface (added widgets, reorders, deletions) will be lost. Other surfaces are left untouched."
+    override val editorPreview           = "Preview"
+    override val editorPreviewHidden     = "Hidden"
+    override val editorPaletteToggleHide = "Hide"
+    override val editorEscHint           = "Esc to exit"
+    override val editorFabEdit           = "Edit layout"
+    override val editorFabDone           = "Done editing"
+
+    // --- Layout editor: surface short names ---
+    override val editorSurfShortHome      = "Home"
+    override val editorSurfShortLibrary   = "Library"
+    override val editorSurfShortLeftRail  = "Left rail"
+    override val editorSurfShortRightRail = "Right rail"
+    override val editorSurfShortAbout     = "About"
+    override val editorSurfShortBg        = "Background"
+    override val editorSurfShortStyle     = "Style"
+    override val editorSurfShortProfile   = "Profile"
+    override val editorSurfShortServer    = "Server"
+    override val editorSurfShortTheme     = "Themes"
+
+    // --- Layout editor: surface long names ---
+    override val editorSurfHomeClassic = "Home (classic)"
+    override val editorSurfHomeNew     = "Home (new)"
+    override val editorSurfLibrary     = "Library"
+    override val editorSurfLeftRail    = "Side panel"
+    override val editorSurfRightRail   = "Right panel"
+    override val editorSurfAbout       = "About"
+    override val editorSurfBg          = "Background settings"
+    override val editorSurfStyle       = "Customization"
+    override val editorSurfProfile     = "Profile"
+    override val editorSurfServer      = "Server details"
+    override val editorSurfTheme       = "Theme picker"
 }
 
 private val notificationTimeFormatterCache = java.util.concurrent.ConcurrentHashMap<java.util.Locale, java.time.format.DateTimeFormatter>()

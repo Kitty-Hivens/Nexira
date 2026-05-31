@@ -705,4 +705,105 @@ object RussianStrings : AppStrings {
     override fun notifTimeMinutes(minutes: Long)        = "${minutes} мин"
     override fun notifTimeHours(hours: Long)            = "${hours} ч"
     override fun notifTimeDays(days: Long)              = "${days} дн"
+
+    // --- Home (new) + launch tiles ---
+    override val homeRecentTitle    = "Твои сборки"
+    override val homeNoPacksTitle   = "Сборок пока нет"
+    override val homeNoPacksBody    = "Установи что-нибудь через Browse — твои сборки появятся здесь."
+    override val browseOpen         = "Открыть Browse"
+    override val homeQuickContinue  = "Продолжить"
+    override val homeQuickStart     = "Запустить"
+    override val homeQuickButton    = "Играть"
+    override val launchTileReady    = "Запустить"
+    override val launchTileBlocked  = "Играть нельзя"
+
+    // --- Library widgets ---
+    override val libraryEmptyTitle     = "Пока пусто"
+    override val libraryEmptyBody      = "Установите сборку через Browse — она появится здесь."
+    override val libraryHeaderTitle    = "Библиотека"
+    override val libraryHeaderSubtitle = "Установленные сборки"
+
+    // --- Customization widget labels ---
+    override val customGlassAlpha   = "Прозрачность стекла"
+    override val customCardCorner   = "Скругление карточек (dp)"
+    override val customCardBorder   = "Толщина рамки (dp)"
+    override val customButtonCorner = "Скругление кнопок (dp)"
+    override val customAnimSpeed    = "Скорость анимаций"
+    override val customSoftGlow     = "Декоративное свечение"
+
+    // --- Layout editor: common actions ---
+    override val editorClose   = "Закрыть"
+    override val editorCancel  = "Отмена"
+    override val editorDelete  = "Удалить"
+    override val editorReset   = "Сбросить"
+    override val editorSave    = "Сохранить"
+    override val editorApply   = "Применить"
+    override val editorExport  = "Экспорт"
+    override val editorWidgets = "Виджеты"
+
+    // --- Layout editor: slot orientation ---
+    override val editorSlotStack  = "Стек"
+    override val editorSlotRow    = "Ряд"
+    override val editorSlotGrid   = "Сетка"
+    override val editorSlotCanvas = "Холст"
+
+    // --- Layout editor: prop panel ---
+    override val editorResetToDefault = "Сбросить к умолчанию"
+
+    // --- Layout editor: presets ---
+    override val editorPresetsTitle          = "Пресеты"
+    override val editorPresetsIntro          = "Снимок layout + темы + стиля. Сохрани сейчас, загрузи когда угодно."
+    override val editorPresetNamePlaceholder = "Имя пресета..."
+    override fun editorPresetsSaved(count: Int) = "Сохранённые ($count)"
+    override val editorPresetsEmpty          = "Пусто. Сохрани текущий layout как первый пресет."
+
+    // --- Layout editor: palette ---
+    override val editorPaletteHide  = "Скрыть палитру"
+    override val editorPaletteHint  = "Перетащи в нужный слот"
+    override val editorPaletteEmpty = "Реестр виджетов пуст (ошибка сборки)."
+
+    // --- Layout editor: empty slot + chrome ---
+    override val editorDragWidgetHere   = "Перетащи виджет сюда"
+    override val editorDragReorder      = "Перетащить"
+    override val editorConfigure        = "Настроить"
+    override val editorForceRemove      = "Удалить принудительно"
+    override val editorForceRemoveTitle = "Удалить виджет принудительно?"
+    override fun editorForceRemoveBody(name: String) =
+        "\"$name\" помечен как неудаляемый. Обычно такие виджеты держат на месте, чтобы пользователь не остался без навигации. Если ты уверен, что виджет тут не нужен, можно снести его прямо сейчас. А если что, сбрось поверхность к умолчанию через меню справа от чипа поверхности."
+
+    // --- Layout editor: host (reset / pill / fab) ---
+    override val editorResetSurfaceTitle = "Сбросить поверхность к умолчанию?"
+    override fun editorResetSurfaceBody(name: String) =
+        "\"$name\" вернётся к расстановке виджетов из встроенного default-layout. Все локальные изменения на этой поверхности (добавленные виджеты, перестановки, удаления) пропадут. Другие поверхности не тронем."
+    override val editorPreview           = "Просмотр"
+    override val editorPreviewHidden     = "Скрыто"
+    override val editorPaletteToggleHide = "Скрыть"
+    override val editorEscHint           = "Esc — выйти"
+    override val editorFabEdit           = "Редактировать раскладку"
+    override val editorFabDone           = "Готово"
+
+    // --- Layout editor: surface short names ---
+    override val editorSurfShortHome      = "Главная"
+    override val editorSurfShortLibrary   = "Библиотека"
+    override val editorSurfShortLeftRail  = "Лев. рейл"
+    override val editorSurfShortRightRail = "Прав. рейл"
+    override val editorSurfShortAbout     = "О приложении"
+    override val editorSurfShortBg        = "Фон"
+    override val editorSurfShortStyle     = "Стиль"
+    override val editorSurfShortProfile   = "Профиль"
+    override val editorSurfShortServer    = "Сервер"
+    override val editorSurfShortTheme     = "Темы"
+
+    // --- Layout editor: surface long names ---
+    override val editorSurfHomeClassic = "Главная (классика)"
+    override val editorSurfHomeNew     = "Главная (новая)"
+    override val editorSurfLibrary     = "Библиотека"
+    override val editorSurfLeftRail    = "Боковая панель"
+    override val editorSurfRightRail   = "Правая панель"
+    override val editorSurfAbout       = "О приложении"
+    override val editorSurfBg          = "Настройки фона"
+    override val editorSurfStyle       = "Кастомизация"
+    override val editorSurfProfile     = "Профиль"
+    override val editorSurfServer      = "Детали сервера"
+    override val editorSurfTheme       = "Выбор темы"
 }
