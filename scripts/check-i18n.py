@@ -18,6 +18,10 @@
 # memory project_i18n_annotation_gap). Drop the annotation skip once that
 # lands. English literals are a lower-precision second layer and are left to
 # a future allowlist-backed rule.
+#
+# An "// i18n-allow" marker anywhere on a line exempts that line -- the escape
+# hatch for a genuinely non-localizable Cyrillic literal (none today) and for
+# the rare trailing-comment false positive the line-start comment skip misses.
 
 from __future__ import annotations
 
@@ -30,7 +34,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 SCAN_ROOT = ROOT / "client-ui" / "src" / "desktopMain"
 SCAN_EXT = ".kt"
-EXCLUDE_PATH_FRAGMENTS = ("/build/", "/i18n/")
+EXCLUDE_DIR_PARTS = {"build", "i18n"}
+
+# An i18n-allow marker on a line exempts it (escape hatch / false-positive
+# override). Convention: put it in a trailing comment -- "// i18n-allow".
+ALLOW_MARKER = "i18n-allow"
 
 # A string literal containing at least one Cyrillic code point. The boundary
 # chars (U+0400..U+04FF, the Russian alphabet plus YO) are built with chr()
@@ -60,6 +68,8 @@ def scan_file(path: Path) -> list[Hit]:
     try:
         with path.open("r", encoding="utf-8", errors="replace") as fh:
             for line_no, line in enumerate(fh, start=1):
+                if ALLOW_MARKER in line:
+                    continue
                 if COMMENT_LINE.match(line):
                     continue
                 if ANNOTATION_CTX.search(line):
@@ -71,14 +81,16 @@ def scan_file(path: Path) -> list[Hit]:
     return hits
 
 
+def _excluded(path: Path) -> bool:
+    # Dir-part membership, not substring -- portable across separators
+    # (POSIX "/i18n/" vs Windows "\\i18n\\").
+    return any(part in EXCLUDE_DIR_PARTS for part in path.parts)
+
+
 def walk_targets() -> list[Path]:
     if not SCAN_ROOT.is_dir():
         return []
-    return [
-        p
-        for p in SCAN_ROOT.rglob("*" + SCAN_EXT)
-        if not any(frag in str(p) for frag in EXCLUDE_PATH_FRAGMENTS)
-    ]
+    return [p for p in SCAN_ROOT.rglob("*" + SCAN_EXT) if not _excluded(p)]
 
 
 def main() -> int:
@@ -104,9 +116,7 @@ def main() -> int:
                 targets.append(p)
             elif p.is_dir():
                 targets.extend(
-                    sub
-                    for sub in p.rglob("*" + SCAN_EXT)
-                    if not any(frag in str(sub) for frag in EXCLUDE_PATH_FRAGMENTS)
+                    sub for sub in p.rglob("*" + SCAN_EXT) if not _excluded(sub)
                 )
     else:
         targets = walk_targets()
@@ -123,7 +133,7 @@ def main() -> int:
     print("Route each through LocalStrings: add a key to AppStrings + en/ru/de, render s.key.")
     print()
     for hit in hits:
-        rel = hit.path.relative_to(ROOT)
+        rel = hit.path.relative_to(ROOT) if hit.path.is_relative_to(ROOT) else hit.path
         print(f"  {rel}:{hit.line_no}: {hit.line.strip()[:120]}")
     print()
 
