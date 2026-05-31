@@ -48,6 +48,8 @@ import hivens.ui.components.LaunchControlPanel
 import hivens.ui.components.ServerGrid
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.notifications.LaunchTarget
+import hivens.ui.notifications.drivers.LaunchDriver
 import hivens.ui.theme.CelestiaTheme
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
@@ -71,6 +73,7 @@ fun HomeClassicContent(instance: WidgetInstance) {
     val settingsService: ISettingsService = koinInject()
     val profileManager: ProfileManager = koinInject()
     val controller: LauncherController = koinInject()
+    val launchDriver: LaunchDriver = koinInject()
     val autoSyncService: AutoSyncService = koinInject()
     val protocolConfig: hivens.launcher.network.ServerProtocolConfig = koinInject()
     val s = LocalStrings.current
@@ -202,6 +205,7 @@ fun HomeClassicContent(instance: WidgetInstance) {
                         onLaunch = { srv ->
                             selectedServerState = srv
                             ctx.onServerSelected(srv)
+                            launchDriver.observe(LaunchTarget.Server(srv))
                             controller.launch(ctx.session, srv, ctx.onSessionUpdated)
                         },
                         onSettings  = { ctx.onOpenServerSettings(it) },
@@ -245,7 +249,12 @@ fun HomeClassicContent(instance: WidgetInstance) {
         ) {
             LaunchControlPanel(
                 state        = launchState,
-                onLaunch     = { selectedServerState?.let { controller.launch(ctx.session, it, ctx.onSessionUpdated) } },
+                onLaunch     = {
+                    selectedServerState?.let { srv ->
+                        launchDriver.observe(LaunchTarget.Server(srv))
+                        controller.launch(ctx.session, srv, ctx.onSessionUpdated)
+                    }
+                },
                 onAbort      = { controller.abort() },
                 onClearError = { controller.clearError() },
             )

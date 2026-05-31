@@ -58,6 +58,8 @@ import hivens.ui.generated.resources.icon
 import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.i18n.LocaleProvider
+import hivens.ui.notifications.LaunchTarget
+import hivens.ui.notifications.drivers.LaunchDriver
 import hivens.ui.notifications.render.NotificationStack
 import hivens.ui.screens.ConsoleWindow
 import hivens.ui.screens.MigrationScreen
@@ -68,6 +70,7 @@ import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.CustomTheme
 import hivens.ui.theme.ThemeManager
 import hivens.ui.tray.TrayManager
+import hivens.ui.utils.ConsoleSettingsManager
 import hivens.ui.utils.GameConsoleService
 import hivens.launcher.LayoutGraphRepository
 import hivens.widget.api.LocalLayoutGraph
@@ -170,6 +173,7 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
     val serverListService: IServerListService  = koinInject()
     val serverListCache: ServerListCacheStore  = koinInject()
     val controller: LauncherController         = koinInject()
+    val launchDriver: LaunchDriver             = koinInject()
     val credentialsManager: CredentialsManager = koinInject()
     val authService: IAuthService              = koinInject()
     val profileManager: ProfileManager         = koinInject()
@@ -290,6 +294,12 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
         val customizationManager = remember { CustomizationManager(dataDirectory, customizationJson) }
         var customization        by remember { mutableStateOf(customizationManager.load()) }
 
+        // Per-domain console preferences -- the same JSON-file-per-manager
+        // shape as customization / background. Loaded eagerly so the
+        // first render uses persisted font / wrap / gutter choices.
+        val consoleSettingsManager = remember { ConsoleSettingsManager(dataDirectory, customizationJson) }
+        var consoleSettings        by remember { mutableStateOf(consoleSettingsManager.load()) }
+
         // Window chrome icon -- KDE overview / Hyprland switcher / macOS
         // dock want the detailed hi-res asset so they can be downscale
         // cleanly to whatever the compositor demands. The tray builds
@@ -396,8 +406,8 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
                                 // empty, which is its job).
                                 credentials.copy(serverId = server.assetDir)
                             }
+                            launchDriver.observe(LaunchTarget.Server(server))
                             controller.launch(session, server)
-                            SwingUtilities.invokeLater { gameConsole.show() }
                         } catch (e: Exception) {
                             LoggerFactory.getLogger("Main").warn(
                                 "Tray-launched login failed for ${server.assetDir}", e
@@ -487,10 +497,11 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
             }
         }
 
-        // ── Console window ─────────────────────────────────────────────
-        if (gameConsole.shouldShowConsole) {
-            ConsoleWindow(isDarkTheme = isDarkTheme, onClose = { gameConsole.hide() })
-        }
+        // Console window moved inside the CompositionLocalProvider /
+        // CelestiaTheme block below so it inherits the active theme +
+        // customization (accent override, role overrides). The window
+        // itself is a separate OS surface, but Compose Desktop propagates
+        // CompositionLocals down through the Window composable.
 
         // ── Main window ────────────────────────────────────────────────
         Window(
@@ -619,6 +630,26 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
             } else {
                 styleSpec
             }
+
+            // Console runs as its own OS window but is composed from here so
+            // it inherits LocalCustomization + LocalCelestiaColors via the
+            // Compose composition tree. The internal CelestiaTheme wrap is
+            // what actually projects the palette into the window's surface;
+            // this site only ensures the composition locals are in scope.
+            if (gameConsole.shouldShowConsole) {
+                ConsoleWindow(
+                    isDarkTheme    = isDarkTheme,
+                    onClose        = { gameConsole.hide() },
+                    customTheme    = customTheme,
+                    style          = effectiveStyle,
+                    settings       = consoleSettings,
+                    onSettingsChange = { updated ->
+                        consoleSettings = updated
+                        consoleSettingsManager.save(updated)
+                    },
+                )
+            }
+
             CelestiaTheme(
                 useDarkTheme = isDarkTheme,
                 customTheme  = customTheme,

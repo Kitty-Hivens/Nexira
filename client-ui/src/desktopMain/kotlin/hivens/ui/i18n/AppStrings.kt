@@ -152,7 +152,22 @@ interface AppStrings {
     val consoleWrap: String
     val consoleSaveToFile: String
     val consoleSearchPlaceholder: String
-    val consoleJumpToBottom: String
+    val consoleCopied: String
+    val consoleCommandPlaceholder: String
+    val consoleMenuCopyLine: String
+    val consoleMenuCopySelection: String
+    val consoleSelectAll: String
+    val consoleSettingsLabel: String
+    val consoleShowGutter: String
+    val consoleHideGutter: String
+    val consoleShowTimestamps: String
+    val consoleHideTimestamps: String
+    val consoleStatusFollow: String
+    val consoleStatusPaused: String
+    fun consoleStatusLines(filtered: Int, total: Int): String
+    fun consoleStatusLinesWithHistory(filtered: Int, total: Int, history: Int): String
+    fun consoleStatusFiltered(warn: Int, error: Int): String
+    fun consoleStatusMatch(current: Int, total: Int): String
 
     // --- Tray ---
     val trayConsole: String
@@ -665,6 +680,9 @@ interface AppStrings {
     val packDetailTabContent: String
     val packDetailTabFiles: String
     val packDetailTabWorlds: String
+    val packDetailTabLogs: String
+    val consoleSessionLive: String
+    fun consoleSessionPickerLabel(current: String): String
 
     // ── Library / PackDetail / Hero + Play bar + Not found ──────────────
     val packDetailReadyTitle: String

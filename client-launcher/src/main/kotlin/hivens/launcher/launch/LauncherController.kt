@@ -32,6 +32,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Instant
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.slf4j.MDCContext
 
 /**
@@ -136,7 +137,6 @@ class LauncherController(
     private fun fail(reason: LaunchError, cause: Throwable? = null) {
         _state.value = LaunchState.Error(reason, cause)
         emit(LaunchLogEvent.Error(reason))
-        emit(LaunchLogEvent.RequestConsoleVisible)
     }
 
     private var launchJob: Job? = null
@@ -149,6 +149,23 @@ class LauncherController(
      */
     @Volatile private var runningProcess: Process? = null
     private val launchLock = Any()
+
+    /**
+     * Per-launch abort token. Each launch installs a fresh
+     * AtomicBoolean here and captures it in its coroutine; [abort] flips
+     * whatever token is current. The launch coroutine -- parked in the
+     * blocking `process.waitFor()`, which resumes with SIGTERM code 143
+     * once the process is destroyed -- checks ITS OWN captured token to
+     * tell a user stop from a crash.
+     *
+     * A single shared flag would race: aborting game A then immediately
+     * launching B (allowed, because abort sets state Idle synchronously
+     * while A's coroutine is still blocked in waitFor) would let B reset
+     * the flag before A's exit handler reads it, so A would falsely
+     * report a crash and clobber B's state. A per-launch token each
+     * coroutine reads in isolation removes the race.
+     */
+    @Volatile private var currentAbortToken: AtomicBoolean? = null
 
     fun launch(
         currentSession: SessionData,
@@ -175,6 +192,8 @@ class LauncherController(
         // dispatcher hop the launch flow takes, including the downstream
         // FileDownloadService coroutines and LauncherService.
         val launchId = UUID.randomUUID().toString().take(8)
+        val abortToken = AtomicBoolean(false)
+        currentAbortToken = abortToken
 
         launchJob = appScope.launch(MDCContext(mapOf("launchId" to launchId))) {
             val settings = settingsService.getSettings()
@@ -183,7 +202,7 @@ class LauncherController(
             try {
                 _state.value = LaunchState.Prepare(PrepareStage.INIT, 0.0f)
 
-                emit(LaunchLogEvent.SessionStarted)
+                emit(LaunchLogEvent.SessionStarted(server.assetDir, server.name))
                 emit(LaunchLogEvent.AppBanner)
                 emit(LaunchLogEvent.TargetServer(server.name, isOffline))
 
@@ -338,7 +357,7 @@ class LauncherController(
                 runningProcess = null
                 ActionRing.record("Game exited: ${server.name} (code $exitCode)")
 
-                if (exitCode != 0) {
+                if (exitCode != 0 && !abortToken.get()) {
                     fail(LaunchError.ExitCode(exitCode))
                 } else {
                     _state.value = LaunchState.Idle
@@ -390,6 +409,8 @@ class LauncherController(
         }
 
         val launchId = UUID.randomUUID().toString().take(8)
+        val abortToken = AtomicBoolean(false)
+        currentAbortToken = abortToken
 
         launchJob = appScope.launch(MDCContext(mapOf("launchId" to launchId))) {
             val settings = settingsService.getSettings()
@@ -397,7 +418,7 @@ class LauncherController(
             try {
                 _state.value = LaunchState.Prepare(PrepareStage.INIT, 0.0f)
 
-                emit(LaunchLogEvent.SessionStarted)
+                emit(LaunchLogEvent.SessionStarted(packInstance.id, packInstance.displayName))
                 emit(LaunchLogEvent.AppBanner)
                 // Mirror packs are public read; surfacing the offline
                 // flag here would be misleading -- pack-centric Play
@@ -487,7 +508,7 @@ class LauncherController(
                 runningProcess = null
                 ActionRing.record("Game exited: ${refreshedInstance.displayName} (code $exitCode)")
 
-                if (exitCode != 0) {
+                if (exitCode != 0 && !abortToken.get()) {
                     fail(LaunchError.ExitCode(exitCode))
                 } else {
                     _state.value = LaunchState.Idle
@@ -633,6 +654,7 @@ class LauncherController(
      * spawn a second game.
      */
     fun abort() {
+        currentAbortToken?.set(true)
         val proc = runningProcess
         runningProcess = null
         runCatching { proc?.destroy() }

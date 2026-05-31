@@ -33,9 +33,9 @@ import hivens.launcher.launch.LaunchState
 import hivens.launcher.launch.LauncherController
 import hivens.ui.AppState
 import hivens.ui.customization.glassSurfaceAlpha
-import hivens.ui.notifications.drivers.PackLaunchDriver
+import hivens.ui.notifications.LaunchTarget
+import hivens.ui.notifications.drivers.LaunchDriver
 import hivens.ui.theme.CelestiaTheme
-import hivens.ui.utils.GameConsoleService
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
 import hivens.widget.model.Widget
@@ -59,8 +59,7 @@ fun HomeNewQuickLaunch(instance: WidgetInstance) {
     val ctx = LocalHomeNewContext.current
     val repo: IPackRepository = koinInject()
     val controller: LauncherController = koinInject()
-    val launchDriver: PackLaunchDriver = koinInject()
-    val gameConsole: GameConsoleService = koinInject()
+    val launchDriver: LaunchDriver = koinInject()
     val all by remember { repo.observe() }.collectAsState(initial = emptyList())
     val launchState by controller.state.collectAsState()
 
@@ -112,8 +111,7 @@ fun HomeNewQuickLaunch(instance: WidgetInstance) {
             Button(
                 onClick = {
                     val s = session ?: return@Button
-                    launchDriver.observe(target)
-                    gameConsole.show()
+                    launchDriver.observe(LaunchTarget.Pack(target))
                     controller.launchPackInstance(s, target)
                 },
                 enabled = canLaunch,

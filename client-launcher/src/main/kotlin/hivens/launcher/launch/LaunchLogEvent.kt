@@ -20,8 +20,17 @@ import hivens.core.data.LauncherLogType
  * no new enum is introduced.
  */
 sealed class LaunchLogEvent {
-    /** Opens a new per-session game-output log file and adds the divider. */
-    data object SessionStarted : LaunchLogEvent()
+    /**
+     * Opens a new per-session game-output log file and adds the divider.
+     * Carries the launch target's stable id + display label so the
+     * console can name the session file per-pack (game-output-<id>-*.log)
+     * and scope the PackDetail Logs tab to its own pack's sessions.
+     * Null id falls back to an unscoped session file.
+     */
+    data class SessionStarted(
+        val targetId: String? = null,
+        val targetLabel: String? = null,
+    ) : LaunchLogEvent()
 
     /** First info line for a new session: `"<AppName>..."`. */
     data object AppBanner : LaunchLogEvent()
@@ -49,11 +58,10 @@ sealed class LaunchLogEvent {
     /**
      * Terminal-state error has just been announced via [LaunchState.Error].
      * Emitted alongside the state change so the UI's console pane can show
-     * the localized reason; backend stays free of i18n. Pairs with
-     * [RequestConsoleVisible] in every failure path.
+     * the localized reason; backend stays free of i18n. The console is no
+     * longer auto-shown on error -- the right-panel notification carries
+     * the diagnosis and a "Show console" action the user invokes when
+     * (and only when) they want the full log.
      */
     data class Error(val reason: LaunchError) : LaunchLogEvent()
-
-    /** Controller asks the UI to make the console window visible (post-error / launch). */
-    data object RequestConsoleVisible : LaunchLogEvent()
 }
