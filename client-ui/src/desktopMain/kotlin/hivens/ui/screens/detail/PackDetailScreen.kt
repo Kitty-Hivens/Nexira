@@ -212,10 +212,11 @@ private fun PackLogsTab(packId: String, instanceDir: Path, dataDir: Path) {
     val consoleSettingsManager = remember { ConsoleSettingsManager(dataDir, consoleJson) }
     var consoleSettings by remember { mutableStateOf(consoleSettingsManager.load()) }
 
-    // Re-list when a session starts / ends: a new captured file appears
-    // and the instance's latest.log gets rewritten. currentSessionPackId
-    // flips on every startSession, so it doubles as the refresh trigger.
-    val sessionEpoch = gameConsole.currentSessionPackId
+    // Re-list when a session starts: a new captured file appears and the
+    // instance's latest.log gets rewritten. Keyed on the monotonic
+    // session counter, NOT the pack id -- relaunching the SAME pack
+    // keeps the id but must still refresh the list.
+    val sessionEpoch = gameConsole.sessionStartCount
     val logFiles = remember(packId, instanceDir, sessionEpoch) {
         // Instance's own logs first (latest.log pinned to the top), then
         // the launcher's redacted captures for this pack.

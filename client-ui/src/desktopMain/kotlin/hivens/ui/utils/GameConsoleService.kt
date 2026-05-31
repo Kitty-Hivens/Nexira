@@ -104,14 +104,14 @@ class GameConsoleService(
     private var sessionFile: File? = null
 
     /**
-     * Pack/server id of the session currently feeding [logs]. The
-     * PackDetail Logs tab reads this to decide whether the live buffer
-     * belongs to the pack being viewed (-> show live) or some other
-     * pack ran more recently (-> the tab loads its own pack's last
-     * session file instead). Observable so the tab re-resolves when a
-     * new session starts. Null before the first session.
+     * Monotonic session-start counter. Bumped on every [startSession],
+     * regardless of which pack launched. The PackDetail Logs tab keys
+     * its file-list refresh on this: keying on the pack id would miss a
+     * relaunch of the SAME pack (same id, no change), leaving the new
+     * captured file + rewritten latest.log hidden until something else
+     * forced recomposition. Observable so the tab re-lists reactively.
      */
-    var currentSessionPackId by mutableStateOf<String?>(null)
+    var sessionStartCount by mutableIntStateOf(0)
         private set
 
     private var sessionWriter: BufferedWriter? = null
@@ -133,7 +133,7 @@ class GameConsoleService(
         paths.logsDir.toFile().also { it.mkdirs() }
 
     fun startSession(packId: String? = null, packLabel: String? = null) {
-        currentSessionPackId = packId
+        sessionStartCount += 1
         slotEntries.clear()
         synchronized(writerLock) {
             sessionWriter?.close()

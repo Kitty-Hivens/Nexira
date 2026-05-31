@@ -13,11 +13,15 @@ import hivens.ui.utils.GameConsoleService
 import hivens.ui.utils.LogType
 import kotlinx.coroutines.flow.SharedFlow
 
-// Launcher-emitted progress lines: "<Word> <current>/<total>[: detail]".
-// Capture group 1 is the leading word -> the collapse slot key. Game
-// stdout never matches (it leads with "[Thread/LEVEL]:"), so this only
-// folds our own provisioning ticks.
-private val PROGRESS_LINE = Regex("""^([A-Za-z]+) \d+/\d+(:.*)?$""")
+// Launcher-emitted provisioning progress: an allowlisted leading word
+// + "<current>/<total>[: detail]". Capture group 1 is the collapse slot
+// key. The word is allowlisted (not any [A-Za-z]+) on purpose: game /
+// mod stdout prints bare progress like "Loading 5/100" or "Baking 4/16"
+// that would otherwise be folded into a slot AND dropped from the
+// archive (appendOrUpdate does not mirror to the session file). Only
+// the launcher's own streams belong here; add new prefixes as they are
+// introduced launcher-side.
+private val PROGRESS_LINE = Regex("""^(Runtime) \d+/\d+(:.*)?$""")
 
 /**
  * Drains [LauncherController.events] into [GameConsoleService] with
