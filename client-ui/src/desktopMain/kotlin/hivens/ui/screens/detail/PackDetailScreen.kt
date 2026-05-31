@@ -180,63 +180,60 @@ fun PackDetailScreen(
                 0 -> ContentTabPane(instance = pack)
                 1 -> FileBrowserPane(rootDir = instanceDir, modifier = Modifier.padding(16.dp))
                 2 -> WorldsTabPane(instanceDir = instanceDir)
-                3 -> PackLogsTab(packId = pack.id, dataDir = paths.dataDir)
+                3 -> PackLogsTab(packId = pack.id, instanceDir = instanceDir, dataDir = paths.dataDir)
             }
         }
     }
 }
 
 /**
- * Logs tab body: a session picker over the console, scoped to this pack.
+ * Logs tab body: a "General" live console plus a picker over every log
+ * file relevant to this pack.
  *
- * Default source resolution:
- * - this pack is the one currently running -> the live buffer.
- * - otherwise -> this pack's most recent session file (read-only),
- *   or an empty state when the pack has never been launched.
+ * - "General" -> the launcher's live console buffer (the same one the
+ *   standalone window tails). Default selection.
+ * - The instance's own logs (logs/latest.log, dated logs, crash
+ *   reports) -- these are the logs that were "already in the pack", and
+ *   they are what a user reaches for. Listed by full filename.
+ * - The launcher's redacted stdout captures for this pack.
  *
- * The picker lets the user switch between the live session (when
- * applicable) and any past session file for THIS pack -- so launching
- * a different pack can never surface its log here. Files are named
- * per-pack by GameConsoleService.startSession, and sessionFilesFor
- * filters to this pack's prefix.
+ * Picking any file opens a read-only file-backed view. Files are read
+ * off-thread and run through the redactor so an external latest.log is
+ * as safe to screenshot as our own capture.
  *
  * ConsoleSettings load through the same manager AppShell + the
  * standalone window use, so font / wrap / gutter / timestamps stay one
  * source of truth across every console surface.
  */
 @Composable
-private fun PackLogsTab(packId: String, dataDir: Path) {
+private fun PackLogsTab(packId: String, instanceDir: Path, dataDir: Path) {
     val gameConsole: GameConsoleService = koinInject()
     val consoleJson = remember { Json { ignoreUnknownKeys = true; encodeDefaults = true } }
     val consoleSettingsManager = remember { ConsoleSettingsManager(dataDir, consoleJson) }
     var consoleSettings by remember { mutableStateOf(consoleSettingsManager.load()) }
 
-    val livePackId = gameConsole.currentSessionPackId
-    val isThisPackLive = livePackId == packId
+    // Re-list when a session starts / ends: a new captured file appears
+    // and the instance's latest.log gets rewritten. currentSessionPackId
+    // flips on every startSession, so it doubles as the refresh trigger.
+    val sessionEpoch = gameConsole.currentSessionPackId
+    val logFiles = remember(packId, instanceDir, sessionEpoch) {
+        // Instance's own logs first (latest.log pinned to the top), then
+        // the launcher's redacted captures for this pack.
+        listInstanceLogs(instanceDir) + gameConsole.capturedSessionFiles(packId)
+    }
 
-    // Re-list when the live session id flips (a launch / exit changes
-    // which files exist + whether live is available for this pack).
-    val sessionFiles = remember(packId, livePackId) { gameConsole.sessionFilesFor(packId) }
-
-    // null selection = "live". When this pack isn't the running one the
-    // null selection resolves to the newest file instead (see below).
+    // null = the "General" live launcher console; a File = a read-only view.
     var selectedFile by remember(packId) { mutableStateOf<File?>(null) }
 
-    // The effective file to show: explicit selection wins; else, when
-    // this pack isn't live, fall back to the newest session file.
-    val effectiveFile = selectedFile ?: if (!isThisPackLive) sessionFiles.firstOrNull()?.file else null
-
-    // Read the chosen file off the UI thread; live source needs no read.
-    val fileEntries by produceState<List<LogEntry>?>(null, effectiveFile) {
-        val f = effectiveFile
+    val fileEntries by produceState<List<LogEntry>?>(null, selectedFile) {
+        val f = selectedFile
         value = if (f == null) null
-                else withContext(Dispatchers.IO) { gameConsole.readSessionFile(f) }
+                else withContext(Dispatchers.IO) { gameConsole.readLogFile(f) }
     }
 
     val source: ConsoleSource? = when {
-        effectiveFile == null && isThisPackLive -> ConsoleSource.Live
-        effectiveFile != null                   -> fileEntries?.let { ConsoleSource.FileBacked(it) }
-        else                                     -> null  // no live, no files
+        selectedFile == null -> ConsoleSource.Live
+        else                 -> fileEntries?.let { ConsoleSource.FileBacked(it) }  // null while loading
     }
 
     Surface(
@@ -249,23 +246,19 @@ private fun PackLogsTab(packId: String, dataDir: Path) {
     ) {
         Column(Modifier.fillMaxSize()) {
             LogSessionPicker(
-                isThisPackLive = isThisPackLive,
-                sessionFiles   = sessionFiles,
-                selectedFile   = effectiveFile,
-                onSelectLive   = { selectedFile = null },
-                onSelectFile   = { selectedFile = it },
+                files           = logFiles,
+                selectedFile    = selectedFile,
+                onSelectGeneral = { selectedFile = null },
+                onSelectFile    = { selectedFile = it },
             )
             HorizontalDivider(color = CelestiaTheme.colors.outline.copy(alpha = 0.3f))
             Box(Modifier.weight(1f).fillMaxWidth()) {
-                when (val src = source) {
-                    null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(
-                            text  = LocalStrings.current.consoleNoSessionsForPack,
-                            color = CelestiaTheme.colors.textSecondary,
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                    }
-                    else -> ConsoleContent(
+                val src = source
+                if (src == null) {
+                    // A file is selected but still reading -- brief flash.
+                    Box(Modifier.fillMaxSize())
+                } else {
+                    ConsoleContent(
                         settings = consoleSettings,
                         onSettingsChange = { new ->
                             consoleSettings = new
@@ -279,30 +272,46 @@ private fun PackLogsTab(packId: String, dataDir: Path) {
     }
 }
 
+// List the instance's own log files, latest.log pinned first, then by
+// recency: the logs dir's .log files plus crash-reports .txt / .log.
+// These are the logs the game itself wrote -- the ones a user expects
+// to find here.
+private fun listInstanceLogs(instanceDir: Path): List<File> {
+    val out = mutableListOf<File>()
+    runCatching {
+        instanceDir.resolve("logs").toFile()
+            .listFiles { f -> f.isFile && f.name.endsWith(".log") }
+            ?.let { out.addAll(it) }
+    }
+    runCatching {
+        instanceDir.resolve("crash-reports").toFile()
+            .listFiles { f -> f.isFile && (f.name.endsWith(".txt") || f.name.endsWith(".log")) }
+            ?.let { out.addAll(it) }
+    }
+    return out.sortedWith(
+        compareByDescending<File> { it.name == "latest.log" }
+            .thenByDescending { it.lastModified() },
+    )
+}
+
 /**
- * Compact session selector for the Logs tab. A single button shows the
- * current selection ("Live session" or a file timestamp) and opens a
- * dropdown of this pack's sessions, newest first. The live entry is
- * offered only while this pack is the running one.
+ * Compact log selector for the Logs tab. The collapsed button shows the
+ * current selection ("General" or a full filename); the dropdown lists
+ * General + every file by full name, newest first, with the active
+ * entry tinted in the accent colour (no ambiguous asterisk).
  */
 @Composable
 private fun LogSessionPicker(
-    isThisPackLive: Boolean,
-    sessionFiles: List<GameConsoleService.SessionLogFile>,
+    files: List<File>,
     selectedFile: File?,
-    onSelectLive: () -> Unit,
+    onSelectGeneral: () -> Unit,
     onSelectFile: (File) -> Unit,
 ) {
     val s = LocalStrings.current
     val colors = CelestiaTheme.colors
     var open by remember { mutableStateOf(false) }
 
-    val currentLabel = when {
-        selectedFile == null && isThisPackLive -> s.consoleSessionLive
-        selectedFile != null                   -> selectedFile.name
-            .substringAfterLast('-').removeSuffix(".log").ifBlank { selectedFile.name }
-        else                                   -> s.consoleSessionNone
-    }
+    val currentLabel = selectedFile?.name ?: s.consoleSessionLive
 
     Box(Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
         Row(
@@ -326,17 +335,28 @@ private fun LogSessionPicker(
             )
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            if (isThisPackLive) {
+            DropdownMenuItem(
+                text    = {
+                    Text(
+                        s.consoleSessionLive,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize   = 11.sp,
+                        color      = if (selectedFile == null) colors.primary else colors.textPrimary,
+                    )
+                },
+                onClick = { onSelectGeneral(); open = false },
+            )
+            files.forEach { f ->
                 DropdownMenuItem(
-                    text    = { Text(s.consoleSessionLive, fontFamily = FontFamily.Monospace, fontSize = 11.sp) },
-                    onClick = { onSelectLive(); open = false },
-                )
-            }
-            sessionFiles.forEach { sf ->
-                val label = if (sf.isLive) "${sf.label}  *" else sf.label
-                DropdownMenuItem(
-                    text    = { Text(label, fontFamily = FontFamily.Monospace, fontSize = 11.sp) },
-                    onClick = { onSelectFile(sf.file); open = false },
+                    text    = {
+                        Text(
+                            f.name,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize   = 11.sp,
+                            color      = if (f == selectedFile) colors.primary else colors.textPrimary,
+                        )
+                    },
+                    onClick = { onSelectFile(f); open = false },
                 )
             }
         }

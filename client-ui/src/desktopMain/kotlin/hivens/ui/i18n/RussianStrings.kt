@@ -653,10 +653,8 @@ object RussianStrings : AppStrings {
     override val packDetailTabFiles             = "Файлы"
     override val packDetailTabWorlds            = "Миры"
     override val packDetailTabLogs              = "Логи"
-    override val consoleSessionLive             = "Текущая сессия"
-    override val consoleSessionNone             = "нет сессий"
-    override val consoleNoSessionsForPack       = "Для этой сборки ещё нет логов. Запустите её, и сессия появится здесь."
-    override fun consoleSessionPickerLabel(current: String) = "Сессия: $current"
+    override val consoleSessionLive             = "Общий"
+    override fun consoleSessionPickerLabel(current: String) = "Лог: $current"
 
     override val packDetailReadyTitle           = "Готов к запуску"
     override fun packDetailInstanceDirHint(dirName: String) = "Папка экземпляра: instances/$dirName"

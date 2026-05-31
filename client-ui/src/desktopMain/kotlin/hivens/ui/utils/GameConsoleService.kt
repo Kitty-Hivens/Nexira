@@ -356,54 +356,55 @@ class GameConsoleService(
     }
 
     /**
-     * One past session log file for a pack, surfaced by the Logs tab's
-     * file picker. [label] is a human-friendly timestamp pulled from
-     * the file name; [isLive] marks the file the current in-memory
-     * session is still writing to.
+     * The launcher's own captured-session files for a pack, newest
+     * first. Matches the `game-output-<sanitized-packId>-<stamp>.log`
+     * naming from [startSession]. These are the redacted stdout/stderr
+     * captures (distinct from the game's own logs/ files); the Logs tab
+     * lists them alongside the instance's real logs.
      */
-    data class SessionLogFile(
-        val file: File,
-        val label: String,
-        val isLive: Boolean,
-    )
-
-    /**
-     * List a pack's past session log files, newest first. Matches the
-     * `game-output-<sanitized-packId>-<stamp>.log` naming from
-     * [startSession]. The file currently being written (if its pack
-     * matches) is flagged [SessionLogFile.isLive] so the picker can
-     * label + default to it.
-     */
-    fun sessionFilesFor(packId: String): List<SessionLogFile> {
+    fun capturedSessionFiles(packId: String): List<File> {
         val prefix = "game-output-${sanitizeId(packId)}-"
-        val live = sessionFile
         return runCatching {
             logsDir().listFiles { f ->
                 f.isFile && f.name.startsWith(prefix) && f.name.endsWith(".log")
-            }?.sortedByDescending { it.lastModified() }?.map { f ->
-                SessionLogFile(
-                    file   = f,
-                    label  = f.name.removePrefix(prefix).removeSuffix(".log"),
-                    isLive = live != null && f.absolutePath == live.absolutePath,
-                )
-            }.orEmpty()
+            }?.sortedByDescending { it.lastModified() }?.toList().orEmpty()
         }.getOrDefault(emptyList())
     }
 
     /**
-     * Read an entire session log file into LogEntry list (read-only
-     * file-backed view for the Logs tab picker). Severity is restored
-     * via [parseFileLine]. Large files are bounded by [limit] from the
-     * tail so a multi-hundred-MB crash log doesn't blow up memory; the
-     * default mirrors the in-memory window cap.
+     * Read a log file into a LogEntry list for a read-only file-backed
+     * view. Works for BOTH our captured-session format (`[ts] [WARN]
+     * text`) and a game's own log (`[ts] [Thread/WARN]: text`): our
+     * marker is restored by [parseFileLine], and an absent marker falls
+     * back to scanning the line for a Minecraft-style `/WARN]` /
+     * `/ERROR]` / `/FATAL]` level so latest.log + crash reports colour
+     * sensibly too. Every line is run through [Redactor] on read -- the
+     * game's own logs are not redacted on disk, so this keeps a
+     * screenshot / copy of an external log as safe to share as our
+     * captured buffer. Tail-bounded by [limit] so a huge crash log does
+     * not blow up memory.
      */
-    fun readSessionFile(file: File, limit: Int = maxLines): List<LogEntry> {
+    fun readLogFile(file: File, limit: Int = maxLines): List<LogEntry> {
         if (!file.exists()) return emptyList()
         return runCatching {
             val lines = file.bufferedReader().useLines { seq -> seq.toList() }
             val tail = if (lines.size > limit) lines.subList(lines.size - limit, lines.size) else lines
-            tail.map { parseFileLine(it) }
+            tail.map { parseDisplayLine(it) }
         }.getOrDefault(emptyList())
+    }
+
+    /** Redact + parse one external/captured log line for display. */
+    private fun parseDisplayLine(raw: String): LogEntry {
+        val redacted = Redactor.redact(raw)
+        val base = parseFileLine(redacted)
+        if (base.type != LogType.INFO) return base
+        // No marker of ours -> sniff a Minecraft logger level token.
+        val mc = when {
+            base.text.contains("/ERROR]") || base.text.contains("/FATAL]") -> LogType.ERROR
+            base.text.contains("/WARN]")                                   -> LogType.WARN
+            else                                                           -> LogType.INFO
+        }
+        return if (mc == base.type) base else base.copy(type = mc)
     }
 
     companion object {

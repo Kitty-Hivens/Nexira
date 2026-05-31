@@ -682,8 +682,6 @@ interface AppStrings {
     val packDetailTabWorlds: String
     val packDetailTabLogs: String
     val consoleSessionLive: String
-    val consoleSessionNone: String
-    val consoleNoSessionsForPack: String
     fun consoleSessionPickerLabel(current: String): String
 
     // ── Library / PackDetail / Hero + Play bar + Not found ──────────────
