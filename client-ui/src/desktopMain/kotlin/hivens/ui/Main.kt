@@ -9,7 +9,7 @@ import hivens.ui.identity.SkinManager
 import hivens.ui.notifications.IndicationCenter
 import hivens.ui.notifications.NotificationCenter
 import hivens.ui.notifications.SessionRegistry
-import hivens.ui.notifications.drivers.PackLaunchDriver
+import hivens.ui.notifications.drivers.LaunchDriver
 import hivens.ui.puppet.PuppetServerLoader
 import hivens.config.Storage
 import hivens.ui.audio.AudioPlayer
@@ -70,15 +70,16 @@ val uiModule = module {
     }
 
     // Notification subsystem: data-only state holders (Center +
-    // Registry) are pure singletons; PackLaunchDriver bridges them
-    // to LauncherController, registered as a regular single so the
-    // UI's per-launch click can resolve it via koinInject.
+    // Registry) are pure singletons; LaunchDriver bridges them to
+    // LauncherController for both pack and SC-server flows (the
+    // observer is keyed by LaunchTarget so the same singleton handles
+    // both kinds of launches without aliasing notifications).
     single { NotificationCenter() }
     single { IndicationCenter() }
     single { SessionRegistry(appScope = get()) }
     single {
         val settingsService: ISettingsService = get()
-        PackLaunchDriver(
+        LaunchDriver(
             controller      = get(),
             notifications   = get(),
             indications     = get(),

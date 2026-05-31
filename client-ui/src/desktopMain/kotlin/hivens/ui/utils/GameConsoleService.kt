@@ -1,124 +1,374 @@
 package hivens.ui.utils
 
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import hivens.core.logging.Redactor
 import hivens.launcher.platform.PlatformPaths
 import org.slf4j.LoggerFactory
+import java.io.BufferedWriter
 import java.io.File
 import java.io.FileWriter
-import java.io.BufferedWriter
 import java.text.SimpleDateFormat
-import java.util.*
+import java.util.Date
 
 private val log = LoggerFactory.getLogger("GameConsoleService")
 
 /**
- * Holds the in-memory console buffer (snapshot-state list backing the
- * `ConsoleWindow` composable), mirrors every entry to a per-session
- * `game-output-*.log` file, and exposes `saveToFile` for one-off
- * exports.
+ * Holds the live in-memory console buffer + mirrors each entry to a
+ * per-session `game-output-*.log` file. The in-memory buffer is a
+ * sliding window: only the latest [maxLines] entries are kept; older
+ * entries drop off the front but remain on disk. UI can ask for
+ * [loadHistoryBefore] to page the older entries back into the window
+ * (Phase 8.5 of the console rework -- see
+ * [[project_console_sliding_window]]).
  *
- * Constructor-injected [paths] rather than a static `PlatformPaths.system()`
- * call so the singleton honors a mid-session data-dir migration
- * (`DataDirMover`) -- otherwise the in-memory writer would keep landing
- * lines in the old directory while everything else writes to the new one.
+ * Why memory-bounded:
+ *
+ * The AnnotatedString rebuild in `ConsoleWindow.buildConsoleAnnotated`
+ * walks every entry in the window on every recomposition; if the
+ * buffer grew unbounded, a long modded session would blow up the
+ * rebuild cost. The disk file already exists per session (one line per
+ * append, redacted at write time so safe to read back) and is the
+ * obvious place to park history.
+ *
+ * Constructor-injected [paths] rather than a static
+ * `PlatformPaths.system()` call so the singleton honors a mid-session
+ * data-dir migration (`DataDirMover`) -- otherwise the in-memory writer
+ * would keep landing lines in the old directory while everything else
+ * writes to the new one.
  *
  * One instance is registered as a Koin singleton in the UI module and
- * shared between composables (`AppLayout`, `ConsoleWindow`, application
- * shell) and the launcher controller. The snapshot-state list and
- * `mutableStateOf` flag survive recomposition naturally because Compose
- * tracks the same instance everywhere.
+ * shared between composables (`AppLayout`, `ConsoleWindow`, the
+ * launcher controller). The snapshot-state list and `mutableStateOf`
+ * flag survive recomposition naturally because Compose tracks the same
+ * instance everywhere.
  */
 class GameConsoleService(
     private val paths: PlatformPaths,
 ) {
     val logs = mutableStateListOf<LogEntry>()
 
+    /**
+     * Bumped on every content mutation -- append, in-place
+     * [appendOrUpdate], [prependHistory], clear. The console's
+     * rebuild coalescer observes THIS, not `logs.size`: an
+     * [appendOrUpdate] that overwrites a line in place leaves the size
+     * unchanged, so a size-keyed snapshotFlow would never re-render the
+     * updated progress line.
+     */
+    var revision by mutableIntStateOf(0)
+        private set
+
     var shouldShowConsole by mutableStateOf(false)
 
-    // Configurable max lines
-    var maxLines: Int = 2000
+    /**
+     * Command sink: set by the [LaunchDriver] when a game process
+     * spawns, cleared on error / clean exit. UI calls [sendCommand]
+     * which routes through the sink to the process stdin. The state
+     * field is observable so the input row can show / hide itself
+     * without polling.
+     *
+     * Backed by mutableStateOf so the canSendCommands flag is a
+     * regular Compose state read; the actual sink is the lambda the
+     * driver stuffs in. Null = no game running, sendCommand is a
+     * no-op.
+     */
+    private var _commandSink by mutableStateOf<((String) -> Unit)?>(null)
+    val canSendCommands: Boolean get() = _commandSink != null
+
+    /**
+     * In-memory sliding-window cap. ConsoleSettings.maxInMemoryLines
+     * drives this at runtime; the default is 5000 to give plenty of
+     * scrollback in memory before the user has to page back from disk.
+     * Trim runs on every append when size exceeds the cap.
+     */
+    var maxLines: Int = 5000
+
+    /**
+     * Count of entries that were dropped off the front of [logs] to
+     * keep within [maxLines]. Equal to the number of older entries
+     * available via [loadHistoryBefore]. UI binds the status footer to
+     * this so the user sees "5000 in window / 12340 on disk".
+     */
+    private val _historyOffset = mutableIntStateOf(0)
+    val historyOffset: Int get() = _historyOffset.intValue
+
+    /**
+     * Current session's on-disk file. Set by [startSession]; consulted
+     * by [loadHistoryBefore] to know which file to page from. Null
+     * before the first session start or after [clear].
+     */
+    private var sessionFile: File? = null
+
+    /**
+     * Monotonic session-start counter. Bumped on every [startSession],
+     * regardless of which pack launched. The PackDetail Logs tab keys
+     * its file-list refresh on this: keying on the pack id would miss a
+     * relaunch of the SAME pack (same id, no change), leaving the new
+     * captured file + rewritten latest.log hidden until something else
+     * forced recomposition. Observable so the tab re-lists reactively.
+     */
+    var sessionStartCount by mutableIntStateOf(0)
+        private set
 
     private var sessionWriter: BufferedWriter? = null
     private val fileDateFmt = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss")
+
     /**
-     * Serializes every [sessionWriter] touch. ProcessLogHandler runs two
-     * daemon threads (stdout + stderr pipes) which both call [append]
-     * concurrently; without the lock their byte streams could interleave
-     * inside a single line in `game-output-*.log` and produce garbled
-     * output that's useless for crash forensics. Same lock guards
-     * open/close in [startSession] / [clear] so a write isn't racing the
-     * writer being swapped out.
+     * Serializes every [sessionWriter] / [sessionFile] touch. The
+     * launcher's event collector funnels stdout + stderr through one
+     * SharedFlow today but the writer historically supported direct
+     * concurrent callers; keeping the lock means a future regression
+     * does not corrupt the file's interleaving. Same lock guards
+     * open / close in [startSession] / [clear] so a write isn't racing
+     * the writer being swapped out, and [loadHistoryBefore] takes it
+     * briefly to flush before reading.
      */
     private val writerLock = Any()
 
     private fun logsDir(): File =
         paths.logsDir.toFile().also { it.mkdirs() }
 
-    fun startSession() {
-        // Close previous session writer and open the new one under the same
-        // lock so a concurrent append doesn't see a half-swapped writer.
+    fun startSession(packId: String? = null, packLabel: String? = null) {
+        sessionStartCount += 1
+        slotEntries.clear()
         synchronized(writerLock) {
             sessionWriter?.close()
             sessionWriter = null
+            sessionFile = null
+            _historyOffset.intValue = 0
             try {
-                val fileName = "game-output-${fileDateFmt.format(Date())}.log"
-                sessionWriter = BufferedWriter(FileWriter(File(logsDir(), fileName), true))
+                // Per-pack file name so the Logs tab can list / scope a
+                // pack's own sessions. Unscoped sessions (null packId)
+                // keep the legacy "game-output-<ts>.log" shape. The
+                // sanitized id keeps arbitrary pack ids filesystem-safe.
+                val stamp = fileDateFmt.format(Date())
+                val fileName = if (packId.isNullOrBlank()) {
+                    "game-output-$stamp.log"
+                } else {
+                    "game-output-${sanitizeId(packId)}-$stamp.log"
+                }
+                val file = File(logsDir(), fileName)
+                sessionFile = file
+                sessionWriter = BufferedWriter(FileWriter(file, true))
             } catch (e: Exception) {
                 log.warn("Could not open per-session game-output log; in-memory console still works", e)
             }
         }
 
-        // Divider goes into the snapshot-state list, which has its own
-        // internal synchronization -- doesn't share writerLock.
+        // The divider goes into BOTH the in-memory buffer AND the file
+        // so history reload reconstructs the session marker on the same
+        // line index as the live view.
         val time = SimpleDateFormat("HH:mm:ss").format(Date())
-        logs.add(LogEntry("--------- Session started $time ---------", LogType.DIVIDER, time))
-    }
-
-    fun append(text: String, type: LogType = LogType.INFO) {
-        if (logs.size >= maxLines) {
-            logs.removeAt(0)
-        }
-        // Redact at append time: the in-memory buffer (which feeds ConsoleWindow,
-        // the auto-save file, and `Save to file` exports) NEVER carries raw
-        // accessTokens / passwords / UUIDs. Means a screenshot of the console or
-        // a Ctrl+C copy of a log line is safe to share for support.
-        val entry = LogEntry(Redactor.redact(text), type)
+        val entry = LogEntry("--------- Session started $time ---------", LogType.DIVIDER, time)
         logs.add(entry)
-
-        // Auto-save to disk. BufferedWriter is NOT thread-safe -- two
-        // ProcessLogHandler daemon threads (stdout + stderr) hammer this
-        // concurrently. Serialize on writerLock so a single line lands
-        // atomically.
         synchronized(writerLock) {
             try {
                 sessionWriter?.apply {
-                    write("[${entry.timestamp}] ${entry.text}")
+                    write(entry.text)
                     newLine()
                     flush()
                 }
             } catch (e: Exception) {
-                // Single line per occurrence; this fires on EVERY append so verbose
-                // levels would flood `launcher.log` if the writer is permanently broken.
+                log.debug("Failed to mirror session-start divider to file", e)
+            }
+        }
+    }
+
+    /**
+     * The most recent in-memory entry per progress slot, for
+     * [appendOrUpdate]. Cleared on session start / [clear] so a new
+     * session's progress never mutates the previous session's line.
+     */
+    private val slotEntries = HashMap<String, LogEntry>()
+
+    /**
+     * Append-or-overwrite a single mutable line keyed by [slotId].
+     * First touch appends; subsequent calls replace that line in place
+     * (TTY carriage-return semantics) so a flood of "Runtime 1/1342 ...
+     * 1342/1342" provisioning ticks collapses to one updating line
+     * instead of 1342 separate entries.
+     *
+     * Deliberately NOT mirrored to the session file: these are
+     * launcher-internal provisioning ticks, not game output worth
+     * archiving, and writing every tick would both bloat the file and
+     * break the sliding-window's file/line index alignment. Real
+     * errors during provisioning still arrive via [append] and are
+     * archived normally.
+     */
+    fun appendOrUpdate(slotId: String, text: String, type: LogType = LogType.INFO) {
+        val entry = LogEntry(Redactor.redact(text), type)
+        val prev = slotEntries[slotId]
+        val idx = if (prev != null) logs.indexOf(prev) else -1
+        if (idx >= 0) {
+            logs[idx] = entry
+        } else {
+            logs.add(entry)
+            if (logs.size > maxLines) {
+                logs.removeAt(0)
+                _historyOffset.intValue += 1
+            }
+        }
+        slotEntries[slotId] = entry
+        revision++
+    }
+
+    /**
+     * Prepend paged-in history entries to the front of the live buffer
+     * (sliding-window scroll-up). Routed through the service so the
+     * content [revision] bumps and the console's coalescer re-renders.
+     */
+    fun prependHistory(entries: List<LogEntry>) {
+        if (entries.isEmpty()) return
+        logs.addAll(0, entries)
+        revision++
+    }
+
+    fun append(text: String, type: LogType = LogType.INFO) {
+        // Redact at append time: the in-memory buffer (which feeds
+        // ConsoleWindow, the auto-save file, and `Save to file`
+        // exports) NEVER carries raw accessTokens / passwords / UUIDs.
+        // Means a screenshot of the console or a Ctrl+C copy of a log
+        // line is safe to share for support.
+        val entry = LogEntry(Redactor.redact(text), type)
+        logs.add(entry)
+        if (logs.size > maxLines) {
+            logs.removeAt(0)
+            _historyOffset.intValue += 1
+        }
+        revision++
+
+        synchronized(writerLock) {
+            try {
+                sessionWriter?.apply {
+                    write(formatFileLine(entry))
+                    newLine()
+                    flush()
+                }
+            } catch (e: Exception) {
                 log.debug("Failed to mirror console entry to per-session file", e)
             }
         }
     }
 
-    fun saveToFile(): File? {
+    /**
+     * Read at most [count] entries from the current session's log file,
+     * positioned immediately before the sliding-window start. Returns
+     * them in chronological order (oldest first) so the caller can
+     * prepend to [logs]. Decrements [historyOffset] by the count
+     * actually returned. Returns an empty list when there is no
+     * remaining history, no session file yet, or the file read fails.
+     *
+     * Flush before read: the writer normally flushes on every append,
+     * but the lock guard against [clear] races also ensures the file
+     * is in a consistent state by the time the reader opens it.
+     */
+    fun loadHistoryBefore(count: Int): List<LogEntry> {
+        if (count <= 0) return emptyList()
+        val current = _historyOffset.intValue
+        if (current <= 0) return emptyList()
+        val file = synchronized(writerLock) {
+            sessionWriter?.flush()
+            sessionFile
+        } ?: return emptyList()
+        if (!file.exists()) return emptyList()
+
+        val take = count.coerceAtMost(current)
+        val skip = current - take
+
+        val out = ArrayList<LogEntry>(take)
+        try {
+            file.bufferedReader().use { reader ->
+                // Skip ahead to the window of interest. The disk file
+                // index = entry index since startSession (dividers and
+                // all), so historyOffset N corresponds to file lines
+                // [0..N) being the dropped tail.
+                var skipped = 0
+                while (skipped < skip) {
+                    if (reader.readLine() == null) break
+                    skipped++
+                }
+                var taken = 0
+                while (taken < take) {
+                    val raw = reader.readLine() ?: break
+                    out.add(parseFileLine(raw))
+                    taken++
+                }
+            }
+        } catch (e: Exception) {
+            log.warn("Failed to load history for sliding window", e)
+            return emptyList()
+        }
+
+        if (out.isNotEmpty()) {
+            _historyOffset.intValue -= out.size
+        }
+        return out
+    }
+
+    /**
+     * Serialise a [LogEntry] to its on-disk line. INFO stays
+     * `[HH:MM:SS] text` (the common case -- keeps files clean and
+     * backward-compatible with pre-8.6 logs). WARN / ERROR carry a
+     * marker after the timestamp so [parseFileLine] can restore the
+     * severity colour on reload: `[HH:MM:SS] [WARN] text`. The marker
+     * sits after our timestamp, so a real game line's own
+     * `[Server thread/WARN]` (which appears later in the text) never
+     * collides with it. Dividers write their text verbatim.
+     */
+    private fun formatFileLine(entry: LogEntry): String = when (entry.type) {
+        LogType.DIVIDER -> entry.text
+        LogType.INFO    -> "[${entry.timestamp}] ${entry.text}"
+        LogType.WARN    -> "[${entry.timestamp}] $MARKER_WARN ${entry.text}"
+        LogType.ERROR   -> "[${entry.timestamp}] $MARKER_ERROR ${entry.text}"
+    }
+
+    /**
+     * Best-effort parse of a single file line back into a LogEntry.
+     * Inverse of [formatFileLine]. A `[WARN]` / `[ERROR]` marker
+     * immediately after the timestamp restores the severity; absent a
+     * marker the line is INFO (also covers pre-8.6 files, which carried
+     * no severity). Dividers are detected by the `---` fence.
+     */
+    private fun parseFileLine(line: String): LogEntry {
+        if (line.startsWith("---") && line.endsWith("---")) {
+            return LogEntry(line, LogType.DIVIDER, "")
+        }
+        if (line.length >= 11 && line[0] == '[' && line[9] == ']' && line[10] == ' ') {
+            val ts = line.substring(1, 9)
+            var rest = line.substring(11)
+            val type = when {
+                rest.startsWith("$MARKER_WARN ")  -> { rest = rest.removePrefix("$MARKER_WARN ");  LogType.WARN }
+                rest.startsWith("$MARKER_ERROR ") -> { rest = rest.removePrefix("$MARKER_ERROR "); LogType.ERROR }
+                else                              -> LogType.INFO
+            }
+            return LogEntry(rest, type, ts)
+        }
+        return LogEntry(line, LogType.INFO, "")
+    }
+
+    /** Export the live buffer. Kept for callers that always mean "the
+     *  current session"; UI surfaces that may be showing a file-backed
+     *  view call [exportEntries] with what's actually on screen. */
+    fun saveToFile(): File? = exportEntries(logs)
+
+    /**
+     * Write the given entries to a fresh `console-export-*.log` using
+     * the same on-disk format as the session files. The Logs tab passes
+     * the entries it is currently displaying, so exporting a past
+     * session file view writes that session -- not whatever the live
+     * buffer happens to hold (which may belong to a different pack).
+     */
+    fun exportEntries(entries: List<LogEntry>): File? {
         return try {
             val fileName = "console-export-${fileDateFmt.format(Date())}.log"
             val file = File(logsDir(), fileName)
             file.bufferedWriter().use { writer ->
-                logs.forEach { entry ->
-                    if (entry.type == LogType.DIVIDER) {
-                        writer.write(entry.text)
-                    } else {
-                        writer.write("[${entry.timestamp}] ${entry.text}")
-                    }
+                entries.forEach { entry ->
+                    writer.write(formatFileLine(entry))
                     writer.newLine()
                 }
             }
@@ -128,12 +378,109 @@ class GameConsoleService(
 
     fun clear() {
         logs.clear()
+        slotEntries.clear()
+        revision++
         synchronized(writerLock) {
             sessionWriter?.close()
             sessionWriter = null
+            sessionFile = null
+            _historyOffset.intValue = 0
         }
     }
 
     fun show() { shouldShowConsole = true }
     fun hide() { shouldShowConsole = false }
+
+    /**
+     * Attach a stdin writer for the currently running game process.
+     * Called by [LaunchDriver] on the [LaunchState.GameRunning]
+     * transition. Subsequent [sendCommand] calls route through this
+     * lambda. The driver replaces the sink on each launch, so the
+     * UI never holds a stale reference across game restarts.
+     */
+    fun attachCommandSink(sink: (String) -> Unit) {
+        _commandSink = sink
+    }
+
+    fun detachCommandSink() {
+        _commandSink = null
+    }
+
+    /**
+     * Best-effort write to the game process's stdin. Newline-suffixed
+     * so each call lands as a complete command on the receiver side.
+     * No-op when no process is running; the UI is expected to gate
+     * the input affordance on [canSendCommands] but this is the
+     * defensive backstop.
+     */
+    fun sendCommand(text: String) {
+        val payload = text.trimEnd('\n', '\r')
+        if (payload.isEmpty()) return
+        _commandSink?.invoke(payload)
+    }
+
+    /**
+     * The launcher's own captured-session files for a pack, newest
+     * first. Matches the `game-output-<sanitized-packId>-<stamp>.log`
+     * naming from [startSession]. These are the redacted stdout/stderr
+     * captures (distinct from the game's own logs/ files); the Logs tab
+     * lists them alongside the instance's real logs.
+     */
+    fun capturedSessionFiles(packId: String): List<File> {
+        val prefix = "game-output-${sanitizeId(packId)}-"
+        return runCatching {
+            logsDir().listFiles { f ->
+                f.isFile && f.name.startsWith(prefix) && f.name.endsWith(".log")
+            }?.sortedByDescending { it.lastModified() }?.toList().orEmpty()
+        }.getOrDefault(emptyList())
+    }
+
+    /**
+     * Read a log file into a LogEntry list for a read-only file-backed
+     * view. Works for BOTH our captured-session format (`[ts] [WARN]
+     * text`) and a game's own log (`[ts] [Thread/WARN]: text`): our
+     * marker is restored by [parseFileLine], and an absent marker falls
+     * back to scanning the line for a Minecraft-style `/WARN]` /
+     * `/ERROR]` / `/FATAL]` level so latest.log + crash reports colour
+     * sensibly too. Every line is run through [Redactor] on read -- the
+     * game's own logs are not redacted on disk, so this keeps a
+     * screenshot / copy of an external log as safe to share as our
+     * captured buffer. Tail-bounded by [limit] so a huge crash log does
+     * not blow up memory.
+     */
+    fun readLogFile(file: File, limit: Int = maxLines): List<LogEntry> {
+        if (!file.exists()) return emptyList()
+        return runCatching {
+            val lines = file.bufferedReader().useLines { seq -> seq.toList() }
+            val tail = if (lines.size > limit) lines.subList(lines.size - limit, lines.size) else lines
+            tail.map { parseDisplayLine(it) }
+        }.getOrDefault(emptyList())
+    }
+
+    /** Redact + parse one external/captured log line for display. */
+    private fun parseDisplayLine(raw: String): LogEntry {
+        val redacted = Redactor.redact(raw)
+        val base = parseFileLine(redacted)
+        if (base.type != LogType.INFO) return base
+        // No marker of ours -> sniff a Minecraft logger level token.
+        val mc = when {
+            base.text.contains("/ERROR]") || base.text.contains("/FATAL]") -> LogType.ERROR
+            base.text.contains("/WARN]")                                   -> LogType.WARN
+            else                                                           -> LogType.INFO
+        }
+        return if (mc == base.type) base else base.copy(type = mc)
+    }
+
+    companion object {
+        // Severity markers written after the timestamp for non-INFO
+        // lines (see formatFileLine / parseFileLine). Kept as literals
+        // a human reading the raw log file recognises at a glance.
+        private const val MARKER_WARN  = "[WARN]"
+        private const val MARKER_ERROR = "[ERROR]"
+
+        /** Filesystem-safe form of a pack/server id for log file names. */
+        private fun sanitizeId(id: String): String =
+            id.map { if (it.isLetterOrDigit() || it == '.' || it == '_' || it == '-') it else '_' }
+                .joinToString("")
+    }
 }

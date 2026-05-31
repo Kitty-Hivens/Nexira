@@ -1,6 +1,5 @@
 package hivens.ui.notifications.drivers
 
-import hivens.core.data.PackInstance
 import hivens.launcher.launch.LaunchError
 import hivens.launcher.launch.LaunchState
 import hivens.launcher.launch.LauncherController
@@ -8,6 +7,7 @@ import hivens.ui.i18n.AppStrings
 import hivens.ui.notifications.IndicationCenter
 import hivens.ui.notifications.IndicationCenter.LaunchIndication
 import hivens.ui.notifications.Kind
+import hivens.ui.notifications.LaunchTarget
 import hivens.ui.notifications.NotifAction
 import hivens.ui.notifications.NotificationCenter
 import hivens.ui.notifications.SessionRegistry
@@ -24,11 +24,15 @@ import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
 import java.util.concurrent.ConcurrentHashMap
 
-// Per-launch observer rather than global controller.state subscription:
-// LaunchState doesn't carry pack identity, and binding the observer to
-// the click that started the launch is how we key the resulting
-// notification/indication/session entries on the right pack.
-class PackLaunchDriver(
+// Per-launch observer rather than a global controller.state subscription:
+// LaunchState carries no target identity, so binding the observer to the
+// click that started the launch is how we key the resulting
+// notification / indication / session entries on the right [LaunchTarget].
+// One observer for both pack launches (LaunchTarget.Pack) and SC server
+// launches (LaunchTarget.Server) -- the controller exposes the same state
+// shape for both, and the target abstraction normalises the (id, label,
+// icon, source-key) tuple.
+class LaunchDriver(
     private val controller: LauncherController,
     private val notifications: NotificationCenter,
     private val indications: IndicationCenter,
@@ -39,21 +43,31 @@ class PackLaunchDriver(
     // mid-launch without restarting the driver.
     private val stringsProvider: () -> AppStrings,
 ) {
-    private val log = LoggerFactory.getLogger(PackLaunchDriver::class.java)
+    private val log = LoggerFactory.getLogger(LaunchDriver::class.java)
 
-    // Per-pack de-dup: rapid double-clicks must not stack observers.
+    // Per-target de-dup: rapid double-clicks must not stack observers.
     // put-then-cancel-previous is atomic via ConcurrentHashMap.put returning
     // the prior mapping.
     private val observerJobs: ConcurrentHashMap<String, Job> = ConcurrentHashMap()
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    fun observe(pack: PackInstance) {
+    fun observe(target: LaunchTarget) {
+        // Single active launch only (the controller enforces it via its
+        // launchLock), so at most one observer should ever be live.
+        // Cancel EVERY prior observer, not just the same target's: when
+        // launch A is aborted and B starts immediately, controller.state
+        // can conflate A's terminal Idle into B's Prepare, leaving A's
+        // collector open. A stale A-observer would then process B's
+        // GameRunning and attach A's dead process stdin sink + register
+        // the session under A. Cancelling all prior jobs closes that race.
+        observerJobs.values.forEach { it.cancel() }
+        observerJobs.clear()
         val job = appScope.launch {
             try {
                 // dropWhile-until-Prepare handles BOTH stale-Idle and stale-
                 // terminal (Error / GameRunning from a previous launch).
-                // launchPackInstance always transitions through Prepare(INIT)
-                // first, so the new launch's first state passes the gate.
+                // Every fresh launch transitions through Prepare(INIT) first,
+                // so the new launch's first state passes the gate.
                 //
                 // transformWhile-emit-then-stop terminates the flow on the
                 // first terminal value seen. `return@launch` from inside a
@@ -67,40 +81,40 @@ class PackLaunchDriver(
                     }
                     .collect { state ->
                         when (state) {
-                            is LaunchState.Prepare     -> onPrepare(pack, state)
-                            is LaunchState.Downloading -> onDownloading(pack, state)
-                            is LaunchState.GameRunning -> onRunning(pack, state)
-                            is LaunchState.Error       -> onError(pack, state.reason)
-                            LaunchState.Idle           -> onIdle(pack)
+                            is LaunchState.Prepare     -> onPrepare(target, state)
+                            is LaunchState.Downloading -> onDownloading(target, state)
+                            is LaunchState.GameRunning -> onRunning(target, state)
+                            is LaunchState.Error       -> onError(target, state.reason)
+                            LaunchState.Idle           -> onIdle(target)
                         }
                     }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                log.warn("PackLaunchDriver observation aborted for ${pack.id}", e)
-                indications.setLaunchIndication(pack.id, null)
-                sessions.unregister(pack.id)
+                log.warn("LaunchDriver observation aborted for ${target.id}", e)
+                indications.setLaunchIndication(target.id, null)
+                sessions.unregister(target.id)
             }
         }
-        observerJobs.put(pack.id, job)?.cancel()
+        observerJobs.put(target.id, job)?.cancel()
     }
 
-    private fun onPrepare(pack: PackInstance, state: LaunchState.Prepare) {
+    private fun onPrepare(target: LaunchTarget, state: LaunchState.Prepare) {
         val s = stringsProvider()
-        indications.setLaunchIndication(pack.id, LaunchIndication.Preparing)
+        indications.setLaunchIndication(target.id, LaunchIndication.Preparing)
         notifications.push(
-            sourceKey = sourceKeyFor(pack),
-            sender    = pack.displayName,
-            iconUrl   = iconUrlFor(pack),
+            sourceKey = target.sourceKey,
+            sender    = target.displayName,
+            iconUrl   = target.iconUrl,
             severity  = Severity.Info,
             kind      = Kind.Progress,
-            title     = s.notifPackPreparing(pack.displayName),
+            title     = s.notifPackPreparing(target.displayName),
             body      = s.notifPackStage(state.stage.name.lowercase()),
             progress  = state.progress.coerceIn(0f, 1f),
         )
     }
 
-    private fun onDownloading(pack: PackInstance, state: LaunchState.Downloading) {
+    private fun onDownloading(target: LaunchTarget, state: LaunchState.Downloading) {
         // null = indeterminate per LaunchIndication.Downloading.progress
         // contract; NaN sentinel goes only to NotificationEvent.progress
         // where the renderer branches on isNaN.
@@ -109,7 +123,7 @@ class PackLaunchDriver(
             state.downloadedBytes > 0L -> null
             else                       -> 0f
         }
-        indications.setLaunchIndication(pack.id, LaunchIndication.Downloading(fraction))
+        indications.setLaunchIndication(target.id, LaunchIndication.Downloading(fraction))
 
         val s = stringsProvider()
         val notifProgress: Float = fraction ?: Float.NaN
@@ -117,34 +131,49 @@ class PackLaunchDriver(
             if (fraction == null) s.notifPackSyncIndeterminate
             else s.notifPackSyncPercent((fraction * 100).toInt())
         notifications.push(
-            sourceKey = sourceKeyFor(pack),
-            sender    = pack.displayName,
-            iconUrl   = iconUrlFor(pack),
+            sourceKey = target.sourceKey,
+            sender    = target.displayName,
+            iconUrl   = target.iconUrl,
             severity  = Severity.Info,
             kind      = Kind.Progress,
-            title     = s.notifPackSyncing(pack.displayName),
+            title     = s.notifPackSyncing(target.displayName),
             body      = s.notifPackSyncBody(state.currentFileIdx, state.totalFiles, displayPct),
             progress  = notifProgress,
         )
     }
 
-    private fun onRunning(pack: PackInstance, state: LaunchState.GameRunning) {
+    private fun onRunning(target: LaunchTarget, state: LaunchState.GameRunning) {
         val s = stringsProvider()
-        indications.setLaunchIndication(pack.id, LaunchIndication.Running)
+        indications.setLaunchIndication(target.id, LaunchIndication.Running)
         sessions.register(
-            packInstanceId  = pack.id,
-            packDisplayName = pack.displayName,
-            packIconUrl     = null,
+            packInstanceId  = target.id,
+            packDisplayName = target.displayName,
+            packIconUrl     = target.iconUrl,
             abort           = { controller.abort() },
             showConsole     = { gameConsole.show() },
         )
+        // Wire command-input -> process stdin while the game is alive.
+        // The console UI surfaces an input row once canSendCommands is
+        // true; each Enter routes here, writes utf-8 + newline, flushes.
+        // Best-effort: IOExceptions on a dead process surface as warn
+        // logs without halting the driver. onError / onIdle both
+        // detach so a stale sink doesn't outlive the process.
+        val stdin = state.process.outputStream
+        gameConsole.attachCommandSink { text ->
+            try {
+                stdin.write((text + "\n").toByteArray(Charsets.UTF_8))
+                stdin.flush()
+            } catch (e: Exception) {
+                log.warn("Failed to send command to game process for ${target.id}", e)
+            }
+        }
         notifications.push(
-            sourceKey = sourceKeyFor(pack),
-            sender    = pack.displayName,
-            iconUrl   = iconUrlFor(pack),
+            sourceKey = target.sourceKey,
+            sender    = target.displayName,
+            iconUrl   = target.iconUrl,
             severity  = Severity.Success,
             kind      = Kind.ActionRequired,
-            title     = s.notifPackRunning(pack.displayName),
+            title     = s.notifPackRunning(target.displayName),
             body      = null,
             actions   = listOf(
                 NotifAction("show_console", s.notifActionShowConsole) { gameConsole.show() },
@@ -153,17 +182,18 @@ class PackLaunchDriver(
         )
     }
 
-    private fun onError(pack: PackInstance, reason: LaunchError) {
+    private fun onError(target: LaunchTarget, reason: LaunchError) {
         val s = stringsProvider()
-        indications.setLaunchIndication(pack.id, LaunchIndication.Failed)
-        sessions.unregister(pack.id)
+        indications.setLaunchIndication(target.id, LaunchIndication.Failed)
+        sessions.unregister(target.id)
+        gameConsole.detachCommandSink()
         notifications.push(
-            sourceKey = sourceKeyFor(pack),
-            sender    = pack.displayName,
-            iconUrl   = iconUrlFor(pack),
+            sourceKey = target.sourceKey,
+            sender    = target.displayName,
+            iconUrl   = target.iconUrl,
             severity  = Severity.Critical,
             kind      = Kind.Sticky,
-            title     = s.notifPackFailed(pack.displayName),
+            title     = s.notifPackFailed(target.displayName),
             body      = humanReason(reason, s),
             actions   = listOf(
                 NotifAction("show_console", s.notifActionShowConsole) { gameConsole.show() },
@@ -171,28 +201,23 @@ class PackLaunchDriver(
         )
     }
 
-    private fun onIdle(pack: PackInstance) {
+    private fun onIdle(target: LaunchTarget) {
         val s = stringsProvider()
         // Idle after non-Idle = clean exit (code 0). Group history stays
         // so the user can scroll back through the run.
-        indications.setLaunchIndication(pack.id, null)
-        sessions.unregister(pack.id)
+        indications.setLaunchIndication(target.id, null)
+        sessions.unregister(target.id)
+        gameConsole.detachCommandSink()
         notifications.push(
-            sourceKey = sourceKeyFor(pack),
-            sender    = pack.displayName,
-            iconUrl   = iconUrlFor(pack),
+            sourceKey = target.sourceKey,
+            sender    = target.displayName,
+            iconUrl   = target.iconUrl,
             severity  = Severity.Success,
             kind      = Kind.OneShot,
-            title     = s.notifPackSessionEnded(pack.displayName),
+            title     = s.notifPackSessionEnded(target.displayName),
             body      = null,
         )
     }
-
-    private fun sourceKeyFor(pack: PackInstance): String = "pack:${pack.id}:launch"
-
-    // PackInstance does not carry icon_url yet; returns null until
-    // project_pack_rich_metadata propagates summary.icon_url.
-    private fun iconUrlFor(pack: PackInstance): String? = null
 
     private fun humanReason(reason: LaunchError, s: AppStrings): String = when (reason) {
         is LaunchError.ExitCode            -> s.notifReasonExitCode(reason.code)
