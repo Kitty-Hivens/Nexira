@@ -622,7 +622,7 @@ internal fun ConsoleContent(
     PuppetToggle("console.searchOpen",  searchOpen)  { if (it) openSearch() else closeSearch() }
     PuppetField ("console.search", searchQuery)      { searchQuery = it }
     PuppetClick ("console.clearSearch", enabled = searchQuery.isNotEmpty()) { searchQuery = "" }
-    PuppetClick ("console.saveToFile")   { gameConsole.saveToFile() }
+    PuppetClick ("console.saveToFile")   { gameConsole.exportEntries(logsCopy) }
     PuppetClick ("console.copyAll")      { copyAll() }
     PuppetClick ("console.clear", enabled = isLive) { if (isLive) gameConsole.clear() }
     PuppetClick ("console.jumpToBottom", enabled = filtered.isNotEmpty()) {
@@ -685,7 +685,11 @@ internal fun ConsoleContent(
             showTimestamps = showTimestamps,
             onToggleTimestamps = { onSettingsChange(settings.copy(showTimestamps = !showTimestamps)) },
             onCopyAll     = { copyAll() },
-            onSave        = { gameConsole.saveToFile() },
+            // Export what's on screen, not the live buffer: in a file-
+            // backed Logs-tab view the live buffer may hold a different
+            // pack's session, so exportEntries(logsCopy) writes the
+            // session the user is actually looking at.
+            onSave        = { gameConsole.exportEntries(logsCopy) },
             // Clear only acts on the live buffer; a file-backed view is
             // read-only, so the button no-ops there rather than wiping
             // the running session's buffer behind the user's back.

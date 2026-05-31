@@ -52,6 +52,16 @@ class LaunchDriver(
 
     @OptIn(ExperimentalCoroutinesApi::class)
     fun observe(target: LaunchTarget) {
+        // Single active launch only (the controller enforces it via its
+        // launchLock), so at most one observer should ever be live.
+        // Cancel EVERY prior observer, not just the same target's: when
+        // launch A is aborted and B starts immediately, controller.state
+        // can conflate A's terminal Idle into B's Prepare, leaving A's
+        // collector open. A stale A-observer would then process B's
+        // GameRunning and attach A's dead process stdin sink + register
+        // the session under A. Cancelling all prior jobs closes that race.
+        observerJobs.values.forEach { it.cancel() }
+        observerJobs.clear()
         val job = appScope.launch {
             try {
                 // dropWhile-until-Prepare handles BOTH stale-Idle and stale-

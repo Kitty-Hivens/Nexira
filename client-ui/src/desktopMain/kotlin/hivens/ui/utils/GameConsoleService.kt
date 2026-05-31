@@ -288,12 +288,24 @@ class GameConsoleService(
         return LogEntry(line, LogType.INFO, "")
     }
 
-    fun saveToFile(): File? {
+    /** Export the live buffer. Kept for callers that always mean "the
+     *  current session"; UI surfaces that may be showing a file-backed
+     *  view call [exportEntries] with what's actually on screen. */
+    fun saveToFile(): File? = exportEntries(logs)
+
+    /**
+     * Write the given entries to a fresh `console-export-*.log` using
+     * the same on-disk format as the session files. The Logs tab passes
+     * the entries it is currently displaying, so exporting a past
+     * session file view writes that session -- not whatever the live
+     * buffer happens to hold (which may belong to a different pack).
+     */
+    fun exportEntries(entries: List<LogEntry>): File? {
         return try {
             val fileName = "console-export-${fileDateFmt.format(Date())}.log"
             val file = File(logsDir(), fileName)
             file.bufferedWriter().use { writer ->
-                logs.forEach { entry ->
+                entries.forEach { entry ->
                     writer.write(formatFileLine(entry))
                     writer.newLine()
                 }
