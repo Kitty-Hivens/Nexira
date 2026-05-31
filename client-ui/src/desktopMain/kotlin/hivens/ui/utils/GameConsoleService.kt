@@ -92,6 +92,17 @@ class GameConsoleService(
      */
     private var sessionFile: File? = null
 
+    /**
+     * Pack/server id of the session currently feeding [logs]. The
+     * PackDetail Logs tab reads this to decide whether the live buffer
+     * belongs to the pack being viewed (-> show live) or some other
+     * pack ran more recently (-> the tab loads its own pack's last
+     * session file instead). Observable so the tab re-resolves when a
+     * new session starts. Null before the first session.
+     */
+    var currentSessionPackId by mutableStateOf<String?>(null)
+        private set
+
     private var sessionWriter: BufferedWriter? = null
     private val fileDateFmt = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss")
 
@@ -110,14 +121,24 @@ class GameConsoleService(
     private fun logsDir(): File =
         paths.logsDir.toFile().also { it.mkdirs() }
 
-    fun startSession() {
+    fun startSession(packId: String? = null, packLabel: String? = null) {
+        currentSessionPackId = packId
         synchronized(writerLock) {
             sessionWriter?.close()
             sessionWriter = null
             sessionFile = null
             _historyOffset.intValue = 0
             try {
-                val fileName = "game-output-${fileDateFmt.format(Date())}.log"
+                // Per-pack file name so the Logs tab can list / scope a
+                // pack's own sessions. Unscoped sessions (null packId)
+                // keep the legacy "game-output-<ts>.log" shape. The
+                // sanitized id keeps arbitrary pack ids filesystem-safe.
+                val stamp = fileDateFmt.format(Date())
+                val fileName = if (packId.isNullOrBlank()) {
+                    "game-output-$stamp.log"
+                } else {
+                    "game-output-${sanitizeId(packId)}-$stamp.log"
+                }
                 val file = File(logsDir(), fileName)
                 sessionFile = file
                 sessionWriter = BufferedWriter(FileWriter(file, true))
@@ -161,7 +182,7 @@ class GameConsoleService(
         synchronized(writerLock) {
             try {
                 sessionWriter?.apply {
-                    write("[${entry.timestamp}] ${entry.text}")
+                    write(formatFileLine(entry))
                     newLine()
                     flush()
                 }
@@ -227,27 +248,44 @@ class GameConsoleService(
     }
 
     /**
+     * Serialise a [LogEntry] to its on-disk line. INFO stays
+     * `[HH:MM:SS] text` (the common case -- keeps files clean and
+     * backward-compatible with pre-8.6 logs). WARN / ERROR carry a
+     * marker after the timestamp so [parseFileLine] can restore the
+     * severity colour on reload: `[HH:MM:SS] [WARN] text`. The marker
+     * sits after our timestamp, so a real game line's own
+     * `[Server thread/WARN]` (which appears later in the text) never
+     * collides with it. Dividers write their text verbatim.
+     */
+    private fun formatFileLine(entry: LogEntry): String = when (entry.type) {
+        LogType.DIVIDER -> entry.text
+        LogType.INFO    -> "[${entry.timestamp}] ${entry.text}"
+        LogType.WARN    -> "[${entry.timestamp}] $MARKER_WARN ${entry.text}"
+        LogType.ERROR   -> "[${entry.timestamp}] $MARKER_ERROR ${entry.text}"
+    }
+
+    /**
      * Best-effort parse of a single file line back into a LogEntry.
-     * The file format is `[HH:MM:SS] text` for normal entries and
-     * `--------- Session started HH:MM:SS ---------` for dividers.
-     * Severity isn't carried in the file (Phase 8.5 limitation) so
-     * non-divider entries reload as INFO -- the AnnotatedString
-     * builder renders them with the INFO color even when they were
-     * originally WARN / ERROR. Per-severity restore is Phase 8.6
-     * scope, would need a JSONL backing or a severity prefix in the
-     * log format.
+     * Inverse of [formatFileLine]. A `[WARN]` / `[ERROR]` marker
+     * immediately after the timestamp restores the severity; absent a
+     * marker the line is INFO (also covers pre-8.6 files, which carried
+     * no severity). Dividers are detected by the `---` fence.
      */
     private fun parseFileLine(line: String): LogEntry {
-        return when {
-            line.startsWith("---") && line.endsWith("---") ->
-                LogEntry(line, LogType.DIVIDER, "")
-            line.length >= 11 && line[0] == '[' && line[9] == ']' && line[10] == ' ' -> {
-                val ts = line.substring(1, 9)
-                val txt = line.substring(11)
-                LogEntry(txt, LogType.INFO, ts)
-            }
-            else -> LogEntry(line, LogType.INFO, "")
+        if (line.startsWith("---") && line.endsWith("---")) {
+            return LogEntry(line, LogType.DIVIDER, "")
         }
+        if (line.length >= 11 && line[0] == '[' && line[9] == ']' && line[10] == ' ') {
+            val ts = line.substring(1, 9)
+            var rest = line.substring(11)
+            val type = when {
+                rest.startsWith("$MARKER_WARN ")  -> { rest = rest.removePrefix("$MARKER_WARN ");  LogType.WARN }
+                rest.startsWith("$MARKER_ERROR ") -> { rest = rest.removePrefix("$MARKER_ERROR "); LogType.ERROR }
+                else                              -> LogType.INFO
+            }
+            return LogEntry(rest, type, ts)
+        }
+        return LogEntry(line, LogType.INFO, "")
     }
 
     fun saveToFile(): File? {
@@ -256,11 +294,7 @@ class GameConsoleService(
             val file = File(logsDir(), fileName)
             file.bufferedWriter().use { writer ->
                 logs.forEach { entry ->
-                    if (entry.type == LogType.DIVIDER) {
-                        writer.write(entry.text)
-                    } else {
-                        writer.write("[${entry.timestamp}] ${entry.text}")
-                    }
+                    writer.write(formatFileLine(entry))
                     writer.newLine()
                 }
             }
@@ -307,5 +341,69 @@ class GameConsoleService(
         val payload = text.trimEnd('\n', '\r')
         if (payload.isEmpty()) return
         _commandSink?.invoke(payload)
+    }
+
+    /**
+     * One past session log file for a pack, surfaced by the Logs tab's
+     * file picker. [label] is a human-friendly timestamp pulled from
+     * the file name; [isLive] marks the file the current in-memory
+     * session is still writing to.
+     */
+    data class SessionLogFile(
+        val file: File,
+        val label: String,
+        val isLive: Boolean,
+    )
+
+    /**
+     * List a pack's past session log files, newest first. Matches the
+     * `game-output-<sanitized-packId>-<stamp>.log` naming from
+     * [startSession]. The file currently being written (if its pack
+     * matches) is flagged [SessionLogFile.isLive] so the picker can
+     * label + default to it.
+     */
+    fun sessionFilesFor(packId: String): List<SessionLogFile> {
+        val prefix = "game-output-${sanitizeId(packId)}-"
+        val live = sessionFile
+        return runCatching {
+            logsDir().listFiles { f ->
+                f.isFile && f.name.startsWith(prefix) && f.name.endsWith(".log")
+            }?.sortedByDescending { it.lastModified() }?.map { f ->
+                SessionLogFile(
+                    file   = f,
+                    label  = f.name.removePrefix(prefix).removeSuffix(".log"),
+                    isLive = live != null && f.absolutePath == live.absolutePath,
+                )
+            }.orEmpty()
+        }.getOrDefault(emptyList())
+    }
+
+    /**
+     * Read an entire session log file into LogEntry list (read-only
+     * file-backed view for the Logs tab picker). Severity is restored
+     * via [parseFileLine]. Large files are bounded by [limit] from the
+     * tail so a multi-hundred-MB crash log doesn't blow up memory; the
+     * default mirrors the in-memory window cap.
+     */
+    fun readSessionFile(file: File, limit: Int = maxLines): List<LogEntry> {
+        if (!file.exists()) return emptyList()
+        return runCatching {
+            val lines = file.bufferedReader().useLines { seq -> seq.toList() }
+            val tail = if (lines.size > limit) lines.subList(lines.size - limit, lines.size) else lines
+            tail.map { parseFileLine(it) }
+        }.getOrDefault(emptyList())
+    }
+
+    companion object {
+        // Severity markers written after the timestamp for non-INFO
+        // lines (see formatFileLine / parseFileLine). Kept as literals
+        // a human reading the raw log file recognises at a glance.
+        private const val MARKER_WARN  = "[WARN]"
+        private const val MARKER_ERROR = "[ERROR]"
+
+        /** Filesystem-safe form of a pack/server id for log file names. */
+        private fun sanitizeId(id: String): String =
+            id.map { if (it.isLetterOrDigit() || it == '.' || it == '_' || it == '-') it else '_' }
+                .joinToString("")
     }
 }

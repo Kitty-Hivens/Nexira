@@ -182,7 +182,7 @@ class LauncherController(
             try {
                 _state.value = LaunchState.Prepare(PrepareStage.INIT, 0.0f)
 
-                emit(LaunchLogEvent.SessionStarted)
+                emit(LaunchLogEvent.SessionStarted(server.assetDir, server.name))
                 emit(LaunchLogEvent.AppBanner)
                 emit(LaunchLogEvent.TargetServer(server.name, isOffline))
 
@@ -396,7 +396,7 @@ class LauncherController(
             try {
                 _state.value = LaunchState.Prepare(PrepareStage.INIT, 0.0f)
 
-                emit(LaunchLogEvent.SessionStarted)
+                emit(LaunchLogEvent.SessionStarted(packInstance.id, packInstance.displayName))
                 emit(LaunchLogEvent.AppBanner)
                 // Mirror packs are public read; surfacing the offline
                 // flag here would be misleading -- pack-centric Play

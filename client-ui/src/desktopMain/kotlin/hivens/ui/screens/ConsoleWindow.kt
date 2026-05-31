@@ -180,6 +180,24 @@ private data class LineSeverity(
     val type:        LogType,
 )
 
+/**
+ * Where [ConsoleContent] reads its entries from.
+ *
+ * [Live] -- the running GameConsoleService buffer: tailing append,
+ * sliding-window history paging, command input, clear / save. The
+ * standalone ConsoleWindow and the PackDetail Logs tab's "current
+ * session" view use this.
+ *
+ * [FileBacked] -- a static, read-only snapshot parsed from a past
+ * session log file (the Logs tab's file picker). No tailing, no
+ * paging, no command input; search / filter / gutter / copy all still
+ * work on the static list.
+ */
+internal sealed interface ConsoleSource {
+    data object Live : ConsoleSource
+    data class FileBacked(val entries: List<LogEntry>) : ConsoleSource
+}
+
 // ── Main composable ─────────────────────────────────────────────────────────
 
 @Composable
@@ -224,7 +242,9 @@ fun ConsoleWindow(
 internal fun ConsoleContent(
     settings: ConsoleSettings,
     onSettingsChange: (ConsoleSettings) -> Unit,
+    source: ConsoleSource = ConsoleSource.Live,
 ) {
+    val isLive = source is ConsoleSource.Live
     val s = LocalStrings.current
     val clipboard = LocalClipboard.current
     val focusManager = LocalFocusManager.current
@@ -291,17 +311,23 @@ internal fun ConsoleContent(
     val density         = LocalDensity.current
 
     // ── Frame-bounded log coalescer ────────────────────────────────────────
-    // Modded MC startup floods 5k+ lines in ~2s. Rebuilding the whole
-    // AnnotatedString per append would jank. snapshotFlow + conflate +
-    // distinctUntilChanged keeps rebuilds to one per frame at most.
+    // Live source: modded MC startup floods 5k+ lines in ~2s. Rebuilding
+    // the whole AnnotatedString per append would jank; snapshotFlow +
+    // conflate + distinctUntilChanged keeps rebuilds to one per frame.
+    // File source: entries are static, so the tick never advances and the
+    // snapshot is the parsed file -- no coalescer needed.
     var logTick by remember { mutableIntStateOf(0) }
-    LaunchedEffect(Unit) {
+    LaunchedEffect(isLive) {
+        if (!isLive) return@LaunchedEffect
         snapshotFlow { gameConsole.logs.size }
             .conflate()
             .distinctUntilChanged()
             .collect { logTick = it }
     }
-    val logsCopy = remember(logTick) { gameConsole.logs.toList() }
+    val logsCopy = when (source) {
+        is ConsoleSource.Live       -> remember(logTick) { gameConsole.logs.toList() }
+        is ConsoleSource.FileBacked -> source.entries
+    }
 
     // ── Search query debounce ──────────────────────────────────────────────
     // Highlight + match-offset rebuild keys off the debounced value;
@@ -429,10 +455,14 @@ internal fun ConsoleContent(
     // shift scrollState by the approximate height of the loaded block so
     // the user's visual line stays put.
     var historyLoading by remember { mutableStateOf(false) }
+    // File-backed views load the whole (tail-bounded) file up front, so
+    // there is nothing to page; historyOffset is meaningful only for the
+    // live sliding window.
     val historyOffset by remember {
-        derivedStateOf { gameConsole.historyOffset }
+        derivedStateOf { if (isLive) gameConsole.historyOffset else 0 }
     }
-    LaunchedEffect(scrollState.value, historyOffset) {
+    LaunchedEffect(scrollState.value, historyOffset, isLive) {
+        if (!isLive) return@LaunchedEffect
         if (historyLoading) return@LaunchedEffect
         if (historyOffset <= 0) return@LaunchedEffect
         if (scrollState.value > 80) return@LaunchedEffect
@@ -594,7 +624,7 @@ internal fun ConsoleContent(
     PuppetClick ("console.clearSearch", enabled = searchQuery.isNotEmpty()) { searchQuery = "" }
     PuppetClick ("console.saveToFile")   { gameConsole.saveToFile() }
     PuppetClick ("console.copyAll")      { copyAll() }
-    PuppetClick ("console.clear")        { gameConsole.clear() }
+    PuppetClick ("console.clear", enabled = isLive) { if (isLive) gameConsole.clear() }
     PuppetClick ("console.jumpToBottom", enabled = filtered.isNotEmpty()) {
         scope.launch { scrollState.animateScrollTo(scrollState.maxValue) }
     }
@@ -656,7 +686,10 @@ internal fun ConsoleContent(
             onToggleTimestamps = { onSettingsChange(settings.copy(showTimestamps = !showTimestamps)) },
             onCopyAll     = { copyAll() },
             onSave        = { gameConsole.saveToFile() },
-            onClear       = { gameConsole.clear() },
+            // Clear only acts on the live buffer; a file-backed view is
+            // read-only, so the button no-ops there rather than wiping
+            // the running session's buffer behind the user's back.
+            onClear       = { if (isLive) gameConsole.clear() },
         )
 
         HorizontalDivider(thickness = 1.dp, color = themeColors.outline.copy(alpha = 0.4f))
@@ -884,7 +917,7 @@ internal fun ConsoleContent(
         // process's stdin via gameConsole.sendCommand, pushes it onto
         // cmdHistory, clears the input. Up / Down step through history
         // (most-recent first). Esc clears or blurs.
-        if (gameConsole.canSendCommands) {
+        if (isLive && gameConsole.canSendCommands) {
             CommandInputRow(
                 value            = cmdInput,
                 onValueChange    = { cmdInput = it; cmdHistoryIdx = -1 },

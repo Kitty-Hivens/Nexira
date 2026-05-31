@@ -1,6 +1,7 @@
 package hivens.ui.screens.detail
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,9 +16,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -30,6 +35,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -37,8 +43,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
@@ -52,15 +60,22 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.screens.ConsoleContent
+import hivens.ui.screens.ConsoleSource
 import hivens.ui.screens.library.FileBrowserPane
 import hivens.ui.screens.library.PackMetaChip
 import hivens.ui.screens.library.content.ContentTabPane
 import hivens.ui.screens.library.worlds.WorldsTabPane
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.utils.ConsoleSettingsManager
+import hivens.ui.utils.GameConsoleService
+import hivens.ui.utils.LogEntry
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import org.koin.compose.koinInject
+import java.io.File
+import java.nio.file.Path
 
 /**
  * Library PackDetail. Hero header + Play bar + tabs (Content / Files /
@@ -160,42 +175,169 @@ fun PackDetailScreen(
             )
         }
 
-        // Logs tab loads its own ConsoleSettings via the same manager
-        // pattern AppShell uses, so the on-disk console.json stays the
-        // single source of truth for font / wrap / gutter / timestamps
-        // / max-in-memory-lines whether the user opens the tab here or
-        // the standalone ConsoleWindow.
-        val consoleJson = remember { Json { ignoreUnknownKeys = true; encodeDefaults = true } }
-        val consoleSettingsManager = remember { ConsoleSettingsManager(paths.dataDir, consoleJson) }
-        var consoleSettings by remember { mutableStateOf(consoleSettingsManager.load()) }
-
         Box(modifier = Modifier.fillMaxSize().padding(top = 4.dp)) {
             when (tabIndex) {
                 0 -> ContentTabPane(instance = pack)
                 1 -> FileBrowserPane(rootDir = instanceDir, modifier = Modifier.padding(16.dp))
                 2 -> WorldsTabPane(instanceDir = instanceDir)
-                3 -> Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    // Glass tint, not the solid theme background: a solid
-                    // fill broke the app's translucent aesthetic and left
-                    // a hard seam ("шлейф") between this tab and the glass
-                    // divider + right panel beside it. glassSurfaceAlpha
-                    // keeps the wallpaper softly visible (honoring the
-                    // user's glass-intensity knob) while still tinting the
-                    // surface enough that dense monospace stays readable.
-                    // The other tabs render straight over the wallpaper;
-                    // the console needs the extra tint because its text is
-                    // far denser than their card layouts.
-                    color    = glassSurfaceAlpha(0.85f),
-                ) {
-                    ConsoleContent(
+                3 -> PackLogsTab(packId = pack.id, dataDir = paths.dataDir)
+            }
+        }
+    }
+}
+
+/**
+ * Logs tab body: a session picker over the console, scoped to this pack.
+ *
+ * Default source resolution:
+ * - this pack is the one currently running -> the live buffer.
+ * - otherwise -> this pack's most recent session file (read-only),
+ *   or an empty state when the pack has never been launched.
+ *
+ * The picker lets the user switch between the live session (when
+ * applicable) and any past session file for THIS pack -- so launching
+ * a different pack can never surface its log here. Files are named
+ * per-pack by GameConsoleService.startSession, and sessionFilesFor
+ * filters to this pack's prefix.
+ *
+ * ConsoleSettings load through the same manager AppShell + the
+ * standalone window use, so font / wrap / gutter / timestamps stay one
+ * source of truth across every console surface.
+ */
+@Composable
+private fun PackLogsTab(packId: String, dataDir: Path) {
+    val gameConsole: GameConsoleService = koinInject()
+    val consoleJson = remember { Json { ignoreUnknownKeys = true; encodeDefaults = true } }
+    val consoleSettingsManager = remember { ConsoleSettingsManager(dataDir, consoleJson) }
+    var consoleSettings by remember { mutableStateOf(consoleSettingsManager.load()) }
+
+    val livePackId = gameConsole.currentSessionPackId
+    val isThisPackLive = livePackId == packId
+
+    // Re-list when the live session id flips (a launch / exit changes
+    // which files exist + whether live is available for this pack).
+    val sessionFiles = remember(packId, livePackId) { gameConsole.sessionFilesFor(packId) }
+
+    // null selection = "live". When this pack isn't the running one the
+    // null selection resolves to the newest file instead (see below).
+    var selectedFile by remember(packId) { mutableStateOf<File?>(null) }
+
+    // The effective file to show: explicit selection wins; else, when
+    // this pack isn't live, fall back to the newest session file.
+    val effectiveFile = selectedFile ?: if (!isThisPackLive) sessionFiles.firstOrNull()?.file else null
+
+    // Read the chosen file off the UI thread; live source needs no read.
+    val fileEntries by produceState<List<LogEntry>?>(null, effectiveFile) {
+        val f = effectiveFile
+        value = if (f == null) null
+                else withContext(Dispatchers.IO) { gameConsole.readSessionFile(f) }
+    }
+
+    val source: ConsoleSource? = when {
+        effectiveFile == null && isThisPackLive -> ConsoleSource.Live
+        effectiveFile != null                   -> fileEntries?.let { ConsoleSource.FileBacked(it) }
+        else                                     -> null  // no live, no files
+    }
+
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        // Glass tint, not solid: a solid fill broke the app's translucent
+        // aesthetic and left a hard seam against the right panel. The
+        // wallpaper stays softly visible while the tint keeps dense
+        // monospace readable.
+        color    = glassSurfaceAlpha(0.85f),
+    ) {
+        Column(Modifier.fillMaxSize()) {
+            LogSessionPicker(
+                isThisPackLive = isThisPackLive,
+                sessionFiles   = sessionFiles,
+                selectedFile   = effectiveFile,
+                onSelectLive   = { selectedFile = null },
+                onSelectFile   = { selectedFile = it },
+            )
+            HorizontalDivider(color = CelestiaTheme.colors.outline.copy(alpha = 0.3f))
+            Box(Modifier.weight(1f).fillMaxWidth()) {
+                when (val src = source) {
+                    null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(
+                            text  = LocalStrings.current.consoleNoSessionsForPack,
+                            color = CelestiaTheme.colors.textSecondary,
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+                    else -> ConsoleContent(
                         settings = consoleSettings,
                         onSettingsChange = { new ->
                             consoleSettings = new
                             consoleSettingsManager.save(new)
                         },
+                        source = src,
                     )
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Compact session selector for the Logs tab. A single button shows the
+ * current selection ("Live session" or a file timestamp) and opens a
+ * dropdown of this pack's sessions, newest first. The live entry is
+ * offered only while this pack is the running one.
+ */
+@Composable
+private fun LogSessionPicker(
+    isThisPackLive: Boolean,
+    sessionFiles: List<GameConsoleService.SessionLogFile>,
+    selectedFile: File?,
+    onSelectLive: () -> Unit,
+    onSelectFile: (File) -> Unit,
+) {
+    val s = LocalStrings.current
+    val colors = CelestiaTheme.colors
+    var open by remember { mutableStateOf(false) }
+
+    val currentLabel = when {
+        selectedFile == null && isThisPackLive -> s.consoleSessionLive
+        selectedFile != null                   -> selectedFile.name
+            .substringAfterLast('-').removeSuffix(".log").ifBlank { selectedFile.name }
+        else                                   -> s.consoleSessionNone
+    }
+
+    Box(Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
+        Row(
+            modifier = Modifier
+                .clip(RoundedCornerShape(4.dp))
+                .clickable { open = true }
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text       = s.consoleSessionPickerLabel(currentLabel),
+                color      = colors.textSecondary,
+                fontSize   = 11.sp,
+                fontFamily = FontFamily.Monospace,
+            )
+            Icon(
+                imageVector        = Icons.Default.ArrowDropDown,
+                contentDescription = null,
+                tint               = colors.textSecondary,
+                modifier           = Modifier.size(16.dp),
+            )
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            if (isThisPackLive) {
+                DropdownMenuItem(
+                    text    = { Text(s.consoleSessionLive, fontFamily = FontFamily.Monospace, fontSize = 11.sp) },
+                    onClick = { onSelectLive(); open = false },
+                )
+            }
+            sessionFiles.forEach { sf ->
+                val label = if (sf.isLive) "${sf.label}  *" else sf.label
+                DropdownMenuItem(
+                    text    = { Text(label, fontFamily = FontFamily.Monospace, fontSize = 11.sp) },
+                    onClick = { onSelectFile(sf.file); open = false },
+                )
             }
         }
     }

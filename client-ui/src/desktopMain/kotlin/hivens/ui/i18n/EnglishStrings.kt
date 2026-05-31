@@ -652,6 +652,10 @@ object EnglishStrings : AppStrings {
     override val packDetailTabFiles             = "Files"
     override val packDetailTabWorlds            = "Worlds"
     override val packDetailTabLogs              = "Logs"
+    override val consoleSessionLive             = "Current session"
+    override val consoleSessionNone             = "no sessions"
+    override val consoleNoSessionsForPack       = "No logs for this pack yet. Launch it and the session shows up here."
+    override fun consoleSessionPickerLabel(current: String) = "Session: $current"
 
     override val packDetailReadyTitle           = "Ready to play"
     override fun packDetailInstanceDirHint(dirName: String) = "Instance folder: instances/$dirName"

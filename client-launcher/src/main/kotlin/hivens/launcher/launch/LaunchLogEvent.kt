@@ -20,8 +20,17 @@ import hivens.core.data.LauncherLogType
  * no new enum is introduced.
  */
 sealed class LaunchLogEvent {
-    /** Opens a new per-session game-output log file and adds the divider. */
-    data object SessionStarted : LaunchLogEvent()
+    /**
+     * Opens a new per-session game-output log file and adds the divider.
+     * Carries the launch target's stable id + display label so the
+     * console can name the session file per-pack (game-output-<id>-*.log)
+     * and scope the PackDetail Logs tab to its own pack's sessions.
+     * Null id falls back to an unscoped session file.
+     */
+    data class SessionStarted(
+        val targetId: String? = null,
+        val targetLabel: String? = null,
+    ) : LaunchLogEvent()
 
     /** First info line for a new session: `"<AppName>..."`. */
     data object AppBanner : LaunchLogEvent()

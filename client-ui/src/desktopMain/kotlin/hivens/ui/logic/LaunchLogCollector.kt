@@ -38,7 +38,7 @@ fun LaunchLogCollector(
         events.collect { event ->
             val s = currentStrings.value
             when (event) {
-                is LaunchLogEvent.SessionStarted -> gameConsole.startSession()
+                is LaunchLogEvent.SessionStarted -> gameConsole.startSession(event.targetId, event.targetLabel)
                 is LaunchLogEvent.AppBanner -> gameConsole.append("${s.appName}...", LogType.INFO)
                 is LaunchLogEvent.TargetServer -> gameConsole.append(
                     "-> ${event.name}" + if (event.offline) " [OFFLINE]" else "",
