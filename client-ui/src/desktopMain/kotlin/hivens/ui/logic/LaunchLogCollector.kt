@@ -13,6 +13,12 @@ import hivens.ui.utils.GameConsoleService
 import hivens.ui.utils.LogType
 import kotlinx.coroutines.flow.SharedFlow
 
+// Launcher-emitted progress lines: "<Word> <current>/<total>[: detail]".
+// Capture group 1 is the leading word -> the collapse slot key. Game
+// stdout never matches (it leads with "[Thread/LEVEL]:"), so this only
+// folds our own provisioning ticks.
+private val PROGRESS_LINE = Regex("""^([A-Za-z]+) \d+/\d+(:.*)?$""")
+
 /**
  * Drains [LauncherController.events] into [GameConsoleService] with
  * localized text. One process-wide collector lives in `Main.kt`'s
@@ -59,7 +65,20 @@ fun LaunchLogCollector(
                         LauncherLogType.WARN  -> LogType.WARN
                         LauncherLogType.ERROR -> LogType.ERROR
                     }
-                    gameConsole.append(event.text, uiType)
+                    // Collapse high-frequency provisioning progress
+                    // ("Runtime 256/1342: <hash>") into a single mutable
+                    // line instead of one console entry per item. The
+                    // format is the launcher's own (game stdout starts
+                    // with "[Thread/LEVEL]:", never "Runtime N/M"), so
+                    // matching it is unambiguous. The captured slot key
+                    // is the leading word, so a future "Asset N/M" /
+                    // "Library N/M" stream folds the same way.
+                    val progress = PROGRESS_LINE.matchEntire(event.text)
+                    if (progress != null) {
+                        gameConsole.appendOrUpdate("progress.${progress.groupValues[1]}", event.text, uiType)
+                    } else {
+                        gameConsole.append(event.text, uiType)
+                    }
                 }
                 is LaunchLogEvent.Error -> gameConsole.append(localizeError(event.reason, s), LogType.ERROR)
             }

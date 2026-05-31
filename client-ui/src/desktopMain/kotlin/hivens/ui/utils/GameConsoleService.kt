@@ -51,6 +51,17 @@ class GameConsoleService(
 ) {
     val logs = mutableStateListOf<LogEntry>()
 
+    /**
+     * Bumped on every content mutation -- append, in-place
+     * [appendOrUpdate], [prependHistory], clear. The console's
+     * rebuild coalescer observes THIS, not `logs.size`: an
+     * [appendOrUpdate] that overwrites a line in place leaves the size
+     * unchanged, so a size-keyed snapshotFlow would never re-render the
+     * updated progress line.
+     */
+    var revision by mutableIntStateOf(0)
+        private set
+
     var shouldShowConsole by mutableStateOf(false)
 
     /**
@@ -123,6 +134,7 @@ class GameConsoleService(
 
     fun startSession(packId: String? = null, packLabel: String? = null) {
         currentSessionPackId = packId
+        slotEntries.clear()
         synchronized(writerLock) {
             sessionWriter?.close()
             sessionWriter = null
@@ -166,6 +178,55 @@ class GameConsoleService(
         }
     }
 
+    /**
+     * The most recent in-memory entry per progress slot, for
+     * [appendOrUpdate]. Cleared on session start / [clear] so a new
+     * session's progress never mutates the previous session's line.
+     */
+    private val slotEntries = HashMap<String, LogEntry>()
+
+    /**
+     * Append-or-overwrite a single mutable line keyed by [slotId].
+     * First touch appends; subsequent calls replace that line in place
+     * (TTY carriage-return semantics) so a flood of "Runtime 1/1342 ...
+     * 1342/1342" provisioning ticks collapses to one updating line
+     * instead of 1342 separate entries.
+     *
+     * Deliberately NOT mirrored to the session file: these are
+     * launcher-internal provisioning ticks, not game output worth
+     * archiving, and writing every tick would both bloat the file and
+     * break the sliding-window's file/line index alignment. Real
+     * errors during provisioning still arrive via [append] and are
+     * archived normally.
+     */
+    fun appendOrUpdate(slotId: String, text: String, type: LogType = LogType.INFO) {
+        val entry = LogEntry(Redactor.redact(text), type)
+        val prev = slotEntries[slotId]
+        val idx = if (prev != null) logs.indexOf(prev) else -1
+        if (idx >= 0) {
+            logs[idx] = entry
+        } else {
+            logs.add(entry)
+            if (logs.size > maxLines) {
+                logs.removeAt(0)
+                _historyOffset.intValue += 1
+            }
+        }
+        slotEntries[slotId] = entry
+        revision++
+    }
+
+    /**
+     * Prepend paged-in history entries to the front of the live buffer
+     * (sliding-window scroll-up). Routed through the service so the
+     * content [revision] bumps and the console's coalescer re-renders.
+     */
+    fun prependHistory(entries: List<LogEntry>) {
+        if (entries.isEmpty()) return
+        logs.addAll(0, entries)
+        revision++
+    }
+
     fun append(text: String, type: LogType = LogType.INFO) {
         // Redact at append time: the in-memory buffer (which feeds
         // ConsoleWindow, the auto-save file, and `Save to file`
@@ -178,6 +239,7 @@ class GameConsoleService(
             logs.removeAt(0)
             _historyOffset.intValue += 1
         }
+        revision++
 
         synchronized(writerLock) {
             try {
@@ -316,6 +378,8 @@ class GameConsoleService(
 
     fun clear() {
         logs.clear()
+        slotEntries.clear()
+        revision++
         synchronized(writerLock) {
             sessionWriter?.close()
             sessionWriter = null

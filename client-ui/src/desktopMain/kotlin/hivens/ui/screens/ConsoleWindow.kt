@@ -319,7 +319,11 @@ internal fun ConsoleContent(
     var logTick by remember { mutableIntStateOf(0) }
     LaunchedEffect(isLive) {
         if (!isLive) return@LaunchedEffect
-        snapshotFlow { gameConsole.logs.size }
+        // Observe the content revision, not logs.size: an in-place
+        // appendOrUpdate (collapsed provisioning progress) overwrites a
+        // line without changing size, and a size-keyed flow would never
+        // re-render it.
+        snapshotFlow { gameConsole.revision }
             .conflate()
             .distinctUntilChanged()
             .collect { logTick = it }
@@ -470,14 +474,13 @@ internal fun ConsoleContent(
         try {
             val loaded = gameConsole.loadHistoryBefore(count = 500)
             if (loaded.isNotEmpty()) {
-                // SnapshotStateList.addAll(0, ...) prepends; the next
-                // snapshotFlow{logs.size} emit rebuilds matchIndex via
-                // logsCopy, so the AnnotatedString picks the new front
-                // automatically. ScrollState shifts by an approximate
-                // line height per loaded entry; not exact because line
-                // height under wrap depends on glyph metrics, but the
-                // miss is sub-100 px and unnoticeable in practice.
-                gameConsole.logs.addAll(0, loaded)
+                // prependHistory bumps the content revision so the
+                // coalescer rebuilds matchIndex with the new front.
+                // ScrollState shifts by an approximate line height per
+                // loaded entry; not exact because line height under wrap
+                // depends on glyph metrics, but the miss is sub-100 px
+                // and unnoticeable in practice.
+                gameConsole.prependHistory(loaded)
                 val approxLineHeightPx = with(density) { (fontSize * 1.4f).sp.toPx() }
                 val shift = (loaded.size * approxLineHeightPx).toInt()
                 scrollState.scrollTo((scrollState.value + shift).coerceAtMost(scrollState.maxValue))
