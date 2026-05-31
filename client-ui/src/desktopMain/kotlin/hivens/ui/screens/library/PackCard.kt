@@ -39,6 +39,8 @@ import androidx.compose.ui.unit.dp
 import hivens.core.data.PackInstance
 import hivens.core.data.PackLoader
 import hivens.core.data.PackOrigin
+import hivens.ui.i18n.AppStrings
+import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
 import java.time.Duration
 import java.time.Instant
@@ -70,6 +72,7 @@ fun PackCard(
     modifier: Modifier = Modifier,
 ) {
     val bg = originGradient(instance.packRef.origin)
+    val s = LocalStrings.current
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -138,13 +141,13 @@ fun PackCard(
                 ) {
                     Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text("Играть", fontWeight = FontWeight.SemiBold)
+                    Text(s.packCardPlay, fontWeight = FontWeight.SemiBold)
                 }
                 IconButton(onClick = onSettings) {
-                    Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color.White)
+                    Icon(Icons.Default.Settings, contentDescription = s.packCardSettings, tint = Color.White)
                 }
                 IconButton(onClick = onMore) {
-                    Icon(Icons.Default.MoreVert, contentDescription = "More", tint = Color.White)
+                    Icon(Icons.Default.MoreVert, contentDescription = s.packCardMore, tint = Color.White)
                 }
             }
         }
@@ -211,19 +214,20 @@ private fun MetaChip(text: String, emphasis: Boolean = false) {
 
 @Composable
 private fun LastPlayedChip(lastPlayedEpoch: Long) {
+    val s = LocalStrings.current
     if (lastPlayedEpoch <= 0L) {
-        MetaChip("Не запускался")
+        MetaChip(s.packCardNeverPlayed)
         return
     }
     val now = Instant.now()
     val then = Instant.ofEpochSecond(lastPlayedEpoch)
     val dur = Duration.between(then, now)
     val label = when {
-        dur.toMinutes() < 1   -> "только что"
-        dur.toHours()   < 1   -> "${dur.toMinutes()} мин назад"
-        dur.toDays()    < 1   -> "${dur.toHours()} ч назад"
-        dur.toDays()    < 14  -> "${dur.toDays()} дн назад"
-        else                  -> "давно"
+        dur.toMinutes() < 1   -> s.packCardPlayedJustNow
+        dur.toHours()   < 1   -> s.packCardPlayedMinutesAgo(dur.toMinutes())
+        dur.toDays()    < 1   -> s.packCardPlayedHoursAgo(dur.toHours())
+        dur.toDays()    < 14  -> s.packCardPlayedDaysAgo(dur.toDays())
+        else                  -> s.packCardPlayedLongAgo
     }
     MetaChip(label)
 }

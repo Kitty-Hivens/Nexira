@@ -832,4 +832,35 @@ interface AppStrings {
     val editorSurfProfile: String
     val editorSurfServer: String
     val editorSurfTheme: String
+
+    // --- Music player widgets ---
+    val musicPlayerTitle: String
+    val audioPlay: String
+    val audioPause: String
+    val audioStop: String
+    val audioOpenFile: String
+    val audioPickTrack: String
+    val audioVolume: String
+    val audioNoFile: String
+    val audioStatusReady: String
+    val audioStatusPlaying: String
+    val audioStatusPaused: String
+    val audioFormatHint: String
+    val audioNoPlayerHere: String
+    val audioAddMusicPlayer: String
+    val audioErrorUnsupported: String
+    val audioErrorOpenFailed: String
+    val audioErrorDeviceBusy: String
+    val audioErrorPlaybackFailed: String
+
+    // --- Library pack card ---
+    val packCardPlay: String
+    val packCardSettings: String
+    val packCardMore: String
+    val packCardNeverPlayed: String
+    val packCardPlayedJustNow: String
+    fun packCardPlayedMinutesAgo(n: Long): String
+    fun packCardPlayedHoursAgo(n: Long): String
+    fun packCardPlayedDaysAgo(n: Long): String
+    val packCardPlayedLongAgo: String
 }

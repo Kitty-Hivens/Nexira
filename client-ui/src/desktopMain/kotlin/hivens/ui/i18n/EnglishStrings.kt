@@ -802,6 +802,37 @@ object EnglishStrings : AppStrings {
     override val editorSurfProfile     = "Profile"
     override val editorSurfServer      = "Server details"
     override val editorSurfTheme       = "Theme picker"
+
+    // --- Music player widgets ---
+    override val musicPlayerTitle      = "Music player"
+    override val audioPlay             = "Play"
+    override val audioPause            = "Pause"
+    override val audioStop             = "Stop"
+    override val audioOpenFile         = "Open file"
+    override val audioPickTrack        = "Pick a track"
+    override val audioVolume           = "Volume"
+    override val audioNoFile           = "No file"
+    override val audioStatusReady      = "Ready"
+    override val audioStatusPlaying    = "Playing"
+    override val audioStatusPaused     = "Paused"
+    override val audioFormatHint       = "WAV / AU / AIFF supported. MP3 arrives with Skinema."
+    override val audioNoPlayerHere     = "No player on this layout"
+    override val audioAddMusicPlayer   = "Add a Music player"
+    override val audioErrorUnsupported = "Unsupported format -- needs WAV / AU / AIFF."
+    override val audioErrorOpenFailed  = "Could not open the file"
+    override val audioErrorDeviceBusy  = "Audio device is busy"
+    override val audioErrorPlaybackFailed = "Playback failed"
+
+    // --- Library pack card ---
+    override val packCardPlay          = "Play"
+    override val packCardSettings      = "Settings"
+    override val packCardMore          = "More"
+    override val packCardNeverPlayed   = "Never played"
+    override val packCardPlayedJustNow = "just now"
+    override fun packCardPlayedMinutesAgo(n: Long) = "$n min ago"
+    override fun packCardPlayedHoursAgo(n: Long)   = "$n h ago"
+    override fun packCardPlayedDaysAgo(n: Long)    = "$n d ago"
+    override val packCardPlayedLongAgo = "long ago"
 }
 
 private val notificationTimeFormatterCache = java.util.concurrent.ConcurrentHashMap<java.util.Locale, java.time.format.DateTimeFormatter>()

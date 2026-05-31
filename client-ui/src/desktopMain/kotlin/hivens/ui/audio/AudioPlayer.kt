@@ -73,10 +73,10 @@ class AudioPlayer(private val scope: CoroutineScope) {
             )
         } catch (e: UnsupportedAudioFileException) {
             log.warn("Unsupported audio format: ${file.name}", e)
-            _state.value = PlaybackState.Error(file, "Формат не поддерживается -- нужен WAV / AU / AIFF.")
+            _state.value = PlaybackState.Error(file, AudioError.UnsupportedFormat)
         } catch (e: Exception) {
             log.error("Failed to open audio file ${file.name}", e)
-            _state.value = PlaybackState.Error(file, e.message ?: "Не удалось открыть файл")
+            _state.value = PlaybackState.Error(file, AudioError.OpenFailed)
         }
     }
 
@@ -153,10 +153,10 @@ class AudioPlayer(private val scope: CoroutineScope) {
                 }
             } catch (e: LineUnavailableException) {
                 log.error("Audio line unavailable for ${file.name}", e)
-                _state.value = PlaybackState.Error(file, "Аудиоустройство занято")
+                _state.value = PlaybackState.Error(file, AudioError.DeviceBusy)
             } catch (e: Exception) {
                 log.error("Playback failed for ${file.name}", e)
-                _state.value = PlaybackState.Error(file, e.message ?: "Ошибка воспроизведения")
+                _state.value = PlaybackState.Error(file, AudioError.PlaybackFailed)
             } finally {
                 runCatching { newStream.close() }
             }
@@ -289,6 +289,8 @@ sealed class PlaybackState {
 
     data class Error(
         override val file: Path,
-        val message: String,
+        val reason: AudioError,
     ) : PlaybackState()
 }
+
+enum class AudioError { UnsupportedFormat, OpenFailed, DeviceBusy, PlaybackFailed }

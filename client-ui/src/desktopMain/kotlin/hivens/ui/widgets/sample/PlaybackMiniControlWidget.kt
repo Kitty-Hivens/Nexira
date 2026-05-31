@@ -51,6 +51,8 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import hivens.ui.audio.PlaybackState
 import hivens.ui.customization.glassSurfaceAlpha
+import hivens.ui.i18n.AppStrings
+import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.widgets.services.MusicPlayerService
 import hivens.widget.api.useService
@@ -83,6 +85,7 @@ fun PlaybackMiniControlWidget(instance: WidgetInstance) {
 
     val state by service.state.collectAsState()
     val volume by service.volume.collectAsState()
+    val s = LocalStrings.current
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -100,7 +103,7 @@ fun PlaybackMiniControlWidget(instance: WidgetInstance) {
         )
         Spacer(Modifier.width(10.dp))
         Text(
-            text       = currentTitleShort(state),
+            text       = currentTitleShort(state, s),
             style      = MaterialTheme.typography.bodyMedium,
             color      = CelestiaTheme.colors.textPrimary,
             fontWeight = FontWeight.Medium,
@@ -121,7 +124,7 @@ fun PlaybackMiniControlWidget(instance: WidgetInstance) {
             icon        = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
             enabled     = canTransport,
             onClick     = { if (isPlaying) service.pause() else service.play() },
-            description = if (isPlaying) "Пауза" else "Воспроизвести",
+            description = if (isPlaying) s.audioPause else s.audioPlay,
         )
         Spacer(Modifier.width(10.dp))
         MiniVolumeBar(
@@ -134,6 +137,7 @@ fun PlaybackMiniControlWidget(instance: WidgetInstance) {
 
 @Composable
 private fun DisabledPlaceholder() {
+    val s = LocalStrings.current
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
@@ -150,13 +154,13 @@ private fun DisabledPlaceholder() {
         )
         Spacer(Modifier.width(10.dp))
         Text(
-            text  = "Нет плеера на этой раскладке",
+            text  = s.audioNoPlayerHere,
             style = MaterialTheme.typography.bodySmall,
             color = CelestiaTheme.colors.textSecondary,
         )
         Spacer(Modifier.weight(1f))
         Text(
-            text  = "Добавь Music player",
+            text  = s.audioAddMusicPlayer,
             style = MaterialTheme.typography.labelSmall,
             color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.7f),
         )
@@ -265,8 +269,8 @@ private fun MiniVolumeBar(
     }
 }
 
-private fun currentTitleShort(state: PlaybackState): String = when (state) {
-    PlaybackState.Idle       -> "Без файла"
+private fun currentTitleShort(state: PlaybackState, s: AppStrings): String = when (state) {
+    PlaybackState.Idle       -> s.audioNoFile
     is PlaybackState.Ready   -> state.file.name
     is PlaybackState.Playing -> state.file.name
     is PlaybackState.Paused  -> state.file.name
