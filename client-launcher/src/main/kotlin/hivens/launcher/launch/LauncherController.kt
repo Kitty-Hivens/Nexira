@@ -149,6 +149,16 @@ class LauncherController(
     @Volatile private var runningProcess: Process? = null
     private val launchLock = Any()
 
+    /**
+     * Set by [abort] before it destroys the process so the launch
+     * coroutine -- which is parked in the blocking `process.waitFor()`
+     * and resumes with a SIGTERM exit code (143) once destroyed -- knows
+     * the non-zero exit was a user-initiated stop, not a crash. Without
+     * it, aborting a running game flashes a red "exited with code 143"
+     * error + crash notification. Reset at the start of every launch.
+     */
+    @Volatile private var aborting = false
+
     fun launch(
         currentSession: SessionData,
         server: ServerProfile,
@@ -182,6 +192,7 @@ class LauncherController(
             try {
                 _state.value = LaunchState.Prepare(PrepareStage.INIT, 0.0f)
 
+                aborting = false
                 emit(LaunchLogEvent.SessionStarted(server.assetDir, server.name))
                 emit(LaunchLogEvent.AppBanner)
                 emit(LaunchLogEvent.TargetServer(server.name, isOffline))
@@ -337,7 +348,7 @@ class LauncherController(
                 runningProcess = null
                 ActionRing.record("Game exited: ${server.name} (code $exitCode)")
 
-                if (exitCode != 0) {
+                if (exitCode != 0 && !aborting) {
                     fail(LaunchError.ExitCode(exitCode))
                 } else {
                     _state.value = LaunchState.Idle
@@ -396,6 +407,7 @@ class LauncherController(
             try {
                 _state.value = LaunchState.Prepare(PrepareStage.INIT, 0.0f)
 
+                aborting = false
                 emit(LaunchLogEvent.SessionStarted(packInstance.id, packInstance.displayName))
                 emit(LaunchLogEvent.AppBanner)
                 // Mirror packs are public read; surfacing the offline
@@ -486,7 +498,7 @@ class LauncherController(
                 runningProcess = null
                 ActionRing.record("Game exited: ${refreshedInstance.displayName} (code $exitCode)")
 
-                if (exitCode != 0) {
+                if (exitCode != 0 && !aborting) {
                     fail(LaunchError.ExitCode(exitCode))
                 } else {
                     _state.value = LaunchState.Idle
@@ -632,6 +644,7 @@ class LauncherController(
      * spawn a second game.
      */
     fun abort() {
+        aborting = true
         val proc = runningProcess
         runningProcess = null
         runCatching { proc?.destroy() }
