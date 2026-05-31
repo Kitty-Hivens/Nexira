@@ -836,4 +836,8 @@ object GermanStrings : AppStrings {
     override fun packCardPlayedHoursAgo(n: Long)   = "vor $n Std"
     override fun packCardPlayedDaysAgo(n: Long)    = "vor $n T"
     override val packCardPlayedLongAgo = "vor langem"
+
+    // --- Session chip + about logo a11y ---
+    override val sessionsActiveTitle = "Aktive Sitzungen"
+    override val aboutLogoDesc       = "App-Logo"
 }

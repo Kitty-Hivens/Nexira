@@ -837,4 +837,8 @@ object RussianStrings : AppStrings {
     override fun packCardPlayedHoursAgo(n: Long)   = "$n ч назад"
     override fun packCardPlayedDaysAgo(n: Long)    = "$n дн назад"
     override val packCardPlayedLongAgo = "давно"
+
+    // --- Session chip + about logo a11y ---
+    override val sessionsActiveTitle = "Активные сессии"
+    override val aboutLogoDesc       = "Логотип приложения"
 }

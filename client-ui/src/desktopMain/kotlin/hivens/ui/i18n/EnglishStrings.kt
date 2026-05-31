@@ -833,6 +833,10 @@ object EnglishStrings : AppStrings {
     override fun packCardPlayedHoursAgo(n: Long)   = "$n h ago"
     override fun packCardPlayedDaysAgo(n: Long)    = "$n d ago"
     override val packCardPlayedLongAgo = "long ago"
+
+    // --- Session chip + about logo a11y ---
+    override val sessionsActiveTitle = "Active sessions"
+    override val aboutLogoDesc       = "App logo"
 }
 
 private val notificationTimeFormatterCache = java.util.concurrent.ConcurrentHashMap<java.util.Locale, java.time.format.DateTimeFormatter>()

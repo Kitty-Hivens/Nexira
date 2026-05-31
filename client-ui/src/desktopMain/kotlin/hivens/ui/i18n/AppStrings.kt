@@ -863,4 +863,8 @@ interface AppStrings {
     fun packCardPlayedHoursAgo(n: Long): String
     fun packCardPlayedDaysAgo(n: Long): String
     val packCardPlayedLongAgo: String
+
+    // --- Session chip + about logo a11y ---
+    val sessionsActiveTitle: String
+    val aboutLogoDesc: String
 }
