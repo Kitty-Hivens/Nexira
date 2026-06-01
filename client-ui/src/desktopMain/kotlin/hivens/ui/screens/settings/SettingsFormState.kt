@@ -39,6 +39,8 @@ internal class SettingsFormState(initial: SettingsData) {
     var forceProxyMode         by mutableStateOf(initial.forceProxyMode)
     var mimicOverrideEnabled   by mutableStateOf(!initial.mimicVersionOverride.isNullOrBlank())
     var mimicVersionText       by mutableStateOf(initial.mimicVersionOverride ?: "")
+    var useOpenSmrtHelper      by mutableStateOf(initial.useOpenSmrtHelper)
+    var strictModVerification  by mutableStateOf(initial.strictModVerification)
 
     /**
      * Build a [SettingsData] suitable for persistence by overlaying this
@@ -63,6 +65,8 @@ internal class SettingsFormState(initial: SettingsData) {
             jvmBuilderEnabled           = jvmBuilderEnabled,
             forceProxyMode              = forceProxyMode,
             mimicVersionOverride        = normalisedMimic,
+            useOpenSmrtHelper           = useOpenSmrtHelper,
+            strictModVerification       = strictModVerification,
         )
     }
 }

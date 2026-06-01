@@ -42,6 +42,8 @@ import hivens.core.time.Clock
 import hivens.core.time.SystemClock
 import hivens.launcher.cache.CacheFactory
 import hivens.launcher.cache.SmrtPackCaches
+import hivens.launcher.smrt.OpenSmrtHelperResolver
+import hivens.launcher.smrt.SmartyModPlanner
 import hivens.launcher.smrt.SmrtPackClient
 import hivens.launcher.smrt.SmrtSyncService
 import hivens.launcher.update.UpdateApplicators
@@ -438,6 +440,12 @@ val appModule = module {
     // Always wired so toggling on at runtime requires no graph rebuild.
     single { SmrtPackClient(get(named("direct")), caches = get()) }
     single { SmrtSyncService(get(), get()) }
+
+    // Smarty -> open-smrt-network swap. Direct channel: GitHub releases +
+    // raw.githubusercontent.com are public, no SC proxy. The planner is what
+    // both sync paths (LauncherController, AutoSyncService) consult.
+    single { OpenSmrtHelperResolver(get(named("direct")), get(), get()) }
+    single { SmartyModPlanner(get<OpenSmrtHelperResolver>()::resolve, get()) }
     single { PackInstaller(syncService = get(), runtimeProvisioner = get(), repository = get(), dataDir = get()) }
     single {
         MrpackInstaller(
@@ -580,6 +588,7 @@ val appModule = module {
         val dataDir: Path = get()
         val profiles: ProfileManager = get()
         val credentials: CredentialsManager = get()
+        val settings: ISettingsService = get()
         AutoSyncService(
             authService = get(),
             downloadService = get(),
@@ -590,6 +599,8 @@ val appModule = module {
             optionalModsStateProvider = { serverId ->
                 profiles.getProfile(serverId).optionalModsState
             },
+            smartyPlanner = get(),
+            settingsProvider = { settings.getSettings() },
         )
     }
 

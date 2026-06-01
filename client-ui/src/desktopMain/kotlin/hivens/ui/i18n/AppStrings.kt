@@ -33,7 +33,6 @@ interface AppStrings {
     val launchButton: String
     val launchAbort: String
     val launchRunning: String
-    val launchResetError: String
     val launchDownloading: String
 
     // --- Launcher States ---
@@ -47,6 +46,7 @@ interface AppStrings {
     fun stateExitCode(code: Int): String
     fun stateError(msg: String): String
     fun stateMissingAuthProvider(providerKey: String): String
+    fun stateHelperUnavailable(mcVersion: String): String
 
     // --- Auth Success ---
     fun authSuccess(uuid: String): String
@@ -393,6 +393,13 @@ interface AppStrings {
     val settingsForceProxyTitle: String
     val settingsForceProxyDesc: String
 
+    // --- Smarty server controls (Settings → Smarty) ---
+    val settingsSectionSmarty: String
+    val settingsOpenSmrtHelperTitle: String
+    val settingsOpenSmrtHelperDesc: String
+    val settingsStrictModCheckTitle: String
+    val settingsStrictModCheckDesc: String
+
     // --- Data directory (Settings → Data dir) ---
     val settingsSectionDataDir: String
     val settingsDataDirCurrent: String
@@ -546,6 +553,7 @@ interface AppStrings {
     // --- Settings two-column nav labels ---
     val settingsCategoryAppearance: String
     val settingsCategoryNetwork: String
+    val settingsCategorySmarty: String
     val settingsCategoryExperimental: String
     val settingsCategoryAdvanced: String
     val settingsCategoryDiagnostics: String
