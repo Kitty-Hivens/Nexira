@@ -186,6 +186,24 @@ class DefaultCacheTest {
     }
 
     @Test
+    fun `invalidateAll wipes disk and a not-yet-flushed write does not resurrect`() = runTest {
+        val clock = TestClock()
+        val disk = MapDiskStore<String>()
+        // A long debounce keeps the write pending across the invalidateAll, so the
+        // clear has to win over an op that was scheduled before it.
+        val cache = cache(disk, CacheConfig(ttlMs = 10_000, diskDebounceMs = 10_000), clock)
+
+        cache.get("k1") { "v1" }; advanceUntilIdle()      // persisted to disk
+        assertTrue(disk.map.containsKey("k1"))
+        cache.get("k2") { "v2" }                          // write scheduled, still within debounce
+
+        cache.invalidateAll()
+        assertTrue(disk.map.isEmpty(), "invalidateAll wipes disk immediately")
+        advanceUntilIdle()                                // let any pending writer run
+        assertTrue(disk.map.isEmpty(), "a write scheduled before the clear must not resurrect after it")
+    }
+
+    @Test
     fun `a cancelled leader load lets a later get recover (no inFlight leak)`() = runTest {
         val cache = cache(MapDiskStore<String>(), CacheConfig(ttlMs = 10_000), TestClock())
         val job = launch { cache.get("k") { delay(1_000); "v" } } // leader, suspended mid-load
