@@ -530,6 +530,31 @@ class FileDownloadDiskIntegrationTest {
             "manifest jar kept")
     }
 
+    @Test
+    fun `strict prune matches the manifest path, not the basename`() = runBlocking {
+        // The manifest places Foo.jar in a version subdir. A stray top-level
+        // mods/Foo.jar with the same basename is NOT what the server asked for
+        // and Forge would load it as a duplicate -- strict verification must
+        // prune it even though a jar of that name appears in the manifest.
+        val files = mapOf("mods/1.12.2/Foo.jar" to "the real foo".toByteArray())
+        val manifest = manifestOf(files)
+        val (svc, _) = newService(files)
+
+        Files.createDirectories(clientDir.resolve("mods"))
+        Files.write(clientDir.resolve("mods/Foo.jar"), "stray duplicate".toByteArray())
+
+        svc.processSession(
+            sessionWith(manifest), "Industrial", clientDir,
+            null, null, null, null,
+            injectModJar = null, strictModCheck = true,
+        )
+
+        assertTrue(Files.exists(clientDir.resolve("mods/1.12.2/Foo.jar")),
+            "the manifest jar at its declared path is kept")
+        assertTrue(!Files.exists(clientDir.resolve("mods/Foo.jar")),
+            "a same-name jar at a non-manifest path is pruned (no basename free pass)")
+    }
+
     // ── Network failure ───────────────────────────────────────────────────
 
     @Test

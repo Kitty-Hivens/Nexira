@@ -103,8 +103,14 @@ class FileDownloadService(
         // is also name-excepted as a belt-and-suspenders). The allowed set is
         // the post-ignored filesMap, so a stripped Smarty jar is not re-admitted.
         val injectName = injectModJar?.fileName?.toString()
+        // Canonical manifest locations (normalized, relative to the client dir),
+        // e.g. "mods/1.12.2/Foo.jar". Strict verification keeps a jar only at its
+        // manifest path, not by basename -- otherwise a stray top-level
+        // mods/Foo.jar would survive whenever the manifest lists
+        // mods/1.12.2/Foo.jar, and Forge (which scans both) loads the duplicate.
+        val strictAllowed: Set<String> = filesMap.keys.mapTo(HashSet()) { normalizePath(it) }
         if (strictModCheck) {
-            strictPruneMods(targetDir, filesMap.keys, injectName, helperKeepGlobs)
+            strictPruneMods(targetDir, strictAllowed, injectName, helperKeepGlobs)
         }
         if (injectModJar != null) {
             injectHelperJar(targetDir, injectModJar)
@@ -169,6 +175,15 @@ class FileDownloadService(
         // 4. Processing Extra.zip
         processExtraZip(targetDir, filesMap, extraCheckSum, messageUI)
 
+        // Re-run strict verification AFTER extra.zip extraction: the pre-cache
+        // pass above can't see a jar that an upstream extra.zip drops into mods/
+        // during this same sync, so without this the first launch wouldn't be
+        // exact. (In practice SC extra.zip payloads carry configs/scripts, not
+        // mods, so this is normally a no-op -- but it closes the window.)
+        if (strictModCheck) {
+            strictPruneMods(targetDir, strictAllowed, injectName, helperKeepGlobs)
+        }
+
         // 5. Mark this manifest as cleanly synced -- next session with the
         // same manifest hash short-circuits the integrity walk above.
         // Pass the manifest content too: the offline-launch path
@@ -199,30 +214,29 @@ class FileDownloadService(
     }
 
     /**
-     * Deletes every jar in `mods/` whose basename is neither in the manifest
-     * ([manifestKeys], full manifest paths), the injected helper ([injectName]),
-     * nor a match for one of [helperKeepGlobs]. The blunt enforcement behind
-     * "Strict mod verification": removes user-added jars too, which is the
-     * documented intent. [helperKeepGlobs] is what keeps the open-smrt helper
-     * alive on a launch where the resolver couldn't refresh it (so [injectName]
-     * is null) -- without it, strict verification would delete the helper and
-     * the next sync would have no network mod. Mirrors
-     * `SmrtSyncService.pruneOrphanMods`; the recursive walk covers both
-     * top-level `mods/` and version subdirs like `mods/1.12.2/`.
+     * Deletes every jar under `mods/` that the manifest does not place at that
+     * exact relative path ([allowedRelPaths], normalized like
+     * `mods/1.12.2/Foo.jar`), except the injected helper ([injectName] /
+     * [helperKeepGlobs], matched by basename since the helper lives at a single
+     * canonical location). Matching by path rather than basename is what makes
+     * verification *exact*: a stray top-level `mods/Foo.jar` is pruned even when
+     * the manifest legitimately ships `mods/1.12.2/Foo.jar`, so Forge (which
+     * scans both) never loads the duplicate. The blunt enforcement behind
+     * "Strict mod verification" -- removes user-added jars too, which is the
+     * documented intent. The recursive walk covers both top-level `mods/` and
+     * version subdirs.
      */
     private fun strictPruneMods(
         baseDir: Path,
-        manifestKeys: Set<String>,
+        allowedRelPaths: Set<String>,
         injectName: String?,
         helperKeepGlobs: List<String>,
     ) {
         val modsDir = baseDir.resolve("mods")
         if (!Files.isDirectory(modsDir)) return
 
-        val allowed = HashSet<String>(manifestKeys.size + 1)
-        manifestKeys.forEach { allowed.add(normalizePath(it).substringAfterLast('/')) }
-        if (injectName != null) allowed.add(injectName)
         val keepPatterns = helperKeepGlobs.map { globToRegex(it) }
+        val baseNorm = baseDir.normalize()
 
         var removed = 0
         try {
@@ -231,7 +245,11 @@ class FileDownloadService(
                     .filter { Files.isRegularFile(it) && it.fileName.toString().endsWith(".jar") }
                     .forEach { jar ->
                         val name = jar.fileName.toString()
-                        if (name !in allowed && keepPatterns.none { it.matches(name) }) {
+                        val rel = baseNorm.relativize(jar.normalize()).toString().replace('\\', '/')
+                        val keep = rel in allowedRelPaths ||
+                            name == injectName ||
+                            keepPatterns.any { it.matches(name) }
+                        if (!keep) {
                             runCatching {
                                 Files.delete(jar)
                                 removed++
