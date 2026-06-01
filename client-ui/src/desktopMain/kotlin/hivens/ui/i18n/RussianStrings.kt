@@ -46,6 +46,8 @@ object RussianStrings : AppStrings {
     override val stateLaunching   = "Запуск процесса..."
     override fun stateExitCode(code: Int)  = "Игра закрылась с кодом $code"
     override fun stateError(msg: String)   = "Ошибка: $msg"
+    override fun stateHelperUnavailable(mcVersion: String) =
+        "Нет open-smrt хелпера для Minecraft $mcVersion. Запуск заблокирован, чтобы не запускать проприетарный мод Smarty; отключи подмену хелпера в настройках, чтобы играть с ним."
     override fun stateMissingAuthProvider(providerKey: String) = when (providerKey) {
         PackAuthRequirement.SmartyCraft.PROVIDER_KEY ->
             "Этой сборке нужен аккаунт SmartyCraft. Войдите, чтобы играть."
@@ -391,6 +393,12 @@ object RussianStrings : AppStrings {
     override val settingsForceProxyTitle = "Только через прокси"
     override val settingsForceProxyDesc  = "Не пытаться подключаться напрямую — все запросы пойдут через SOCKS-прокси SmartyCraft. Включи если в твоей сети прямое соединение блокируется."
 
+    override val settingsSectionSmarty           = "Серверы Smarty"
+    override val settingsOpenSmrtHelperTitle      = "Использовать альтернативный хелпер для сети smrt"
+    override val settingsStrictModCheckTitle      = "Точная проверка модификаций"
+    override val settingsOpenSmrtHelperDesc       = "Подменяет родной мод Smarty нашим открытым хелпером на каждом сервере Smarty. Те же сетевые функции, но без слежки. Если замену пока не удаётся скачать — остаётся родной мод."
+    override val settingsStrictModCheckDesc       = "После синхронизации удаляет из папки mods всё, чего сервер не запрашивал. Держит сборку чистой, но заодно сносит и моды, которые ты добавил вручную."
+
     override val settingsSectionDataDir       = "Каталог данных"
     override val settingsDataDirCurrent       = "Текущий путь:"
     override val settingsDataDirMove          = "Переместить..."
@@ -523,6 +531,7 @@ object RussianStrings : AppStrings {
 
     override val settingsCategoryAppearance   = "Внешний вид"
     override val settingsCategoryNetwork      = "Сеть"
+    override val settingsCategorySmarty       = "Smarty"
     override val settingsCategoryExperimental = "Эксперименты"
     override val settingsCategoryAdvanced     = "Расширенные"
     override val settingsCategoryDiagnostics  = "Диагностика"

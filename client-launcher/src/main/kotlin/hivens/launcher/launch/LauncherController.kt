@@ -11,12 +11,14 @@ import hivens.core.data.OptionalContentRules
 import hivens.core.data.PackAuthRequirement
 import hivens.core.data.PackInstance
 import hivens.core.data.SessionData
-import hivens.core.data.SettingsData
 import hivens.core.diag.ActionRing
 import hivens.launcher.CredentialsManager
 import hivens.launcher.ManifestCache
 import hivens.launcher.ProfileManager
 import hivens.launcher.di.AppCoroutineScopeHook
+import hivens.launcher.smrt.ClientSyncCoordinator
+import hivens.launcher.smrt.OpenSmrtHelperResolver
+import hivens.launcher.smrt.SmartyModPlanner
 import hivens.launcher.smrt.SmrtPackClient
 import hivens.launcher.smrt.SmrtSyncService
 import kotlinx.coroutines.*
@@ -61,6 +63,7 @@ class LauncherController(
     private val packRepository: IPackRepository,
     private val smrtPackClient: SmrtPackClient,
     private val smrtSyncService: SmrtSyncService,
+    private val smartyPlanner: SmartyModPlanner,
     private val dataDirectory: Path,
     private val appScope: CoroutineScope,
 ) {
@@ -297,34 +300,55 @@ class LauncherController(
                     }
                     emit(LaunchLogEvent.OfflineSkipSync)
                 } else {
-                    downloadService.processSession(
-                        session = session,
-                        serverId = targetServerId,
-                        targetDir = clientDir,
-                        extraCheckSum = server.extraCheckSum,
-                        ignoredFiles = ignoredFiles,
-                        messageUI = { /* log */ },
-                        progressUI = { current, total, bytesRead, totalBytes, speed ->
-                            if (!isActive) return@processSession
-                            _state.value = LaunchState.Downloading(
-                                currentFileIdx   = current,
-                                totalFiles       = total,
-                                downloadedBytes  = bytesRead,
-                                totalBytes       = totalBytes,
-                                speedBytesPerSec = parseSpeedString(speed),
-                            )
-                        },
-                        // Map integrity-walk progress onto the SYNC stage's 0.2..0.7
-                        // sub-range. The actual download progress takes over from
-                        // 0.7 upward via the Downloading state above. Without
-                        // this, the progress bar froze at 20% during the MD5
-                        // walk on 1000-file modpacks -- 5-30s of perceived hang.
-                        verifyUI = { verified, total ->
-                            if (!isActive) return@processSession
-                            val fraction = if (total > 0) verified.toFloat() / total else 0f
-                            setStage(PrepareStage.SYNC, 0.2f + 0.5f * fraction)
-                        },
-                    )
+                    // Smarty swap / strict plan -- computed here (not in the offline
+                    // branch) so an offline launch never makes the resolver's
+                    // doomed network fetch.
+                    val smartyPlan = smartyPlanner.plan(server, session.fileManifest, settings)
+
+                    // Block rather than strip Smarty with no replacement: if the swap
+                    // is on and the manifest ships Smarty but no helper is available
+                    // for this MC version (unsupported version / descriptor down /
+                    // nothing cached), launching would either join with no network
+                    // mod (kick) or, if we kept Smarty, run the surveillance mod.
+                    if (settings.useOpenSmrtHelper && smartyPlan.ignoredAddon.isNotEmpty() &&
+                        !helperPresent(clientDir, server.version, smartyPlan)) {
+                        fail(LaunchError.HelperUnavailable(server.version))
+                        return@launch
+                    }
+
+                    ClientSyncCoordinator.withClientLock(clientDir) {
+                        downloadService.processSession(
+                            session = session,
+                            serverId = targetServerId,
+                            targetDir = clientDir,
+                            extraCheckSum = server.extraCheckSum,
+                            ignoredFiles = ignoredFiles + smartyPlan.ignoredAddon,
+                            messageUI = { /* log */ },
+                            progressUI = { current, total, bytesRead, totalBytes, speed ->
+                                if (!isActive) return@processSession
+                                _state.value = LaunchState.Downloading(
+                                    currentFileIdx   = current,
+                                    totalFiles       = total,
+                                    downloadedBytes  = bytesRead,
+                                    totalBytes       = totalBytes,
+                                    speedBytesPerSec = parseSpeedString(speed),
+                                )
+                            },
+                            // Map integrity-walk progress onto the SYNC stage's 0.2..0.7
+                            // sub-range. The actual download progress takes over from
+                            // 0.7 upward via the Downloading state above. Without
+                            // this, the progress bar froze at 20% during the MD5
+                            // walk on 1000-file modpacks -- 5-30s of perceived hang.
+                            verifyUI = { verified, total ->
+                                if (!isActive) return@processSession
+                                val fraction = if (total > 0) verified.toFloat() / total else 0f
+                                setStage(PrepareStage.SYNC, 0.2f + 0.5f * fraction)
+                            },
+                            injectModJar = smartyPlan.injectJar,
+                            strictModCheck = smartyPlan.strict,
+                            helperKeepGlobs = smartyPlan.helperKeepGlobs,
+                        )
+                    }
                 }
 
                 // 4. Java
@@ -674,6 +698,15 @@ class LauncherController(
         val userState = profileManager.getProfile(server.assetDir).optionalModsState
         return manifestProcessor.calculateIgnoredFiles(server, userState)
     }
+
+    /**
+     * A helper is usable for [mcVersion] when one was resolved this launch
+     * ([SmartyModPlanner.Plan.injectJar]) or a previously-injected one of the
+     * exact expected name is still on disk.
+     */
+    private fun helperPresent(clientDir: Path, mcVersion: String, plan: SmartyModPlanner.Plan): Boolean =
+        plan.injectJar != null ||
+            Files.isRegularFile(clientDir.resolve("mods").resolve(OpenSmrtHelperResolver.helperFileName(mcVersion)))
 
     /**
      * Best-effort parse of FileDownloadService's pre-formatted speed string

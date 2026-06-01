@@ -207,6 +207,7 @@ private fun localizeError(error: LaunchError, s: hivens.ui.i18n.AppStrings): Str
     is LaunchError.OfflineNoManifest    -> s.stateOfflineNoManifest
     is LaunchError.TwoFactorExpired     -> s.auth2faExpired
     is LaunchError.AuthFail             -> "${s.stateAuthFail}: ${error.cause ?: ""}"
+    is LaunchError.HelperUnavailable    -> s.stateHelperUnavailable(error.mcVersion)
     is LaunchError.MissingAuthProvider  -> s.stateMissingAuthProvider(error.providerKey)
 }
 

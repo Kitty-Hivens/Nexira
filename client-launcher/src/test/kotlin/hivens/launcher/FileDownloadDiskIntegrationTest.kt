@@ -376,6 +376,160 @@ class FileDownloadDiskIntegrationTest {
             "non-ignored jar must survive cleanup")
     }
 
+    // ── Smarty swap: strict verification + helper injection ───────────────
+
+    @Test
+    fun `strict mod check deletes foreign jar, keeps manifest jar and injected helper`() = runBlocking {
+        val files = mapOf("mods/keeper.jar" to "keep me".toByteArray())
+        val manifest = manifestOf(files)
+        val (svc, _) = newService(files)
+
+        // A user-added jar the manifest never lists -- strict mode must remove it.
+        Files.createDirectories(clientDir.resolve("mods"))
+        Files.write(clientDir.resolve("mods/foreign.jar"), "i should not be here".toByteArray())
+
+        // The open-smrt helper the launcher injects in Smarty's place.
+        val helper = workDir / "helpers" / "open-smrt-network-1.12.jar"
+        Files.createDirectories(helper.parent)
+        Files.write(helper, "open-smrt bytes".toByteArray())
+
+        svc.processSession(
+            sessionWith(manifest), "Industrial", clientDir,
+            null, null, null, null,
+            injectModJar = helper, strictModCheck = true,
+        )
+
+        assertTrue(Files.exists(clientDir.resolve("mods/keeper.jar")),
+            "manifest jar must survive strict check")
+        assertTrue(!Files.exists(clientDir.resolve("mods/foreign.jar")),
+            "foreign jar absent from manifest must be pruned")
+        assertTrue(Files.exists(clientDir.resolve("mods/open-smrt-network-1.12.jar")),
+            "injected helper must be present and exempt from the strict prune")
+        assertEquals("open-smrt bytes",
+            Files.readString(clientDir.resolve("mods/open-smrt-network-1.12.jar")),
+            "injected helper bytes must match the resolved source")
+    }
+
+    @Test
+    fun `without strict check a foreign jar survives while the helper still injects`() = runBlocking {
+        val files = mapOf("mods/keeper.jar" to "keep me".toByteArray())
+        val manifest = manifestOf(files)
+        val (svc, _) = newService(files)
+
+        Files.createDirectories(clientDir.resolve("mods"))
+        Files.write(clientDir.resolve("mods/foreign.jar"), "left alone".toByteArray())
+
+        val helper = workDir / "helpers" / "open-smrt-network-1.12.jar"
+        Files.createDirectories(helper.parent)
+        Files.write(helper, "open-smrt bytes".toByteArray())
+
+        svc.processSession(
+            sessionWith(manifest), "Industrial", clientDir,
+            null, null, null, null,
+            injectModJar = helper, strictModCheck = false,
+        )
+
+        assertTrue(Files.exists(clientDir.resolve("mods/foreign.jar")),
+            "foreign jar must survive when strict check is off")
+        assertTrue(Files.exists(clientDir.resolve("mods/open-smrt-network-1.12.jar")),
+            "helper must inject regardless of strict check")
+    }
+
+    @Test
+    fun `helper injection is idempotent across re-sync`() = runBlocking {
+        val files = mapOf("mods/keeper.jar" to "keep me".toByteArray())
+        val manifest = manifestOf(files)
+        val (svc, _) = newService(files)
+
+        val helper = workDir / "helpers" / "open-smrt-network-1.12.jar"
+        Files.createDirectories(helper.parent)
+        Files.write(helper, "open-smrt bytes".toByteArray())
+
+        repeat(2) {
+            svc.processSession(
+                sessionWith(manifest), "Industrial", clientDir,
+                null, null, null, null,
+                injectModJar = helper, strictModCheck = true,
+            )
+        }
+
+        assertEquals("open-smrt bytes",
+            Files.readString(clientDir.resolve("mods/open-smrt-network-1.12.jar")),
+            "second sync must leave the helper intact, not duplicate or corrupt it")
+    }
+
+    @Test
+    fun `swapped Smarty in manifest still allows the cache to short-circuit`() = runBlocking {
+        // The upstream manifest lists Smarty; we ignore it (swap) and the jar
+        // never lands on disk. The disk-sanity walk must not treat that
+        // deliberate absence as a reason to refetch on every launch -- otherwise
+        // the default-on swap would kill the cache for every SmartyCraft server.
+        val files = mapOf(
+            "mods/keeper.jar" to "keep me".toByteArray(),
+            "mods/Smarty-1.12.2.jar" to "surveillance".toByteArray(),
+        )
+        val manifest = manifestOf(files)
+        val (svc, requests) = newService(files)
+
+        val helper = workDir / "helpers" / "open-smrt-network-1.12.jar"
+        Files.createDirectories(helper.parent)
+        Files.write(helper, "open-smrt bytes".toByteArray())
+        val ignored = setOf("Smarty-1.12.2.jar")
+
+        svc.processSession(
+            sessionWith(manifest), "Industrial", clientDir,
+            null, ignored, null, null,
+            injectModJar = helper, strictModCheck = true,
+        )
+        val afterFirst = requests.get()
+        assertTrue(!Files.exists(clientDir.resolve("mods/Smarty-1.12.2.jar")),
+            "Smarty must not be downloaded when swapped")
+        assertTrue(Files.exists(clientDir.resolve("mods/open-smrt-network-1.12.jar")),
+            "helper present after first sync")
+
+        svc.processSession(
+            sessionWith(manifest), "Industrial", clientDir,
+            null, ignored, null, null,
+            injectModJar = helper, strictModCheck = true,
+        )
+
+        assertEquals(afterFirst, requests.get(),
+            "second swapped sync must hit the cache -- zero new fetches")
+        assertTrue(!Files.exists(clientDir.resolve("mods/Smarty-1.12.2.jar")),
+            "Smarty stays gone on the cache-hot path")
+        assertTrue(Files.exists(clientDir.resolve("mods/open-smrt-network-1.12.jar")),
+            "helper stays put on the cache-hot path")
+    }
+
+    @Test
+    fun `strict prune keeps the helper by glob even when nothing is injected this launch`() = runBlocking {
+        // The stability fix: a launch where the resolver couldn't refresh the
+        // helper passes injectModJar = null, but helperKeepGlobs still protects
+        // the on-disk helper from strict verification. Without it, strict mode
+        // would delete the helper and the join would lose its network mod.
+        val files = mapOf("mods/keeper.jar" to "keep me".toByteArray())
+        val manifest = manifestOf(files)
+        val (svc, _) = newService(files)
+
+        Files.createDirectories(clientDir.resolve("mods"))
+        Files.write(clientDir.resolve("mods/open-smrt-network-1.12.jar"), "helper bytes".toByteArray())
+        Files.write(clientDir.resolve("mods/foreign.jar"), "delete me".toByteArray())
+
+        svc.processSession(
+            sessionWith(manifest), "Industrial", clientDir,
+            null, null, null, null,
+            injectModJar = null, strictModCheck = true,
+            helperKeepGlobs = listOf("open-smrt-network*.jar"),
+        )
+
+        assertTrue(Files.exists(clientDir.resolve("mods/open-smrt-network-1.12.jar")),
+            "helper must survive strict prune via the keep-glob with no injection this launch")
+        assertTrue(!Files.exists(clientDir.resolve("mods/foreign.jar")),
+            "foreign jar is still pruned")
+        assertTrue(Files.exists(clientDir.resolve("mods/keeper.jar")),
+            "manifest jar kept")
+    }
+
     // ── Network failure ───────────────────────────────────────────────────
 
     @Test

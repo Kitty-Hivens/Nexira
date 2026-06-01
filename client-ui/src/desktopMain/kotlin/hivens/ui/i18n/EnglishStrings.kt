@@ -46,6 +46,8 @@ object EnglishStrings : AppStrings {
     override val stateLaunching   = "Starting process..."
     override fun stateExitCode(code: Int)  = "Game exited with code $code"
     override fun stateError(msg: String)   = "Error: $msg"
+    override fun stateHelperUnavailable(mcVersion: String) =
+        "No open-smrt helper for Minecraft $mcVersion. Launch blocked so the proprietary Smarty mod isn't run; disable the helper swap in Settings to play with it."
     override fun stateMissingAuthProvider(providerKey: String) = when (providerKey) {
         PackAuthRequirement.SmartyCraft.PROVIDER_KEY ->
             "This pack needs a SmartyCraft account. Sign in to play."
@@ -390,6 +392,12 @@ object EnglishStrings : AppStrings {
     override val settingsForceProxyTitle = "Force proxy mode"
     override val settingsForceProxyDesc  = "Skip the direct connection attempt and route every request through the SmartyCraft SOCKS proxy. Enable if you're in a region or network where direct access fails."
 
+    override val settingsSectionSmarty           = "Smarty servers"
+    override val settingsOpenSmrtHelperTitle      = "Use the alternative smrt network helper"
+    override val settingsOpenSmrtHelperDesc       = "Replace the upstream Smarty mod with our open-source helper on every Smarty server. Same network features, none of the surveillance. Falls back to the original mod if the replacement cannot be downloaded yet."
+    override val settingsStrictModCheckTitle      = "Exact mod verification"
+    override val settingsStrictModCheckDesc       = "After syncing, delete everything in the mods folder the server did not ask for. Keeps the install clean, but also removes any mods you added by hand."
+
     override val settingsSectionDataDir       = "Data directory"
     override val settingsDataDirCurrent       = "Current path:"
     override val settingsDataDirMove          = "Move..."
@@ -522,6 +530,7 @@ object EnglishStrings : AppStrings {
 
     override val settingsCategoryAppearance   = "Appearance"
     override val settingsCategoryNetwork      = "Network"
+    override val settingsCategorySmarty       = "Smarty"
     override val settingsCategoryExperimental = "Experimental"
     override val settingsCategoryAdvanced     = "Advanced"
     override val settingsCategoryDiagnostics  = "Diagnostics"

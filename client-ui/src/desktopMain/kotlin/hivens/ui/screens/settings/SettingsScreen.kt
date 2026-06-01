@@ -127,6 +127,10 @@ fun SettingsScreen(
                             form = form,
                             save = ::save,
                         )
+                        SettingsCategory.Smarty -> SmartySection(
+                            form = form,
+                            save = ::save,
+                        )
                         SettingsCategory.Experimental -> ExperimentalSection(
                             form            = form,
                             save            = ::save,

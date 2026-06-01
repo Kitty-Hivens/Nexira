@@ -59,9 +59,14 @@ class FileDownloadService(
         messageUI: ((String) -> Unit)?,
         progressUI: ((Int, Int, Long, Long, String) -> Unit)?,
         verifyUI: ((Int, Int) -> Unit)?,
+        injectModJar: Path?,
+        strictModCheck: Boolean,
+        helperKeepGlobs: List<String>,
     ) = withContext(Dispatchers.IO) {
         val manifest = session.fileManifest ?: throw IOException("File manifest is empty!")
         Files.createDirectories(targetDir)
+
+        val filesMap = flattenManifest(manifest)
 
         // ── Disabled-mod cleanup runs UNCONDITIONALLY ────────────────────
         // Must precede the cache short-circuit below: a stale jar in
@@ -75,6 +80,34 @@ class FileDownloadService(
         // of launch latency.
         if (!ignoredFiles.isNullOrEmpty()) {
             cleanupIgnoredFiles(targetDir, ignoredFiles)
+        }
+
+        // Drop ignored entries from the working set BEFORE the cache gate.
+        // An ignored mod that the manifest still lists (e.g. the upstream
+        // Smarty jar we replace with open-smrt) is deliberately absent from
+        // disk; leaving it in filesMap would fail the disk-sanity walk on
+        // every launch and defeat the cache. The cache key already carries
+        // the ignored set, so a toggle change still invalidates correctly.
+        if (!ignoredFiles.isNullOrEmpty()) {
+            filesMap.keys.removeIf { relativePath ->
+                val clean = normalizePath(relativePath)
+                ignoredFiles.any { clean.endsWith("/$it") || clean == it }
+            }
+        }
+
+        // ── Smarty swap + strict verification -- also pre-cache ──────────
+        // Same reasoning as the disabled-mod cleanup: both must run before
+        // the cache gate so a cache hit still strips foreign jars and keeps
+        // the injected open-smrt helper in place. Strict prune first, then
+        // inject, so the prune can never delete the jar we just placed (it
+        // is also name-excepted as a belt-and-suspenders). The allowed set is
+        // the post-ignored filesMap, so a stripped Smarty jar is not re-admitted.
+        val injectName = injectModJar?.fileName?.toString()
+        if (strictModCheck) {
+            strictPruneMods(targetDir, filesMap.keys, injectName, helperKeepGlobs)
+        }
+        if (injectModJar != null) {
+            injectHelperJar(targetDir, injectModJar)
         }
 
         // ── Manifest cache short-circuit ─────────────────────────────────
@@ -91,7 +124,7 @@ class FileDownloadService(
         // cleanupIgnoredFiles above is the belt that catches stale jars,
         // the cache key is the suspenders that catches missing
         // newly-enabled jars.
-        val manifestHash = manifestCache.hashOf(cacheKeyInputFor(manifest, ignoredFiles))
+        val manifestHash = manifestCache.hashOf(cacheKeyInputFor(manifest, ignoredFiles, injectName, strictModCheck))
         // Disk-sanity gate: the manifest-cache file alone can't tell
         // that the user moved their data dir leaving manifest-cache/
         // behind, deleted clients/<id>/ by hand, removed one mod, or
@@ -116,7 +149,6 @@ class FileDownloadService(
         // entry or the cache silently masks a missing mod and the
         // game crashes downstream with a NoClassDefFoundError the
         // user can't map back to a launcher-side cause.
-        val filesMap = flattenManifest(manifest)
         val cacheValid = manifestCache.isClean(serverId, manifestHash) {
             filesMap.entries.all { (rawPath, fileData) ->
                 val path = targetDir.resolve(normalizePath(rawPath))
@@ -129,16 +161,6 @@ class FileDownloadService(
         if (cacheValid) {
             messageUI?.invoke("Files verified (cached)")
             return@withContext
-        }
-
-        // 2. Filtering -- remove disabled mods from the download set.
-        // (Their on-disk copies, if any, were already removed by the
-        // unconditional cleanupIgnoredFiles pass above the cache gate.)
-        if (!ignoredFiles.isNullOrEmpty()) {
-            filesMap.keys.removeIf { relativePath ->
-                val clean = normalizePath(relativePath)
-                ignoredFiles.any { clean.endsWith("/$it") || clean == it }
-            }
         }
 
         // 3. Downloading
@@ -156,14 +178,105 @@ class FileDownloadService(
     }
 
     /**
-     * Composes the cache-key input as `<canonical-manifest-json>|ignored:<sorted-csv>`.
+     * Composes the cache-key input as
+     * `<canonical-manifest-json>|ignored:<sorted-csv>|inject:<name>|strict:<bool>`.
      * Sorting the ignored set is mandatory -- `Set` iteration order isn't
      * stable, and the cache must be insensitive to insertion order while
-     * sensitive to membership changes.
+     * sensitive to membership changes. The inject + strict bits join the key so
+     * flipping either Smarty setting invalidates a previously-clean sync.
      */
-    private fun cacheKeyInputFor(manifest: FileManifest, ignoredFiles: Set<String>?): String {
+    private fun cacheKeyInputFor(
+        manifest: FileManifest,
+        ignoredFiles: Set<String>?,
+        injectName: String?,
+        strictModCheck: Boolean,
+    ): String {
         val ignored = ignoredFiles?.toSortedSet()?.joinToString(",") ?: ""
-        return indexJson.encodeToString(manifest) + "|ignored:" + ignored
+        return indexJson.encodeToString(manifest) +
+            "|ignored:" + ignored +
+            "|inject:" + (injectName ?: "") +
+            "|strict:" + strictModCheck
+    }
+
+    /**
+     * Deletes every jar in `mods/` whose basename is neither in the manifest
+     * ([manifestKeys], full manifest paths), the injected helper ([injectName]),
+     * nor a match for one of [helperKeepGlobs]. The blunt enforcement behind
+     * "Strict mod verification": removes user-added jars too, which is the
+     * documented intent. [helperKeepGlobs] is what keeps the open-smrt helper
+     * alive on a launch where the resolver couldn't refresh it (so [injectName]
+     * is null) -- without it, strict verification would delete the helper and
+     * the next sync would have no network mod. Mirrors
+     * `SmrtSyncService.pruneOrphanMods`; the recursive walk covers both
+     * top-level `mods/` and version subdirs like `mods/1.12.2/`.
+     */
+    private fun strictPruneMods(
+        baseDir: Path,
+        manifestKeys: Set<String>,
+        injectName: String?,
+        helperKeepGlobs: List<String>,
+    ) {
+        val modsDir = baseDir.resolve("mods")
+        if (!Files.isDirectory(modsDir)) return
+
+        val allowed = HashSet<String>(manifestKeys.size + 1)
+        manifestKeys.forEach { allowed.add(normalizePath(it).substringAfterLast('/')) }
+        if (injectName != null) allowed.add(injectName)
+        val keepPatterns = helperKeepGlobs.map { globToRegex(it) }
+
+        var removed = 0
+        try {
+            Files.walk(modsDir).use { stream ->
+                stream
+                    .filter { Files.isRegularFile(it) && it.fileName.toString().endsWith(".jar") }
+                    .forEach { jar ->
+                        val name = jar.fileName.toString()
+                        if (name !in allowed && keepPatterns.none { it.matches(name) }) {
+                            runCatching {
+                                Files.delete(jar)
+                                removed++
+                                logger.debug("Strict mod check: pruned {}", jar)
+                            }.onFailure { logger.warn("Strict mod check: failed to prune {}", jar, it) }
+                        }
+                    }
+            }
+        } catch (e: Exception) {
+            logger.error("Strict mod check: error walking mods folder", e)
+        }
+        if (removed > 0) logger.info("Strict mod check: pruned {} foreign jar(s) from mods/", removed)
+    }
+
+    private fun globToRegex(glob: String): Regex {
+        val sb = StringBuilder()
+        for (c in glob) {
+            when (c) {
+                '*' -> sb.append(".*")
+                '?' -> sb.append('.')
+                else -> sb.append(Regex.escape(c.toString()))
+            }
+        }
+        return Regex(sb.toString(), RegexOption.IGNORE_CASE)
+    }
+
+    /**
+     * Copies the open-smrt-network helper into `mods/`, replacing the upstream
+     * Smarty coremod the caller stripped via `ignoredFiles`. Always overwrites:
+     * the source bytes were already SHA-256 verified by `OpenSmrtHelperResolver`,
+     * and a size-only skip would miss a same-size helper rebuild. The jar is tiny
+     * (single-digit KB), so an unconditional copy per sync is negligible.
+     */
+    private fun injectHelperJar(baseDir: Path, jar: Path) {
+        if (!Files.isRegularFile(jar)) {
+            logger.warn("open-smrt helper: jar {} missing at inject time; skipping", jar)
+            return
+        }
+        runCatching {
+            val modsDir = baseDir.resolve("mods")
+            Files.createDirectories(modsDir)
+            val dest = modsDir.resolve(jar.fileName.toString())
+            Files.copy(jar, dest, java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+            logger.info("open-smrt helper: injected {}", dest.fileName)
+        }.onFailure { logger.warn("open-smrt helper: failed to inject {}", jar, it) }
     }
 
     /**

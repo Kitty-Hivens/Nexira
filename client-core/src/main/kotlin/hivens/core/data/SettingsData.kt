@@ -135,4 +135,25 @@ data class SettingsData(
      * (current visual feel); see [UiStyle] for available variants.
      */
     val uiStyle: UiStyle = UiStyle.Celestia,
+
+    // ── Smarty server controls ───────────────────────────────────────────
+
+    /**
+     * Swap the upstream Smarty surveillance coremod for our open-smrt-network
+     * helper when syncing a raw SmartyCraft server. The mirror packs already
+     * carry the replacement in their manifest; this brings the same swap to
+     * servers synced straight from SC. The replacement jar is resolved per
+     * MC version from open-smrt-network's GitHub releases -- if no release is
+     * resolvable yet, the sync falls back to the upstream Smarty jar so the
+     * launcher stays functional (with a loud warning).
+     */
+    val useOpenSmrtHelper: Boolean = true,
+
+    /**
+     * After sync, delete every jar in `mods/` that the server manifest does not
+     * list (the injected open-smrt helper aside). The blunt, exact version of
+     * "only what the server asks for runs". Removes user-added client mods
+     * too -- that is the point, and the Settings copy says so.
+     */
+    val strictModVerification: Boolean = true,
 )
