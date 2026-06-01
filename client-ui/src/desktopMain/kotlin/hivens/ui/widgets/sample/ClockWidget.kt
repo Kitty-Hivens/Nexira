@@ -59,12 +59,12 @@ data class ClockProps(
     @PropLabel("Режим") val mode: ClockMode = ClockMode.Both,
     @PropLabel("24-часовой формат") val format24h: Boolean = true,
     @PropLabel("Секунды") val showSeconds: Boolean = true,
-    @PropLabel("Заголовок") val title: String = "Часы",
+    @PropLabel("Заголовок") val title: String = "",
     @PropLabel("Размер циферблата") @PropRange(80.0, 200.0) val faceSize: Int = 140,
     @PropLabel("Цвет акцента") @PropColor val accent: String = "",
 )
 
-// Analog + digital clock with smooth-sweeping seconds. Theme-aware: dial
+// Analog + digital clock with a once-per-second second hand. Theme-aware: dial
 // reads surface, hands read textPrimary, accent (second hand / hub) reads
 // the accent prop or falls back to primary. Per-second tick recomposes
 // only the Canvas + the digital time line; the surrounding card stays
@@ -88,10 +88,11 @@ fun ClockWidget(instance: WidgetInstance) {
     LaunchedEffect(Unit) {
         while (true) {
             now = LocalDateTime.now()
-            // 1Hz tick is enough; the second hand interpolates smoothly
-            // in the canvas using milliseconds-of-second so we do not
-            // need 60Hz recomposition.
-            delay(500L)
+            // Tick once per second, aligned to the next second boundary so the
+            // hand steps cleanly on the second (quartz-style) rather than
+            // drifting or double-stepping. A continuous sweep would need
+            // per-frame recomposition, which a background clock does not earn.
+            delay(1000L - now.nano / 1_000_000L)
         }
     }
 
@@ -101,7 +102,7 @@ fun ClockWidget(instance: WidgetInstance) {
                 .fillMaxSize()
                 .padding(top = 12.dp * scale)
                 .clip(RoundedCornerShape(14.dp * scale))
-                .background(glassSurfaceAlpha(0.45f))
+                .background(glassSurfaceAlpha(0.65f))
                 .padding(horizontal = 16.dp * scale, vertical = 14.dp * scale),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
