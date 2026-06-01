@@ -2,6 +2,7 @@ package hivens.launcher
 
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
+import hivens.core.io.AtomicFiles
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -17,7 +18,6 @@ import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.StandardCopyOption
 
 /**
  * JSON-on-disk [IPackRepository]. Persists the launcher's installed
@@ -93,46 +93,8 @@ class JsonPackRepository(
 
     private suspend fun persist() = withContext(Dispatchers.IO) {
         try {
-            Files.createDirectories(file.parent)
-            val tmp = file.resolveSibling("${file.fileName}.tmp")
             val snapshot = PacksFile(schemaVersion = SCHEMA_VERSION, instances = state.value)
-            Files.writeString(tmp, json.encodeToString(snapshot))
-            // ATOMIC_MOVE so a crash between writeString and move
-            // leaves either the old or the new file, never a
-            // half-written packs.json that the next load() would
-            // reject as malformed and silently empty the library.
-            //
-            // Filesystems that do not support atomic rename (FAT32 on
-            // removable drives, some network shares) throw
-            // AtomicMoveNotSupportedException; without a fallback the
-            // outer catch then swallows it and the in-memory state
-            // diverges from disk indefinitely, so a restart would
-            // empty the library.
-            try {
-                Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
-            } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
-                // Best-effort: the underlying filesystem (typically
-                // FAT32 / exFAT on a removable drive, or some SMB
-                // shares) does not support atomic rename. A non-
-                // atomic REPLACE_EXISTING move decomposes to
-                // delete-target-then-rename on those filesystems,
-                // and a power loss between the two steps leaves
-                // packs.json missing -- next launch loads emptyList()
-                // and the library appears wiped. We surface a WARN
-                // so a user who lands on this branch can correlate
-                // their data-dir choice with the weaker durability
-                // contract; full safety would require a fsync ladder
-                // that POSIX cannot guarantee on these filesystems.
-                log.warn(
-                    "Filesystem at {} does not support ATOMIC_MOVE; " +
-                    "falling back to non-atomic rename. A crash mid-rename " +
-                    "can lose packs.json. Move the data directory to a " +
-                    "filesystem that supports atomic rename (ext4, NTFS, " +
-                    "APFS) for full library durability.",
-                    file.parent,
-                )
-                Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING)
-            }
+            AtomicFiles.writeString(file, json.encodeToString(snapshot))
         } catch (e: CancellationException) {
             // Today persist() has no suspension points inside the
             // try-body, so withContext's cancellation check fires at

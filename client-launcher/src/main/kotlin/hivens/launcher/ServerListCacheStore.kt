@@ -7,9 +7,9 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
+import hivens.core.io.AtomicFiles
 import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.StandardCopyOption
 
 /**
  * Disk snapshot of the most recently fetched dashboard server list.
@@ -87,11 +87,8 @@ class JsonServerListCacheStore(
     override suspend fun save(servers: List<ServerProfile>) {
         withContext(Dispatchers.IO) {
             try {
-                Files.createDirectories(file.parent)
-                val tmp = file.resolveSibling("${file.fileName}.tmp")
                 val snapshot = ServersCacheFile(schemaVersion = SCHEMA_VERSION, servers = servers)
-                Files.writeString(tmp, json.encodeToString(snapshot))
-                Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+                AtomicFiles.writeString(file, json.encodeToString(snapshot))
             } catch (e: Exception) {
                 log.error("Failed to persist servers cache at {}", file, e)
             }
