@@ -2,6 +2,18 @@
   "schema_version": 2,
   "graph": {
     "surfaces": {
+      "appshell.root": {
+        "slots": {
+          "regions": {
+            "orientation": "Row",
+            "widgets": [
+              { "kind": "appshell.region.left",   "instance_id": "appshell-region-left-default" },
+              { "kind": "appshell.region.center", "instance_id": "appshell-region-center-default", "weight": 1.0 },
+              { "kind": "appshell.region.right",  "instance_id": "appshell-region-right-default" }
+            ]
+          }
+        }
+      },
       "home.classic": {
         "slots": {
           "main": {

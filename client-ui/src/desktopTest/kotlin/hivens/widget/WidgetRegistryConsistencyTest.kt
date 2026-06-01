@@ -45,6 +45,10 @@ class WidgetRegistryConsistencyTest {
             "appshell.leftrail.logout",
             "appshell.rightrail.authpanel",
             "appshell.rightrail.compactnews",
+            // shell-as-surface region widgets
+            "appshell.region.left",
+            "appshell.region.center",
+            "appshell.region.right",
             // editor-2 sample widgets
             "home.new.clock",
             "home.new.spacer",
@@ -134,6 +138,9 @@ class WidgetRegistryConsistencyTest {
                 "appshell.leftrail.navbuttons", // bundled rail variant
                 "appshell.rightrail.authpanel",
                 "nav.settings",                  // individual-nav safety: always reachable
+                "appshell.region.left",          // shell regions: the frame must stay whole
+                "appshell.region.center",
+                "appshell.region.right",
             ),
             nonRemovable,
             "non-removable set protects the launcher from being navigation-locked",

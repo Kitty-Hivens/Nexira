@@ -52,6 +52,8 @@ import hivens.ui.editor.EditorSurfaceHost
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.widgets.shell.LeftRailContext
 import hivens.ui.widgets.shell.LocalLeftRailContext
+import hivens.ui.widgets.shell.LocalShellContext
+import hivens.ui.widgets.shell.ShellContext
 import hivens.widget.api.SlotRenderer
 import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId
@@ -98,45 +100,18 @@ fun AppLayout(
     val bypassesList by NetworkState.bypassesState.collectAsState()
     val sslBypass = remember(bypassesList, bypassHost) { NetworkState.bypassFor(bypassHost) }
 
-    // The editor host wraps the WHOLE shell Row (rails included), not just the
-    // center, so its decorators reach rail widgets. The insets keep the edit
-    // chrome anchored over the center pane (past the 64dp rail + 264dp panel,
-    // each plus a 1dp divider).
-    EditorSurfaceHost(
-        currentScreen          = currentScreen,
-        homeView               = homeView,
-        customization          = customization,
-        onCustomizationChanged = onCustomizationChanged,
-        uiStyle                = uiStyle,
-        onUiStyleChanged       = onUiStyleChanged,
-        centerStartInset       = 65.dp,
-        centerEndInset         = 265.dp,
-    ) {
-      Row(Modifier.fillMaxSize().background(rowBackground)) {
-
-        // ── Sidebar 64dp ──────────────────────────────────────────────────
-        AppSidebar(
-            currentScreen   = currentScreen,
-            isAuthenticated = appState is AppState.Authenticated,
-            onScreenChange  = onScreenChange,
-            onLogout        = onLogout
-        )
-
-        VerticalDivider(
-            modifier = Modifier.fillMaxHeight(),
-            color    = glassSurfaceAlpha(0.6f)
-        )
-
-        // ── Main content ──────────────────────────────────────────────────
-        Box(Modifier.weight(1f).fillMaxHeight()) {
-            // Screen-to-screen Crossfade duration follows the active
-            // style. Under Brut (animationMultiplier = 0) the swap is
-            // effectively instant; under Celestia keeps the 180ms fade.
-            val crossfadeMs = LocalStyle.current.animationDurationMs(180)
-            Crossfade(
-                targetState   = currentScreen,
-                animationSpec = tween(crossfadeMs)
-            ) { screen ->
+    // The center region's screen router. Defined here (not in the layout graph)
+    // because navigation is not yet a widget surface; the center region widget
+    // invokes it. Reads currentSession/selectedServer live on each recompose.
+    val centerBody: @Composable () -> Unit = {
+        // Screen-to-screen Crossfade duration follows the active style. Under
+        // Brut (animationMultiplier = 0) the swap is effectively instant; under
+        // Celestia keeps the 180ms fade.
+        val crossfadeMs = LocalStyle.current.animationDurationMs(180)
+        Crossfade(
+            targetState   = currentScreen,
+            animationSpec = tween(crossfadeMs),
+        ) { screen ->
                 when (screen) {
                     Screen.Home -> {
                         val session = currentSession
@@ -255,23 +230,41 @@ fun AppLayout(
                         )
                 }
             }
-        } // end main content Box
+    } // end centerBody
 
-        VerticalDivider(
-            modifier = Modifier.fillMaxHeight(),
-            color    = glassSurfaceAlpha(0.6f)
-        )
+    val shellCtx = ShellContext(
+        currentScreen   = currentScreen,
+        isAuthenticated = appState is AppState.Authenticated,
+        onScreenChange  = onScreenChange,
+        onLogout        = onLogout,
+        appState        = appState,
+        onLogin         = onLogin,
+        sslBypass       = sslBypass,
+        centerBody      = centerBody,
+    )
 
-        // ── Right panel 264dp ─────────────────────────────────────────────
-        RightPanel(
-            appState = appState,
-            onLogin  = onLogin,
-            onLogout = onLogout,
-            sslBypass = sslBypass,
-            modifier = Modifier.width(264.dp).fillMaxHeight()
-        )
-      } // end shell Row
-    } // end EditorSurfaceHost
+    // The editor host wraps the WHOLE shell (rails included) so its decorators
+    // reach rail widgets; the insets keep the chrome over the center pane (past
+    // the 64dp rail + 264dp panel, each plus a 1dp divider). The shell itself is
+    // now a widget surface: appshell.root lays its three region widgets in a Row.
+    EditorSurfaceHost(
+        currentScreen          = currentScreen,
+        homeView               = homeView,
+        customization          = customization,
+        onCustomizationChanged = onCustomizationChanged,
+        uiStyle                = uiStyle,
+        onUiStyleChanged       = onUiStyleChanged,
+        centerStartInset       = 65.dp,
+        centerEndInset         = 265.dp,
+    ) {
+        CompositionLocalProvider(LocalShellContext provides shellCtx) {
+            SlotRenderer(
+                surface  = SurfaceId("appshell.root"),
+                slot     = SlotId("regions"),
+                modifier = Modifier.fillMaxSize().background(rowBackground),
+            )
+        }
+    }
 }
 
 // ─── Sidebar ─────────────────────────────────────────────────────────────────
