@@ -32,6 +32,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.ui.editor.dnd.DropTargetRegistry
+import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
 import hivens.widget.model.SlotPath
 
@@ -51,6 +52,7 @@ fun EmptySlotPlaceholder(
     path: SlotPath,
     registry: DropTargetRegistry,
 ) {
+    val s = LocalStrings.current
     val breath by rememberInfiniteTransition(label = "empty-slot-breath").animateFloat(
         initialValue  = 0.45f,
         targetValue   = 0.85f,
@@ -98,7 +100,7 @@ fun EmptySlotPlaceholder(
                     modifier           = Modifier.padding(end = 6.dp),
                 )
                 Text(
-                    text       = "Перетащи виджет сюда",
+                    text       = s.editorDragWidgetHere,
                     style      = MaterialTheme.typography.bodySmall,
                     color      = CelestiaTheme.colors.textSecondary,
                     fontWeight = FontWeight.Medium,

@@ -1,0 +1,33 @@
+name: i18n-lint
+
+on:
+  pull_request:
+    branches: [stable, Project-Void]
+    paths:
+      - "client-ui/**/*.kt"
+      - "scripts/check-i18n.py"
+      - ".github/workflows/i18n-lint.yml"
+  push:
+    branches: [stable]
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    name: i18n hardcoded strings
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # --strict from the start: the non-annotation baseline is already zero,
+      # so this only fails on NEWLY hardcoded UI strings. Annotation values
+      # (@PropLabel / @Widget displayName) are excluded by the scanner until
+      # the key-indirection pass lands.
+      - name: Scan for hardcoded UI strings
+        run: python3 scripts/check-i18n.py --strict

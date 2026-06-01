@@ -83,6 +83,8 @@ import hivens.core.data.UiStyle
 import hivens.launcher.LayoutGraphRepository
 import hivens.ui.Screen
 import hivens.ui.customization.CustomizationSettings
+import hivens.ui.i18n.AppStrings
+import hivens.ui.i18n.LocalStrings
 import hivens.widget.api.LocalLayoutGraph
 import kotlinx.coroutines.CoroutineScope as KotlinCoroutineScope
 import kotlinx.coroutines.launch
@@ -170,6 +172,7 @@ fun EditorSurfaceHost(
     val layoutRepo: LayoutGraphRepository = koinInject()
     val presetRepo: PresetRepository      = koinInject()
     val coroutineScope = rememberCoroutineScope()
+    val s = LocalStrings.current
 
     var editing       by remember(availableSurfaces) { mutableStateOf(false) }
     var paletteOpen   by remember(availableSurfaces) { mutableStateOf(true) }
@@ -429,16 +432,10 @@ fun EditorSurfaceHost(
                 if (resetSurfaceConfirm && surfaceForReset != null) {
                     AlertDialog(
                         onDismissRequest = { resetSurfaceConfirm = false },
-                        title            = { Text("Сбросить поверхность к умолчанию?") },
+                        title            = { Text(s.editorResetSurfaceTitle) },
                         text             = {
                             Text(
-                                text = buildString {
-                                    append("\"")
-                                    append(humanSurfaceName(surfaceForReset))
-                                    append("\" вернётся к расстановке виджетов из встроенного default-layout. ")
-                                    append("Все локальные изменения на этой поверхности (добавленные виджеты, ")
-                                    append("перестановки, удаления) пропадут. Другие поверхности не тронем.")
-                                },
+                                text = s.editorResetSurfaceBody(humanSurfaceName(surfaceForReset, s)),
                                 style = MaterialTheme.typography.bodyMedium,
                             )
                         },
@@ -446,10 +443,10 @@ fun EditorSurfaceHost(
                             TextButton(onClick = {
                                 controller.resetSurface(surfaceForReset)
                                 resetSurfaceConfirm = false
-                            }) { Text("Сбросить", color = CelestiaTheme.colors.error) }
+                            }) { Text(s.editorReset, color = CelestiaTheme.colors.error) }
                         },
                         dismissButton = {
-                            TextButton(onClick = { resetSurfaceConfirm = false }) { Text("Отмена") }
+                            TextButton(onClick = { resetSurfaceConfirm = false }) { Text(s.editorCancel) }
                         },
                     )
                 }
@@ -545,6 +542,7 @@ private fun EditModeFab(
     modifier: Modifier = Modifier,
 ) {
     val style = LocalStyle.current
+    val s = LocalStrings.current
     val scale by animateFloatAsState(
         targetValue   = if (editing) 1.08f else 1f,
         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
@@ -598,14 +596,14 @@ private fun EditModeFab(
                     enter   = fadeIn(spring()),
                     exit    = fadeOut(spring()),
                 ) {
-                    Icon(Icons.Default.Edit, contentDescription = "Edit layout")
+                    Icon(Icons.Default.Edit, contentDescription = s.editorFabEdit)
                 }
                 AnimatedVisibility(
                     visible = editing,
                     enter   = fadeIn(spring()),
                     exit    = fadeOut(spring()),
                 ) {
-                    Icon(Icons.Default.Check, contentDescription = "Done editing")
+                    Icon(Icons.Default.Check, contentDescription = s.editorFabDone)
                 }
             }
         }
@@ -628,6 +626,7 @@ private fun EditModePill(
     onRequestReset: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val s = LocalStrings.current
     AnimatedVisibility(
         visible  = active,
         enter    = fadeIn(spring()) + slideInVertically(spring()) { -it },
@@ -670,7 +669,7 @@ private fun EditModePill(
                 // handles), which matches user intent.
                 ToolChip(
                     icon       = if (previewing) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                    label      = if (previewing) "Скрыто" else "Просмотр",
+                    label      = if (previewing) s.editorPreviewHidden else s.editorPreview,
                     selected   = previewing,
                     onClick    = onTogglePreview,
                 )
@@ -679,7 +678,7 @@ private fun EditModePill(
                 // Palette toggle.
                 ToolChip(
                     icon     = Icons.Default.Widgets,
-                    label    = if (paletteOpen) "Скрыть" else "Виджеты",
+                    label    = if (paletteOpen) s.editorPaletteToggleHide else s.editorWidgets,
                     selected = paletteOpen,
                     onClick  = onTogglePalette,
                 )
@@ -688,7 +687,7 @@ private fun EditModePill(
                 // Presets dialog.
                 ToolChip(
                     icon     = Icons.Default.Inventory2,
-                    label    = "Пресеты",
+                    label    = s.editorPresetsTitle,
                     selected = false,
                     onClick  = onOpenPresets,
                 )
@@ -702,7 +701,7 @@ private fun EditModePill(
                 // the chip cannot pretend to be live.
                 ToolChip(
                     icon        = Icons.Default.RestartAlt,
-                    label       = "Сбросить",
+                    label       = s.editorReset,
                     selected    = false,
                     onClick     = onRequestReset,
                     destructive = true,
@@ -711,7 +710,7 @@ private fun EditModePill(
                 Spacer(Modifier.width(10.dp))
 
                 Text(
-                    text  = "Esc — выйти",
+                    text  = s.editorEscHint,
                     style = MaterialTheme.typography.labelSmall,
                     color = CelestiaTheme.colors.textSecondary,
                     modifier = Modifier.padding(end = 8.dp),
@@ -723,6 +722,7 @@ private fun EditModePill(
 
 @Composable
 private fun SurfaceChip(surface: SurfaceId, active: Boolean, onClick: () -> Unit) {
+    val s = LocalStrings.current
     val bg = if (active) CelestiaTheme.colors.primary.copy(alpha = 0.18f)
              else Color.Transparent
     val fg = if (active) CelestiaTheme.colors.primary else CelestiaTheme.colors.textSecondary
@@ -745,7 +745,7 @@ private fun SurfaceChip(surface: SurfaceId, active: Boolean, onClick: () -> Unit
             )
             Spacer(Modifier.width(5.dp))
             Text(
-                text       = humanSurfaceShortName(surface),
+                text       = humanSurfaceShortName(surface, s),
                 style      = MaterialTheme.typography.labelSmall,
                 color      = fg,
                 fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
@@ -806,33 +806,33 @@ private fun surfaceIcon(surface: SurfaceId): androidx.compose.ui.graphics.vector
         else                 -> Icons.Default.Home
     }
 
-private fun humanSurfaceShortName(surface: SurfaceId): String = when (surface.value) {
-    "home.classic"        -> "Главная"
-    "home.new"            -> "Главная"
-    "library"             -> "Library"
-    "appshell.leftrail"   -> "Лев. рейл"
-    "appshell.rightrail"  -> "Прав. рейл"
-    "about"               -> "О приложении"
-    "bg.settings"         -> "Фон"
-    "customization"       -> "Стиль"
-    "profile"             -> "Профиль"
-    "server.details"      -> "Сервер"
-    "theme.picker"        -> "Темы"
+private fun humanSurfaceShortName(surface: SurfaceId, s: AppStrings): String = when (surface.value) {
+    "home.classic"        -> s.editorSurfShortHome
+    "home.new"            -> s.editorSurfShortHome
+    "library"             -> s.editorSurfShortLibrary
+    "appshell.leftrail"   -> s.editorSurfShortLeftRail
+    "appshell.rightrail"  -> s.editorSurfShortRightRail
+    "about"               -> s.editorSurfShortAbout
+    "bg.settings"         -> s.editorSurfShortBg
+    "customization"       -> s.editorSurfShortStyle
+    "profile"             -> s.editorSurfShortProfile
+    "server.details"      -> s.editorSurfShortServer
+    "theme.picker"        -> s.editorSurfShortTheme
     else                  -> surface.value
 }
 
-private fun humanSurfaceName(surface: SurfaceId): String = when (surface.value) {
-    "home.classic"        -> "Главная (классика)"
-    "home.new"            -> "Главная (новая)"
-    "library"             -> "Library"
-    "appshell.leftrail"   -> "Боковая панель"
-    "appshell.rightrail"  -> "Правая панель"
-    "about"               -> "О приложении"
-    "bg.settings"         -> "Настройки фона"
-    "customization"       -> "Кастомизация"
-    "profile"             -> "Профиль"
-    "server.details"      -> "Детали сервера"
-    "theme.picker"        -> "Выбор темы"
+private fun humanSurfaceName(surface: SurfaceId, s: AppStrings): String = when (surface.value) {
+    "home.classic"        -> s.editorSurfHomeClassic
+    "home.new"            -> s.editorSurfHomeNew
+    "library"             -> s.editorSurfLibrary
+    "appshell.leftrail"   -> s.editorSurfLeftRail
+    "appshell.rightrail"  -> s.editorSurfRightRail
+    "about"               -> s.editorSurfAbout
+    "bg.settings"         -> s.editorSurfBg
+    "customization"       -> s.editorSurfStyle
+    "profile"             -> s.editorSurfProfile
+    "server.details"      -> s.editorSurfServer
+    "theme.picker"        -> s.editorSurfTheme
     else                  -> surface.value
 }
 

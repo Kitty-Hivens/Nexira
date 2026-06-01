@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.ui.customization.glassSurfaceAlpha
+import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
 import hivens.widget.model.SlotContent
 import hivens.widget.model.SlotOrientation
@@ -27,6 +28,7 @@ import hivens.widget.model.SlotPath
 // dominate the slot it sits in.
 @Composable
 internal fun SlotControl(path: SlotPath, content: SlotContent, controller: EditModeController) {
+    val s = LocalStrings.current
     Row(
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(2.dp),
@@ -35,16 +37,16 @@ internal fun SlotControl(path: SlotPath, content: SlotContent, controller: EditM
             .background(glassSurfaceAlpha(0.8f))
             .padding(3.dp),
     ) {
-        OrientChip("Стек", content.orientation == SlotOrientation.Column) {
+        OrientChip(s.editorSlotStack, content.orientation == SlotOrientation.Column) {
             controller.setSlotOrientation(path, SlotOrientation.Column)
         }
-        OrientChip("Ряд", content.orientation == SlotOrientation.Row) {
+        OrientChip(s.editorSlotRow, content.orientation == SlotOrientation.Row) {
             controller.setSlotOrientation(path, SlotOrientation.Row)
         }
-        OrientChip("Сетка", content.orientation == SlotOrientation.Grid) {
+        OrientChip(s.editorSlotGrid, content.orientation == SlotOrientation.Grid) {
             controller.setSlotOrientation(path, SlotOrientation.Grid)
         }
-        OrientChip("Холст", content.orientation == SlotOrientation.Canvas) {
+        OrientChip(s.editorSlotCanvas, content.orientation == SlotOrientation.Canvas) {
             controller.setSlotOrientation(path, SlotOrientation.Canvas)
         }
         if (content.orientation == SlotOrientation.Grid) {

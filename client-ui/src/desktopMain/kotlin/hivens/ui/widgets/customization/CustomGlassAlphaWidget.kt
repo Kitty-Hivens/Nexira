@@ -3,6 +3,7 @@ package hivens.ui.widgets.customization
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import hivens.ui.customization.ColorRole
+import hivens.ui.i18n.LocalStrings
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 
@@ -15,8 +16,9 @@ fun CustomGlassAlphaWidget(instance: WidgetInstance) {
     val ctx = LocalCustomizationContext.current
     val settings by ctx.settings
     val value = settings.colorOverrides[ColorRole.GLASS_ALPHA]?.toFloatOrNull() ?: 0.6f
+    val s = LocalStrings.current
     LabeledSlider(
-        label  = "Glass alpha",
+        label  = s.customGlassAlpha,
         value  = value,
         range  = 0f..1f,
         format = "%.2f",

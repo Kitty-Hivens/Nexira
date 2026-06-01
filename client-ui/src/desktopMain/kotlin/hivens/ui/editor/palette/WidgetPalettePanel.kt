@@ -42,6 +42,7 @@ import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.editor.EditModeController
 import hivens.ui.editor.dnd.DragController
 import hivens.ui.editor.dnd.DropTargetRegistry
+import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
 import hivens.widget.api.LocalWidgetRegistry
 
@@ -57,6 +58,7 @@ fun WidgetPalettePanel(
     editController: EditModeController,
     modifier: Modifier = Modifier,
 ) {
+    val s = LocalStrings.current
     val registry0 = LocalWidgetRegistry.current
     // Only removable descriptors enter the palette. Non-removable
     // widgets (auth panel, nav.settings, bundled navbuttons) are
@@ -102,7 +104,7 @@ fun WidgetPalettePanel(
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        text       = "Виджеты",
+                        text       = s.editorWidgets,
                         style      = MaterialTheme.typography.titleSmall,
                         color      = CelestiaTheme.colors.textPrimary,
                         fontWeight = FontWeight.SemiBold,
@@ -117,14 +119,14 @@ fun WidgetPalettePanel(
                 IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
                     Icon(
                         imageVector        = Icons.Default.Close,
-                        contentDescription = "Hide palette",
+                        contentDescription = s.editorPaletteHide,
                         tint               = CelestiaTheme.colors.textSecondary,
                         modifier           = Modifier.size(16.dp),
                     )
                 }
             }
             Text(
-                text     = "Перетащи в нужный слот",
+                text     = s.editorPaletteHint,
                 style    = MaterialTheme.typography.labelSmall,
                 color    = CelestiaTheme.colors.textSecondary,
                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 0.dp),
@@ -137,7 +139,7 @@ fun WidgetPalettePanel(
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        text  = "Registry пуст — это build issue.",
+                        text  = s.editorPaletteEmpty,
                         style = MaterialTheme.typography.bodySmall,
                         color = CelestiaTheme.colors.textSecondary,
                     )

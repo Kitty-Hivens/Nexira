@@ -11,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
@@ -20,24 +21,25 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class LibraryHeaderProps(
-    @PropLabel("Заголовок") val title: String = "Библиотека",
-    @PropLabel("Подзаголовок") val subtitle: String = "Установленные сборки",
+    @PropLabel("Заголовок") val title: String = "",
+    @PropLabel("Подзаголовок") val subtitle: String = "",
 )
 
 @Widget(id = "library.header", displayName = "Library Header", propsClass = LibraryHeaderProps::class)
 @Composable
 fun LibraryHeader(instance: WidgetInstance) {
     val p = instance.rememberProps<LibraryHeaderProps>()
+    val s = LocalStrings.current
     Column(Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
         Text(
-            text       = p.title,
+            text       = p.title.ifBlank { s.libraryHeaderTitle },
             style      = MaterialTheme.typography.headlineSmall,
             color      = CelestiaTheme.colors.textPrimary,
             fontWeight = FontWeight.Bold,
         )
         Spacer(Modifier.height(4.dp))
         Text(
-            text  = p.subtitle,
+            text  = p.subtitle.ifBlank { s.libraryHeaderSubtitle },
             style = MaterialTheme.typography.bodyMedium,
             color = CelestiaTheme.colors.textSecondary,
         )

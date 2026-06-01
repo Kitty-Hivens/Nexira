@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
 import java.text.DateFormat
 import java.util.Date
@@ -69,6 +70,7 @@ fun PresetManagerPanel(
 ) {
     if (!visible) return
 
+    val s = LocalStrings.current
     var presets by remember(visible) { mutableStateOf(listProvider()) }
     var newName by remember(visible) { mutableStateOf("") }
     LaunchedEffect(visible) {
@@ -104,20 +106,20 @@ fun PresetManagerPanel(
                         )
                         Spacer(Modifier.width(10.dp))
                         Text(
-                            text       = "Пресеты",
+                            text       = s.editorPresetsTitle,
                             style      = MaterialTheme.typography.titleMedium,
                             color      = CelestiaTheme.colors.textPrimary,
                             fontWeight = FontWeight.SemiBold,
                         )
                     }
                     IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, contentDescription = "Закрыть",
+                        Icon(Icons.Default.Close, contentDescription = s.editorClose,
                              tint = CelestiaTheme.colors.textSecondary)
                     }
                 }
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    text  = "Снимок layout + темы + стиля. Сохрани сейчас, загрузи когда угодно.",
+                    text  = s.editorPresetsIntro,
                     style = MaterialTheme.typography.bodySmall,
                     color = CelestiaTheme.colors.textSecondary,
                 )
@@ -146,7 +148,7 @@ fun PresetManagerPanel(
                         decorationBox = { inner ->
                             if (newName.isEmpty()) {
                                 Text(
-                                    text  = "Имя пресета...",
+                                    text  = s.editorPresetNamePlaceholder,
                                     color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.55f),
                                     style = MaterialTheme.typography.bodyMedium,
                                 )
@@ -173,14 +175,14 @@ fun PresetManagerPanel(
                     ) {
                         Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text("Сохранить", fontWeight = FontWeight.Medium)
+                        Text(s.editorSave, fontWeight = FontWeight.Medium)
                     }
                 }
 
                 Spacer(Modifier.height(16.dp))
 
                 Text(
-                    text       = "Сохранённые (${presets.size})",
+                    text       = s.editorPresetsSaved(presets.size),
                     style      = MaterialTheme.typography.labelMedium,
                     color      = CelestiaTheme.colors.textSecondary,
                     fontWeight = FontWeight.Medium,
@@ -197,7 +199,7 @@ fun PresetManagerPanel(
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(
-                            text  = "Пусто. Сохрани текущий layout как первый пресет.",
+                            text  = s.editorPresetsEmpty,
                             style = MaterialTheme.typography.bodySmall,
                             color = CelestiaTheme.colors.textSecondary,
                         )
@@ -232,6 +234,7 @@ private fun PresetRow(
     onDelete: () -> Unit,
     onExport: () -> Unit,
 ) {
+    val s = LocalStrings.current
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
@@ -265,13 +268,13 @@ private fun PresetRow(
                 contentColor   = Color.White,
             ),
         ) {
-            Text("Применить", fontWeight = FontWeight.Medium, style = MaterialTheme.typography.labelMedium)
+            Text(s.editorApply, fontWeight = FontWeight.Medium, style = MaterialTheme.typography.labelMedium)
         }
         Spacer(Modifier.width(4.dp))
         IconButton(onClick = onExport, modifier = Modifier.size(36.dp)) {
             Icon(
                 imageVector        = Icons.Default.Upload,
-                contentDescription = "Экспорт",
+                contentDescription = s.editorExport,
                 tint               = CelestiaTheme.colors.textSecondary,
                 modifier           = Modifier.size(18.dp),
             )
@@ -279,7 +282,7 @@ private fun PresetRow(
         IconButton(onClick = onDelete, modifier = Modifier.size(36.dp)) {
             Icon(
                 imageVector        = Icons.Default.Delete,
-                contentDescription = "Удалить",
+                contentDescription = s.editorDelete,
                 tint               = CelestiaTheme.colors.error,
                 modifier           = Modifier.size(18.dp),
             )

@@ -42,6 +42,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.editor.EditModeController
+import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalWidgetRegistry
@@ -130,6 +131,7 @@ private fun PropPanelBody(
     controller: EditModeController,
     onDismiss: () -> Unit,
 ) {
+    val s = LocalStrings.current
     val sd = serializer.descriptor
     // Effective values: the encoded default baseline overlaid with the
     // instance's stored overrides. Every key is present, so each field's
@@ -172,7 +174,7 @@ private fun PropPanelBody(
             IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
                 Icon(
                     imageVector        = Icons.Default.Close,
-                    contentDescription = "Закрыть",
+                    contentDescription = s.editorClose,
                     tint               = CelestiaTheme.colors.textSecondary,
                     modifier           = Modifier.size(16.dp),
                 )
@@ -211,7 +213,7 @@ private fun PropPanelBody(
         ) {
             Icon(Icons.Default.RestartAlt, contentDescription = null, modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(6.dp))
-            Text("Сбросить к умолчанию", style = MaterialTheme.typography.labelMedium)
+            Text(s.editorResetToDefault, style = MaterialTheme.typography.labelMedium)
         }
     }
 }

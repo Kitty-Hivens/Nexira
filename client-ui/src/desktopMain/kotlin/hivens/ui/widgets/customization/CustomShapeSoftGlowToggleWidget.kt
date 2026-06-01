@@ -13,6 +13,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
@@ -22,6 +23,7 @@ import hivens.widget.model.WidgetInstance
 fun CustomShapeSoftGlowToggleWidget(instance: WidgetInstance) {
     val ctx = LocalCustomizationContext.current
     val settings by ctx.settings
+    val s = LocalStrings.current
 
     Row(
         modifier              = Modifier.fillMaxWidth().padding(top = 6.dp),
@@ -29,7 +31,7 @@ fun CustomShapeSoftGlowToggleWidget(instance: WidgetInstance) {
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Text(
-            text       = "Decorative glow",
+            text       = s.customSoftGlow,
             color      = CelestiaTheme.colors.textPrimary,
             fontWeight = FontWeight.Medium,
         )

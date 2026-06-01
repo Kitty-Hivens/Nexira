@@ -56,6 +56,7 @@ import hivens.ui.editor.dnd.DragPayload
 import hivens.ui.editor.dnd.DropTargetRegistry
 import hivens.ui.editor.dnd.dragSource
 import hivens.ui.editor.dnd.widgetBounds
+import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.WidgetDescriptor
@@ -92,6 +93,7 @@ fun EditableWidgetChrome(
     onCommitDrop: (committedPointer: androidx.compose.ui.geometry.Offset) -> Unit,
     content: @Composable () -> Unit,
 ) {
+    val s = LocalStrings.current
     val interaction = remember { MutableInteractionSource() }
     val isHovered by interaction.collectIsHoveredAsState()
     var widgetWindowBounds by remember { mutableStateOf<Rect?>(null) }
@@ -188,7 +190,7 @@ fun EditableWidgetChrome(
             ) {
                 Icon(
                     imageVector        = Icons.Default.DragIndicator,
-                    contentDescription = "Drag to reorder",
+                    contentDescription = s.editorDragReorder,
                     tint               = CelestiaTheme.colors.textSecondary,
                     modifier           = Modifier.size(16.dp).padding(0.dp),
                 )
@@ -222,7 +224,7 @@ fun EditableWidgetChrome(
                 ) {
                     Icon(
                         imageVector        = Icons.Default.Close,
-                        contentDescription = "Удалить",
+                        contentDescription = s.editorDelete,
                         tint               = CelestiaTheme.colors.onPrimary,
                         modifier           = Modifier.size(14.dp).padding(0.dp).graphicsLayer { },
                     )
@@ -259,7 +261,7 @@ fun EditableWidgetChrome(
                 ) {
                     Icon(
                         imageVector        = Icons.Default.Tune,
-                        contentDescription = "Настроить",
+                        contentDescription = s.editorConfigure,
                         tint               = CelestiaTheme.colors.onPrimary,
                         modifier           = Modifier.size(14.dp).padding(0.dp),
                     )
@@ -300,7 +302,7 @@ fun EditableWidgetChrome(
                 ) {
                     Icon(
                         imageVector        = Icons.Default.DeleteForever,
-                        contentDescription = "Удалить принудительно",
+                        contentDescription = s.editorForceRemove,
                         tint               = CelestiaTheme.colors.onPrimary,
                         modifier           = Modifier.size(14.dp).padding(0.dp),
                     )
@@ -326,18 +328,10 @@ fun EditableWidgetChrome(
     if (forceRemoveOpen) {
         AlertDialog(
             onDismissRequest = { forceRemoveOpen = false },
-            title            = { Text("Удалить виджет принудительно?") },
+            title            = { Text(s.editorForceRemoveTitle) },
             text             = {
                 Text(
-                    text = buildString {
-                        append("\"")
-                        append(descriptor.displayName)
-                        append("\" помечен как неудаляемый. ")
-                        append("Обычно такие виджеты держат на месте, чтобы пользователь не остался ")
-                        append("без навигации. Если ты уверен, что виджет тут не нужен, можно ")
-                        append("снести его прямо сейчас -- а если что, сбрось поверхность к умолчанию ")
-                        append("через меню справа от чипа поверхности.")
-                    },
+                    text = s.editorForceRemoveBody(descriptor.displayName),
                     style = MaterialTheme.typography.bodyMedium,
                 )
             },
@@ -345,10 +339,10 @@ fun EditableWidgetChrome(
                 TextButton(onClick = {
                     forceRemoveOpen = false
                     onRemove()
-                }) { Text("Удалить", color = CelestiaTheme.colors.error) }
+                }) { Text(s.editorDelete, color = CelestiaTheme.colors.error) }
             },
             dismissButton = {
-                TextButton(onClick = { forceRemoveOpen = false }) { Text("Отмена") }
+                TextButton(onClick = { forceRemoveOpen = false }) { Text(s.editorCancel) }
             },
         )
     }

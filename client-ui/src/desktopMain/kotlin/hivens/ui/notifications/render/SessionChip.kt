@@ -28,6 +28,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import hivens.ui.i18n.LocalStrings
 import hivens.ui.notifications.SessionRegistry
 import hivens.ui.notifications.SessionRegistry.ActiveSession
 import hivens.ui.theme.CelestiaTheme
@@ -38,10 +39,11 @@ import java.time.Duration
 fun ActiveSessionsSection(registry: SessionRegistry = koinInject()) {
     val active by registry.active.collectAsState()
     if (active.isEmpty()) return
+    val s = LocalStrings.current
 
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(
-            text       = "Active sessions",
+            text       = s.sessionsActiveTitle,
             style      = MaterialTheme.typography.labelSmall,
             color      = CelestiaTheme.colors.textSecondary,
             fontWeight = FontWeight.Medium,
@@ -55,6 +57,7 @@ fun ActiveSessionsSection(registry: SessionRegistry = koinInject()) {
 @Composable
 fun SessionChip(session: ActiveSession) {
     val uptime by session.uptime.collectAsState()
+    val s = LocalStrings.current
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -87,14 +90,14 @@ fun SessionChip(session: ActiveSession) {
             IconButton(onClick = session.showConsole) {
                 Icon(
                     imageVector       = Icons.AutoMirrored.Default.MenuOpen,
-                    contentDescription = "Show console",
+                    contentDescription = s.notifActionShowConsole,
                     tint              = CelestiaTheme.colors.textSecondary,
                 )
             }
             IconButton(onClick = session.abort) {
                 Icon(
                     imageVector       = Icons.Default.Stop,
-                    contentDescription = "Stop",
+                    contentDescription = s.notifActionStop,
                     tint              = CelestiaTheme.colors.error,
                 )
             }
