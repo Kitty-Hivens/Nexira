@@ -31,6 +31,16 @@ import hivens.launcher.runtime.loader.LoaderRegistry
 import hivens.launcher.runtime.loader.ModernInstallerResolver
 import hivens.launcher.security.KeyringStorageFactory
 import hivens.launcher.smrt.ModIconResolver
+import hivens.core.api.dto.smrt.ModrinthProject
+import hivens.core.api.dto.smrt.ModrinthVersion
+import hivens.core.api.dto.smrt.SmrtPackListing
+import hivens.core.api.dto.smrt.SmrtPackManifest
+import hivens.core.api.dto.smrt.SmrtPackSummary
+import hivens.core.cache.CacheConfig
+import hivens.core.time.Clock
+import hivens.core.time.SystemClock
+import hivens.launcher.cache.CacheFactory
+import hivens.launcher.cache.SmrtPackCaches
 import hivens.launcher.smrt.SmrtPackClient
 import hivens.launcher.smrt.SmrtSyncService
 import hivens.launcher.update.UpdateApplicators
@@ -397,11 +407,35 @@ val appModule = module {
     }
     single<IFileDownloadService> { FileDownloadService(get(), get(), get(), get<ServerProtocolConfig>()) }
 
+    // Cross-cutting cache layer. CacheFactory shares the app Json, the
+    // process-lifetime IO scope, and a system clock; each pack-metadata endpoint
+    // gets its own disk-backed, TTL + stale-while-revalidate namespace.
+    single<Clock> { SystemClock }
+    single { CacheFactory(rootDir = get<Path>().resolve("cache"), json = get(), scope = get(), clock = get()) }
+    single {
+        val f: CacheFactory = get()
+        val min = 60_000L
+        val hour = 60 * min
+        val day = 24 * hour
+        SmrtPackCaches(
+            // Browse listing + per-pack summary: change occasionally; serve stale
+            // for a day on outage.
+            listing = f.create("pack-listing", SmrtPackListing.serializer(), CacheConfig(ttlMs = 5 * min, staleTtlMs = day)),
+            summary = f.create("pack-summary", SmrtPackSummary.serializer(), CacheConfig(ttlMs = 10 * min, staleTtlMs = day)),
+            // Manifests change on a pack release; pinned-version manifests are
+            // immutable and ride the same namespace as long-lived hits.
+            manifest = f.create("pack-manifest", SmrtPackManifest.serializer(), CacheConfig(ttlMs = 10 * min, staleTtlMs = 7 * day)),
+            // Modrinth project metadata (icons) rarely changes; a version is immutable.
+            modrinthProject = f.create("modrinth-project", ModrinthProject.serializer(), CacheConfig(ttlMs = hour, staleTtlMs = 7 * day)),
+            modrinthVersion = f.create("modrinth-version", ModrinthVersion.serializer(), CacheConfig(ttlMs = 7 * day, staleTtlMs = 30 * day)),
+        )
+    }
+
     // Hivens Mirror sync. Uses the "direct" HttpClient because
     // smrt.hivens.dev and Modrinth are public CDN-fronted endpoints
     // that don't need the SC channel's SOCKS proxy or SSL bypass.
     // Always wired so toggling on at runtime requires no graph rebuild.
-    single { SmrtPackClient(get(named("direct"))) }
+    single { SmrtPackClient(get(named("direct")), caches = get()) }
     single { SmrtSyncService(get(), get()) }
     single { PackInstaller(syncService = get(), runtimeProvisioner = get(), repository = get(), dataDir = get()) }
     single {

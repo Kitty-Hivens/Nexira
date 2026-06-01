@@ -5,7 +5,9 @@ import hivens.core.cache.CacheConfig
 import hivens.core.cache.DefaultCache
 import hivens.core.time.Clock
 import hivens.core.time.SystemClock
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
 import java.nio.file.Path
@@ -21,9 +23,10 @@ class CacheFactory(
     private val json: Json,
     private val scope: CoroutineScope,    // shared app scope (SupervisorJob + IO)
     private val clock: Clock = SystemClock,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     fun <V> create(namespace: String, serializer: KSerializer<V>, config: CacheConfig<V>): Cache<V> {
         val disk = JsonDiskStore(rootDir.resolve(namespace), serializer, json)
-        return DefaultCache(disk, config, scope, clock, namespace)
+        return DefaultCache(disk, config, scope, clock, namespace, ioDispatcher)
     }
 }
