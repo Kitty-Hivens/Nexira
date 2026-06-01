@@ -3,7 +3,16 @@ package hivens.launcher
 import hivens.core.api.ServerRepository
 import hivens.core.api.dto.SmartyServer
 import hivens.core.api.protocol.LoaderResponse
+import hivens.core.cache.Cache
+import hivens.core.cache.CacheConfig
+import hivens.core.cache.DefaultCache
+import hivens.core.cache.NoOpDiskStore
+import hivens.core.data.DashboardData
+import hivens.core.time.SystemClock
 import hivens.test.FakeServerProtocol
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -23,6 +32,16 @@ import kotlin.time.Duration.Companion.milliseconds
  */
 class SmartyCraftServerListServiceTest {
 
+    // The single-flight + in-memory dedup now live in the injected cache (the
+    // service's own field is gone), so the tests provide a real in-memory one.
+    private fun memCache(): Cache<DashboardData> = DefaultCache(
+        diskStore = NoOpDiskStore(),
+        config = CacheConfig(ttlMs = Long.MAX_VALUE / 2, shouldStore = { it.servers.isNotEmpty() }),
+        scope = CoroutineScope(Dispatchers.IO + SupervisorJob()),
+        clock = SystemClock,
+        namespace = "dashboard-test",
+    )
+
     @Test
     fun `concurrent fetchDashboardData fires the underlying repo only once`() = runBlocking {
         val protocol = FakeServerProtocol().apply {
@@ -35,7 +54,7 @@ class SmartyCraftServerListServiceTest {
             }
         }
         val repo = ServerRepository(protocol)
-        val svc = SmartyCraftServerListService(repo)
+        val svc = SmartyCraftServerListService(repo, dashboardCache = memCache())
 
         val parallel = 32
         val results = coroutineScope {
@@ -52,7 +71,7 @@ class SmartyCraftServerListServiceTest {
             // Cache only memorizes a non-empty result -- give it something to bite on.
             loaderResult = { LoaderResponse(status = "OK", servers = listOf(SmartyServer(id = "Industrial", ip = "127.0.0.1"))) }
         }
-        val svc = SmartyCraftServerListService(ServerRepository(protocol))
+        val svc = SmartyCraftServerListService(ServerRepository(protocol), dashboardCache = memCache())
 
         val first = svc.fetchDashboardData().await()
         val second = svc.fetchDashboardData().await()
@@ -69,12 +88,36 @@ class SmartyCraftServerListServiceTest {
         val protocol = FakeServerProtocol().apply {
             loaderResult = { LoaderResponse(status = "ERROR") }
         }
-        val svc = SmartyCraftServerListService(ServerRepository(protocol))
+        val svc = SmartyCraftServerListService(ServerRepository(protocol), dashboardCache = memCache())
 
         svc.fetchDashboardData().await()
         delay(10.milliseconds)
         svc.fetchDashboardData().await()
 
         assertEquals(2, protocol.loaderCalls.size, "empty result must not be cached")
+    }
+
+    private class RecordingStore : ServerListCacheStore {
+        val saved = mutableListOf<List<hivens.core.api.model.ServerProfile>>()
+        override fun load(): List<hivens.core.api.model.ServerProfile> = emptyList()
+        override suspend fun save(servers: List<hivens.core.api.model.ServerProfile>) { saved += servers }
+    }
+
+    @Test
+    fun `tray seed is written on success but not on an empty result`() = runBlocking {
+        val ok = FakeServerProtocol().apply {
+            loaderResult = { LoaderResponse(status = "OK", servers = listOf(SmartyServer(id = "Industrial", ip = "127.0.0.1"))) }
+        }
+        val store = RecordingStore()
+        SmartyCraftServerListService(ServerRepository(ok), cache = store, dashboardCache = memCache())
+            .fetchDashboardData().await()
+        assertEquals(1, store.saved.size, "a successful fetch seeds the tray cache")
+        assertEquals("Industrial", store.saved.single().single().assetDir)
+
+        val down = FakeServerProtocol().apply { loaderResult = { LoaderResponse(status = "ERROR") } }
+        val store2 = RecordingStore()
+        SmartyCraftServerListService(ServerRepository(down), cache = store2, dashboardCache = memCache())
+            .fetchDashboardData().await()
+        assertEquals(0, store2.saved.size, "an empty/failed fetch must not overwrite the tray seed")
     }
 }

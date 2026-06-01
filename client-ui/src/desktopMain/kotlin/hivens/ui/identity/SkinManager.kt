@@ -3,6 +3,9 @@ package hivens.ui.identity
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import hivens.core.api.HttpClientProvider
+import hivens.core.io.AtomicFiles
+import hivens.core.time.Clock
+import hivens.core.time.SystemClock
 import hivens.launcher.platform.PlatformPaths
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -42,7 +45,8 @@ import org.jetbrains.skia.Rect
  */
 class SkinManager(
     private val clientProvider: HttpClientProvider,
-    private val paths: PlatformPaths
+    private val paths: PlatformPaths,
+    private val clock: Clock = SystemClock,
 ) {
     private val httpClient get() = clientProvider.current
 
@@ -188,8 +192,8 @@ class SkinManager(
 
     // ── Disk cache helpers ─────────────────────────────────────────────────
 
-    private fun isExpired(file: File): Boolean {
-        return System.currentTimeMillis() - file.lastModified() > CACHE_TTL_MS
+    internal fun isExpired(file: File): Boolean {
+        return clock.nowMillis() - file.lastModified() > CACHE_TTL_MS
     }
 
     private suspend fun getOrDownloadRawSkin(nickname: String): Image? {
@@ -210,11 +214,10 @@ class SkinManager(
 
         // Save raw to disk
         try {
-            rawFile.parentFile?.mkdirs()
             // Re-encode as PNG for caching
             val data = image.encodeToData(org.jetbrains.skia.EncodedImageFormat.PNG)
             if (data != null) {
-                rawFile.writeBytes(data.bytes)
+                AtomicFiles.writeBytes(rawFile.toPath(), data.bytes)
             }
         } catch (e: Exception) {
             logger.warn("Failed to save raw skin to disk: {}", e.message)
@@ -230,8 +233,7 @@ class SkinManager(
                 image.encodeToData(org.jetbrains.skia.EncodedImageFormat.PNG)
             }
             if (data != null) {
-                file.parentFile?.mkdirs()
-                file.writeBytes(data.bytes)
+                AtomicFiles.writeBytes(file.toPath(), data.bytes)
             }
         } catch (e: Exception) {
             logger.warn("Failed to save rendered skin to disk: {}", e.message)
