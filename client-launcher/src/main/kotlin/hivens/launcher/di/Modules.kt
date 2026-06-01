@@ -37,6 +37,7 @@ import hivens.core.api.dto.smrt.SmrtPackListing
 import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.dto.smrt.SmrtPackSummary
 import hivens.core.cache.CacheConfig
+import hivens.core.data.DashboardData
 import hivens.core.time.Clock
 import hivens.core.time.SystemClock
 import hivens.launcher.cache.CacheFactory
@@ -525,7 +526,21 @@ val appModule = module {
         )
     }
 
-    single<IServerListService> { SmartyCraftServerListService(get(), get(), get()) }
+    single<IServerListService> {
+        // In-memory dashboard cache (single-flight + 10-min SWR). The disk seed
+        // for the tray stays in ServerListCacheStore (servers-only, read
+        // synchronously before any coroutine); empty results don't get stored.
+        val dashboardCache = get<CacheFactory>().createInMemory<DashboardData>(
+            "dashboard",
+            CacheConfig(
+                ttlMs = 10 * 60_000L,
+                staleTtlMs = Long.MAX_VALUE,
+                maxEntries = 4,
+                shouldStore = { it.servers.isNotEmpty() },
+            ),
+        )
+        SmartyCraftServerListService(get(), get(), get(), dashboardCache)
+    }
 
     // JSON-on-disk pack registry. Persists installed PackInstances
     // to <dataDir>/packs.json so Library reflects real state across

@@ -3,6 +3,7 @@ package hivens.launcher.cache
 import hivens.core.cache.Cache
 import hivens.core.cache.CacheConfig
 import hivens.core.cache.DefaultCache
+import hivens.core.cache.NoOpDiskStore
 import hivens.core.time.Clock
 import hivens.core.time.SystemClock
 import kotlinx.coroutines.CoroutineDispatcher
@@ -29,4 +30,8 @@ class CacheFactory(
         val disk = JsonDiskStore(rootDir.resolve(namespace), serializer, json)
         return DefaultCache(disk, config, scope, clock, namespace, ioDispatcher)
     }
+
+    /** In-memory only (no disk persistence) -- single-flight + TTL + SWR, no serializer needed. */
+    fun <V> createInMemory(namespace: String, config: CacheConfig<V>): Cache<V> =
+        DefaultCache(NoOpDiskStore(), config, scope, clock, namespace, ioDispatcher)
 }
