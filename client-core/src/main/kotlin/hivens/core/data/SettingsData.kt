@@ -143,9 +143,10 @@ data class SettingsData(
      * helper when syncing a raw SmartyCraft server. The mirror packs already
      * carry the replacement in their manifest; this brings the same swap to
      * servers synced straight from SC. The replacement jar is resolved per
-     * MC version from open-smrt-network's GitHub releases -- if no release is
-     * resolvable yet, the sync falls back to the upstream Smarty jar so the
-     * launcher stays functional (with a loud warning).
+     * MC version from open-smrt-network's GitHub releases. Authoritative: the
+     * Smarty jar is always stripped, never re-admitted. If no replacement is
+     * available for the server's MC version (and none is cached on disk), the
+     * launch is BLOCKED rather than running the surveillance mod.
      */
     val useOpenSmrtHelper: Boolean = true,
 

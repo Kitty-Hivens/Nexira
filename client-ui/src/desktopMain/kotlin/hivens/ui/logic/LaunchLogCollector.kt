@@ -91,10 +91,9 @@ fun LaunchLogCollector(
 }
 
 /**
- * Mirrors `localizeError` in `LaunchControlPanel`. Kept as a private
- * helper rather than shared so the two consumers (status row + console
- * pane) can diverge independently. Strings are passed in (not read from
- * a global) so the caller controls which locale snapshot is used.
+ * Localizes a [LaunchError] for the console pane. Private (not shared) so the
+ * console copy can diverge from the notification driver's phrasing. Strings are
+ * passed in (not read from a global) so the caller controls the locale snapshot.
  */
 private fun localizeError(error: LaunchError, s: AppStrings): String = when (error) {
     is LaunchError.ExitCode             -> s.stateExitCode(error.code)

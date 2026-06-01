@@ -196,23 +196,30 @@ class AutoSyncService(
             }
             if (session == null) continue  // SKIPPED above; counters not bumped (it's neither succeeded nor failed)
 
-            val ok = runCatching {
-                val settings = settingsProvider()
-                val userState = optionalModsStateProvider(server.assetDir)
-                val ignoredFiles = manifestProcessor.calculateIgnoredFiles(server, userState)
-                val clientDir = dataDirectory.resolve("clients").resolve(server.assetDir)
-                val smartyPlan = smartyPlanner.plan(server, session.fileManifest, settings)
-
-                // Refuse to strip Smarty with no replacement (same gate as a
-                // foreground launch): don't mutate the pack into a broken state in
-                // the background. Surfaces as FAILED for this server.
-                if (settings.useOpenSmrtHelper && smartyPlan.ignoredAddon.isNotEmpty() &&
-                    !helperPresent(clientDir, server.version, smartyPlan)) {
-                    throw IllegalStateException(
-                        "open-smrt helper unavailable for ${server.version}; refusing to strip Smarty without a replacement"
-                    )
+            val settings = settingsProvider()
+            val userState = optionalModsStateProvider(server.assetDir)
+            val ignoredFiles = manifestProcessor.calculateIgnoredFiles(server, userState)
+            val clientDir = dataDirectory.resolve("clients").resolve(server.assetDir)
+            val smartyPlan = runCatching { smartyPlanner.plan(server, session.fileManifest, settings) }
+                .getOrElse {
+                    log.warn("Auto-sync: Smarty planning failed for {}: {}", server.assetDir, it.message)
+                    updateServerState(server.assetDir, ServerState.FAILED)
+                    failed++
+                    continue
                 }
 
+            // Refuse to strip Smarty with no replacement (same gate as a foreground
+            // launch): don't mutate the pack into a broken state in the background.
+            // This is "awaiting upstream/user action", not a failure -> SKIPPED, the
+            // same convention the 2FA branch uses.
+            if (settings.useOpenSmrtHelper && smartyPlan.ignoredAddon.isNotEmpty() &&
+                !helperPresent(clientDir, server.version, smartyPlan)) {
+                log.info("Auto-sync skipped for {}: no open-smrt helper for MC {}", server.assetDir, server.version)
+                updateServerState(server.assetDir, ServerState.SKIPPED)
+                continue
+            }
+
+            val ok = runCatching {
                 ClientSyncCoordinator.withClientLock(clientDir) {
                     downloadService.processSession(
                         session = session,

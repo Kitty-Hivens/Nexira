@@ -33,7 +33,6 @@ object RussianStrings : AppStrings {
     override val launchButton      = "Играть"
     override val launchAbort       = "Отмена"
     override val launchRunning     = "Игра запущена"
-    override val launchResetError  = "Сбросить ошибку"
     override val launchDownloading = "Загрузка:"
 
     // Launcher States
@@ -396,7 +395,7 @@ object RussianStrings : AppStrings {
     override val settingsSectionSmarty           = "Серверы Smarty"
     override val settingsOpenSmrtHelperTitle      = "Использовать альтернативный хелпер для сети smrt"
     override val settingsStrictModCheckTitle      = "Точная проверка модификаций"
-    override val settingsOpenSmrtHelperDesc       = "Подменяет родной мод Smarty нашим открытым хелпером на каждом сервере Smarty. Те же сетевые функции, но без слежки. Если замену пока не удаётся скачать — остаётся родной мод."
+    override val settingsOpenSmrtHelperDesc       = "Подменяет родной мод Smarty нашим открытым хелпером на серверах Smarty. Те же сетевые функции, но без слежки. Если для версии игры замены нет, запуск блокируется, а не запускает родной мод."
     override val settingsStrictModCheckDesc       = "После синхронизации удаляет из папки mods всё, чего сервер не запрашивал. Держит сборку чистой, но заодно сносит и моды, которые ты добавил вручную."
 
     override val settingsSectionDataDir       = "Каталог данных"

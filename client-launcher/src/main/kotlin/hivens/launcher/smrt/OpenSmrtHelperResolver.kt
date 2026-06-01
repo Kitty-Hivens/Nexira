@@ -32,9 +32,9 @@ import java.security.MessageDigest
  * version under `<dataDir>/helpers/` for reuse across every pack.
  *
  * Every failure path returns null: no descriptor, no matching variant, network
- * error, or hash mismatch all mean "no helper available", and the caller falls
- * back to the upstream Smarty jar so the launcher stays usable until the
- * open-smrt-network release pipeline exists.
+ * error, or hash mismatch all mean "no helper available". The caller still
+ * strips Smarty (never re-admits the surveillance mod) and, if nothing is
+ * cached on disk either, blocks the launch rather than running it.
  */
 class OpenSmrtHelperResolver(
     private val clientProvider: HttpClientProvider,

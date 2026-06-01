@@ -33,7 +33,6 @@ object GermanStrings : AppStrings {
     override val launchButton      = "Spielen"
     override val launchAbort       = "Abbrechen"
     override val launchRunning     = "Spiel läuft"
-    override val launchResetError  = "FEHLER ZURÜCKSETZEN"
     override val launchDownloading = "Herunterladen:"
 
     // Launcher States
@@ -394,7 +393,7 @@ object GermanStrings : AppStrings {
 
     override val settingsSectionSmarty           = "Smarty-Server"
     override val settingsOpenSmrtHelperTitle      = "Alternativen smrt-Netzwerk-Helfer verwenden"
-    override val settingsOpenSmrtHelperDesc       = "Ersetzt den originalen Smarty-Mod auf jedem Smarty-Server durch unseren quelloffenen Helfer. Dieselben Netzwerkfunktionen, aber ohne Überwachung. Lässt sich der Ersatz noch nicht herunterladen, bleibt der Original-Mod."
+    override val settingsOpenSmrtHelperDesc       = "Ersetzt den originalen Smarty-Mod auf Smarty-Servern durch unseren quelloffenen Helfer. Dieselben Netzwerkfunktionen, aber ohne Überwachung. Gibt es für die Spielversion keinen Ersatz, wird der Start blockiert statt den Original-Mod auszuführen."
     override val settingsStrictModCheckTitle      = "Genaue Mod-Prüfung"
     override val settingsStrictModCheckDesc       = "Löscht nach der Synchronisierung alles im Mods-Ordner, was der Server nicht angefordert hat. Hält die Installation sauber, entfernt aber auch von Hand hinzugefügte Mods."
 

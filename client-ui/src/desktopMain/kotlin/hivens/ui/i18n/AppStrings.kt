@@ -33,7 +33,6 @@ interface AppStrings {
     val launchButton: String
     val launchAbort: String
     val launchRunning: String
-    val launchResetError: String
     val launchDownloading: String
 
     // --- Launcher States ---
