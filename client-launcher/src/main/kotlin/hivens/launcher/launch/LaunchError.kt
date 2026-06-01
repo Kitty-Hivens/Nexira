@@ -29,6 +29,15 @@ sealed class LaunchError {
     data class AuthFail(val cause: String?) : LaunchError()
 
     /**
+     * The open-smrt helper swap is enabled and the server ships the
+     * proprietary Smarty jar, but no helper is available for [mcVersion]
+     * (unsupported version / descriptor down / nothing cached). The launch
+     * is blocked rather than stripping Smarty with no replacement (broken
+     * join) or silently keeping the surveillance mod.
+     */
+    data class HelperUnavailable(val mcVersion: String) : LaunchError()
+
+    /**
      * Pack declares an auth requirement the user has no live session
      * for. The UI renders a "sign in with <provider> to play this
      * pack" hint -- distinct from [AuthFail] (where the user IS

@@ -5,6 +5,8 @@ import hivens.core.api.interfaces.IFileDownloadService
 import hivens.core.api.interfaces.IManifestProcessorService
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.SessionData
+import hivens.core.data.SettingsData
+import hivens.launcher.smrt.SmartyModPlanner
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.coVerifyOrder
@@ -45,6 +47,11 @@ class AutoSyncServiceTest {
 
         every { manifestProcessor.calculateIgnoredFiles(any(), any()) } returns emptySet()
 
+        // Smarty planning is exercised in SmartyModPlannerTest; here the helper
+        // never resolves and both Smarty settings are off, so the plan is a
+        // no-op and these tests stay focused on the queue / state machine.
+        val smartyPlanner = SmartyModPlanner(resolveHelper = { null }, manifestProcessor = manifestProcessor)
+
         service = AutoSyncService(
             authService = authService,
             downloadService = downloadService,
@@ -53,6 +60,8 @@ class AutoSyncServiceTest {
             dataDirectory = sandbox,
             credentialsProvider = { stubCredentials },
             optionalModsStateProvider = { emptyMap() },
+            smartyPlanner = smartyPlanner,
+            settingsProvider = { SettingsData(useOpenSmrtHelper = false, strictModVerification = false) },
         )
     }
 

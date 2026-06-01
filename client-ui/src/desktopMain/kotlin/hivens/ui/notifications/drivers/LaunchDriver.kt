@@ -228,6 +228,7 @@ class LaunchDriver(
                                                 ?.let { s.notifReasonAuthFailDetail(it) }
                                                 ?: s.notifReasonAuthFail
         is LaunchError.MissingAuthProvider -> s.notifReasonMissingAuthProvider(reason.providerKey)
+        is LaunchError.HelperUnavailable   -> s.stateHelperUnavailable(reason.mcVersion)
         LaunchError.OfflineNoClient        -> s.notifReasonOfflineNoClient
         LaunchError.OfflineNoManifest      -> s.notifReasonOfflineNoManifest
         LaunchError.TwoFactorExpired       -> s.notifReasonTwoFactorExpired

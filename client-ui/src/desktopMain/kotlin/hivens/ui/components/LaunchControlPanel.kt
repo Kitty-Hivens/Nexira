@@ -10,7 +10,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import hivens.launcher.launch.LaunchError
 import hivens.launcher.launch.LaunchState
 import hivens.launcher.launch.PrepareStage
 import hivens.ui.easter.LocalAprilFools
@@ -24,7 +23,6 @@ fun LaunchControlPanel(
     state: LaunchState,
     onLaunch: () -> Unit,
     onAbort: () -> Unit,
-    onClearError: () -> Unit,
 ) {
     val s = LocalStrings.current
     val af = LocalAprilFools.current
@@ -79,10 +77,13 @@ fun LaunchControlPanel(
                     }
                 }
 
+                // Error is rendered like Idle here: the failure is surfaced by
+                // the notification system, not by an in-panel banner. The panel
+                // just returns to a ready/playable state.
                 is LaunchState.Error -> Text(
-                    text  = localizeError(state.reason, s),
+                    s.launchReady,
                     style = MaterialTheme.typography.bodySmall,
-                    color = CelestiaTheme.colors.error,
+                    color = CelestiaTheme.colors.textSecondary,
                 )
 
                 is LaunchState.GameRunning -> Text(
@@ -136,10 +137,12 @@ fun LaunchControlPanel(
         Spacer(Modifier.height(16.dp))
 
         // -- Action button --------------------------------------------------
+        // Error maps to Play (not a "clear error" affordance): the next launch
+        // attempt overwrites the Error state, and the failure already went out as
+        // a notification. So Error behaves exactly like Idle in this panel.
         val btnText = when (state) {
             is LaunchState.Downloading, is LaunchState.Prepare -> s.launchAbort
             is LaunchState.GameRunning                         -> s.launchRunning
-            is LaunchState.Error                               -> s.launchResetError
             else                                               -> s.launchButton
         }
 
@@ -156,12 +159,12 @@ fun LaunchControlPanel(
             CelestiaButton(
                 text    = btnText,
                 enabled = state !is LaunchState.GameRunning,
-                // Pulse when ready to play
-                glowing = state is LaunchState.Idle,
+                // Pulse when ready to play (Idle, or after an error -- which the
+                // panel now treats as ready, with the failure shown via notification)
+                glowing = state is LaunchState.Idle || state is LaunchState.Error,
                 onClick = {
                     when (state) {
                         is LaunchState.Downloading, is LaunchState.Prepare -> onAbort()
-                        is LaunchState.Error                               -> onClearError()
                         else                                               -> onLaunch()
                     }
                 },
@@ -175,7 +178,6 @@ fun LaunchControlPanel(
         PuppetClick("dashboard.launch", enabled = state !is LaunchState.GameRunning) {
             when (state) {
                 is LaunchState.Downloading, is LaunchState.Prepare -> onAbort()
-                is LaunchState.Error                               -> onClearError()
                 else                                               -> onLaunch()
             }
         }
@@ -193,21 +195,6 @@ private fun localizeStage(stage: PrepareStage, s: hivens.ui.i18n.AppStrings): St
     PrepareStage.SYNC   -> s.stateSync
     PrepareStage.JVM    -> s.stateJvm
     PrepareStage.LAUNCH -> s.stateLaunching
-}
-
-/**
- * Maps a [LaunchError] to a localized error message. `Internal` is the
- * catch-all path; the rest are semantic codes from the controller's
- * known terminal states.
- */
-private fun localizeError(error: LaunchError, s: hivens.ui.i18n.AppStrings): String = when (error) {
-    is LaunchError.ExitCode             -> s.stateExitCode(error.code)
-    is LaunchError.Internal             -> s.stateError(error.message)
-    is LaunchError.OfflineNoClient      -> s.stateOfflineNoClient
-    is LaunchError.OfflineNoManifest    -> s.stateOfflineNoManifest
-    is LaunchError.TwoFactorExpired     -> s.auth2faExpired
-    is LaunchError.AuthFail             -> "${s.stateAuthFail}: ${error.cause ?: ""}"
-    is LaunchError.MissingAuthProvider  -> s.stateMissingAuthProvider(error.providerKey)
 }
 
 /**
