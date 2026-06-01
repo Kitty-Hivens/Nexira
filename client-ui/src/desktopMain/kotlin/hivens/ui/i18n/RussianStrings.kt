@@ -801,6 +801,7 @@ object RussianStrings : AppStrings {
     override val editorSurfShortProfile   = "Профиль"
     override val editorSurfShortServer    = "Сервер"
     override val editorSurfShortTheme     = "Темы"
+    override val editorSurfShortShell     = "Оболочка"
 
     // --- Layout editor: surface long names ---
     override val editorSurfHomeClassic = "Главная (классика)"
@@ -814,6 +815,7 @@ object RussianStrings : AppStrings {
     override val editorSurfProfile     = "Профиль"
     override val editorSurfServer      = "Детали сервера"
     override val editorSurfTheme       = "Выбор темы"
+    override val editorSurfShell        = "Оболочка приложения"
 
     // --- Music player widgets ---
     override val musicPlayerTitle      = "Музыкальный плеер"

@@ -25,6 +25,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ViewQuilt
 import androidx.compose.material.icons.automirrored.filled.ViewSidebar
+import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.RestartAlt
@@ -722,12 +723,14 @@ private fun ToolChip(
 
 private fun surfaceIcon(surface: SurfaceId): androidx.compose.ui.graphics.vector.ImageVector =
     when (surface.value) {
+        "appshell.root"      -> Icons.Default.Dashboard
         "appshell.leftrail"  -> Icons.AutoMirrored.Filled.ViewSidebar
         "appshell.rightrail" -> Icons.AutoMirrored.Filled.ViewQuilt
         else                 -> Icons.Default.Home
     }
 
 private fun humanSurfaceShortName(surface: SurfaceId, s: AppStrings): String = when (surface.value) {
+    "appshell.root"       -> s.editorSurfShortShell
     "home.classic"        -> s.editorSurfShortHome
     "home.new"            -> s.editorSurfShortHome
     "library"             -> s.editorSurfShortLibrary
@@ -743,6 +746,7 @@ private fun humanSurfaceShortName(surface: SurfaceId, s: AppStrings): String = w
 }
 
 private fun humanSurfaceName(surface: SurfaceId, s: AppStrings): String = when (surface.value) {
+    "appshell.root"       -> s.editorSurfShell
     "home.classic"        -> s.editorSurfHomeClassic
     "home.new"            -> s.editorSurfHomeNew
     "library"             -> s.editorSurfLibrary
@@ -838,7 +842,8 @@ private fun transparentPointerIcon(): PointerIcon {
 // follow. Other screens (Settings, Profile, etc.) are not widget-
 // composed yet and return an empty list (FAB stays hidden).
 private fun availableSurfacesFor(screen: Screen, homeView: HomeView): List<SurfaceId> {
-    val main: SurfaceId = when (screen) {
+    // The center surface for this screen, or null for screens not yet widgetized.
+    val main: SurfaceId? = when (screen) {
         Screen.Home -> when (homeView) {
             HomeView.Classic      -> SurfaceId("home.classic")
             HomeView.LibraryFirst -> SurfaceId("library")
@@ -853,11 +858,14 @@ private fun availableSurfacesFor(screen: Screen, homeView: HomeView): List<Surfa
         Screen.ThemePicker            -> SurfaceId("theme.picker")
         // Other widget-composed surfaces from B.1 land here as the
         // rest of the screens migrate over.
-        else               -> return emptyList()
+        else                          -> null
     }
-    return listOf(
-        main,
+    // The shell + rails are always present, so they are editable from every
+    // screen even when the center is not yet a widget surface. The center
+    // surface (when there is one) is first, so it stays the default selection.
+    return listOfNotNull(main) + listOf(
         SurfaceId("appshell.leftrail"),
         SurfaceId("appshell.rightrail"),
+        SurfaceId("appshell.root"),
     )
 }

@@ -274,7 +274,8 @@ fun AppSidebar(
     currentScreen: Screen,
     isAuthenticated: Boolean,
     onScreenChange: (Screen) -> Unit,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    modifier: Modifier = Modifier.width(64.dp).fillMaxHeight(),
 ) {
     val gameConsole: GameConsoleService = koinInject()
 
@@ -305,7 +306,7 @@ fun AppSidebar(
     }
     CompositionLocalProvider(LocalLeftRailContext provides ctx) {
         NavigationRail(
-            modifier       = Modifier.width(64.dp).fillMaxHeight(),
+            modifier       = modifier,
             containerColor = glassSurfaceAlpha(0.35f),
             contentColor   = CelestiaTheme.colors.textSecondary
         ) {

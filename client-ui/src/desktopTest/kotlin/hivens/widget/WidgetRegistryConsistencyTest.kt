@@ -177,6 +177,10 @@ class WidgetRegistryConsistencyTest {
             "profile.skin.section",
             // tab container (tabCount + labels)
             "container.tabs",
+            // shell regions (width / glass / divider / collapse frame props)
+            "appshell.region.left",
+            "appshell.region.center",
+            "appshell.region.right",
         )
         assertEquals(
             expected,

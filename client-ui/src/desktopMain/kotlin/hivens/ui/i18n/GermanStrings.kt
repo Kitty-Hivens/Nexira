@@ -800,6 +800,7 @@ object GermanStrings : AppStrings {
     override val editorSurfShortProfile   = "Profil"
     override val editorSurfShortServer    = "Server"
     override val editorSurfShortTheme     = "Themes"
+    override val editorSurfShortShell     = "Hülle"
 
     // --- Layout editor: surface long names ---
     override val editorSurfHomeClassic = "Start (klassisch)"
@@ -813,6 +814,7 @@ object GermanStrings : AppStrings {
     override val editorSurfProfile     = "Profil"
     override val editorSurfServer      = "Server-Details"
     override val editorSurfTheme       = "Themenauswahl"
+    override val editorSurfShell        = "App-Hülle"
 
     // --- Music player widgets ---
     override val musicPlayerTitle      = "Musik-Player"

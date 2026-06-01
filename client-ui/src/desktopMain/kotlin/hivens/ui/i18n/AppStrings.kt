@@ -827,6 +827,7 @@ interface AppStrings {
     val editorSurfShortProfile: String
     val editorSurfShortServer: String
     val editorSurfShortTheme: String
+    val editorSurfShortShell: String
 
     // --- Layout editor: surface long names ---
     val editorSurfHomeClassic: String
@@ -840,6 +841,7 @@ interface AppStrings {
     val editorSurfProfile: String
     val editorSurfServer: String
     val editorSurfTheme: String
+    val editorSurfShell: String
 
     // --- Music player widgets ---
     val musicPlayerTitle: String
