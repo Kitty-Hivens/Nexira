@@ -704,4 +704,140 @@ object GermanStrings : AppStrings {
     override fun notifTimeMinutes(minutes: Long)        = "${minutes} min"
     override fun notifTimeHours(hours: Long)            = "${hours} h"
     override fun notifTimeDays(days: Long)              = "${days} T"
+
+    // --- Home (new) + launch tiles ---
+    override val homeRecentTitle    = "Deine Modpacks"
+    override val homeNoPacksTitle   = "Noch keine Modpacks"
+    override val homeNoPacksBody    = "Installiere etwas über Browse, dann erscheinen deine Modpacks hier."
+    override val browseOpen         = "Browse öffnen"
+    override val homeQuickContinue  = "Fortsetzen"
+    override val homeQuickStart     = "Starten"
+    override val homeQuickButton    = "Spielen"
+    override val launchTileReady    = "Starten"
+    override val launchTileBlocked  = "Noch nicht spielbar"
+
+    // --- Library widgets ---
+    override val libraryEmptyTitle     = "Noch leer"
+    override val libraryEmptyBody      = "Installiere ein Modpack über Browse, dann erscheint es hier."
+    override val libraryHeaderTitle    = "Bibliothek"
+    override val libraryHeaderSubtitle = "Installierte Modpacks"
+
+    // --- Customization widget labels ---
+    override val customGlassAlpha   = "Glas-Transparenz"
+    override val customCardCorner   = "Kartenecke (dp)"
+    override val customCardBorder   = "Kartenrahmen (dp)"
+    override val customButtonCorner = "Knopfecke (dp)"
+    override val customAnimSpeed    = "Animationsgeschwindigkeit"
+    override val customSoftGlow     = "Dekoratives Leuchten"
+
+    // --- Layout editor: common actions ---
+    override val editorClose   = "Schließen"
+    override val editorCancel  = "Abbrechen"
+    override val editorDelete  = "Löschen"
+    override val editorReset   = "Zurücksetzen"
+    override val editorSave    = "Speichern"
+    override val editorApply   = "Anwenden"
+    override val editorExport  = "Exportieren"
+    override val editorWidgets = "Widgets"
+
+    // --- Layout editor: slot orientation ---
+    override val editorSlotStack  = "Stapel"
+    override val editorSlotRow    = "Reihe"
+    override val editorSlotGrid   = "Raster"
+    override val editorSlotCanvas = "Leinwand"
+
+    // --- Layout editor: prop panel ---
+    override val editorResetToDefault = "Auf Standard zurücksetzen"
+
+    // --- Layout editor: presets ---
+    override val editorPresetsTitle          = "Presets"
+    override val editorPresetsIntro          = "Ein Schnappschuss von Layout, Theme und Stil. Jetzt speichern, jederzeit laden."
+    override val editorPresetNamePlaceholder = "Preset-Name..."
+    override fun editorPresetsSaved(count: Int) = "Gespeichert ($count)"
+    override val editorPresetsEmpty          = "Leer. Speichere das aktuelle Layout als erstes Preset."
+
+    // --- Layout editor: palette ---
+    override val editorPaletteHide  = "Palette ausblenden"
+    override val editorPaletteHint  = "In einen Slot ziehen"
+    override val editorPaletteEmpty = "Widget-Registry ist leer (Build-Fehler)."
+
+    // --- Layout editor: empty slot + chrome ---
+    override val editorDragWidgetHere   = "Widget hierher ziehen"
+    override val editorDragReorder      = "Zum Sortieren ziehen"
+    override val editorConfigure        = "Einstellen"
+    override val editorForceRemove      = "Erzwungen entfernen"
+    override val editorForceRemoveTitle = "Widget erzwungen entfernen?"
+    override fun editorForceRemoveBody(name: String) =
+        "\"$name\" ist als nicht entfernbar markiert. Solche Widgets bleiben normalerweise an Ort und Stelle, damit du nicht ohne Navigation dastehst. Wenn du sicher bist, dass es hier nicht gebraucht wird, kannst du es jetzt entfernen. Falls nötig, setze die Oberfläche über das Menü neben dem Oberflächen-Chip auf Standard zurück."
+
+    // --- Layout editor: host (reset / pill / fab) ---
+    override val editorResetSurfaceTitle = "Oberfläche auf Standard zurücksetzen?"
+    override fun editorResetSurfaceBody(name: String) =
+        "\"$name\" kehrt zur Widget-Anordnung aus dem eingebauten Standard-Layout zurück. Alle lokalen Änderungen auf dieser Oberfläche (hinzugefügte Widgets, Umsortierungen, Löschungen) gehen verloren. Andere Oberflächen bleiben unberührt."
+    override val editorPreview           = "Vorschau"
+    override val editorPreviewHidden     = "Ausgeblendet"
+    override val editorPaletteToggleHide = "Ausblenden"
+    override val editorEscHint           = "Esc zum Beenden"
+    override val editorFabEdit           = "Layout bearbeiten"
+    override val editorFabDone           = "Bearbeitung beenden"
+
+    // --- Layout editor: surface short names ---
+    override val editorSurfShortHome      = "Start"
+    override val editorSurfShortLibrary   = "Bibliothek"
+    override val editorSurfShortLeftRail  = "Linke Leiste"
+    override val editorSurfShortRightRail = "Rechte Leiste"
+    override val editorSurfShortAbout     = "Über"
+    override val editorSurfShortBg        = "Hintergrund"
+    override val editorSurfShortStyle     = "Stil"
+    override val editorSurfShortProfile   = "Profil"
+    override val editorSurfShortServer    = "Server"
+    override val editorSurfShortTheme     = "Themes"
+
+    // --- Layout editor: surface long names ---
+    override val editorSurfHomeClassic = "Start (klassisch)"
+    override val editorSurfHomeNew     = "Start (neu)"
+    override val editorSurfLibrary     = "Bibliothek"
+    override val editorSurfLeftRail    = "Seitenleiste"
+    override val editorSurfRightRail   = "Rechte Leiste"
+    override val editorSurfAbout       = "Über"
+    override val editorSurfBg          = "Hintergrund-Einstellungen"
+    override val editorSurfStyle       = "Anpassung"
+    override val editorSurfProfile     = "Profil"
+    override val editorSurfServer      = "Server-Details"
+    override val editorSurfTheme       = "Themenauswahl"
+
+    // --- Music player widgets ---
+    override val musicPlayerTitle      = "Musik-Player"
+    override val audioPlay             = "Abspielen"
+    override val audioPause            = "Pause"
+    override val audioStop             = "Stopp"
+    override val audioOpenFile         = "Datei öffnen"
+    override val audioPickTrack        = "Track auswählen"
+    override val audioVolume           = "Lautstärke"
+    override val audioNoFile           = "Keine Datei"
+    override val audioStatusReady      = "Bereit"
+    override val audioStatusPlaying    = "Spielt"
+    override val audioStatusPaused     = "Pausiert"
+    override val audioFormatHint       = "WAV / AU / AIFF werden unterstützt. MP3 kommt mit Skinema."
+    override val audioNoPlayerHere     = "Kein Player auf diesem Layout"
+    override val audioAddMusicPlayer   = "Music player hinzufügen"
+    override val audioErrorUnsupported = "Format nicht unterstützt -- WAV / AU / AIFF nötig."
+    override val audioErrorOpenFailed  = "Datei konnte nicht geöffnet werden"
+    override val audioErrorDeviceBusy  = "Audiogerät ist belegt"
+    override val audioErrorPlaybackFailed = "Wiedergabe fehlgeschlagen"
+
+    // --- Library pack card ---
+    override val packCardPlay          = "Spielen"
+    override val packCardSettings      = "Einstellungen"
+    override val packCardMore          = "Mehr"
+    override val packCardNeverPlayed   = "Nie gespielt"
+    override val packCardPlayedJustNow = "gerade eben"
+    override fun packCardPlayedMinutesAgo(n: Long) = "vor $n Min"
+    override fun packCardPlayedHoursAgo(n: Long)   = "vor $n Std"
+    override fun packCardPlayedDaysAgo(n: Long)    = "vor $n T"
+    override val packCardPlayedLongAgo = "vor langem"
+
+    // --- Session chip + about logo a11y ---
+    override val sessionsActiveTitle = "Aktive Sitzungen"
+    override val aboutLogoDesc       = "App-Logo"
 }

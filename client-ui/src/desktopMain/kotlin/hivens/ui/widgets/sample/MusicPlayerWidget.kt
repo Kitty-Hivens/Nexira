@@ -60,9 +60,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import hivens.ui.audio.AudioError
 import hivens.ui.audio.AudioPlayer
 import hivens.ui.audio.PlaybackState
 import hivens.ui.customization.glassSurfaceAlpha
+import hivens.ui.i18n.AppStrings
+import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.widgets.services.MusicPlayerService
 import hivens.ui.widgets.services.MusicPlayerServiceImpl
@@ -93,7 +96,7 @@ import kotlin.io.path.name
 // via Panama).
 @Serializable
 data class MusicProps(
-    @PropLabel("Заголовок") val title: String = "Музыкальный плеер",
+    @PropLabel("Заголовок") val title: String = "",
 )
 
 @Widget(id = "home.new.music", displayName = "Music player", propsClass = MusicProps::class)
@@ -101,6 +104,7 @@ data class MusicProps(
 @Composable
 fun MusicPlayerWidget(instance: WidgetInstance) {
     val p = instance.rememberProps<MusicProps>()
+    val s = LocalStrings.current
     val player: AudioPlayer = koinInject()
     val state by player.state.collectAsState()
     val volume by player.volume.collectAsState()
@@ -121,7 +125,7 @@ fun MusicPlayerWidget(instance: WidgetInstance) {
             val picked = withContext(Dispatchers.IO) {
                 FileKit.openFilePicker(
                     type           = FileKitType.File(extensions = listOf("wav", "au", "aif", "aiff", "snd")),
-                    dialogSettings = FileKitDialogSettings(title = "Выбери трек"),
+                    dialogSettings = FileKitDialogSettings(title = s.audioPickTrack),
                 )
             }
             val path = picked?.path?.let { Paths.get(it) }
@@ -152,14 +156,14 @@ fun MusicPlayerWidget(instance: WidgetInstance) {
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(
-                    text       = p.title,
+                    text       = p.title.ifBlank { s.musicPlayerTitle },
                     style      = MaterialTheme.typography.labelLarge,
                     color      = CelestiaTheme.colors.textSecondary,
                     fontWeight = FontWeight.Medium,
                 )
                 Spacer(Modifier.height(2.dp))
                 Text(
-                    text       = currentTitle(state),
+                    text       = currentTitle(state, s),
                     style      = MaterialTheme.typography.titleMedium,
                     color      = CelestiaTheme.colors.textPrimary,
                     fontWeight = FontWeight.SemiBold,
@@ -168,13 +172,13 @@ fun MusicPlayerWidget(instance: WidgetInstance) {
                 )
                 if (state is PlaybackState.Error) {
                     Text(
-                        text  = (state as PlaybackState.Error).message,
+                        text  = audioErrorText((state as PlaybackState.Error).reason, s),
                         style = MaterialTheme.typography.bodySmall,
                         color = CelestiaTheme.colors.error,
                     )
                 } else {
                     Text(
-                        text     = subtitle(state),
+                        text     = subtitle(state, s),
                         style    = MaterialTheme.typography.bodySmall,
                         color    = CelestiaTheme.colors.textSecondary,
                         maxLines = 1,
@@ -201,12 +205,12 @@ fun MusicPlayerWidget(instance: WidgetInstance) {
         ) {
             ControlButton(
                 icon            = Icons.Default.FolderOpen,
-                contentDesc     = "Открыть файл",
+                contentDesc     = s.audioOpenFile,
                 onClick         = { pickFile() },
             )
             ControlButton(
                 icon         = if (state is PlaybackState.Playing) Icons.Default.Pause else Icons.Default.PlayArrow,
-                contentDesc  = if (state is PlaybackState.Playing) "Пауза" else "Воспроизвести",
+                contentDesc  = if (state is PlaybackState.Playing) s.audioPause else s.audioPlay,
                 enabled      = state !is PlaybackState.Idle && state !is PlaybackState.Error,
                 primary      = true,
                 onClick      = {
@@ -215,7 +219,7 @@ fun MusicPlayerWidget(instance: WidgetInstance) {
             )
             ControlButton(
                 icon         = Icons.Default.Stop,
-                contentDesc  = "Стоп",
+                contentDesc  = s.audioStop,
                 enabled      = state is PlaybackState.Playing || state is PlaybackState.Paused,
                 onClick      = { player.stop() },
             )
@@ -240,7 +244,7 @@ fun MusicPlayerWidget(instance: WidgetInstance) {
         ) {
             Icon(
                 imageVector        = volumeIcon(volume),
-                contentDescription = "Громкость",
+                contentDescription = s.audioVolume,
                 tint               = CelestiaTheme.colors.textSecondary,
                 modifier           = Modifier.size(16.dp),
             )
@@ -400,19 +404,26 @@ private fun ControlButton(
     }
 }
 
-private fun currentTitle(state: PlaybackState): String = when (state) {
-    is PlaybackState.Idle    -> "Выбери трек"
+private fun audioErrorText(reason: AudioError, s: AppStrings): String = when (reason) {
+    AudioError.UnsupportedFormat -> s.audioErrorUnsupported
+    AudioError.OpenFailed        -> s.audioErrorOpenFailed
+    AudioError.DeviceBusy        -> s.audioErrorDeviceBusy
+    AudioError.PlaybackFailed    -> s.audioErrorPlaybackFailed
+}
+
+private fun currentTitle(state: PlaybackState, s: AppStrings): String = when (state) {
+    is PlaybackState.Idle    -> s.audioPickTrack
     is PlaybackState.Ready   -> state.file.name
     is PlaybackState.Playing -> state.file.name
     is PlaybackState.Paused  -> state.file.name
     is PlaybackState.Error   -> state.file.name
 }
 
-private fun subtitle(state: PlaybackState): String = when (state) {
-    PlaybackState.Idle       -> "WAV / AU / AIFF поддерживаются. MP3 будет в Skinema."
-    is PlaybackState.Ready   -> "Готов"
-    is PlaybackState.Playing -> "Играет"
-    is PlaybackState.Paused  -> "Пауза"
+private fun subtitle(state: PlaybackState, s: AppStrings): String = when (state) {
+    PlaybackState.Idle       -> s.audioFormatHint
+    is PlaybackState.Ready   -> s.audioStatusReady
+    is PlaybackState.Playing -> s.audioStatusPlaying
+    is PlaybackState.Paused  -> s.audioStatusPaused
     is PlaybackState.Error   -> ""
 }
 

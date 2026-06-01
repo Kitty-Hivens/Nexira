@@ -29,6 +29,7 @@ import hivens.core.data.PackInstance
 import hivens.launcher.launch.LauncherController
 import hivens.ui.AppState
 import hivens.ui.Screen
+import hivens.ui.i18n.LocalStrings
 import hivens.ui.notifications.LaunchTarget
 import hivens.ui.notifications.drivers.LaunchDriver
 import hivens.ui.screens.library.PackCard
@@ -42,9 +43,9 @@ import org.koin.compose.koinInject
 
 @Serializable
 data class LibraryBodyProps(
-    @PropLabel("Заголовок пустого состояния") val emptyTitle: String = "Пока пусто",
+    @PropLabel("Заголовок пустого состояния") val emptyTitle: String = "",
     @PropLabel("Текст пустого состояния")
-    val emptyText: String = "Установите сборку через Browse — она появится здесь.",
+    val emptyText: String = "",
 )
 
 // Single widget covers both populated list and empty state. Slot-level
@@ -56,6 +57,7 @@ data class LibraryBodyProps(
 fun LibraryBody(instance: WidgetInstance) {
     val p = instance.rememberProps<LibraryBodyProps>()
     val ctx = LocalLibraryContext.current
+    val s = LocalStrings.current
     val repo: IPackRepository = koinInject()
     val controller: LauncherController = koinInject()
     val launchDriver: LaunchDriver = koinInject()
@@ -64,8 +66,8 @@ fun LibraryBody(instance: WidgetInstance) {
 
     if (instances.isEmpty()) {
         LibraryEmpty(
-            title    = p.emptyTitle,
-            body     = p.emptyText,
+            title    = p.emptyTitle.ifBlank { s.libraryEmptyTitle },
+            body     = p.emptyText.ifBlank { s.libraryEmptyBody },
             onBrowse = { ctx.onScreenChange(Screen.Browse) },
         )
     } else {
@@ -117,6 +119,7 @@ private fun LibraryList(
 
 @Composable
 private fun LibraryEmpty(title: String, body: String, onBrowse: () -> Unit) {
+    val s = LocalStrings.current
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -142,7 +145,7 @@ private fun LibraryEmpty(title: String, body: String, onBrowse: () -> Unit) {
                     containerColor = CelestiaTheme.colors.primary,
                     contentColor   = Color.White,
                 ),
-            ) { Text("Открыть Browse", fontWeight = FontWeight.SemiBold) }
+            ) { Text(s.browseOpen, fontWeight = FontWeight.SemiBold) }
         }
     }
 }

@@ -62,7 +62,7 @@ fun AboutLogoWidget(instance: WidgetInstance) {
         ) {
             Image(
                 painter            = painterResource(Res.drawable.favicon),
-                contentDescription = "App Logo",
+                contentDescription = s.aboutLogoDesc,
                 modifier           = Modifier.size(86.dp),
             )
             Spacer(Modifier.height(16.dp))
