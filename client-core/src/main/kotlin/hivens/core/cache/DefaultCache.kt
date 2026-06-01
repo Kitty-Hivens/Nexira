@@ -5,7 +5,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -43,17 +43,25 @@ class DefaultCache<V>(
 
     private class Entry<V>(val value: V, val storedAtMillis: Long)
 
+    /**
+     * The latest pending disk op for a key, conflated onto by the single per-key
+     * writer. [delete] = true is an invalidation routed through the same writer so
+     * a delete can never interleave with an in-flight write (no resurrection).
+     */
+    private class Pending<V>(val value: V?, val storedAtMillis: Long, val delete: Boolean)
+
     private val memory = object : LinkedHashMap<String, Entry<V>>(16, 0.75f, /* accessOrder = */ true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Entry<V>>?): Boolean =
             size > config.maxEntries
     }
     private val inFlight = HashMap<String, CompletableDeferred<V>>()
-    private val pendingWrites = HashMap<String, Job>()
+    private val pending = HashMap<String, Pending<V>>()
+    private val writerActive = HashSet<String>()
 
     override suspend fun get(key: String, loader: suspend () -> V): V {
         val entry = lookup(key)
         if (entry != null) {
-            val age = clock.nowMillis() - entry.storedAtMillis
+            val age = ageOf(entry)
             if (age < config.ttlMs) return entry.value
             if (age < config.staleTtlMs) {
                 triggerRefresh(key, loader)
@@ -67,7 +75,7 @@ class DefaultCache<V>(
     override fun flow(key: String, loader: suspend () -> V): Flow<CacheValue<V>> = flow {
         val entry = lookup(key)
         if (entry != null) {
-            val age = clock.nowMillis() - entry.storedAtMillis
+            val age = ageOf(entry)
             if (age < config.ttlMs) {
                 emit(CacheValue(entry.value, Freshness.FRESH))
                 return@flow
@@ -84,16 +92,20 @@ class DefaultCache<V>(
     override suspend fun invalidate(key: String) {
         mutex.withLock {
             memory.remove(key)
-            pendingWrites.remove(key)?.cancel()
+            // Route the delete through the per-key writer instead of deleting
+            // off-lock here: that's what keeps it ordered with any in-flight
+            // write so an older value can't land back on disk after the delete.
+            pending[key] = Pending(value = null, storedAtMillis = 0, delete = true)
+            if (writerActive.add(key)) {
+                scope.launch { runWriter(key) }
+            }
         }
-        withContext(ioDispatcher) { runCatching { diskStore.delete(key) } }
     }
 
     override suspend fun invalidateAll() {
         mutex.withLock {
             memory.clear()
-            pendingWrites.values.forEach { it.cancel() }
-            pendingWrites.clear()
+            pending.clear()
         }
         withContext(ioDispatcher) { runCatching { diskStore.clear() } }
     }
@@ -141,20 +153,57 @@ class DefaultCache<V>(
 
     /**
      * Write-through to memory now + debounced to disk; [CacheConfig.shouldStore]
-     * can veto. The debounced write runs on [scope] (IO-dispatched in production),
-     * so the disk op already runs off any UI thread without a nested context hop.
+     * can veto. Disk writes are serialized per key by a single [runWriter]
+     * coroutine that conflates onto the latest [Pending] value -- so two rapid
+     * stores can neither race on the shared `<key>.tmp` nor publish out of order
+     * (an older value landing after a newer one). The write runs on [scope]
+     * (IO-dispatched in production), off any UI thread.
      */
     private suspend fun store(key: String, value: V) {
         if (!config.shouldStore(value)) return
         val now = clock.nowMillis()
         mutex.withLock {
             memory[key] = Entry(value, now)
-            pendingWrites.remove(key)?.cancel()
-            pendingWrites[key] = scope.launch {
-                delay(config.diskDebounceMs)
-                runCatching { diskStore.write(key, value, now) }
-                mutex.withLock { pendingWrites.remove(key) }
+            pending[key] = Pending(value, now, delete = false)
+            // add() returns true only if no writer is already running for this key,
+            // so there is at most one writer (and one in-flight disk op) per key.
+            if (writerActive.add(key)) {
+                scope.launch { runWriter(key) }
             }
         }
     }
+
+    /**
+     * One writer per key: debounce, then apply the latest pending op (write or
+     * delete) and loop until none is pending. Taking the op and the exit decision
+     * (`writerActive.remove`) under the SAME lock is what prevents a store from
+     * seeing a still-active writer that is about to exit and orphaning its op.
+     * The op is applied off-lock but is the only disk mutation in flight for the
+     * key, so writes and deletes can't reorder.
+     */
+    @Suppress("UNCHECKED_CAST")
+    private suspend fun runWriter(key: String) {
+        try {
+            while (true) {
+                delay(config.diskDebounceMs)
+                val op = mutex.withLock {
+                    val p = pending.remove(key)
+                    if (p == null) writerActive.remove(key)
+                    p
+                } ?: return
+                if (op.delete) {
+                    runCatching { diskStore.delete(key) }
+                } else {
+                    runCatching { diskStore.write(key, op.value as V, op.storedAtMillis) }
+                }
+            }
+        } finally {
+            // Cancellation (scope shutdown) can skip the in-loop removal; make the
+            // writerActive slot release uncancellable so a key can't get stuck.
+            withContext(NonCancellable) { mutex.withLock { writerActive.remove(key) } }
+        }
+    }
+
+    private fun ageOf(entry: Entry<V>): Long =
+        (clock.nowMillis() - entry.storedAtMillis).coerceAtLeast(0)
 }

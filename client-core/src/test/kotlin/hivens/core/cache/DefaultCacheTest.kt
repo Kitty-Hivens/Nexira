@@ -1,12 +1,13 @@
 package hivens.core.cache
 
 import hivens.test.TestClock
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import java.util.concurrent.ConcurrentHashMap
@@ -178,10 +179,22 @@ class DefaultCacheTest {
         val loader: suspend () -> String = { calls.incrementAndGet(); "v" }
 
         cache.get("k", loader); advanceUntilIdle()
-        cache.invalidate("k")
+        cache.invalidate("k"); advanceUntilIdle() // delete is routed through the debounced writer
         assertTrue(!disk.map.containsKey("k"))
         cache.get("k", loader)
         assertEquals(2, calls.get(), "post-invalidate get reloads")
+    }
+
+    @Test
+    fun `a cancelled leader load lets a later get recover (no inFlight leak)`() = runTest {
+        val cache = cache(MapDiskStore<String>(), CacheConfig(ttlMs = 10_000), TestClock())
+        val job = launch { cache.get("k") { delay(1_000); "v" } } // leader, suspended mid-load
+        advanceTimeBy(10)
+        job.cancel()                                              // cancel the leader before it completes
+        advanceUntilIdle()
+        // inFlight must have been cleared in the leader's finally, so a fresh get
+        // becomes a new leader rather than awaiting a dead deferred.
+        assertEquals("v2", cache.get("k") { "v2" })
     }
 
     @Test
@@ -249,6 +262,26 @@ class DefaultCacheTest {
         async { cache.get("k", loader) }.await()
         advanceUntilIdle()                                // refresh runs on the cache scope regardless
         assertEquals("new", cache.get("k", loader))
+    }
+
+    @Test
+    fun `a store during a pending write conflates to the latest value (no reorder)`() = runTest {
+        // Codex P2: a second store for the same key while the first is still
+        // pending must not let an older value land last. The single per-key
+        // writer conflates onto the newest value and writes it exactly once.
+        val clock = TestClock()
+        val disk = MapDiskStore<String>()
+        var current = "v1"
+        val cache = cache(disk, CacheConfig(ttlMs = 1_000, diskDebounceMs = 200), clock)
+
+        cache.get("k") { current }          // store v1 (writer is debouncing)
+        current = "v2"
+        clock.advance(1_500)                // stale
+        cache.get("k") { current }          // stale served; background refresh stores v2
+        advanceUntilIdle()
+
+        assertEquals("v2", disk.map["k"]?.value, "disk holds the newest value, not the older one")
+        assertEquals(1, disk.writeCount.get(), "the two stores collapse into one write")
     }
 
     @Test
