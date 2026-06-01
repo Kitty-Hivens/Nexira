@@ -1,20 +1,14 @@
 package hivens.ui.editor
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -31,8 +25,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ViewQuilt
 import androidx.compose.material.icons.automirrored.filled.ViewSidebar
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.RestartAlt
@@ -41,7 +33,6 @@ import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Widgets
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -145,13 +136,10 @@ import org.koin.compose.koinInject
 //   * provides LocalEditMode, LocalDragController, LocalDropTargetRegistry,
 //     and LocalWidgetDecorator (the decorator wraps each widget with
 //     chrome only while edit mode is on)
-//   * paints the FAB (edit/done morph)
 //   * paints the optional "Edit layout" pill at the top
 //   * paints the drag ghost following the pointer when a drag is active
-//   * consumes Escape to exit edit mode
-//
-// editor-3 will add palette panel + cross-slot drop. editor-2 keeps
-// drags within the source slot.
+//   * consumes Escape to exit edit mode (Ctrl+E, window-level in AppShell,
+//     toggles it on/off; there is no edit-mode button)
 
 // Which widget instance the prop panel is currently editing.
 private data class PropTarget(val path: SlotPath, val instanceId: String)
@@ -166,8 +154,8 @@ fun EditorSurfaceHost(
     onUiStyleChanged: (UiStyle) -> Unit = {},
     // The host now wraps the WHOLE shell Row (rails included) so the editor's
     // decorators reach rail widgets. These insets keep the chrome overlays
-    // (pill / palette / prop panel / FAB / vignette) anchored over the center
-    // pane, past the left rail and right panel, matching their pre-hoist place.
+    // (pill / palette / prop panel / vignette) anchored over the center pane,
+    // past the left rail and right panel, matching their pre-hoist place.
     centerStartInset: Dp = 0.dp,
     centerEndInset: Dp = 0.dp,
     content: @Composable () -> Unit,
@@ -531,97 +519,14 @@ fun EditorSurfaceHost(
                     modifier   = Modifier.align(Alignment.TopEnd),
                 )
 
-                EditModeFab(
-                    editing  = editing,
-                    onToggle = {
-                        editing = !editing
-                        if (!editing) previewing = false
-                    },
-                    modifier = Modifier.align(Alignment.BottomEnd).padding(24.dp),
-                )
+                // No edit-mode FAB: Ctrl+E (window-level, see AppShell) toggles
+                // edit mode and Escape exits, so a dedicated button is redundant.
             }
             } // end center-anchored chrome layer
 
             // The drag ghost follows the pointer across the WHOLE shell (rails
             // included), so it stays full-window, above the inset chrome layer.
             DragGhostOverlay(dragController = dragController)
-        }
-    }
-}
-
-// ── FAB ─────────────────────────────────────────────────────────────────────
-
-@Composable
-private fun EditModeFab(
-    editing: Boolean,
-    onToggle: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val style = LocalStyle.current
-    val s = LocalStrings.current
-    val scale by animateFloatAsState(
-        targetValue   = if (editing) 1.08f else 1f,
-        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-        label         = "fab-scale",
-    )
-    val container = if (editing) CelestiaTheme.colors.primary
-                    else CelestiaTheme.colors.surfaceVariant
-    val content   = if (editing) Color.White
-                    else CelestiaTheme.colors.textPrimary
-
-    // Subtle pulse glow while in edit mode -- communicates "live state"
-    // without being noisy. Brut zeroes out animationMultiplier, so the
-    // pulse goes flat there.
-    val pulseTransition = rememberInfiniteTransition(label = "fab-pulse")
-    val pulse by pulseTransition.animateFloat(
-        initialValue  = 0f,
-        targetValue   = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(
-                durationMillis = style.animationDurationMs(1800),
-                easing         = LinearEasing,
-            ),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "fab-pulse-value",
-    )
-    val pulseAlpha = if (editing) 0.18f + pulse * 0.18f else 0f
-
-    Box(modifier = modifier) {
-        // Glow halo
-        Box(
-            modifier = Modifier
-                .matchParentSize()
-                .graphicsLayer { scaleX = 1.45f; scaleY = 1.45f; alpha = pulseAlpha }
-                .background(CelestiaTheme.colors.primary, shape = RoundedCornerShape(24.dp)),
-        )
-        FloatingActionButton(
-            onClick        = onToggle,
-            modifier       = Modifier
-                .graphicsLayer { scaleX = scale; scaleY = scale }
-                .shadow(elevation = 8.dp, shape = RoundedCornerShape(16.dp)),
-            containerColor = container,
-            contentColor   = content,
-            shape          = RoundedCornerShape(16.dp),
-        ) {
-            // Crossfade icons between Edit and Check so the morph is
-            // smooth rather than a hard swap.
-            Box(contentAlignment = Alignment.Center) {
-                AnimatedVisibility(
-                    visible = !editing,
-                    enter   = fadeIn(spring()),
-                    exit    = fadeOut(spring()),
-                ) {
-                    Icon(Icons.Default.Edit, contentDescription = s.editorFabEdit)
-                }
-                AnimatedVisibility(
-                    visible = editing,
-                    enter   = fadeIn(spring()),
-                    exit    = fadeOut(spring()),
-                ) {
-                    Icon(Icons.Default.Check, contentDescription = s.editorFabDone)
-                }
-            }
         }
     }
 }
