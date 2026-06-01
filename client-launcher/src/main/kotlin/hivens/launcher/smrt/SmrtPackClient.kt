@@ -6,6 +6,7 @@ import hivens.core.api.dto.smrt.ModrinthVersion
 import hivens.core.api.dto.smrt.SmrtPackListing
 import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.dto.smrt.SmrtPackSummary
+import hivens.launcher.cache.SmrtPackCaches
 import io.ktor.client.request.get
 import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.HttpResponse
@@ -27,6 +28,7 @@ class SmrtPackClient(
     private val httpProvider: HttpClientProvider,
     private val mirrorBase: String = DEFAULT_MIRROR_BASE,
     private val json: Json = DEFAULT_JSON,
+    private val caches: SmrtPackCaches = SmrtPackCaches.passthrough(),
 ) {
     companion object {
         const val DEFAULT_MIRROR_BASE = "https://smrt.hivens.dev"
@@ -45,8 +47,10 @@ class SmrtPackClient(
         }
     }
 
-    suspend fun fetchManifest(packId: String): SmrtPackManifest =
-        getJson("$mirrorBase/v1/packs/$packId/manifest")
+    suspend fun fetchManifest(packId: String): SmrtPackManifest {
+        val url = "$mirrorBase/v1/packs/$packId/manifest"
+        return caches.manifest.get(url) { getJson(url) }
+    }
 
     /**
      * Fetch a specific historical manifest version. Pinned-version
@@ -57,14 +61,22 @@ class SmrtPackClient(
      * manifest's MC version / loader / Java major would not match
      * the files that were synced to disk.
      */
-    suspend fun fetchManifestVersion(packId: String, version: String): SmrtPackManifest =
-        getJson("$mirrorBase/v1/packs/$packId/manifest/$version")
+    suspend fun fetchManifestVersion(packId: String, version: String): SmrtPackManifest {
+        // Same cache as the latest endpoint, keyed by the version-pinned URL; a
+        // pinned historical manifest is immutable so it stays a warm cache hit.
+        val url = "$mirrorBase/v1/packs/$packId/manifest/$version"
+        return caches.manifest.get(url) { getJson(url) }
+    }
 
-    suspend fun fetchSummary(packId: String): SmrtPackSummary =
-        getJson("$mirrorBase/v1/packs/$packId")
+    suspend fun fetchSummary(packId: String): SmrtPackSummary {
+        val url = "$mirrorBase/v1/packs/$packId"
+        return caches.summary.get(url) { getJson(url) }
+    }
 
-    suspend fun listPacks(): SmrtPackListing =
-        getJson("$mirrorBase/v1/packs")
+    suspend fun listPacks(): SmrtPackListing {
+        val url = "$mirrorBase/v1/packs"
+        return caches.listing.get(url) { getJson(url) }
+    }
 
     /**
      * Resolve a modrinth source by hitting Modrinth's project/version
@@ -74,8 +86,10 @@ class SmrtPackClient(
      * via `primary: true` on the file. Caller picks the file via
      * [ModrinthVersion.primaryFile].
      */
-    suspend fun resolveModrinthVersion(projectId: String, versionId: String): ModrinthVersion =
-        getJson("$MODRINTH_API_BASE/v2/project/$projectId/version/$versionId")
+    suspend fun resolveModrinthVersion(projectId: String, versionId: String): ModrinthVersion {
+        val url = "$MODRINTH_API_BASE/v2/project/$projectId/version/$versionId"
+        return caches.modrinthVersion.get(url) { getJson(url) }
+    }
 
     /**
      * Fetch project metadata for a Modrinth-sourced mod -- used by the
@@ -83,8 +97,10 @@ class SmrtPackClient(
      * carry its own `display.iconUrl`. One call per project_id is
      * enough; callers cache the result.
      */
-    suspend fun resolveModrinthProject(projectId: String): ModrinthProject =
-        getJson("$MODRINTH_API_BASE/v2/project/$projectId")
+    suspend fun resolveModrinthProject(projectId: String): ModrinthProject {
+        val url = "$MODRINTH_API_BASE/v2/project/$projectId"
+        return caches.modrinthProject.get(url) { getJson(url) }
+    }
 
     /**
      * Stream a download through a caller-supplied consumer. The

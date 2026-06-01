@@ -19,6 +19,10 @@ dependencies {
     // JSON
     implementation(libs.kotlinx.serialization.json)
 
+    // Coroutines (Mutex / StateFlow / CompletableDeferred for the cache layer).
+    // Was previously only transitive via ktor; depend on it explicitly.
+    implementation(libs.kotlinx.coroutines.core)
+
     // Archive extraction with unix-mode-aware ZipArchiveEntry -- needed by
     // ZipUtils to reject symlink entries that bypass plain Zip Slip checks.
     implementation(libs.commons.compress)

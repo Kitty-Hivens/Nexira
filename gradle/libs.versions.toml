@@ -67,6 +67,7 @@ ktor-server-content-negotiation = { group = "io.ktor", name = "ktor-server-conte
 
 # Kotlinx
 kotlinx-serialization-json      = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "serialization" }
+kotlinx-coroutines-core         = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core",    version.ref = "coroutines" }
 kotlinx-coroutines-test         = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test",    version.ref = "coroutines" }
 kotlinx-coroutines-swing        = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-swing",   version.ref = "coroutines" }
 kotlinx-coroutines-slf4j        = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-slf4j",   version.ref = "coroutines" }

@@ -5,6 +5,8 @@ import hivens.core.api.dto.SmartyServer
 import hivens.core.api.interfaces.IServerListService
 import hivens.core.api.model.ServerProfile
 import hivens.core.api.model.ServerSource
+import hivens.core.cache.Cache
+import hivens.core.cache.PassthroughCache
 import hivens.core.data.DashboardData
 import hivens.core.data.NewsItem
 import hivens.launcher.network.ServerProtocolConfig
@@ -20,81 +22,61 @@ import java.time.format.DateTimeFormatter
 import java.util.*
 import java.util.concurrent.CompletableFuture
 
+/**
+ * The in-memory dedup + single-flight that this service hand-rolled now lives in
+ * [dashboardCache] (an in-memory [Cache] keyed by [CACHE_KEY]). The disk side --
+ * the SERVERS-ONLY [cache] that seeds the tray synchronously at next launch --
+ * stays as-is, since that seed is read before any coroutine. Concurrent callers
+ * (auto-sync + dashboard composition + tray launch overlap on cold start) share
+ * one fetch via the cache's single-flight; an empty result (transient outage)
+ * neither overwrites the last-known-good list nor caches, so it retries.
+ */
 class SmartyCraftServerListService(
     private val repository: ServerRepository,
     private val protocolConfig: ServerProtocolConfig = ServerProtocolConfig(),
     private val cache: ServerListCacheStore = ServerListCacheStore.NoOp,
+    private val dashboardCache: Cache<DashboardData> = PassthroughCache(),
 ) : IServerListService {
 
     private val logger = LoggerFactory.getLogger(SmartyCraftServerListService::class.java)
-    private val lock = Any()
-    @Volatile
-    private var cachedData: DashboardData? = null
-    /**
-     * Single in-flight fetch. If a load is already running when a second
-     * caller arrives (auto-sync + dashboard composition + tray-launch
-     * can overlap on cold start), they share the same future rather than
-     * each firing their own request and racing to populate [cachedData].
-     */
-    @Volatile
-    private var inFlight: CompletableFuture<DashboardData>? = null
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val dateFormatter = DateTimeFormatter
         .ofPattern("dd MMM yyyy", Locale.of("ru"))
         .withZone(ZoneId.systemDefault())
 
-    override fun refresh(): CompletableFuture<DashboardData> {
-        synchronized(lock) { cachedData = null }
-        return fetchDashboardData()
+    override fun refresh(): CompletableFuture<DashboardData> = serviceScope.future {
+        dashboardCache.invalidate(CACHE_KEY)
+        dashboardCache.get(CACHE_KEY) { loadDashboard() }
     }
 
-    override fun fetchDashboardData(): CompletableFuture<DashboardData> {
-        cachedData?.let { return CompletableFuture.completedFuture(it) }
+    override fun fetchDashboardData(): CompletableFuture<DashboardData> = serviceScope.future {
+        dashboardCache.get(CACHE_KEY) { loadDashboard() }
+    }
 
-        synchronized(lock) {
-            // Double-checked: another caller may have populated either field
-            // between the unlocked fast-path read and the lock acquire.
-            cachedData?.let { return CompletableFuture.completedFuture(it) }
-            inFlight?.let { return it }
-
-            val future = serviceScope.future {
-                try {
-                    val response = repository.fetchDashboard()
-
-                    val servers = response.servers.map { getProfile(it) }
-                    val news = response.news.map { newsDto ->
-                        val imageName = if (newsDto.image.endsWith(".jpg")) newsDto.image else "${newsDto.image}.jpg"
-                        val imageUrl = "${protocolConfig.baseUrl}/images/news/mini/$imageName"
-
-                        NewsItem(
-                            id = newsDto.id,
-                            title = newsDto.name,
-                            description = "Views: ${newsDto.views}",
-                            date = formatTimestamp(newsDto.date),
-                            imageUrl = imageUrl
-                        )
-                    }
-
-                    val data = DashboardData(servers, news)
-                    if (servers.isNotEmpty()) {
-                        synchronized(lock) { cachedData = data }
-                        // Disk cache feeds [TrayManager] at the next launch
-                        // before the network round-trip; only persist on
-                        // success so a transient outage cannot overwrite
-                        // the last-known-good list with an empty one.
-                        cache.save(servers)
-                    }
-                    data
-                } catch (e: Exception) {
-                    logger.error("fetchDashboardData failed -- returning empty dashboard", e)
-                    DashboardData(emptyList(), emptyList())
-                }
+    private suspend fun loadDashboard(): DashboardData =
+        try {
+            val response = repository.fetchDashboard()
+            val servers = response.servers.map { getProfile(it) }
+            val news = response.news.map { newsDto ->
+                val imageName = if (newsDto.image.endsWith(".jpg")) newsDto.image else "${newsDto.image}.jpg"
+                val imageUrl = "${protocolConfig.baseUrl}/images/news/mini/$imageName"
+                NewsItem(
+                    id = newsDto.id,
+                    title = newsDto.name,
+                    description = "Views: ${newsDto.views}",
+                    date = formatTimestamp(newsDto.date),
+                    imageUrl = imageUrl
+                )
             }
-            inFlight = future
-            future.whenComplete { _, _ -> synchronized(lock) { inFlight = null } }
-            return future
+            // Persist only on success so a transient outage cannot overwrite the
+            // last-known-good list the tray seeds from. The in-memory cache's
+            // shouldStore guard does the same for the session cache.
+            if (servers.isNotEmpty()) cache.save(servers)
+            DashboardData(servers, news)
+        } catch (e: Exception) {
+            logger.error("fetchDashboardData failed -- returning empty dashboard", e)
+            DashboardData(emptyList(), emptyList())
         }
-    }
 
     private fun getProfile(srv: SmartyServer): ServerProfile =
         ServerProfile(
@@ -115,5 +97,10 @@ class SmartyCraftServerListService(
         } catch (_: Exception) {
             "Unknown Date"
         }
+    }
+
+    private companion object {
+        // One dashboard per session; a fixed key is enough.
+        const val CACHE_KEY = "dashboard"
     }
 }

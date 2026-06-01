@@ -20,7 +20,7 @@ import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.StandardCopyOption
+import hivens.core.io.AtomicFiles
 
 /**
  * JSON-on-disk store for the widget [LayoutGraph]. Single-file envelope
@@ -157,9 +157,7 @@ class LayoutGraphRepository(
             // against the in-memory default.
             val def = defaultGraph()
             try {
-                Files.createDirectories(file.parent)
-                val envelope = Envelope(schemaVersion = SCHEMA_VERSION, graph = def)
-                Files.writeString(file, json.encodeToString(envelope))
+                AtomicFiles.writeString(file, json.encodeToString(Envelope(schemaVersion = SCHEMA_VERSION, graph = def)))
             } catch (e: Exception) {
                 log.warn("Failed to seed default layout graph at {} -- continuing in memory", file, e)
             }
@@ -199,22 +197,8 @@ class LayoutGraphRepository(
     // block; flush() invokes from inside its own mutex.withLock.
     private fun writeNow() {
         try {
-            Files.createDirectories(file.parent)
-            val tmp = file.resolveSibling("${file.fileName}.tmp")
             val envelope = Envelope(schemaVersion = SCHEMA_VERSION, graph = state.value)
-            Files.writeString(tmp, json.encodeToString(envelope))
-            try {
-                Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
-            } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
-                log.warn(
-                    "Filesystem at {} does not support ATOMIC_MOVE; " +
-                    "falling back to non-atomic rename for layout-graph.json. " +
-                    "Move the data directory to a filesystem that supports " +
-                    "atomic rename (ext4, NTFS, APFS) for full durability.",
-                    file.parent,
-                )
-                Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING)
-            }
+            AtomicFiles.writeString(file, json.encodeToString(envelope))
         } catch (e: Exception) {
             log.error("Failed to persist layout graph at {}", file, e)
         }

@@ -5,6 +5,7 @@ import hivens.launcher.platform.ServerNameValidator
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
+import hivens.core.io.AtomicFiles
 import java.nio.file.Files
 import java.nio.file.Path
 import java.security.MessageDigest
@@ -97,13 +98,12 @@ class ManifestCache(
 
     fun markClean(serverId: String, manifestHash: String, manifest: FileManifest? = null) {
         runCatching {
-            Files.createDirectories(cacheDir)
             val entry = Entry(
                 hash = manifestHash,
                 syncedAt = System.currentTimeMillis(),
                 manifest = manifest,
             )
-            Files.writeString(cacheFile(serverId), json.encodeToString(entry))
+            AtomicFiles.writeString(cacheFile(serverId), json.encodeToString(entry))
         }.onFailure { log.warn("Failed to persist manifest-cache entry for {}", serverId, it) }
     }
 
