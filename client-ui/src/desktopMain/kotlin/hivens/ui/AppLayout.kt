@@ -98,7 +98,21 @@ fun AppLayout(
     val bypassesList by NetworkState.bypassesState.collectAsState()
     val sslBypass = remember(bypassesList, bypassHost) { NetworkState.bypassFor(bypassHost) }
 
-    Row(Modifier.fillMaxSize().background(rowBackground)) {
+    // The editor host wraps the WHOLE shell Row (rails included), not just the
+    // center, so its decorators reach rail widgets. The insets keep the edit
+    // chrome anchored over the center pane (past the 64dp rail + 264dp panel,
+    // each plus a 1dp divider).
+    EditorSurfaceHost(
+        currentScreen          = currentScreen,
+        homeView               = homeView,
+        customization          = customization,
+        onCustomizationChanged = onCustomizationChanged,
+        uiStyle                = uiStyle,
+        onUiStyleChanged       = onUiStyleChanged,
+        centerStartInset       = 65.dp,
+        centerEndInset         = 265.dp,
+    ) {
+      Row(Modifier.fillMaxSize().background(rowBackground)) {
 
         // ── Sidebar 64dp ──────────────────────────────────────────────────
         AppSidebar(
@@ -115,14 +129,6 @@ fun AppLayout(
 
         // ── Main content ──────────────────────────────────────────────────
         Box(Modifier.weight(1f).fillMaxHeight()) {
-          EditorSurfaceHost(
-              currentScreen          = currentScreen,
-              homeView               = homeView,
-              customization          = customization,
-              onCustomizationChanged = onCustomizationChanged,
-              uiStyle                = uiStyle,
-              onUiStyleChanged       = onUiStyleChanged,
-          ) {
             // Screen-to-screen Crossfade duration follows the active
             // style. Under Brut (animationMultiplier = 0) the swap is
             // effectively instant; under Celestia keeps the 180ms fade.
@@ -249,8 +255,7 @@ fun AppLayout(
                         )
                 }
             }
-          } // end EditorSurfaceHost
-        }
+        } // end main content Box
 
         VerticalDivider(
             modifier = Modifier.fillMaxHeight(),
@@ -265,7 +270,8 @@ fun AppLayout(
             sslBypass = sslBypass,
             modifier = Modifier.width(264.dp).fillMaxHeight()
         )
-    }
+      } // end shell Row
+    } // end EditorSurfaceHost
 }
 
 // ─── Sidebar ─────────────────────────────────────────────────────────────────

@@ -76,6 +76,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import hivens.core.data.HomeView
@@ -163,6 +164,12 @@ fun EditorSurfaceHost(
     onCustomizationChanged: (CustomizationSettings) -> Unit = {},
     uiStyle: UiStyle = UiStyle.Celestia,
     onUiStyleChanged: (UiStyle) -> Unit = {},
+    // The host now wraps the WHOLE shell Row (rails included) so the editor's
+    // decorators reach rail widgets. These insets keep the chrome overlays
+    // (pill / palette / prop panel / FAB / vignette) anchored over the center
+    // pane, past the left rail and right panel, matching their pre-hoist place.
+    centerStartInset: Dp = 0.dp,
+    centerEndInset: Dp = 0.dp,
     content: @Composable () -> Unit,
 ) {
     val availableSurfaces: List<SurfaceId> = remember(currentScreen, homeView) {
@@ -406,12 +413,16 @@ fun EditorSurfaceHost(
             // primary tint at very low alpha to communicate "this whole
             // pane is being edited", without obscuring content.
             content()
-            EditModeVignette(active = editing)
 
-            // Drag ghost overlay -- positioned in window coords relative
-            // to the host's own Box. Renders nothing when no drag is
-            // active.
-            DragGhostOverlay(dragController = dragController)
+            // Center-anchored chrome layer: inset past the left rail and right
+            // panel so the vignette + overlays stay over the center pane exactly
+            // as before the host was hoisted around the whole shell Row.
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(start = centerStartInset, end = centerEndInset),
+            ) {
+            EditModeVignette(active = editing)
 
             if (availableSurfaces.isNotEmpty()) {
                 EditModePill(
@@ -529,6 +540,11 @@ fun EditorSurfaceHost(
                     modifier = Modifier.align(Alignment.BottomEnd).padding(24.dp),
                 )
             }
+            } // end center-anchored chrome layer
+
+            // The drag ghost follows the pointer across the WHOLE shell (rails
+            // included), so it stays full-window, above the inset chrome layer.
+            DragGhostOverlay(dragController = dragController)
         }
     }
 }
