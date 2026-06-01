@@ -756,6 +756,10 @@ object GermanStrings : AppStrings {
 
     // --- Layout editor: prop panel ---
     override val editorResetToDefault = "Auf Standard zurücksetzen"
+    override val editorBackingTitle   = "Hintergrund"
+    override val editorBackingGlass   = "Glas"
+    override val editorBackingCorner  = "Ecke"
+    override val editorBackingPadding = "Abstand"
 
     // --- Layout editor: presets ---
     override val editorPresetsTitle          = "Presets"

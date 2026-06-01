@@ -28,6 +28,22 @@ data class WidgetInstance(
     // Absolute placement when the enclosing slot is Canvas. Null for flow
     // slots (Column/Row/Grid) -- back-compat default for old layouts.
     val canvas: CanvasPlacement? = null,
+    // Per-instance backing the kernel paints around the widget (glass card,
+    // corner, padding). Null = no backing -- back-compat default for old
+    // layouts. The editor's "Backing" section sets it on ANY widget, propless
+    // included. Rendered in production via LocalWidgetChromeRenderer.
+    val chrome: WidgetChrome? = null,
+)
+
+// Optional backing painted around a widget by the kernel: a glass card behind
+// it ([glassAlphaPct] 0 = none), rounded corners ([cornerRadiusDp]), and inner
+// [paddingDp]. Compose-free (widget-model carries no Compose); the kernel turns
+// these scalars into a Modifier via the injected LocalWidgetChromeRenderer.
+@Serializable
+data class WidgetChrome(
+    val glassAlphaPct: Int = 0,
+    val cornerRadiusDp: Int = 0,
+    val paddingDp: Int = 0,
 )
 
 // Phase G: how a slot arranges its widgets. Column (default) reproduces
@@ -140,6 +156,26 @@ fun LayoutGraph.updateWidgetProps(
             },
         )
     }
+
+// Sets (or clears, with null) the per-instance backing chrome. Same no-op /
+// missing-instance contract as updateWidgetProps. A no-backing chrome
+// normalizes to null so the field stays absent for default-styled widgets.
+fun LayoutGraph.updateWidgetChrome(
+    path: SlotPath,
+    instanceId: String,
+    chrome: WidgetChrome?,
+): LayoutGraph {
+    val normalized = chrome?.takeUnless { it == WidgetChrome() }
+    return mutate(path) { content ->
+        val target = content.widgets.firstOrNull { it.instanceId == instanceId } ?: return@mutate content
+        if (target.chrome == normalized) return@mutate content
+        content.copy(
+            widgets = content.widgets.map {
+                if (it.instanceId == instanceId) it.copy(chrome = normalized) else it
+            },
+        )
+    }
+}
 
 // Phase G layout transforms. Slot orientation + grid column count are
 // slot-level; widget weight is per-instance. Each is a no-op (identity

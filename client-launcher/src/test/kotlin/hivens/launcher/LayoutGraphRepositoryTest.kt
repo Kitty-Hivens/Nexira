@@ -6,6 +6,7 @@ import hivens.widget.model.SlotId
 import hivens.widget.model.SlotPath
 import hivens.widget.model.SurfaceId
 import hivens.widget.model.SurfaceLayout
+import hivens.widget.model.WidgetChrome
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
 import kotlinx.coroutines.CoroutineScope
@@ -304,6 +305,49 @@ class LayoutGraphRepositoryTest {
             .widgets.first()
         assertEquals("i1", loadedWidget.instanceId)
         assertEquals(emptyMap(), loadedWidget.children)
+    }
+
+    @Test
+    fun `v2 envelope without chrome parses cleanly under v3`() = runBlocking {
+        // A v2 file pre-dates the chrome field; it must load with null chrome
+        // (the v2 -> v3 migration is identity, deserialization fills the default).
+        val widget = WidgetInstance(WidgetKind("legacy"), "i1", JsonObject(emptyMap()))
+        val v2 = LayoutGraph(surfaces = mapOf(
+            SurfaceId("s") to SurfaceLayout(slots = mapOf(
+                SlotId("a") to SlotContent(listOf(widget)),
+            )),
+        ))
+        Files.writeString(
+            file,
+            """{"schema_version":2,"graph":${json.encodeToString(LayoutGraph.serializer(), v2)}}""",
+        )
+
+        val loaded = repo().value()
+            .surfaces[SurfaceId("s")]!!.slots[SlotId("a")]!!.widgets.first()
+        assertEquals("i1", loaded.instanceId)
+        assertEquals(null, loaded.chrome)
+    }
+
+    @Test
+    fun `widget chrome survives a write + reload`() = runBlocking {
+        val repo = repo()
+        repo.flush() // settle seed
+        val widget = WidgetInstance(
+            kind = WidgetKind("k"),
+            instanceId = "chrome-1",
+            props = JsonObject(emptyMap()),
+            chrome = WidgetChrome(glassAlphaPct = 45, cornerRadiusDp = 10, paddingDp = 4),
+        )
+        repo.update {
+            it.copy(surfaces = it.surfaces + (SurfaceId("cx") to SurfaceLayout(
+                slots = mapOf(SlotId("o") to SlotContent(listOf(widget))),
+            )))
+        }
+        repo.flush()
+
+        val reloaded = LayoutGraphRepository(file, json, scope) { sampleDefault }
+        val w = reloaded.value().surfaces[SurfaceId("cx")]!!.slots[SlotId("o")]!!.widgets.first()
+        assertEquals(WidgetChrome(glassAlphaPct = 45, cornerRadiusDp = 10, paddingDp = 4), w.chrome)
     }
 
     @Test

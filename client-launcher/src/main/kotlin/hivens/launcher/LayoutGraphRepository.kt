@@ -211,7 +211,7 @@ class LayoutGraphRepository(
     )
 
     private companion object {
-        const val SCHEMA_VERSION = 2
+        const val SCHEMA_VERSION = 3
 
         // 200ms catches a drag-thrash without delaying single drops
         // noticeably. Verification target in the Phase A plan is "<=5
@@ -242,13 +242,15 @@ internal object Migrations {
         return current
     }
 
-    private const val CURRENT = 2
+    private const val CURRENT = 3
 
     private fun step(toVersion: Int): Step = when (toVersion) {
-        // v1 -> v2: WidgetInstance gained a children field. Default
-        // value handles backward compat on deserialization, so the
-        // step itself is identity.
+        // v1 -> v2: WidgetInstance gained a children field.
+        // v2 -> v3: WidgetInstance gained a nullable chrome field.
+        // Both add a defaulted field, so deserialization handles backward
+        // compat and the steps are identity.
         2 -> Step.IDENTITY
+        3 -> Step.IDENTITY
         else -> Step.IDENTITY
     }
 

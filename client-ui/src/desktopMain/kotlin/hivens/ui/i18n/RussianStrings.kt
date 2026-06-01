@@ -757,6 +757,10 @@ object RussianStrings : AppStrings {
 
     // --- Layout editor: prop panel ---
     override val editorResetToDefault = "Сбросить к умолчанию"
+    override val editorBackingTitle   = "Подложка"
+    override val editorBackingGlass   = "Стекло"
+    override val editorBackingCorner  = "Скругление"
+    override val editorBackingPadding = "Отступ"
 
     // --- Layout editor: presets ---
     override val editorPresetsTitle          = "Пресеты"

@@ -75,6 +75,13 @@ import hivens.ui.utils.GameConsoleService
 import hivens.launcher.LayoutGraphRepository
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalWidgetRegistry
+import hivens.widget.api.LocalWidgetChromeRenderer
+import hivens.widget.api.WidgetChromeRenderer
+import hivens.ui.customization.glassSurfaceAlpha
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import hivens.widget.api.LocalWidgetServiceRegistry
 import hivens.widget.api.WidgetServiceRegistry
 import hivens.widget.api.WidgetRegistry
@@ -618,12 +625,30 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
                 )
             }
             val layoutGraph by layoutGraphRepo.observe().collectAsState()
+            // Production renderer for per-widget backing (WidgetChrome): glass
+            // card (follows the active style via glassSurfaceAlpha), rounded
+            // corners, inner padding. Invoked by the kernel only when a widget
+            // carries chrome, so default-styled widgets pay nothing.
+            val chromeRenderer: WidgetChromeRenderer = { chrome, content ->
+                val glass = glassSurfaceAlpha(chrome.glassAlphaPct / 100f)
+                androidx.compose.foundation.layout.Box(
+                    Modifier
+                        .then(
+                            if (chrome.cornerRadiusDp > 0)
+                                Modifier.clip(RoundedCornerShape(chrome.cornerRadiusDp.dp))
+                            else Modifier,
+                        )
+                        .background(glass)
+                        .padding(chrome.paddingDp.dp),
+                ) { content() }
+            }
             CompositionLocalProvider(
                 LocalCustomization                       provides customization,
                 androidx.compose.ui.platform.LocalDensity provides scaledDensity,
                 LocalLayoutGraph                         provides layoutGraph,
                 LocalWidgetRegistry                      provides widgetRegistry,
                 LocalWidgetServiceRegistry               provides widgetServiceRegistry,
+                LocalWidgetChromeRenderer                provides chromeRenderer,
             ) {
             val effectiveStyle = if (customization.experimentalColorOverridesEnabled) {
                 styleSpec.applyOverrides(customization.styleOverrides)

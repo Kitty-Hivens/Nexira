@@ -100,10 +100,10 @@ private fun RenderSlotContent(path: SlotPath, modifier: Modifier, spacing: Dp) {
                 if (descriptor != null) {
                     if (instance.weight > 0f) {
                         Box(Modifier.weight(instance.weight)) {
-                            decorator(address, index, descriptor, instance) { descriptor.Render(instance) }
+                            decorator(address, index, descriptor, instance) { RenderWidget(descriptor, instance) }
                         }
                     } else {
-                        decorator(address, index, descriptor, instance) { descriptor.Render(instance) }
+                        decorator(address, index, descriptor, instance) { RenderWidget(descriptor, instance) }
                     }
                 }
                 if (index < content.widgets.lastIndex) slotDivider(path, content, index)
@@ -123,7 +123,7 @@ private fun RenderSlotContent(path: SlotPath, modifier: Modifier, spacing: Dp) {
                         val descriptor = registry[instance.kind]
                         Box(Modifier.weight(1f)) {
                             if (descriptor != null) {
-                                decorator(address, index, descriptor, instance) { descriptor.Render(instance) }
+                                decorator(address, index, descriptor, instance) { RenderWidget(descriptor, instance) }
                             }
                         }
                     }
@@ -143,7 +143,7 @@ private fun RenderSlotContent(path: SlotPath, modifier: Modifier, spacing: Dp) {
                     val sizeMod = if (cp != null && cp.width > 0f && cp.height > 0f)
                         Modifier.size(cp.width.dp, cp.height.dp) else Modifier
                     Box(Modifier.offset((cp?.x ?: 0f).dp, (cp?.y ?: 0f).dp).then(sizeMod)) {
-                        decorator(address, index, descriptor, instance) { descriptor.Render(instance) }
+                        decorator(address, index, descriptor, instance) { RenderWidget(descriptor, instance) }
                     }
                 }
         }
@@ -155,14 +155,28 @@ private fun RenderSlotContent(path: SlotPath, modifier: Modifier, spacing: Dp) {
                 if (descriptor != null) {
                     if (instance.weight > 0f) {
                         Box(Modifier.weight(instance.weight)) {
-                            decorator(address, index, descriptor, instance) { descriptor.Render(instance) }
+                            decorator(address, index, descriptor, instance) { RenderWidget(descriptor, instance) }
                         }
                     } else {
-                        decorator(address, index, descriptor, instance) { descriptor.Render(instance) }
+                        decorator(address, index, descriptor, instance) { RenderWidget(descriptor, instance) }
                     }
                 }
                 if (index < content.widgets.lastIndex) slotDivider(path, content, index)
             }
         }
+    }
+}
+
+// Renders a widget, wrapped in its per-instance backing when it has one. The
+// chrome wrap is inside the editor decorator (the drag handle / remove button
+// surround the glass card) but is PRODUCTION styling -- it paints whenever
+// instance.chrome != null, editor mounted or not.
+@Composable
+private fun RenderWidget(descriptor: WidgetDescriptor, instance: WidgetInstance) {
+    val chrome = instance.chrome
+    if (chrome == null) {
+        descriptor.Render(instance)
+    } else {
+        LocalWidgetChromeRenderer.current(chrome) { descriptor.Render(instance) }
     }
 }

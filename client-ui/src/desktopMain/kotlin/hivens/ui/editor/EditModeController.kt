@@ -8,6 +8,7 @@ import hivens.widget.model.SlotId
 import hivens.widget.model.SlotOrientation
 import hivens.widget.model.SlotPath
 import hivens.widget.model.SurfaceId
+import hivens.widget.model.WidgetChrome
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
 import hivens.widget.model.insertWidget
@@ -17,6 +18,7 @@ import hivens.widget.model.reorderInSlot
 import hivens.widget.model.setGridColumns
 import hivens.widget.model.setSlotOrientation
 import hivens.widget.model.setWidgetWeight
+import hivens.widget.model.updateWidgetChrome
 import hivens.widget.model.updateWidgetProps
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -92,6 +94,14 @@ class EditModeController(
     fun updateProps(path: SlotPath, instanceId: String, props: JsonObject) {
         scope.launch {
             repo.update { it.updateWidgetProps(path, instanceId, props) }
+        }
+    }
+
+    // Per-instance backing chrome (glass / corner / padding). A no-backing
+    // chrome normalizes to null in the transform, so it never bloats the file.
+    fun updateChrome(path: SlotPath, instanceId: String, chrome: WidgetChrome?) {
+        scope.launch {
+            repo.update { it.updateWidgetChrome(path, instanceId, chrome) }
         }
     }
 

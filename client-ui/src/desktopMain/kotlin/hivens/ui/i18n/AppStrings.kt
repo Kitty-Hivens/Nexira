@@ -785,6 +785,10 @@ interface AppStrings {
 
     // --- Layout editor: prop panel ---
     val editorResetToDefault: String
+    val editorBackingTitle: String
+    val editorBackingGlass: String
+    val editorBackingCorner: String
+    val editorBackingPadding: String
 
     // --- Layout editor: presets ---
     val editorPresetsTitle: String
