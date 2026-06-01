@@ -1,11 +1,16 @@
 package hivens.launcher
 
+import hivens.core.api.TwoFactorRequiredException
 import hivens.core.api.interfaces.IAuthService
 import hivens.core.api.interfaces.IFileDownloadService
 import hivens.core.api.interfaces.IManifestProcessorService
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.SessionData
+import hivens.core.data.SettingsData
 import hivens.core.diag.ActionRing
+import hivens.launcher.smrt.ClientSyncCoordinator
+import hivens.launcher.smrt.OpenSmrtHelperResolver
+import hivens.launcher.smrt.SmartyModPlanner
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -52,6 +57,13 @@ class AutoSyncService(
      * [credentialsProvider].
      */
     private val optionalModsStateProvider: (serverId: String) -> Map<String, Boolean>,
+    /**
+     * Builds the Smarty swap + strict-verification plan so background sync
+     * applies the same mod handling as a foreground launch.
+     */
+    private val smartyPlanner: SmartyModPlanner,
+    /** Current settings, read per-server so a mid-session toggle is honoured. */
+    private val settingsProvider: () -> SettingsData,
 ) {
     private val log = LoggerFactory.getLogger(AutoSyncService::class.java)
 
@@ -158,7 +170,7 @@ class AutoSyncService(
             var sessionFailed = false
             val session: SessionData? = try {
                 authService.login(creds.playerName, pass, server.assetDir)
-            } catch (_: hivens.core.api.TwoFactorRequiredException) {
+            } catch (_: TwoFactorRequiredException) {
                 val cached = manifestCache.loadManifest(server.assetDir)
                 if (cached == null) {
                     log.info(
@@ -184,28 +196,52 @@ class AutoSyncService(
             }
             if (session == null) continue  // SKIPPED above; counters not bumped (it's neither succeeded nor failed)
 
-            val ok = runCatching {
-                val userState = optionalModsStateProvider(server.assetDir)
-                val ignoredFiles = manifestProcessor.calculateIgnoredFiles(server, userState)
-                val clientDir = dataDirectory.resolve("clients").resolve(server.assetDir)
+            val settings = settingsProvider()
+            val userState = optionalModsStateProvider(server.assetDir)
+            val ignoredFiles = manifestProcessor.calculateIgnoredFiles(server, userState)
+            val clientDir = dataDirectory.resolve("clients").resolve(server.assetDir)
+            val smartyPlan = runCatching { smartyPlanner.plan(server, session.fileManifest, settings) }
+                .getOrElse {
+                    log.warn("Auto-sync: Smarty planning failed for {}: {}", server.assetDir, it.message)
+                    updateServerState(server.assetDir, ServerState.FAILED)
+                    failed++
+                    continue
+                }
 
-                downloadService.processSession(
-                    session = session,
-                    serverId = server.assetDir,
-                    targetDir = clientDir,
-                    extraCheckSum = server.extraCheckSum,
-                    ignoredFiles = ignoredFiles,
-                    messageUI = null,
-                    progressUI = { _, _, bytesRead, totalBytes, _ ->
-                        setOverall(OverallState.InProgress(
-                            currentServer = server.title ?: server.name,
-                            currentIdx = idx + 1,
-                            total = installed.size,
-                            bytesRead = bytesRead,
-                            totalBytes = totalBytes,
-                        ))
-                    },
-                )
+            // Refuse to strip Smarty with no replacement (same gate as a foreground
+            // launch): don't mutate the pack into a broken state in the background.
+            // This is "awaiting upstream/user action", not a failure -> SKIPPED, the
+            // same convention the 2FA branch uses.
+            if (settings.useOpenSmrtHelper && smartyPlan.ignoredAddon.isNotEmpty() &&
+                !helperPresent(clientDir, server.version, smartyPlan)) {
+                log.info("Auto-sync skipped for {}: no open-smrt helper for MC {}", server.assetDir, server.version)
+                updateServerState(server.assetDir, ServerState.SKIPPED)
+                continue
+            }
+
+            val ok = runCatching {
+                ClientSyncCoordinator.withClientLock(clientDir) {
+                    downloadService.processSession(
+                        session = session,
+                        serverId = server.assetDir,
+                        targetDir = clientDir,
+                        extraCheckSum = server.extraCheckSum,
+                        ignoredFiles = ignoredFiles + smartyPlan.ignoredAddon,
+                        messageUI = null,
+                        progressUI = { _, _, bytesRead, totalBytes, _ ->
+                            setOverall(OverallState.InProgress(
+                                currentServer = server.title ?: server.name,
+                                currentIdx = idx + 1,
+                                total = installed.size,
+                                bytesRead = bytesRead,
+                                totalBytes = totalBytes,
+                            ))
+                        },
+                        injectModJar = smartyPlan.injectJar,
+                        strictModCheck = smartyPlan.strict,
+                        helperKeepGlobs = smartyPlan.helperKeepGlobs,
+                    )
+                }
             }
 
             if (ok.isSuccess) {
@@ -234,4 +270,8 @@ class AutoSyncService(
         if (!Files.isDirectory(dir)) return false
         return Files.list(dir).use { it.findFirst().isPresent }
     }
+
+    private fun helperPresent(clientDir: Path, mcVersion: String, plan: SmartyModPlanner.Plan): Boolean =
+        plan.injectJar != null ||
+            Files.isRegularFile(clientDir.resolve("mods").resolve(OpenSmrtHelperResolver.helperFileName(mcVersion)))
 }

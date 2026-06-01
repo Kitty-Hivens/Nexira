@@ -17,6 +17,7 @@ import hivens.core.security.IKeyringStorage
 import hivens.launcher.CredentialsManager
 import hivens.launcher.ManifestCache
 import hivens.launcher.ProfileManager
+import hivens.launcher.smrt.SmartyModPlanner
 import hivens.launcher.smrt.SmrtPackClient
 import io.mockk.coEvery
 import io.mockk.coJustRun
@@ -80,6 +81,7 @@ class LauncherControllerTest {
     private lateinit var profileManager: ProfileManager
     private lateinit var packRepository: IPackRepository
     private lateinit var smrtPackClient: SmrtPackClient
+    private lateinit var smartyPlanner: SmartyModPlanner
 
     private val server = ServerProfile(
         name     = "TestSrv",
@@ -115,8 +117,14 @@ class LauncherControllerTest {
         // constructor without any stubbing.
         packRepository     = mockk(relaxed = true)
         smrtPackClient     = mockk(relaxed = true)
+        // No Smarty swap in SC-launch tests; the helper never resolves, so the
+        // plan injects nothing. The swap path has its own test.
+        smartyPlanner      = SmartyModPlanner(resolveHelper = { null }, manifestProcessor = manifestProcessor)
 
         every { manifestProcessor.calculateIgnoredFiles(any(), any()) } returns emptySet()
+        // Swap planning (enabled by default in SettingsData) flattens the manifest
+        // to find Smarty jars to strip; no Smarty in these SC-launch fixtures.
+        every { manifestProcessor.flattenManifest(any()) } returns emptyMap()
         coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/usr/bin/java")
     }
 
@@ -139,6 +147,7 @@ class LauncherControllerTest {
         packRepository     = packRepository,
         smrtPackClient     = smrtPackClient,
         smrtSyncService    = mockk(relaxed = true),
+        smartyPlanner      = smartyPlanner,
         dataDirectory      = sandbox,
         appScope           = scope,
     )
@@ -167,6 +176,9 @@ class LauncherControllerTest {
                 messageUI = any(),
                 progressUI = any(),
                 verifyUI = any(),
+                injectModJar = any(),
+                strictModCheck = any(),
+                helperKeepGlobs = any(),
             )
         }
 
@@ -222,7 +234,36 @@ class LauncherControllerTest {
         assertEquals(LaunchError.OfflineNoClient, state.reason)
 
         coVerify(exactly = 0) {
-            downloadService.processSession(any(), any(), any(), any(), any(), any(), any(), any())
+            downloadService.processSession(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+        }
+    }
+
+    @Test
+    fun `swap on with Smarty in manifest but no helper blocks the launch`() = runTest {
+        every { settingsService.getSettings() } returns SettingsData()  // useOpenSmrtHelper = true
+        // Manifest ships the proprietary Smarty jar; the planner's default glob
+        // matches it, and the resolver (newController stubs resolveHelper = null)
+        // yields no helper, with none on disk -> launch must be blocked.
+        every { manifestProcessor.flattenManifest(any()) } returns
+            mapOf("mods/Smarty-1.7.10.jar" to hivens.core.data.FileData("x", 1))
+
+        val session = SessionData(
+            playerName = "tester",
+            cachedPassword = "pw",
+            fileManifest = FileManifest(),
+        )
+        coEvery { authService.login("tester", "pw", "test") } returns
+            session.copy(fileManifest = FileManifest())
+
+        val controller = newController(this)
+        controller.launch(session, server, onSessionRefreshed = null)
+        advanceUntilIdle()
+
+        val state = controller.state.value
+        assertIs<LaunchState.Error>(state)
+        assertEquals(LaunchError.HelperUnavailable("1.7.10"), state.reason)
+        coVerify(exactly = 0) {
+            downloadService.processSession(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
         }
     }
 
@@ -517,7 +558,7 @@ class LauncherControllerTest {
             fileManifest = FileManifest(),
         )
         coJustRun {
-            downloadService.processSession(any(), any(), any(), any(), any(), any(), any(), any())
+            downloadService.processSession(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
         }
 
         val process = mockk<Process>()

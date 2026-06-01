@@ -12,6 +12,26 @@ below are for the GitHub release page and CHANGELOG readers.
 
 ## [Unreleased]
 
+### Highlights
+- **Smarty servers, without the spyware**. A new Settings -> Smarty section
+  can swap SmartyCraft's proprietary Smarty mod for our open-source helper:
+  same network compatibility, none of the client-side surveillance. If no
+  open replacement exists for a server's game version, the launch is blocked
+  rather than quietly running the original mod.
+- **Exact mod verification**. Optionally delete anything in a server's mods
+  folder it did not ask for. Keeps installs clean, but it also removes mods
+  you added by hand, so it is a deliberate opt-out of a curated set.
+- **Quieter launch errors**. Launch failures now surface through the
+  notification system instead of an in-panel banner.
+
+### Added
+- Settings -> Smarty section with "Use the alternative smrt network helper"
+  and "Exact mod verification" toggles (both on by default).
+
+### Changed
+- Launch failures are delivered as notifications; the in-panel error banner
+  was removed.
+
 ## [2.3.3] - 2026-05-25
 
 Visual customization release. Custom background gains real

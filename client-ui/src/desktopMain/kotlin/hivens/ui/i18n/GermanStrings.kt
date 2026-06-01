@@ -33,7 +33,6 @@ object GermanStrings : AppStrings {
     override val launchButton      = "Spielen"
     override val launchAbort       = "Abbrechen"
     override val launchRunning     = "Spiel läuft"
-    override val launchResetError  = "FEHLER ZURÜCKSETZEN"
     override val launchDownloading = "Herunterladen:"
 
     // Launcher States
@@ -46,6 +45,8 @@ object GermanStrings : AppStrings {
     override val stateLaunching   = "Prozess starten..."
     override fun stateExitCode(code: Int)  = "Spiel mit Code $code beendet"
     override fun stateError(msg: String)   = "Fehler: $msg"
+    override fun stateHelperUnavailable(mcVersion: String) =
+        "Kein open-smrt-Helfer für Minecraft $mcVersion. Start blockiert, damit der proprietäre Smarty-Mod nicht läuft; deaktiviere den Helfer-Tausch in den Einstellungen, um damit zu spielen."
     override fun stateMissingAuthProvider(providerKey: String) = when (providerKey) {
         PackAuthRequirement.SmartyCraft.PROVIDER_KEY ->
             "Dieses Pack braucht ein SmartyCraft-Konto. Bitte anmelden, um zu spielen."
@@ -390,6 +391,12 @@ object GermanStrings : AppStrings {
     override val settingsForceProxyTitle = "Nur Proxy verwenden"
     override val settingsForceProxyDesc  = "Direktverbindung überspringen und alle Anfragen über den SmartyCraft-SOCKS-Proxy leiten. Aktivieren Sie dies, wenn in Ihrem Netzwerk Direktverbindungen blockiert werden."
 
+    override val settingsSectionSmarty           = "Smarty-Server"
+    override val settingsOpenSmrtHelperTitle      = "Alternativen smrt-Netzwerk-Helfer verwenden"
+    override val settingsOpenSmrtHelperDesc       = "Ersetzt den originalen Smarty-Mod auf Smarty-Servern durch unseren quelloffenen Helfer. Dieselben Netzwerkfunktionen, aber ohne Überwachung. Gibt es für die Spielversion keinen Ersatz, wird der Start blockiert statt den Original-Mod auszuführen."
+    override val settingsStrictModCheckTitle      = "Genaue Mod-Prüfung"
+    override val settingsStrictModCheckDesc       = "Löscht nach der Synchronisierung alles im Mods-Ordner, was der Server nicht angefordert hat. Hält die Installation sauber, entfernt aber auch von Hand hinzugefügte Mods."
+
     override val settingsSectionDataDir       = "Datenverzeichnis"
     override val settingsDataDirCurrent       = "Aktueller Pfad:"
     override val settingsDataDirMove          = "Verschieben..."
@@ -522,6 +529,7 @@ object GermanStrings : AppStrings {
 
     override val settingsCategoryAppearance   = "Erscheinungsbild"
     override val settingsCategoryNetwork      = "Netzwerk"
+    override val settingsCategorySmarty       = "Smarty"
     override val settingsCategoryExperimental = "Experimentell"
     override val settingsCategoryAdvanced     = "Erweitert"
     override val settingsCategoryDiagnostics  = "Diagnose"

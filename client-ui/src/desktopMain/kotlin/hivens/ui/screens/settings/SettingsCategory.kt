@@ -5,6 +5,7 @@ import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Science
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.ui.graphics.vector.ImageVector
 import hivens.ui.i18n.AppStrings
@@ -24,6 +25,7 @@ internal enum class SettingsCategory(
 ) {
     Appearance(   Icons.Default.Palette,   { it.settingsCategoryAppearance }),
     Network(      Icons.Default.Wifi,      { it.settingsCategoryNetwork }),
+    Smarty(       Icons.Default.Shield,    { it.settingsCategorySmarty }),
     Experimental( Icons.Default.Science,   { it.settingsCategoryExperimental }),
     Advanced(     Icons.Default.Folder,    { it.settingsCategoryAdvanced }),
     Diagnostics(  Icons.Default.BugReport, { it.settingsCategoryDiagnostics }),

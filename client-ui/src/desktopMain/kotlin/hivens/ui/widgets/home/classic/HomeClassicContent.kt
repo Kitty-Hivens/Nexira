@@ -256,7 +256,6 @@ fun HomeClassicContent(instance: WidgetInstance) {
                     }
                 },
                 onAbort      = { controller.abort() },
-                onClearError = { controller.clearError() },
             )
         }
     }
