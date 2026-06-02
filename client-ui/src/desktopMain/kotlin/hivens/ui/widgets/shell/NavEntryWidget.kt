@@ -148,22 +148,28 @@ private fun NavSlot(
     val af = LocalAprilFools.current
 
     val bounceAmp = if (chaosEligible && af.isActive()) af.intensity() * 18f else 0f
-    val transition = rememberInfiniteTransition(label = "nav-bounce-$phase")
-    val cycle by transition.animateFloat(
-        initialValue  = 0f,
-        targetValue   = (2f * Math.PI).toFloat(),
-        animationSpec = infiniteRepeatable(
-            animation = tween(
-                durationMillis = if (af.isActive())
-                    (2200 - af.intensity() * 1400).toInt().coerceAtLeast(600)
-                else 2200,
-                easing = LinearEasing,
+    // Only run the infinite transition during April Fools. Otherwise a 0-amplitude
+    // bounce still subscribes to an infinite-transition State and recomposes every
+    // rail item every frame forever -- the rail is mounted app-wide, so the
+    // launcher never reaches Compose idle (perpetual 60fps wakeups, battery drain).
+    val offsetY = if (bounceAmp != 0f) {
+        val transition = rememberInfiniteTransition(label = "nav-bounce-$phase")
+        val cycle by transition.animateFloat(
+            initialValue  = 0f,
+            targetValue   = (2f * Math.PI).toFloat(),
+            animationSpec = infiniteRepeatable(
+                animation = tween(
+                    durationMillis = (2200 - af.intensity() * 1400).toInt().coerceAtLeast(600),
+                    easing = LinearEasing,
+                ),
+                repeatMode = RepeatMode.Restart,
             ),
-            repeatMode = RepeatMode.Restart,
-        ),
-        label = "nav-bounce-cycle-$phase",
-    )
-    val offsetY = sin(cycle + phase) * bounceAmp
+            label = "nav-bounce-cycle-$phase",
+        )
+        sin(cycle + phase) * bounceAmp
+    } else {
+        0f
+    }
 
     val gated = {
         if (!chaosEligible || !af.isActive() || Random.nextFloat() > 0.30f) onClick()

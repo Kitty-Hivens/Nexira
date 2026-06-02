@@ -228,6 +228,7 @@ private fun PropPanelBody(
                 value         = chrome.glassAlphaPct.toFloat(),
                 range         = 0f..100f,
                 format        = "%.0f%%",
+                keyStep       = 1f,
                 onValueChange = { controller.updateChrome(path, instanceId, chrome.copy(glassAlphaPct = it.roundToInt())) },
             )
             LabeledSlider(
@@ -235,6 +236,7 @@ private fun PropPanelBody(
                 value         = chrome.cornerRadiusDp.toFloat(),
                 range         = 0f..40f,
                 format        = "%.0f",
+                keyStep       = 1f,
                 onValueChange = { controller.updateChrome(path, instanceId, chrome.copy(cornerRadiusDp = it.roundToInt())) },
             )
             LabeledSlider(
@@ -242,6 +244,7 @@ private fun PropPanelBody(
                 value         = chrome.paddingDp.toFloat(),
                 range         = 0f..32f,
                 format        = "%.0f",
+                keyStep       = 1f,
                 onValueChange = { controller.updateChrome(path, instanceId, chrome.copy(paddingDp = it.roundToInt())) },
             )
         }

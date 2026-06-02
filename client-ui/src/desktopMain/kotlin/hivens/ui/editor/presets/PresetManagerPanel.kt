@@ -54,6 +54,8 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
 import java.text.DateFormat
 import java.util.Date
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 // Modal preset manager. Reached via the "Presets" chip on the
 // edit-mode pill. Lists existing presets with Load / Delete / Export
@@ -71,9 +73,11 @@ fun PresetManagerPanel(
     if (!visible) return
 
     val s = LocalStrings.current
-    var presets by remember(visible) { mutableStateOf(listProvider()) }
+    var presets by remember(visible) { mutableStateOf(emptyList<PresetMeta>()) }
     var newName by remember(visible) { mutableStateOf("") }
-    LaunchedEffect(Unit) { presets = listProvider() }
+    // Init empty + load off the UI thread: listProvider() is a directory scan and
+    // ran twice before (once here during composition, once in the effect).
+    LaunchedEffect(Unit) { presets = withContext(Dispatchers.IO) { listProvider() } }
 
     Dialog(
         onDismissRequest = onDismiss,

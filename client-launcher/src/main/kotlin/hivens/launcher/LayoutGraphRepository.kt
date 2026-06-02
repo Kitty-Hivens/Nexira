@@ -80,23 +80,27 @@ class LayoutGraphRepository(
      * scheduled [DEBOUNCE_MS] in the future, replacing any previous
      * pending write.
      */
-    suspend fun update(transform: (LayoutGraph) -> LayoutGraph) {
+    suspend fun update(validate: Boolean = true, transform: (LayoutGraph) -> LayoutGraph) {
         mutex.withLock {
             val next = transform(state.value)
             if (next == state.value) return@withLock
 
-            // Tree-wide instanceId uniqueness check. Walks the whole
-            // tree including nested children. Sequence-based so we
-            // short-circuit on the first dup.
-            val seen = HashSet<String>()
-            for (widget in next.walkInstances()) {
-                if (!seen.add(widget.instanceId)) {
-                    log.warn(
-                        "Layout update rejected: duplicate instanceId '{}' in tree. " +
-                        "Keeping previous graph to protect findByInstanceId-style traversals.",
-                        widget.instanceId,
-                    )
-                    return@withLock
+            // Tree-wide instanceId uniqueness check. Walks the whole tree
+            // including nested children; short-circuits on the first dup.
+            // Skipped (validate = false) for geometry-only transforms (offset /
+            // size / z / weight) that fire per drag frame and provably cannot
+            // introduce a duplicate id -- otherwise this walk runs ~60x/sec.
+            if (validate) {
+                val seen = HashSet<String>()
+                for (widget in next.walkInstances()) {
+                    if (!seen.add(widget.instanceId)) {
+                        log.warn(
+                            "Layout update rejected: duplicate instanceId '{}' in tree. " +
+                            "Keeping previous graph to protect findByInstanceId-style traversals.",
+                            widget.instanceId,
+                        )
+                        return@withLock
+                    }
                 }
             }
 

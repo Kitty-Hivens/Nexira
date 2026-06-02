@@ -116,10 +116,13 @@ private fun RenderSlotContent(path: SlotPath, modifier: Modifier, spacing: Dp) {
                 if (descriptor != null) {
                     val sizeMod = canvasSizeModifier(instance.canvas)
                     when {
-                        sizeMod != null -> Box(sizeMod) {
+                        // Weight wins over an explicit size in a flow slot: resizing
+                        // a weighted widget must not strip its flex (else the
+                        // weighted center region stops filling between the rails).
+                        instance.weight > 0f -> Box(Modifier.weight(instance.weight)) {
                             decorator(address, index, descriptor, instance) { RenderWidget(descriptor, instance) }
                         }
-                        instance.weight > 0f -> Box(Modifier.weight(instance.weight)) {
+                        sizeMod != null -> Box(sizeMod) {
                             decorator(address, index, descriptor, instance) { RenderWidget(descriptor, instance) }
                         }
                         else -> decorator(address, index, descriptor, instance) { RenderWidget(descriptor, instance) }
@@ -192,10 +195,13 @@ private fun RenderSlotContent(path: SlotPath, modifier: Modifier, spacing: Dp) {
                 if (descriptor != null) {
                     val sizeMod = canvasSizeModifier(instance.canvas)
                     when {
-                        sizeMod != null -> Box(sizeMod) {
+                        // Weight wins over an explicit size in a flow slot: resizing
+                        // a weighted widget must not strip its flex (else the
+                        // weighted center region stops filling between the rails).
+                        instance.weight > 0f -> Box(Modifier.weight(instance.weight)) {
                             decorator(address, index, descriptor, instance) { RenderWidget(descriptor, instance) }
                         }
-                        instance.weight > 0f -> Box(Modifier.weight(instance.weight)) {
+                        sizeMod != null -> Box(sizeMod) {
                             decorator(address, index, descriptor, instance) { RenderWidget(descriptor, instance) }
                         }
                         else -> decorator(address, index, descriptor, instance) { RenderWidget(descriptor, instance) }

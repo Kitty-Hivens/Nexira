@@ -40,6 +40,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.currentCompositionLocalContext
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -68,7 +69,6 @@ import hivens.ui.editor.canvasResizeSize
 import hivens.ui.editor.dnd.DragController
 import hivens.ui.editor.dnd.DragPayload
 import hivens.ui.editor.dnd.DropTargetRegistry
-import hivens.ui.editor.dnd.widgetBounds
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.LocalStyle
@@ -81,10 +81,10 @@ import hivens.widget.model.WidgetInstance
 import hivens.widget.model.traverse
 import java.awt.Cursor
 
-// Wraps a single widget with edit-mode chrome: drag handle (always
-// visible, opacity boosts on hover), remove button (hover-only, hidden
-// when descriptor says non-removable), prop "tune" gear (hover, only when
-// the widget has props), faint border outline, and a drop indicator.
+// Wraps a single widget with edit-mode chrome: whole-body drag overlay,
+// remove button (hover-only, hidden when non-removable), configure "tune"
+// gear (hover -- opens props + the universal backing controls), a resize
+// handle, faint border outline, and a drop indicator.
 //
 // Phase G: the chrome follows the slot's orientation. In a Column slot it
 // wraps in a Column with horizontal drop bars above/below; in a Row slot
@@ -161,6 +161,13 @@ fun EditableWidgetChrome(
     // wherever it lands.
     val capturedLocals = currentCompositionLocalContext
 
+    // Drop this widget's drop-target rect when it leaves composition (deleted /
+    // moved): the registry persists across the edit session, so without this a
+    // phantom rect keeps winning hit-tests at the widget's old spot.
+    DisposableEffect(path, instance.instanceId) {
+        onDispose { registry.unregisterWidget(path, instance.instanceId) }
+    }
+
     // Source widget fades to 30% while being dragged -- the ghost is
     // doing the work on top. Once drag ends, we ramp back smoothly.
     val sourceAlpha by animateFloatAsState(
@@ -182,18 +189,21 @@ fun EditableWidgetChrome(
             modifier = Modifier
                 .then(if (isRow) Modifier.padding(horizontal = 4.dp) else Modifier.padding(vertical = 4.dp))
                 .hoverable(interaction)
-                .onGloballyPositioned { coords: LayoutCoordinates ->
-                    val rect = coords.boundsInWindow()
-                    widgetWindowBounds = rect
-                    registry.registerWidget(path, instance.instanceId, index, rect)
-                }
-                .widgetBounds(registry, path, instance.instanceId, index)
                 .padding(2.dp)
                 .border(
                     width = 1.dp,
                     color = CelestiaTheme.colors.primary.copy(alpha = borderAlpha),
                     shape = RoundedCornerShape(8.dp),
-                ),
+                )
+                .onGloballyPositioned { coords: LayoutCoordinates ->
+                    // Register AFTER padding+border so the hit-test rect includes
+                    // the visible border pad (edge drops land on the widget, not
+                    // the parent slot). Single registration -- the .widgetBounds
+                    // modifier was a redundant duplicate of this.
+                    val rect = coords.boundsInWindow()
+                    widgetWindowBounds = rect
+                    registry.registerWidget(path, instance.instanceId, index, rect)
+                },
         ) {
             Box(Modifier.alpha(sourceAlpha)) { content() }
 
@@ -402,7 +412,7 @@ fun EditableWidgetChrome(
             title            = { Text(s.editorForceRemoveTitle) },
             text             = {
                 Text(
-                    text = s.editorForceRemoveBody(descriptor.displayName),
+                    text = s.editorForceRemoveBody(s.widgetLabel(descriptor.displayName)),
                     style = MaterialTheme.typography.bodyMedium,
                 )
             },

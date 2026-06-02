@@ -147,22 +147,22 @@ class EditModeController(
     }
 
     fun setWidgetWeight(path: SlotPath, instanceId: String, weight: Float) {
-        scope.launch(writeDispatcher) { repo.update { it.setWidgetWeight(path, instanceId, weight) } }
+        scope.launch(writeDispatcher) { repo.update(validate = false) { it.setWidgetWeight(path, instanceId, weight) } }
     }
 
     // Canvas free-placement (orientation == Canvas): offset + size in dp,
     // z = paint order. Each composes through the model's updateCanvas, so
     // offset / size / z edits do not clobber one another mid-drag.
     fun setWidgetOffset(path: SlotPath, instanceId: String, x: Float, y: Float) {
-        scope.launch(writeDispatcher) { repo.update { it.setWidgetOffset(path, instanceId, x, y) } }
+        scope.launch(writeDispatcher) { repo.update(validate = false) { it.setWidgetOffset(path, instanceId, x, y) } }
     }
 
     fun setWidgetSize(path: SlotPath, instanceId: String, width: Float, height: Float) {
-        scope.launch(writeDispatcher) { repo.update { it.setWidgetSize(path, instanceId, width, height) } }
+        scope.launch(writeDispatcher) { repo.update(validate = false) { it.setWidgetSize(path, instanceId, width, height) } }
     }
 
     fun setWidgetZ(path: SlotPath, instanceId: String, z: Int) {
-        scope.launch(writeDispatcher) { repo.update { it.setWidgetZ(path, instanceId, z) } }
+        scope.launch(writeDispatcher) { repo.update(validate = false) { it.setWidgetZ(path, instanceId, z) } }
     }
 
     fun moveWidget(from: SlotPath, to: SlotPath, instanceId: String, toIndex: Int) {

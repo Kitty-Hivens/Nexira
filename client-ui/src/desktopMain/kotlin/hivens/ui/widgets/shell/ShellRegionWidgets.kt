@@ -19,6 +19,8 @@ import hivens.ui.AppState
 import hivens.ui.RightPanel
 import hivens.ui.Screen
 import hivens.ui.customization.glassSurfaceAlpha
+import hivens.ui.editor.EditModeState
+import hivens.ui.editor.LocalEditMode
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
 import hivens.widget.model.PropRange
@@ -79,6 +81,14 @@ private fun RowScope.RegionDivider(show: Boolean) {
     if (show) VerticalDivider(Modifier.fillMaxHeight(), color = glassSurfaceAlpha(0.6f))
 }
 
+// Shown for a collapsed region while editing: thin but visible, so the region's
+// edit chrome (and its Tune affordance -- the only un-collapse path) stays
+// hoverable. A fully-returned region leaves nothing to hover, stranding the user.
+@Composable
+private fun CollapsedRegionStrip() {
+    Box(Modifier.width(22.dp).fillMaxHeight().background(glassSurfaceAlpha(0.4f)))
+}
+
 /**
  * Left region: the navigation rail plus the divider that separates it from the
  * center. removable=false -- losing the rail would navigation-lock the launcher.
@@ -87,7 +97,12 @@ private fun RowScope.RegionDivider(show: Boolean) {
 @Composable
 fun ShellLeftRegion(instance: WidgetInstance) {
     val props = instance.rememberProps<ShellRegionProps>()
-    if (props.collapsed) return
+    if (props.collapsed) {
+        // Render nothing in production; keep a thin visible strip in edit mode so
+        // the prop panel (the only un-collapse path) stays reachable via Tune.
+        if (LocalEditMode.current is EditModeState.On) CollapsedRegionStrip()
+        return
+    }
     val ctx = LocalShellContext.current
     Row(regionModifier(props)) {
         AppSidebar(
@@ -124,7 +139,10 @@ fun ShellCenterRegion(instance: WidgetInstance) {
 @Composable
 fun ShellRightRegion(instance: WidgetInstance) {
     val props = instance.rememberProps<ShellRegionProps>()
-    if (props.collapsed) return
+    if (props.collapsed) {
+        if (LocalEditMode.current is EditModeState.On) CollapsedRegionStrip()
+        return
+    }
     val ctx = LocalShellContext.current
     Row(regionModifier(props)) {
         RegionDivider(props.showDivider)

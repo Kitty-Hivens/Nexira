@@ -262,6 +262,10 @@ fun EditorSurfaceHost(
                     registry     = registry,
                     orientation  = orientation,
                     onRemove     = {
+                        // Clear the prop target if it points at this widget, else
+                        // the palette stays gated off (propTarget != null) and the
+                        // user is left with neither panel.
+                        if (propTarget?.instanceId == instance.instanceId) propTarget = null
                         controller.removeWidget(path, instance.instanceId)
                     },
                     onEditProps  = { propTarget = PropTarget(path, instance.instanceId) },
