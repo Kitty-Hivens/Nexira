@@ -175,7 +175,7 @@ jobs:
           # virtual display's MIT-MAGIC-COOKIE; absent on debian:stable
           # by default and not pulled in by `xvfb` alone.
           - distro_name: Fedora-latest
-            container: fedora:latest
+            container: registry.fedoraproject.org/fedora:latest
             expect_keyring: any
             install_cmd: |
               dnf install -y --setopt=install_weak_deps=False \
@@ -220,7 +220,7 @@ jobs:
                 libfontconfig1 libfreetype6 libgl1 \
                 xauth
           - distro_name: Fedora-no-libsecret
-            container: fedora:latest
+            container: registry.fedoraproject.org/fedora:latest
             expect_keyring: noop
             # Deliberately no libsecret -- exercises KeyringStorageFactory's
             # construction-time-exception fallback path.
