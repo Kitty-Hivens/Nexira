@@ -12,25 +12,82 @@ below are for the GitHub release page and CHANGELOG readers.
 
 ## [Unreleased]
 
+## [2.3.4-beta] - 2026-06-03
+
+The customization release. The launcher's whole interface becomes
+editable: an in-app edit mode lets you rearrange, resize, and restyle
+every widget -- including the app shell itself -- and save the result as
+a preset. The UI also learns to recover: a crash reloads the shell
+instead of leaving a dead window. Alongside that: pack browsing and
+install from the mirror, a reworked console, multi-loader runtime
+support, and Russian / English / German across the interface.
+
 ### Highlights
-- **Smarty servers, without the spyware**. A new Settings -> Smarty section
-  can swap SmartyCraft's proprietary Smarty mod for our open-source helper:
+- **Make the launcher yours**. Press Ctrl+E to edit. Drag, resize, and
+  rearrange every widget across the home, library, side rails, and the
+  app shell itself. A free-placement Canvas mode, per-widget glass
+  backing (corner / padding / opacity), and save / load / export of
+  layout presets.
+- **A UI that recovers instead of dying**. If the interface crashes, the
+  launcher reloads its shell on the fly; a repeated crash falls back to a
+  minimal quit-only safe screen rather than a frozen window.
+- **Browse and install packs from the mirror**. A catalogue page with a
+  pack detail view (Content / Files / Worlds), optional-mod toggles, and
+  dependency-aware grouping.
+- **A calmer console**. Quiet by default, themed to the active palette,
+  and available as a file-backed Logs tab on each pack.
+- **Smarty servers, without the spyware**. A Settings -> Smarty section
+  swaps SmartyCraft's proprietary Smarty mod for an open-source helper:
   same network compatibility, none of the client-side surveillance. If no
-  open replacement exists for a server's game version, the launch is blocked
-  rather than quietly running the original mod.
-- **Exact mod verification**. Optionally delete anything in a server's mods
-  folder it did not ask for. Keeps installs clean, but it also removes mods
-  you added by hand, so it is a deliberate opt-out of a curated set.
-- **Quieter launch errors**. Launch failures now surface through the
-  notification system instead of an in-panel banner.
+  open replacement exists for a server's game version, the launch is
+  blocked rather than quietly running the original mod.
 
 ### Added
-- Settings -> Smarty section with "Use the alternative smrt network helper"
+- In-app UI editor (Ctrl+E): widget palette with search, drag-and-drop
+  placement, cross-slot moves, slot orientation (Column / Row / Grid),
+  free-placement Canvas (move / resize / bring-to-front / send-to-back),
+  per-widget backing (glass / corner radius / padding), weight
+  drag-dividers, container and tabs widgets, and layout presets
+  (save / load / export). Home, Library, the side rails, and the app
+  shell are all editable widget surfaces.
+- Self-healing UI: the launcher restarts its shell on a composition crash
+  and keeps your data; a crash loop opens a standalone safe-mode window.
+- Pack browsing and install from the mirror catalogue, with a pack detail
+  page (Content / Files / Worlds tabs), optional-mod toggles, rich pack
+  metadata, and a per-mod dependency graph with role grouping.
+- Multi-loader runtime provisioning and .mrpack install; per-pack managed
+  JDK selection.
+- Notification center with severity / kind split, accessibility, and
+  session controls.
+- Cross-cutting cache layer (TTL + stale-while-revalidate, disk-backed).
+- Settings -> Smarty section: "Use the alternative smrt network helper"
   and "Exact mod verification" toggles (both on by default).
+- Russian, English, and German across the home, library, editor, widgets,
+  and notifications, with a CI gate against hardcoded UI strings.
+- Keyboard fine-adjustment on sliders (hover, then arrow keys).
 
 ### Changed
-- Launch failures are delivered as notifications; the in-panel error banner
-  was removed.
+- Console is quiet by default, themed, and file-backed, and now lives as a
+  Logs tab on the pack detail screen.
+- Launch failures are delivered as notifications instead of an in-panel
+  banner.
+- SmartyCraft join re-authenticates before spawning a pack so it sees a
+  fresh token.
+- libtray is resolved from Maven Central (no longer JitPack).
+
+### Fixed
+- Offline relaunch of a server with no cached token no longer crashes the
+  client (a missing token had produced a malformed launch argument).
+- Unknown values in saved settings are coerced to a default instead of
+  wiping the whole settings file.
+- Legacy LWJGL2 natives are mirrored through the Mojang CDN first.
+- The tray menu seeds from the disk cache before init, so it no longer
+  flashes "(No servers)" on startup.
+- The window minimum size is clamped to the current screen.
+
+### Removed
+- Edit-mode floating action button (replaced by Ctrl+E and Escape).
+- Experimental "Hivens Mirror" settings toggle.
 
 ## [2.3.3] - 2026-05-25
 
