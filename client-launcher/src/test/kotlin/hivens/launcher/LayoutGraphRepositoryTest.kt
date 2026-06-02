@@ -1,5 +1,6 @@
 package hivens.launcher
 
+import hivens.widget.model.CanvasPlacement
 import hivens.widget.model.LayoutGraph
 import hivens.widget.model.SlotContent
 import hivens.widget.model.SlotId
@@ -19,6 +20,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonPrimitive
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.AfterTest
@@ -375,6 +378,163 @@ class LayoutGraphRepositoryTest {
             .widgets.first()
         val childLoaded = containerLoaded.children[SlotId("body")]!!.widgets.first()
         assertEquals("c1", childLoaded.instanceId)
+    }
+
+    // ── Schema v3 -> v4 nav migration ─────────────────────────────────
+
+    private fun loadFrom(version: Int, graph: LayoutGraph, default: LayoutGraph = sampleDefault): LayoutGraph {
+        Files.writeString(
+            file,
+            """{"schema_version":$version,"graph":${json.encodeToString(LayoutGraph.serializer(), graph)}}""",
+        )
+        return LayoutGraphRepository(file, json, scope) { default }.value()
+    }
+
+    private fun leftrailGraph(top: List<WidgetInstance>, bottom: List<WidgetInstance> = emptyList()) =
+        LayoutGraph(surfaces = mapOf(
+            SurfaceId("appshell.leftrail") to SurfaceLayout(slots = mapOf(
+                SlotId("top")    to SlotContent(top),
+                SlotId("bottom") to SlotContent(bottom),
+            )),
+        ))
+
+    private fun navKind(kind: String, id: String, chrome: WidgetChrome? = null, weight: Float = 0f) =
+        WidgetInstance(WidgetKind(kind), id, JsonObject(emptyMap()), chrome = chrome, weight = weight)
+
+    private fun LayoutGraph.leftrailSlot(slot: String) =
+        surfaces[SurfaceId("appshell.leftrail")]!!.slots[SlotId(slot)]!!.widgets
+
+    private fun WidgetInstance.target() = props["target"]?.jsonPrimitive?.content
+
+    @Test
+    fun `v3 -- navbuttons expands to six nav-entry in declared order, siblings preserved`() {
+        val v3 = leftrailGraph(
+            top = listOf(navKind("appshell.leftrail.navbuttons", "nb"), navKind("home.new.spacer", "sp")),
+        )
+        val top = loadFrom(3, v3).leftrailSlot("top")
+        assertEquals(7, top.size, "six nav entries plus the preserved sibling")
+        assertEquals(List(6) { "nav.entry" } + "home.new.spacer", top.map { it.kind.value })
+        assertEquals(
+            listOf("Home", "Library", "Browse", "Profile", "Settings", "About"),
+            top.take(6).map { it.target() },
+        )
+        assertEquals("sp", top[6].instanceId)
+    }
+
+    @Test
+    fun `v3 -- console and logout become nav-entry keeping their ids`() {
+        val v3 = leftrailGraph(
+            top = listOf(navKind("appshell.leftrail.navbuttons", "nb")),
+            bottom = listOf(
+                navKind("appshell.leftrail.consoletoggle", "console-id"),
+                navKind("appshell.leftrail.logout", "logout-id"),
+            ),
+        )
+        val bottom = loadFrom(3, v3).leftrailSlot("bottom")
+        assertEquals(
+            listOf("console-id" to "Console", "logout-id" to "Logout"),
+            bottom.map { it.instanceId to it.target() },
+        )
+        bottom.forEach { assertEquals("nav.entry", it.kind.value) }
+    }
+
+    @Test
+    fun `v3 -- a stray nav widget on any surface is converted in place`() {
+        val v3 = LayoutGraph(surfaces = mapOf(
+            SurfaceId("home.new") to SurfaceLayout(slots = mapOf(
+                SlotId("main") to SlotContent(listOf(navKind("nav.home", "stray"))),
+            )),
+        ))
+        val w = loadFrom(3, v3).surfaces[SurfaceId("home.new")]!!.slots[SlotId("main")]!!.widgets.first()
+        assertEquals("nav.entry", w.kind.value)
+        assertEquals("Home", w.target())
+        assertEquals("stray", w.instanceId)
+    }
+
+    @Test
+    fun `v4 graph passes through the nav migration untouched`() {
+        val entry = WidgetInstance(
+            WidgetKind("nav.entry"), "e1", JsonObject(mapOf("target" to JsonPrimitive("Home"))),
+        )
+        val top = loadFrom(4, leftrailGraph(top = listOf(entry))).leftrailSlot("top")
+        assertEquals(listOf(entry), top)
+    }
+
+    @Test
+    fun `v3 -- chrome on a non-nav widget survives the migration`() {
+        val styled = WidgetInstance(
+            WidgetKind("home.new.clock"), "clock", JsonObject(emptyMap()),
+            chrome = WidgetChrome(glassAlphaPct = 30),
+        )
+        val v3 = LayoutGraph(surfaces = mapOf(
+            SurfaceId("home.new") to SurfaceLayout(slots = mapOf(SlotId("main") to SlotContent(listOf(styled)))),
+        ))
+        val w = loadFrom(3, v3).surfaces[SurfaceId("home.new")]!!.slots[SlotId("main")]!!.widgets.first()
+        assertEquals(styled, w)
+    }
+
+    @Test
+    fun `v3 -- 1to1 nav conversion preserves chrome and weight`() {
+        val v3 = LayoutGraph(surfaces = mapOf(
+            SurfaceId("home.new") to SurfaceLayout(slots = mapOf(SlotId("main") to SlotContent(listOf(
+                navKind("nav.profile", "p", chrome = WidgetChrome(cornerRadiusDp = 8), weight = 2f),
+            )))),
+        ))
+        val w = loadFrom(3, v3).surfaces[SurfaceId("home.new")]!!.slots[SlotId("main")]!!.widgets.first()
+        assertEquals("nav.entry", w.kind.value)
+        assertEquals("Profile", w.target())
+        assertEquals(WidgetChrome(cornerRadiusDp = 8), w.chrome)
+        assertEquals(2f, w.weight)
+    }
+
+    @Test
+    fun `v3 -- navbuttons expansion drops block chrome, weight, and canvas`() {
+        val v3 = leftrailGraph(top = listOf(
+            WidgetInstance(
+                WidgetKind("appshell.leftrail.navbuttons"), "nb", JsonObject(emptyMap()),
+                chrome = WidgetChrome(glassAlphaPct = 50),
+                weight = 3f,
+                canvas = CanvasPlacement(x = 10f, y = 20f, z = 5),
+            ),
+        ))
+        val top = loadFrom(3, v3).leftrailSlot("top")
+        assertEquals(6, top.size)
+        // The monolith's single block frame cannot map onto six items, so the
+        // expansion intentionally resets these to defaults.
+        top.forEach {
+            assertEquals(null, it.chrome)
+            assertEquals(0f, it.weight)
+            assertEquals(null, it.canvas)
+        }
+    }
+
+    @Test
+    fun `v3 -- migrated graph has unique instance ids tree-wide`() {
+        val v3 = leftrailGraph(
+            top = listOf(navKind("appshell.leftrail.navbuttons", "nb")),
+            bottom = listOf(
+                navKind("appshell.leftrail.consoletoggle", "c"),
+                navKind("appshell.leftrail.logout", "l"),
+            ),
+        )
+        val loaded = loadFrom(3, v3)
+        val ids = loaded.surfaces.values.flatMap { it.slots.values }.flatMap { it.widgets }.map { it.instanceId }
+        assertEquals(ids.toSet().size, ids.size, "migration must not produce duplicate ids")
+    }
+
+    @Test
+    fun `v3 -- user without the leftrail surface gets the bundled default seeded`() {
+        val defaultWithRail = leftrailGraph(top = listOf(
+            WidgetInstance(WidgetKind("nav.entry"), "d-home", JsonObject(mapOf("target" to JsonPrimitive("Home")))),
+        ))
+        val v3 = LayoutGraph(surfaces = mapOf(
+            SurfaceId("home.new") to SurfaceLayout(slots = mapOf(SlotId("main") to SlotContent(emptyList()))),
+        ))
+        val loaded = loadFrom(3, v3, default = defaultWithRail)
+        assertEquals(
+            defaultWithRail.surfaces[SurfaceId("appshell.leftrail")],
+            loaded.surfaces[SurfaceId("appshell.leftrail")],
+        )
     }
 
     // ── Surface reset ─────────────────────────────────────────────────

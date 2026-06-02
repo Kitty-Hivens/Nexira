@@ -10,7 +10,7 @@ import hivens.widget.model.WidgetInstance
 // Glass alpha is stored in colorOverrides under the GLASS_ALPHA key
 // but rendered as a slider, not a hex field. The theme parser
 // special-cases the key and reads it as a float.
-@Widget(id = "customization.glass.alpha", displayName = "Прозрачность стекла")
+@Widget(id = "customization.glass.alpha", displayName = "widget.customization.glass.alpha")
 @Composable
 fun CustomGlassAlphaWidget(instance: WidgetInstance) {
     val ctx = LocalCustomizationContext.current

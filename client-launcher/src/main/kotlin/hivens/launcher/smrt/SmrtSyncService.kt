@@ -2,19 +2,20 @@ package hivens.launcher.smrt
 
 import hivens.core.api.dto.smrt.SmrtAssetEntry
 import hivens.core.api.dto.smrt.SmrtModEntry
-import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.dto.smrt.SmrtSource
+import hivens.launcher.FileDownloadService
 import hivens.launcher.ProtectedPaths
+import hivens.launcher.util.sha1Of
 import io.ktor.utils.io.readAvailable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 import java.io.FileOutputStream
 import java.io.IOException
+import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
-import java.security.MessageDigest
 import java.util.Comparator
 
 /**
@@ -334,35 +335,22 @@ class SmrtSyncService(
             Files.move(
                 tmp,
                 dest,
-                java.nio.file.StandardCopyOption.REPLACE_EXISTING,
-                java.nio.file.StandardCopyOption.ATOMIC_MOVE,
+                StandardCopyOption.REPLACE_EXISTING,
+                StandardCopyOption.ATOMIC_MOVE,
             )
-        } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
+        } catch (_: AtomicMoveNotSupportedException) {
             log.warn(
                 "Filesystem at {} does not support ATOMIC_MOVE; non-atomic fallback may leave a 0-byte file on crash",
                 dest.parent,
             )
-            Files.move(tmp, dest, java.nio.file.StandardCopyOption.REPLACE_EXISTING)
-        } catch (_: java.nio.file.FileAlreadyExistsException) {
+            Files.move(tmp, dest, StandardCopyOption.REPLACE_EXISTING)
+        } catch (_: FileAlreadyExistsException) {
             // Java spec allows ATOMIC_MOVE to ignore REPLACE_EXISTING; some
             // providers then refuse and raise FileAlreadyExistsException
             // when dest already exists. Re-sync over an existing jar would
             // hard-fail without this fallback.
-            Files.move(tmp, dest, java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+            Files.move(tmp, dest, StandardCopyOption.REPLACE_EXISTING)
         }
-    }
-
-    private fun sha1Of(p: Path): String {
-        val md = MessageDigest.getInstance("SHA-1")
-        Files.newInputStream(p).use { input ->
-            val buf = ByteArray(64 * 1024)
-            while (true) {
-                val n = input.read(buf)
-                if (n <= 0) break
-                md.update(buf, 0, n)
-            }
-        }
-        return md.digest().joinToString("") { "%02x".format(it) }
     }
 
     companion object {

@@ -1,12 +1,6 @@
 package hivens.launcher.nbt
 
-import java.io.DataInput
-import java.io.DataInputStream
-import java.io.DataOutput
-import java.io.DataOutputStream
-import java.io.EOFException
-import java.io.InputStream
-import java.io.OutputStream
+import java.io.*
 import java.util.zip.GZIPInputStream
 import java.util.zip.GZIPOutputStream
 
@@ -50,10 +44,6 @@ object Nbt {
         val payload = input.readCompoundPayload()
         return RootCompound(name = rootName, value = payload)
     }
-
-    /** Convenience overload for the common "root compound, don't care about its name" case. */
-    fun readCompound(stream: InputStream, gzipped: Boolean): NbtCompound =
-        read(stream, gzipped).value
 
     /**
      * Writes a root compound to [stream]. Mirrors [read]: caller passes
@@ -204,13 +194,13 @@ data class NbtCompound(val entries: Map<String, NbtValue>) {
 
     operator fun get(name: String): NbtValue? = entries[name]
 
-    fun int(name: String): kotlin.Int? = (entries[name] as? NbtValue.Int)?.value
-    fun long(name: String): kotlin.Long? = (entries[name] as? NbtValue.Long)?.value
-    fun string(name: String): kotlin.String? = (entries[name] as? NbtValue.String)?.value
-    fun byte(name: String): kotlin.Byte? = (entries[name] as? NbtValue.Byte)?.value
+    fun int(name: String): Int? = (entries[name] as? NbtValue.Int)?.value
+    fun long(name: String): Long? = (entries[name] as? NbtValue.Long)?.value
+    fun string(name: String): String? = (entries[name] as? NbtValue.String)?.value
+    fun byte(name: String): Byte? = (entries[name] as? NbtValue.Byte)?.value
     fun compound(name: String): NbtCompound? = (entries[name] as? NbtValue.Compound)?.value
     fun list(name: String): NbtValue.List? = entries[name] as? NbtValue.List
-    fun byteArray(name: String): kotlin.ByteArray? = (entries[name] as? NbtValue.ByteArray)?.value
+    fun byteArray(name: String): ByteArray? = (entries[name] as? NbtValue.ByteArray)?.value
 }
 
 /**
@@ -229,7 +219,7 @@ sealed class NbtValue {
     data class Double(val value: kotlin.Double) : NbtValue()      { override val typeId = Nbt.TYPE_DOUBLE }
     data class ByteArray(val value: kotlin.ByteArray) : NbtValue() {
         override val typeId = Nbt.TYPE_BYTE_ARRAY
-        override fun equals(other: Any?): kotlin.Boolean =
+        override fun equals(other: Any?): Boolean =
             this === other || (other is ByteArray && value.contentEquals(other.value))
         override fun hashCode(): kotlin.Int = value.contentHashCode()
     }
@@ -241,13 +231,13 @@ sealed class NbtValue {
     data class Compound(val value: NbtCompound) : NbtValue()      { override val typeId = Nbt.TYPE_COMPOUND }
     data class IntArray(val value: kotlin.IntArray) : NbtValue() {
         override val typeId = Nbt.TYPE_INT_ARRAY
-        override fun equals(other: Any?): kotlin.Boolean =
+        override fun equals(other: Any?): Boolean =
             this === other || (other is IntArray && value.contentEquals(other.value))
         override fun hashCode(): kotlin.Int = value.contentHashCode()
     }
     data class LongArray(val value: kotlin.LongArray) : NbtValue() {
         override val typeId = Nbt.TYPE_LONG_ARRAY
-        override fun equals(other: Any?): kotlin.Boolean =
+        override fun equals(other: Any?): Boolean =
             this === other || (other is LongArray && value.contentEquals(other.value))
         override fun hashCode(): kotlin.Int = value.contentHashCode()
     }

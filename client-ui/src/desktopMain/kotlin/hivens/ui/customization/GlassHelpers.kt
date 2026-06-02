@@ -13,7 +13,7 @@ import hivens.ui.theme.CelestiaTheme
  *
  * Use this anywhere that currently does
  * `CelestiaTheme.colors.surface.copy(alpha = X)` to make the
- * surface honor [hivens.ui.customization.CustomizationSettings.glassIntensity].
+ * surface honor [CustomizationSettings.glassIntensity].
  */
 @Composable
 fun glassSurfaceAlpha(baseAlpha: Float): Color {

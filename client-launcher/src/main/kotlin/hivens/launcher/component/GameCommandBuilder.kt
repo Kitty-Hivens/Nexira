@@ -136,10 +136,7 @@ internal class GameCommandBuilder(
         if (!isModernEnvironment) args.add("-noverify")
 
         // 2. OS Specific Flags
-        if (System.getProperty("os.name").lowercase().contains("mac")) {
-            args.add("-XstartOnFirstThread") // Critical for LWJGL on macOS
-            args.add("-Djava.awt.headless=false")
-        }
+        addMacOsStartupFlags(args)
 
         // 3. System Properties (Launcher Identity & Custom Authlib)
         args.add("-Dminecraft.api.auth.host=${protocolConfig.baseUrl}/launcher/")
@@ -295,10 +292,7 @@ internal class GameCommandBuilder(
         val usesModulePath = runtime.mainClass.contains("bootstraplauncher", ignoreCase = true)
         val usesModernArgs = usesModulePath || runtime.jvmArgs.any { it.contains($$"${") }
         if (javaMajor <= 8) args.add("-noverify")
-        if (System.getProperty("os.name").lowercase().contains("mac")) {
-            args.add("-XstartOnFirstThread")
-            args.add("-Djava.awt.headless=false")
-        }
+        addMacOsStartupFlags(args)
 
         // Launcher identity + authlib redirect. Reaching the menu does not need
         // it; joining an SC-derived server does (the redirect points auth at the
@@ -336,10 +330,7 @@ internal class GameCommandBuilder(
         args.add("--gameDir"); args.add(gameDir.toAbsolutePath().toString())
         args.add("--assetsDir"); args.add(sharedAssetsDir.toAbsolutePath().toString())
         args.add("--assetIndex"); args.add(runtime.assetIndexId)
-        args.add("--uuid"); args.add(session.uuid)
-        args.add("--accessToken"); args.add(session.accessToken)
-        args.add("--userProperties"); args.add("{}")
-        args.add("--userType"); args.add("mojang")
+        addSessionAuthArgs(args, session)
         args.addAll(runtime.gameArgs)
 
         return args
@@ -435,6 +426,21 @@ internal class GameCommandBuilder(
         return out
     }
 
+    /** -XstartOnFirstThread is mandatory for LWJGL on macOS; no-op on other OSes. */
+    private fun addMacOsStartupFlags(args: MutableList<String>) {
+        if (System.getProperty("os.name").lowercase().contains("mac")) {
+            args.add("-XstartOnFirstThread")
+            args.add("-Djava.awt.headless=false")
+        }
+    }
+
+    private fun addSessionAuthArgs(args: MutableList<String>, session: SessionData) {
+        args.add("--uuid"); args.add(session.uuid)
+        args.add("--accessToken"); args.add(session.accessToken)
+        args.add("--userProperties"); args.add("{}")
+        args.add("--userType"); args.add("mojang")
+    }
+
     private fun getConfig(version: String): VersionConfig {
         return configs[version]
             ?: configs.entries.find { version.startsWith(it.key) }?.value
@@ -454,10 +460,7 @@ internal class GameCommandBuilder(
         args.add("--gameDir"); args.add(root.toAbsolutePath().toString())
         args.add("--assetsDir"); args.add(root.resolve("assets").toAbsolutePath().toString())
         args.add("--assetIndex"); args.add(assetIndex)
-        args.add("--uuid"); args.add(session.uuid)
-        args.add("--accessToken"); args.add(session.accessToken)
-        args.add("--userProperties"); args.add("{}")
-        args.add("--userType"); args.add("mojang")
+        addSessionAuthArgs(args, session)
 
         if (isModernEnvironment) {
             // NeoForge needs `--fml.{neoForgeVersion,fmlVersion,mcVersion,neoFormVersion}`.

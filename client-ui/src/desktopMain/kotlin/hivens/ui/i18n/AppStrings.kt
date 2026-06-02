@@ -772,6 +772,21 @@ interface AppStrings {
     val editorCancel: String
     val editorDelete: String
     val editorReset: String
+    val editorResetAll: String
+    val editorToFront: String
+    val editorToBack: String
+
+    // --- Widget palette / prop-editor labels (key-indirection) ---
+    // @Widget(displayName) and @PropLabel carry a key; the palette and prop
+    // editor resolve it via widgetLabel(). Unknown key returns itself, so label
+    // conversion is incremental and never crashes.
+    val widgetLabels: Map<String, String>
+    fun widgetLabel(key: String): String = widgetLabels[key] ?: key
+
+    // --- UI crash recovery (safe mode) ---
+    val recoverySafeModeTitle: String
+    val recoverySafeModeBody: String
+    val recoverySafeModeQuit: String
     val editorSave: String
     val editorApply: String
     val editorExport: String
@@ -801,6 +816,8 @@ interface AppStrings {
     val editorPaletteHide: String
     val editorPaletteHint: String
     val editorPaletteEmpty: String
+    val editorPaletteSearch: String
+    val editorPaletteNoMatch: String
 
     // --- Layout editor: empty slot + chrome ---
     val editorDragWidgetHere: String

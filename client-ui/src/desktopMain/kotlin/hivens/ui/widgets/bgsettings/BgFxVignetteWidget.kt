@@ -6,7 +6,7 @@ import hivens.ui.i18n.LocalStrings
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 
-@Widget(id = "bg.fx.vignette", displayName = "Виньетка")
+@Widget(id = "bg.fx.vignette", displayName = "widget.bg.fx.vignette")
 @Composable
 fun BgFxVignetteWidget(instance: WidgetInstance) {
     val ctx = LocalBgSettingsContext.current

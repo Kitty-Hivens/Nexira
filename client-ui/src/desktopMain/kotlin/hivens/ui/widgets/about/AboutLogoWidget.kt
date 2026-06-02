@@ -45,10 +45,10 @@ import java.util.Locale
 // stays readable on purpose.
 @Serializable
 data class AboutLogoProps(
-    @PropLabel("Заголовок") val title: String = "",
+    @PropLabel("widget.about.logo.title") val title: String = "",
 )
 
-@Widget(id = "about.logo", displayName = "Логотип и версия", propsClass = AboutLogoProps::class)
+@Widget(id = "about.logo", displayName = "widget.about.logo", propsClass = AboutLogoProps::class)
 @Composable
 fun AboutLogoWidget(instance: WidgetInstance) {
     val p = instance.rememberProps<AboutLogoProps>()

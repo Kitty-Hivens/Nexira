@@ -10,7 +10,7 @@ import hivens.widget.model.WidgetInstance
 
 // Big display headline. Reads server.title (display string) or
 // falls back to server.name (technical id) when title is unset.
-@Widget(id = "server.details.title", displayName = "Заголовок сервера")
+@Widget(id = "server.details.title", displayName = "widget.server.details.title")
 @Composable
 fun ServerDetailsTitleWidget(instance: WidgetInstance) {
     val ctx = LocalServerDetailsContext.current

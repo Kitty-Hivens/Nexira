@@ -1,6 +1,9 @@
 package hivens.ui.i18n
 
 import hivens.core.data.PackAuthRequirement
+import java.time.format.DateTimeFormatter
+import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 
 object EnglishStrings : AppStrings {
 
@@ -740,6 +743,122 @@ object EnglishStrings : AppStrings {
     override val editorCancel  = "Cancel"
     override val editorDelete  = "Delete"
     override val editorReset   = "Reset"
+    override val editorResetAll = "Reset everything"
+    override val editorToFront = "Bring to front"
+    override val editorToBack = "Send to back"
+    override val widgetLabels: Map<String, String> = mapOf(
+        "widget.about.credits" to "Credits and tech",
+        "widget.about.credits.title" to "Heading (credits)",
+        "widget.about.links.card" to "Links",
+        "widget.about.links.card.title" to "Heading",
+        "widget.about.logo" to "Logo and version",
+        "widget.about.logo.title" to "Heading",
+        "widget.about.system.card" to "System",
+        "widget.about.system.card.title" to "Heading",
+        "widget.about.update.panel" to "Updates",
+        "widget.about.update.panel.title" to "Heading",
+        "widget.appshell.region.center" to "Main content",
+        "widget.appshell.region.collapsed" to "Collapsed",
+        "widget.appshell.region.glassAlphaPct" to "Glass, %",
+        "widget.appshell.region.left" to "Left rail",
+        "widget.appshell.region.right" to "Right panel",
+        "widget.appshell.region.showDivider" to "Divider",
+        "widget.appshell.region.widthDp" to "Width (0 = flexible)",
+        "widget.appshell.rightrail.authpanel" to "Auth panel",
+        "widget.appshell.rightrail.compactnews" to "News feed",
+        "widget.bg.enable.toggle" to "Background on/off",
+        "widget.bg.fx.animspeed" to "Animation speed",
+        "widget.bg.fx.blur" to "Blur",
+        "widget.bg.fx.darken" to "Darken",
+        "widget.bg.fx.opacity" to "Opacity",
+        "widget.bg.fx.parallax" to "Parallax",
+        "widget.bg.fx.saturation" to "Saturation",
+        "widget.bg.fx.vignette" to "Vignette",
+        "widget.bg.image.picker" to "Background image",
+        "widget.bg.loop.mode" to "Playback loop",
+        "widget.bg.position.x" to "Position X",
+        "widget.bg.position.y" to "Position Y",
+        "widget.bg.preview" to "Preview",
+        "widget.bg.reset" to "Reset background",
+        "widget.bg.scale.mode" to "Scaling",
+        "widget.bg.tint" to "Tint",
+        "widget.container.group" to "Group",
+        "widget.container.tabs" to "Tabs",
+        "widget.container.tabs.label1" to "Tab 1",
+        "widget.container.tabs.label2" to "Tab 2",
+        "widget.container.tabs.label3" to "Tab 3",
+        "widget.container.tabs.tabCount" to "Tabs",
+        "widget.customization.accent.override" to "Accent color",
+        "widget.customization.color.background" to "Color: background",
+        "widget.customization.color.criticalAccent" to "Color: criticalAccent",
+        "widget.customization.color.error" to "Color: error",
+        "widget.customization.color.outline" to "Color: outline",
+        "widget.customization.color.primary" to "Color: primary",
+        "widget.customization.color.progressAccent" to "Color: progressAccent",
+        "widget.customization.color.secondary" to "Color: secondary",
+        "widget.customization.color.success" to "Color: success",
+        "widget.customization.color.surface" to "Color: surface",
+        "widget.customization.color.textPrimary" to "Color: textPrimary",
+        "widget.customization.color.textSecondary" to "Color: textSecondary",
+        "widget.customization.color.warnAccent" to "Color: warnAccent",
+        "widget.customization.density" to "UI density",
+        "widget.customization.experimental.toggle" to "Experimental settings",
+        "widget.customization.glass.alpha" to "Glass opacity",
+        "widget.customization.glass.intensity" to "Glass intensity",
+        "widget.customization.reset" to "Reset customization",
+        "widget.customization.shape.animMultiplier" to "Animation speed",
+        "widget.customization.shape.buttonCorner" to "Button rounding",
+        "widget.customization.shape.cardBorder" to "Card border width",
+        "widget.customization.shape.cardCorner" to "Card rounding",
+        "widget.customization.shape.softGlow" to "Decorative glow",
+        "widget.home.classic.content" to "Classic dashboard",
+        "widget.home.new.clock" to "Clock",
+        "widget.home.new.clock.accent" to "Accent color",
+        "widget.home.new.clock.faceSize" to "Dial size",
+        "widget.home.new.clock.format24h" to "24-hour format",
+        "widget.home.new.clock.mode" to "Mode",
+        "widget.home.new.clock.showSeconds" to "Seconds",
+        "widget.home.new.clock.title" to "Heading",
+        "widget.home.new.launchbutton" to "Launch button",
+        "widget.home.new.launchbutton.label" to "Label",
+        "widget.home.new.music" to "Music player",
+        "widget.home.new.music.title" to "Heading",
+        "widget.home.new.playback.mini" to "Mini player",
+        "widget.home.new.progress" to "Background activity",
+        "widget.home.new.progress.idleText" to "Idle text",
+        "widget.home.new.progress.title" to "Heading",
+        "widget.home.new.quicklaunch" to "Quick launch",
+        "widget.home.new.quicklaunch.buttonLabel" to "Button label",
+        "widget.home.new.recent" to "Pack tiles",
+        "widget.home.new.recent.maxTiles" to "Tile count",
+        "widget.home.new.recent.title" to "Heading",
+        "widget.home.new.spacer" to "Spacer",
+        "widget.home.new.spacer.height" to "Height",
+        "widget.home.new.welcome" to "Welcome banner",
+        "widget.home.new.welcome.customGreeting" to "Custom greeting text",
+        "widget.home.new.welcome.showSubtitle" to "Show subtitle",
+        "widget.library.body" to "Library body",
+        "widget.library.body.emptyText" to "Empty-state text",
+        "widget.library.body.emptyTitle" to "Empty-state title",
+        "widget.library.header" to "Library header",
+        "widget.library.header.subtitle" to "Subtitle",
+        "widget.library.header.title" to "Heading",
+        "widget.nav.entry" to "Nav item",
+        "widget.profile.account.section" to "Account",
+        "widget.profile.nav" to "Profile navigation",
+        "widget.profile.skin.section" to "Skin",
+        "widget.profile.skin.section.previewHeight" to "Preview height",
+        "widget.server.details.banner" to "Server banner",
+        "widget.server.details.banner.cornerRadius" to "Corner rounding",
+        "widget.server.details.description" to "Server description",
+        "widget.server.details.tagbar" to "Server tags",
+        "widget.server.details.title" to "Server title",
+        "widget.theme.picker.grid" to "Theme grid",
+        "widget.theme.picker.preview" to "Theme preview",
+    )
+    override val recoverySafeModeTitle = "Can't recover the interface"
+    override val recoverySafeModeBody  = "The interface crashed several times in a row. A crash report was saved to disk. Restart the launcher."
+    override val recoverySafeModeQuit  = "Quit"
     override val editorSave    = "Save"
     override val editorApply   = "Apply"
     override val editorExport  = "Export"
@@ -769,6 +888,8 @@ object EnglishStrings : AppStrings {
     override val editorPaletteHide  = "Hide palette"
     override val editorPaletteHint  = "Drag into a slot"
     override val editorPaletteEmpty = "Widget registry is empty (build issue)."
+    override val editorPaletteSearch = "Search widgets…"
+    override val editorPaletteNoMatch = "No matches"
 
     // --- Layout editor: empty slot + chrome ---
     override val editorDragWidgetHere   = "Drag a widget here"
@@ -853,8 +974,8 @@ object EnglishStrings : AppStrings {
     override val aboutLogoDesc       = "App logo"
 }
 
-private val notificationTimeFormatterCache = java.util.concurrent.ConcurrentHashMap<java.util.Locale, java.time.format.DateTimeFormatter>()
-private fun notificationTimeFormatter(locale: java.util.Locale): java.time.format.DateTimeFormatter =
+private val notificationTimeFormatterCache = ConcurrentHashMap<Locale, DateTimeFormatter>()
+private fun notificationTimeFormatter(locale: Locale): DateTimeFormatter =
     notificationTimeFormatterCache.computeIfAbsent(locale) {
         java.time.format.DateTimeFormatter
             .ofPattern("d MMM yyyy, HH:mm:ss", it)

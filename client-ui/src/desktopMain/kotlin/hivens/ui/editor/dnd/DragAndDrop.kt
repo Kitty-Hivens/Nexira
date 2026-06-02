@@ -53,7 +53,6 @@ data class ActiveDrag(
 class DragController {
     private val _active = mutableStateOf<ActiveDrag?>(null)
     val active: ActiveDrag? get() = _active.value
-    val isDragging: Boolean get() = _active.value != null
 
     fun begin(
         payload: DragPayload,
@@ -102,11 +101,6 @@ class DropTargetRegistry {
 
     fun registerSlot(path: SlotPath, rect: Rect) {
         slotBounds[path] = rect
-    }
-
-    fun unregisterSlot(path: SlotPath) {
-        slotBounds.remove(path)
-        widgets.remove(path)
     }
 
     fun registerWidget(path: SlotPath, instanceId: String, index: Int, rect: Rect) {

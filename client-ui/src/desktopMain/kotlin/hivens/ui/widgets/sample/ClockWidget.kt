@@ -56,12 +56,12 @@ enum class ClockMode { Analog, Digital, Both }
 
 @Serializable
 data class ClockProps(
-    @PropLabel("Режим") val mode: ClockMode = ClockMode.Both,
-    @PropLabel("24-часовой формат") val format24h: Boolean = true,
-    @PropLabel("Секунды") val showSeconds: Boolean = true,
-    @PropLabel("Заголовок") val title: String = "",
-    @PropLabel("Размер циферблата") @PropRange(80.0, 200.0) val faceSize: Int = 140,
-    @PropLabel("Цвет акцента") @PropColor val accent: String = "",
+    @PropLabel("widget.home.new.clock.mode") val mode: ClockMode = ClockMode.Both,
+    @PropLabel("widget.home.new.clock.format24h") val format24h: Boolean = true,
+    @PropLabel("widget.home.new.clock.showSeconds") val showSeconds: Boolean = true,
+    @PropLabel("widget.home.new.clock.title") val title: String = "",
+    @PropLabel("widget.home.new.clock.faceSize") @PropRange(80.0, 200.0) val faceSize: Int = 140,
+    @PropLabel("widget.home.new.clock.accent") @PropColor val accent: String = "",
 )
 
 // Analog + digital clock with a once-per-second second hand. Theme-aware: dial
@@ -69,7 +69,7 @@ data class ClockProps(
 // the accent prop or falls back to primary. Per-second tick recomposes
 // only the Canvas + the digital time line; the surrounding card stays
 // still.
-@Widget(id = "home.new.clock", displayName = "Clock", propsClass = ClockProps::class)
+@Widget(id = "home.new.clock", displayName = "widget.home.new.clock", propsClass = ClockProps::class)
 @Composable
 fun ClockWidget(instance: WidgetInstance) {
     val p = instance.rememberProps<ClockProps>()

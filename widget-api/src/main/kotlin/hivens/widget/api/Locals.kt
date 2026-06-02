@@ -2,7 +2,9 @@ package hivens.widget.api
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ProvidableCompositionLocal
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.geometry.Size
 import hivens.widget.model.LayoutGraph
 import hivens.widget.model.SlotAddress
 import hivens.widget.model.SlotContent
@@ -101,3 +103,21 @@ val LocalWidgetServiceRegistry: ProvidableCompositionLocal<WidgetServiceRegistry
     staticCompositionLocalOf {
         error("LocalWidgetServiceRegistry not provided -- wire WidgetServiceRegistry in Koin and at the composition root")
     }
+
+// Edit-mode slot reflow duration (ms). 0 = no animation (the production
+// default, since the only provider is the editor host). While editing, the
+// host supplies the active style's duration, so add / remove / resize reflow
+// animates in the editor only; under Brut that resolves to ~1ms (effectively
+// instant). Static is fine -- it changes only on the edit-mode toggle.
+val LocalSlotMotionMs: ProvidableCompositionLocal<Int> =
+    staticCompositionLocalOf { 0 }
+
+// Measured size (dp) of the current Canvas slot's content box, published by
+// SlotRenderer's Canvas branch. The editor's move gesture reads it to clamp a
+// free-placed widget so a grab margin always stays on-canvas (a widget can't
+// be dragged fully out of reach). Zero -- the default, and outside a Canvas
+// slot -- disables clamping. Dynamic (not static): it updates from onSizeChanged
+// on every slot resize, and a static local would recompose the whole canvas
+// subtree on each change rather than just the chrome that reads it.
+val LocalCanvasSlotSizeDp: ProvidableCompositionLocal<Size> =
+    compositionLocalOf { Size.Zero }

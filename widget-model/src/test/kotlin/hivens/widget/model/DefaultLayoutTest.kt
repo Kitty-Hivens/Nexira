@@ -1,5 +1,6 @@
 package hivens.widget.model
 
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -76,5 +77,17 @@ class DefaultLayoutTest {
         assertEquals(setOf("header", "body"), slots("library"))
         assertEquals(setOf("top", "bottom"),  slots("appshell.leftrail"))
         assertEquals(setOf("auth", "news"),   slots("appshell.rightrail"))
+    }
+
+    @Test
+    fun `appshell leftrail is a unified nav-entry rail in declared order`() {
+        val graph = DefaultLayout.load()
+        val leftrail = graph.surfaces[SurfaceId("appshell.leftrail")]!!.slots
+        fun targets(slot: String) = leftrail[SlotId(slot)]!!.widgets.map {
+            assertEquals("nav.entry", it.kind.value, "leftrail items must all be nav.entry")
+            it.props["target"]?.jsonPrimitive?.content
+        }
+        assertEquals(listOf("Home", "Library", "Browse", "Profile", "Settings", "About"), targets("top"))
+        assertEquals(listOf("Console", "Logout"), targets("bottom"))
     }
 }

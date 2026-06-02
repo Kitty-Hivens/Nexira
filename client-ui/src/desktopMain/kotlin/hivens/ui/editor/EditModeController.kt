@@ -3,6 +3,7 @@ package hivens.ui.editor
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import hivens.launcher.LayoutGraphRepository
+import hivens.widget.model.CanvasPlacement
 import hivens.widget.model.SlotContent
 import hivens.widget.model.SlotId
 import hivens.widget.model.SlotOrientation
@@ -17,10 +18,15 @@ import hivens.widget.model.removeWidget
 import hivens.widget.model.reorderInSlot
 import hivens.widget.model.setGridColumns
 import hivens.widget.model.setSlotOrientation
+import hivens.widget.model.setWidgetOffset
+import hivens.widget.model.setWidgetSize
 import hivens.widget.model.setWidgetWeight
+import hivens.widget.model.setWidgetZ
 import hivens.widget.model.updateWidgetChrome
 import hivens.widget.model.updateWidgetProps
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
 import java.util.UUID
@@ -39,6 +45,15 @@ class EditModeController(
     private val repo: LayoutGraphRepository,
     private val scope: CoroutineScope,
 ) {
+    // Editor mutations run on a single-thread view of Default so per-frame
+    // canvas writes (offset / size during a drag) reach the repo in submission
+    // order. The shared [scope] is Dispatchers.IO (multi-threaded): fire-and-
+    // forget launches there can grab the repo mutex out of order, letting an
+    // older drag frame's offset clobber a newer one. limitedParallelism(1)
+    // serializes dispatch; the repo's own debounced file write stays on [scope].
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private val writeDispatcher = Dispatchers.Default.limitedParallelism(1)
+
     // Window-level Ctrl+E increments this tick. The EditorSurfaceHost
     // observes it via snapshotFlow and flips its own edit state. The
     // signal lives on the singleton controller because the keybind is
@@ -65,8 +80,17 @@ class EditModeController(
     // happens at the editor layer because the LayoutGraph layer
     // intentionally rejects undeclared slots (no auto-create), so
     // typo-protection stays at the model boundary.
-    fun addWidget(path: SlotPath, kind: WidgetKind, slots: List<SlotId>, index: Int) {
-        scope.launch {
+    // `canvas` seeds an initial CanvasPlacement so a palette drop onto a
+    // Canvas slot is born at the drop point (and at a concrete size) rather
+    // than flashing at (0,0) and recomposing. Null for flow slots.
+    fun addWidget(
+        path: SlotPath,
+        kind: WidgetKind,
+        slots: List<SlotId>,
+        index: Int,
+        canvas: CanvasPlacement? = null,
+    ) {
+        scope.launch(writeDispatcher) {
             val children = if (slots.isEmpty()) {
                 emptyMap()
             } else {
@@ -76,13 +100,14 @@ class EditModeController(
                 kind       = kind,
                 instanceId = newInstanceId(),
                 children   = children,
+                canvas     = canvas,
             )
             repo.update { it.insertWidget(path, widget, index) }
         }
     }
 
     fun removeWidget(path: SlotPath, instanceId: String) {
-        scope.launch {
+        scope.launch(writeDispatcher) {
             repo.update { it.removeWidget(path, instanceId) }
         }
     }
@@ -92,7 +117,7 @@ class EditModeController(
     // user's edits); an empty object resets the widget to its declared
     // defaults.
     fun updateProps(path: SlotPath, instanceId: String, props: JsonObject) {
-        scope.launch {
+        scope.launch(writeDispatcher) {
             repo.update { it.updateWidgetProps(path, instanceId, props) }
         }
     }
@@ -100,13 +125,13 @@ class EditModeController(
     // Per-instance backing chrome (glass / corner / padding). A no-backing
     // chrome normalizes to null in the transform, so it never bloats the file.
     fun updateChrome(path: SlotPath, instanceId: String, chrome: WidgetChrome?) {
-        scope.launch {
+        scope.launch(writeDispatcher) {
             repo.update { it.updateWidgetChrome(path, instanceId, chrome) }
         }
     }
 
     fun reorderInSlot(path: SlotPath, fromIndex: Int, toIndex: Int) {
-        scope.launch {
+        scope.launch(writeDispatcher) {
             repo.update { it.reorderInSlot(path, fromIndex, toIndex) }
         }
     }
@@ -114,19 +139,34 @@ class EditModeController(
     // Phase G slot layout. Orientation + grid columns are slot-level;
     // widget weight is per-instance (set by the drag-dividers in G4).
     fun setSlotOrientation(path: SlotPath, orientation: SlotOrientation) {
-        scope.launch { repo.update { it.setSlotOrientation(path, orientation) } }
+        scope.launch(writeDispatcher) { repo.update { it.setSlotOrientation(path, orientation) } }
     }
 
     fun setGridColumns(path: SlotPath, columns: Int) {
-        scope.launch { repo.update { it.setGridColumns(path, columns) } }
+        scope.launch(writeDispatcher) { repo.update { it.setGridColumns(path, columns) } }
     }
 
     fun setWidgetWeight(path: SlotPath, instanceId: String, weight: Float) {
-        scope.launch { repo.update { it.setWidgetWeight(path, instanceId, weight) } }
+        scope.launch(writeDispatcher) { repo.update { it.setWidgetWeight(path, instanceId, weight) } }
+    }
+
+    // Canvas free-placement (orientation == Canvas): offset + size in dp,
+    // z = paint order. Each composes through the model's updateCanvas, so
+    // offset / size / z edits do not clobber one another mid-drag.
+    fun setWidgetOffset(path: SlotPath, instanceId: String, x: Float, y: Float) {
+        scope.launch(writeDispatcher) { repo.update { it.setWidgetOffset(path, instanceId, x, y) } }
+    }
+
+    fun setWidgetSize(path: SlotPath, instanceId: String, width: Float, height: Float) {
+        scope.launch(writeDispatcher) { repo.update { it.setWidgetSize(path, instanceId, width, height) } }
+    }
+
+    fun setWidgetZ(path: SlotPath, instanceId: String, z: Int) {
+        scope.launch(writeDispatcher) { repo.update { it.setWidgetZ(path, instanceId, z) } }
     }
 
     fun moveWidget(from: SlotPath, to: SlotPath, instanceId: String, toIndex: Int) {
-        scope.launch {
+        scope.launch(writeDispatcher) {
             repo.update { it.moveWidget(from, to, instanceId, toIndex) }
         }
     }
@@ -136,9 +176,14 @@ class EditModeController(
     // wants to undo a chain of edits on one surface without nuking
     // their whole layout.
     fun resetSurface(surface: SurfaceId) {
-        scope.launch {
+        scope.launch(writeDispatcher) {
             repo.resetSurface(surface)
         }
+    }
+
+    // Full reset to the bundled default across every surface.
+    fun resetAll() {
+        scope.launch(writeDispatcher) { repo.resetAll() }
     }
 
     // UUID minting on palette drop. Matches NotificationCenter.kt's

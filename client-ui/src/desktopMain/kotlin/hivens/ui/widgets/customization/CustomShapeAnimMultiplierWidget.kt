@@ -6,7 +6,7 @@ import hivens.ui.i18n.LocalStrings
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 
-@Widget(id = "customization.shape.animMultiplier", displayName = "Скорость анимаций")
+@Widget(id = "customization.shape.animMultiplier", displayName = "widget.customization.shape.animMultiplier")
 @Composable
 fun CustomShapeAnimMultiplierWidget(instance: WidgetInstance) {
     val ctx = LocalCustomizationContext.current

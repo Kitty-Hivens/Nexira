@@ -32,6 +32,7 @@ import org.jetbrains.skia.ImageInfo
 import org.jetbrains.skia.makeFromFileName
 import org.slf4j.LoggerFactory
 import java.io.File
+import kotlin.time.Duration.Companion.milliseconds
 
 private val log = LoggerFactory.getLogger("CustomBackground")
 
@@ -217,7 +218,7 @@ private fun rememberSkiaImage(
                 frameIdx = i
                 val speed   = speedRef.value.coerceAtLeast(0.01f)
                 val waitMs  = (d.durationsMs[i] / speed).toLong().coerceAtLeast(1L)
-                delay(waitMs)
+                delay(waitMs.milliseconds)
             }
             played++
         }
@@ -287,11 +288,9 @@ private fun decodeBackground(file: File, onPreview: (DecodedBg) -> Unit = {}): D
 
 private fun decodeFrame(codec: Codec, info: ImageInfo, frame: Int, trackTag: String): ImageBitmap {
     val bmp = org.jetbrains.skia.Bitmap().apply { allocPixels(info) }
-    return try {
+    return bmp.use { bmp ->
         codec.readPixels(bmp, frame)
         val img = org.jetbrains.skia.Image.makeFromBitmap(bmp)
         img.use { it.toComposeImageBitmap().also { ib -> SkiaTracker.track(trackTag, ib) } }
-    } finally {
-        bmp.close()
     }
 }

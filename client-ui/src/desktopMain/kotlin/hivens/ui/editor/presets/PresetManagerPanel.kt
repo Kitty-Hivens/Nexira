@@ -73,9 +73,7 @@ fun PresetManagerPanel(
     val s = LocalStrings.current
     var presets by remember(visible) { mutableStateOf(listProvider()) }
     var newName by remember(visible) { mutableStateOf("") }
-    LaunchedEffect(visible) {
-        if (visible) presets = listProvider()
-    }
+    LaunchedEffect(Unit) { presets = listProvider() }
 
     Dialog(
         onDismissRequest = onDismiss,

@@ -1,9 +1,7 @@
 package hivens.ui.editor
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -116,6 +114,7 @@ import hivens.widget.api.EmptySlotDecorator
 import hivens.widget.api.LocalEmptySlotDecorator
 import hivens.widget.api.LocalSlotControlDecorator
 import hivens.widget.api.LocalSlotDividerDecorator
+import hivens.widget.api.LocalSlotMotionMs
 import hivens.widget.api.LocalSlotPath
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.LocalStyle
@@ -258,6 +257,7 @@ fun EditorSurfaceHost(
                     descriptor   = descriptor,
                     instance     = instance,
                     controller   = dragController,
+                    editController = controller,
                     registry     = registry,
                     orientation  = orientation,
                     onRemove     = {
@@ -367,6 +367,11 @@ fun EditorSurfaceHost(
         LocalEmptySlotDecorator provides emptyDecorator,
         LocalSlotControlDecorator provides slotControlDecorator,
         LocalSlotDividerDecorator provides slotDividerDecorator,
+        // Edit-mode reflow duration -- slot add / remove / resize animates while
+        // editing (style-driven: Brut resolves to ~instant), zero elsewhere.
+        LocalSlotMotionMs provides if (state is EditModeState.On && !previewing) {
+            LocalStyle.current.animationDurationMs(260)
+        } else 0,
         // Stub surface contexts. Surface composables that mount under
         // content() override with the real values; widgets dropped on
         // a foreign surface fall through to the stubs and render
@@ -440,10 +445,16 @@ fun EditorSurfaceHost(
                             )
                         },
                         confirmButton = {
-                            TextButton(onClick = {
-                                controller.resetSurface(surfaceForReset)
-                                resetSurfaceConfirm = false
-                            }) { Text(s.editorReset, color = CelestiaTheme.colors.error) }
+                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                TextButton(onClick = {
+                                    controller.resetAll()
+                                    resetSurfaceConfirm = false
+                                }) { Text(s.editorResetAll, color = CelestiaTheme.colors.error) }
+                                TextButton(onClick = {
+                                    controller.resetSurface(surfaceForReset)
+                                    resetSurfaceConfirm = false
+                                }) { Text(s.editorReset, color = CelestiaTheme.colors.error) }
+                            }
                         },
                         dismissButton = {
                             TextButton(onClick = { resetSurfaceConfirm = false }) { Text(s.editorCancel) }
@@ -504,6 +515,7 @@ fun EditorSurfaceHost(
 
                 WidgetPalettePanel(
                     visible        = editing && paletteOpen && !previewing && propTarget == null,
+                    dimmed         = dragController.active != null,
                     onDismiss      = { paletteOpen = false },
                     controller     = dragController,
                     registry       = registry,
@@ -549,10 +561,11 @@ private fun EditModePill(
     modifier: Modifier = Modifier,
 ) {
     val s = LocalStrings.current
+    val motionMs = LocalStyle.current.animationDurationMs(260)
     AnimatedVisibility(
         visible  = active,
-        enter    = fadeIn(spring()) + slideInVertically(spring()) { -it },
-        exit     = fadeOut(spring()) + slideOutVertically(spring()) { -it },
+        enter    = fadeIn(tween(motionMs)) + slideInVertically(tween(motionMs)) { -it },
+        exit     = fadeOut(tween(motionMs)) + slideOutVertically(tween(motionMs)) { -it },
         modifier = modifier,
     ) {
         Surface(
@@ -765,9 +778,10 @@ private fun humanSurfaceName(surface: SurfaceId, s: AppStrings): String = when (
 
 @Composable
 private fun EditModeVignette(active: Boolean) {
+    val motionMs = LocalStyle.current.animationDurationMs(320)
     val alpha by animateFloatAsState(
         targetValue   = if (active) 1f else 0f,
-        animationSpec = spring(stiffness = Spring.StiffnessLow),
+        animationSpec = tween(motionMs),
         label         = "edit-vignette",
     )
     if (alpha <= 0.01f) return

@@ -96,7 +96,6 @@ import okhttp3.Call
 import org.jetbrains.compose.resources.ExperimentalResourceApi
 import org.jetbrains.compose.resources.painterResource
 import org.koin.compose.koinInject
-import org.koin.core.context.stopKoin
 import org.koin.core.qualifier.named
 import org.slf4j.LoggerFactory
 import java.awt.Dimension
@@ -167,12 +166,15 @@ sealed class Screen {
 @OptIn(ExperimentalResourceApi::class)
 @Composable
 fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
+    // Tray teardown is composition-scoped: the tray is re-init'd per
+    // composition (see the tray LaunchedEffect below), so disposing it here
+    // gives a clean shutdown -> init cycle across a shell restart. Process-
+    // lifetime teardown (puppet server, Koin) is deliberately NOT here: it
+    // also fires when the composition is disposed on a crash, which would stop
+    // Koin out from under the recovery restart loop. It lives in a JVM
+    // shutdown hook in Main instead.
     DisposableEffect(Unit) {
-        onDispose {
-            TrayManager.shutdown()
-            hivens.ui.puppet.PuppetServerLoader.instance.stop()
-            stopKoin()
-        }
+        onDispose { TrayManager.shutdown() }
     }
 
     val windowState      = rememberWindowState(placement = WindowPlacement.Maximized)

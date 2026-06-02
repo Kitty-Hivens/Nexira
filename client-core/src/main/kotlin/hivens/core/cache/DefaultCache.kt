@@ -1,6 +1,7 @@
 package hivens.core.cache
 
 import hivens.core.time.Clock
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -221,7 +222,7 @@ class DefaultCache<V>(
     private suspend fun runWriter(key: String) {
         try {
             while (true) {
-                delay(config.diskDebounceMs)
+                delay(config.diskDebounceMs.milliseconds)
                 val op = mutex.withLock {
                     val p = pending.remove(key)
                     if (p == null) writerActive.remove(key)

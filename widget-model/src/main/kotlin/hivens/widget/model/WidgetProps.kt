@@ -1,5 +1,6 @@
 package hivens.widget.model
 
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialInfo
 
 // Field-level metadata for widget prop classes. These are @SerialInfo
@@ -16,6 +17,7 @@ import kotlinx.serialization.SerialInfo
 
 // Human-facing label shown in the editor. Without it the editor falls
 // back to the serial element name.
+@OptIn(ExperimentalSerializationApi::class)
 @SerialInfo
 @Target(AnnotationTarget.PROPERTY)
 annotation class PropLabel(val value: String)
@@ -23,12 +25,14 @@ annotation class PropLabel(val value: String)
 // Numeric bounds for an Int/Float field -- renders a slider instead of a
 // free-entry field. step == 0.0 means continuous (the control rounds
 // Int fields to whole steps itself).
+@OptIn(ExperimentalSerializationApi::class)
 @SerialInfo
 @Target(AnnotationTarget.PROPERTY)
 annotation class PropRange(val min: Double, val max: Double, val step: Double = 0.0)
 
 // Marks a String field as a hex colour ("#RRGGBB" / "#AARRGGBB"; ""
 // means "fall back to the theme"). Renders the swatch + hex control.
+@OptIn(ExperimentalSerializationApi::class)
 @SerialInfo
 @Target(AnnotationTarget.PROPERTY)
 annotation class PropColor
@@ -42,6 +46,7 @@ annotation class PropChoice(val options: Array<String>)
 
 // Excludes a field from the editor form. Still serialized and readable
 // by the widget -- for computed or internal props the user must not tune.
+@OptIn(ExperimentalSerializationApi::class)
 @SerialInfo
 @Target(AnnotationTarget.PROPERTY)
 annotation class PropHidden

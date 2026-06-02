@@ -105,7 +105,7 @@ object SingleInstance {
             // side. createFile + ignore-if-exists collapses the race.
             try {
                 Files.createFile(show)
-            } catch (_: java.nio.file.FileAlreadyExistsException) {
+            } catch (_: FileAlreadyExistsException) {
                 // Already signalled by a sibling launcher attempt -- fine,
                 // the running instance's watcher will pick it up either way.
             }

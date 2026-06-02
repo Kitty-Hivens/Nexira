@@ -183,9 +183,41 @@ fun LayoutGraph.updateWidgetChrome(
 // same contract as the transforms above.
 fun LayoutGraph.setSlotOrientation(path: SlotPath, orientation: SlotOrientation): LayoutGraph =
     mutate(path) { content ->
-        if (content.orientation == orientation) content
-        else content.copy(orientation = orientation)
+        if (content.orientation == orientation) return@mutate content
+        if (orientation != SlotOrientation.Canvas) {
+            return@mutate content.copy(orientation = orientation)
+        }
+        // Flipping to Canvas: seed a staggered grid onto widgets with no
+        // placement yet, so they don't all pile at (0,0). Already-placed
+        // widgets keep their placement -- re-entering Canvas is idempotent.
+        content.copy(
+            orientation = SlotOrientation.Canvas,
+            widgets = content.widgets.mapIndexed { i, w ->
+                if (w.canvas != null) w else w.copy(canvas = seededCanvasPlacement(i))
+            },
+        )
     }
+
+// Staggered default placement for the Nth not-yet-placed widget when a slot
+// flips to Canvas. width/height 0 keeps intrinsic size until the user resizes;
+// z = index preserves the prior stacking order as the initial paint order.
+// Pure + deterministic so the seed cascade is unit-testable.
+fun seededCanvasPlacement(
+    index: Int,
+    columns: Int = 3,
+    cellWidth: Float = 220f,
+    cellHeight: Float = 160f,
+    marginX: Float = 16f,
+    marginY: Float = 16f,
+): CanvasPlacement {
+    val col = index % columns
+    val row = index / columns
+    return CanvasPlacement(
+        x = marginX + col * cellWidth,
+        y = marginY + row * cellHeight,
+        z = index,
+    )
+}
 
 fun LayoutGraph.setGridColumns(path: SlotPath, columns: Int): LayoutGraph =
     mutate(path) { content ->
@@ -277,6 +309,29 @@ private fun SlotContent.walkInstances(): Sequence<WidgetInstance> = sequence {
         }
     }
 }
+
+// Rewrites every WidgetInstance graph-wide, replacing each with the 0..n
+// instances `transform` returns (drop / keep / expand). A widget's own
+// children are rewritten before the widget itself is handed to `transform`,
+// so the transform always sees an already-converted subtree. Pure; the
+// schema migrations use it to restructure widget kinds across the whole
+// graph. The caller owns instanceId uniqueness across the produced set --
+// the load() migration path does not run the tree-wide uniqueness guard.
+fun LayoutGraph.flatMapInstances(
+    transform: (WidgetInstance) -> List<WidgetInstance>,
+): LayoutGraph = copy(
+    surfaces = surfaces.mapValues { (_, layout) ->
+        layout.copy(slots = layout.slots.mapValues { (_, content) -> content.flatMapInstances(transform) })
+    },
+)
+
+private fun SlotContent.flatMapInstances(
+    transform: (WidgetInstance) -> List<WidgetInstance>,
+): SlotContent = copy(
+    widgets = widgets.flatMap { w ->
+        transform(w.copy(children = w.children.mapValues { (_, c) -> c.flatMapInstances(transform) }))
+    },
+)
 
 // All instanceIds under one surface, tree-wide (including nested children).
 fun SurfaceLayout.instanceIds(): Set<String> =

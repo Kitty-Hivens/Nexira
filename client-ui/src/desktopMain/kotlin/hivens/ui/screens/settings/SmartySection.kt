@@ -3,6 +3,7 @@ package hivens.ui.screens.settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Rule
 import androidx.compose.material.icons.filled.Rule
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.runtime.Composable
@@ -52,7 +53,7 @@ internal fun SmartySection(
         SettingsRowWithDescription(
             title           = s.settingsStrictModCheckTitle,
             description     = s.settingsStrictModCheckDesc,
-            icon            = Icons.Default.Rule,
+            icon            = Icons.AutoMirrored.Filled.Rule,
             iconTint        = CelestiaTheme.colors.primary,
             checked         = form.strictModVerification,
             enabled         = true,

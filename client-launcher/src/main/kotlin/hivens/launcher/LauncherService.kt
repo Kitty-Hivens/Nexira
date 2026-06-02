@@ -84,18 +84,7 @@ internal class LauncherService(
             classpath
         )
 
-        val pb = ProcessBuilder(command)
-        pb.directory(clientRootPath.toFile())
-        pb.redirectErrorStream(false)
-
-        onLog("CMD: ${java.lang.String.join(" ", command)}", LauncherLogType.INFO)
-
-        val process = pb.start()
-
-        // 6. Connecting a log interceptor
-        logHandler.attach(process, onLog)
-
-        return process
+        return spawnProcess(command, clientRootPath, onLog)
     }
 
     override suspend fun launchClient(
@@ -181,12 +170,23 @@ internal class LauncherService(
             jvmArgsOverride = runtime.jvmArgs,
         )
 
+        return spawnProcess(command, clientRootPath, onLog)
+    }
+
+    /**
+     * Builds, starts, and log-attaches the game process. Both launch paths
+     * (SC server + pack) run on the caller's IO dispatcher, so the blocking
+     * ProcessBuilder.start happens on IO without an extra context switch.
+     */
+    private fun spawnProcess(
+        command: List<String>,
+        clientRootPath: Path,
+        onLog: (String, LauncherLogType) -> Unit,
+    ): Process {
         val pb = ProcessBuilder(command)
         pb.directory(clientRootPath.toFile())
         pb.redirectErrorStream(false)
-
         onLog("CMD: ${java.lang.String.join(" ", command)}", LauncherLogType.INFO)
-
         val process = pb.start()
         logHandler.attach(process, onLog)
         return process

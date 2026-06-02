@@ -7,7 +7,7 @@ import hivens.ui.i18n.LocalStrings
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 
-@Widget(id = "customization.color.error", displayName = "Цвет: error")
+@Widget(id = "customization.color.error", displayName = "widget.customization.color.error")
 @Composable
 fun CustomColorErrorWidget(instance: WidgetInstance) {
     val ctx = LocalCustomizationContext.current

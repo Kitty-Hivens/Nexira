@@ -33,10 +33,10 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 data class ShellRegionProps(
-    @PropLabel("Ширина (0 — гибкая)") @PropRange(0.0, 600.0) val widthDp: Int = 0,
-    @PropLabel("Стекло, %") @PropRange(0.0, 100.0) val glassAlphaPct: Int = 0,
-    @PropLabel("Разделитель") val showDivider: Boolean = true,
-    @PropLabel("Свёрнут") val collapsed: Boolean = false,
+    @PropLabel("widget.appshell.region.widthDp") @PropRange(0.0, 600.0) val widthDp: Int = 0,
+    @PropLabel("widget.appshell.region.glassAlphaPct") @PropRange(0.0, 100.0) val glassAlphaPct: Int = 0,
+    @PropLabel("widget.appshell.region.showDivider") val showDivider: Boolean = true,
+    @PropLabel("widget.appshell.region.collapsed") val collapsed: Boolean = false,
 ) {
     val glassAlpha: Float get() = glassAlphaPct / 100f
 }
@@ -83,7 +83,7 @@ private fun RowScope.RegionDivider(show: Boolean) {
  * Left region: the navigation rail plus the divider that separates it from the
  * center. removable=false -- losing the rail would navigation-lock the launcher.
  */
-@Widget(id = "appshell.region.left", displayName = "Left rail", removable = false, propsClass = ShellRegionProps::class)
+@Widget(id = "appshell.region.left", displayName = "widget.appshell.region.left", removable = false, propsClass = ShellRegionProps::class)
 @Composable
 fun ShellLeftRegion(instance: WidgetInstance) {
     val props = instance.rememberProps<ShellRegionProps>()
@@ -106,7 +106,7 @@ fun ShellLeftRegion(instance: WidgetInstance) {
  * flexes between the two rails. removable=false and never collapsible -- without
  * it there is no content area.
  */
-@Widget(id = "appshell.region.center", displayName = "Main content", removable = false, propsClass = ShellRegionProps::class)
+@Widget(id = "appshell.region.center", displayName = "widget.appshell.region.center", removable = false, propsClass = ShellRegionProps::class)
 @Composable
 fun ShellCenterRegion(instance: WidgetInstance) {
     val props = instance.rememberProps<ShellRegionProps>()
@@ -120,7 +120,7 @@ fun ShellCenterRegion(instance: WidgetInstance) {
  * Right region: the divider plus the auth + news panel. removable=false -- the
  * auth panel is the only sign-in entry point.
  */
-@Widget(id = "appshell.region.right", displayName = "Right panel", removable = false, propsClass = ShellRegionProps::class)
+@Widget(id = "appshell.region.right", displayName = "widget.appshell.region.right", removable = false, propsClass = ShellRegionProps::class)
 @Composable
 fun ShellRightRegion(instance: WidgetInstance) {
     val props = instance.rememberProps<ShellRegionProps>()

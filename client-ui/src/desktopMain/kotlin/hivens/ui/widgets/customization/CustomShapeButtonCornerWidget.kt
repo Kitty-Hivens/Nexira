@@ -6,7 +6,7 @@ import hivens.ui.i18n.LocalStrings
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 
-@Widget(id = "customization.shape.buttonCorner", displayName = "Скругление кнопок")
+@Widget(id = "customization.shape.buttonCorner", displayName = "widget.customization.shape.buttonCorner")
 @Composable
 fun CustomShapeButtonCornerWidget(instance: WidgetInstance) {
     val ctx = LocalCustomizationContext.current

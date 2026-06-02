@@ -50,8 +50,8 @@ import org.koin.compose.koinInject
 
 @Serializable
 data class RecentProps(
-    @PropLabel("Заголовок") val title: String = "",
-    @PropLabel("Сколько плиток") @PropRange(1.0, 12.0) val maxTiles: Int = 5,
+    @PropLabel("widget.home.new.recent.title") val title: String = "",
+    @PropLabel("widget.home.new.recent.maxTiles") @PropRange(1.0, 12.0) val maxTiles: Int = 5,
 )
 
 // Pack tiles row. Sort priority: played packs first by recency, then
@@ -59,7 +59,7 @@ data class RecentProps(
 // launches still shows the tiles (sorted by createdAt), so the new
 // home reads as populated rather than blank. Empty repo shows a CTA
 // pointing at Browse.
-@Widget(id = "home.new.recent", displayName = "Pack tiles", propsClass = RecentProps::class)
+@Widget(id = "home.new.recent", displayName = "widget.home.new.recent", propsClass = RecentProps::class)
 @Composable
 fun HomeNewRecent(instance: WidgetInstance) {
     val p = instance.rememberProps<RecentProps>()

@@ -111,8 +111,7 @@ fun WidgetPropPanel(
         // survives the exit frame where the target may have just vanished
         // (dismiss / edit-mode exit / widget removed). Uses the latched resolve*
         // so exit renders the last content. serializer stays nullable (propless).
-        if (descriptor != null && instance != null &&
-            resolvePath != null && resolveId != null
+        if (descriptor != null && resolvePath != null && resolveId != null
         ) {
             PropPanelBody(
                 descriptor = descriptor,
@@ -171,7 +170,7 @@ private fun PropPanelBody(
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    text       = descriptor.displayName,
+                    text       = s.widgetLabel(descriptor.displayName),
                     style      = MaterialTheme.typography.titleSmall,
                     color      = CelestiaTheme.colors.textPrimary,
                     fontWeight = FontWeight.SemiBold,
@@ -201,7 +200,7 @@ private fun PropPanelBody(
                     if (anns.any { it is PropHidden }) continue
                     val name = sd.getElementName(i)
                     val cur = effective[name] ?: continue
-                    val label = anns.filterIsInstance<PropLabel>().firstOrNull()?.value ?: name
+                    val label = s.widgetLabel(anns.filterIsInstance<PropLabel>().firstOrNull()?.value ?: name)
                     PropFieldRow(
                         label       = label,
                         element     = sd.getElementDescriptor(i),

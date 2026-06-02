@@ -35,6 +35,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import hivens.ui.customization.glassSurfaceAlpha
+import hivens.ui.customization.sliderKeyboardAdjust
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.widgets.toWidgetColorOrNull
 
@@ -56,6 +57,7 @@ internal fun LabeledSlider(
     range: ClosedFloatingPointRange<Float>,
     format: String,
     displayMultiplier: Float = 1f,
+    keyStep: Float = (range.endInclusive - range.start) / 100f,
     onValueChange: (Float) -> Unit,
 ) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -65,17 +67,21 @@ internal fun LabeledSlider(
             color    = CelestiaTheme.colors.textSecondary,
             modifier = Modifier.width(150.dp),
         )
-        Slider(
-            value         = value,
-            onValueChange = onValueChange,
-            valueRange    = range,
-            modifier      = Modifier.weight(1f),
-            colors        = SliderDefaults.colors(
-                thumbColor         = CelestiaTheme.colors.primary,
-                activeTrackColor   = CelestiaTheme.colors.primary,
-                inactiveTrackColor = CelestiaTheme.colors.outline.copy(alpha = 0.2f),
-            ),
-        )
+        // Box owns hover-focus + arrow keys (fine adjustment); the Slider keeps
+        // the pointer drag.
+        Box(Modifier.weight(1f).sliderKeyboardAdjust(value, range, keyStep, onValueChange)) {
+            Slider(
+                value         = value,
+                onValueChange = onValueChange,
+                valueRange    = range,
+                modifier      = Modifier.fillMaxWidth(),
+                colors        = SliderDefaults.colors(
+                    thumbColor         = CelestiaTheme.colors.primary,
+                    activeTrackColor   = CelestiaTheme.colors.primary,
+                    inactiveTrackColor = CelestiaTheme.colors.outline.copy(alpha = 0.2f),
+                ),
+            )
+        }
         Text(
             text     = format.format(value * displayMultiplier),
             style    = MaterialTheme.typography.labelSmall,
