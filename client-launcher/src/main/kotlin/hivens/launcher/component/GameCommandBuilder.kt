@@ -435,8 +435,13 @@ internal class GameCommandBuilder(
     }
 
     private fun addSessionAuthArgs(args: MutableList<String>, session: SessionData) {
-        args.add("--uuid"); args.add(session.uuid)
-        args.add("--accessToken"); args.add(session.accessToken)
+        // Never emit a blank uuid/token. An offline relaunch of a server whose
+        // per-server SmartyCraft token was never cached leaves accessToken empty,
+        // which puts an empty element in argv ("--accessToken" then "") -- the
+        // client crashes parsing it before it can even report a bad session.
+        // A "0" placeholder degrades to a clean in-game "invalid session" instead.
+        args.add("--uuid"); args.add(session.uuid.ifBlank { "0" })
+        args.add("--accessToken"); args.add(session.accessToken.ifBlank { "0" })
         args.add("--userProperties"); args.add("{}")
         args.add("--userType"); args.add("mojang")
     }
