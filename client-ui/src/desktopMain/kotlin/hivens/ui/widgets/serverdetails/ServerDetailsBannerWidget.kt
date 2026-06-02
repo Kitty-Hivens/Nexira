@@ -31,13 +31,13 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class ServerBannerProps(
-    @PropLabel("Скругление углов") @PropRange(0.0, 32.0) val cornerRadius: Int = 16,
+    @PropLabel("widget.server.details.banner.cornerRadius") @PropRange(0.0, 32.0) val cornerRadius: Int = 16,
 )
 
 // Banner image (banner.png from the pack assets dir) or a missing
 // hint when the file is absent. Fills its slot box, image scaled
 // to crop so framing is consistent across asset sizes.
-@Widget(id = "server.details.banner", displayName = "Баннер сервера", propsClass = ServerBannerProps::class)
+@Widget(id = "server.details.banner", displayName = "widget.server.details.banner", propsClass = ServerBannerProps::class)
 @Composable
 fun ServerDetailsBannerWidget(instance: WidgetInstance) {
     val p = instance.rememberProps<ServerBannerProps>()

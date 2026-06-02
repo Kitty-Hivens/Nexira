@@ -61,10 +61,10 @@ import java.io.File
 // directly (services live per-widget, not in the surface context).
 @Serializable
 data class ProfileSkinProps(
-    @PropLabel("Высота превью") @PropRange(200.0, 480.0) val previewHeight: Int = 360,
+    @PropLabel("widget.profile.skin.section.previewHeight") @PropRange(200.0, 480.0) val previewHeight: Int = 360,
 )
 
-@Widget(id = "profile.skin.section", displayName = "Скин", propsClass = ProfileSkinProps::class)
+@Widget(id = "profile.skin.section", displayName = "widget.profile.skin.section", propsClass = ProfileSkinProps::class)
 @Composable
 fun ProfileSkinSectionWidget(instance: WidgetInstance) {
     val p = instance.rememberProps<ProfileSkinProps>()

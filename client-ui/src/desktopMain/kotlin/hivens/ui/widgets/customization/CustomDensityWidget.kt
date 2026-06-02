@@ -6,7 +6,7 @@ import hivens.ui.i18n.LocalStrings
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 
-@Widget(id = "customization.density", displayName = "Плотность UI")
+@Widget(id = "customization.density", displayName = "widget.customization.density")
 @Composable
 fun CustomDensityWidget(instance: WidgetInstance) {
     val ctx = LocalCustomizationContext.current

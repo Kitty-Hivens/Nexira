@@ -23,7 +23,7 @@ import hivens.widget.model.WidgetInstance
 // minimal screen. Removing this widget from the editor leaves the
 // experimental flag stuck at its last value; reset-to-default
 // brings the toggle back.
-@Widget(id = "customization.experimental.toggle", displayName = "Экспериментальные настройки")
+@Widget(id = "customization.experimental.toggle", displayName = "widget.customization.experimental.toggle")
 @Composable
 fun CustomExperimentalToggleWidget(instance: WidgetInstance) {
     val ctx = LocalCustomizationContext.current

@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
@@ -24,8 +23,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -40,7 +37,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -57,8 +53,8 @@ import hivens.launcher.smrt.DepGraphResolver
 import hivens.launcher.smrt.ModGrouping
 import hivens.launcher.smrt.ModRoleGrouper
 import hivens.launcher.smrt.SmrtPackClient
-import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.screens.RetryStateBlock
 import hivens.ui.theme.CelestiaTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -134,34 +130,15 @@ fun ContentTabPane(instance: PackInstance, modifier: Modifier = Modifier) {
 @Composable
 private fun ErrorBlock(modifier: Modifier, message: String, onRetry: () -> Unit) {
     val s = LocalStrings.current
-    Box(modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Text(
-                text       = s.contentTabFetchErrorTitle,
-                style      = MaterialTheme.typography.titleMedium,
-                color      = CelestiaTheme.colors.error,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(
-                text      = message,
-                style     = MaterialTheme.typography.bodySmall,
-                color     = CelestiaTheme.colors.textSecondary,
-                textAlign = TextAlign.Center,
-                modifier  = Modifier.widthIn(max = 480.dp),
-            )
-            Button(
-                onClick = onRetry,
-                shape   = RoundedCornerShape(10.dp),
-                colors  = ButtonDefaults.buttonColors(
-                    containerColor = CelestiaTheme.colors.primary,
-                    contentColor   = Color.White,
-                ),
-            ) { Text(s.contentTabRetry, fontWeight = FontWeight.SemiBold) }
-        }
-    }
+    RetryStateBlock(
+        title      = s.contentTabFetchErrorTitle,
+        message    = message,
+        retryLabel = s.contentTabRetry,
+        onRetry    = onRetry,
+        modifier   = modifier.fillMaxSize().padding(32.dp),
+        titleStyle = MaterialTheme.typography.titleMedium,
+        spacing    = 10.dp,
+    )
 }
 
 @Composable

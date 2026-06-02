@@ -18,30 +18,30 @@ class IndicationCenter {
         data object Failed : LaunchIndication()
     }
 
-    enum class MirrorHealth { Ok, Degraded, Unreachable }
+    enum class MirrorHealth { Ok, Degraded, Unreachable } // TODO: Class "Degraded" is never used, Class "Unreachable" is never used
 
     private val launchFlows: ConcurrentHashMap<String, MutableStateFlow<LaunchIndication?>> =
         ConcurrentHashMap()
     private val updateFlows: ConcurrentHashMap<String, MutableStateFlow<Boolean>> =
         ConcurrentHashMap()
     private val _mirrorHealth = MutableStateFlow(MirrorHealth.Ok)
-    val mirrorHealth: StateFlow<MirrorHealth> = _mirrorHealth.asStateFlow()
+    val mirrorHealth: StateFlow<MirrorHealth> = _mirrorHealth.asStateFlow() // TODO: Property "mirrorHealth" is never used
 
-    fun launchIndication(packInstanceId: String): StateFlow<LaunchIndication?> =
+    fun launchIndication(packInstanceId: String): StateFlow<LaunchIndication?> = // TODO: Function "launchIndication" is never used
         launchFlows.computeIfAbsent(packInstanceId) { MutableStateFlow(null) }.asStateFlow()
 
     fun setLaunchIndication(packInstanceId: String, value: LaunchIndication?) {
         launchFlows.computeIfAbsent(packInstanceId) { MutableStateFlow(null) }.value = value
     }
 
-    fun updateAvailable(packInstanceId: String): StateFlow<Boolean> =
+    fun updateAvailable(packInstanceId: String): StateFlow<Boolean> = // TODO: Function "updateAvailable" is never used
         updateFlows.computeIfAbsent(packInstanceId) { MutableStateFlow(false) }.asStateFlow()
 
-    fun setUpdateAvailable(packInstanceId: String, available: Boolean) {
+    fun setUpdateAvailable(packInstanceId: String, available: Boolean) { // TODO: Function "setUpdateAvailable" is never used
         updateFlows.computeIfAbsent(packInstanceId) { MutableStateFlow(false) }.value = available
     }
 
-    fun setMirrorHealth(value: MirrorHealth) {
+    fun setMirrorHealth(value: MirrorHealth) { // TODO: Function "setMirrorHealth" is never used
         _mirrorHealth.update { value }
     }
 }

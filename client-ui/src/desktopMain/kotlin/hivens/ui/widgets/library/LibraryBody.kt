@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -43,8 +42,8 @@ import org.koin.compose.koinInject
 
 @Serializable
 data class LibraryBodyProps(
-    @PropLabel("Заголовок пустого состояния") val emptyTitle: String = "",
-    @PropLabel("Текст пустого состояния")
+    @PropLabel("widget.library.body.emptyTitle") val emptyTitle: String = "",
+    @PropLabel("widget.library.body.emptyText")
     val emptyText: String = "",
 )
 
@@ -52,7 +51,7 @@ data class LibraryBodyProps(
 // branching would force the layout graph to know about appState, which
 // belongs to navigation, not layout. Self-gating keeps the slot stable
 // across the empty -> populated transition.
-@Widget(id = "library.body", displayName = "Library Body", propsClass = LibraryBodyProps::class)
+@Widget(id = "library.body", displayName = "widget.library.body", propsClass = LibraryBodyProps::class)
 @Composable
 fun LibraryBody(instance: WidgetInstance) {
     val p = instance.rememberProps<LibraryBodyProps>()

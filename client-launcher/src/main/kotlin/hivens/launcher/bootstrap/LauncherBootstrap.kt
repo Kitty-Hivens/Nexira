@@ -155,6 +155,10 @@ object LauncherBootstrap {
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
             val handlerLog = LoggerFactory.getLogger("CrashHandler")
             handlerLog.error("Uncaught exception on thread '${thread.name}'", throwable)
+            // This handler is for crashes OFF the composition path (background
+            // threads, coroutines). Shell-composition crashes unwind
+            // `application {}` and are recovered by the restart loop in
+            // hivens.ui.Main instead -- they never reach here.
             runCatching {
                 val report     = crashReporter.generate(throwable, thread)
                 val reportFile = crashReporter.saveToDisk(report)

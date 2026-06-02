@@ -6,7 +6,7 @@ import hivens.ui.i18n.LocalStrings
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 
-@Widget(id = "bg.fx.animspeed", displayName = "Скорость анимации")
+@Widget(id = "bg.fx.animspeed", displayName = "widget.bg.fx.animspeed")
 @Composable
 fun BgFxAnimSpeedWidget(instance: WidgetInstance) {
     val ctx = LocalBgSettingsContext.current

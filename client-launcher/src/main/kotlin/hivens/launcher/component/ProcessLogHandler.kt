@@ -75,7 +75,7 @@ internal class ProcessLogHandler {
          * word-boundary substring scan below.
          */
         internal val LEVEL_PREFIX_RE: Regex =
-            Regex("""\[(?:[^\]]*?[/ ])?(INFO|WARN|WARNING|ERROR|FATAL|SEVERE|DEBUG|TRACE)\]""")
+            Regex("""\[(?:[^]]*?[/ ])?(INFO|WARN|WARNING|ERROR|FATAL|SEVERE|DEBUG|TRACE)]""")
 
         /**
          * Fallback for log lines without a structured prefix -- typically

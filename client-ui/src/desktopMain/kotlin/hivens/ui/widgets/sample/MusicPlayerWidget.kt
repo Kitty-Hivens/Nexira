@@ -96,10 +96,10 @@ import kotlin.io.path.name
 // via Panama).
 @Serializable
 data class MusicProps(
-    @PropLabel("Заголовок") val title: String = "",
+    @PropLabel("widget.home.new.music.title") val title: String = "",
 )
 
-@Widget(id = "home.new.music", displayName = "Music player", propsClass = MusicProps::class)
+@Widget(id = "home.new.music", displayName = "widget.home.new.music", propsClass = MusicProps::class)
 @ProvidesService(MusicPlayerService::class)
 @Composable
 fun MusicPlayerWidget(instance: WidgetInstance) {

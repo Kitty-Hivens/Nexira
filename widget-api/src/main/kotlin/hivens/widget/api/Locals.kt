@@ -2,11 +2,15 @@ package hivens.widget.api
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ProvidableCompositionLocal
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import hivens.widget.model.LayoutGraph
 import hivens.widget.model.SlotAddress
 import hivens.widget.model.SlotContent
 import hivens.widget.model.SlotPath
+import hivens.widget.model.WidgetChrome
 import hivens.widget.model.WidgetInstance
 
 // Locals provided once near the application root. Static because the
@@ -40,6 +44,16 @@ val LocalWidgetDecorator: ProvidableCompositionLocal<WidgetDecorator> =
         // mounted (release builds, headless smoke, future TUI surface)
         { _, _, _, _, content -> content() }
     }
+
+// Paints the optional per-instance backing (WidgetChrome) around a widget --
+// PRODUCTION styling, applied whenever instance.chrome != null, not just in
+// edit mode. Default = identity so the kernel stays Compose-token-agnostic;
+// :client-ui provides the real renderer (glass via glassSurfaceAlpha + corner
+// clip + padding), so the glass color follows the active style.
+typealias WidgetChromeRenderer = @Composable (chrome: WidgetChrome, content: @Composable () -> Unit) -> Unit
+
+val LocalWidgetChromeRenderer: ProvidableCompositionLocal<WidgetChromeRenderer> =
+    staticCompositionLocalOf { { _, content -> content() } }
 
 // Rendered by SlotRenderer when a slot has no widgets. Default = nothing
 // (production behavior: empty slot stays invisible). The editor swaps
@@ -90,3 +104,28 @@ val LocalWidgetServiceRegistry: ProvidableCompositionLocal<WidgetServiceRegistry
     staticCompositionLocalOf {
         error("LocalWidgetServiceRegistry not provided -- wire WidgetServiceRegistry in Koin and at the composition root")
     }
+
+// Edit-mode slot reflow duration (ms). 0 = no animation (the production
+// default, since the only provider is the editor host). While editing, the
+// host supplies the active style's duration, so add / remove / resize reflow
+// animates in the editor only; under Brut that resolves to ~1ms (effectively
+// instant). Static is fine -- it changes only on the edit-mode toggle.
+val LocalSlotMotionMs: ProvidableCompositionLocal<Int> =
+    staticCompositionLocalOf { 0 }
+
+// Measured size (dp) of the current Canvas slot's content box, published by
+// SlotRenderer's Canvas branch. The editor's move gesture reads it to clamp a
+// free-placed widget so a grab margin always stays on-canvas (a widget can't
+// be dragged fully out of reach). Zero -- the default, and outside a Canvas
+// slot -- disables clamping. Dynamic (not static): it updates from onSizeChanged
+// on every slot resize, and a static local would recompose the whole canvas
+// subtree on each change rather than just the chrome that reads it.
+val LocalCanvasSlotSizeDp: ProvidableCompositionLocal<Size> =
+    compositionLocalOf { Size.Zero }
+
+// Editor-only hook: SlotRenderer's Canvas branch reports its window bounds here
+// so a palette drop can land at the release point (converted to slot-local dp).
+// Default no-op; the editor host provides one that registers into the
+// DropTargetRegistry.
+val LocalSlotBoundsReporter: ProvidableCompositionLocal<(SlotPath, Rect) -> Unit> =
+    staticCompositionLocalOf { { _, _ -> } }

@@ -4,13 +4,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -35,6 +33,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -44,8 +43,14 @@ import hivens.ui.editor.dnd.DragController
 import hivens.ui.editor.dnd.DragPayload
 import hivens.ui.editor.dnd.DropTargetRegistry
 import hivens.ui.editor.dnd.dragSource
+import hivens.ui.editor.windowPointToSlotDp
+import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
+import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.WidgetDescriptor
+import hivens.widget.model.SlotOrientation
+import hivens.widget.model.seededCanvasPlacement
+import hivens.widget.model.traverse
 
 // Palette row. Click + drag from the row drops the widget into the
 // hit-tested slot under the cursor. The ghost is a labeled chip rather
@@ -64,6 +69,11 @@ fun PaletteItem(
     val interaction = remember { MutableInteractionSource() }
     val isHovered by interaction.collectIsHoveredAsState()
     var rowBounds by remember { mutableStateOf<Rect?>(null) }
+    val graph = LocalLayoutGraph.current
+    val s = LocalStrings.current
+    // Resolve the widget's label via key-indirection (see AppStrings.widgetLabel).
+    val label = s.widgetLabel(descriptor.displayName)
+    val density = LocalDensity.current.density
 
     val background = if (isHovered) CelestiaTheme.colors.primary.copy(alpha = 0.12f)
                      else Color.Transparent
@@ -80,11 +90,33 @@ fun PaletteItem(
                 controller            = controller,
                 payload               = DragPayload.PaletteWidget(descriptor.kind),
                 widgetBoundsProvider  = { rowBounds },
-                ghost                 = { PaletteGhost(displayName = descriptor.displayName) },
+                ghost                 = { PaletteGhost(displayName = label) },
                 onDragEnd             = { pointer ->
                     val targetPath = registry.slotForPoint(pointer) ?: return@dragSource
-                    val index = registry.insertionIndexInSlot(targetPath, pointer)
-                    editController.addWidget(targetPath, descriptor.kind, descriptor.slots, index)
+                    val target = graph.traverse(targetPath)
+                    if (target?.orientation == SlotOrientation.Canvas) {
+                        // Free placement: drop at the release point (pointer ->
+                        // slot-local dp via the slot's reported window origin).
+                        // Fall back to a staggered seed if the slot has not
+                        // reported bounds. seed carries the default size/z.
+                        val seed = seededCanvasPlacement(target.widgets.size)
+                        val origin = registry.slotOrigin(targetPath)
+                        val placement = if (origin != null) {
+                            val (xDp, yDp) = windowPointToSlotDp(pointer.x, pointer.y, origin.x, origin.y, density)
+                            seed.copy(x = xDp.coerceAtLeast(0f), y = yDp.coerceAtLeast(0f))
+                        } else {
+                            seed
+                        }
+                        editController.addWidget(
+                            targetPath, descriptor.kind, descriptor.slots,
+                            index  = target.widgets.size,
+                            canvas = placement,
+                        )
+                    } else {
+                        val orientation = target?.orientation ?: SlotOrientation.Column
+                        val index = registry.insertionIndexInSlot(targetPath, pointer, orientation)
+                        editController.addWidget(targetPath, descriptor.kind, descriptor.slots, index)
+                    }
                 },
             )
             .padding(horizontal = 10.dp, vertical = 8.dp),
@@ -100,7 +132,7 @@ fun PaletteItem(
             contentAlignment = Alignment.Center,
         ) {
             Text(
-                text       = descriptor.displayName.firstOrNull()?.uppercase() ?: "?",
+                text       = label.firstOrNull()?.uppercase() ?: "?",
                 style      = MaterialTheme.typography.titleMedium,
                 color      = CelestiaTheme.colors.primary,
                 fontWeight = FontWeight.SemiBold,
@@ -109,7 +141,7 @@ fun PaletteItem(
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
             Text(
-                text       = descriptor.displayName,
+                text       = label,
                 style      = MaterialTheme.typography.bodyMedium,
                 color      = CelestiaTheme.colors.textPrimary,
                 fontWeight = FontWeight.Medium,

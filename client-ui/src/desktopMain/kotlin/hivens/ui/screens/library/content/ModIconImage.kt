@@ -21,7 +21,6 @@ import androidx.compose.ui.unit.Dp
 import coil3.compose.AsyncImage
 import hivens.core.api.dto.smrt.SmrtModEntry
 import hivens.launcher.smrt.ModIconResolver
-import hivens.ui.theme.CelestiaTheme
 import org.koin.compose.koinInject
 
 /**

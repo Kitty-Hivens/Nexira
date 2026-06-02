@@ -686,10 +686,6 @@ class LauncherController(
         _state.value = LaunchState.Idle
     }
 
-    fun clearError() {
-        _state.value = LaunchState.Idle
-    }
-
     private fun setStage(stage: PrepareStage, progress: Float) {
         _state.value = LaunchState.Prepare(stage, progress)
     }

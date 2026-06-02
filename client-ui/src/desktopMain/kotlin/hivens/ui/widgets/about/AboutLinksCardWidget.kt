@@ -22,7 +22,7 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class AboutLinksProps(
-    @PropLabel("Заголовок") val title: String = "",
+    @PropLabel("widget.about.links.card.title") val title: String = "",
 )
 
 // External links: repo + issue tracker + releases. URLs are stable
@@ -30,7 +30,7 @@ data class AboutLinksProps(
 // configuration. Per-button atomization would be the same shape as
 // system rows -- one card per button or floating buttons. Single
 // card matches the legacy visual.
-@Widget(id = "about.links.card", displayName = "Ссылки", propsClass = AboutLinksProps::class)
+@Widget(id = "about.links.card", displayName = "widget.about.links.card", propsClass = AboutLinksProps::class)
 @Composable
 fun AboutLinksCardWidget(instance: WidgetInstance) {
     val p = instance.rememberProps<AboutLinksProps>()

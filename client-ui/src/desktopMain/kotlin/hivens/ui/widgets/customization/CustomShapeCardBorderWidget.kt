@@ -6,7 +6,7 @@ import hivens.ui.i18n.LocalStrings
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 
-@Widget(id = "customization.shape.cardBorder", displayName = "Толщина рамки карточек")
+@Widget(id = "customization.shape.cardBorder", displayName = "widget.customization.shape.cardBorder")
 @Composable
 fun CustomShapeCardBorderWidget(instance: WidgetInstance) {
     val ctx = LocalCustomizationContext.current

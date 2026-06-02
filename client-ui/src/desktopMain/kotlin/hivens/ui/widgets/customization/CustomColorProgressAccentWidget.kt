@@ -7,7 +7,7 @@ import hivens.ui.i18n.LocalStrings
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 
-@Widget(id = "customization.color.progressAccent", displayName = "Цвет: progressAccent")
+@Widget(id = "customization.color.progressAccent", displayName = "widget.customization.color.progressAccent")
 @Composable
 fun CustomColorProgressAccentWidget(instance: WidgetInstance) {
     val ctx = LocalCustomizationContext.current

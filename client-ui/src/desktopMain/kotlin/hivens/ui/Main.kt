@@ -3,6 +3,8 @@ package hivens.ui
 import androidx.compose.ui.window.application
 import hivens.core.api.interfaces.ISettingsService
 import hivens.launcher.bootstrap.LauncherBootstrap
+import hivens.launcher.diag.ShellRecovery
+import hivens.launcher.diag.UiRecoverySignal
 import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.stringsFor
 import hivens.ui.identity.SkinManager
@@ -17,10 +19,13 @@ import hivens.ui.editor.EditModeController
 import hivens.ui.editor.presets.PresetRepository
 import hivens.ui.utils.GameConsoleService
 import java.nio.file.Path
+import javax.swing.SwingUtilities
+import org.slf4j.LoggerFactory
 import hivens.widget.api.WidgetRegistry
 import hivens.widget.api.WidgetServiceRegistry
 import hivens.widget.generated.GeneratedWidgetRegistry
 import org.jetbrains.compose.resources.ExperimentalResourceApi
+import org.koin.core.context.stopKoin
 import org.koin.dsl.module
 
 // ─── DI ──────────────────────────────────────────────────────────────────────
@@ -108,5 +113,77 @@ fun main() {
     // registers itself.
     PuppetServerLoader.instance.startIfRequested()
 
-    application { AppShell(boot) }
+    // Process-lifetime teardown. Puppet + Koin are set up once here, outside
+    // the shell restart loop, so they get torn down once at process exit --
+    // NOT from a composition DisposableEffect, which also fires when the shell
+    // is disposed on a crash and would then stop Koin out from under the
+    // recovery restart (the next `application {}` would koinInject() into a
+    // dead context). `application(exitProcessOnExit = true)` exits via
+    // exitProcess on a normal window close, so this hook still runs then.
+    Runtime.getRuntime().addShutdownHook(
+        Thread {
+            runCatching { PuppetServerLoader.instance.stop() }
+            runCatching { stopKoin() }
+        },
+    )
+
+    runShellWithRecovery(boot)
+}
+
+/**
+ * Run the Compose shell inside a restart loop -- the UI self-healing core.
+ * `application {}` blocks until every window closes; if the shell composition
+ * throws instead, the exception unwinds it here and we re-enter with a fresh
+ * composition ("reload the shell"). [UiRecoverySignal] bounds the restarts: a
+ * crash loop latches safe mode (a quit-only surface that skips the widget
+ * kernel), and a crash while already in safe mode falls back to the terminal
+ * Swing crash dialog.
+ *
+ * Koin singletons and the data dirs are created in [LauncherBootstrap.preBoot]
+ * -- outside this loop -- so a restart keeps the user's data, session and audio
+ * playback; only transient composition state (current screen, scroll) is lost.
+ */
+private fun runShellWithRecovery(boot: LauncherBootstrap.Result) {
+    val log = LoggerFactory.getLogger("ShellRecovery")
+    while (true) {
+        // Safe mode runs a standalone window that does NOT build the shell
+        // scaffolding (Koin inject, tray init, theme, widget kernel) -- a crash
+        // anywhere in that scaffolding is what latched safe mode, so re-running
+        // it would just crash again. Deciding here (not inside AppShell) is what
+        // makes the safe surface actually reachable.
+        val safe = UiRecoverySignal.safeMode.value
+        val outcome = runCatching {
+            if (safe) {
+                application { SafeModeWindow(onQuit = { exitApplication() }) }
+            } else {
+                application { AppShell(boot) }
+            }
+        }
+        if (outcome.isSuccess) return
+
+        val crash = outcome.exceptionOrNull() ?: return
+        log.error(
+            if (safe) "Safe-mode window crashed -- giving up" else "Shell composition crashed -- attempting recovery",
+            crash,
+        )
+
+        val saved = runCatching {
+            val report = boot.crashReporter.generate(crash, Thread.currentThread())
+            report to boot.crashReporter.saveToDisk(report)
+        }.getOrNull()
+
+        when (UiRecoverySignal.recordShellCrash()) {
+            ShellRecovery.RETRY     -> log.warn("Restarting shell with a fresh composition")
+            ShellRecovery.SAFE_MODE -> log.warn("Crash loop detected -- falling back to safe mode")
+            ShellRecovery.FATAL     -> {
+                log.error("Safe mode itself crashed -- giving up on the UI")
+                if (saved != null) {
+                    runCatching {
+                        SwingUtilities.invokeAndWait { boot.crashReporter.showCrashDialog(saved.first, saved.second) }
+                    }
+                }
+                return
+            }
+        }
+    }
 }

@@ -65,7 +65,7 @@ import org.koin.compose.koinInject
 // new widget-composed home matures; we widgetize it as one block so
 // the slot machinery is exercised without paying the refactor cost on
 // code that's going away.
-@Widget(id = "home.classic.content", displayName = "Classic dashboard")
+@Widget(id = "home.classic.content", displayName = "widget.home.classic.content")
 @Composable
 fun HomeClassicContent(instance: WidgetInstance) {
     val ctx = LocalHomeClassicContext.current

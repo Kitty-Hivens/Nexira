@@ -39,7 +39,7 @@ import hivens.widget.model.WidgetInstance
 // for shared reads, even though no other widget currently reads
 // them -- the future PackDetail / Library hover-preview widgets
 // will share the same handles.
-@Widget(id = "bg.preview", displayName = "Превью")
+@Widget(id = "bg.preview", displayName = "widget.bg.preview")
 @Composable
 fun BgPreviewWidget(instance: WidgetInstance) {
     val ctx = LocalBgSettingsContext.current

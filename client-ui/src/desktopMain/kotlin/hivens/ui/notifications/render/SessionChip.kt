@@ -36,7 +36,7 @@ import org.koin.compose.koinInject
 import java.time.Duration
 
 @Composable
-fun ActiveSessionsSection(registry: SessionRegistry = koinInject()) {
+fun ActiveSessionsSection(registry: SessionRegistry = koinInject()) { // TODO: Function "ActiveSessionsSection" is never used
     val active by registry.active.collectAsState()
     if (active.isEmpty()) return
     val s = LocalStrings.current

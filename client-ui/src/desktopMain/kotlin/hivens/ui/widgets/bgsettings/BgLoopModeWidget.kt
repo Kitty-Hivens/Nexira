@@ -28,7 +28,7 @@ import hivens.ui.theme.CelestiaTheme
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 
-@Widget(id = "bg.loop.mode", displayName = "Цикл воспроизведения")
+@Widget(id = "bg.loop.mode", displayName = "widget.bg.loop.mode")
 @Composable
 fun BgLoopModeWidget(instance: WidgetInstance) {
     val ctx = LocalBgSettingsContext.current

@@ -28,14 +28,14 @@ import kotlinx.serialization.Serializable
 data class WelcomeProps(
     // Blank keeps the localized, name-personalized greeting; a non-blank
     // value is the user's own banner text (single language, by choice).
-    @PropLabel("Свой текст приветствия") val customGreeting: String = "",
-    @PropLabel("Показывать подзаголовок") val showSubtitle: Boolean = true,
+    @PropLabel("widget.home.new.welcome.customGreeting") val customGreeting: String = "",
+    @PropLabel("widget.home.new.welcome.showSubtitle") val showSubtitle: Boolean = true,
 )
 
 // Greeting banner. Personalizes with the authenticated player name;
 // in unauthenticated / loading states the welcome stays generic so the
 // banner does not flicker between greetings during login.
-@Widget(id = "home.new.welcome", displayName = "Welcome banner", propsClass = WelcomeProps::class)
+@Widget(id = "home.new.welcome", displayName = "widget.home.new.welcome", propsClass = WelcomeProps::class)
 @Composable
 fun HomeNewWelcome(instance: WidgetInstance) {
     val p = instance.rememberProps<WelcomeProps>()

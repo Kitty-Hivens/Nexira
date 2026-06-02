@@ -9,6 +9,7 @@ import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.core.data.PackReference
 import hivens.launcher.runtime.RuntimeProvisioner
+import hivens.launcher.util.sha1Of
 import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.http.isSuccess
@@ -23,7 +24,6 @@ import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
-import java.security.MessageDigest
 import java.time.Instant
 import java.util.UUID
 import java.util.zip.ZipFile
@@ -194,19 +194,6 @@ class MrpackInstaller(
         } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
             Files.move(tmp, dest, StandardCopyOption.REPLACE_EXISTING)
         }
-    }
-
-    private fun sha1Of(path: Path): String {
-        val md = MessageDigest.getInstance("SHA-1")
-        Files.newInputStream(path).use { input ->
-            val buf = ByteArray(64 * 1024)
-            while (true) {
-                val n = input.read(buf)
-                if (n <= 0) break
-                md.update(buf, 0, n)
-            }
-        }
-        return md.digest().joinToString("") { "%02x".format(it) }
     }
 
     private companion object {

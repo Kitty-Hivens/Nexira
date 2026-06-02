@@ -32,7 +32,7 @@ import io.github.vinceglb.filekit.dialogs.openFilePicker
 import io.github.vinceglb.filekit.path
 import kotlinx.coroutines.launch
 
-@Widget(id = "bg.image.picker", displayName = "Картинка фона")
+@Widget(id = "bg.image.picker", displayName = "widget.bg.image.picker")
 @Composable
 fun BgImagePickerWidget(instance: WidgetInstance) {
     val ctx = LocalBgSettingsContext.current

@@ -15,7 +15,7 @@ import hivens.ui.i18n.LocalStrings
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 
-@Widget(id = "customization.accent.override", displayName = "Акцентный цвет")
+@Widget(id = "customization.accent.override", displayName = "widget.customization.accent.override")
 @Composable
 fun CustomAccentOverrideWidget(instance: WidgetInstance) {
     val ctx = LocalCustomizationContext.current

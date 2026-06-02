@@ -6,7 +6,7 @@ import hivens.ui.i18n.LocalStrings
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 
-@Widget(id = "bg.fx.parallax", displayName = "Параллакс")
+@Widget(id = "bg.fx.parallax", displayName = "widget.bg.fx.parallax")
 @Composable
 fun BgFxParallaxWidget(instance: WidgetInstance) {
     val ctx = LocalBgSettingsContext.current

@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import hivens.core.logging.Redactor
 import hivens.launcher.platform.PlatformPaths
+import hivens.ui.notifications.drivers.LaunchDriver
 import org.slf4j.LoggerFactory
 import java.io.BufferedWriter
 import java.io.File
@@ -132,7 +133,7 @@ class GameConsoleService(
     private fun logsDir(): File =
         paths.logsDir.toFile().also { it.mkdirs() }
 
-    fun startSession(packId: String? = null, packLabel: String? = null) {
+    fun startSession(packId: String? = null, packLabel: String? = null) { // TODO: Parameter "packLabel" is never used
         sessionStartCount += 1
         slotEntries.clear()
         synchronized(writerLock) {

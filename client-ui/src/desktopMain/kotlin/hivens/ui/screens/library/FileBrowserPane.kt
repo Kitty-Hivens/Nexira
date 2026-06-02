@@ -38,7 +38,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -297,10 +296,10 @@ private fun FileTreeRow(
 
 private fun fileIconFor(path: Path): androidx.compose.ui.graphics.vector.ImageVector {
     val ext = path.name.substringAfterLast('.', "").lowercase()
-    return when {
-        ext in TEXT_EXTENSIONS  -> Icons.Default.Description
-        ext in IMAGE_EXTENSIONS -> Icons.Default.Image
-        else                    -> Icons.AutoMirrored.Filled.InsertDriveFile
+    return when (ext) {
+        in TEXT_EXTENSIONS -> Icons.Default.Description
+        in IMAGE_EXTENSIONS -> Icons.Default.Image
+        else -> Icons.AutoMirrored.Filled.InsertDriveFile
     }
 }
 
@@ -308,13 +307,12 @@ private fun fileIconFor(path: Path): androidx.compose.ui.graphics.vector.ImageVe
 
 @Composable
 private fun FilePreview(file: Path) {
-    val s = LocalStrings.current
     val ext = file.name.substringAfterLast('.', "").lowercase()
 
-    when {
-        ext in TEXT_EXTENSIONS  -> TextPreview(file)
-        ext in IMAGE_EXTENSIONS -> ImagePreview(file)
-        else                    -> BinaryPreview(file)
+    when (ext) {
+        in TEXT_EXTENSIONS -> TextPreview(file)
+        in IMAGE_EXTENSIONS -> ImagePreview(file)
+        else -> BinaryPreview(file)
     }
 }
 

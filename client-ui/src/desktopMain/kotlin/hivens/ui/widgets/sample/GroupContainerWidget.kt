@@ -28,7 +28,7 @@ import hivens.widget.model.WidgetInstance
 // remain the figure.
 @Widget(
     id          = "container.group",
-    displayName = "Группа",
+    displayName = "widget.container.group",
     slots       = ["body"],
 )
 @Composable

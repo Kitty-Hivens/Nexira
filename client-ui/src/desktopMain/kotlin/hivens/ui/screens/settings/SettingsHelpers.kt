@@ -39,7 +39,7 @@ import hivens.ui.theme.LocalStyle
  * (GlassCard, library cards) elsewhere.
  */
 @Composable
-internal fun settingsRowBackground(): androidx.compose.ui.graphics.Color =
+internal fun settingsRowBackground(): Color =
     CelestiaTheme.colors.background.copy(alpha = 0.4f)
 
 /**

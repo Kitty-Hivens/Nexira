@@ -4,6 +4,7 @@ import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.LinkOption
 import java.nio.file.Path
+import java.nio.file.Paths
 import java.nio.file.StandardCopyOption
 import java.util.stream.Collectors
 
@@ -87,8 +88,8 @@ object DataDirMover {
         val sourceStr = conf[BootstrapConf.KEY_PENDING_SOURCE] ?: return
         val targetStr = conf[BootstrapConf.KEY_PENDING_TARGET] ?: return
 
-        val source = java.nio.file.Paths.get(sourceStr)
-        val target = java.nio.file.Paths.get(targetStr)
+        val source = Paths.get(sourceStr)
+        val target = Paths.get(targetStr)
 
         log.info("Applying pending data-dir move: {} -> {}", source, target)
 

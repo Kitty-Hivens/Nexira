@@ -71,7 +71,7 @@ import kotlin.io.path.name
 // same AudioPlayer Koin singleton.
 @Widget(
     id          = "home.new.playback.mini",
-    displayName = "Мини-плеер",
+    displayName = "widget.home.new.playback.mini",
 )
 @InjectService(MusicPlayerService::class)
 @Composable

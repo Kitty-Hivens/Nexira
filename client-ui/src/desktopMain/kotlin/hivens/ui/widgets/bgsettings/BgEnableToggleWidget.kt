@@ -23,7 +23,7 @@ import hivens.ui.theme.CelestiaTheme
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 
-@Widget(id = "bg.enable.toggle", displayName = "Фон вкл/выкл")
+@Widget(id = "bg.enable.toggle", displayName = "widget.bg.enable.toggle")
 @Composable
 fun BgEnableToggleWidget(instance: WidgetInstance) {
     val ctx = LocalBgSettingsContext.current

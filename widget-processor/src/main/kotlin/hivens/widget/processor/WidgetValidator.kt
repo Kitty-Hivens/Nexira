@@ -128,7 +128,7 @@ internal object WidgetValidator {
         val propsDecl = propsType?.declaration
         val propsClassFqn = propsDecl?.qualifiedName?.asString()?.takeIf { it != "kotlin.Unit" }
         if (propsClassFqn != null) {
-            val isSerializable = propsDecl!!.annotations.any {
+            val isSerializable = propsDecl.annotations.any {
                 it.shortName.asString() == "Serializable" &&
                     it.annotationType.resolve().declaration.qualifiedName?.asString() ==
                         SERIALIZABLE_ANNOTATION_FQN

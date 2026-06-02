@@ -52,6 +52,8 @@ import hivens.ui.editor.EditorSurfaceHost
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.widgets.shell.LeftRailContext
 import hivens.ui.widgets.shell.LocalLeftRailContext
+import hivens.ui.widgets.shell.LocalShellContext
+import hivens.ui.widgets.shell.ShellContext
 import hivens.widget.api.SlotRenderer
 import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId
@@ -98,39 +100,18 @@ fun AppLayout(
     val bypassesList by NetworkState.bypassesState.collectAsState()
     val sslBypass = remember(bypassesList, bypassHost) { NetworkState.bypassFor(bypassHost) }
 
-    Row(Modifier.fillMaxSize().background(rowBackground)) {
-
-        // ── Sidebar 64dp ──────────────────────────────────────────────────
-        AppSidebar(
-            currentScreen   = currentScreen,
-            isAuthenticated = appState is AppState.Authenticated,
-            onScreenChange  = onScreenChange,
-            onLogout        = onLogout
-        )
-
-        VerticalDivider(
-            modifier = Modifier.fillMaxHeight(),
-            color    = glassSurfaceAlpha(0.6f)
-        )
-
-        // ── Main content ──────────────────────────────────────────────────
-        Box(Modifier.weight(1f).fillMaxHeight()) {
-          EditorSurfaceHost(
-              currentScreen          = currentScreen,
-              homeView               = homeView,
-              customization          = customization,
-              onCustomizationChanged = onCustomizationChanged,
-              uiStyle                = uiStyle,
-              onUiStyleChanged       = onUiStyleChanged,
-          ) {
-            // Screen-to-screen Crossfade duration follows the active
-            // style. Under Brut (animationMultiplier = 0) the swap is
-            // effectively instant; under Celestia keeps the 180ms fade.
-            val crossfadeMs = LocalStyle.current.animationDurationMs(180)
-            Crossfade(
-                targetState   = currentScreen,
-                animationSpec = tween(crossfadeMs)
-            ) { screen ->
+    // The center region's screen router. Defined here (not in the layout graph)
+    // because navigation is not yet a widget surface; the center region widget
+    // invokes it. Reads currentSession/selectedServer live on each recompose.
+    val centerBody: @Composable () -> Unit = {
+        // Screen-to-screen Crossfade duration follows the active style. Under
+        // Brut (animationMultiplier = 0) the swap is effectively instant; under
+        // Celestia keeps the 180ms fade.
+        val crossfadeMs = LocalStyle.current.animationDurationMs(180)
+        Crossfade(
+            targetState   = currentScreen,
+            animationSpec = tween(crossfadeMs),
+        ) { screen ->
                 when (screen) {
                     Screen.Home -> {
                         val session = currentSession
@@ -249,22 +230,40 @@ fun AppLayout(
                         )
                 }
             }
-          } // end EditorSurfaceHost
+    } // end centerBody
+
+    val shellCtx = ShellContext(
+        currentScreen   = currentScreen,
+        isAuthenticated = appState is AppState.Authenticated,
+        onScreenChange  = onScreenChange,
+        onLogout        = onLogout,
+        appState        = appState,
+        onLogin         = onLogin,
+        sslBypass       = sslBypass,
+        centerBody      = centerBody,
+    )
+
+    // The editor host wraps the WHOLE shell (rails included) so its decorators
+    // reach rail widgets; the insets keep the chrome over the center pane (past
+    // the 64dp rail + 264dp panel, each plus a 1dp divider). The shell itself is
+    // now a widget surface: appshell.root lays its three region widgets in a Row.
+    EditorSurfaceHost(
+        currentScreen          = currentScreen,
+        homeView               = homeView,
+        customization          = customization,
+        onCustomizationChanged = onCustomizationChanged,
+        uiStyle                = uiStyle,
+        onUiStyleChanged       = onUiStyleChanged,
+        centerStartInset       = 65.dp,
+        centerEndInset         = 265.dp,
+    ) {
+        CompositionLocalProvider(LocalShellContext provides shellCtx) {
+            SlotRenderer(
+                surface  = SurfaceId("appshell.root"),
+                slot     = SlotId("regions"),
+                modifier = Modifier.fillMaxSize().background(rowBackground),
+            )
         }
-
-        VerticalDivider(
-            modifier = Modifier.fillMaxHeight(),
-            color    = glassSurfaceAlpha(0.6f)
-        )
-
-        // ── Right panel 264dp ─────────────────────────────────────────────
-        RightPanel(
-            appState = appState,
-            onLogin  = onLogin,
-            onLogout = onLogout,
-            sslBypass = sslBypass,
-            modifier = Modifier.width(264.dp).fillMaxHeight()
-        )
     }
 }
 
@@ -275,7 +274,8 @@ fun AppSidebar(
     currentScreen: Screen,
     isAuthenticated: Boolean,
     onScreenChange: (Screen) -> Unit,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    modifier: Modifier = Modifier.width(64.dp).fillMaxHeight(),
 ) {
     val gameConsole: GameConsoleService = koinInject()
 
@@ -306,17 +306,20 @@ fun AppSidebar(
     }
     CompositionLocalProvider(LocalLeftRailContext provides ctx) {
         NavigationRail(
-            modifier       = Modifier.width(64.dp).fillMaxHeight(),
+            modifier       = modifier,
             containerColor = glassSurfaceAlpha(0.35f),
             contentColor   = CelestiaTheme.colors.textSecondary
         ) {
-            SlotRenderer(SurfaceId(SIDEBAR_SURFACE), SlotId("top"), Modifier.fillMaxWidth())
-            // Spacer is layout, not content -- stays surface-owned so
-            // widgets in the top/bottom slots do not need ColumnScope
-            // for weight. fillMaxWidth keeps the slot's own Column at rail
-            // width so the NavigationRailItems stay centered.
+            // Leading breathing room + per-item spacing so the nav icons are
+            // not jammed together at the top edge (the slot's own Column
+            // defaults to 0 spacing). Spacers are layout, not content -- they
+            // stay surface-owned so the top/bottom widgets need no ColumnScope
+            // for the weighted gap, and fillMaxWidth keeps the slot's Column at
+            // rail width so the NavigationRailItems stay centered.
+            Spacer(Modifier.height(8.dp))
+            SlotRenderer(SurfaceId(SIDEBAR_SURFACE), SlotId("top"), Modifier.fillMaxWidth(), spacing = 6.dp)
             Spacer(Modifier.weight(1f))
-            SlotRenderer(SurfaceId(SIDEBAR_SURFACE), SlotId("bottom"), Modifier.fillMaxWidth())
+            SlotRenderer(SurfaceId(SIDEBAR_SURFACE), SlotId("bottom"), Modifier.fillMaxWidth(), spacing = 6.dp)
             Spacer(Modifier.height(8.dp))
         }
     }

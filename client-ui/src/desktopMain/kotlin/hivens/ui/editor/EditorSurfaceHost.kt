@@ -1,20 +1,12 @@
 package hivens.ui.editor
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -31,8 +23,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ViewQuilt
 import androidx.compose.material.icons.automirrored.filled.ViewSidebar
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.RestartAlt
@@ -41,7 +32,6 @@ import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Widgets
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -76,6 +66,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import hivens.core.data.HomeView
@@ -123,6 +114,8 @@ import hivens.widget.api.EmptySlotDecorator
 import hivens.widget.api.LocalEmptySlotDecorator
 import hivens.widget.api.LocalSlotControlDecorator
 import hivens.widget.api.LocalSlotDividerDecorator
+import hivens.widget.api.LocalSlotBoundsReporter
+import hivens.widget.api.LocalSlotMotionMs
 import hivens.widget.api.LocalSlotPath
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.LocalStyle
@@ -144,13 +137,10 @@ import org.koin.compose.koinInject
 //   * provides LocalEditMode, LocalDragController, LocalDropTargetRegistry,
 //     and LocalWidgetDecorator (the decorator wraps each widget with
 //     chrome only while edit mode is on)
-//   * paints the FAB (edit/done morph)
 //   * paints the optional "Edit layout" pill at the top
 //   * paints the drag ghost following the pointer when a drag is active
-//   * consumes Escape to exit edit mode
-//
-// editor-3 will add palette panel + cross-slot drop. editor-2 keeps
-// drags within the source slot.
+//   * consumes Escape to exit edit mode (Ctrl+E, window-level in AppShell,
+//     toggles it on/off; there is no edit-mode button)
 
 // Which widget instance the prop panel is currently editing.
 private data class PropTarget(val path: SlotPath, val instanceId: String)
@@ -163,6 +153,12 @@ fun EditorSurfaceHost(
     onCustomizationChanged: (CustomizationSettings) -> Unit = {},
     uiStyle: UiStyle = UiStyle.Celestia,
     onUiStyleChanged: (UiStyle) -> Unit = {},
+    // The host now wraps the WHOLE shell Row (rails included) so the editor's
+    // decorators reach rail widgets. These insets keep the chrome overlays
+    // (pill / palette / prop panel / vignette) anchored over the center pane,
+    // past the left rail and right panel, matching their pre-hoist place.
+    centerStartInset: Dp = 0.dp,
+    centerEndInset: Dp = 0.dp,
     content: @Composable () -> Unit,
 ) {
     val availableSurfaces: List<SurfaceId> = remember(currentScreen, homeView) {
@@ -262,9 +258,14 @@ fun EditorSurfaceHost(
                     descriptor   = descriptor,
                     instance     = instance,
                     controller   = dragController,
+                    editController = controller,
                     registry     = registry,
                     orientation  = orientation,
                     onRemove     = {
+                        // Clear the prop target if it points at this widget, else
+                        // the palette stays gated off (propTarget != null) and the
+                        // user is left with neither panel.
+                        if (propTarget?.instanceId == instance.instanceId) propTarget = null
                         controller.removeWidget(path, instance.instanceId)
                     },
                     onEditProps  = { propTarget = PropTarget(path, instance.instanceId) },
@@ -371,6 +372,18 @@ fun EditorSurfaceHost(
         LocalEmptySlotDecorator provides emptyDecorator,
         LocalSlotControlDecorator provides slotControlDecorator,
         LocalSlotDividerDecorator provides slotDividerDecorator,
+        // Edit-mode reflow duration -- slot add / remove / resize animates while
+        // editing (style-driven: Brut resolves to ~instant), zero elsewhere.
+        LocalSlotMotionMs provides if (state is EditModeState.On && !previewing) {
+            LocalStyle.current.animationDurationMs(260)
+        } else 0,
+        // Canvas slots report their window bounds so palette drops land at the
+        // release point (PaletteItem reads slotOrigin to convert the pointer).
+        LocalSlotBoundsReporter provides if (state is EditModeState.On && !previewing) {
+            { p, r -> registry.registerSlot(p, r) }
+        } else {
+            { _, _ -> }
+        },
         // Stub surface contexts. Surface composables that mount under
         // content() override with the real values; widgets dropped on
         // a foreign surface fall through to the stubs and render
@@ -406,12 +419,16 @@ fun EditorSurfaceHost(
             // primary tint at very low alpha to communicate "this whole
             // pane is being edited", without obscuring content.
             content()
-            EditModeVignette(active = editing)
 
-            // Drag ghost overlay -- positioned in window coords relative
-            // to the host's own Box. Renders nothing when no drag is
-            // active.
-            DragGhostOverlay(dragController = dragController)
+            // Center-anchored chrome layer: inset past the left rail and right
+            // panel so the vignette + overlays stay over the center pane exactly
+            // as before the host was hoisted around the whole shell Row.
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(start = centerStartInset, end = centerEndInset),
+            ) {
+            EditModeVignette(active = editing)
 
             if (availableSurfaces.isNotEmpty()) {
                 EditModePill(
@@ -440,10 +457,16 @@ fun EditorSurfaceHost(
                             )
                         },
                         confirmButton = {
-                            TextButton(onClick = {
-                                controller.resetSurface(surfaceForReset)
-                                resetSurfaceConfirm = false
-                            }) { Text(s.editorReset, color = CelestiaTheme.colors.error) }
+                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                TextButton(onClick = {
+                                    controller.resetAll()
+                                    resetSurfaceConfirm = false
+                                }) { Text(s.editorResetAll, color = CelestiaTheme.colors.error) }
+                                TextButton(onClick = {
+                                    controller.resetSurface(surfaceForReset)
+                                    resetSurfaceConfirm = false
+                                }) { Text(s.editorReset, color = CelestiaTheme.colors.error) }
+                            }
                         },
                         dismissButton = {
                             TextButton(onClick = { resetSurfaceConfirm = false }) { Text(s.editorCancel) }
@@ -504,6 +527,7 @@ fun EditorSurfaceHost(
 
                 WidgetPalettePanel(
                     visible        = editing && paletteOpen && !previewing && propTarget == null,
+                    dimmed         = dragController.active != null,
                     onDismiss      = { paletteOpen = false },
                     controller     = dragController,
                     registry       = registry,
@@ -520,92 +544,14 @@ fun EditorSurfaceHost(
                     modifier   = Modifier.align(Alignment.TopEnd),
                 )
 
-                EditModeFab(
-                    editing  = editing,
-                    onToggle = {
-                        editing = !editing
-                        if (!editing) previewing = false
-                    },
-                    modifier = Modifier.align(Alignment.BottomEnd).padding(24.dp),
-                )
+                // No edit-mode FAB: Ctrl+E (window-level, see AppShell) toggles
+                // edit mode and Escape exits, so a dedicated button is redundant.
             }
-        }
-    }
-}
+            } // end center-anchored chrome layer
 
-// ── FAB ─────────────────────────────────────────────────────────────────────
-
-@Composable
-private fun EditModeFab(
-    editing: Boolean,
-    onToggle: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val style = LocalStyle.current
-    val s = LocalStrings.current
-    val scale by animateFloatAsState(
-        targetValue   = if (editing) 1.08f else 1f,
-        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-        label         = "fab-scale",
-    )
-    val container = if (editing) CelestiaTheme.colors.primary
-                    else CelestiaTheme.colors.surfaceVariant
-    val content   = if (editing) Color.White
-                    else CelestiaTheme.colors.textPrimary
-
-    // Subtle pulse glow while in edit mode -- communicates "live state"
-    // without being noisy. Brut zeroes out animationMultiplier, so the
-    // pulse goes flat there.
-    val pulseTransition = rememberInfiniteTransition(label = "fab-pulse")
-    val pulse by pulseTransition.animateFloat(
-        initialValue  = 0f,
-        targetValue   = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(
-                durationMillis = style.animationDurationMs(1800),
-                easing         = LinearEasing,
-            ),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "fab-pulse-value",
-    )
-    val pulseAlpha = if (editing) 0.18f + pulse * 0.18f else 0f
-
-    Box(modifier = modifier) {
-        // Glow halo
-        Box(
-            modifier = Modifier
-                .matchParentSize()
-                .graphicsLayer { scaleX = 1.45f; scaleY = 1.45f; alpha = pulseAlpha }
-                .background(CelestiaTheme.colors.primary, shape = RoundedCornerShape(24.dp)),
-        )
-        FloatingActionButton(
-            onClick        = onToggle,
-            modifier       = Modifier
-                .graphicsLayer { scaleX = scale; scaleY = scale }
-                .shadow(elevation = 8.dp, shape = RoundedCornerShape(16.dp)),
-            containerColor = container,
-            contentColor   = content,
-            shape          = RoundedCornerShape(16.dp),
-        ) {
-            // Crossfade icons between Edit and Check so the morph is
-            // smooth rather than a hard swap.
-            Box(contentAlignment = Alignment.Center) {
-                AnimatedVisibility(
-                    visible = !editing,
-                    enter   = fadeIn(spring()),
-                    exit    = fadeOut(spring()),
-                ) {
-                    Icon(Icons.Default.Edit, contentDescription = s.editorFabEdit)
-                }
-                AnimatedVisibility(
-                    visible = editing,
-                    enter   = fadeIn(spring()),
-                    exit    = fadeOut(spring()),
-                ) {
-                    Icon(Icons.Default.Check, contentDescription = s.editorFabDone)
-                }
-            }
+            // The drag ghost follows the pointer across the WHOLE shell (rails
+            // included), so it stays full-window, above the inset chrome layer.
+            DragGhostOverlay(dragController = dragController)
         }
     }
 }
@@ -627,10 +573,11 @@ private fun EditModePill(
     modifier: Modifier = Modifier,
 ) {
     val s = LocalStrings.current
+    val motionMs = LocalStyle.current.animationDurationMs(260)
     AnimatedVisibility(
         visible  = active,
-        enter    = fadeIn(spring()) + slideInVertically(spring()) { -it },
-        exit     = fadeOut(spring()) + slideOutVertically(spring()) { -it },
+        enter    = fadeIn(tween(motionMs)) + slideInVertically(tween(motionMs)) { -it },
+        exit     = fadeOut(tween(motionMs)) + slideOutVertically(tween(motionMs)) { -it },
         modifier = modifier,
     ) {
         Surface(
@@ -801,12 +748,14 @@ private fun ToolChip(
 
 private fun surfaceIcon(surface: SurfaceId): androidx.compose.ui.graphics.vector.ImageVector =
     when (surface.value) {
+        "appshell.root"      -> Icons.Default.Dashboard
         "appshell.leftrail"  -> Icons.AutoMirrored.Filled.ViewSidebar
         "appshell.rightrail" -> Icons.AutoMirrored.Filled.ViewQuilt
         else                 -> Icons.Default.Home
     }
 
 private fun humanSurfaceShortName(surface: SurfaceId, s: AppStrings): String = when (surface.value) {
+    "appshell.root"       -> s.editorSurfShortShell
     "home.classic"        -> s.editorSurfShortHome
     "home.new"            -> s.editorSurfShortHome
     "library"             -> s.editorSurfShortLibrary
@@ -822,6 +771,7 @@ private fun humanSurfaceShortName(surface: SurfaceId, s: AppStrings): String = w
 }
 
 private fun humanSurfaceName(surface: SurfaceId, s: AppStrings): String = when (surface.value) {
+    "appshell.root"       -> s.editorSurfShell
     "home.classic"        -> s.editorSurfHomeClassic
     "home.new"            -> s.editorSurfHomeNew
     "library"             -> s.editorSurfLibrary
@@ -840,9 +790,10 @@ private fun humanSurfaceName(surface: SurfaceId, s: AppStrings): String = when (
 
 @Composable
 private fun EditModeVignette(active: Boolean) {
+    val motionMs = LocalStyle.current.animationDurationMs(320)
     val alpha by animateFloatAsState(
         targetValue   = if (active) 1f else 0f,
-        animationSpec = spring(stiffness = Spring.StiffnessLow),
+        animationSpec = tween(motionMs),
         label         = "edit-vignette",
     )
     if (alpha <= 0.01f) return
@@ -917,7 +868,8 @@ private fun transparentPointerIcon(): PointerIcon {
 // follow. Other screens (Settings, Profile, etc.) are not widget-
 // composed yet and return an empty list (FAB stays hidden).
 private fun availableSurfacesFor(screen: Screen, homeView: HomeView): List<SurfaceId> {
-    val main: SurfaceId = when (screen) {
+    // The center surface for this screen, or null for screens not yet widgetized.
+    val main: SurfaceId? = when (screen) {
         Screen.Home -> when (homeView) {
             HomeView.Classic      -> SurfaceId("home.classic")
             HomeView.LibraryFirst -> SurfaceId("library")
@@ -932,11 +884,14 @@ private fun availableSurfacesFor(screen: Screen, homeView: HomeView): List<Surfa
         Screen.ThemePicker            -> SurfaceId("theme.picker")
         // Other widget-composed surfaces from B.1 land here as the
         // rest of the screens migrate over.
-        else               -> return emptyList()
+        else                          -> null
     }
-    return listOf(
-        main,
+    // The shell + rails are always present, so they are editable from every
+    // screen even when the center is not yet a widget surface. The center
+    // surface (when there is one) is first, so it stays the default selection.
+    return listOfNotNull(main) + listOf(
         SurfaceId("appshell.leftrail"),
         SurfaceId("appshell.rightrail"),
+        SurfaceId("appshell.root"),
     )
 }

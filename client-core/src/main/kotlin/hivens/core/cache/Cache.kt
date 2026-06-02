@@ -3,7 +3,7 @@ package hivens.core.cache
 import kotlinx.coroutines.flow.Flow
 
 /** How current a [CacheValue] is relative to the namespace TTL. */
-enum class Freshness { FRESH, STALE, REVALIDATING }
+enum class Freshness { FRESH, STALE }
 
 data class CacheValue<V>(val value: V, val freshness: Freshness)
 

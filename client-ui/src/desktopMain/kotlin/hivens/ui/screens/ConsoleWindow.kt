@@ -121,6 +121,7 @@ import hivens.ui.utils.GameConsoleService
 import hivens.ui.utils.LogEntry
 import hivens.ui.utils.LogType
 import java.awt.datatransfer.StringSelection
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.conflate
@@ -339,7 +340,7 @@ internal fun ConsoleContent(
     // their typing immediately.
     var effectiveQuery by remember { mutableStateOf("") }
     LaunchedEffect(searchQuery) {
-        delay(120)
+        delay(120.milliseconds)
         effectiveQuery = searchQuery
     }
 
@@ -507,7 +508,7 @@ internal fun ConsoleContent(
         scope.launch { clipboard.setClipEntry(ClipEntry(StringSelection(text))) }
         copiedFlash = true
         scope.launch {
-            delay(900)
+            delay(900.milliseconds)
             copiedFlash = false
         }
     }
@@ -534,7 +535,7 @@ internal fun ConsoleContent(
         scope.launch { clipboard.setClipEntry(ClipEntry(StringSelection(lineText))) }
         copiedFlash = true
         scope.launch {
-            delay(900)
+            delay(900.milliseconds)
             copiedFlash = false
         }
     }
@@ -551,7 +552,7 @@ internal fun ConsoleContent(
         scope.launch { clipboard.setClipEntry(ClipEntry(StringSelection(text))) }
         copiedFlash = true
         scope.launch {
-            delay(900)
+            delay(900.milliseconds)
             copiedFlash = false
         }
     }
@@ -1486,10 +1487,10 @@ private fun handleKey(
 
     // Search-prompt-focused: only Escape, F3 / Shift+F3 are intercepted.
     if (searchFocus) {
-        return when {
-            key == Key.Escape          -> { onCloseSearch(); true }
-            key == Key.F3 && ev.isShiftPressed -> { onPrevMatch(); true }
-            key == Key.F3              -> { onNextMatch(); true }
+        return when (key) {
+            Key.Escape -> { onCloseSearch(); true }
+            Key.F3 if ev.isShiftPressed -> { onPrevMatch(); true }
+            Key.F3 -> { onNextMatch(); true }
             else -> false
         }
     }
@@ -1553,7 +1554,6 @@ private fun buildConsoleAnnotated(
 ): MatchIndex {
     val matches = mutableListOf<IntRange>()
     val severities = mutableListOf<LineSeverity>()
-    val query = rawQuery
 
     val annotated = buildAnnotatedString {
         for ((idx, e) in entries.withIndex()) {
@@ -1569,10 +1569,11 @@ private fun buildConsoleAnnotated(
                 }
             } else {
                 severityColor = when (e.type) {
-                    LogType.INFO  -> palette.severityInfo
                     LogType.WARN  -> palette.severityWarn
                     LogType.ERROR -> palette.severityError
-                    LogType.DIVIDER -> palette.divider
+                    // DIVIDER is handled in the if-branch above; INFO is the
+                    // remaining reachable case.
+                    else          -> palette.severityInfo
                 }
                 lineText = if (showTimestamps) "[${e.timestamp}] ${e.text}" else e.text
                 withStyle(SpanStyle(color = severityColor)) {
@@ -1592,11 +1593,11 @@ private fun buildConsoleAnnotated(
 
             // Search highlight + match-offset collection, scanning the
             // just-appended line text directly (no builder readback).
-            if (query.isNotBlank()) {
+            if (rawQuery.isNotBlank()) {
                 val matchRanges = if (regexMode) {
                     regexCompiled?.findAll(lineText)?.map { it.range }?.toList().orEmpty()
                 } else {
-                    findAllSubstring(lineText, query, ignoreCase = true)
+                    findAllSubstring(lineText, rawQuery)
                 }
                 matchRanges.forEach { range ->
                     if (range.isEmpty()) return@forEach
@@ -1702,15 +1703,15 @@ private fun DrawScope.drawSeverityGutter(
     }
 }
 
-private fun findAllSubstring(text: String, query: String, ignoreCase: Boolean): List<IntRange> {
+private fun findAllSubstring(text: String, query: String): List<IntRange> {
     if (query.isEmpty()) return emptyList()
     val out = mutableListOf<IntRange>()
-    var i = text.indexOf(query, ignoreCase = ignoreCase)
+    var i = text.indexOf(query, ignoreCase = true)
     while (i >= 0) {
         out.add(i until i + query.length)
         // Non-overlapping (matches less / grep / IDE find semantics):
         // "aa" in "aaaa" -> hits (0..1) and (2..3), not (0..1)(1..2)(2..3).
-        i = text.indexOf(query, startIndex = i + query.length, ignoreCase = ignoreCase)
+        i = text.indexOf(query, startIndex = i + query.length, ignoreCase = true)
     }
     return out
 }

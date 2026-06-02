@@ -7,7 +7,7 @@ import hivens.ui.i18n.LocalStrings
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 
-@Widget(id = "customization.color.criticalAccent", displayName = "Цвет: criticalAccent")
+@Widget(id = "customization.color.criticalAccent", displayName = "widget.customization.color.criticalAccent")
 @Composable
 fun CustomColorCriticalAccentWidget(instance: WidgetInstance) {
     val ctx = LocalCustomizationContext.current

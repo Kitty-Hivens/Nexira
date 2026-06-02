@@ -3,7 +3,6 @@ package hivens.ui.audio
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -103,7 +102,7 @@ class AudioPlayer(private val scope: CoroutineScope) {
 
         playbackJob?.cancel()
         playbackJob = scope.launch(Dispatchers.IO) {
-            var newStream = AudioSystem.getAudioInputStream(file.toAbsolutePath().toFile())
+            val newStream = AudioSystem.getAudioInputStream(file.toAbsolutePath().toFile())
             try {
                 val info = DataLine.Info(SourceDataLine::class.java, format)
                 val newLine = AudioSystem.getLine(info) as SourceDataLine
@@ -254,11 +253,6 @@ class AudioPlayer(private val scope: CoroutineScope) {
             if (n <= 0) return
             remaining -= n
         }
-    }
-
-    fun shutdown() {
-        stop()
-        scope.cancel()
     }
 }
 

@@ -36,6 +36,7 @@ import hivens.launcher.smrt.SmrtPackClient
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
+import hivens.ui.screens.RetryStateBlock
 import hivens.ui.theme.CelestiaTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -154,34 +155,13 @@ private fun BrowseEmpty(onRetry: () -> Unit) {
 @Composable
 private fun BrowseError(message: String, onRetry: () -> Unit) {
     val s = LocalStrings.current
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Text(
-                text       = s.browseErrorTitle,
-                style      = MaterialTheme.typography.titleLarge,
-                color      = CelestiaTheme.colors.error,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(
-                text      = message,
-                style     = MaterialTheme.typography.bodySmall,
-                color     = CelestiaTheme.colors.textSecondary,
-                textAlign = TextAlign.Center,
-                modifier  = Modifier.widthIn(max = 480.dp),
-            )
-            Button(
-                onClick = onRetry,
-                shape   = RoundedCornerShape(10.dp),
-                colors  = ButtonDefaults.buttonColors(
-                    containerColor = CelestiaTheme.colors.primary,
-                    contentColor   = Color.White,
-                ),
-            ) { Text(s.browseRetry, fontWeight = FontWeight.SemiBold) }
-        }
-    }
+    RetryStateBlock(
+        title      = s.browseErrorTitle,
+        message    = message,
+        retryLabel = s.browseRetry,
+        onRetry    = onRetry,
+        modifier   = Modifier.fillMaxSize(),
+    )
 }
 
 @Composable

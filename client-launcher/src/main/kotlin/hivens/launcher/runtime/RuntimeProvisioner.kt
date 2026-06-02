@@ -7,6 +7,7 @@ import hivens.launcher.runtime.loader.LoaderRegistry
 import hivens.launcher.runtime.loader.ResolvedLibrary
 import hivens.launcher.runtime.loader.ResolvedRuntime
 import hivens.launcher.runtime.loader.mergeLibraries
+import hivens.launcher.util.sha1Of
 import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.client.statement.bodyAsText
@@ -445,19 +446,6 @@ class RuntimeProvisioner(
         if (!actual.equals(expectedSha1, ignoreCase = true)) {
             throw IOException("sha1 mismatch for $label: expected $expectedSha1, got $actual")
         }
-    }
-
-    private fun sha1Of(path: Path): String {
-        val md = MessageDigest.getInstance("SHA-1")
-        Files.newInputStream(path).use { input ->
-            val buf = ByteArray(64 * 1024)
-            while (true) {
-                val n = input.read(buf)
-                if (n <= 0) break
-                md.update(buf, 0, n)
-            }
-        }
-        return md.digest().joinToString("") { "%02x".format(it) }
     }
 
     private fun sha1Of(bytes: ByteArray): String =

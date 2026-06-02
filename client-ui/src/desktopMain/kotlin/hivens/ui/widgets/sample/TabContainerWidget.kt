@@ -43,15 +43,15 @@ import kotlinx.serialization.Serializable
 // preserved), and the labels are editable props.
 @Serializable
 data class TabContainerProps(
-    @PropLabel("Вкладок") @PropRange(1.0, 3.0) val tabCount: Int = 2,
-    @PropLabel("Вкладка 1") val label1: String = "Вкладка 1",
-    @PropLabel("Вкладка 2") val label2: String = "Вкладка 2",
-    @PropLabel("Вкладка 3") val label3: String = "Вкладка 3",
+    @PropLabel("widget.container.tabs.tabCount") @PropRange(1.0, 3.0) val tabCount: Int = 2,
+    @PropLabel("widget.container.tabs.label1") val label1: String = "Вкладка 1",
+    @PropLabel("widget.container.tabs.label2") val label2: String = "Вкладка 2",
+    @PropLabel("widget.container.tabs.label3") val label3: String = "Вкладка 3",
 )
 
 @Widget(
     id          = "container.tabs",
-    displayName = "Вкладки",
+    displayName = "widget.container.tabs",
     slots       = ["tab_0", "tab_1", "tab_2"],
     propsClass  = TabContainerProps::class,
 )

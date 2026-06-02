@@ -35,7 +35,7 @@ import hivens.widget.model.WidgetInstance
 // description.txt file is missing on disk. Self-scrolls inside a
 // Column.verticalScroll so a wall of text still fits the slot --
 // the surface does not wrap the slot itself in scroll.
-@Widget(id = "server.details.description", displayName = "Описание сервера")
+@Widget(id = "server.details.description", displayName = "widget.server.details.description")
 @Composable
 fun ServerDetailsDescriptionWidget(instance: WidgetInstance) {
     val ctx = LocalServerDetailsContext.current

@@ -27,6 +27,7 @@ class EnvironmentPreparer(private val clientProvider: HttpClientProvider) {
         "lwjgl", "lwjgl-jemalloc", "lwjgl-openal", "lwjgl-opengl",
         "lwjgl-glfw", "lwjgl-stb", "lwjgl-tinyfd"
     )
+    // Java 25+ runtimes need a newer LWJGL than this; bump when that path lands.
     private val lwjgl3Version = "3.3.3"
 
     // Mirrors tried in order until one succeeds. Mojang's libraries CDN

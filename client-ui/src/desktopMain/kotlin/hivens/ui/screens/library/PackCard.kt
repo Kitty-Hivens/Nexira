@@ -37,9 +37,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import hivens.core.data.PackInstance
-import hivens.core.data.PackLoader
 import hivens.core.data.PackOrigin
-import hivens.ui.i18n.AppStrings
+import hivens.ui.screens.detail.PackDetailScreen
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
 import java.time.Duration
@@ -257,9 +256,4 @@ private fun originAvatarColor(origin: PackOrigin): Color = when (origin) {
 @Composable
 internal fun PackMetaChip(text: String, emphasis: Boolean = false) {
     MetaChip(text, emphasis = emphasis)
-}
-
-@Composable
-internal fun PackLoaderChip(loader: PackLoader) {
-    MetaChip(loader.name)
 }

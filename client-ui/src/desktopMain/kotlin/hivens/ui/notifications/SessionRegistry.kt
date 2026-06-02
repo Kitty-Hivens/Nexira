@@ -12,6 +12,7 @@ import kotlinx.coroutines.launch
 import java.time.Duration
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.time.Duration.Companion.milliseconds
 
 class SessionRegistry(
     private val appScope: CoroutineScope,
@@ -65,7 +66,7 @@ class SessionRegistry(
         val newJob = appScope.launch(Dispatchers.Default) {
             while (true) {
                 uptime.value = Duration.between(startedAt, clock())
-                delay(1_000L)
+                delay(1_000L.milliseconds)
             }
         }
         uptimeJobs.put(packInstanceId, newJob)?.cancel()

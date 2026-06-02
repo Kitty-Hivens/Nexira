@@ -2,6 +2,9 @@ package hivens.launcher
 
 import hivens.widget.model.LayoutGraph
 import hivens.widget.model.SurfaceId
+import hivens.widget.model.WidgetInstance
+import hivens.widget.model.WidgetKind
+import hivens.widget.model.flatMapInstances
 import hivens.widget.model.resetSurface
 import hivens.widget.model.walkInstances
 import kotlinx.coroutines.CancellationException
@@ -17,10 +20,13 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
 import hivens.core.io.AtomicFiles
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * JSON-on-disk store for the widget [LayoutGraph]. Single-file envelope
@@ -74,23 +80,27 @@ class LayoutGraphRepository(
      * scheduled [DEBOUNCE_MS] in the future, replacing any previous
      * pending write.
      */
-    suspend fun update(transform: (LayoutGraph) -> LayoutGraph) {
+    suspend fun update(validate: Boolean = true, transform: (LayoutGraph) -> LayoutGraph) {
         mutex.withLock {
             val next = transform(state.value)
             if (next == state.value) return@withLock
 
-            // Tree-wide instanceId uniqueness check. Walks the whole
-            // tree including nested children. Sequence-based so we
-            // short-circuit on the first dup.
-            val seen = HashSet<String>()
-            for (widget in next.walkInstances()) {
-                if (!seen.add(widget.instanceId)) {
-                    log.warn(
-                        "Layout update rejected: duplicate instanceId '{}' in tree. " +
-                        "Keeping previous graph to protect findByInstanceId-style traversals.",
-                        widget.instanceId,
-                    )
-                    return@withLock
+            // Tree-wide instanceId uniqueness check. Walks the whole tree
+            // including nested children; short-circuits on the first dup.
+            // Skipped (validate = false) for geometry-only transforms (offset /
+            // size / z / weight) that fire per drag frame and provably cannot
+            // introduce a duplicate id -- otherwise this walk runs ~60x/sec.
+            if (validate) {
+                val seen = HashSet<String>()
+                for (widget in next.walkInstances()) {
+                    if (!seen.add(widget.instanceId)) {
+                        log.warn(
+                            "Layout update rejected: duplicate instanceId '{}' in tree. " +
+                            "Keeping previous graph to protect findByInstanceId-style traversals.",
+                            widget.instanceId,
+                        )
+                        return@withLock
+                    }
                 }
             }
 
@@ -101,7 +111,7 @@ class LayoutGraphRepository(
             pendingWrite?.cancel()
             pendingWrite = scope.launch {
                 try {
-                    delay(DEBOUNCE_MS)
+                    delay(DEBOUNCE_MS.milliseconds)
                     mutex.withLock { writeNow() }
                 } catch (_: CancellationException) {
                     // Superseded by a later update() or flushed
@@ -127,6 +137,15 @@ class LayoutGraphRepository(
     suspend fun resetSurface(surface: SurfaceId) {
         val def = defaultGraph()
         update { it.resetSurface(surface, def.surfaces[surface]) }
+    }
+
+    /**
+     * Full reset: restore the entire graph to the bundled default. The escape
+     * hatch when per-surface resets are not enough -- e.g. undoing edits spread
+     * across several surfaces in one action.
+     */
+    suspend fun resetAll() {
+        update { defaultGraph() }
     }
 
     /**
@@ -211,7 +230,7 @@ class LayoutGraphRepository(
     )
 
     private companion object {
-        const val SCHEMA_VERSION = 2
+        const val SCHEMA_VERSION = 4
 
         // 200ms catches a drag-thrash without delaying single drops
         // noticeably. Verification target in the Phase A plan is "<=5
@@ -242,13 +261,17 @@ internal object Migrations {
         return current
     }
 
-    private const val CURRENT = 2
+    private const val CURRENT = 4
 
     private fun step(toVersion: Int): Step = when (toVersion) {
-        // v1 -> v2: WidgetInstance gained a children field. Default
-        // value handles backward compat on deserialization, so the
-        // step itself is identity.
+        // v1 -> v2: WidgetInstance gained a children field.
+        // v2 -> v3: WidgetInstance gained a nullable chrome field.
+        // Both add a defaulted field, so deserialization handles backward
+        // compat and the steps are identity.
         2 -> Step.IDENTITY
+        3 -> Step.IDENTITY
+        // v3 -> v4: the nav rail unified onto the single nav.entry kind.
+        4 -> Step(::migrateNavToEntries)
         else -> Step.IDENTITY
     }
 
@@ -259,3 +282,60 @@ internal object Migrations {
         }
     }
 }
+
+// Schema v3 -> v4: the nav rail unified onto a single configurable kind,
+// nav.entry. The retired kinds (the bundled navbuttons block, the per-item
+// nav.* widgets, the console/logout buttons) render nothing once dropped
+// from the registry, so a persisted leftrail must be rewritten or the rail
+// goes blank with no in-product way back except a surface reset. Applied
+// graph-wide so a retired nav widget dropped on any surface is converted
+// too, not only the bundled leftrail.
+private fun migrateNavToEntries(graph: LayoutGraph): LayoutGraph =
+    graph.flatMapInstances { w ->
+        when (w.kind.value) {
+            "appshell.leftrail.navbuttons" -> NAVBUTTONS_TARGETS.map { (token, target) ->
+                // Drop the block's chrome / weight / canvas: the monolith
+                // painted six bare rail items under one frame, so a single
+                // backing or weighted share must not replicate onto all six.
+                // The id derives from the (unique) original, so the six stay
+                // unique without the load-path uniqueness guard.
+                WidgetInstance(
+                    kind       = NAV_ENTRY,
+                    instanceId = "${w.instanceId}-$token",
+                    props      = navTargetProps(target),
+                )
+            }
+            "appshell.leftrail.consoletoggle" -> listOf(w.toNavEntry("Console"))
+            "appshell.leftrail.logout"        -> listOf(w.toNavEntry("Logout"))
+            "nav.home"     -> listOf(w.toNavEntry("Home"))
+            "nav.library"  -> listOf(w.toNavEntry("Library"))
+            "nav.browse"   -> listOf(w.toNavEntry("Browse"))
+            "nav.profile"  -> listOf(w.toNavEntry("Profile"))
+            "nav.settings" -> listOf(w.toNavEntry("Settings"))
+            "nav.about"    -> listOf(w.toNavEntry("About"))
+            else           -> listOf(w)
+        }
+    }
+
+// 1:1 conversion -- preserves chrome / weight / canvas, only kind + props change.
+private fun WidgetInstance.toNavEntry(target: String): WidgetInstance =
+    copy(kind = NAV_ENTRY, props = navTargetProps(target))
+
+// Raw-string props: client-launcher cannot see the NavTarget enum (it lives
+// in client-ui), and a Kotlin enum's default serial name equals its constant
+// name, so these strings decode straight into NavTarget. A NavTarget rename
+// would break the contract -- guarded by NavTargetSerialNameTest.
+private fun navTargetProps(target: String): JsonObject =
+    JsonObject(mapOf("target" to JsonPrimitive(target)))
+
+private val NAV_ENTRY = WidgetKind("nav.entry")
+
+// Top-to-bottom order of the retired monolith's six items.
+private val NAVBUTTONS_TARGETS = listOf(
+    "home" to "Home",
+    "library" to "Library",
+    "browse" to "Browse",
+    "profile" to "Profile",
+    "settings" to "Settings",
+    "about" to "About",
+)

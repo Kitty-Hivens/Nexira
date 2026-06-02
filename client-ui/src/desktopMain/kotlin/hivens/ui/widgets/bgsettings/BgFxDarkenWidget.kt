@@ -6,7 +6,7 @@ import hivens.ui.i18n.LocalStrings
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 
-@Widget(id = "bg.fx.darken", displayName = "Затемнение")
+@Widget(id = "bg.fx.darken", displayName = "widget.bg.fx.darken")
 @Composable
 fun BgFxDarkenWidget(instance: WidgetInstance) {
     val ctx = LocalBgSettingsContext.current

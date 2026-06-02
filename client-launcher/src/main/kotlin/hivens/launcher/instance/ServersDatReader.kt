@@ -3,7 +3,6 @@ package hivens.launcher.instance
 import hivens.core.data.MultiplayerServerEntry
 import hivens.launcher.nbt.Nbt
 import hivens.launcher.nbt.NbtCompound
-import hivens.launcher.nbt.NbtException
 import hivens.launcher.nbt.NbtValue
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext

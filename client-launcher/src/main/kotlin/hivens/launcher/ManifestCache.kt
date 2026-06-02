@@ -1,6 +1,7 @@
 package hivens.launcher
 
 import hivens.core.data.FileManifest
+import hivens.launcher.component.ClasspathProvider
 import hivens.launcher.platform.ServerNameValidator
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json

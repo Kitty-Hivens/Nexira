@@ -175,6 +175,56 @@ class LayoutGraphMutationsTest {
         assertEquals(5, out.mainWidgets().first { it.instanceId == "i1" }.canvas?.z)
     }
 
+    // ── Seed-on-switch (flip to Canvas) ───────────────────────────────
+
+    @Test
+    fun `setSlotOrientation to Canvas seeds a staggered grid onto null-placement widgets`() {
+        val w4 = WidgetInstance(WidgetKind("d"), "i4", JsonObject(emptyMap()))
+        val out = seed(w1, w2, w3, w4).setSlotOrientation(rootPath, SlotOrientation.Canvas)
+        val placed = out.mainWidgets().associate { it.instanceId to it.canvas }
+        assertEquals(CanvasPlacement(x = 16f, y = 16f, z = 0), placed["i1"])
+        assertEquals(CanvasPlacement(x = 236f, y = 16f, z = 1), placed["i2"])
+        assertEquals(CanvasPlacement(x = 456f, y = 16f, z = 2), placed["i3"])
+        assertEquals(CanvasPlacement(x = 16f, y = 176f, z = 3), placed["i4"]) // wraps to row 1
+        assertEquals(SlotOrientation.Canvas, out.surfaces[home]?.slots?.get(main)?.orientation)
+    }
+
+    @Test
+    fun `setSlotOrientation to Canvas preserves an already-placed widget`() {
+        val pre = seed(w1, w2).setCanvasPlacement(rootPath, "i1", CanvasPlacement(x = 500f, y = 500f, z = 9))
+        val out = pre.setSlotOrientation(rootPath, SlotOrientation.Canvas)
+        val placed = out.mainWidgets().associate { it.instanceId to it.canvas }
+        assertEquals(CanvasPlacement(x = 500f, y = 500f, z = 9), placed["i1"]) // kept
+        assertEquals(CanvasPlacement(x = 236f, y = 16f, z = 1), placed["i2"])  // seeded at its index
+    }
+
+    @Test
+    fun `setSlotOrientation to a non-Canvas orientation only flips, no seeding`() {
+        val out = seed(w1, w2).setSlotOrientation(rootPath, SlotOrientation.Row)
+        assertEquals(SlotOrientation.Row, out.surfaces[home]?.slots?.get(main)?.orientation)
+        assertNull(out.mainWidgets().first { it.instanceId == "i1" }.canvas)
+        assertNull(out.mainWidgets().first { it.instanceId == "i2" }.canvas)
+    }
+
+    @Test
+    fun `setSlotOrientation to the current orientation is identity`() {
+        val graph = seed(w1) // defaults to Column
+        assertSame(graph, graph.setSlotOrientation(rootPath, SlotOrientation.Column))
+    }
+
+    @Test
+    fun `setSlotOrientation to Canvas twice is idempotent`() {
+        val once = seed(w1, w2).setSlotOrientation(rootPath, SlotOrientation.Canvas)
+        assertSame(once, once.setSlotOrientation(rootPath, SlotOrientation.Canvas))
+    }
+
+    @Test
+    fun `seededCanvasPlacement wraps into columns`() {
+        assertEquals(CanvasPlacement(x = 16f, y = 16f, z = 0), seededCanvasPlacement(0))
+        assertEquals(CanvasPlacement(x = 456f, y = 16f, z = 2), seededCanvasPlacement(2))
+        assertEquals(CanvasPlacement(x = 16f, y = 176f, z = 3), seededCanvasPlacement(3))
+    }
+
     @Test
     fun `reorderInSlot swaps positions`() {
         val out = seed(w1, w2, w3).reorderInSlot(rootPath, fromIndex = 0, toIndex = 2)

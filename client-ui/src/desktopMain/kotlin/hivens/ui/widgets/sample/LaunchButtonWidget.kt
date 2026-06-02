@@ -19,9 +19,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -29,53 +26,33 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import hivens.core.api.interfaces.IPackRepository
-import hivens.core.data.PackInstance
-import hivens.launcher.launch.LaunchState
-import hivens.launcher.launch.LauncherController
-import hivens.ui.AppState
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.notifications.LaunchTarget
-import hivens.ui.notifications.drivers.LaunchDriver
 import hivens.ui.theme.CelestiaTheme
-import hivens.ui.widgets.home.new.LocalHomeNewContext
+import hivens.ui.widgets.home.new.rememberQuickLaunchTarget
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 import kotlinx.serialization.Serializable
-import org.koin.compose.koinInject
 
 @Serializable
 data class LaunchButtonProps(
     // Blank falls back to the localized ready label.
-    @PropLabel("Надпись") val label: String = "",
+    @PropLabel("widget.home.new.launchbutton.label") val label: String = "",
 )
 
 // Big "Continue last" launch tile. Decoupled from the QuickLaunch
 // card -- this one is a single full-width tap target with a gradient
 // background, no surrounding labels or metadata. Designed to feel
 // like a console "press to play" affordance.
-@Widget(id = "home.new.launchbutton", displayName = "Launch button", propsClass = LaunchButtonProps::class)
+@Widget(id = "home.new.launchbutton", displayName = "widget.home.new.launchbutton", propsClass = LaunchButtonProps::class)
 @Composable
 fun LaunchButtonWidget(instance: WidgetInstance) {
     val p = instance.rememberProps<LaunchButtonProps>()
-    val ctx = LocalHomeNewContext.current
     val s = LocalStrings.current
-    val repo: IPackRepository = koinInject()
-    val controller: LauncherController = koinInject()
-    val launchDriver: LaunchDriver = koinInject()
-    val all by remember { repo.observe() }.collectAsState(initial = emptyList())
-    val launchState by controller.state.collectAsState()
-
-    val target: PackInstance = remember(all) {
-        all.maxByOrNull { it.lastPlayedEpochOrZero }
-            ?: all.maxByOrNull { it.createdAtEpoch }
-    } ?: return
-
-    val session = (ctx.appState as? AppState.Authenticated)?.session
-    val ready = session != null &&
-        (launchState is LaunchState.Idle || launchState is LaunchState.Error)
+    val qt = rememberQuickLaunchTarget() ?: return
+    val target = qt.target
+    val ready = qt.canLaunch
 
     val gradient = Brush.linearGradient(
         colors = listOf(
@@ -93,11 +70,7 @@ fun LaunchButtonWidget(instance: WidgetInstance) {
                 CelestiaTheme.colors.surfaceVariant,
                 CelestiaTheme.colors.surfaceVariant,
             )))
-            .clickable(enabled = ready) {
-                val s = session ?: return@clickable
-                launchDriver.observe(LaunchTarget.Pack(target))
-                controller.launchPackInstance(s, target)
-            }
+            .clickable(enabled = ready, onClick = qt.launch)
             .padding(horizontal = 20.dp, vertical = 18.dp),
     ) {
         Row(

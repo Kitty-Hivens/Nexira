@@ -24,7 +24,7 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class AboutSystemProps(
-    @PropLabel("Заголовок") val title: String = "",
+    @PropLabel("widget.about.system.card.title") val title: String = "",
 )
 
 // OS / CPU / RAM / Java / Display info rows in one card.
@@ -32,7 +32,7 @@ data class AboutSystemProps(
 // not actually exercise (no one hides "RAM" but keeps "CPU"), and
 // would either explode into five mini-cards or leave bare rows
 // floating with no visual grouping.
-@Widget(id = "about.system.card", displayName = "Система", propsClass = AboutSystemProps::class)
+@Widget(id = "about.system.card", displayName = "widget.about.system.card", propsClass = AboutSystemProps::class)
 @Composable
 fun AboutSystemCardWidget(instance: WidgetInstance) {
     val p = instance.rememberProps<AboutSystemProps>()

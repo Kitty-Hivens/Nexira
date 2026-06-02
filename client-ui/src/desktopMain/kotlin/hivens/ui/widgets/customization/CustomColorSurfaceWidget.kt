@@ -7,7 +7,7 @@ import hivens.ui.i18n.LocalStrings
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 
-@Widget(id = "customization.color.surface", displayName = "Цвет: surface")
+@Widget(id = "customization.color.surface", displayName = "widget.customization.color.surface")
 @Composable
 fun CustomColorSurfaceWidget(instance: WidgetInstance) {
     val ctx = LocalCustomizationContext.current
