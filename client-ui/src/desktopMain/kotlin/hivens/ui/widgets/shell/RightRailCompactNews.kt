@@ -7,7 +7,7 @@ import hivens.ui.CompactNewsFeed
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 
-@Widget(id = "appshell.rightrail.compactnews", displayName = "News feed")
+@Widget(id = "appshell.rightrail.compactnews", displayName = "widget.appshell.rightrail.compactnews")
 @Composable
 fun RightRailCompactNews(instance: WidgetInstance) {
     val ctx = LocalRightRailContext.current

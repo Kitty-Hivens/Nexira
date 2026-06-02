@@ -37,6 +37,7 @@ import hivens.ui.theme.CelestiaTheme
 import kotlinx.coroutines.delay
 import org.koin.compose.koinInject
 import java.time.Instant
+import kotlin.time.Duration.Companion.milliseconds
 
 @Composable
 fun NotificationStack(center: NotificationCenter = koinInject()) {
@@ -52,7 +53,7 @@ fun NotificationStack(center: NotificationCenter = koinInject()) {
     LaunchedEffect(hasGroups) {
         if (!hasGroups) return@LaunchedEffect
         while (true) {
-            delay(1_000L)
+            delay(1_000L.milliseconds)
             clockTick = Instant.now()
         }
     }

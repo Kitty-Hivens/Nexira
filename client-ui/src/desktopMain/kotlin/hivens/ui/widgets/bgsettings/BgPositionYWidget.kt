@@ -6,7 +6,7 @@ import hivens.ui.i18n.LocalStrings
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 
-@Widget(id = "bg.position.y", displayName = "Позиция Y")
+@Widget(id = "bg.position.y", displayName = "widget.bg.position.y")
 @Composable
 fun BgPositionYWidget(instance: WidgetInstance) {
     val ctx = LocalBgSettingsContext.current

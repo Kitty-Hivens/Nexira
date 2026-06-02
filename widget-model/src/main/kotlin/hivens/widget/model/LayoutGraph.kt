@@ -28,6 +28,22 @@ data class WidgetInstance(
     // Absolute placement when the enclosing slot is Canvas. Null for flow
     // slots (Column/Row/Grid) -- back-compat default for old layouts.
     val canvas: CanvasPlacement? = null,
+    // Per-instance backing the kernel paints around the widget (glass card,
+    // corner, padding). Null = no backing -- back-compat default for old
+    // layouts. The editor's "Backing" section sets it on ANY widget, propless
+    // included. Rendered in production via LocalWidgetChromeRenderer.
+    val chrome: WidgetChrome? = null,
+)
+
+// Optional backing painted around a widget by the kernel: a glass card behind
+// it ([glassAlphaPct] 0 = none), rounded corners ([cornerRadiusDp]), and inner
+// [paddingDp]. Compose-free (widget-model carries no Compose); the kernel turns
+// these scalars into a Modifier via the injected LocalWidgetChromeRenderer.
+@Serializable
+data class WidgetChrome(
+    val glassAlphaPct: Int = 0,
+    val cornerRadiusDp: Int = 0,
+    val paddingDp: Int = 0,
 )
 
 // Phase G: how a slot arranges its widgets. Column (default) reproduces
@@ -141,15 +157,67 @@ fun LayoutGraph.updateWidgetProps(
         )
     }
 
+// Sets (or clears, with null) the per-instance backing chrome. Same no-op /
+// missing-instance contract as updateWidgetProps. A no-backing chrome
+// normalizes to null so the field stays absent for default-styled widgets.
+fun LayoutGraph.updateWidgetChrome(
+    path: SlotPath,
+    instanceId: String,
+    chrome: WidgetChrome?,
+): LayoutGraph {
+    val normalized = chrome?.takeUnless { it == WidgetChrome() }
+    return mutate(path) { content ->
+        val target = content.widgets.firstOrNull { it.instanceId == instanceId } ?: return@mutate content
+        if (target.chrome == normalized) return@mutate content
+        content.copy(
+            widgets = content.widgets.map {
+                if (it.instanceId == instanceId) it.copy(chrome = normalized) else it
+            },
+        )
+    }
+}
+
 // Phase G layout transforms. Slot orientation + grid column count are
 // slot-level; widget weight is per-instance. Each is a no-op (identity
 // return) when the value is unchanged or the slot/instance is missing --
 // same contract as the transforms above.
 fun LayoutGraph.setSlotOrientation(path: SlotPath, orientation: SlotOrientation): LayoutGraph =
     mutate(path) { content ->
-        if (content.orientation == orientation) content
-        else content.copy(orientation = orientation)
+        if (content.orientation == orientation) return@mutate content
+        if (orientation != SlotOrientation.Canvas) {
+            return@mutate content.copy(orientation = orientation)
+        }
+        // Flipping to Canvas: seed a staggered grid onto widgets with no
+        // placement yet, so they don't all pile at (0,0). Already-placed
+        // widgets keep their placement -- re-entering Canvas is idempotent.
+        content.copy(
+            orientation = SlotOrientation.Canvas,
+            widgets = content.widgets.mapIndexed { i, w ->
+                if (w.canvas != null) w else w.copy(canvas = seededCanvasPlacement(i))
+            },
+        )
     }
+
+// Staggered default placement for the Nth not-yet-placed widget when a slot
+// flips to Canvas. width/height 0 keeps intrinsic size until the user resizes;
+// z = index preserves the prior stacking order as the initial paint order.
+// Pure + deterministic so the seed cascade is unit-testable.
+fun seededCanvasPlacement(
+    index: Int,
+    columns: Int = 3,
+    cellWidth: Float = 220f,
+    cellHeight: Float = 160f,
+    marginX: Float = 16f,
+    marginY: Float = 16f,
+): CanvasPlacement {
+    val col = index % columns
+    val row = index / columns
+    return CanvasPlacement(
+        x = marginX + col * cellWidth,
+        y = marginY + row * cellHeight,
+        z = index,
+    )
+}
 
 fun LayoutGraph.setGridColumns(path: SlotPath, columns: Int): LayoutGraph =
     mutate(path) { content ->
@@ -241,6 +309,29 @@ private fun SlotContent.walkInstances(): Sequence<WidgetInstance> = sequence {
         }
     }
 }
+
+// Rewrites every WidgetInstance graph-wide, replacing each with the 0..n
+// instances `transform` returns (drop / keep / expand). A widget's own
+// children are rewritten before the widget itself is handed to `transform`,
+// so the transform always sees an already-converted subtree. Pure; the
+// schema migrations use it to restructure widget kinds across the whole
+// graph. The caller owns instanceId uniqueness across the produced set --
+// the load() migration path does not run the tree-wide uniqueness guard.
+fun LayoutGraph.flatMapInstances(
+    transform: (WidgetInstance) -> List<WidgetInstance>,
+): LayoutGraph = copy(
+    surfaces = surfaces.mapValues { (_, layout) ->
+        layout.copy(slots = layout.slots.mapValues { (_, content) -> content.flatMapInstances(transform) })
+    },
+)
+
+private fun SlotContent.flatMapInstances(
+    transform: (WidgetInstance) -> List<WidgetInstance>,
+): SlotContent = copy(
+    widgets = widgets.flatMap { w ->
+        transform(w.copy(children = w.children.mapValues { (_, c) -> c.flatMapInstances(transform) }))
+    },
+)
 
 // All instanceIds under one surface, tree-wide (including nested children).
 fun SurfaceLayout.instanceIds(): Set<String> =

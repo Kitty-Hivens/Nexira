@@ -22,13 +22,13 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class SpacerProps(
-    @PropLabel("Высота") @PropRange(8.0, 160.0) val height: Int = 32,
+    @PropLabel("widget.home.new.spacer.height") @PropRange(8.0, 160.0) val height: Int = 32,
 )
 
 // Layout primitive. Renders empty vertical space (height is a prop); in
 // edit mode a faint dashed center line shows the widget is there and
 // grabbable.
-@Widget(id = "home.new.spacer", displayName = "Spacer", propsClass = SpacerProps::class)
+@Widget(id = "home.new.spacer", displayName = "widget.home.new.spacer", propsClass = SpacerProps::class)
 @Composable
 fun SpacerWidget(instance: WidgetInstance) {
     val h = instance.rememberProps<SpacerProps>().height.dp

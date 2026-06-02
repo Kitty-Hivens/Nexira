@@ -53,7 +53,6 @@ data class ActiveDrag(
 class DragController {
     private val _active = mutableStateOf<ActiveDrag?>(null)
     val active: ActiveDrag? get() = _active.value
-    val isDragging: Boolean get() = _active.value != null
 
     fun begin(
         payload: DragPayload,
@@ -104,11 +103,6 @@ class DropTargetRegistry {
         slotBounds[path] = rect
     }
 
-    fun unregisterSlot(path: SlotPath) {
-        slotBounds.remove(path)
-        widgets.remove(path)
-    }
-
     fun registerWidget(path: SlotPath, instanceId: String, index: Int, rect: Rect) {
         val byId = widgets.getOrPut(path) { mutableStateMapOf() }
         byId[instanceId] = WidgetBounds(index, rect)
@@ -122,6 +116,11 @@ class DropTargetRegistry {
     // slot dividers to read the two neighbors' main-axis px at drag start.
     fun widgetRect(path: SlotPath, instanceId: String): Rect? =
         widgets[path]?.get(instanceId)?.rect
+
+    // Window-coord top-left of a registered slot (Canvas slots report bounds via
+    // LocalSlotBoundsReporter). Lets a palette drop land at the release point.
+    // Null when the slot has not reported bounds.
+    fun slotOrigin(path: SlotPath): Offset? = slotBounds[path]?.topLeft
 
     // Two passes:
     //   1) exact rect hit across all registered sources (widget rects +

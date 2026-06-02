@@ -1,7 +1,19 @@
 {
-  "schema_version": 2,
+  "schema_version": 4,
   "graph": {
     "surfaces": {
+      "appshell.root": {
+        "slots": {
+          "regions": {
+            "orientation": "Row",
+            "widgets": [
+              { "kind": "appshell.region.left",   "instance_id": "appshell-region-left-default",   "props": { "widthDp": 65 } },
+              { "kind": "appshell.region.center", "instance_id": "appshell-region-center-default", "weight": 1.0 },
+              { "kind": "appshell.region.right",  "instance_id": "appshell-region-right-default",  "props": { "widthDp": 265 } }
+            ]
+          }
+        }
+      },
       "home.classic": {
         "slots": {
           "main": {
@@ -16,7 +28,6 @@
           "main": {
             "widgets": [
               { "kind": "home.new.welcome",     "instance_id": "home-new-welcome-default" },
-              { "kind": "home.new.clock",       "instance_id": "home-new-clock-default" },
               { "kind": "home.new.spacer",      "instance_id": "home-new-spacer-default" },
               { "kind": "home.new.recent",      "instance_id": "home-new-recent-default" },
               { "kind": "home.new.quicklaunch", "instance_id": "home-new-quicklaunch-default" }
@@ -42,13 +53,18 @@
         "slots": {
           "top": {
             "widgets": [
-              { "kind": "appshell.leftrail.navbuttons", "instance_id": "appshell-leftrail-navbuttons-default" }
+              { "kind": "nav.entry", "instance_id": "appshell-leftrail-nav-home",     "props": { "target": "Home" } },
+              { "kind": "nav.entry", "instance_id": "appshell-leftrail-nav-library",  "props": { "target": "Library" } },
+              { "kind": "nav.entry", "instance_id": "appshell-leftrail-nav-browse",   "props": { "target": "Browse" } },
+              { "kind": "nav.entry", "instance_id": "appshell-leftrail-nav-profile",  "props": { "target": "Profile" } },
+              { "kind": "nav.entry", "instance_id": "appshell-leftrail-nav-settings", "props": { "target": "Settings" } },
+              { "kind": "nav.entry", "instance_id": "appshell-leftrail-nav-about",    "props": { "target": "About" } }
             ]
           },
           "bottom": {
             "widgets": [
-              { "kind": "appshell.leftrail.consoletoggle", "instance_id": "appshell-leftrail-consoletoggle-default" },
-              { "kind": "appshell.leftrail.logout",        "instance_id": "appshell-leftrail-logout-default" }
+              { "kind": "nav.entry", "instance_id": "appshell-leftrail-nav-console", "props": { "target": "Console" } },
+              { "kind": "nav.entry", "instance_id": "appshell-leftrail-nav-logout",  "props": { "target": "Logout" } }
             ]
           }
         }

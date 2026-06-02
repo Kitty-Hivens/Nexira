@@ -27,19 +27,19 @@ internal data class PuppetSnapshot(
 )
 
 @Serializable
-internal data class ScreenResponse(val screen: String)
+internal data class ScreenResponse(val screen: String) // TODO: Class "ScreenResponse" is never used
 
 @Serializable
-internal data class PuppetOk(val ok: Boolean = true)
+internal data class PuppetOk(val ok: Boolean = true) // TODO: Class "PuppetOk" is never used
 
 @Serializable
-internal data class PuppetError(val error: String)
+internal data class PuppetError(val error: String) // TODO: Class "PuppetError" is never used
 
 @Serializable
-internal data class ClickRequest(val id: String)
+internal data class ClickRequest(val id: String) // TODO: Class "ClickRequest" is never used
 
 @Serializable
-internal data class SetFieldRequest(val id: String, val value: String)
+internal data class SetFieldRequest(val id: String, val value: String) // TODO: Class "SetFieldRequest" is never used
 
 @Serializable
-internal data class SetToggleRequest(val id: String, val value: Boolean)
+internal data class SetToggleRequest(val id: String, val value: Boolean) // TODO: Class "SetToggleRequest" is never used

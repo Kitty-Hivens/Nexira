@@ -19,7 +19,7 @@ import hivens.ui.i18n.LocalStrings
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 
-@Widget(id = "customization.reset", displayName = "Сброс кастомизации")
+@Widget(id = "customization.reset", displayName = "widget.customization.reset")
 @Composable
 fun CustomResetWidget(instance: WidgetInstance) {
     val ctx = LocalCustomizationContext.current

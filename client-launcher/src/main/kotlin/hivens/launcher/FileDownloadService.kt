@@ -500,7 +500,7 @@ class FileDownloadService(
         onBytesRead: ((Int) -> Unit)?,
     ) {
         val channel = response.bodyAsChannel()
-        FileOutputStream(localPath.toFile(), append).use { output -> // TODO: Possibly blocking call in non-blocking context could lead to thread starvation
+        FileOutputStream(localPath.toFile(), append).use { output ->
             val buffer = ByteArray(8192)
             while (!channel.isClosedForRead) {
                 val read = channel.readAvailable(buffer, 0, buffer.size)

@@ -21,11 +21,11 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class LibraryHeaderProps(
-    @PropLabel("Заголовок") val title: String = "",
-    @PropLabel("Подзаголовок") val subtitle: String = "",
+    @PropLabel("widget.library.header.title") val title: String = "",
+    @PropLabel("widget.library.header.subtitle") val subtitle: String = "",
 )
 
-@Widget(id = "library.header", displayName = "Library Header", propsClass = LibraryHeaderProps::class)
+@Widget(id = "library.header", displayName = "widget.library.header", propsClass = LibraryHeaderProps::class)
 @Composable
 fun LibraryHeader(instance: WidgetInstance) {
     val p = instance.rememberProps<LibraryHeaderProps>()

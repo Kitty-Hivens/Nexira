@@ -40,24 +40,21 @@ class WidgetRegistryConsistencyTest {
             "home.new.quicklaunch",
             "library.header",
             "library.body",
-            "appshell.leftrail.navbuttons",
-            "appshell.leftrail.consoletoggle",
-            "appshell.leftrail.logout",
             "appshell.rightrail.authpanel",
             "appshell.rightrail.compactnews",
+            // shell-as-surface region widgets
+            "appshell.region.left",
+            "appshell.region.center",
+            "appshell.region.right",
             // editor-2 sample widgets
             "home.new.clock",
             "home.new.spacer",
             "home.new.progress",
             "home.new.launchbutton",
-            // editor-3.7 music + individual nav
+            // editor-3.7 music
             "home.new.music",
-            "nav.home",
-            "nav.library",
-            "nav.browse",
-            "nav.profile",
-            "nav.settings",
-            "nav.about",
+            // unified configurable nav rail item
+            "nav.entry",
             // Phase A.3 container sample
             "container.group",
             // tab container
@@ -131,12 +128,14 @@ class WidgetRegistryConsistencyTest {
             .toSet()
         assertEquals(
             setOf(
-                "appshell.leftrail.navbuttons", // bundled rail variant
                 "appshell.rightrail.authpanel",
-                "nav.settings",                  // individual-nav safety: always reachable
+                "appshell.region.left",          // shell regions: the frame must stay whole
+                "appshell.region.center",
+                "appshell.region.right",
             ),
             nonRemovable,
-            "non-removable set protects the launcher from being navigation-locked",
+            "non-removable set keeps the shell frame and sign-in panel intact; nav items " +
+                "are removable and restored via the editor's leftrail surface reset",
         )
     }
 
@@ -170,6 +169,12 @@ class WidgetRegistryConsistencyTest {
             "profile.skin.section",
             // tab container (tabCount + labels)
             "container.tabs",
+            // shell regions (width / glass / divider / collapse frame props)
+            "appshell.region.left",
+            "appshell.region.center",
+            "appshell.region.right",
+            // unified nav rail item (target prop)
+            "nav.entry",
         )
         assertEquals(
             expected,

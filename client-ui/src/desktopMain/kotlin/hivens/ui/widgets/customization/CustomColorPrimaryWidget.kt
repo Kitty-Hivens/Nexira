@@ -7,7 +7,7 @@ import hivens.ui.i18n.LocalStrings
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 
-@Widget(id = "customization.color.primary", displayName = "Цвет: primary")
+@Widget(id = "customization.color.primary", displayName = "widget.customization.color.primary")
 @Composable
 fun CustomColorPrimaryWidget(instance: WidgetInstance) {
     val ctx = LocalCustomizationContext.current

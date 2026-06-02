@@ -10,7 +10,7 @@ import java.awt.Dimension
  * The launcher's 2-column Library + sidebar layout breaks below roughly
  * 960dp width / 600dp height; that's the design intent the caller is
  * expected to pass in -- already density-converted to raw pixels via
- * the Compose [androidx.compose.ui.platform.LocalDensity]. If the
+ * the Compose LocalDensity. If the
  * user's screen is smaller than the intent in either dimension, the
  * intent gets clamped to [maxScreenFraction] of the available screen
  * so the user retains headroom to drag the window edges.

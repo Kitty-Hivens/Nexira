@@ -31,7 +31,7 @@ import hivens.widget.model.WidgetInstance
 // of splitting per-preset (6 widgets) or per-control (picker +
 // intensity = 2 widgets) -- the intensity slider only makes sense
 // when a tint is selected, so they share fate.
-@Widget(id = "bg.tint", displayName = "Тонировка")
+@Widget(id = "bg.tint", displayName = "widget.bg.tint")
 @Composable
 fun BgTintWidget(instance: WidgetInstance) {
     val ctx = LocalBgSettingsContext.current

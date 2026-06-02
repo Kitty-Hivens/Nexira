@@ -254,8 +254,7 @@ private fun PackLogsTab(packId: String, instanceDir: Path, dataDir: Path) {
             )
             HorizontalDivider(color = CelestiaTheme.colors.outline.copy(alpha = 0.3f))
             Box(Modifier.weight(1f).fillMaxWidth()) {
-                val src = source
-                if (src == null) {
+                if (source == null) {
                     // A file is selected but still reading -- brief flash.
                     Box(Modifier.fillMaxSize())
                 } else {
@@ -265,7 +264,7 @@ private fun PackLogsTab(packId: String, instanceDir: Path, dataDir: Path) {
                             consoleSettings = new
                             consoleSettingsManager.save(new)
                         },
-                        source = src,
+                        source = source,
                     )
                 }
             }

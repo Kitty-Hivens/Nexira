@@ -83,6 +83,7 @@ internal fun PropFieldRow(
                 value         = (cur.intOrNull ?: range.min.toInt()).toFloat(),
                 range         = range.min.toFloat()..range.max.toFloat(),
                 format        = "%.0f",
+                keyStep       = 1f,
                 onValueChange = { onChange(JsonPrimitive(it.roundToInt())) },
             )
         (element.kind == PrimitiveKind.FLOAT || element.kind == PrimitiveKind.DOUBLE) && range != null ->

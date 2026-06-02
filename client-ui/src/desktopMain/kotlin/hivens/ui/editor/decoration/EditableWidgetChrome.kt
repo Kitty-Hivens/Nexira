@@ -1,16 +1,20 @@
 package hivens.ui.editor.decoration
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitTouchSlopOrCancellation
+import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -24,7 +28,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteForever
-import androidx.compose.material.icons.filled.DragIndicator
+import androidx.compose.material.icons.filled.FlipToBack
+import androidx.compose.material.icons.filled.FlipToFront
+import androidx.compose.material.icons.filled.OpenInFull
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -34,41 +40,51 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.currentCompositionLocalContext
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.unit.dp
+import hivens.ui.editor.EditModeController
+import hivens.ui.editor.canvasDragOffset
+import hivens.ui.editor.canvasResizeSize
 import hivens.ui.editor.dnd.DragController
 import hivens.ui.editor.dnd.DragPayload
 import hivens.ui.editor.dnd.DropTargetRegistry
-import hivens.ui.editor.dnd.dragSource
-import hivens.ui.editor.dnd.widgetBounds
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.LocalStyle
+import hivens.widget.api.LocalCanvasSlotSizeDp
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.WidgetDescriptor
 import hivens.widget.model.SlotOrientation
 import hivens.widget.model.SlotPath
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.traverse
+import java.awt.Cursor
 
-// Wraps a single widget with edit-mode chrome: drag handle (always
-// visible, opacity boosts on hover), remove button (hover-only, hidden
-// when descriptor says non-removable), prop "tune" gear (hover, only when
-// the widget has props), faint border outline, and a drop indicator.
+// Wraps a single widget with edit-mode chrome: whole-body drag overlay,
+// remove button (hover-only, hidden when non-removable), configure "tune"
+// gear (hover -- opens props + the universal backing controls), a resize
+// handle, faint border outline, and a drop indicator.
 //
 // Phase G: the chrome follows the slot's orientation. In a Column slot it
 // wraps in a Column with horizontal drop bars above/below; in a Row slot
@@ -86,14 +102,17 @@ fun EditableWidgetChrome(
     descriptor: WidgetDescriptor,
     instance: WidgetInstance,
     controller: DragController,
+    editController: EditModeController,
     registry: DropTargetRegistry,
     orientation: SlotOrientation,
     onRemove: () -> Unit,
     onEditProps: () -> Unit,
-    onCommitDrop: (committedPointer: androidx.compose.ui.geometry.Offset) -> Unit,
+    onCommitDrop: (committedPointer: Offset) -> Unit,
     content: @Composable () -> Unit,
 ) {
     val s = LocalStrings.current
+    val style = LocalStyle.current
+    val chromeMotionMs = style.animationDurationMs(220)
     val interaction = remember { MutableInteractionSource() }
     val isHovered by interaction.collectIsHoveredAsState()
     var widgetWindowBounds by remember { mutableStateOf<Rect?>(null) }
@@ -103,6 +122,16 @@ fun EditableWidgetChrome(
         ?.instance?.instanceId == instance.instanceId
 
     val isRow = orientation == SlotOrientation.Row
+    val isCanvas = orientation == SlotOrientation.Canvas
+    // Live placement read from inside the long-lived drag gesture: the
+    // pointerInput is keyed only on instanceId so it does not restart
+    // mid-drag, and without this the gesture would capture a stale start
+    // placement on the second drag of the same widget.
+    val liveCanvas = rememberUpdatedState(instance.canvas)
+    // Live canvas slot size for the move-clamp (published by SlotRenderer's
+    // Canvas branch; Zero outside a Canvas slot disables clamping).
+    val liveSlotSize = rememberUpdatedState(LocalCanvasSlotSizeDp.current)
+    val resizeCursor = remember { PointerIcon(Cursor(Cursor.SE_RESIZE_CURSOR)) }
 
     // Drop-indicator hit test. Reading controller.active recomposes on
     // every pointer update; traverse + registry queries are O(depth +
@@ -132,16 +161,23 @@ fun EditableWidgetChrome(
     // wherever it lands.
     val capturedLocals = currentCompositionLocalContext
 
+    // Drop this widget's drop-target rect when it leaves composition (deleted /
+    // moved): the registry persists across the edit session, so without this a
+    // phantom rect keeps winning hit-tests at the widget's old spot.
+    DisposableEffect(path, instance.instanceId) {
+        onDispose { registry.unregisterWidget(path, instance.instanceId) }
+    }
+
     // Source widget fades to 30% while being dragged -- the ghost is
     // doing the work on top. Once drag ends, we ramp back smoothly.
     val sourceAlpha by animateFloatAsState(
         targetValue   = if (isThisDragging) 0.30f else 1f,
-        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        animationSpec = tween(chromeMotionMs),
         label         = "edit-source-alpha",
     )
     val borderAlpha by animateFloatAsState(
-        targetValue   = if (isHovered) 0.55f + depthBoost else 0.18f + depthBoost,
-        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        targetValue   = if (isHovered) 0.50f + depthBoost else 0.10f + depthBoost,
+        animationSpec = tween(chromeMotionMs),
         label         = "edit-border-alpha",
     )
 
@@ -153,172 +189,217 @@ fun EditableWidgetChrome(
             modifier = Modifier
                 .then(if (isRow) Modifier.padding(horizontal = 4.dp) else Modifier.padding(vertical = 4.dp))
                 .hoverable(interaction)
-                .onGloballyPositioned { coords: LayoutCoordinates ->
-                    val rect = coords.boundsInWindow()
-                    widgetWindowBounds = rect
-                    registry.registerWidget(path, instance.instanceId, index, rect)
-                }
-                .widgetBounds(registry, path, instance.instanceId, index)
                 .padding(2.dp)
                 .border(
                     width = 1.dp,
                     color = CelestiaTheme.colors.primary.copy(alpha = borderAlpha),
                     shape = RoundedCornerShape(8.dp),
-                ),
+                )
+                .onGloballyPositioned { coords: LayoutCoordinates ->
+                    // Register AFTER padding+border so the hit-test rect includes
+                    // the visible border pad (edge drops land on the widget, not
+                    // the parent slot). Single registration -- the .widgetBounds
+                    // modifier was a redundant duplicate of this.
+                    val rect = coords.boundsInWindow()
+                    widgetWindowBounds = rect
+                    registry.registerWidget(path, instance.instanceId, index, rect)
+                },
         ) {
             Box(Modifier.alpha(sourceAlpha)) { content() }
 
-            // Drag handle: always visible (so the user discovers it),
-            // brightens on hover. Attached pointerInput drives the drag.
-            Surface(
-                color    = CelestiaTheme.colors.surface.copy(alpha = if (isHovered) 0.95f else 0.65f),
-                shape    = RoundedCornerShape(6.dp),
-                shadowElevation = 0.dp,
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(4.dp)
-                    .size(22.dp)
-                    .dragSource(
-                        controller            = controller,
-                        payload               = DragPayload.ExistingWidget(path, index, instance),
-                        widgetBoundsProvider  = { widgetWindowBounds },
-                        ghost                 = {
-                            CompositionLocalProvider(capturedLocals) { content() }
-                        },
-                        onDragEnd             = onCommitDrop,
-                    ),
-            ) {
-                Icon(
-                    imageVector        = Icons.Default.DragIndicator,
-                    contentDescription = s.editorDragReorder,
-                    tint               = CelestiaTheme.colors.textSecondary,
-                    modifier           = Modifier.size(16.dp).padding(0.dp),
-                )
-            }
-
-            // Remove button: hover-only, red close icon. Hidden on
-            // non-removable widgets (those get the force-remove
-            // affordance below instead).
-            AnimatedVisibility(
-                visible  = isHovered && descriptor.removable,
-                enter    = fadeIn(spring(stiffness = Spring.StiffnessMedium)),
-                exit     = fadeOut(spring(stiffness = Spring.StiffnessMedium)),
-                modifier = Modifier.align(Alignment.TopEnd).padding(4.dp),
-            ) {
-                Surface(
-                    color    = CelestiaTheme.colors.error.copy(alpha = 0.85f),
-                    shape    = RoundedCornerShape(6.dp),
-                    modifier = Modifier
-                        .size(22.dp)
-                        .pointerInput(instance.instanceId) {
-                            awaitPointerEventScope {
-                                while (true) {
-                                    val event = awaitPointerEvent()
-                                    if (event.type == PointerEventType.Release) {
-                                        onRemove()
-                                        event.changes.forEach { it.consume() }
-                                    }
+            // Whole-widget drag surface -- no separate handle. A press anywhere
+            // on the body (above the content, below the hover affordances) drags
+            // the widget: reorder in a flow slot, absolute move on a Canvas slot.
+            // The gesture consumes the press, so the widget's own controls stay
+            // inert while editing -- you arrange the widget, you do not operate
+            // it. The corner affordances sit above this overlay and still tap.
+            Box(
+                Modifier
+                    .matchParentSize()
+                    .pointerInput(instance.instanceId, isCanvas) {
+                        awaitEachGesture {
+                            // requireUnconsumed: yield to the hover affordances
+                            // and resize handle stacked above (each consumes its
+                            // own press), so resizing does not also drag the body.
+                            val down = awaitFirstDown(requireUnconsumed = true)
+                            // Claim the press so a tap never reaches the content.
+                            down.consume()
+                            if (isCanvas) {
+                                // Absolute move: apply each frame's delta to the
+                                // current (already-clamped) position and re-seat,
+                                // so dragging past an edge and back responds at
+                                // once -- no dead-zone from an unbounded
+                                // accumulator. canvasDragOffset clamps the output.
+                                val p = liveCanvas.value
+                                var curX = p?.x ?: 0f
+                                var curY = p?.y ?: 0f
+                                drag(down.id) { change ->
+                                    val slot = liveSlotSize.value
+                                    val wb = widgetWindowBounds
+                                    val (nx, ny) = canvasDragOffset(
+                                        curX, curY,
+                                        change.positionChange().x, change.positionChange().y,
+                                        density,
+                                        slotWDp   = slot.width,
+                                        slotHDp   = slot.height,
+                                        widgetWDp = (wb?.width ?: 0f) / density,
+                                        widgetHDp = (wb?.height ?: 0f) / density,
+                                    )
+                                    curX = nx
+                                    curY = ny
+                                    editController.setWidgetOffset(path, instance.instanceId, nx, ny)
+                                    change.consume()
                                 }
+                            } else {
+                                // Flow reorder: drive the existing DnD controller
+                                // once past the touch slop (a tap is swallowed).
+                                val slop = awaitTouchSlopOrCancellation(down.id) { c, _ -> c.consume() }
+                                    ?: return@awaitEachGesture
+                                val bounds = widgetWindowBounds ?: return@awaitEachGesture
+                                controller.begin(
+                                    payload         = DragPayload.ExistingWidget(path, index, instance),
+                                    pointerInWindow = bounds.topLeft + slop.position,
+                                    pickupOffset    = slop.position,
+                                    widgetSize      = Offset(bounds.width, bounds.height),
+                                    ghost           = { CompositionLocalProvider(capturedLocals) { content() } },
+                                )
+                                var last = bounds.topLeft + slop.position
+                                drag(slop.id) { change ->
+                                    val wb = widgetWindowBounds
+                                    if (wb != null) {
+                                        last = wb.topLeft + change.position
+                                        controller.update(last)
+                                    }
+                                    change.consume()
+                                }
+                                onCommitDrop(last)
+                                controller.end()
                             }
-                        },
+                        }
+                    },
+            )
+
+            // Hover affordances, stacked vertically at the top-right so they
+            // fit narrow widgets (the 64dp rail) instead of overflowing a row.
+            // Each uses the Release-consume tap pattern so a tap acts without
+            // starting the body drag overlay.
+            Column(
+                modifier            = Modifier.align(Alignment.TopEnd).padding(3.dp),
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(3.dp),
+            ) {
+                // Z-order (Canvas only): bring to front / send to back. Overlap
+                // is meaningful only under free placement.
+                if (isCanvas) {
+                    AnimatedVisibility(
+                        visible = isHovered,
+                        enter   = fadeIn(tween(chromeMotionMs)),
+                        exit    = fadeOut(tween(chromeMotionMs)),
+                    ) {
+                        AffordanceButton(Icons.Default.FlipToFront, s.editorToFront, CelestiaTheme.colors.primary, instance.instanceId) {
+                            val maxZ = graph.traverse(path)?.widgets?.maxOfOrNull { it.canvas?.z ?: 0 } ?: 0
+                            editController.setWidgetZ(path, instance.instanceId, maxZ + 1)
+                        }
+                    }
+                    AnimatedVisibility(
+                        visible = isHovered,
+                        enter   = fadeIn(tween(chromeMotionMs)),
+                        exit    = fadeOut(tween(chromeMotionMs)),
+                    ) {
+                        AffordanceButton(Icons.Default.FlipToBack, s.editorToBack, CelestiaTheme.colors.primary, instance.instanceId) {
+                            val minZ = graph.traverse(path)?.widgets?.minOfOrNull { it.canvas?.z ?: 0 } ?: 0
+                            editController.setWidgetZ(path, instance.instanceId, minZ - 1)
+                        }
+                    }
+                }
+                AnimatedVisibility(
+                    visible = isHovered,
+                    enter   = fadeIn(tween(chromeMotionMs)),
+                    exit    = fadeOut(tween(chromeMotionMs)),
                 ) {
-                    Icon(
-                        imageVector        = Icons.Default.Close,
-                        contentDescription = s.editorDelete,
-                        tint               = CelestiaTheme.colors.onPrimary,
-                        modifier           = Modifier.size(14.dp).padding(0.dp).graphicsLayer { },
-                    )
+                    AffordanceButton(Icons.Default.Tune, s.editorConfigure, CelestiaTheme.colors.primary, instance.instanceId, onEditProps)
+                }
+                AnimatedVisibility(
+                    visible = isHovered && descriptor.removable,
+                    enter   = fadeIn(tween(chromeMotionMs)),
+                    exit    = fadeOut(tween(chromeMotionMs)),
+                ) {
+                    AffordanceButton(Icons.Default.Close, s.editorDelete, CelestiaTheme.colors.error, instance.instanceId, onRemove)
+                }
+                AnimatedVisibility(
+                    visible = isHovered && !descriptor.removable,
+                    enter   = fadeIn(tween(chromeMotionMs)),
+                    exit    = fadeOut(tween(chromeMotionMs)),
+                ) {
+                    AffordanceButton(Icons.Default.DeleteForever, s.editorForceRemove, CelestiaTheme.colors.warnAccent, instance.instanceId) { forceRemoveOpen = true }
                 }
             }
 
-            // Prop editor affordance: hover-only "tune" gear, shown only
-            // when the widget declares props (propsSerializer != null).
-            // Sits left of the remove/force-remove button at the top-end.
-            // Same Release-consume pattern as remove so the tap does not
-            // start a drag.
+            // SE resize handle (hover-only) -> setWidgetSize. Works on any slot:
+            // on a Canvas slot it sizes the free-placed widget; in a flow slot
+            // SlotRenderer applies the size. Seizes the measured px as the
+            // baseline when the placement size is 0 (intrinsic) so the first
+            // drag does not jump from nothing.
             AnimatedVisibility(
-                visible  = isHovered && descriptor.propsSerializer != null,
-                enter    = fadeIn(spring(stiffness = Spring.StiffnessMedium)),
-                exit     = fadeOut(spring(stiffness = Spring.StiffnessMedium)),
-                modifier = Modifier.align(Alignment.TopEnd).padding(top = 4.dp, end = 30.dp),
+                visible  = isHovered,
+                enter    = fadeIn(tween(chromeMotionMs)),
+                exit     = fadeOut(tween(chromeMotionMs)),
+                modifier = Modifier.align(Alignment.BottomEnd).padding(3.dp),
             ) {
                 Surface(
                     color    = CelestiaTheme.colors.primary.copy(alpha = 0.85f),
-                    shape    = RoundedCornerShape(6.dp),
+                    shape    = RoundedCornerShape(5.dp),
                     modifier = Modifier
-                        .size(22.dp)
+                        .size(16.dp)
+                        .pointerHoverIcon(resizeCursor)
                         .pointerInput(instance.instanceId) {
-                            awaitPointerEventScope {
-                                while (true) {
-                                    val event = awaitPointerEvent()
-                                    if (event.type == PointerEventType.Release) {
-                                        onEditProps()
-                                        event.changes.forEach { it.consume() }
-                                    }
+                            // Custom gesture (not detectDragGestures) so the press
+                            // is consumed -- otherwise the body drag overlay also
+                            // claims it and the widget jumps / size resets on the
+                            // next drag. Start size is read live each gesture.
+                            awaitEachGesture {
+                                val down = awaitFirstDown(requireUnconsumed = false)
+                                down.consume()
+                                val p = liveCanvas.value
+                                val wb = widgetWindowBounds
+                                val startW = (p?.width ?: 0f).takeIf { it > 0f }
+                                    ?: ((wb?.width ?: 0f) / density)
+                                val startH = (p?.height ?: 0f).takeIf { it > 0f }
+                                    ?: ((wb?.height ?: 0f) / density)
+                                var accX = 0f
+                                var accY = 0f
+                                drag(down.id) { change ->
+                                    accX += change.positionChange().x
+                                    accY += change.positionChange().y
+                                    val (nw, nh) = canvasResizeSize(startW, startH, accX, accY, density)
+                                    editController.setWidgetSize(path, instance.instanceId, nw, nh)
+                                    change.consume()
                                 }
                             }
                         },
                 ) {
                     Icon(
-                        imageVector        = Icons.Default.Tune,
-                        contentDescription = s.editorConfigure,
+                        imageVector        = Icons.Default.OpenInFull,
+                        contentDescription = null,
                         tint               = CelestiaTheme.colors.onPrimary,
-                        modifier           = Modifier.size(14.dp).padding(0.dp),
-                    )
-                }
-            }
-
-            // Force-remove affordance for non-removable widgets. Same
-            // top-right slot as the regular remove button, but uses a
-            // warning-tinted DeleteForever icon and gates the action
-            // behind a confirmation dialog. Without this, a non-
-            // removable widget that ends up in the wrong slot (preset
-            // import, plugin install, or a user-driven move out of its
-            // home surface) has no exit path short of editing
-            // layout-graph.json by hand or invoking the per-surface
-            // reset on the edit pill.
-            AnimatedVisibility(
-                visible  = isHovered && !descriptor.removable,
-                enter    = fadeIn(spring(stiffness = Spring.StiffnessMedium)),
-                exit     = fadeOut(spring(stiffness = Spring.StiffnessMedium)),
-                modifier = Modifier.align(Alignment.TopEnd).padding(4.dp),
-            ) {
-                Surface(
-                    color    = CelestiaTheme.colors.warnAccent.copy(alpha = 0.85f),
-                    shape    = RoundedCornerShape(6.dp),
-                    modifier = Modifier
-                        .size(22.dp)
-                        .pointerInput(instance.instanceId) {
-                            awaitPointerEventScope {
-                                while (true) {
-                                    val event = awaitPointerEvent()
-                                    if (event.type == PointerEventType.Release) {
-                                        forceRemoveOpen = true
-                                        event.changes.forEach { it.consume() }
-                                    }
-                                }
-                            }
-                        },
-                ) {
-                    Icon(
-                        imageVector        = Icons.Default.DeleteForever,
-                        contentDescription = s.editorForceRemove,
-                        tint               = CelestiaTheme.colors.onPrimary,
-                        modifier           = Modifier.size(14.dp).padding(0.dp),
+                        modifier           = Modifier.size(11.dp).padding(0.dp),
                     )
                 }
             }
         }
     }
 
-    if (isRow) {
-        Row(modifier = Modifier.fillMaxHeight(), verticalAlignment = Alignment.Top) {
+    when {
+        // Canvas: the widget is positioned by SlotRenderer's outer offset Box.
+        // No flow wrapper and no drop bars -- insertion index is meaningless
+        // under free placement.
+        isCanvas -> widgetBox()
+        isRow -> Row(modifier = Modifier.fillMaxHeight(), verticalAlignment = Alignment.Top) {
             if (showIndicatorBefore) DropIndicator(isRow = true)
             widgetBox()
             if (showIndicatorAfter) DropIndicator(isRow = true)
         }
-    } else {
-        Column(modifier = Modifier.fillMaxWidth()) {
+        else -> Column(modifier = Modifier.fillMaxWidth()) {
             if (showIndicatorBefore) DropIndicator(isRow = false)
             widgetBox()
             if (showIndicatorAfter) DropIndicator(isRow = false)
@@ -331,7 +412,7 @@ fun EditableWidgetChrome(
             title            = { Text(s.editorForceRemoveTitle) },
             text             = {
                 Text(
-                    text = s.editorForceRemoveBody(descriptor.displayName),
+                    text = s.editorForceRemoveBody(s.widgetLabel(descriptor.displayName)),
                     style = MaterialTheme.typography.bodyMedium,
                 )
             },
@@ -344,6 +425,55 @@ fun EditableWidgetChrome(
             dismissButton = {
                 TextButton(onClick = { forceRemoveOpen = false }) { Text(s.editorCancel) }
             },
+        )
+    }
+}
+
+// One hover affordance button (z-order / tune / remove / force-remove). Consumes
+// the press AND release so a tap fires the action without the body drag overlay
+// (which arms on any unconsumed down) also nudging the widget.
+@Composable
+private fun AffordanceButton(
+    icon: ImageVector,
+    description: String,
+    color: Color,
+    instanceId: String,
+    onTap: () -> Unit,
+) {
+    // Read the latest onTap: the pointerInput is keyed on instanceId so it does
+    // not restart, and the z-order closures capture live graph state (current
+    // min/max z) that would otherwise be stale.
+    val tap by rememberUpdatedState(onTap)
+    Surface(
+        color    = color.copy(alpha = 0.85f),
+        shape    = RoundedCornerShape(6.dp),
+        modifier = Modifier
+            .size(20.dp)
+            .pointerInput(instanceId) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        when (event.type) {
+                            // Consume the press so the body drag overlay
+                            // (awaitFirstDown(requireUnconsumed = true)) does not
+                            // also arm; a button tap with a little jitter would
+                            // otherwise nudge the widget under the button.
+                            PointerEventType.Press -> event.changes.forEach { it.consume() }
+                            PointerEventType.Release -> {
+                                tap()
+                                event.changes.forEach { it.consume() }
+                            }
+                            else -> {}
+                        }
+                    }
+                }
+            },
+    ) {
+        Icon(
+            imageVector        = icon,
+            contentDescription = description,
+            tint               = CelestiaTheme.colors.onPrimary,
+            modifier           = Modifier.size(13.dp),
         )
     }
 }

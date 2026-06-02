@@ -36,7 +36,7 @@ import hivens.widget.model.WidgetInstance
 // error based on token-length sniff (same heuristic as the legacy
 // AccountSection -- "online" means the active session looks signed
 // in). Reads session from LocalProfileContext.
-@Widget(id = "profile.account.section", displayName = "Аккаунт")
+@Widget(id = "profile.account.section", displayName = "widget.profile.account.section")
 @Composable
 fun ProfileAccountSectionWidget(instance: WidgetInstance) {
     val ctx = LocalProfileContext.current

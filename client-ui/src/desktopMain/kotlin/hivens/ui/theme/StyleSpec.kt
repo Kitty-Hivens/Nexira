@@ -104,9 +104,9 @@ fun StyleSpec.applyOverrides(
 ): StyleSpec {
     if (overrides == null) return this
     return copy(
-        cardCorner          = overrides.cardCornerDp?.let { it.dp } ?: cardCorner,
-        cardBorder          = overrides.cardBorderDp?.let { it.dp } ?: cardBorder,
-        buttonCorner        = overrides.buttonCornerDp?.let { it.dp } ?: buttonCorner,
+        cardCorner          = overrides.cardCornerDp?.dp ?: cardCorner,
+        cardBorder          = overrides.cardBorderDp?.dp ?: cardBorder,
+        buttonCorner        = overrides.buttonCornerDp?.dp ?: buttonCorner,
         animationMultiplier = overrides.animationMultiplier ?: animationMultiplier,
         softGlowEnabled     = overrides.softGlowEnabled ?: softGlowEnabled,
     )

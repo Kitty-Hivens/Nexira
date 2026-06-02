@@ -50,11 +50,7 @@ class SmartyModPlanner(
         val injectJar: Path?,
         val strict: Boolean,
         val helperKeepGlobs: List<String>,
-    ) {
-        companion object {
-            val NONE = Plan(emptySet(), null, false, emptyList())
-        }
-    }
+    )
 
     suspend fun plan(server: ServerProfile, manifest: FileManifest?, settings: SettingsData): Plan {
         val strict = settings.strictModVerification

@@ -17,7 +17,7 @@ import androidx.compose.ui.unit.IntSize
  * Must have a public no-arg constructor so `ServiceLoader` can
  * instantiate it.
  */
-class RealAprilFools : AprilFoolsLifecycle {
+class RealAprilFools : AprilFoolsLifecycle { // TODO: Class "RealAprilFools" is never used
 
     override fun isActive(): Boolean = AprilFools.isActive()
     override fun intensity(): Float = AprilFools.intensity()

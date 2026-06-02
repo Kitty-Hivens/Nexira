@@ -33,15 +33,15 @@ import org.koin.compose.koinInject
 
 @Serializable
 data class ProgressProps(
-    @PropLabel("Заголовок") val title: String = "Фоновая активность",
-    @PropLabel("Текст простоя") val idleText: String = "Сейчас ничего не качается.",
+    @PropLabel("widget.home.new.progress.title") val title: String = "Фоновая активность",
+    @PropLabel("widget.home.new.progress.idleText") val idleText: String = "Сейчас ничего не качается.",
 )
 
 // Compact background-activity card. Shows AutoSyncService state when
 // a sync is in flight; collapses to a calm "idle" message otherwise.
 // Polished version of the dashboard's autosync strip, broken out so
 // the new home can host it independently.
-@Widget(id = "home.new.progress", displayName = "Background activity", propsClass = ProgressProps::class)
+@Widget(id = "home.new.progress", displayName = "widget.home.new.progress", propsClass = ProgressProps::class)
 @Composable
 fun ProgressWidget(instance: WidgetInstance) {
     val p = instance.rememberProps<ProgressProps>()

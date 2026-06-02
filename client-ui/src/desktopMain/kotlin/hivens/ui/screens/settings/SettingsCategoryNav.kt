@@ -9,18 +9,14 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import hivens.ui.components.NavItemRowContent
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.theme.CelestiaTheme
@@ -65,20 +61,10 @@ internal fun SettingsCategoryNav(
                     .padding(horizontal = 12.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(
-                    imageVector = category.icon,
-                    contentDescription = null,
-                    tint = if (isSelected) CelestiaTheme.colors.primary
-                           else CelestiaTheme.colors.textSecondary,
-                    modifier = Modifier.size(20.dp),
-                )
-                Spacer(Modifier.width(12.dp))
-                Text(
-                    text  = category.label(s),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = if (isSelected) CelestiaTheme.colors.primary
-                            else CelestiaTheme.colors.textPrimary,
-                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                NavItemRowContent(
+                    icon = category.icon,
+                    label = category.label(s),
+                    isSelected = isSelected,
                 )
             }
         }

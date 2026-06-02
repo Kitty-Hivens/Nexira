@@ -709,10 +709,10 @@ object RussianStrings : AppStrings {
     }
 
     override val notifTimeNow                           = "сейчас"
-    override fun notifTimeSeconds(seconds: Long)        = "${seconds} с"
-    override fun notifTimeMinutes(minutes: Long)        = "${minutes} мин"
-    override fun notifTimeHours(hours: Long)            = "${hours} ч"
-    override fun notifTimeDays(days: Long)              = "${days} дн"
+    override fun notifTimeSeconds(seconds: Long)        = "$seconds с"
+    override fun notifTimeMinutes(minutes: Long)        = "$minutes мин"
+    override fun notifTimeHours(hours: Long)            = "$hours ч"
+    override fun notifTimeDays(days: Long)              = "$days дн"
 
     // --- Home (new) + launch tiles ---
     override val homeRecentTitle    = "Твои сборки"
@@ -744,6 +744,122 @@ object RussianStrings : AppStrings {
     override val editorCancel  = "Отмена"
     override val editorDelete  = "Удалить"
     override val editorReset   = "Сбросить"
+    override val editorResetAll = "Сбросить всё"
+    override val editorToFront = "На передний план"
+    override val editorToBack = "На задний план"
+    override val widgetLabels: Map<String, String> = mapOf(
+        "widget.about.credits" to "Авторы и технологии",
+        "widget.about.credits.title" to "Заголовок (авторы)",
+        "widget.about.links.card" to "Ссылки",
+        "widget.about.links.card.title" to "Заголовок",
+        "widget.about.logo" to "Логотип и версия",
+        "widget.about.logo.title" to "Заголовок",
+        "widget.about.system.card" to "Система",
+        "widget.about.system.card.title" to "Заголовок",
+        "widget.about.update.panel" to "Обновления",
+        "widget.about.update.panel.title" to "Заголовок",
+        "widget.appshell.region.center" to "Центральная область",
+        "widget.appshell.region.collapsed" to "Свёрнут",
+        "widget.appshell.region.glassAlphaPct" to "Стекло, %",
+        "widget.appshell.region.left" to "Левая панель",
+        "widget.appshell.region.right" to "Правая панель",
+        "widget.appshell.region.showDivider" to "Разделитель",
+        "widget.appshell.region.widthDp" to "Ширина (0 — гибкая)",
+        "widget.appshell.rightrail.authpanel" to "Панель входа",
+        "widget.appshell.rightrail.compactnews" to "Лента новостей",
+        "widget.bg.enable.toggle" to "Фон вкл/выкл",
+        "widget.bg.fx.animspeed" to "Скорость анимации",
+        "widget.bg.fx.blur" to "Размытие",
+        "widget.bg.fx.darken" to "Затемнение",
+        "widget.bg.fx.opacity" to "Прозрачность",
+        "widget.bg.fx.parallax" to "Параллакс",
+        "widget.bg.fx.saturation" to "Насыщенность",
+        "widget.bg.fx.vignette" to "Виньетка",
+        "widget.bg.image.picker" to "Картинка фона",
+        "widget.bg.loop.mode" to "Цикл воспроизведения",
+        "widget.bg.position.x" to "Позиция X",
+        "widget.bg.position.y" to "Позиция Y",
+        "widget.bg.preview" to "Превью",
+        "widget.bg.reset" to "Сброс фона",
+        "widget.bg.scale.mode" to "Масштабирование",
+        "widget.bg.tint" to "Тонировка",
+        "widget.container.group" to "Группа",
+        "widget.container.tabs" to "Вкладки",
+        "widget.container.tabs.label1" to "Вкладка 1",
+        "widget.container.tabs.label2" to "Вкладка 2",
+        "widget.container.tabs.label3" to "Вкладка 3",
+        "widget.container.tabs.tabCount" to "Вкладок",
+        "widget.customization.accent.override" to "Акцентный цвет",
+        "widget.customization.color.background" to "Цвет: background",
+        "widget.customization.color.criticalAccent" to "Цвет: criticalAccent",
+        "widget.customization.color.error" to "Цвет: error",
+        "widget.customization.color.outline" to "Цвет: outline",
+        "widget.customization.color.primary" to "Цвет: primary",
+        "widget.customization.color.progressAccent" to "Цвет: progressAccent",
+        "widget.customization.color.secondary" to "Цвет: secondary",
+        "widget.customization.color.success" to "Цвет: success",
+        "widget.customization.color.surface" to "Цвет: surface",
+        "widget.customization.color.textPrimary" to "Цвет: textPrimary",
+        "widget.customization.color.textSecondary" to "Цвет: textSecondary",
+        "widget.customization.color.warnAccent" to "Цвет: warnAccent",
+        "widget.customization.density" to "Плотность UI",
+        "widget.customization.experimental.toggle" to "Экспериментальные настройки",
+        "widget.customization.glass.alpha" to "Прозрачность стекла",
+        "widget.customization.glass.intensity" to "Интенсивность стекла",
+        "widget.customization.reset" to "Сброс кастомизации",
+        "widget.customization.shape.animMultiplier" to "Скорость анимаций",
+        "widget.customization.shape.buttonCorner" to "Скругление кнопок",
+        "widget.customization.shape.cardBorder" to "Толщина рамки карточек",
+        "widget.customization.shape.cardCorner" to "Скругление карточек",
+        "widget.customization.shape.softGlow" to "Декоративное свечение",
+        "widget.home.classic.content" to "Классический дашборд",
+        "widget.home.new.clock" to "Часы",
+        "widget.home.new.clock.accent" to "Цвет акцента",
+        "widget.home.new.clock.faceSize" to "Размер циферблата",
+        "widget.home.new.clock.format24h" to "24-часовой формат",
+        "widget.home.new.clock.mode" to "Режим",
+        "widget.home.new.clock.showSeconds" to "Секунды",
+        "widget.home.new.clock.title" to "Заголовок",
+        "widget.home.new.launchbutton" to "Кнопка запуска",
+        "widget.home.new.launchbutton.label" to "Надпись",
+        "widget.home.new.music" to "Музыкальный плеер",
+        "widget.home.new.music.title" to "Заголовок",
+        "widget.home.new.playback.mini" to "Мини-плеер",
+        "widget.home.new.progress" to "Фоновая активность",
+        "widget.home.new.progress.idleText" to "Текст простоя",
+        "widget.home.new.progress.title" to "Заголовок",
+        "widget.home.new.quicklaunch" to "Быстрый запуск",
+        "widget.home.new.quicklaunch.buttonLabel" to "Надпись кнопки",
+        "widget.home.new.recent" to "Плитки сборок",
+        "widget.home.new.recent.maxTiles" to "Сколько плиток",
+        "widget.home.new.recent.title" to "Заголовок",
+        "widget.home.new.spacer" to "Отступ",
+        "widget.home.new.spacer.height" to "Высота",
+        "widget.home.new.welcome" to "Баннер приветствия",
+        "widget.home.new.welcome.customGreeting" to "Свой текст приветствия",
+        "widget.home.new.welcome.showSubtitle" to "Показывать подзаголовок",
+        "widget.library.body" to "Тело библиотеки",
+        "widget.library.body.emptyText" to "Текст пустого состояния",
+        "widget.library.body.emptyTitle" to "Заголовок пустого состояния",
+        "widget.library.header" to "Шапка библиотеки",
+        "widget.library.header.subtitle" to "Подзаголовок",
+        "widget.library.header.title" to "Заголовок",
+        "widget.nav.entry" to "Пункт навигации",
+        "widget.profile.account.section" to "Аккаунт",
+        "widget.profile.nav" to "Навигация профиля",
+        "widget.profile.skin.section" to "Скин",
+        "widget.profile.skin.section.previewHeight" to "Высота превью",
+        "widget.server.details.banner" to "Баннер сервера",
+        "widget.server.details.banner.cornerRadius" to "Скругление углов",
+        "widget.server.details.description" to "Описание сервера",
+        "widget.server.details.tagbar" to "Теги сервера",
+        "widget.server.details.title" to "Заголовок сервера",
+        "widget.theme.picker.grid" to "Сетка тем",
+        "widget.theme.picker.preview" to "Превью темы",
+    )
+    override val recoverySafeModeTitle = "Интерфейс не удаётся восстановить"
+    override val recoverySafeModeBody  = "Интерфейс падал несколько раз подряд. Отчёт о сбое сохранён на диск. Перезапусти лаунчер."
+    override val recoverySafeModeQuit  = "Выйти"
     override val editorSave    = "Сохранить"
     override val editorApply   = "Применить"
     override val editorExport  = "Экспорт"
@@ -757,6 +873,10 @@ object RussianStrings : AppStrings {
 
     // --- Layout editor: prop panel ---
     override val editorResetToDefault = "Сбросить к умолчанию"
+    override val editorBackingTitle   = "Подложка"
+    override val editorBackingGlass   = "Стекло"
+    override val editorBackingCorner  = "Скругление"
+    override val editorBackingPadding = "Отступ"
 
     // --- Layout editor: presets ---
     override val editorPresetsTitle          = "Пресеты"
@@ -769,6 +889,8 @@ object RussianStrings : AppStrings {
     override val editorPaletteHide  = "Скрыть палитру"
     override val editorPaletteHint  = "Перетащи в нужный слот"
     override val editorPaletteEmpty = "Реестр виджетов пуст (ошибка сборки)."
+    override val editorPaletteSearch = "Поиск виджетов…"
+    override val editorPaletteNoMatch = "Ничего не найдено"
 
     // --- Layout editor: empty slot + chrome ---
     override val editorDragWidgetHere   = "Перетащи виджет сюда"
@@ -801,6 +923,7 @@ object RussianStrings : AppStrings {
     override val editorSurfShortProfile   = "Профиль"
     override val editorSurfShortServer    = "Сервер"
     override val editorSurfShortTheme     = "Темы"
+    override val editorSurfShortShell     = "Оболочка"
 
     // --- Layout editor: surface long names ---
     override val editorSurfHomeClassic = "Главная (классика)"
@@ -814,6 +937,7 @@ object RussianStrings : AppStrings {
     override val editorSurfProfile     = "Профиль"
     override val editorSurfServer      = "Детали сервера"
     override val editorSurfTheme       = "Выбор темы"
+    override val editorSurfShell        = "Оболочка приложения"
 
     // --- Music player widgets ---
     override val musicPlayerTitle      = "Музыкальный плеер"

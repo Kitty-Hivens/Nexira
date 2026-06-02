@@ -27,13 +27,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mikepenz.markdown.m3.Markdown
 import hivens.core.api.dto.smrt.SmrtAssetEntry
-import hivens.core.api.dto.smrt.SmrtSource
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
@@ -102,7 +100,7 @@ fun AssetRowPanel(asset: SmrtAssetEntry, modifier: Modifier = Modifier) {
                 }
             }
 
-            AssetSourceBadge(asset.source)
+            SourceBadge(asset.source)
 
             Icon(
                 imageVector        = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
@@ -126,22 +124,5 @@ fun AssetRowPanel(asset: SmrtAssetEntry, modifier: Modifier = Modifier) {
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun AssetSourceBadge(source: SmrtSource) {
-    val (label, color) = when (source) {
-        is SmrtSource.Modrinth   -> "Modrinth" to Color(0xFF22C55E)
-        is SmrtSource.SmrtCache  -> "Mirror"   to Color(0xFF3B82F6)
-        is SmrtSource.SmrtStatic -> "Static"   to Color(0xFF94A3B8)
-    }
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(6.dp))
-            .background(color.copy(alpha = 0.85f))
-            .padding(horizontal = 6.dp, vertical = 2.dp),
-    ) {
-        Text(label, style = MaterialTheme.typography.labelSmall, color = Color.White, fontWeight = FontWeight.Bold)
     }
 }

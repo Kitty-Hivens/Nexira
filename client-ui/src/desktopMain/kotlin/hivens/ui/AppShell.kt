@@ -75,6 +75,13 @@ import hivens.ui.utils.GameConsoleService
 import hivens.launcher.LayoutGraphRepository
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalWidgetRegistry
+import hivens.widget.api.LocalWidgetChromeRenderer
+import hivens.widget.api.WidgetChromeRenderer
+import hivens.ui.customization.glassSurfaceAlpha
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import hivens.widget.api.LocalWidgetServiceRegistry
 import hivens.widget.api.WidgetServiceRegistry
 import hivens.widget.api.WidgetRegistry
@@ -89,7 +96,6 @@ import okhttp3.Call
 import org.jetbrains.compose.resources.ExperimentalResourceApi
 import org.jetbrains.compose.resources.painterResource
 import org.koin.compose.koinInject
-import org.koin.core.context.stopKoin
 import org.koin.core.qualifier.named
 import org.slf4j.LoggerFactory
 import java.awt.Dimension
@@ -160,12 +166,15 @@ sealed class Screen {
 @OptIn(ExperimentalResourceApi::class)
 @Composable
 fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
+    // Tray teardown is composition-scoped: the tray is re-init'd per
+    // composition (see the tray LaunchedEffect below), so disposing it here
+    // gives a clean shutdown -> init cycle across a shell restart. Process-
+    // lifetime teardown (puppet server, Koin) is deliberately NOT here: it
+    // also fires when the composition is disposed on a crash, which would stop
+    // Koin out from under the recovery restart loop. It lives in a JVM
+    // shutdown hook in Main instead.
     DisposableEffect(Unit) {
-        onDispose {
-            TrayManager.shutdown()
-            hivens.ui.puppet.PuppetServerLoader.instance.stop()
-            stopKoin()
-        }
+        onDispose { TrayManager.shutdown() }
     }
 
     val windowState      = rememberWindowState(placement = WindowPlacement.Maximized)
@@ -618,12 +627,30 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
                 )
             }
             val layoutGraph by layoutGraphRepo.observe().collectAsState()
+            // Production renderer for per-widget backing (WidgetChrome): glass
+            // card (follows the active style via glassSurfaceAlpha), rounded
+            // corners, inner padding. Invoked by the kernel only when a widget
+            // carries chrome, so default-styled widgets pay nothing.
+            val chromeRenderer: WidgetChromeRenderer = { chrome, content ->
+                val glass = glassSurfaceAlpha(chrome.glassAlphaPct / 100f)
+                androidx.compose.foundation.layout.Box(
+                    Modifier
+                        .then(
+                            if (chrome.cornerRadiusDp > 0)
+                                Modifier.clip(RoundedCornerShape(chrome.cornerRadiusDp.dp))
+                            else Modifier,
+                        )
+                        .background(glass)
+                        .padding(chrome.paddingDp.dp),
+                ) { content() }
+            }
             CompositionLocalProvider(
                 LocalCustomization                       provides customization,
                 androidx.compose.ui.platform.LocalDensity provides scaledDensity,
                 LocalLayoutGraph                         provides layoutGraph,
                 LocalWidgetRegistry                      provides widgetRegistry,
                 LocalWidgetServiceRegistry               provides widgetServiceRegistry,
+                LocalWidgetChromeRenderer                provides chromeRenderer,
             ) {
             val effectiveStyle = if (customization.experimentalColorOverridesEnabled) {
                 styleSpec.applyOverrides(customization.styleOverrides)

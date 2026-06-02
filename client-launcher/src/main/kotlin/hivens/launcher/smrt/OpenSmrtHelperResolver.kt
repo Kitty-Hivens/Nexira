@@ -19,6 +19,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Resolves the open-smrt-network helper jar that replaces the upstream Smarty
@@ -57,7 +58,7 @@ class OpenSmrtHelperResolver(
     suspend fun resolve(mcVersion: String): Resolved? = withContext(Dispatchers.IO) {
         // Bounded so a slow/hung CDN can't stall the launch hot path; null on
         // timeout (handled like any other resolve miss).
-        withTimeoutOrNull(RESOLVE_TIMEOUT_MS) {
+        withTimeoutOrNull(RESOLVE_TIMEOUT_MS.milliseconds) {
             val descriptor = fetchDescriptor() ?: return@withTimeoutOrNull null
             val variant = descriptor.variantFor(mcVersion) ?: run {
                 log.warn("open-smrt helper: no variant for MC {} in descriptor", mcVersion)

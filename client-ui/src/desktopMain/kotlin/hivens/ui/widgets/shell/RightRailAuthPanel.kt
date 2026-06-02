@@ -15,7 +15,7 @@ import hivens.widget.model.WidgetInstance
 
 @Widget(
     id          = "appshell.rightrail.authpanel",
-    displayName = "Auth panel",
+    displayName = "widget.appshell.rightrail.authpanel",
     removable   = false,
 )
 @Composable

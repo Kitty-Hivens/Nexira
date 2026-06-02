@@ -6,7 +6,7 @@ import hivens.ui.i18n.LocalStrings
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 
-@Widget(id = "bg.fx.opacity", displayName = "Прозрачность")
+@Widget(id = "bg.fx.opacity", displayName = "widget.bg.fx.opacity")
 @Composable
 fun BgFxOpacityWidget(instance: WidgetInstance) {
     val ctx = LocalBgSettingsContext.current

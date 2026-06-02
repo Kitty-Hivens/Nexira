@@ -51,7 +51,6 @@ fun MigrationScreen(
     target: Path,
     onQuit: () -> Unit,
 ) {
-    val s = LocalStrings.current
     val scope = rememberCoroutineScope()
     var state: UiState by remember { mutableStateOf(UiState.Ready) }
 

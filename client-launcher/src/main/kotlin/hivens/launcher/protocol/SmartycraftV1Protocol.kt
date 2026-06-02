@@ -66,7 +66,6 @@ class SmartycraftV1Protocol(
             )
         )
         val raw = postForm(
-            "loader",
             Parameters.build {
                 append("action", "loader")
                 append("json", payload)
@@ -79,7 +78,6 @@ class SmartycraftV1Protocol(
     override suspend fun login(request: LoginRequest): LoginResponse {
         val payload = json.encodeToString(request)
         val raw = postForm(
-            "login",
             Parameters.build {
                 append("action", "login")
                 append("json", payload)
@@ -109,7 +107,6 @@ class SmartycraftV1Protocol(
 
     private suspend fun postSignedAction(action: String, jsonPayload: String, signature: String): StatusOnlyResponse {
         val raw = postForm(
-            action,
             Parameters.build {
                 append("action", action)
                 append("json", jsonPayload)
@@ -161,7 +158,7 @@ class SmartycraftV1Protocol(
      * IOException from the shouldRetry predicate and make the SOCKS h2
      * reset retry chain dead code.
      */
-    private suspend fun postForm(actionName: String, params: Parameters): String =
+    private suspend fun postForm(params: Parameters): String =
         router.execute { client ->
             val response = client.post(config.authUrl) { setBody(FormDataContent(params)) }
             response.body<String>().trim()

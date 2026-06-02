@@ -6,7 +6,7 @@ import hivens.ui.i18n.LocalStrings
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 
-@Widget(id = "bg.fx.blur", displayName = "Размытие")
+@Widget(id = "bg.fx.blur", displayName = "widget.bg.fx.blur")
 @Composable
 fun BgFxBlurWidget(instance: WidgetInstance) {
     val ctx = LocalBgSettingsContext.current

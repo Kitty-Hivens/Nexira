@@ -18,7 +18,7 @@ import hivens.ui.theme.CelestiaTheme
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 
-@Widget(id = "customization.shape.softGlow", displayName = "Декоративное свечение")
+@Widget(id = "customization.shape.softGlow", displayName = "widget.customization.shape.softGlow")
 @Composable
 fun CustomShapeSoftGlowToggleWidget(instance: WidgetInstance) {
     val ctx = LocalCustomizationContext.current

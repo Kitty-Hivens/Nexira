@@ -44,16 +44,19 @@ import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.editor.EditModeController
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
+import hivens.ui.widgets.customization.LabeledSlider
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalWidgetRegistry
 import hivens.widget.api.WidgetDescriptor
 import hivens.widget.model.PropHidden
 import hivens.widget.model.PropLabel
 import hivens.widget.model.SlotPath
+import hivens.widget.model.WidgetChrome
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.traverse
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.JsonObject
+import kotlin.math.roundToInt
 
 // Right-edge prop editor. Opened by a widget's "tune" chrome affordance,
 // which sets the host's prop target (path + instanceId). Resolves the
@@ -96,17 +99,19 @@ fun WidgetPropPanel(
     val serializer = descriptor?.propsSerializer
 
     AnimatedVisibility(
-        visible  = visible && serializer != null,
+        // Shown for ANY targeted widget, propless included -- the Backing
+        // section (per-widget glass / corner / padding) is universal, and the
+        // typed-prop section only renders when the widget has a props class.
+        visible  = visible && descriptor != null,
         enter    = fadeIn(spring()) + slideInHorizontally(spring(stiffness = Spring.StiffnessMediumLow)) { it },
         exit     = fadeOut(spring()) + slideOutHorizontally(spring(stiffness = Spring.StiffnessMediumLow)) { it },
         modifier = modifier,
     ) {
-        // All non-null inside the gate; an explicit check keeps smart-cast
-        // happy and survives the exit frame where the target may have just
-        // vanished (dismiss / edit-mode exit / widget removed). Uses the
-        // latched resolve* so exit renders the last content.
-        if (descriptor != null && serializer != null && instance != null &&
-            resolvePath != null && resolveId != null
+        // Non-null inside the gate; an explicit check keeps smart-cast happy and
+        // survives the exit frame where the target may have just vanished
+        // (dismiss / edit-mode exit / widget removed). Uses the latched resolve*
+        // so exit renders the last content. serializer stays nullable (propless).
+        if (descriptor != null && resolvePath != null && resolveId != null
         ) {
             PropPanelBody(
                 descriptor = descriptor,
@@ -124,7 +129,7 @@ fun WidgetPropPanel(
 @Composable
 private fun PropPanelBody(
     descriptor: WidgetDescriptor,
-    serializer: KSerializer<*>,
+    serializer: KSerializer<*>?,
     instance: WidgetInstance,
     path: SlotPath,
     instanceId: String,
@@ -132,7 +137,7 @@ private fun PropPanelBody(
     onDismiss: () -> Unit,
 ) {
     val s = LocalStrings.current
-    val sd = serializer.descriptor
+    val sd = serializer?.descriptor
     // Effective values: the encoded default baseline overlaid with the
     // instance's stored overrides. Every key is present, so each field's
     // current value is non-null.
@@ -165,7 +170,7 @@ private fun PropPanelBody(
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    text       = descriptor.displayName,
+                    text       = s.widgetLabel(descriptor.displayName),
                     style      = MaterialTheme.typography.titleSmall,
                     color      = CelestiaTheme.colors.textPrimary,
                     fontWeight = FontWeight.SemiBold,
@@ -189,26 +194,66 @@ private fun PropPanelBody(
                 .padding(horizontal = 14.dp, vertical = 4.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            for (i in 0 until sd.elementsCount) {
-                val anns = sd.getElementAnnotations(i)
-                if (anns.any { it is PropHidden }) continue
-                val name = sd.getElementName(i)
-                val cur = effective[name] ?: continue
-                val label = anns.filterIsInstance<PropLabel>().firstOrNull()?.value ?: name
-                PropFieldRow(
-                    label       = label,
-                    element     = sd.getElementDescriptor(i),
-                    annotations = anns,
-                    current     = cur,
-                    onChange    = { newValue ->
-                        controller.updateProps(path, instanceId, JsonObject(effective + (name to newValue)))
-                    },
-                )
+            if (sd != null) {
+                for (i in 0 until sd.elementsCount) {
+                    val anns = sd.getElementAnnotations(i)
+                    if (anns.any { it is PropHidden }) continue
+                    val name = sd.getElementName(i)
+                    val cur = effective[name] ?: continue
+                    val label = s.widgetLabel(anns.filterIsInstance<PropLabel>().firstOrNull()?.value ?: name)
+                    PropFieldRow(
+                        label       = label,
+                        element     = sd.getElementDescriptor(i),
+                        annotations = anns,
+                        current     = cur,
+                        onChange    = { newValue ->
+                            controller.updateProps(path, instanceId, JsonObject(effective + (name to newValue)))
+                        },
+                    )
+                }
+                Spacer(Modifier.size(8.dp))
             }
+
+            // Universal "Backing" section: per-widget glass / corner / padding.
+            // Available on every widget, propless included.
+            Text(
+                text       = s.editorBackingTitle,
+                style      = MaterialTheme.typography.labelMedium,
+                color      = CelestiaTheme.colors.textSecondary,
+                fontWeight = FontWeight.SemiBold,
+            )
+            val chrome = instance.chrome ?: WidgetChrome()
+            LabeledSlider(
+                label         = s.editorBackingGlass,
+                value         = chrome.glassAlphaPct.toFloat(),
+                range         = 0f..100f,
+                format        = "%.0f%%",
+                keyStep       = 1f,
+                onValueChange = { controller.updateChrome(path, instanceId, chrome.copy(glassAlphaPct = it.roundToInt())) },
+            )
+            LabeledSlider(
+                label         = s.editorBackingCorner,
+                value         = chrome.cornerRadiusDp.toFloat(),
+                range         = 0f..40f,
+                format        = "%.0f",
+                keyStep       = 1f,
+                onValueChange = { controller.updateChrome(path, instanceId, chrome.copy(cornerRadiusDp = it.roundToInt())) },
+            )
+            LabeledSlider(
+                label         = s.editorBackingPadding,
+                value         = chrome.paddingDp.toFloat(),
+                range         = 0f..32f,
+                format        = "%.0f",
+                keyStep       = 1f,
+                onValueChange = { controller.updateChrome(path, instanceId, chrome.copy(paddingDp = it.roundToInt())) },
+            )
         }
 
         TextButton(
-            onClick  = { controller.updateProps(path, instanceId, JsonObject(emptyMap())) },
+            onClick  = {
+                if (sd != null) controller.updateProps(path, instanceId, JsonObject(emptyMap()))
+                controller.updateChrome(path, instanceId, null)
+            },
             modifier = Modifier.padding(start = 8.dp, end = 8.dp, bottom = 8.dp),
         ) {
             Icon(Icons.Default.RestartAlt, contentDescription = null, modifier = Modifier.size(16.dp))

@@ -19,7 +19,7 @@ import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 
 // Two-chip tag row: minecraft version + assetDir identifier.
-@Widget(id = "server.details.tagbar", displayName = "Теги сервера")
+@Widget(id = "server.details.tagbar", displayName = "widget.server.details.tagbar")
 @Composable
 fun ServerDetailsTagBarWidget(instance: WidgetInstance) {
     val ctx = LocalServerDetailsContext.current

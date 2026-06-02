@@ -7,7 +7,7 @@ import hivens.ui.i18n.LocalStrings
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 
-@Widget(id = "customization.color.success", displayName = "Цвет: success")
+@Widget(id = "customization.color.success", displayName = "widget.customization.color.success")
 @Composable
 fun CustomColorSuccessWidget(instance: WidgetInstance) {
     val ctx = LocalCustomizationContext.current

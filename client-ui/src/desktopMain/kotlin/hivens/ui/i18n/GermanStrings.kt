@@ -708,10 +708,10 @@ object GermanStrings : AppStrings {
     }
 
     override val notifTimeNow                           = "Jetzt"
-    override fun notifTimeSeconds(seconds: Long)        = "${seconds} s"
-    override fun notifTimeMinutes(minutes: Long)        = "${minutes} min"
-    override fun notifTimeHours(hours: Long)            = "${hours} h"
-    override fun notifTimeDays(days: Long)              = "${days} T"
+    override fun notifTimeSeconds(seconds: Long)        = "$seconds s"
+    override fun notifTimeMinutes(minutes: Long)        = "$minutes min"
+    override fun notifTimeHours(hours: Long)            = "$hours h"
+    override fun notifTimeDays(days: Long)              = "$days T"
 
     // --- Home (new) + launch tiles ---
     override val homeRecentTitle    = "Deine Modpacks"
@@ -743,6 +743,122 @@ object GermanStrings : AppStrings {
     override val editorCancel  = "Abbrechen"
     override val editorDelete  = "Löschen"
     override val editorReset   = "Zurücksetzen"
+    override val editorResetAll = "Alles zurücksetzen"
+    override val editorToFront = "In den Vordergrund"
+    override val editorToBack = "In den Hintergrund"
+    override val widgetLabels: Map<String, String> = mapOf(
+        "widget.about.credits" to "Mitwirkende und Technik",
+        "widget.about.credits.title" to "Überschrift (Mitwirkende)",
+        "widget.about.links.card" to "Links",
+        "widget.about.links.card.title" to "Überschrift",
+        "widget.about.logo" to "Logo und Version",
+        "widget.about.logo.title" to "Überschrift",
+        "widget.about.system.card" to "System",
+        "widget.about.system.card.title" to "Überschrift",
+        "widget.about.update.panel" to "Updates",
+        "widget.about.update.panel.title" to "Überschrift",
+        "widget.appshell.region.center" to "Hauptbereich",
+        "widget.appshell.region.collapsed" to "Eingeklappt",
+        "widget.appshell.region.glassAlphaPct" to "Glas, %",
+        "widget.appshell.region.left" to "Linke Leiste",
+        "widget.appshell.region.right" to "Rechte Leiste",
+        "widget.appshell.region.showDivider" to "Trennlinie",
+        "widget.appshell.region.widthDp" to "Breite (0 = flexibel)",
+        "widget.appshell.rightrail.authpanel" to "Anmeldebereich",
+        "widget.appshell.rightrail.compactnews" to "Neuigkeiten",
+        "widget.bg.enable.toggle" to "Hintergrund an/aus",
+        "widget.bg.fx.animspeed" to "Animationstempo",
+        "widget.bg.fx.blur" to "Unschärfe",
+        "widget.bg.fx.darken" to "Abdunkeln",
+        "widget.bg.fx.opacity" to "Deckkraft",
+        "widget.bg.fx.parallax" to "Parallaxe",
+        "widget.bg.fx.saturation" to "Sättigung",
+        "widget.bg.fx.vignette" to "Vignette",
+        "widget.bg.image.picker" to "Hintergrundbild",
+        "widget.bg.loop.mode" to "Wiedergabeschleife",
+        "widget.bg.position.x" to "Position X",
+        "widget.bg.position.y" to "Position Y",
+        "widget.bg.preview" to "Vorschau",
+        "widget.bg.reset" to "Hintergrund zurücksetzen",
+        "widget.bg.scale.mode" to "Skalierung",
+        "widget.bg.tint" to "Tönung",
+        "widget.container.group" to "Gruppe",
+        "widget.container.tabs" to "Tabs",
+        "widget.container.tabs.label1" to "Tab 1",
+        "widget.container.tabs.label2" to "Tab 2",
+        "widget.container.tabs.label3" to "Tab 3",
+        "widget.container.tabs.tabCount" to "Tabs",
+        "widget.customization.accent.override" to "Akzentfarbe",
+        "widget.customization.color.background" to "Farbe: background",
+        "widget.customization.color.criticalAccent" to "Farbe: criticalAccent",
+        "widget.customization.color.error" to "Farbe: error",
+        "widget.customization.color.outline" to "Farbe: outline",
+        "widget.customization.color.primary" to "Farbe: primary",
+        "widget.customization.color.progressAccent" to "Farbe: progressAccent",
+        "widget.customization.color.secondary" to "Farbe: secondary",
+        "widget.customization.color.success" to "Farbe: success",
+        "widget.customization.color.surface" to "Farbe: surface",
+        "widget.customization.color.textPrimary" to "Farbe: textPrimary",
+        "widget.customization.color.textSecondary" to "Farbe: textSecondary",
+        "widget.customization.color.warnAccent" to "Farbe: warnAccent",
+        "widget.customization.density" to "UI-Dichte",
+        "widget.customization.experimental.toggle" to "Experimentelle Einstellungen",
+        "widget.customization.glass.alpha" to "Glas-Deckkraft",
+        "widget.customization.glass.intensity" to "Glas-Intensität",
+        "widget.customization.reset" to "Anpassung zurücksetzen",
+        "widget.customization.shape.animMultiplier" to "Animationstempo",
+        "widget.customization.shape.buttonCorner" to "Button-Rundung",
+        "widget.customization.shape.cardBorder" to "Kartenrahmen-Stärke",
+        "widget.customization.shape.cardCorner" to "Kartenrundung",
+        "widget.customization.shape.softGlow" to "Dekoratives Leuchten",
+        "widget.home.classic.content" to "Klassisches Dashboard",
+        "widget.home.new.clock" to "Uhr",
+        "widget.home.new.clock.accent" to "Akzentfarbe",
+        "widget.home.new.clock.faceSize" to "Zifferblattgröße",
+        "widget.home.new.clock.format24h" to "24-Stunden-Format",
+        "widget.home.new.clock.mode" to "Modus",
+        "widget.home.new.clock.showSeconds" to "Sekunden",
+        "widget.home.new.clock.title" to "Überschrift",
+        "widget.home.new.launchbutton" to "Startknopf",
+        "widget.home.new.launchbutton.label" to "Beschriftung",
+        "widget.home.new.music" to "Musikplayer",
+        "widget.home.new.music.title" to "Überschrift",
+        "widget.home.new.playback.mini" to "Mini-Player",
+        "widget.home.new.progress" to "Hintergrundaktivität",
+        "widget.home.new.progress.idleText" to "Leerlauftext",
+        "widget.home.new.progress.title" to "Überschrift",
+        "widget.home.new.quicklaunch" to "Schnellstart",
+        "widget.home.new.quicklaunch.buttonLabel" to "Knopfbeschriftung",
+        "widget.home.new.recent" to "Pack-Kacheln",
+        "widget.home.new.recent.maxTiles" to "Anzahl Kacheln",
+        "widget.home.new.recent.title" to "Überschrift",
+        "widget.home.new.spacer" to "Abstand",
+        "widget.home.new.spacer.height" to "Höhe",
+        "widget.home.new.welcome" to "Willkommensbanner",
+        "widget.home.new.welcome.customGreeting" to "Eigener Begrüßungstext",
+        "widget.home.new.welcome.showSubtitle" to "Untertitel anzeigen",
+        "widget.library.body" to "Bibliotheksinhalt",
+        "widget.library.body.emptyText" to "Text für leeren Zustand",
+        "widget.library.body.emptyTitle" to "Titel für leeren Zustand",
+        "widget.library.header" to "Bibliothekskopf",
+        "widget.library.header.subtitle" to "Untertitel",
+        "widget.library.header.title" to "Überschrift",
+        "widget.nav.entry" to "Navigationspunkt",
+        "widget.profile.account.section" to "Konto",
+        "widget.profile.nav" to "Profilnavigation",
+        "widget.profile.skin.section" to "Skin",
+        "widget.profile.skin.section.previewHeight" to "Vorschauhöhe",
+        "widget.server.details.banner" to "Server-Banner",
+        "widget.server.details.banner.cornerRadius" to "Eckenrundung",
+        "widget.server.details.description" to "Serverbeschreibung",
+        "widget.server.details.tagbar" to "Server-Tags",
+        "widget.server.details.title" to "Servertitel",
+        "widget.theme.picker.grid" to "Themen-Raster",
+        "widget.theme.picker.preview" to "Themen-Vorschau",
+    )
+    override val recoverySafeModeTitle = "Oberfläche nicht wiederherstellbar"
+    override val recoverySafeModeBody  = "Die Oberfläche ist mehrfach hintereinander abgestürzt. Ein Absturzbericht wurde gespeichert. Starte den Launcher neu."
+    override val recoverySafeModeQuit  = "Beenden"
     override val editorSave    = "Speichern"
     override val editorApply   = "Anwenden"
     override val editorExport  = "Exportieren"
@@ -756,6 +872,10 @@ object GermanStrings : AppStrings {
 
     // --- Layout editor: prop panel ---
     override val editorResetToDefault = "Auf Standard zurücksetzen"
+    override val editorBackingTitle   = "Hintergrund"
+    override val editorBackingGlass   = "Glas"
+    override val editorBackingCorner  = "Ecke"
+    override val editorBackingPadding = "Abstand"
 
     // --- Layout editor: presets ---
     override val editorPresetsTitle          = "Presets"
@@ -768,6 +888,8 @@ object GermanStrings : AppStrings {
     override val editorPaletteHide  = "Palette ausblenden"
     override val editorPaletteHint  = "In einen Slot ziehen"
     override val editorPaletteEmpty = "Widget-Registry ist leer (Build-Fehler)."
+    override val editorPaletteSearch = "Widgets suchen…"
+    override val editorPaletteNoMatch = "Keine Treffer"
 
     // --- Layout editor: empty slot + chrome ---
     override val editorDragWidgetHere   = "Widget hierher ziehen"
@@ -800,6 +922,7 @@ object GermanStrings : AppStrings {
     override val editorSurfShortProfile   = "Profil"
     override val editorSurfShortServer    = "Server"
     override val editorSurfShortTheme     = "Themes"
+    override val editorSurfShortShell     = "Hülle"
 
     // --- Layout editor: surface long names ---
     override val editorSurfHomeClassic = "Start (klassisch)"
@@ -813,6 +936,7 @@ object GermanStrings : AppStrings {
     override val editorSurfProfile     = "Profil"
     override val editorSurfServer      = "Server-Details"
     override val editorSurfTheme       = "Themenauswahl"
+    override val editorSurfShell        = "App-Hülle"
 
     // --- Music player widgets ---
     override val musicPlayerTitle      = "Musik-Player"

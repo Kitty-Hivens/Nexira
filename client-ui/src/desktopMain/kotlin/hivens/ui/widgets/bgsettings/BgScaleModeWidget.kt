@@ -28,7 +28,7 @@ import hivens.ui.theme.CelestiaTheme
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 
-@Widget(id = "bg.scale.mode", displayName = "Масштабирование")
+@Widget(id = "bg.scale.mode", displayName = "widget.bg.scale.mode")
 @Composable
 fun BgScaleModeWidget(instance: WidgetInstance) {
     val ctx = LocalBgSettingsContext.current

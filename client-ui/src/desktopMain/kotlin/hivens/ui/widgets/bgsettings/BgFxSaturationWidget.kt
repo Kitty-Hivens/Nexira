@@ -6,7 +6,7 @@ import hivens.ui.i18n.LocalStrings
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 
-@Widget(id = "bg.fx.saturation", displayName = "Насыщенность")
+@Widget(id = "bg.fx.saturation", displayName = "widget.bg.fx.saturation")
 @Composable
 fun BgFxSaturationWidget(instance: WidgetInstance) {
     val ctx = LocalBgSettingsContext.current

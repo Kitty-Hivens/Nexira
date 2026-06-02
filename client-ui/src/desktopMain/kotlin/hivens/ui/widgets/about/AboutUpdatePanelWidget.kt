@@ -45,7 +45,7 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class AboutUpdateProps(
-    @PropLabel("Заголовок") val title: String = "",
+    @PropLabel("widget.about.update.panel.title") val title: String = "",
 )
 
 // Update check + state machine: Idle (check button) -> Checking
@@ -54,7 +54,7 @@ data class AboutUpdateProps(
 // ctx.showUpdateDialog. Removing this widget loses the in-pane
 // update affordance but the puppet check / dialog routes still
 // work because the state lives in the surface composable.
-@Widget(id = "about.update.panel", displayName = "Обновления", propsClass = AboutUpdateProps::class)
+@Widget(id = "about.update.panel", displayName = "widget.about.update.panel", propsClass = AboutUpdateProps::class)
 @Composable
 fun AboutUpdatePanelWidget(instance: WidgetInstance) {
     val p = instance.rememberProps<AboutUpdateProps>()

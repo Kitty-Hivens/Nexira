@@ -7,7 +7,7 @@ import hivens.ui.i18n.LocalStrings
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 
-@Widget(id = "customization.color.outline", displayName = "Цвет: outline")
+@Widget(id = "customization.color.outline", displayName = "widget.customization.color.outline")
 @Composable
 fun CustomColorOutlineWidget(instance: WidgetInstance) {
     val ctx = LocalCustomizationContext.current
