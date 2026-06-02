@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ProvidableCompositionLocal
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import hivens.widget.model.LayoutGraph
 import hivens.widget.model.SlotAddress
@@ -121,3 +122,10 @@ val LocalSlotMotionMs: ProvidableCompositionLocal<Int> =
 // subtree on each change rather than just the chrome that reads it.
 val LocalCanvasSlotSizeDp: ProvidableCompositionLocal<Size> =
     compositionLocalOf { Size.Zero }
+
+// Editor-only hook: SlotRenderer's Canvas branch reports its window bounds here
+// so a palette drop can land at the release point (converted to slot-local dp).
+// Default no-op; the editor host provides one that registers into the
+// DropTargetRegistry.
+val LocalSlotBoundsReporter: ProvidableCompositionLocal<(SlotPath, Rect) -> Unit> =
+    staticCompositionLocalOf { { _, _ -> } }

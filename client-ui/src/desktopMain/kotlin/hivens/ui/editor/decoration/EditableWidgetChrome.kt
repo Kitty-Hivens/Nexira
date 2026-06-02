@@ -303,7 +303,7 @@ fun EditableWidgetChrome(
                     }
                 }
                 AnimatedVisibility(
-                    visible = isHovered && descriptor.propsSerializer != null,
+                    visible = isHovered,
                     enter   = fadeIn(tween(chromeMotionMs)),
                     exit    = fadeOut(tween(chromeMotionMs)),
                 ) {

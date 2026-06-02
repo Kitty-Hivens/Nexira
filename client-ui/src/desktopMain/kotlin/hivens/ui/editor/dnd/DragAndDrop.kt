@@ -117,6 +117,11 @@ class DropTargetRegistry {
     fun widgetRect(path: SlotPath, instanceId: String): Rect? =
         widgets[path]?.get(instanceId)?.rect
 
+    // Window-coord top-left of a registered slot (Canvas slots report bounds via
+    // LocalSlotBoundsReporter). Lets a palette drop land at the release point.
+    // Null when the slot has not reported bounds.
+    fun slotOrigin(path: SlotPath): Offset? = slotBounds[path]?.topLeft
+
     // Two passes:
     //   1) exact rect hit across all registered sources (widget rects +
     //      empty-slot placeholder bounds), innermost (smallest area)

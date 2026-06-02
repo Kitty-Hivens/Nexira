@@ -20,6 +20,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
@@ -153,11 +155,14 @@ private fun RenderSlotContent(path: SlotPath, modifier: Modifier, spacing: Dp) {
             // clamps a free-placed widget on-canvas. onSizeChanged keeps it
             // current without restarting the gesture.
             val density = LocalDensity.current
+            val reportSlotBounds = LocalSlotBoundsReporter.current
             var slotSizeDp by remember { mutableStateOf(Size.Zero) }
             Box(
-                modifier.onSizeChanged { sz ->
-                    slotSizeDp = with(density) { Size(sz.width.toDp().value, sz.height.toDp().value) }
-                },
+                modifier
+                    .onSizeChanged { sz ->
+                        slotSizeDp = with(density) { Size(sz.width.toDp().value, sz.height.toDp().value) }
+                    }
+                    .onGloballyPositioned { reportSlotBounds(path, it.boundsInWindow()) },
             ) {
                 CompositionLocalProvider(LocalCanvasSlotSizeDp provides slotSizeDp) {
                     // Anchor the edit-mode orientation chip to the corner so it

@@ -114,6 +114,7 @@ import hivens.widget.api.EmptySlotDecorator
 import hivens.widget.api.LocalEmptySlotDecorator
 import hivens.widget.api.LocalSlotControlDecorator
 import hivens.widget.api.LocalSlotDividerDecorator
+import hivens.widget.api.LocalSlotBoundsReporter
 import hivens.widget.api.LocalSlotMotionMs
 import hivens.widget.api.LocalSlotPath
 import hivens.ui.theme.CelestiaTheme
@@ -372,6 +373,13 @@ fun EditorSurfaceHost(
         LocalSlotMotionMs provides if (state is EditModeState.On && !previewing) {
             LocalStyle.current.animationDurationMs(260)
         } else 0,
+        // Canvas slots report their window bounds so palette drops land at the
+        // release point (PaletteItem reads slotOrigin to convert the pointer).
+        LocalSlotBoundsReporter provides if (state is EditModeState.On && !previewing) {
+            { p, r -> registry.registerSlot(p, r) }
+        } else {
+            { _, _ -> }
+        },
         // Stub surface contexts. Surface composables that mount under
         // content() override with the real values; widgets dropped on
         // a foreign surface fall through to the stubs and render

@@ -33,6 +33,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -42,6 +43,7 @@ import hivens.ui.editor.dnd.DragController
 import hivens.ui.editor.dnd.DragPayload
 import hivens.ui.editor.dnd.DropTargetRegistry
 import hivens.ui.editor.dnd.dragSource
+import hivens.ui.editor.windowPointToSlotDp
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
 import hivens.widget.api.LocalLayoutGraph
@@ -71,6 +73,7 @@ fun PaletteItem(
     val s = LocalStrings.current
     // Resolve the widget's label via key-indirection (see AppStrings.widgetLabel).
     val label = s.widgetLabel(descriptor.displayName)
+    val density = LocalDensity.current.density
 
     val background = if (isHovered) CelestiaTheme.colors.primary.copy(alpha = 0.12f)
                      else Color.Transparent
@@ -92,13 +95,22 @@ fun PaletteItem(
                     val targetPath = registry.slotForPoint(pointer) ?: return@dragSource
                     val target = graph.traverse(targetPath)
                     if (target?.orientation == SlotOrientation.Canvas) {
-                        // Free placement: seed a staggered slot relative to the
-                        // current count so the new widget lands clear of the
-                        // existing widgets instead of at (0,0).
+                        // Free placement: drop at the release point (pointer ->
+                        // slot-local dp via the slot's reported window origin).
+                        // Fall back to a staggered seed if the slot has not
+                        // reported bounds. seed carries the default size/z.
+                        val seed = seededCanvasPlacement(target.widgets.size)
+                        val origin = registry.slotOrigin(targetPath)
+                        val placement = if (origin != null) {
+                            val (xDp, yDp) = windowPointToSlotDp(pointer.x, pointer.y, origin.x, origin.y, density)
+                            seed.copy(x = xDp.coerceAtLeast(0f), y = yDp.coerceAtLeast(0f))
+                        } else {
+                            seed
+                        }
                         editController.addWidget(
                             targetPath, descriptor.kind, descriptor.slots,
                             index  = target.widgets.size,
-                            canvas = seededCanvasPlacement(target.widgets.size),
+                            canvas = placement,
                         )
                     } else {
                         val orientation = target?.orientation ?: SlotOrientation.Column
