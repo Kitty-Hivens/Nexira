@@ -222,6 +222,8 @@ class LauncherServiceTest {
                 clientProvider = deadHttpClientProvider(),
                 json = json,
             ),
+            profilerStore = ProfilerProfileStore(json),
+            agentExtractor = AgentExtractor(workDir),
             sharedAssetsDir = workDir / "assets",
             sharedLibrariesDir = workDir / "libraries",
         )

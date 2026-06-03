@@ -10,4 +10,11 @@ object Storage {
     const val SERVERS_CACHE_FILE    = "servers-cache.json"
     const val LAYOUT_GRAPH_FILE     = "layout-graph.json"
     const val PRESETS_DIR           = "presets"
+
+    /** Extracted runtime helpers under the data dir (e.g. the profiler agent jar). */
+    const val RUNTIME_DIR           = "runtime"
+    /** Per-instance: the profiler agent's last-session metrics (the agent writes it). */
+    const val PROFILER_METRICS_FILE = "profiler-metrics.json"
+    /** Per-instance: the launcher's persisted derived-heap profile. */
+    const val HEAP_PROFILE_FILE     = "profiler.json"
 }

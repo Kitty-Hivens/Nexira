@@ -93,7 +93,9 @@ internal class GameCommandBuilder(
         serverProfile: ServerProfile,
         session: SessionData,
         userProfile: InstanceProfile,
-        classpath: String
+        classpath: String,
+        agentJarPath: Path? = null,
+        metricsOutPath: Path? = null,
     ): List<String> = build(
         javaExec   = javaExec,
         memoryMB   = memoryMB,
@@ -107,6 +109,8 @@ internal class GameCommandBuilder(
         ),
         session    = session,
         classpath  = classpath,
+        agentJarPath   = agentJarPath,
+        metricsOutPath = metricsOutPath,
     )
 
     /**
@@ -120,7 +124,9 @@ internal class GameCommandBuilder(
         clientRoot: Path,
         target: LaunchTarget,
         session: SessionData,
-        classpath: String
+        classpath: String,
+        agentJarPath: Path? = null,
+        metricsOutPath: Path? = null,
     ): List<String> {
         val version = target.mcVersion
         val config = getConfig(version)
@@ -184,6 +190,7 @@ internal class GameCommandBuilder(
 
         args.add("-Xms${minOf(memoryMB, 512)}M")
         args.add("-Xmx${memoryMB}M")
+        addProfilerArgs(args, agentJarPath, metricsOutPath)
 
         // 7. Java 9+ Module Path (NeoForge / Modern Forge) dynamically resolved
         var validModules = emptyList<String>()
@@ -281,6 +288,8 @@ internal class GameCommandBuilder(
         runtime: ResolvedRuntime,
         session: SessionData,
         jvmArgsOverride: String?,
+        agentJarPath: Path? = null,
+        metricsOutPath: Path? = null,
     ): List<String> {
         val args = ArrayList<String>()
         args.add(javaExec)
@@ -320,6 +329,7 @@ internal class GameCommandBuilder(
         }
         args.add("-Xms${minOf(memoryMB, 512)}M")
         args.add("-Xmx${memoryMB}M")
+        addProfilerArgs(args, agentJarPath, metricsOutPath)
 
         args.add("-cp")
         args.add(if (usesModernArgs) modernClasspath(runtime) else packClasspath(runtime))
@@ -432,6 +442,19 @@ internal class GameCommandBuilder(
             args.add("-XstartOnFirstThread")
             args.add("-Djava.awt.headless=false")
         }
+    }
+
+    /**
+     * Attaches the heap-profiler agent for an adaptive launch. Both flags go in
+     * as discrete argv elements (ProcessBuilder's list form passes each verbatim,
+     * so a path with spaces is safe). The metrics out-path rides a `-D` property,
+     * NOT the `-javaagent:jar=opts` suffix -- that suffix splits on its first `=`
+     * and mangles Windows drive/paths. No-op unless both paths are present.
+     */
+    private fun addProfilerArgs(args: MutableList<String>, agentJarPath: Path?, metricsOutPath: Path?) {
+        if (agentJarPath == null || metricsOutPath == null) return
+        args.add("-Dnexira.profiler.out=${metricsOutPath.toAbsolutePath()}")
+        args.add("-javaagent:${agentJarPath.toAbsolutePath()}")
     }
 
     private fun addSessionAuthArgs(args: MutableList<String>, session: SessionData) {
