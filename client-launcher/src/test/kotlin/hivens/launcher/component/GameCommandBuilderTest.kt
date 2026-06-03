@@ -548,7 +548,8 @@ class GameCommandBuilderTest {
         assertTrue(cmd.contains("-noverify"), "legacy launchwrapper runtime gets -noverify")
         assertTrue(cmd.contains("net.minecraft.launchwrapper.Launch"))
         assertEquals("1.12", cmd[cmd.indexOf("--assetIndex") + 1])
-        assertTrue(cmd[cmd.indexOf("--assetsDir") + 1].contains("shared/assets"), "assets from the shared root")
+        // Normalize separators -- the resolved path uses '\' on Windows.
+        assertTrue(cmd[cmd.indexOf("--assetsDir") + 1].replace('\\', '/').contains("shared/assets"), "assets from the shared root")
         assertEquals("net.minecraftforge.fml.common.launcher.FMLTweaker", cmd[cmd.indexOf("--tweakClass") + 1])
     }
 
@@ -651,11 +652,11 @@ class GameCommandBuilderTest {
         // Module path kept, with ${library_directory}/${classpath_separator} resolved.
         val pValue = cmd[cmd.indexOf("-p") + 1]
         assertTrue(pValue.contains("bootstraplauncher-2.0.2.jar"), "boot module on -p")
-        assertTrue(pValue.contains("/tmp/shared/libraries"), "library_directory substituted, got $pValue")
+        assertTrue(pValue.replace('\\', '/').contains("/tmp/shared/libraries"), "library_directory substituted, got $pValue")
         assertFalse(pValue.contains($$"${"), "no placeholder left in -p, got $pValue")
         assertTrue(pValue.contains(File.pathSeparator), "two boot jars joined by the path separator, got $pValue")
 
-        assertTrue(cmd.contains("-DlibraryDirectory=/tmp/shared/libraries"), "libraryDirectory substituted")
+        assertTrue(cmd.any { it.startsWith("-DlibraryDirectory=") && it.replace('\\', '/').contains("/tmp/shared/libraries") }, "libraryDirectory substituted")
         assertTrue(cmd.contains("--add-opens=java.base/java.lang=ALL-UNNAMED"), "kept add-opens")
         assertTrue(cmd.contains("--add-modules=jdk.incubator.vector"), "vector module added on the module path")
 
