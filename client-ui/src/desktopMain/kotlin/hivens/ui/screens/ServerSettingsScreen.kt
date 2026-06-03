@@ -88,6 +88,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
     var profile    by remember { mutableStateOf<InstanceProfile?>(null) }
     var javaPath   by remember { mutableStateOf("") }
     var memory     by remember { mutableStateOf(4096) }
+    var ramTouched by remember { mutableStateOf(false) }
     var jvmArgs    by remember { mutableStateOf("") }
     var winWidth   by remember { mutableStateOf("925") }
     var winHeight  by remember { mutableStateOf("530") }
@@ -135,6 +136,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
             val updated = p.copy(
                 javaPath     = javaPath.ifBlank { null },
                 memoryMb     = memory,
+                adaptiveMemory = if (ramTouched) false else p.adaptiveMemory,
                 jvmArgs      = jvmArgs.ifBlank { null },
                 windowWidth  = winWidth.toIntOrNull() ?: 925,
                 windowHeight = winHeight.toIntOrNull() ?: 530,
@@ -276,7 +278,8 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                     // ── RAM -- RamSelector replaces old Slider ─────────────────
                     RamSelector(
                         currentMb = memory,
-                        onValueChanged = { memory = it }
+                        // An explicit pick opts this server out of Auto heap.
+                        onValueChanged = { memory = it; ramTouched = true }
                     )
 
                     Spacer(Modifier.height(16.dp))

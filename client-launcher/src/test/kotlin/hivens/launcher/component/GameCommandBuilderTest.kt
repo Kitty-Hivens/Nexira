@@ -668,4 +668,41 @@ class GameCommandBuilderTest {
         assertEquals("neoforgeclient", cmd[cmd.indexOf("--launchTarget") + 1])
         assertEquals("21.1.66", cmd[cmd.indexOf("--fml.neoForgeVersion") + 1])
     }
+
+    @Test
+    fun `profiler args inject as discrete elements in the JVM-arg region`() {
+        val cmd = builder.buildPackCommand(
+            javaExec = "/usr/bin/java",
+            memoryMB = 4096,
+            gameDir = Path.of("/tmp/instances/Industrial"),
+            sharedAssetsDir = Path.of("/tmp/shared/assets"),
+            sharedLibrariesDir = Path.of("/tmp/shared/libraries"),
+            nativesDirName = "bin/natives-1.12.2",
+            versionLabel = "Forge 1.12.2",
+            javaMajor = 8,
+            runtime = forgeRuntime(),
+            session = session(),
+            jvmArgsOverride = null,
+            agentJarPath = Path.of("/home/My Games/runtime/profiler-agent.jar"),
+            metricsOutPath = Path.of("/home/My Games/instances/Industrial/profiler-metrics.json"),
+        )
+        assertEquals(1, cmd.count { it.startsWith("-javaagent:") }, "exactly one -javaagent")
+        assertEquals(1, cmd.count { it.startsWith("-Dnexira.profiler.out=") }, "exactly one out-property")
+        // A path with a space must survive as one argv element (ProcessBuilder list form).
+        assertTrue(cmd.single { it.startsWith("-javaagent:") }.contains("My Games"), "agent path kept whole")
+        // Both land in the JVM-arg region: after -Xmx, before -cp / main class.
+        val xmx = cmd.indexOfFirst { it.startsWith("-Xmx") }
+        val cp = cmd.indexOf("-cp")
+        val agent = cmd.indexOfFirst { it.startsWith("-javaagent:") }
+        val outProp = cmd.indexOfFirst { it.startsWith("-Dnexira.profiler.out=") }
+        assertTrue(xmx in 0 until agent && agent < cp, "agent after -Xmx and before -cp (xmx=$xmx agent=$agent cp=$cp)")
+        assertTrue(outProp in 0 until cp, "out-property before -cp")
+    }
+
+    @Test
+    fun `no profiler args when agent paths are null`() {
+        val cmd = packCommand()
+        assertTrue(cmd.none { it.startsWith("-javaagent:") }, "no -javaagent without paths")
+        assertTrue(cmd.none { it.startsWith("-Dnexira.profiler.out=") }, "no out-property without paths")
+    }
 }

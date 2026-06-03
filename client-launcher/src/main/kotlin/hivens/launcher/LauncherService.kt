@@ -5,10 +5,13 @@ import hivens.core.api.interfaces.ILauncherService
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.CachedManifestSnapshot
 import hivens.core.data.FileManifest
+import hivens.core.data.HeapProfile
 import hivens.core.data.InstanceProfile
 import hivens.core.data.InstanceRuntime
 import hivens.core.data.LauncherLogType
 import hivens.core.data.SessionData
+import hivens.core.jvm.HeapDeriver
+import hivens.core.jvm.SystemMemory
 import hivens.launcher.component.ClasspathProvider
 import hivens.launcher.component.EnvironmentPreparer
 import hivens.launcher.component.GameCommandBuilder
@@ -35,6 +38,8 @@ internal class LauncherService(
     private val commandBuilder: GameCommandBuilder,
     private val logHandler: ProcessLogHandler,
     private val runtimeProvisioner: RuntimeProvisioner,
+    private val profilerStore: ProfilerProfileStore,
+    private val agentExtractor: AgentExtractor,
     private val sharedAssetsDir: Path,
     private val sharedLibrariesDir: Path,
 ) : ILauncherService {
@@ -53,13 +58,19 @@ internal class LauncherService(
         clientRootPath: Path,
         javaExecutablePath: Path,
         allocatedMemoryMB: Int,
+        adaptiveMemory: Boolean,
         onLog: (String, LauncherLogType) -> Unit
     ): Process {
         val profile: InstanceProfile = profileManager.getProfile(serverProfile.assetDir)
         val version = serverProfile.version
 
-        // 1. Memory allocation strategy
-        val memory = normalizeMemory(profile.memoryMb, allocatedMemoryMB)
+        // 1. Memory allocation strategy (adaptive heap when opted in, else static)
+        val adaptive = resolveAdaptive(
+            enabled = adaptiveMemory && profile.adaptiveMemory,
+            instanceDir = clientRootPath,
+            baseMemoryMb = normalizeMemory(profile.memoryMb, allocatedMemoryMB),
+        )
+        val memory = adaptive.memoryMb
 
         // 2. Determining the path to Java
         val javaExec: String = resolveJavaPath(javaManager, profile, javaExecutablePath, version)
@@ -81,7 +92,9 @@ internal class LauncherService(
         val command = commandBuilder.build(
             javaExec, memory, clientRootPath,
             serverProfile, sessionData, profile,
-            classpath
+            classpath,
+            agentJarPath = adaptive.agentJar,
+            metricsOutPath = adaptive.metricsOut,
         )
 
         return spawnProcess(command, clientRootPath, onLog)
@@ -95,7 +108,8 @@ internal class LauncherService(
         allocatedMemoryMB: Int
     ): Process {
         return launchClientWithLogs(
-            sessionData, serverProfile, clientRootPath, javaExecutablePath, allocatedMemoryMB
+            sessionData, serverProfile, clientRootPath, javaExecutablePath, allocatedMemoryMB,
+            adaptiveMemory = false,
         ) { _, _ -> /* Logs are ignored */ }
     }
 
@@ -107,14 +121,20 @@ internal class LauncherService(
         clientRootPath: Path,
         javaPathOverride: Path?,
         allocatedMemoryMB: Int,
+        adaptiveMemory: Boolean,
         displayName: String,
         onLog: (String, LauncherLogType) -> Unit
     ): Process {
         val mcVersion = manifest.minecraftVersion
 
-        // 1. Memory allocation strategy -- same floor logic as the
-        // SC path; the InstanceRuntime value wins when positive.
-        val memory = normalizeMemory(runtime.memoryMb, allocatedMemoryMB)
+        // 1. Memory allocation strategy -- same floor logic as the SC path; the
+        // InstanceRuntime value wins when positive, then adaptive may refine it.
+        val adaptive = resolveAdaptive(
+            enabled = adaptiveMemory && runtime.adaptiveMemory,
+            instanceDir = clientRootPath,
+            baseMemoryMb = normalizeMemory(runtime.memoryMb, allocatedMemoryMB),
+        )
+        val memory = adaptive.memoryMb
 
         onLog("Running $displayName...", LauncherLogType.INFO)
 
@@ -168,6 +188,8 @@ internal class LauncherService(
             runtime = resolved,
             session = sessionData,
             jvmArgsOverride = runtime.jvmArgs,
+            agentJarPath = adaptive.agentJar,
+            metricsOutPath = adaptive.metricsOut,
         )
 
         return spawnProcess(command, clientRootPath, onLog)
@@ -191,6 +213,47 @@ internal class LauncherService(
         logHandler.attach(process, onLog)
         return process
     }
+
+    /**
+     * Resolves heap + profiler-agent attachment for a launch. Adaptive off ->
+     * static [baseMemoryMb], no agent. Adaptive on -> fold the previous session's
+     * metrics into the per-instance rolling profile, derive the next heap from the
+     * reliable samples (keep [baseMemoryMb] until data exists), persist, and attach
+     * the agent so THIS session produces the next sample.
+     */
+    private fun resolveAdaptive(enabled: Boolean, instanceDir: Path, baseMemoryMb: Int): AdaptiveLaunch {
+        if (!enabled) return AdaptiveLaunch(baseMemoryMb, null, null)
+
+        val profile = profilerStore.readProfile(instanceDir) ?: HeapProfile()
+        // Consume the previous session's metrics: fold once, never re-read a stale
+        // file (a session that crashed before its shutdown hook wrote leaves none).
+        val last = profilerStore.readMetrics(instanceDir)
+        profilerStore.deleteMetrics(instanceDir)
+        val samples = if (last != null && last.liveSetReliable) {
+            (profile.recentSamples + last).takeLast(ProfilerProfileStore.SAMPLE_WINDOW)
+        } else {
+            profile.recentSamples
+        }
+
+        // 1024 == the modded-client floor normalizeMemory also enforces.
+        val derived = HeapDeriver.derive(samples.map { it.liveSetMb }, SystemMemory.totalPhysicalMb(), floorMb = 1024)
+        if (samples != profile.recentSamples || derived != profile.derivedHeapMb) {
+            profilerStore.writeProfile(
+                instanceDir,
+                profile.copy(
+                    derivedHeapMb = derived,
+                    recentSamples = samples,
+                    updatedAtEpoch = System.currentTimeMillis(),
+                ),
+            )
+        }
+
+        val agentJar = agentExtractor.ensureExtracted()
+        val metricsOut = if (agentJar != null) profilerStore.metricsPath(instanceDir) else null
+        return AdaptiveLaunch(derived ?: baseMemoryMb, agentJar, metricsOut)
+    }
+
+    private data class AdaptiveLaunch(val memoryMb: Int, val agentJar: Path?, val metricsOut: Path?)
 
     /** Display label for `--version`, e.g. "Forge 1.12.2" / "Fabric 1.20.1". */
     private fun packVersionLabel(loaderName: String, mcVersion: String): String {

@@ -22,6 +22,8 @@ import hivens.launcher.component.GameCommandBuilder
 import hivens.launcher.component.ProcessLogHandler
 import hivens.launcher.launch.LauncherController
 import hivens.launcher.mrpack.MrpackInstaller
+import hivens.launcher.AgentExtractor
+import hivens.launcher.ProfilerProfileStore
 import hivens.launcher.platform.PlatformPaths
 import hivens.launcher.runtime.RuntimeProvisioner
 import hivens.launcher.runtime.loader.FabricLikeResolver
@@ -604,6 +606,11 @@ val appModule = module {
         )
     }
 
+    // Adaptive-memory profiler: reads the agent's per-session metrics + persists
+    // the per-instance derived-heap profile; extracts the agent jar to the data dir.
+    single { ProfilerProfileStore(get()) }
+    single { AgentExtractor(get<Path>()) }
+
     /**
      * Basic launch service. All collaborators are constructor-injected so the
      * facade is fully replaceable / mockable in tests.
@@ -617,6 +624,8 @@ val appModule = module {
             commandBuilder     = get(),
             logHandler         = get(),
             runtimeProvisioner = get(),
+            profilerStore      = get(),
+            agentExtractor     = get(),
             sharedAssetsDir    = get<PlatformPaths>().assetsDir,
             sharedLibrariesDir = get<PlatformPaths>().librariesDir,
         )

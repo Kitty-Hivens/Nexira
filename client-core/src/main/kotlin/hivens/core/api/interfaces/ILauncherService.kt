@@ -30,6 +30,7 @@ interface ILauncherService {
         clientRootPath: Path,
         javaExecutablePath: Path,
         allocatedMemoryMB: Int,
+        adaptiveMemory: Boolean = false,
         onLog: (String, LauncherLogType) -> Unit,
     ): Process
 
@@ -81,6 +82,7 @@ interface ILauncherService {
         clientRootPath: Path,
         javaPathOverride: Path?,
         allocatedMemoryMB: Int,
+        adaptiveMemory: Boolean = false,
         displayName: String,
         onLog: (String, LauncherLogType) -> Unit,
     ): Process

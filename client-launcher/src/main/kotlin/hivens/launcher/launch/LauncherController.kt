@@ -370,6 +370,7 @@ class LauncherController(
                     clientRootPath = clientDir,
                     javaExecutablePath = javaPath,
                     allocatedMemoryMB = settings.memoryMB,
+                    adaptiveMemory = settings.adaptiveMemoryEnabled,
                 ) { text, type ->
                     emit(LaunchLogEvent.ProcessOutput(text, type))
                 }
@@ -509,6 +510,7 @@ class LauncherController(
                     clientRootPath       = clientDir,
                     javaPathOverride     = javaOverride,
                     allocatedMemoryMB    = settings.memoryMB,
+                    adaptiveMemory       = settings.adaptiveMemoryEnabled,
                     displayName          = refreshedInstance.displayName,
                 ) { text, type ->
                     emit(LaunchLogEvent.ProcessOutput(text, type))
