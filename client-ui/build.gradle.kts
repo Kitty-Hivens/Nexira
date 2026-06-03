@@ -101,6 +101,14 @@ kotlin {
             }
         }
 
+        // The profiler agent jar ships as an OPAQUE resource under /runtime/, NOT a
+        // compile dependency: it lands in the ProGuard'd uber jar where
+        // -repackageclasses would rename its Premain-Class and break -javaagent.
+        // AgentExtractor reads /runtime/profiler-agent.jar at runtime. The
+        // bundleProfilerAgent task (below) fills this generated dir; every
+        // *ProcessResources task depends on it.
+        desktopMain.resources.srcDir(layout.buildDirectory.dir("generated/profilerAgent"))
+
         // First UI-side test source set. Compose-MP auto-creates the
         // task `desktopTest`; explicit source-set wiring lets the
         // module declare kotlin-test + coroutines-test deps and pull
@@ -524,6 +532,18 @@ tasks.configureEach {
         )
     }
 }
+
+// Stage the :profiler-agent jar (renamed to a stable name) into the generated
+// resources dir registered above, so it ships inside the uber jar as
+// /runtime/profiler-agent.jar. `from(task)` wires the dependency on
+// :profiler-agent:jar; the explicit *ProcessResources dependency guarantees the
+// file exists before resources are processed (the srcDir is a plain dir, so
+// Gradle does not infer the task edge on its own).
+val bundleProfilerAgent = tasks.register<Copy>("bundleProfilerAgent") {
+    from(project(":profiler-agent").tasks.named("jar")) { rename { "profiler-agent.jar" } }
+    into(layout.buildDirectory.dir("generated/profilerAgent/runtime"))
+}
+tasks.matching { it.name.endsWith("ProcessResources") }.configureEach { dependsOn(bundleProfilerAgent) }
 
 // Portable ZIP packaging lives in the build_release workflow's
 // PowerShell step, not in a Gradle task. The previous local-dev task

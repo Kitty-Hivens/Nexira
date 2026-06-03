@@ -2,6 +2,7 @@ package hivens.ui.screens.settings
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.NewReleases
 import androidx.compose.material.icons.filled.Science
 import androidx.compose.material.icons.filled.Sync
@@ -114,6 +115,21 @@ internal fun ExperimentalSection(
     )
     PuppetToggle("settings.jvmBuilder", form.jvmBuilderEnabled, enabled = form.experimentalEnabled) {
         form.jvmBuilderEnabled = it; save()
+    }
+
+    Spacer(Modifier.height(4.dp))
+
+    SettingsRowWithDescription(
+        title          = s.settingsAdaptiveMemory,
+        description    = s.settingsAdaptiveMemoryDesc,
+        icon           = Icons.Default.Memory,
+        iconTint       = CelestiaTheme.colors.primary,
+        checked        = form.experimentalEnabled && form.adaptiveMemoryEnabled,
+        enabled        = form.experimentalEnabled,
+        onCheckedChange = { form.adaptiveMemoryEnabled = it; save() }
+    )
+    PuppetToggle("settings.adaptiveMemory", form.adaptiveMemoryEnabled, enabled = form.experimentalEnabled) {
+        form.adaptiveMemoryEnabled = it; save()
     }
 
     Spacer(Modifier.height(4.dp))
