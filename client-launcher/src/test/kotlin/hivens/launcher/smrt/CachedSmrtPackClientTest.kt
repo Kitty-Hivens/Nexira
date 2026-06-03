@@ -18,10 +18,14 @@ import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import io.ktor.utils.io.ByteReadChannel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import java.nio.file.Files
 import java.nio.file.Path
@@ -114,7 +118,14 @@ class CachedSmrtPackClientTest {
         assertEquals(1, counter.get())
         clock.advance(2_000)               // past the 1s TTL -> stale
         client.listPacks()                 // serves stale, triggers background refresh
+        // The refresh is fire-and-forget through Ktor, whose call is not bound to
+        // the virtual scheduler -- advanceUntilIdle() can return before the
+        // background read lands (rare, timing-dependent; surfaced on a slower CI
+        // runner). Await the observable effect within a real-time bound instead.
         advanceUntilIdle()
+        withContext(Dispatchers.Default) {
+            withTimeout(5_000) { while (counter.get() < 2) delay(10) }
+        }
         assertEquals(2, counter.get(), "stale read revalidates exactly once in the background")
     }
 
