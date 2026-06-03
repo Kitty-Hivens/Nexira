@@ -53,6 +53,7 @@ class RuntimeProvisioner(
     private val json: Json,
     private val loaderRegistry: LoaderRegistry = LoaderRegistry(emptyList()),
     osName: String = System.getProperty("os.name", ""),
+    osArch: String = System.getProperty("os.arch", ""),
     private val versionManifestUrl: String = VERSION_MANIFEST_URL,
     private val resourcesBaseUrl: String = RESOURCES_BASE,
 ) {
@@ -71,7 +72,7 @@ class RuntimeProvisioner(
      * x64 spellings.
      */
     private val acceptedNativeClassifiers: Set<String> = run {
-        val arch = System.getProperty("os.arch", "").lowercase()
+        val arch = osArch.lowercase()
         val arm64 = arch.contains("aarch64") || arch.contains("arm64")
         when (mojangOs) {
             "windows" -> if (arm64) setOf("natives-windows-arm64") else setOf("natives-windows")

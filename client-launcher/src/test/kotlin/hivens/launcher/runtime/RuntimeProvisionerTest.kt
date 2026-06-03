@@ -45,12 +45,20 @@ class RuntimeProvisionerTest {
 
     private fun sha1(s: String): String = sha1(s.toByteArray())
 
-    private fun provisioner(client: HttpClient, osName: String = "Linux") = RuntimeProvisioner(
+    // Pin the host arch: CI runners vary (macos-latest is arm64), and an
+    // un-pinned os.arch flips acceptedNativeClassifiers to the -arm64 variant,
+    // breaking tests that assert the x64 `natives-<os>` classifier.
+    private fun provisioner(
+        client: HttpClient,
+        osName: String = "Linux",
+        osArch: String = "amd64",
+    ) = RuntimeProvisioner(
         librariesDir = librariesDir,
         assetsDir = assetsDir,
         clientProvider = HttpClientProvider { client },
         json = json,
         osName = osName,
+        osArch = osArch,
         versionManifestUrl = MANIFEST_URL,
         resourcesBaseUrl = RES_BASE,
     )
