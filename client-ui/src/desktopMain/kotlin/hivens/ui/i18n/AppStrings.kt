@@ -332,6 +332,8 @@ interface AppStrings {
     val settingsAutoSyncAllPacksDesc: String
     val settingsJvmBuilder: String
     val settingsJvmBuilderDesc: String
+    val settingsAdaptiveMemory: String
+    val settingsAdaptiveMemoryDesc: String
     val settingsMimicVersion: String
     val settingsMimicVersionDesc: String
     /** Placeholder shown inside the mimic-version text field when override is empty. Receives the built-in default version, e.g. `Default: 3.6.5`. */

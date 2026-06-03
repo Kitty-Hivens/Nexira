@@ -70,7 +70,9 @@ class ProfileManager(
     }
 
     fun getProfile(serverId: String): InstanceProfile {
-        return profiles.computeIfAbsent(serverId) { InstanceProfile(it) }
+        // New (never-configured) servers opt into Auto heap; an explicit RAM pick
+        // in ServerSettingsScreen flips adaptiveMemory back off.
+        return profiles.computeIfAbsent(serverId) { InstanceProfile(it, adaptiveMemory = true) }
     }
 
     fun saveProfile(profile: InstanceProfile) {

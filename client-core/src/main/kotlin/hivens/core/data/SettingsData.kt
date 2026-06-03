@@ -100,6 +100,17 @@ data class SettingsData(
     val jvmBuilderEnabled: Boolean = false,
 
     /**
+     * Adaptive memory: let the profiler agent size each instance's heap from
+     * its observed live-set instead of the static [memoryMB] default. On by
+     * default (under the experimental master) -- new instances run Auto, and
+     * picking a specific RAM value opts that instance out. This global flag is
+     * the kill-switch; the per-instance opt-in lives on `InstanceProfile` /
+     * `InstanceRuntime` (`adaptiveMemory`). Both must be true for a heap to be
+     * derived, so an explicitly-set instance is never silently overridden.
+     */
+    val adaptiveMemoryEnabled: Boolean = true,
+
+    /**
      * Skip the direct-channel attempt; route every SmartyCraft request
      * through SOCKS5 from the first call. Off by default -- direct works
      * for ~99% of users. Enable when `smartycraft.ru:443` is blocked

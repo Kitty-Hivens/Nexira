@@ -186,7 +186,7 @@ class LauncherControllerTest {
         every { process.waitFor() } returns 0
         every { process.destroy() } just runs
         coEvery {
-            launcherService.launchClientWithLogs(any(), any(), any(), any(), any(), any())
+            launcherService.launchClientWithLogs(any(), any(), any(), any(), any(), any(), any())
         } returns process
 
         val controller = newController(this)
@@ -212,7 +212,7 @@ class LauncherControllerTest {
 
         coVerify(exactly = 1) { authService.login("tester", "pw", "test") }
         coVerify(exactly = 1) {
-            launcherService.launchClientWithLogs(any(), any(), any(), any(), any(), any())
+            launcherService.launchClientWithLogs(any(), any(), any(), any(), any(), any(), any())
         }
 
         collectorJob.cancel()
@@ -313,6 +313,7 @@ class LauncherControllerTest {
                 clientRootPath     = any(),
                 javaPathOverride   = any(),
                 allocatedMemoryMB  = any(),
+                adaptiveMemory     = any(),
                 displayName        = any(),
                 onLog              = any(),
             )
@@ -439,6 +440,7 @@ class LauncherControllerTest {
                 clientRootPath     = any(),
                 javaPathOverride   = any(),
                 allocatedMemoryMB  = any(),
+                adaptiveMemory     = any(),
                 displayName        = any(),
                 onLog              = any(),
             )
@@ -481,7 +483,7 @@ class LauncherControllerTest {
             state.reason,
         )
         coVerify(exactly = 0) {
-            launcherService.launchPackClient(any(), any(), any(), any(), any(), any(), any(), any())
+            launcherService.launchPackClient(any(), any(), any(), any(), any(), any(), any(), any(), any())
         }
         coVerify(exactly = 0) { authService.login(any(), any(), any()) }
     }
@@ -544,7 +546,7 @@ class LauncherControllerTest {
         assertIs<LaunchState.Error>(state)
         assertEquals(LaunchError.TwoFactorExpired, state.reason)
         coVerify(exactly = 0) {
-            launcherService.launchPackClient(any(), any(), any(), any(), any(), any(), any(), any())
+            launcherService.launchPackClient(any(), any(), any(), any(), any(), any(), any(), any(), any())
         }
     }
 
@@ -565,7 +567,7 @@ class LauncherControllerTest {
         every { process.waitFor() } returns 137 // SIGKILL exit code
         every { process.destroy() } just runs
         coEvery {
-            launcherService.launchClientWithLogs(any(), any(), any(), any(), any(), any())
+            launcherService.launchClientWithLogs(any(), any(), any(), any(), any(), any(), any())
         } returns process
 
         val controller = newController(this)

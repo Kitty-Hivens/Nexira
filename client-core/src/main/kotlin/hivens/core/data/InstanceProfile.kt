@@ -12,6 +12,13 @@ data class InstanceProfile(
      * smooth); the constructor screen overwrites this on save.
      */
     val memoryMb: Int = 6144,
+    /**
+     * Auto heap sizing for this server. The moment the user picks an explicit
+     * RAM value in RamSelector this flips to false (explicit wins). Default
+     * false so profiles persisted before this field existed keep their stored
+     * [memoryMb]; only freshly-created profiles opt in (set true at creation).
+     */
+    val adaptiveMemory: Boolean = false,
     val javaPath: String? = null,
     val jvmArgs: String? = null,
     val windowWidth: Int = 925,
