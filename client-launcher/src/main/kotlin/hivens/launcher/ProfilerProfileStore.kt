@@ -65,7 +65,11 @@ class ProfilerProfileStore(private val json: Json) {
     }
 
     companion object {
-        /** How many recent reliable live-set samples to keep in the rolling window. */
+        /**
+         * How many recent samples to keep in the rolling window. Each carries a
+         * reliable live set OR a positive peak (`HeapDeriver.foldSample` admits
+         * them; the deriver filters reliability per term).
+         */
         const val SAMPLE_WINDOW = 5
     }
 }

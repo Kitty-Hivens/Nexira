@@ -8,6 +8,7 @@ import hivens.core.data.InstanceProfile
 import hivens.core.data.LauncherLogType
 import hivens.core.data.SessionData
 import hivens.core.api.model.ServerProfile
+import hivens.launcher.LauncherService.Companion.adaptiveApplies
 import hivens.launcher.LauncherService.Companion.normalizeMemory
 import hivens.launcher.LauncherService.Companion.resolveJavaPath
 import hivens.launcher.component.ClasspathProvider
@@ -33,6 +34,7 @@ import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
@@ -69,6 +71,16 @@ class LauncherServiceTest {
     fun `normalizeMemory leaves comfortable values alone`() {
         assertEquals(8192, normalizeMemory(profileMb = 0, allocatedMb = 8192))
         assertEquals(768, normalizeMemory(profileMb = 768, allocatedMb = 0))
+    }
+
+    // ── adaptiveApplies (the per-instance gate) ──────────────────────────────
+
+    @Test
+    fun `adaptiveApplies needs the global signal on and the instance unpinned`() {
+        assertTrue(adaptiveApplies(adaptiveEnabled = true, fixedMemory = false))   // default: adaptive on
+        assertFalse(adaptiveApplies(adaptiveEnabled = true, fixedMemory = true))   // pinned -> off
+        assertFalse(adaptiveApplies(adaptiveEnabled = false, fixedMemory = false)) // global off -> off
+        assertFalse(adaptiveApplies(adaptiveEnabled = false, fixedMemory = true))  // both off
     }
 
     // ── resolveJavaPath ──────────────────────────────────────────────────────

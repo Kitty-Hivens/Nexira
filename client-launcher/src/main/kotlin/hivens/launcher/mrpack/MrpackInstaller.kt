@@ -103,7 +103,7 @@ class MrpackInstaller(
                 instanceDirName = instanceDirName,
                 createdAtEpoch = Instant.now().epochSecond,
                 pinnedPackVersion = index.versionId.ifBlank { null },
-                runtime = InstanceRuntime(adaptiveMemory = true),  // new packs default to Auto heap
+                runtime = InstanceRuntime(),  // heap left to the global adaptive sizer
                 cachedManifest = CachedManifestSnapshot(
                     minecraftVersion = mcVersion,
                     loaderName = loaderName ?: "vanilla",

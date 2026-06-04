@@ -313,7 +313,7 @@ class LauncherControllerTest {
                 clientRootPath     = any(),
                 javaPathOverride   = any(),
                 allocatedMemoryMB  = any(),
-                adaptiveMemory     = any(),
+                adaptiveEnabled    = any(),
                 displayName        = any(),
                 onLog              = any(),
             )
@@ -440,7 +440,7 @@ class LauncherControllerTest {
                 clientRootPath     = any(),
                 javaPathOverride   = any(),
                 allocatedMemoryMB  = any(),
-                adaptiveMemory     = any(),
+                adaptiveEnabled    = any(),
                 displayName        = any(),
                 onLog              = any(),
             )

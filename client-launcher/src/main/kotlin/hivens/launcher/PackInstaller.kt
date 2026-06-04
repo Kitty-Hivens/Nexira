@@ -92,7 +92,7 @@ class PackInstaller(
             createdAtEpoch        = Instant.now().epochSecond,
             lastPlayedEpochOrZero = 0L,
             pinnedPackVersion     = manifest.packVersion,
-            runtime               = InstanceRuntime(adaptiveMemory = true),  // new packs default to Auto heap
+            runtime               = InstanceRuntime(),  // heap left to the global adaptive sizer
             optionalContent       = optionalToggles,
             forkedFrom            = null,
             notes                 = "",

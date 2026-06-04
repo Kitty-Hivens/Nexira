@@ -329,7 +329,7 @@ object GermanStrings : AppStrings {
     override val settingsJvmBuilder             = "Visueller JVM-Argument-Builder"
     override val settingsJvmBuilderDesc         = "Zeigt einen „Argumente bauen“-Button in den Server-Einstellungen. Wähle Garbage Collector, justiere Heap-Regionen, aktiviere AppCDS oder JFR — ohne Flags auswendig zu lernen. Vorgaben: Aikar's Rezept, GTNH-Klasse, ZGC für große Heaps und mehr."
     override val settingsAdaptiveMemory         = "Adaptiver Speicher (Auto)"
-    override val settingsAdaptiveMemoryDesc     = "Neue Instanzen bestimmen ihren Heap selbst, anhand des tatsächlichen Verbrauchs des Packs, verfeinert über mehrere Sitzungen. Ein fester RAM-Wert deaktiviert Auto für diese Instanz; ausschalten gibt jeder Instanz den festen Standardwert."
+    override val settingsAdaptiveMemoryDesc     = "Jede Instanz bestimmt ihren Heap selbst, anhand des tatsächlichen Verbrauchs des Packs, verfeinert über mehrere Sitzungen. Ein fester RAM-Wert deaktiviert Auto für diese Instanz; ausschalten gibt jeder Instanz den festen Standardwert."
     override val settingsMimicVersion           = "Launcher-Version-Override"
     override val settingsMimicVersionDesc       = "Fixiert den Versions-String, der an den Upstream im Handshake und User-Agent gesendet wird. Leer lassen für den eingebauten Standard — nur setzen, wenn der Upstream seine Versions-Anforderung schneller anhebt als Nexiras Release-Zyklus. Wirkt beim nächsten Protokoll-Aufruf nach Speichern, kein Neustart nötig."
     override fun settingsMimicVersionPlaceholder(default: String) = "Standard: $default"
