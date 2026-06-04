@@ -24,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import hivens.core.jvm.SystemMemory
 import hivens.launcher.update.UpdateService
 import hivens.ui.components.UpdateDialog
 import hivens.ui.i18n.LocalStrings
@@ -35,7 +36,6 @@ import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
-import java.lang.management.ManagementFactory
 
 private const val SURFACE = "about"
 
@@ -51,8 +51,8 @@ private const val SURFACE = "about"
 // UpdateDialog modal lives at the surface level so it survives even
 // if the user removes the update.panel widget via the editor.
 //
-// Pre-computed values (systemRam reflection lookup, displayRes AWT
-// toolkit call) happen once at surface mount and pass into the
+// Pre-computed values (systemRam lookup, displayRes AWT toolkit
+// call) happen once at surface mount and pass into the
 // context -- per-widget recomputation would re-read these on every
 // recomposition.
 //
@@ -68,14 +68,7 @@ fun AboutSurface(onBack: () -> Unit) {
     val updateState      = remember { mutableStateOf<UpdateCheckState>(UpdateCheckState.Idle) }
     val showUpdateDialog = remember { mutableStateOf(false) }
 
-    val systemRam = remember {
-        runCatching {
-            val osBean = ManagementFactory.getOperatingSystemMXBean()
-            val method = osBean.javaClass.getMethod("getTotalPhysicalMemorySize")
-            method.isAccessible = true
-            ((method.invoke(osBean) as Long) / (1024 * 1024)).toInt()
-        }.getOrDefault(0)
-    }
+    val systemRam = remember { SystemMemory.totalPhysicalMb() }
 
     val displayRes = remember {
         runCatching {
