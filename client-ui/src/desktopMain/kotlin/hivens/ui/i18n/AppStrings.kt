@@ -217,6 +217,8 @@ interface AppStrings {
     // =========================================================================
     val ramCustomInputLabel: String
     fun ramSystemHint(systemRam: String, recommended: String): String
+    /** Auto-mode chip label; [resolved] is the formatted heap Auto currently resolves to. */
+    fun ramAutoLabel(resolved: String): String
 
     // =========================================================================
     // Mod cards
@@ -691,6 +693,7 @@ interface AppStrings {
     val packDetailTabFiles: String
     val packDetailTabWorlds: String
     val packDetailTabLogs: String
+    val packDetailTabSettings: String
     val consoleSessionLive: String
     fun consoleSessionPickerLabel(current: String): String
 
