@@ -25,12 +25,13 @@ data class InstanceRuntime(
     val javaPath: String? = null,
     val memoryMb: Int = 4096,
     /**
-     * Auto heap sizing for this instance. Flips to false the moment the user
-     * picks an explicit RAM value (explicit wins). Default false so instances
-     * persisted before this field existed keep their stored [memoryMb]; only
-     * freshly-created instances opt in (set true at creation).
+     * Pin this instance to its explicit [memoryMb] instead of the global adaptive
+     * sizer. Default false so [SettingsData.adaptiveMemoryEnabled] governs every
+     * instance; a pack RAM editor would set it true on an explicit pick. A fresh
+     * field (not a flipped opt-in) so instances persisted before it default to
+     * adaptive, not to a stale opt-out.
      */
-    val adaptiveMemory: Boolean = false,
+    val fixedMemory: Boolean = false,
     val jvmArgs: String? = null,
     val windowWidth: Int = 925,
     val windowHeight: Int = 530,

@@ -64,9 +64,9 @@ internal class LauncherService(
         val profile: InstanceProfile = profileManager.getProfile(serverProfile.assetDir)
         val version = serverProfile.version
 
-        // 1. Memory allocation strategy (adaptive heap when opted in, else static)
+        // 1. Memory allocation strategy (adaptive heap unless this instance is pinned)
         val adaptive = resolveAdaptive(
-            enabled = adaptiveMemory && profile.adaptiveMemory,
+            enabled = adaptiveMemory && !profile.fixedMemory,
             instanceDir = clientRootPath,
             baseMemoryMb = normalizeMemory(profile.memoryMb, allocatedMemoryMB),
         )
@@ -128,9 +128,10 @@ internal class LauncherService(
         val mcVersion = manifest.minecraftVersion
 
         // 1. Memory allocation strategy -- same floor logic as the SC path; the
-        // InstanceRuntime value wins when positive, then adaptive may refine it.
+        // InstanceRuntime value wins when positive, then adaptive may refine it
+        // unless the instance is pinned.
         val adaptive = resolveAdaptive(
-            enabled = adaptiveMemory && runtime.adaptiveMemory,
+            enabled = adaptiveMemory && !runtime.fixedMemory,
             instanceDir = clientRootPath,
             baseMemoryMb = normalizeMemory(runtime.memoryMb, allocatedMemoryMB),
         )

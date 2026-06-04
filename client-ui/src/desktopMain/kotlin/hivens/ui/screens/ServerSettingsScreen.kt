@@ -136,7 +136,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
             val updated = p.copy(
                 javaPath     = javaPath.ifBlank { null },
                 memoryMb     = memory,
-                adaptiveMemory = if (ramTouched) false else p.adaptiveMemory,
+                fixedMemory = if (ramTouched) true else p.fixedMemory,
                 jvmArgs      = jvmArgs.ifBlank { null },
                 windowWidth  = winWidth.toIntOrNull() ?: 925,
                 windowHeight = winHeight.toIntOrNull() ?: 530,

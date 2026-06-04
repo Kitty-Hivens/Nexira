@@ -100,13 +100,12 @@ data class SettingsData(
     val jvmBuilderEnabled: Boolean = false,
 
     /**
-     * Adaptive memory: let the profiler agent size each instance's heap from
-     * its observed live-set instead of the static [memoryMB] default. On by
-     * default (under the experimental master) -- new instances run Auto, and
-     * picking a specific RAM value opts that instance out. This global flag is
-     * the kill-switch; the per-instance opt-in lives on `InstanceProfile` /
-     * `InstanceRuntime` (`adaptiveMemory`). Both must be true for a heap to be
-     * derived, so an explicitly-set instance is never silently overridden.
+     * Adaptive memory: let the profiler agent size each instance's heap from its
+     * observed live-set + peak instead of the static per-instance heap. On by
+     * default (under the experimental master) -- the master switch that governs
+     * EVERY instance. An instance opts out only by pinning a specific RAM value
+     * (`fixedMemory` on `InstanceProfile` / `InstanceRuntime`); turning this off
+     * forces every instance back to its static heap.
      */
     val adaptiveMemoryEnabled: Boolean = true,
 

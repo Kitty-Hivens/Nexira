@@ -13,12 +13,13 @@ data class InstanceProfile(
      */
     val memoryMb: Int = 6144,
     /**
-     * Auto heap sizing for this server. The moment the user picks an explicit
-     * RAM value in RamSelector this flips to false (explicit wins). Default
-     * false so profiles persisted before this field existed keep their stored
-     * [memoryMb]; only freshly-created profiles opt in (set true at creation).
+     * Pin this server to its explicit [memoryMb] instead of the global adaptive
+     * sizer. Set true the moment the user picks a RAM value in RamSelector.
+     * Default false so [SettingsData.adaptiveMemoryEnabled] governs every
+     * instance out of the box -- a fresh field (not a flipped opt-in) so
+     * profiles persisted before it default to adaptive, not to a stale opt-out.
      */
-    val adaptiveMemory: Boolean = false,
+    val fixedMemory: Boolean = false,
     val javaPath: String? = null,
     val jvmArgs: String? = null,
     val windowWidth: Int = 925,
