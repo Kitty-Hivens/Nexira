@@ -107,4 +107,22 @@ class HeapDeriverTest {
         assertEquals(5, folded.size)
         assertEquals(recent.drop(1) + newest, folded)
     }
+
+    @Test
+    fun `derive floors the headroomed term instead of rounding up`() {
+        // 1001 * 1.5 = 1501.5 -> truncates to 1501; guards against a switch to rounding.
+        assertEquals(1501, HeapDeriver.derive(liveSetMb = 1001, peakHeapMb = 0, machineRamMb = 16384, floorMb = 1024))
+    }
+
+    @Test
+    fun `rolling derive returns null when the only live set is unreliable and there is no peak`() {
+        // liveSetMb > 0 but unreliable, peak 0 -> no usable signal -> null. Guards the
+        // reliability filter: a plain liveSetMb>0 check would wrongly derive 9000*1.5.
+        assertNull(
+            HeapDeriver.derive(
+                listOf(ProfilerMetrics(liveSetMb = 9000, peakHeapMb = 0, liveSetReliable = false)),
+                machineRamMb = 16384, floorMb = 1024,
+            ),
+        )
+    }
 }

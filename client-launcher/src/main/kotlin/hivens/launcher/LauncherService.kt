@@ -58,7 +58,7 @@ internal class LauncherService(
         clientRootPath: Path,
         javaExecutablePath: Path,
         allocatedMemoryMB: Int,
-        adaptiveMemory: Boolean,
+        adaptiveEnabled: Boolean,
         onLog: (String, LauncherLogType) -> Unit
     ): Process {
         val profile: InstanceProfile = profileManager.getProfile(serverProfile.assetDir)
@@ -66,7 +66,7 @@ internal class LauncherService(
 
         // 1. Memory allocation strategy (adaptive heap unless this instance is pinned)
         val adaptive = resolveAdaptive(
-            enabled = adaptiveMemory && !profile.fixedMemory,
+            enabled = adaptiveApplies(adaptiveEnabled, profile.fixedMemory),
             instanceDir = clientRootPath,
             baseMemoryMb = normalizeMemory(profile.memoryMb, allocatedMemoryMB),
         )
@@ -109,7 +109,7 @@ internal class LauncherService(
     ): Process {
         return launchClientWithLogs(
             sessionData, serverProfile, clientRootPath, javaExecutablePath, allocatedMemoryMB,
-            adaptiveMemory = false,
+            adaptiveEnabled = false,
         ) { _, _ -> /* Logs are ignored */ }
     }
 
@@ -121,7 +121,7 @@ internal class LauncherService(
         clientRootPath: Path,
         javaPathOverride: Path?,
         allocatedMemoryMB: Int,
-        adaptiveMemory: Boolean,
+        adaptiveEnabled: Boolean,
         displayName: String,
         onLog: (String, LauncherLogType) -> Unit
     ): Process {
@@ -131,7 +131,7 @@ internal class LauncherService(
         // InstanceRuntime value wins when positive, then adaptive may refine it
         // unless the instance is pinned.
         val adaptive = resolveAdaptive(
-            enabled = adaptiveMemory && !runtime.fixedMemory,
+            enabled = adaptiveApplies(adaptiveEnabled, runtime.fixedMemory),
             instanceDir = clientRootPath,
             baseMemoryMb = normalizeMemory(runtime.memoryMb, allocatedMemoryMB),
         )
@@ -219,7 +219,8 @@ internal class LauncherService(
      * Resolves heap + profiler-agent attachment for a launch. Adaptive off ->
      * static [baseMemoryMb], no agent. Adaptive on -> fold the previous session's
      * metrics into the per-instance rolling profile, derive the next heap from the
-     * reliable samples (keep [baseMemoryMb] until data exists), persist, and attach
+     * samples (live set when reliable, else the observed peak; keep [baseMemoryMb]
+     * until data exists), persist, and attach
      * the agent so THIS session produces the next sample.
      */
     private fun resolveAdaptive(enabled: Boolean, instanceDir: Path, baseMemoryMb: Int): AdaptiveLaunch {
@@ -272,6 +273,14 @@ internal class LauncherService(
             val raw = if (profileMb > 0) profileMb else allocatedMb
             return if (raw < 768) 1024 else raw
         }
+
+        /**
+         * Whether the adaptive heap sizer applies to an instance: the global signal
+         * [adaptiveEnabled] (experimental master AND the adaptive toggle) must be on
+         * AND the instance must not be pinned to a fixed heap.
+         */
+        internal fun adaptiveApplies(adaptiveEnabled: Boolean, fixedMemory: Boolean): Boolean =
+            adaptiveEnabled && !fixedMemory
 
         /**
          * Pack-centric Java path resolution. Mirrors [resolveJavaPath]'s

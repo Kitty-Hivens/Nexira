@@ -73,7 +73,8 @@ object HeapDeriver {
         last: ProfilerMetrics?,
         window: Int,
     ): List<ProfilerMetrics> {
-        if (last == null || (!last.liveSetReliable && last.peakHeapMb <= 0)) return recent
-        return (recent + last).takeLast(window)
+        val keep = window.coerceAtLeast(0)
+        if (last == null || (!last.liveSetReliable && last.peakHeapMb <= 0)) return recent.takeLast(keep)
+        return (recent + last).takeLast(keep)
     }
 }
