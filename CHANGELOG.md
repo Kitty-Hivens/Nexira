@@ -12,6 +12,33 @@ below are for the GitHub release page and CHANGELOG readers.
 
 ## [Unreleased]
 
+## [2.3.4-beta3] - 2026-06-04
+
+Matures the adaptive memory from 2.3.4-beta2 into a three-tier model
+(Fixed / Automatic / Adaptive) and cleans up the release notes.
+
+### Highlights
+- **Automatic memory baseline**. A non-pinned instance now sizes its heap from
+  your machine's RAM (a sane share, capped) instead of a fixed default, so it
+  stops over-allocating on a small machine. The adaptive sizer refines this
+  baseline over a few sessions.
+- **Adaptive governs every instance**. The global Adaptive memory toggle now
+  applies to every instance, not just freshly-created ones. Pin a specific RAM
+  value to opt one out; turn the toggle off to keep the automatic baseline
+  without learning.
+- **See and set the mode**. The RAM selector shows an "Auto" chip with the heap
+  it currently resolves to, and pack instances get their own Settings tab for RAM.
+
+### Changed
+- Adaptive heap derivation is peak-aware: it also covers churn-heavy packs and
+  collectors that never report a major GC.
+
+### Fixed
+- The experimental master toggle now actually disables adaptive memory at launch
+  (previously the launch path ignored it).
+- Release notes no longer carry a duplicated "What's Changed" section, and the
+  in-app update dialog no longer shows the download table as a changelog.
+
 ## [2.3.4-beta2] - 2026-06-03
 
 Adds the experimental adaptive memory sizer on top of 2.3.4-beta.
