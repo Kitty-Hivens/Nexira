@@ -32,6 +32,15 @@ HIGHLIGHTS=$(printf '%s' "$CHANGELOG_NOTES" \
   | awk '/^### Highlights/ {flag=1; next} /^### / {flag=0} flag' \
   | sed '/^[[:space:]]*$/d')
 
+# The same notes WITHOUT the ### Highlights block -- highlights already render
+# above as "## What's New", so dumping the full section below would repeat them.
+CHANGELOG_DETAILS=$(printf '%s' "$CHANGELOG_NOTES" \
+  | awk '/^### Highlights/ {skip=1; next} /^### / {skip=0} !skip')
+# Degenerate entry (highlights only, no summary/details) -> keep the full notes.
+if [ -z "$(printf '%s' "$CHANGELOG_DETAILS" | tr -d '[:space:]')" ]; then
+  CHANGELOG_DETAILS="$CHANGELOG_NOTES"
+fi
+
 # Build the SHA256 checksum table by walking dist/SHA256SUMS.txt.
 CHECKSUMS=""
 while IFS= read -r line; do
@@ -71,5 +80,5 @@ done < "$CHECKSUMS_FILE"
   printf '\n</details>\n\n'
 
   printf "## What's Changed\n\n"
-  printf '%s\n' "$CHANGELOG_NOTES"
+  printf '%s\n' "$CHANGELOG_DETAILS"
 }
