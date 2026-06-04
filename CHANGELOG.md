@@ -12,6 +12,21 @@ below are for the GitHub release page and CHANGELOG readers.
 
 ## [Unreleased]
 
+## [2.3.4-beta2] - 2026-06-03
+
+Adds the experimental adaptive memory sizer on top of 2.3.4-beta.
+
+### Highlights
+- **Adaptive memory (experimental)**. New instances measure their real heap use
+  while you play and right-size `-Xmx` over the next few launches, so a pack runs
+  smoother without hand-tuning RAM. On by default under the experimental settings;
+  pick a specific RAM value to opt that instance out.
+
+### Added
+- Profiler agent: a small in-JVM measurement agent (GC / heap only, no mod contact)
+  that records each session's metrics; the launcher derives the next launch's heap
+  from them between runs.
+
 ## [2.3.4-beta] - 2026-06-03
 
 The customization release. The launcher's whole interface becomes
