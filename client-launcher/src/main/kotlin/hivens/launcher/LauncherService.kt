@@ -58,15 +58,15 @@ internal class LauncherService(
         clientRootPath: Path,
         javaExecutablePath: Path,
         allocatedMemoryMB: Int,
-        adaptiveMemory: Boolean,
+        adaptiveEnabled: Boolean,
         onLog: (String, LauncherLogType) -> Unit
     ): Process {
         val profile: InstanceProfile = profileManager.getProfile(serverProfile.assetDir)
         val version = serverProfile.version
 
-        // 1. Memory allocation strategy (adaptive heap when opted in, else static)
+        // 1. Memory allocation strategy (adaptive heap unless this instance is pinned)
         val adaptive = resolveAdaptive(
-            enabled = adaptiveMemory && profile.adaptiveMemory,
+            enabled = adaptiveApplies(adaptiveEnabled, profile.fixedMemory),
             instanceDir = clientRootPath,
             baseMemoryMb = normalizeMemory(profile.memoryMb, allocatedMemoryMB),
         )
@@ -109,7 +109,7 @@ internal class LauncherService(
     ): Process {
         return launchClientWithLogs(
             sessionData, serverProfile, clientRootPath, javaExecutablePath, allocatedMemoryMB,
-            adaptiveMemory = false,
+            adaptiveEnabled = false,
         ) { _, _ -> /* Logs are ignored */ }
     }
 
@@ -121,16 +121,17 @@ internal class LauncherService(
         clientRootPath: Path,
         javaPathOverride: Path?,
         allocatedMemoryMB: Int,
-        adaptiveMemory: Boolean,
+        adaptiveEnabled: Boolean,
         displayName: String,
         onLog: (String, LauncherLogType) -> Unit
     ): Process {
         val mcVersion = manifest.minecraftVersion
 
         // 1. Memory allocation strategy -- same floor logic as the SC path; the
-        // InstanceRuntime value wins when positive, then adaptive may refine it.
+        // InstanceRuntime value wins when positive, then adaptive may refine it
+        // unless the instance is pinned.
         val adaptive = resolveAdaptive(
-            enabled = adaptiveMemory && runtime.adaptiveMemory,
+            enabled = adaptiveApplies(adaptiveEnabled, runtime.fixedMemory),
             instanceDir = clientRootPath,
             baseMemoryMb = normalizeMemory(runtime.memoryMb, allocatedMemoryMB),
         )
@@ -218,7 +219,8 @@ internal class LauncherService(
      * Resolves heap + profiler-agent attachment for a launch. Adaptive off ->
      * static [baseMemoryMb], no agent. Adaptive on -> fold the previous session's
      * metrics into the per-instance rolling profile, derive the next heap from the
-     * reliable samples (keep [baseMemoryMb] until data exists), persist, and attach
+     * samples (live set when reliable, else the observed peak; keep [baseMemoryMb]
+     * until data exists), persist, and attach
      * the agent so THIS session produces the next sample.
      */
     private fun resolveAdaptive(enabled: Boolean, instanceDir: Path, baseMemoryMb: Int): AdaptiveLaunch {
@@ -229,14 +231,14 @@ internal class LauncherService(
         // file (a session that crashed before its shutdown hook wrote leaves none).
         val last = profilerStore.readMetrics(instanceDir)
         profilerStore.deleteMetrics(instanceDir)
-        val samples = if (last != null && last.liveSetReliable) {
-            (profile.recentSamples + last).takeLast(ProfilerProfileStore.SAMPLE_WINDOW)
-        } else {
-            profile.recentSamples
-        }
+        // Roll the previous session into the rolling window. foldSample drops zero-signal
+        // records (no GC AND peak 0) so a run of them can't evict good samples and
+        // collapse the heap back to the static base; reliability is filtered per-term in
+        // the deriver.
+        val samples = HeapDeriver.foldSample(profile.recentSamples, last, ProfilerProfileStore.SAMPLE_WINDOW)
 
         // 1024 == the modded-client floor normalizeMemory also enforces.
-        val derived = HeapDeriver.derive(samples.map { it.liveSetMb }, SystemMemory.totalPhysicalMb(), floorMb = 1024)
+        val derived = HeapDeriver.derive(samples, SystemMemory.totalPhysicalMb(), floorMb = 1024)
         if (samples != profile.recentSamples || derived != profile.derivedHeapMb) {
             profilerStore.writeProfile(
                 instanceDir,
@@ -271,6 +273,14 @@ internal class LauncherService(
             val raw = if (profileMb > 0) profileMb else allocatedMb
             return if (raw < 768) 1024 else raw
         }
+
+        /**
+         * Whether the adaptive heap sizer applies to an instance: the global signal
+         * [adaptiveEnabled] (experimental master AND the adaptive toggle) must be on
+         * AND the instance must not be pinned to a fixed heap.
+         */
+        internal fun adaptiveApplies(adaptiveEnabled: Boolean, fixedMemory: Boolean): Boolean =
+            adaptiveEnabled && !fixedMemory
 
         /**
          * Pack-centric Java path resolution. Mirrors [resolveJavaPath]'s

@@ -136,7 +136,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
             val updated = p.copy(
                 javaPath     = javaPath.ifBlank { null },
                 memoryMb     = memory,
-                adaptiveMemory = if (ramTouched) false else p.adaptiveMemory,
+                fixedMemory = if (ramTouched) true else p.fixedMemory,
                 jvmArgs      = jvmArgs.ifBlank { null },
                 windowWidth  = winWidth.toIntOrNull() ?: 925,
                 windowHeight = winHeight.toIntOrNull() ?: 530,
@@ -278,7 +278,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                     // ── RAM -- RamSelector replaces old Slider ─────────────────
                     RamSelector(
                         currentMb = memory,
-                        // An explicit pick opts this server out of Auto heap.
+                        // An explicit pick pins this server (fixedMemory = true), opting it out of the adaptive sizer.
                         onValueChanged = { memory = it; ramTouched = true }
                     )
 

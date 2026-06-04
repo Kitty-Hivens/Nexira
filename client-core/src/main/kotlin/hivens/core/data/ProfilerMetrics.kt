@@ -27,8 +27,9 @@ data class ProfilerMetrics(
 
 /**
  * Persisted per-(machine, pack) heap profile: the heap the launcher last derived
- * plus a short window of recent reliable samples it derived from. Stored next to
- * the instance so it follows that instance's lifetime.
+ * plus a short window of recent samples it derived from -- each carrying a reliable
+ * live set OR a positive peak (zero-signal sessions are never folded in). Stored
+ * next to the instance so it follows that instance's lifetime.
  */
 @Serializable
 data class HeapProfile(

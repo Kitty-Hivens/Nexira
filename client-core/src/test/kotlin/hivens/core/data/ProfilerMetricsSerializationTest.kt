@@ -1,5 +1,6 @@
 package hivens.core.data
 
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -49,5 +50,20 @@ class ProfilerMetricsSerializationTest {
         val p = json.decodeFromString<HeapProfile>("""{"schema_version":1}""")
         assertEquals(null, p.derivedHeapMb)
         assertTrue(p.recentSamples.isEmpty())
+    }
+
+    @Test
+    fun `heap profile round-trips an unreliable-but-positive-peak sample`() {
+        // foldSample now persists unreliable sessions that still carry a peak; the
+        // window must survive encode/decode without dropping that shape.
+        val profile = HeapProfile(
+            derivedHeapMb = 3005,
+            recentSamples = listOf(ProfilerMetrics(liveSetMb = 0, peakHeapMb = 2732, liveSetReliable = false)),
+            updatedAtEpoch = 123L,
+        )
+        val round = json.decodeFromString<HeapProfile>(json.encodeToString(profile))
+        assertEquals(profile, round)
+        assertEquals(2732, round.recentSamples.single().peakHeapMb)
+        assertFalse(round.recentSamples.single().liveSetReliable)
     }
 }
