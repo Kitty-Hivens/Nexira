@@ -653,12 +653,15 @@ class UpdateService(
             .ifBlank { "No changelog available" }
     }
 
-    private fun extractWhatsChanged(body: String?): String {
+    internal fun extractWhatsChanged(body: String?): String {
         if (body == null) return ""
 
-        // Slice between "## What's Changed" and the next "---" or "##"
+        // The section between "## What's Changed" and the next heading / "---".
+        // No section -> empty, NOT a substringBefore("---") fallback: our release
+        // bodies carry no "---" rule, so that fallback returned the WHOLE body
+        // (NOTE + Downloads + checksums) as the changelog -- garbage in the dialog.
         val start = body.indexOf("## What's Changed")
-        if (start == -1) return body.substringBefore("---").trim()
+        if (start == -1) return ""
 
         val afterHeader = body.substring(start + "## What's Changed".length)
         return afterHeader

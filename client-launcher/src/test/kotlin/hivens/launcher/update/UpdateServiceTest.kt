@@ -169,6 +169,32 @@ class UpdateServiceTest {
         assertEquals(0, svc.compareVersions("1.3.0", "1.3.0"))
     }
 
+    // ═══════════════════════════════════════════════════════════════════════════
+    // extractWhatsChanged
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    @Test
+    fun `extractWhatsChanged returns the section up to the next heading`() {
+        val svc = createService("{}")
+        val body = "## What's New\n\nfeatures\n\n## What's Changed\n\nthe details\n\n## Downloads\n\ntable"
+        assertEquals("the details", svc.extractWhatsChanged(body))
+    }
+
+    @Test
+    fun `extractWhatsChanged returns empty when there is no section`() {
+        val svc = createService("{}")
+        // A body with no "## What's Changed" (e.g. a manually-cut release) must NOT
+        // fall back to the whole body / download table.
+        val body = "> [!NOTE]\n> blah\n\n## Downloads\n\n| a | b |\n|---|---|"
+        assertEquals("", svc.extractWhatsChanged(body))
+    }
+
+    @Test
+    fun `extractWhatsChanged is empty for a null body`() {
+        val svc = createService("{}")
+        assertEquals("", svc.extractWhatsChanged(null))
+    }
+
     @Test
     fun `compareVersions handles patch level differences`() {
         val svc = createService("{}")

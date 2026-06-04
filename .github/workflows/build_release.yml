@@ -560,12 +560,8 @@ jobs:
           body: ${{ steps.body.outputs.body }}
           files: dist/*
           draft: false
-          # Appends GitHub's auto-generated "What's Changed" section (PR list
-          # since the previous tag) BELOW our curated body. Additive, not
-          # replacement -- the CHANGELOG extraction in the body still wins
-          # for highlights. Fallback for when someone forgets the CHANGELOG
-          # entry and the extracted body falls back to the "No changelog
-          # entry for v${VERSION}" placeholder: at least the user gets the
-          # raw merged-PR list instead of an empty release page.
-          generate_release_notes: true
+          # generate_release_notes intentionally OFF: GitHub's auto section is also
+          # titled "What's Changed" and duplicated our curated CHANGELOG section of
+          # the same name on the release page (and the in-app updater parses the
+          # first "## What's Changed"). The composed body is the single source.
           prerelease: ${{ contains(needs.changelog.outputs.version, '-') }}
