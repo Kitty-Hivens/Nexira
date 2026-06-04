@@ -59,4 +59,21 @@ object HeapDeriver {
         if (maxLive == 0 && maxPeak == 0) return null
         return derive(maxLive, maxPeak, machineRamMb, floorMb, headroom, peakHeadroom)
     }
+
+    /**
+     * Rolls [last] into the [recent] window, keeping the newest [window] samples --
+     * but only if [last] carries signal (a reliable live set OR a positive peak). A
+     * zero-signal record (no major GC AND peak 0, e.g. a near-instant crash) is
+     * dropped: appending it would let a run of such records evict the good samples via
+     * `takeLast` and collapse the derived heap back to the static base. [derive] still
+     * filters reliability per term; this guards what is allowed into the window.
+     */
+    fun foldSample(
+        recent: List<ProfilerMetrics>,
+        last: ProfilerMetrics?,
+        window: Int,
+    ): List<ProfilerMetrics> {
+        if (last == null || (!last.liveSetReliable && last.peakHeapMb <= 0)) return recent
+        return (recent + last).takeLast(window)
+    }
 }

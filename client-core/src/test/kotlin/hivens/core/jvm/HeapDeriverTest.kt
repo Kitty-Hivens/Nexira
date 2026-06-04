@@ -72,4 +72,39 @@ class HeapDeriverTest {
             ),
         )
     }
+
+    @Test
+    fun `foldSample keeps an unreliable session that still has a positive peak`() {
+        // ChoKO's first file: no major GC -> liveSet 0 / unreliable, but peak 2732 is real.
+        val prior = listOf(ProfilerMetrics(liveSetMb = 1000, peakHeapMb = 1500, liveSetReliable = true))
+        val zeroLivePositivePeak = ProfilerMetrics(liveSetMb = 0, peakHeapMb = 2732, liveSetReliable = false)
+        assertEquals(prior + zeroLivePositivePeak, HeapDeriver.foldSample(prior, zeroLivePositivePeak, 5))
+    }
+
+    @Test
+    fun `foldSample drops a zero-signal session so it cannot evict good samples`() {
+        // No GC AND peak 0 (near-instant crash): nothing to learn -> must not enter the
+        // window, or a run of them would push the good samples out and collapse the heap.
+        val good = listOf(
+            ProfilerMetrics(liveSetMb = 3000, peakHeapMb = 4000, liveSetReliable = true),
+            ProfilerMetrics(liveSetMb = 0,    peakHeapMb = 5000, liveSetReliable = false),
+        )
+        val zeroSignal = ProfilerMetrics(liveSetMb = 0, peakHeapMb = 0, liveSetReliable = false)
+        assertEquals(good, HeapDeriver.foldSample(good, zeroSignal, 5))
+    }
+
+    @Test
+    fun `foldSample on a null session leaves the window unchanged`() {
+        val good = listOf(ProfilerMetrics(liveSetMb = 3000, peakHeapMb = 4000, liveSetReliable = true))
+        assertEquals(good, HeapDeriver.foldSample(good, null, 5))
+    }
+
+    @Test
+    fun `foldSample evicts the oldest sample when the window is full`() {
+        val recent = (1..5).map { ProfilerMetrics(liveSetMb = it * 100, peakHeapMb = it * 100, liveSetReliable = true) }
+        val newest = ProfilerMetrics(liveSetMb = 9000, peakHeapMb = 9000, liveSetReliable = true)
+        val folded = HeapDeriver.foldSample(recent, newest, 5)
+        assertEquals(5, folded.size)
+        assertEquals(recent.drop(1) + newest, folded)
+    }
 }

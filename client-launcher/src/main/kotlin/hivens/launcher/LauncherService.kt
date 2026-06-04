@@ -230,14 +230,11 @@ internal class LauncherService(
         // file (a session that crashed before its shutdown hook wrote leaves none).
         val last = profilerStore.readMetrics(instanceDir)
         profilerStore.deleteMetrics(instanceDir)
-        // Fold any non-null session, not only reliable ones: an unreliable session
-        // still carries a valid peak, which the deriver's peak term uses. Reliability
-        // is filtered per-term inside HeapDeriver, not here.
-        val samples = if (last != null) {
-            (profile.recentSamples + last).takeLast(ProfilerProfileStore.SAMPLE_WINDOW)
-        } else {
-            profile.recentSamples
-        }
+        // Roll the previous session into the rolling window. foldSample drops zero-signal
+        // records (no GC AND peak 0) so a run of them can't evict good samples and
+        // collapse the heap back to the static base; reliability is filtered per-term in
+        // the deriver.
+        val samples = HeapDeriver.foldSample(profile.recentSamples, last, ProfilerProfileStore.SAMPLE_WINDOW)
 
         // 1024 == the modded-client floor normalizeMemory also enforces.
         val derived = HeapDeriver.derive(samples, SystemMemory.totalPhysicalMb(), floorMb = 1024)
