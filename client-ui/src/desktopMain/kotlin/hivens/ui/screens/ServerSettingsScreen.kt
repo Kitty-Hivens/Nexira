@@ -30,8 +30,11 @@ import hivens.core.api.interfaces.ISettingsService
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.InstanceProfile
 import hivens.core.data.OptionalMod
+import hivens.core.jvm.AutomaticHeap
+import hivens.core.jvm.SystemMemory
 import hivens.launcher.CredentialsManager
 import hivens.launcher.ProfileManager
+import hivens.launcher.ProfilerProfileStore
 import hivens.ui.components.CelestiaButton
 import hivens.ui.components.GlassCard
 import hivens.ui.components.JvmArgsBuilderDialog
@@ -79,6 +82,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
     val playerRepository: PlayerRepository           = koinInject()
     val credentialsManager: CredentialsManager       = koinInject()
     val settingsService: ISettingsService            = koinInject()
+    val profilerStore: ProfilerProfileStore          = koinInject()
     val s = LocalStrings.current
 
     val jvmBuilderEnabled = remember { settingsService.getSettings().jvmBuilderEnabled }
@@ -88,7 +92,8 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
     var profile    by remember { mutableStateOf<InstanceProfile?>(null) }
     var javaPath   by remember { mutableStateOf("") }
     var memory     by remember { mutableStateOf(4096) }
-    var ramTouched by remember { mutableStateOf(false) }
+    var isAutoMode by remember { mutableStateOf(true) }
+    var resolvedAutoMb by remember { mutableStateOf(AutomaticHeap.compute(SystemMemory.totalPhysicalMb())) }
     var jvmArgs    by remember { mutableStateOf("") }
     var winWidth   by remember { mutableStateOf("925") }
     var winHeight  by remember { mutableStateOf("530") }
@@ -113,6 +118,16 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
         autoConnect = p.autoConnect
         if (p.memoryMb > 0) memory = p.memoryMb
 
+        // RAM mode: Auto unless the user pinned a value. The Auto chip shows what the next
+        // launch will actually use -- the adaptive-derived heap when adaptive is on and has
+        // data, otherwise the machine-aware Automatic baseline (mirrors LauncherService).
+        isAutoMode = !p.fixedMemory
+        val settings = settingsService.getSettings()
+        val adaptiveOn = settings.experimentalFeaturesEnabled && settings.adaptiveMemoryEnabled
+        val clientDir = dataDirectory.resolve("clients").resolve(server.assetDir)
+        val derivedMb = if (adaptiveOn) withContext(Dispatchers.IO) { profilerStore.readProfile(clientDir)?.derivedHeapMb } else null
+        resolvedAutoMb = derivedMb ?: AutomaticHeap.compute(SystemMemory.totalPhysicalMb())
+
         val loadedMods = manifestProcessorService.getOptionalModsForClient(server)
         mods = loadedMods
         loadedMods.forEach { mod ->
@@ -136,7 +151,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
             val updated = p.copy(
                 javaPath     = javaPath.ifBlank { null },
                 memoryMb     = memory,
-                fixedMemory = if (ramTouched) true else p.fixedMemory,
+                fixedMemory = !isAutoMode,
                 jvmArgs      = jvmArgs.ifBlank { null },
                 windowWidth  = winWidth.toIntOrNull() ?: 925,
                 windowHeight = winHeight.toIntOrNull() ?: 530,
@@ -277,9 +292,12 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
 
                     // ── RAM -- RamSelector replaces old Slider ─────────────────
                     RamSelector(
+                        isAuto = isAutoMode,
+                        resolvedAutoMb = resolvedAutoMb,
                         currentMb = memory,
-                        // An explicit pick pins this server (fixedMemory = true), opting it out of the adaptive sizer.
-                        onValueChanged = { memory = it; ramTouched = true }
+                        // Auto un-pins (fixedMemory=false); picking a value pins (Fixed).
+                        onAutoSelected = { isAutoMode = true },
+                        onValueChanged = { memory = it; isAutoMode = false },
                     )
 
                     Spacer(Modifier.height(16.dp))
