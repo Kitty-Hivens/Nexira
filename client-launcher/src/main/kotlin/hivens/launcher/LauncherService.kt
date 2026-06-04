@@ -10,6 +10,7 @@ import hivens.core.data.InstanceProfile
 import hivens.core.data.InstanceRuntime
 import hivens.core.data.LauncherLogType
 import hivens.core.data.SessionData
+import hivens.core.jvm.AutomaticHeap
 import hivens.core.jvm.HeapDeriver
 import hivens.core.jvm.SystemMemory
 import hivens.launcher.component.ClasspathProvider
@@ -64,11 +65,12 @@ internal class LauncherService(
         val profile: InstanceProfile = profileManager.getProfile(serverProfile.assetDir)
         val version = serverProfile.version
 
-        // 1. Memory allocation strategy (adaptive heap unless this instance is pinned)
+        // 1. Heap: pinned -> explicit value; else the machine-aware Automatic baseline,
+        // which the adaptive sizer refines from when it is on.
         val adaptive = resolveAdaptive(
             enabled = adaptiveApplies(adaptiveEnabled, profile.fixedMemory),
             instanceDir = clientRootPath,
-            baseMemoryMb = normalizeMemory(profile.memoryMb, allocatedMemoryMB),
+            baseMemoryMb = baselineMemory(profile.fixedMemory, profile.memoryMb, allocatedMemoryMB, SystemMemory.totalPhysicalMb()),
         )
         val memory = adaptive.memoryMb
 
@@ -127,13 +129,12 @@ internal class LauncherService(
     ): Process {
         val mcVersion = manifest.minecraftVersion
 
-        // 1. Memory allocation strategy -- same floor logic as the SC path; the
-        // InstanceRuntime value wins when positive, then adaptive may refine it
-        // unless the instance is pinned.
+        // 1. Heap: same tiering as the SC path -- pinned -> explicit value, else the
+        // machine-aware Automatic baseline that the adaptive sizer refines from.
         val adaptive = resolveAdaptive(
             enabled = adaptiveApplies(adaptiveEnabled, runtime.fixedMemory),
             instanceDir = clientRootPath,
-            baseMemoryMb = normalizeMemory(runtime.memoryMb, allocatedMemoryMB),
+            baseMemoryMb = baselineMemory(runtime.fixedMemory, runtime.memoryMb, allocatedMemoryMB, SystemMemory.totalPhysicalMb()),
         )
         val memory = adaptive.memoryMb
 
@@ -281,6 +282,21 @@ internal class LauncherService(
          */
         internal fun adaptiveApplies(adaptiveEnabled: Boolean, fixedMemory: Boolean): Boolean =
             adaptiveEnabled && !fixedMemory
+
+        /**
+         * The baseline heap before any adaptive refinement. A pinned instance
+         * ([fixedMemory]) keeps its explicit [profileMb] (respected as-is, even above
+         * the machine ceiling -- a deliberate value is the user's call); an unpinned
+         * instance uses the machine-aware [AutomaticHeap] baseline, which is also the
+         * cold-start the adaptive sizer grows from. Pure.
+         */
+        internal fun baselineMemory(
+            fixedMemory: Boolean,
+            profileMb: Int,
+            allocatedMb: Int,
+            systemRamMb: Int,
+        ): Int = if (fixedMemory) normalizeMemory(profileMb, allocatedMb)
+                 else AutomaticHeap.compute(systemRamMb)
 
         /**
          * Pack-centric Java path resolution. Mirrors [resolveJavaPath]'s
