@@ -217,6 +217,7 @@ object GermanStrings : AppStrings {
     override val ramCustomInputLabel = "Eigener Wert:"
     override fun ramSystemHint(systemRam: String, recommended: String) =
         "System: $systemRam • Empfohlen max: $recommended"
+    override fun ramAutoLabel(resolved: String) = "Auto · ~$resolved"
 
     // =========================================================================
     // Mod cards
@@ -328,8 +329,8 @@ object GermanStrings : AppStrings {
     override val settingsAutoSyncAllPacksDesc   = "Aktualisiert beim Launcher-Start jedes bereits installierte Server-Pack im Hintergrund. Kostet Bandbreite — nützlich, wenn du zwischen mehreren Servern wechselst und frischen Stand ohne Klick auf jeden willst."
     override val settingsJvmBuilder             = "Visueller JVM-Argument-Builder"
     override val settingsJvmBuilderDesc         = "Zeigt einen „Argumente bauen“-Button in den Server-Einstellungen. Wähle Garbage Collector, justiere Heap-Regionen, aktiviere AppCDS oder JFR — ohne Flags auswendig zu lernen. Vorgaben: Aikar's Rezept, GTNH-Klasse, ZGC für große Heaps und mehr."
-    override val settingsAdaptiveMemory         = "Adaptiver Speicher (Auto)"
-    override val settingsAdaptiveMemoryDesc     = "Jede Instanz bestimmt ihren Heap selbst, anhand des tatsächlichen Verbrauchs des Packs, verfeinert über mehrere Sitzungen. Ein fester RAM-Wert deaktiviert Auto für diese Instanz; ausschalten gibt jeder Instanz den festen Standardwert."
+    override val settingsAdaptiveMemory         = "Adaptiver Speicher"
+    override val settingsAdaptiveMemoryDesc     = "Verfeinert den Heap jeder Instanz anhand des realen Verbrauchs über einige Sitzungen, aufbauend auf dem automatischen RAM-basierten Basiswert. Festen RAM-Wert setzen, um eine Instanz auszunehmen; ausschalten, um den automatischen Basiswert ohne Lernen zu behalten."
     override val settingsMimicVersion           = "Launcher-Version-Override"
     override val settingsMimicVersionDesc       = "Fixiert den Versions-String, der an den Upstream im Handshake und User-Agent gesendet wird. Leer lassen für den eingebauten Standard — nur setzen, wenn der Upstream seine Versions-Anforderung schneller anhebt als Nexiras Release-Zyklus. Wirkt beim nächsten Protokoll-Aufruf nach Speichern, kein Neustart nötig."
     override fun settingsMimicVersionPlaceholder(default: String) = "Standard: $default"
@@ -662,6 +663,7 @@ object GermanStrings : AppStrings {
     override val packDetailTabFiles             = "Dateien"
     override val packDetailTabWorlds            = "Welten"
     override val packDetailTabLogs              = "Logs"
+    override val packDetailTabSettings          = "Einstellungen"
     override val consoleSessionLive             = "Allgemein"
     override fun consoleSessionPickerLabel(current: String) = "Log: $current"
 

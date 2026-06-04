@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -37,6 +38,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -48,11 +50,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import hivens.core.api.interfaces.IPackRepository
+import hivens.core.api.interfaces.ISettingsService
+import hivens.core.data.InstanceRuntime
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
+import hivens.core.jvm.AutomaticHeap
+import hivens.core.jvm.SystemMemory
+import hivens.launcher.ProfilerProfileStore
 import hivens.launcher.launch.LauncherController
 import hivens.launcher.platform.PlatformPaths
 import hivens.ui.AppState
+import hivens.ui.components.RamSelector
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.notifications.LaunchTarget
 import hivens.ui.notifications.drivers.LaunchDriver
@@ -71,6 +79,7 @@ import hivens.ui.utils.GameConsoleService
 import hivens.ui.utils.LogEntry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import org.koin.compose.koinInject
@@ -125,6 +134,7 @@ fun PackDetailScreen(
 
     var tabIndex by remember(pack.id) { mutableIntStateOf(0) }
     val s = LocalStrings.current
+    val scope = rememberCoroutineScope()
 
     Column(Modifier.fillMaxSize()) {
         Hero(pack = pack, onBack = onBack)
@@ -173,6 +183,11 @@ fun PackDetailScreen(
                 onClick  = { tabIndex = 3 },
                 text     = { Text(s.packDetailTabLogs, fontWeight = if (tabIndex == 3) FontWeight.Bold else FontWeight.Normal) },
             )
+            Tab(
+                selected = tabIndex == 4,
+                onClick  = { tabIndex = 4 },
+                text     = { Text(s.packDetailTabSettings, fontWeight = if (tabIndex == 4) FontWeight.Bold else FontWeight.Normal) },
+            )
         }
 
         Box(modifier = Modifier.fillMaxSize().padding(top = 4.dp)) {
@@ -181,6 +196,15 @@ fun PackDetailScreen(
                 1 -> FileBrowserPane(rootDir = instanceDir, modifier = Modifier.padding(16.dp))
                 2 -> WorldsTabPane(instanceDir = instanceDir)
                 3 -> PackLogsTab(packId = pack.id, instanceDir = instanceDir, dataDir = paths.dataDir)
+                4 -> PackSettingsTab(
+                    runtime = pack.runtime,
+                    instanceDir = instanceDir,
+                    onRuntimeChange = { rt ->
+                        val updated = pack.copy(runtime = rt)
+                        instance = updated
+                        scope.launch { repo.put(updated) }
+                    },
+                )
             }
         }
     }
@@ -268,6 +292,55 @@ private fun PackLogsTab(packId: String, instanceDir: Path, dataDir: Path) {
                     )
                 }
             }
+        }
+    }
+}
+
+/**
+ * Settings tab: per-instance runtime. RAM only for now -- Auto (the machine-aware
+ * Automatic baseline, refined by the adaptive sizer) vs a pinned value. Persists each
+ * change through [onRuntimeChange]; the Auto chip shows what the next launch will use.
+ */
+@Composable
+private fun PackSettingsTab(
+    runtime: InstanceRuntime,
+    instanceDir: Path,
+    onRuntimeChange: (InstanceRuntime) -> Unit,
+) {
+    val profilerStore: ProfilerProfileStore = koinInject()
+    val settingsService: ISettingsService = koinInject()
+
+    // Keyed on the stable instanceDir, not runtime: the tab's own edits mutate runtime,
+    // and re-seeding on those would fight an in-progress edit. Reset only when the
+    // displayed instance changes (which also remounts the screen via the nav Crossfade).
+    var isAutoMode by remember(instanceDir) { mutableStateOf(!runtime.fixedMemory) }
+    var memory by remember(instanceDir) { mutableStateOf(if (runtime.memoryMb > 0) runtime.memoryMb else 4096) }
+    var resolvedAutoMb by remember { mutableStateOf(AutomaticHeap.compute(SystemMemory.totalPhysicalMb())) }
+
+    LaunchedEffect(instanceDir) {
+        val settings = settingsService.getSettings()
+        val adaptiveOn = settings.experimentalFeaturesEnabled && settings.adaptiveMemoryEnabled
+        val derivedMb = if (adaptiveOn) withContext(Dispatchers.IO) { profilerStore.readProfile(instanceDir)?.derivedHeapMb } else null
+        resolvedAutoMb = derivedMb ?: AutomaticHeap.compute(SystemMemory.totalPhysicalMb())
+    }
+
+    Surface(modifier = Modifier.fillMaxSize(), color = glassSurfaceAlpha(0.85f)) {
+        Column(Modifier.fillMaxSize().padding(24.dp)) {
+            RamSelector(
+                isAuto = isAutoMode,
+                resolvedAutoMb = resolvedAutoMb,
+                currentMb = memory,
+                onAutoSelected = {
+                    isAutoMode = true
+                    onRuntimeChange(runtime.copy(fixedMemory = false))
+                },
+                onValueChanged = {
+                    memory = it
+                    isAutoMode = false
+                    onRuntimeChange(runtime.copy(memoryMb = it, fixedMemory = true))
+                },
+                modifier = Modifier.widthIn(max = 560.dp),
+            )
         }
     }
 }

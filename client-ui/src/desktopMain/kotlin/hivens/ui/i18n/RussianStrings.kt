@@ -217,6 +217,7 @@ object RussianStrings : AppStrings {
     override val ramCustomInputLabel = "Своё значение:"
     override fun ramSystemHint(systemRam: String, recommended: String) =
         "Система: $systemRam • Рекомендуется не более $recommended"
+    override fun ramAutoLabel(resolved: String) = "Авто · ~$resolved"
 
     // =========================================================================
     // Mod cards
@@ -329,8 +330,8 @@ object RussianStrings : AppStrings {
     override val settingsAutoSyncAllPacksDesc   = "Тихо обновлять все уже установленные сборки в фоне при старте лаунчера. Тратит фоновый трафик — полезно если играешь на нескольких серверах и хочешь свежее состояние без клика по каждому."
     override val settingsJvmBuilder             = "Визуальный конструктор JVM-аргументов"
     override val settingsJvmBuilderDesc         = "Показывает кнопку «Собрать аргументы» в настройках сервера. Выбираешь сборщик мусора, настраиваешь регионы хипа, включаешь AppCDS или JFR — без необходимости помнить флаги. Готовые пресеты: Aikar's recipe, GTNH-класс, ZGC для больших хипов и другие."
-    override val settingsAdaptiveMemory         = "Адаптивная память (Авто)"
-    override val settingsAdaptiveMemoryDesc     = "Каждая сборка сама подбирает размер хипа по реальному потреблению пака, уточняя за несколько сессий. Выбор конкретного значения RAM отключает Авто для этой сборки; выключи, чтобы у всех был фиксированный дефолт."
+    override val settingsAdaptiveMemory         = "Адаптивная память"
+    override val settingsAdaptiveMemoryDesc     = "Уточняет размер хипа каждой сборки по реальному потреблению за несколько сессий, поверх автоматического базового значения от ОЗУ машины. Зафиксируй конкретное значение RAM, чтобы исключить сборку; выключи, чтобы оставить автоматическую базу без обучения."
     override val settingsMimicVersion           = "Подмена версии лаунчера"
     override val settingsMimicVersionDesc       = "Зафиксировать строку версии, которая отправляется в рукопожатии и User-Agent. Оставь пустым для стандартного значения — заполни только если апстрим успел поднять свою версию быстрее цикла релизов Nexira. Применяется на следующем запросе к протоколу после сохранения, перезапуск не требуется."
     override fun settingsMimicVersionPlaceholder(default: String) = "По умолчанию: $default"
@@ -663,6 +664,7 @@ object RussianStrings : AppStrings {
     override val packDetailTabFiles             = "Файлы"
     override val packDetailTabWorlds            = "Миры"
     override val packDetailTabLogs              = "Логи"
+    override val packDetailTabSettings          = "Настройки"
     override val consoleSessionLive             = "Общий"
     override fun consoleSessionPickerLabel(current: String) = "Лог: $current"
 
