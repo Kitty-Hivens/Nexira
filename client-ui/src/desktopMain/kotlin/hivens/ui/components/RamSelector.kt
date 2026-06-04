@@ -55,8 +55,13 @@ fun RamSelector(
         allPresets.filter { it <= (systemRamMb * 0.75).toInt() }.ifEmpty { listOf(1024, 2048) }
     }
 
-    var customInput by remember { mutableStateOf("") }
-    var isCustomMode by remember { mutableStateOf(!isAuto && !allPresets.contains(currentMb)) }
+    // Seed the custom field from a pinned non-preset value (against the machine-FILTERED
+    // presets, so a value pinned above the machine ceiling still shows in the field, not
+    // a missing chip). Keyed on the inputs so a profile load / instance switch re-seeds.
+    var customInput by remember(isAuto, currentMb) {
+        mutableStateOf(if (!isAuto && currentMb in 512..32768 && !presets.contains(currentMb)) currentMb.toString() else "")
+    }
+    var isCustomMode by remember(isAuto, currentMb) { mutableStateOf(!isAuto && !presets.contains(currentMb)) }
     val focusManager = LocalFocusManager.current
 
     Column(modifier = modifier.fillMaxWidth()) {

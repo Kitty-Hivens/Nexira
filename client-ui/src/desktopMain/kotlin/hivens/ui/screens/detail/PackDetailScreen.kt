@@ -310,8 +310,11 @@ private fun PackSettingsTab(
     val profilerStore: ProfilerProfileStore = koinInject()
     val settingsService: ISettingsService = koinInject()
 
-    var isAutoMode by remember(runtime) { mutableStateOf(!runtime.fixedMemory) }
-    var memory by remember(runtime) { mutableStateOf(if (runtime.memoryMb > 0) runtime.memoryMb else 4096) }
+    // Keyed on the stable instanceDir, not runtime: the tab's own edits mutate runtime,
+    // and re-seeding on those would fight an in-progress edit. Reset only when the
+    // displayed instance changes (which also remounts the screen via the nav Crossfade).
+    var isAutoMode by remember(instanceDir) { mutableStateOf(!runtime.fixedMemory) }
+    var memory by remember(instanceDir) { mutableStateOf(if (runtime.memoryMb > 0) runtime.memoryMb else 4096) }
     var resolvedAutoMb by remember { mutableStateOf(AutomaticHeap.compute(SystemMemory.totalPhysicalMb())) }
 
     LaunchedEffect(instanceDir) {
