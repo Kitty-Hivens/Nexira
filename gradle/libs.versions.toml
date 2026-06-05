@@ -46,6 +46,8 @@ libtray           = "0.1.0"
 
 # ── Test ─────────────────────────────────────────────────────────────────────
 mockk             = "1.13.12"
+junit             = "5.11.4"
+junitPlatform     = "1.11.4"
 
 [libraries]
 # Logging
@@ -100,6 +102,8 @@ libtray                          = { group = "dev.hivens", name = "libtray", ver
 
 # Test
 mockk                            = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
+junit-jupiter                    = { group = "org.junit.jupiter",  name = "junit-jupiter",           version.ref = "junit" }
+junit-platform-launcher          = { group = "org.junit.platform", name = "junit-platform-launcher", version.ref = "junitPlatform" }
 
 # KSP processor API (used by :widget-processor to scan @Widget composables
 # and emit GeneratedWidgetRegistry at compile time).
