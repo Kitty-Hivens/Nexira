@@ -68,7 +68,9 @@ fun AboutSurface(onBack: () -> Unit) {
     val updateState      = remember { mutableStateOf<UpdateCheckState>(UpdateCheckState.Idle) }
     val showUpdateDialog = remember { mutableStateOf(false) }
 
-    val systemRam = remember { SystemMemory.totalPhysicalMb() }
+    // OrNull (not the sizing fallback): the System-info card shows "Unknown" on a 0,
+    // so a broken runtime reads as unknown rather than a fabricated 16 GB.
+    val systemRam = remember { SystemMemory.totalPhysicalMbOrNull() ?: 0 }
 
     val displayRes = remember {
         runCatching {

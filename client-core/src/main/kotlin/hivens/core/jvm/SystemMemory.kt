@@ -12,29 +12,39 @@ import org.slf4j.LoggerFactory
  * That extension lives in the `jdk.management` module: on the jlinked
  * distribution the module MUST be in the runtime image (see client-ui's
  * `packaging.modules` + the `verifyRuntimeModules` guard) or the class fails to
- * link and the read degrades to [FALLBACK_MB] -- which mis-sizes the Automatic
- * heap. The fallback logs a warning so such a regression is visible, not silent.
+ * link and the read is unavailable. [totalPhysicalMb] then substitutes
+ * [FALLBACK_MB] for sizing; [totalPhysicalMbOrNull] returns null so a caller
+ * that must not guess (a diagnostics display) can show "unknown" instead. The
+ * read is memoized -- host RAM is constant per process -- so the warning on a
+ * broken runtime fires once, not once per caller.
  */
 object SystemMemory {
 
-    /** Used when the platform does not expose physical RAM (e.g. jdk.management absent). */
+    /** Heap-sizing fallback used when the platform does not expose physical RAM. */
     const val FALLBACK_MB = 16384
 
     private val logger = LoggerFactory.getLogger("SystemMemory")
 
-    fun totalPhysicalMb(): Int {
+    private val cachedMb: Int? by lazy { readPhysicalMb() }
+
+    /** Host physical RAM (MB), or null if the platform does not expose it (e.g. jdk.management absent). */
+    fun totalPhysicalMbOrNull(): Int? = cachedMb
+
+    /** Host physical RAM (MB) for sizing; [FALLBACK_MB] when the platform does not expose it. */
+    fun totalPhysicalMb(): Int = cachedMb ?: FALLBACK_MB
+
+    private fun readPhysicalMb(): Int? {
         return try {
             val os = ManagementFactory.getOperatingSystemMXBean() as OperatingSystemMXBean
-            (os.totalMemorySize / (1024 * 1024)).toInt().takeIf { it > 0 } ?: FALLBACK_MB
+            (os.totalMemorySize / (1024 * 1024)).toInt().takeIf { it > 0 }
         } catch (_: LinkageError) {
             // com.sun.management failed to link: jdk.management is absent from the runtime
-            // image. Degrade to a fallback rather than crash the launcher over a RAM read.
+            // image. Degrade rather than crash the launcher over a RAM read.
             logger.warn(
                 "Could not read host RAM via com.sun.management OperatingSystemMXBean " +
-                    "(jdk.management missing from the runtime image?). Using {} MB fallback.",
-                FALLBACK_MB,
+                    "(jdk.management missing from the runtime image?).",
             )
-            FALLBACK_MB
+            null
         }
     }
 }

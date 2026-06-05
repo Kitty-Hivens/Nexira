@@ -452,7 +452,7 @@ packaging {
 val packagingExtension = the<PackagingExtension>()
 val verifyRuntimeModules by tasks.registering {
     group = "verification"
-    description = "Fails if packaging.modules omits a module runtime reflection needs (jdk.management)."
+    description = "Fails if packaging.modules omits a module the runtime read needs (jdk.management)."
     val modules = packagingExtension.modules.get()
     doLast {
         require("jdk.management" in modules) {
