@@ -2,6 +2,18 @@ plugins {
     java
 }
 
+dependencies {
+    testImplementation(libs.junit.jupiter)
+    testRuntimeOnly(libs.junit.platform.launcher)
+}
+
+// JUnit 5 for the agent's own tests (the GC-classification table). Test compile
+// is still pinned to release 8 by the block below -- fine, JUnit 5 is Java 8
+// compatible; only the JVM that RUNS the tests is JDK 25.
+tasks.test {
+    useJUnitPlatform()
+}
+
 // This jar is a -javaagent that loads into the GAME JVM, not the launcher.
 // Legacy SmartyCraft packs (1.7.10 / 1.12.2) run on Java 8, so the agent must
 // be Java 8 bytecode (class major 52) or it throws UnsupportedClassVersionError
