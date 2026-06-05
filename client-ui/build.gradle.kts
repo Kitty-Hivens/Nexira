@@ -1,3 +1,4 @@
+import hivens.packaging.PackagingExtension
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
@@ -230,6 +231,12 @@ compose.desktop {
                 "java.desktop",
                 "java.logging",
                 "java.management",
+                // jdk.management carries com.sun.management.OperatingSystemMXBean, which
+                // SystemMemory reflects into for host RAM (Automatic heap sizing). Without it
+                // the bean lacks getTotalMemorySize/getTotalPhysicalMemorySize and RAM silently
+                // falls back to a wrong 16 GB -- unlike the loud NoClassDefFound a missing
+                // jdk.security.auth throws. Keep both module lists in sync.
+                "jdk.management",
                 "java.prefs",
                 "jdk.crypto.ec",
                 // jdk.security.auth: provides com.sun.security.auth.module.UnixSystem,
@@ -376,6 +383,10 @@ packaging {
         "java.desktop",
         "java.logging",
         "java.management",
+        // jdk.management: see the matching note in the compose block above. SystemMemory's
+        // RAM read needs com.sun.management's OperatingSystemMXBean; its absence is a silent
+        // 16 GB fallback (mis-sizing the Automatic heap), not a crash. verifyRuntimeModules guards it.
+        "jdk.management",
         "java.prefs",
         "jdk.crypto.ec",
         // See the matching note in the compose.desktop.application block
@@ -428,6 +439,30 @@ packaging {
         // PackagingPlugin's conventions -- omitted intentionally.
     }
 }
+
+// Guard the one jlink module whose omission fails SILENTLY. SystemMemory reads host
+// RAM via com.sun.management's OperatingSystemMXBean (the jdk.management module); drop
+// it from the runtime image and the read falls back to a wrong 16 GB, mis-sizing the
+// Automatic heap with no crash to flag it. A missing jdk.security.auth / jdk.crypto.ec
+// throws NoClassDefFound (loud), so those need no guard. This reads the configured list
+// only -- no jlink or release build -- and is wired into `check`.
+// the<PackagingExtension>() is resolved at Project scope; inside the task lambda `the`
+// would resolve against the Task's own extensions. The config-time .get() snapshot keeps
+// doLast configuration-cache safe -- it closes over a plain List, not the build script.
+val packagingExtension = the<PackagingExtension>()
+val verifyRuntimeModules by tasks.registering {
+    group = "verification"
+    description = "Fails if packaging.modules omits a module the runtime read needs (jdk.management)."
+    val modules = packagingExtension.modules.get()
+    doLast {
+        require("jdk.management" in modules) {
+            "packaging.modules is missing \"jdk.management\": SystemMemory.totalPhysicalMb() will " +
+                "silently fall back to 16 GB on the packaged build, mis-sizing the Automatic heap."
+        }
+    }
+}
+
+tasks.named("check") { dependsOn(verifyRuntimeModules) }
 
 // Kotlin compiler options for every JVM compile task in client-ui.
 // freeCompilerArgs split into "always on" and "opt-in" groups.
