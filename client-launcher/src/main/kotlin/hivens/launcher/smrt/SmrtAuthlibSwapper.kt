@@ -102,6 +102,11 @@ class SmrtAuthlibSwapper(
                 Files.deleteIfExists(dest)
                 null
             }
+        } catch (e: CancellationException) {
+            // An aborted launch must cancel cleanly, not surface as AuthlibUnavailable
+            // (which would overwrite the abort's Idle state with an error).
+            runCatching { Files.deleteIfExists(dest) }
+            throw e
         } catch (e: Exception) {
             log.warn("authlib swap: download failed for {}", fileName, e)
             runCatching { Files.deleteIfExists(dest) }
