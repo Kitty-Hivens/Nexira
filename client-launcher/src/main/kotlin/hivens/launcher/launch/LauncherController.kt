@@ -505,7 +505,11 @@ class LauncherController(
 
                 val process = launcherService.launchPackClient(
                     sessionData          = session,
-                    manifest             = manifestSnapshot,
+                    // Carry the EFFECTIVE requirement (manifest value or the
+                    // name-based fallback) so the service's SC-binding step sees it;
+                    // the raw snapshot's authRequirement is null for packs whose
+                    // mirror manifest has no auth block yet (e.g. Industrial).
+                    manifest             = manifestSnapshot.copy(authRequirement = authRequirement),
                     runtime              = refreshedInstance.runtime,
                     clientRootPath       = clientDir,
                     javaPathOverride     = javaOverride,
@@ -540,6 +544,12 @@ class LauncherController(
                     _state.value = LaunchState.Idle
                 }
 
+            } catch (e: PackPrepBlocked) {
+                // SC-binding step could not complete (patched authlib / open-smrt
+                // helper unavailable). Surface the semantic reason, not Internal.
+                runningProcess = null
+                logger.warn("Pack launch blocked for {}: {}", packInstance.displayName, e.error)
+                fail(e.error)
             } catch (e: Exception) {
                 runningProcess = null
                 if (e !is CancellationException) {

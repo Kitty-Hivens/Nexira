@@ -47,6 +47,7 @@ interface AppStrings {
     fun stateError(msg: String): String
     fun stateMissingAuthProvider(providerKey: String): String
     fun stateHelperUnavailable(mcVersion: String): String
+    fun stateAuthlibUnavailable(mcVersion: String): String
 
     // --- Auth Success ---
     fun authSuccess(uuid: String): String

@@ -10,13 +10,21 @@ import hivens.core.data.SessionData
 import hivens.core.api.model.ServerProfile
 import hivens.launcher.LauncherService.Companion.adaptiveApplies
 import hivens.launcher.LauncherService.Companion.baselineMemory
+import hivens.launcher.LauncherService.Companion.findAuthlibLibrary
 import hivens.launcher.LauncherService.Companion.normalizeMemory
 import hivens.launcher.LauncherService.Companion.resolveJavaPath
+import hivens.launcher.LauncherService.Companion.swapAuthlibPath
+import hivens.launcher.runtime.MavenCoord
+import hivens.launcher.runtime.loader.ResolvedLibrary
+import hivens.launcher.runtime.loader.ResolvedRuntime
 import hivens.launcher.component.ClasspathProvider
 import hivens.launcher.component.EnvironmentPreparer
 import hivens.launcher.component.GameCommandBuilder
 import hivens.launcher.component.ProcessLogHandler
+import hivens.launcher.network.ServerProtocolConfig
 import hivens.launcher.runtime.RuntimeProvisioner
+import hivens.launcher.smrt.OpenSmrtHelperResolver
+import hivens.launcher.smrt.SmrtAuthlibSwapper
 import hivens.test.buildMockClient
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -261,6 +269,9 @@ class LauncherServiceTest {
             ),
             profilerStore = ProfilerProfileStore(json),
             agentExtractor = AgentExtractor(workDir),
+            // SC server path never reaches the SC-binding step; dead deps satisfy the ctor.
+            authlibSwapper = SmrtAuthlibSwapper(deadHttpClientProvider(), ServerProtocolConfig(), workDir),
+            openSmrtResolver = OpenSmrtHelperResolver(deadHttpClientProvider(), json, workDir),
             sharedAssetsDir = workDir / "assets",
             sharedLibrariesDir = workDir / "libraries",
         )
@@ -335,4 +346,36 @@ class LauncherServiceTest {
     }
 
     private fun makeTempDir(): Path = Files.createTempDirectory("launcher-test-").also { it.createDirectories() }
+
+    // ── SC-bound authlib swap (the pure half of applySmrtBinding) ─────────────
+
+    private fun runtimeOf(libs: List<ResolvedLibrary>) = ResolvedRuntime(
+        libraries = libs,
+        clientJar = Path.of("/libs/client.jar"),
+        mainClass = "Main",
+        assetIndexId = "1.12",
+    )
+
+    private val lwjgl = ResolvedLibrary(MavenCoord("org.lwjgl", "lwjgl", "3.3.1"), Path.of("/libs/lwjgl.jar"))
+    private val authlib = ResolvedLibrary(MavenCoord("com.mojang", "authlib", "1.5.25"), Path.of("/libs/authlib-1.5.25.jar"))
+
+    @Test
+    fun `findAuthlibLibrary picks the com_mojang authlib entry`() {
+        assertEquals(authlib, findAuthlibLibrary(runtimeOf(listOf(lwjgl, authlib))))
+    }
+
+    @Test
+    fun `findAuthlibLibrary returns null when no authlib is present`() {
+        assertEquals(null, findAuthlibLibrary(runtimeOf(listOf(lwjgl))))
+    }
+
+    @Test
+    fun `swapAuthlibPath repoints only the authlib entry`() {
+        val patched = Path.of("/cache/smrt-authlib/Industrial/authlib-1.5.25.jar")
+        val out = swapAuthlibPath(runtimeOf(listOf(lwjgl, authlib)), authlib, patched)
+
+        assertEquals(patched, out.libraries.first { it.coord.artifact == "authlib" }.path, "authlib path is swapped")
+        assertEquals(lwjgl.path, out.libraries.first { it.coord.artifact == "lwjgl" }.path, "other libraries untouched")
+        assertEquals(2, out.libraries.size, "no entry added or dropped")
+    }
 }
