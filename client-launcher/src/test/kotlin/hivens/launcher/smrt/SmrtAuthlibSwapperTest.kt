@@ -18,6 +18,7 @@ import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
+import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -65,10 +66,9 @@ class SmrtAuthlibSwapperTest {
         assertNotNull(out, "patched authlib should resolve")
         assertTrue(Files.isRegularFile(out), "cached jar must exist on disk")
         assertContentEquals(bytes, Files.readAllBytes(out), "cached bytes must be the downloaded payload")
-        assertTrue(
-            out.toString().contains("smrt-authlib") && out.toString().endsWith("Industrial/authlib-1.5.25.jar"),
-            "cache path is per-server: got $out",
-        )
+        assertEquals("authlib-1.5.25.jar", out.fileName.toString(), "cached under the SC filename")
+        assertEquals("Industrial", out.parent.fileName.toString(), "cache is per-server")
+        assertEquals("smrt-authlib", out.parent.parent.fileName.toString(), "under the smrt-authlib cache root")
     }
 
     @Test
@@ -77,7 +77,7 @@ class SmrtAuthlibSwapperTest {
         // expected filename, so a differing version still resolves (the BLOCKER).
         val out = swapper(bytes).ensurePatchedAuthlib("Industrial", manifest("libraries-1.12.2", "authlib-1.5.21.jar", goodMd5))
         assertNotNull(out, "a differing SC authlib version must still resolve")
-        assertTrue(out.toString().endsWith("Industrial/authlib-1.5.21.jar"), "cached under SC's own filename: got $out")
+        assertEquals("authlib-1.5.21.jar", out.fileName.toString(), "cached under SC's own filename")
     }
 
     @Test
