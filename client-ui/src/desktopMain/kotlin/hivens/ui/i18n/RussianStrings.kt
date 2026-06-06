@@ -47,6 +47,8 @@ object RussianStrings : AppStrings {
     override fun stateError(msg: String)   = "Ошибка: $msg"
     override fun stateHelperUnavailable(mcVersion: String) =
         "Нет open-smrt хелпера для Minecraft $mcVersion. Запуск заблокирован, чтобы не запускать проприетарный мод Smarty; отключи подмену хелпера в настройках, чтобы играть с ним."
+    override fun stateAuthlibUnavailable(mcVersion: String) =
+        "Не удалось получить authlib SmartyCraft для Minecraft $mcVersion. Запуск заблокирован: сервер отклонит вход. Проверь соединение и вход в SmartyCraft и попробуй снова."
     override fun stateMissingAuthProvider(providerKey: String) = when (providerKey) {
         PackAuthRequirement.SmartyCraft.PROVIDER_KEY ->
             "Этой сборке нужен аккаунт SmartyCraft. Войдите, чтобы играть."

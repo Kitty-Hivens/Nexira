@@ -103,5 +103,6 @@ private fun localizeError(error: LaunchError, s: AppStrings): String = when (err
     is LaunchError.TwoFactorExpired     -> s.auth2faExpired
     is LaunchError.AuthFail             -> "${s.stateAuthFail}: ${error.cause ?: ""}"
     is LaunchError.HelperUnavailable    -> s.stateHelperUnavailable(error.mcVersion)
+    is LaunchError.AuthlibUnavailable   -> s.stateAuthlibUnavailable(error.mcVersion)
     is LaunchError.MissingAuthProvider  -> s.stateMissingAuthProvider(error.providerKey)
 }

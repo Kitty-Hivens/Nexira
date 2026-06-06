@@ -461,6 +461,40 @@ class LauncherControllerTest {
     }
 
     @Test
+    fun `pack blocked by PackPrepBlocked surfaces the carried LaunchError, not Internal`() = runTest {
+        every { settingsService.getSettings() } returns SettingsData()
+        coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk8/bin/java")
+        credentialsManager.save(
+            SessionData(playerName = "tester", uuid = "u", accessToken = "stale", cachedPassword = "pw"),
+        )
+        coEvery { authService.login("tester", "pw", "Industrial") } returns
+            SessionData(playerName = "tester", uuid = "u", accessToken = "fresh")
+
+        // The SC-binding step inside the service could not source the patched
+        // authlib; it throws PackPrepBlocked carrying the semantic reason.
+        coEvery {
+            launcherService.launchPackClient(
+                any(), any(), any(), any(), any(), any(), any(), any(), any(),
+            )
+        } throws PackPrepBlocked(LaunchError.AuthlibUnavailable("1.12.2"))
+
+        val instance = scBoundPackInstance()
+        val controller = newController(this)
+        controller.launchPackInstance(
+            currentSession = SessionData(playerName = "tester", uuid = "u", accessToken = "stale"),
+            packInstance   = instance,
+        )
+        advanceUntilIdle()
+
+        val state = controller.state.value
+        assertIs<LaunchState.Error>(state)
+        assertEquals(
+            LaunchError.AuthlibUnavailable("1.12.2"), state.reason,
+            "controller must map PackPrepBlocked.error, not wrap it in Internal",
+        )
+    }
+
+    @Test
     fun `pack with SC requirement and no cached password fails with MissingAuthProvider`() = runTest {
         every { settingsService.getSettings() } returns SettingsData()
 
@@ -513,6 +547,45 @@ class LauncherControllerTest {
             LaunchError.MissingAuthProvider(PackAuthRequirement.SmartyCraft.PROVIDER_KEY),
             state.reason,
             "Industrial fallback must drive the same precondition surface as an explicit requirement",
+        )
+    }
+
+    @Test
+    fun `fallback SC requirement is forwarded to launchPackClient, not dropped`() = runTest {
+        // Guards the snapshot-forwarding bug: when the requirement comes from the
+        // name-based fallback (manifest authRequirement = null), the service must
+        // still receive it, or the SC-binding step (authlib swap) never runs.
+        every { settingsService.getSettings() } returns SettingsData()
+        coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk8/bin/java")
+        credentialsManager.save(
+            SessionData(playerName = "tester", uuid = "u", accessToken = "stale", cachedPassword = "pw"),
+        )
+        coEvery { authService.login("tester", "pw", "Industrial") } returns
+            SessionData(playerName = "tester", uuid = "u", accessToken = "fresh")
+
+        val process = mockk<Process>()
+        every { process.waitFor() } returns 0
+        val manifestPassed = slot<hivens.core.data.CachedManifestSnapshot>()
+        coEvery {
+            launcherService.launchPackClient(
+                sessionData = any(), manifest = capture(manifestPassed), runtime = any(),
+                clientRootPath = any(), javaPathOverride = any(), allocatedMemoryMB = any(),
+                adaptiveEnabled = any(), displayName = any(), onLog = any(),
+            )
+        } returns process
+        coJustRun { packRepository.put(any()) }
+
+        val instance = scBoundPackInstance(packId = "Industrial", displayName = "Industrial", authRequirement = null)
+        val controller = newController(this)
+        controller.launchPackInstance(
+            currentSession = SessionData(playerName = "tester", uuid = "u", accessToken = "stale"),
+            packInstance   = instance,
+        )
+        advanceUntilIdle()
+
+        assertEquals(
+            PackAuthRequirement.SmartyCraft("Industrial"), manifestPassed.captured.authRequirement,
+            "the effective (fallback) requirement must reach the service so SC-binding runs",
         )
     }
 

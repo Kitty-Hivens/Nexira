@@ -12,9 +12,15 @@ fun getGitVersion(providerFactory: ProviderFactory): String {
     return try {
         val version = providerFactory.exec {
             commandLine("git", "describe", "--tags", "--always", "--dirty")
-        }.standardOutput.asText.get().trim()
+        }.standardOutput.asText.get().trim().removePrefix("v")
 
-        version.removePrefix("v")
+        // `--always` falls back to a bare commit SHA when no tag is reachable
+        // (the test CI does a shallow, no-tags checkout). A SHA carries no dotted
+        // version component, and an all-numeric short SHA would otherwise parse as
+        // a single huge version number and invert every version comparison. Treat
+        // "no reachable tag" as an unknown 0.0.0 build (no prerelease suffix, so
+        // it stays a clean lower bound for comparisons).
+        if (version.contains('.')) version else "0.0.0"
     } catch (e: Exception) {
         println("Git version lookup failed: ${e.message}")
         "0.0.0-dev"

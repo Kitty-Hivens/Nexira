@@ -50,6 +50,8 @@ object EnglishStrings : AppStrings {
     override fun stateError(msg: String)   = "Error: $msg"
     override fun stateHelperUnavailable(mcVersion: String) =
         "No open-smrt helper for Minecraft $mcVersion. Launch blocked so the proprietary Smarty mod isn't run; disable the helper swap in Settings to play with it."
+    override fun stateAuthlibUnavailable(mcVersion: String) =
+        "Could not get the SmartyCraft authlib for Minecraft $mcVersion. Launch blocked: the join would be rejected. Check your connection and SmartyCraft sign-in, then try again."
     override fun stateMissingAuthProvider(providerKey: String) = when (providerKey) {
         PackAuthRequirement.SmartyCraft.PROVIDER_KEY ->
             "This pack needs a SmartyCraft account. Sign in to play."

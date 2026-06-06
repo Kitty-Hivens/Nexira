@@ -9,6 +9,7 @@ import hivens.core.data.HeapProfile
 import hivens.core.data.InstanceProfile
 import hivens.core.data.InstanceRuntime
 import hivens.core.data.LauncherLogType
+import hivens.core.data.PackAuthRequirement
 import hivens.core.data.SessionData
 import hivens.core.jvm.AutomaticHeap
 import hivens.core.jvm.HeapDeriver
@@ -17,7 +18,14 @@ import hivens.launcher.component.ClasspathProvider
 import hivens.launcher.component.EnvironmentPreparer
 import hivens.launcher.component.GameCommandBuilder
 import hivens.launcher.component.ProcessLogHandler
+import hivens.launcher.launch.LaunchError
+import hivens.launcher.launch.PackPrepBlocked
 import hivens.launcher.runtime.RuntimeProvisioner
+import hivens.launcher.runtime.loader.ResolvedLibrary
+import hivens.launcher.runtime.loader.ResolvedRuntime
+import hivens.launcher.smrt.ModInjector
+import hivens.launcher.smrt.OpenSmrtHelperResolver
+import hivens.launcher.smrt.SmrtAuthlibSwapper
 import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.nio.file.Files
@@ -41,6 +49,8 @@ internal class LauncherService(
     private val runtimeProvisioner: RuntimeProvisioner,
     private val profilerStore: ProfilerProfileStore,
     private val agentExtractor: AgentExtractor,
+    private val authlibSwapper: SmrtAuthlibSwapper,
+    private val openSmrtResolver: OpenSmrtHelperResolver,
     private val sharedAssetsDir: Path,
     private val sharedLibrariesDir: Path,
 ) : ILauncherService {
@@ -145,11 +155,16 @@ internal class LauncherService(
         // Java major can drive JDK provisioning -- same MC version on a different
         // loader needs a different JDK (Cleanroom-1.12.2 wants 25, not 8).
         val nativesDir = commandBuilder.packNativesDir(mcVersion)
-        val resolved = runtimeProvisioner.ensureRuntime(
+        val baseRuntime = runtimeProvisioner.ensureRuntime(
             mcVersion = mcVersion,
             loaderName = manifest.loaderName,
             loaderVersion = manifest.loaderVersion,
         ) { current, total, file -> onLog("Runtime $current/$total: $file", LauncherLogType.INFO) }
+
+        // 2b. SC binding: an SC-bound pack provisions the VANILLA authlib (sends the
+        // join to Mojang -> 403 for an SC token), so swap in SC's patched authlib
+        // and inject the open-smrt interop helper. No-op for Hivens-native packs.
+        val resolved = applySmrtBinding(manifest, sessionData, clientRootPath, mcVersion, baseRuntime, onLog)
 
         // 3. Java. Major precedence: loader-resolved override -> the pack manifest's
         // own declaration (authoritative for the pack) -> Mojang's per-version field
@@ -195,6 +210,64 @@ internal class LauncherService(
         )
 
         return spawnProcess(command, clientRootPath, onLog)
+    }
+
+    /**
+     * Applies SC-binding to a freshly provisioned pack [runtime]: returns it
+     * unchanged for non-SC packs; for an SC-bound pack swaps the vanilla authlib
+     * classpath entry to SC's patched jar and injects the open-smrt-network
+     * helper into the instance mods. Throws [PackPrepBlocked] (mapped to a
+     * [LaunchError] by the controller) ONLY when the patched authlib cannot be
+     * sourced -- without it the join is a guaranteed rejection. The open-smrt
+     * helper is best-effort interop (a miss only degrades connection stability),
+     * so it never blocks the launch.
+     *
+     * The patched authlib comes from the SC session's own file manifest
+     * ([SessionData.fileManifest], populated by the pre-spawn re-auth), so it is
+     * pulled from the same distribution the `clients/` cache already uses -- nothing of
+     * SC's is rehosted. Only the resolved classpath entry is rewritten; the
+     * shared `libraries/` root stays vanilla (a patched jar there would hit every
+     * pack of that MC version and be reverted by the provisioner's size check).
+     */
+    private suspend fun applySmrtBinding(
+        manifest: CachedManifestSnapshot,
+        sessionData: SessionData,
+        clientRootPath: Path,
+        mcVersion: String,
+        runtime: ResolvedRuntime,
+        onLog: (String, LauncherLogType) -> Unit,
+    ): ResolvedRuntime {
+        val requirement = manifest.authRequirement
+        if (requirement !is PackAuthRequirement.SmartyCraft) return runtime
+
+        // authlib swap: intrinsic to SC-bound packs (no toggle -- vanilla authlib
+        // is a guaranteed 403, there is no "original works" alternative).
+        val authlib = findAuthlibLibrary(runtime)
+            ?: throw PackPrepBlocked(LaunchError.AuthlibUnavailable(mcVersion))
+        val patched = authlibSwapper.ensurePatchedAuthlib(requirement.serverId, sessionData.fileManifest)
+            ?: throw PackPrepBlocked(LaunchError.AuthlibUnavailable(mcVersion))
+        onLog("Using SmartyCraft authlib for ${requirement.serverId}", LauncherLogType.INFO)
+        val bound = swapAuthlibPath(runtime, authlib, patched)
+
+        // open-smrt-network helper: always attempted for an SC-bound pack (no toggle --
+        // a pack ships no proprietary Smarty, so the server-list useOpenSmrtHelper
+        // choice of "keep the original" is meaningless here). But this is interop
+        // infrastructure, NOT an auth gate: without it the SC connection may be less
+        // stable, the join itself is not rejected. So a resolve miss is best-effort
+        // (log + continue), never a block -- the authlib swap above is the only hard
+        // requirement.
+        val helper = openSmrtResolver.resolve(mcVersion)
+        if (helper != null) {
+            ModInjector.stripByGlobs(clientRootPath, helper.smartyNames)
+            ModInjector.injectHelperJar(clientRootPath, helper.jar)
+            onLog("Injected open-smrt-network helper", LauncherLogType.INFO)
+        } else {
+            onLog(
+                "open-smrt-network helper unavailable for $mcVersion; joining without it (connection may be less stable)",
+                LauncherLogType.WARN,
+            )
+        }
+        return bound
     }
 
     /**
@@ -265,6 +338,14 @@ internal class LauncherService(
     }
 
     internal companion object {
+        /** The vanilla `com.mojang:authlib` classpath entry in [runtime], or null if absent. */
+        internal fun findAuthlibLibrary(runtime: ResolvedRuntime): ResolvedLibrary? =
+            runtime.libraries.firstOrNull { it.coord.group == "com.mojang" && it.coord.artifact == "authlib" }
+
+        /** [runtime] with [target]'s path repointed to [newPath]; every other entry left as-is. */
+        internal fun swapAuthlibPath(runtime: ResolvedRuntime, target: ResolvedLibrary, newPath: Path): ResolvedRuntime =
+            runtime.copy(libraries = runtime.libraries.map { if (it === target) it.copy(path = newPath) else it })
+
         /**
          * Memory allocation rule: profile's per-instance value wins when positive,
          * otherwise the launcher's globally allocated value is used. Anything below
