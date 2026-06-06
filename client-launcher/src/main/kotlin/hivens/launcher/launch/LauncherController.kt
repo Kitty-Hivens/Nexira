@@ -10,6 +10,7 @@ import hivens.core.data.ContentToggle
 import hivens.core.data.OptionalContentRules
 import hivens.core.data.PackAuthRequirement
 import hivens.core.data.PackInstance
+import hivens.core.data.PackOrigin
 import hivens.core.data.SessionData
 import hivens.core.diag.ActionRing
 import hivens.launcher.CredentialsManager
@@ -515,6 +516,11 @@ class LauncherController(
                     javaPathOverride     = javaOverride,
                     allocatedMemoryMB    = settings.memoryMB,
                     adaptiveEnabled      = settings.experimentalFeaturesEnabled && settings.adaptiveMemoryEnabled,
+                    // Redirect authlib to the mirror auth host only for
+                    // mirror-derived packs. A Modrinth / local / own pack keeps
+                    // the default Mojang hosts so its own auth provider stands.
+                    redirectAuthHost     = refreshedInstance.packRef.origin
+                        .let { it == PackOrigin.Smartycraft || it == PackOrigin.Mirror },
                     displayName          = refreshedInstance.displayName,
                 ) { text, type ->
                     emit(LaunchLogEvent.ProcessOutput(text, type))

@@ -83,6 +83,10 @@ interface ILauncherService {
         javaPathOverride: Path?,
         allocatedMemoryMB: Int,
         adaptiveEnabled: Boolean = false,
+        // Redirect authlib's auth/account/session hosts at the configured mirror
+        // host. Mirror-derived packs only; a Modrinth / local / own pack leaves
+        // the default Mojang hosts so its own auth provider is not redirected.
+        redirectAuthHost: Boolean = true,
         displayName: String,
         onLog: (String, LauncherLogType) -> Unit,
     ): Process

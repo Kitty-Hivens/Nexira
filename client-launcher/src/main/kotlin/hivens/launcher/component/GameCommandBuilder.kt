@@ -288,6 +288,7 @@ internal class GameCommandBuilder(
         runtime: ResolvedRuntime,
         session: SessionData,
         jvmArgsOverride: String?,
+        redirectAuthHost: Boolean = true,
         agentJarPath: Path? = null,
         metricsOutPath: Path? = null,
     ): List<String> {
@@ -303,12 +304,17 @@ internal class GameCommandBuilder(
         if (javaMajor <= 8) args.add("-noverify")
         addMacOsStartupFlags(args)
 
-        // Launcher identity + authlib redirect. Reaching the menu does not need
-        // it; joining an SC-derived server does (the redirect points auth at the
-        // configured host, same as the SC path).
-        args.add("-Dminecraft.api.auth.host=${protocolConfig.baseUrl}/launcher/")
-        args.add("-Dminecraft.api.account.host=${protocolConfig.baseUrl}/launcher/")
-        args.add("-Dminecraft.api.session.host=${protocolConfig.baseUrl}/launcher/")
+        // authlib redirect: point auth/account/session at the configured host so
+        // joining an SC/mirror-derived server authenticates there (same as the SC
+        // path). Mirror-derived packs ONLY -- a Modrinth / local / own pack keeps
+        // the default Mojang hosts so its own auth provider (e.g. real Yggdrasil)
+        // is never redirected to the mirror. No-op today (launcher is all mirror
+        // auth), load-bearing once a second provider exists.
+        if (redirectAuthHost) {
+            args.add("-Dminecraft.api.auth.host=${protocolConfig.baseUrl}/launcher/")
+            args.add("-Dminecraft.api.account.host=${protocolConfig.baseUrl}/launcher/")
+            args.add("-Dminecraft.api.session.host=${protocolConfig.baseUrl}/launcher/")
+        }
         args.add("-Dminecraft.launcher.brand=${Branding.UPSTREAM_NAME}")
         args.add("-Dminecraft.launcher.version=${Protocol.MIMIC_LAUNCHER_VERSION}")
 

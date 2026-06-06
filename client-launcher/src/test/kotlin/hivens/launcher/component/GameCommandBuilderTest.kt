@@ -527,6 +527,7 @@ class GameCommandBuilderTest {
     private fun packCommand(
         runtime: ResolvedRuntime = forgeRuntime(),
         javaMajor: Int = 8,
+        redirectAuthHost: Boolean = true,
     ) = builder.buildPackCommand(
         javaExec = "/usr/bin/java",
         memoryMB = 4096,
@@ -539,7 +540,26 @@ class GameCommandBuilderTest {
         runtime = runtime,
         session = session(),
         jvmArgsOverride = null,
+        redirectAuthHost = redirectAuthHost,
     )
+
+    @Test
+    fun `buildPackCommand redirects the auth hosts for a mirror-derived pack`() {
+        val cmd = packCommand(redirectAuthHost = true)
+        assertTrue(cmd.any { it.startsWith("-Dminecraft.api.auth.host=") })
+        assertTrue(cmd.any { it.startsWith("-Dminecraft.api.account.host=") })
+        assertTrue(cmd.any { it.startsWith("-Dminecraft.api.session.host=") })
+    }
+
+    @Test
+    fun `buildPackCommand leaves the default auth hosts for a non-mirror pack`() {
+        // Modrinth / local / own packs keep the default Mojang hosts so their own
+        // auth provider is not redirected to the mirror.
+        val cmd = packCommand(redirectAuthHost = false)
+        assertFalse(cmd.any { it.startsWith("-Dminecraft.api.auth.host=") })
+        assertFalse(cmd.any { it.startsWith("-Dminecraft.api.account.host=") })
+        assertFalse(cmd.any { it.startsWith("-Dminecraft.api.session.host=") })
+    }
 
     @Test
     fun `buildPackCommand drives mainClass, assetIndex and tweak from the runtime`() {
