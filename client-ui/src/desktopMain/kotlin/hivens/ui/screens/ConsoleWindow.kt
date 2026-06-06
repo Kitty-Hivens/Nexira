@@ -54,6 +54,7 @@ import androidx.compose.material3.VerticalDivider
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -63,7 +64,6 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
@@ -76,7 +76,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEvent
@@ -124,8 +123,6 @@ import java.awt.datatransfer.StringSelection
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.conflate
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
@@ -169,11 +166,21 @@ private val CONSOLE_PAUSE_ACCENT   = Color(0xFFFFA726)
 // severity gutter strip needs -- one entry per LogEntry, carrying the char
 // range it occupies in `annotated` so the painter can ask layoutResult for
 // the y-extent of each visual line that range spans.
-private data class MatchIndex(
+// The full off-thread render result: the annotated document, F3/n match ranges,
+// the per-entry severity spans for the gutter, plus the scalar counts the
+// toolbar / footer show. Everything the UI needs is computed once on
+// Dispatchers.Default and swapped in together, so composition stays O(1).
+private data class ConsoleRender(
     val annotated:      AnnotatedString,
     val ranges:         List<IntRange>,
     val lineSeverities: List<LineSeverity>,
+    val filteredCount:  Int,
+    val totalCount:     Int,
+    val warnCount:      Int,
+    val errorCount:     Int,
 )
+
+private val EMPTY_RENDER = ConsoleRender(AnnotatedString(""), emptyList(), emptyList(), 0, 0, 0, 0)
 
 private data class LineSeverity(
     val startOffset: Int,
@@ -311,28 +318,18 @@ internal fun ConsoleContent(
     val logFocus        = remember { FocusRequester() }
     val density         = LocalDensity.current
 
-    // ── Frame-bounded log coalescer ────────────────────────────────────────
-    // Live source: modded MC startup floods 5k+ lines in ~2s. Rebuilding
-    // the whole AnnotatedString per append would jank; snapshotFlow +
-    // conflate + distinctUntilChanged keeps rebuilds to one per frame.
-    // File source: entries are static, so the tick never advances and the
-    // snapshot is the parsed file -- no coalescer needed.
-    var logTick by remember { mutableIntStateOf(0) }
-    LaunchedEffect(isLive) {
-        if (!isLive) return@LaunchedEffect
-        // Observe the content revision, not logs.size: an in-place
-        // appendOrUpdate (collapsed provisioning progress) overwrites a
-        // line without changing size, and a size-keyed flow would never
-        // re-render it.
-        snapshotFlow { gameConsole.revision }
-            .conflate()
-            .distinctUntilChanged()
-            .collect { logTick = it }
-    }
-    val logsCopy = when (source) {
-        is ConsoleSource.Live       -> remember(logTick) { gameConsole.logs.toList() }
+    // ── Buffer source ──────────────────────────────────────────────────────
+    // Live source: the service publishes a coalesced, off-thread ConsoleSnapshot
+    // -- ingestion, file IO, and the buffer copy all run on its drainer, never on
+    // Main -- so the consumer just reads the latest immutable list. A modded MC
+    // start floods 5k+ lines in ~2s; those collapse into a handful of snapshots.
+    // File source: a static, parsed list.
+    val liveSnapshot by gameConsole.snapshot.collectAsState()
+    val entries = when (source) {
+        is ConsoleSource.Live       -> liveSnapshot.entries
         is ConsoleSource.FileBacked -> source.entries
     }
+    val historyOffset = if (isLive) liveSnapshot.historyOffset else 0
 
     // ── Search query debounce ──────────────────────────────────────────────
     // Highlight + match-offset rebuild keys off the debounced value;
@@ -353,64 +350,41 @@ internal fun ConsoleContent(
         } else null
     }
 
-    // ── Filtered + annotated buffer ────────────────────────────────────────
-    // Two-stage filter: severity gates first, then optional query-narrowing
-    // when search-as-filter is on. The default (filter off) leaves search
-    // purely a highlight + F3 navigation aid; turning the mode on collapses
-    // the buffer to just lines containing the active query, the same shape
-    // less-grep gives. Dividers are kept verbatim either way so session
-    // boundaries stay visible.
-    val filtered = remember(
-        logsCopy, filterInfo, filterWarn, filterError,
-        searchAsFilter, effectiveQuery, regexMode, searchRegex,
-    ) {
-        val severityOk: (LogEntry) -> Boolean = { entry ->
-            when (entry.type) {
-                LogType.INFO    -> filterInfo
-                LogType.WARN    -> filterWarn
-                LogType.ERROR   -> filterError
-                LogType.DIVIDER -> true
-            }
-        }
-        val queryOk: (LogEntry) -> Boolean = q@{ entry ->
-            if (!searchAsFilter || effectiveQuery.isBlank()) return@q true
-            if (entry.type == LogType.DIVIDER) return@q true
-            val haystack = entry.text
-            if (regexMode) {
-                searchRegex?.containsMatchIn(haystack) ?: false
-            } else {
-                haystack.contains(effectiveQuery, ignoreCase = true)
-            }
-        }
-        logsCopy.filter { severityOk(it) && queryOk(it) }
-    }
-
-    val warnCount  = remember(logsCopy) { logsCopy.count { it.type == LogType.WARN } }
-    val errorCount = remember(logsCopy) { logsCopy.count { it.type == LogType.ERROR } }
-
-    // Async rebuild on Dispatchers.Default: the prior synchronous
-    // `remember(...) { buildConsoleAnnotated(...) }` blocked the UI
-    // thread for ~30-50 ms on 5000-line buffers under spammed filter
-    // toggles, producing the user-reported lag. produceState swaps the
-    // value in once the background coroutine returns; in-flight builds
-    // are cancelled when the input keys change, so rapid clicks
-    // collapse to one rebuild for the final state.
+    // ── Render: filter + counts + annotate, all OFF the UI thread ──────────
+    // The whole O(n) pass -- severity/query filtering, warn/error counts, and
+    // the AnnotatedString build -- runs on Dispatchers.Default and swaps in once
+    // via produceState. Nothing O(n) touches composition, so a 5000-line buffer
+    // (or a live flood) never blocks Main. In-flight builds cancel when any key
+    // changes, so rapid filter/search edits collapse to one final rebuild.
+    // First-render fallback is an empty render; the cold-open gap is sub-frame.
     //
-    // First-render fallback is an empty MatchIndex; the gap is
-    // sub-frame on a cold open (~30 ms) and visually negligible against
-    // the window's own paint.
-    val matchIndex by produceState(
-        initialValue = remember { MatchIndex(AnnotatedString(""), emptyList(), emptyList()) },
-        filtered, effectiveQuery, regexMode, searchRegex, palette, showTimestamps,
+    // Two-stage filter: severity gates first, then optional query-narrowing when
+    // search-as-filter is on (the default leaves search a pure highlight + F3
+    // aid). Dividers are kept verbatim so session boundaries stay visible.
+    val render by produceState(
+        initialValue = remember { EMPTY_RENDER },
+        entries, filterInfo, filterWarn, filterError,
+        searchAsFilter, effectiveQuery, regexMode, searchRegex, palette, showTimestamps,
     ) {
         value = withContext(Dispatchers.Default) {
-            buildConsoleAnnotated(filtered, effectiveQuery, regexMode, searchRegex, palette, showTimestamps)
+            buildConsoleRender(
+                all            = entries,
+                filterInfo     = filterInfo,
+                filterWarn     = filterWarn,
+                filterError    = filterError,
+                searchAsFilter = searchAsFilter,
+                rawQuery       = effectiveQuery,
+                regexMode      = regexMode,
+                regexCompiled  = searchRegex,
+                palette        = palette,
+                showTimestamps = showTimestamps,
+            )
         }
     }
 
     // Clamp current match index when the match set shrinks past it.
-    LaunchedEffect(matchIndex.ranges.size) {
-        if (currentMatch >= matchIndex.ranges.size) currentMatch = 0
+    LaunchedEffect(render.ranges.size) {
+        if (currentMatch >= render.ranges.size) currentMatch = 0
     }
 
     // Initial focus on the log area: BasicTextField is read-only but still
@@ -446,7 +420,7 @@ internal fun ConsoleContent(
             scrollState.maxValue == 0 || scrollState.value >= scrollState.maxValue - 16
         }
     }
-    LaunchedEffect(matchIndex.annotated) {
+    LaunchedEffect(render.annotated) {
         if (isAtBottom) scrollState.scrollTo(scrollState.maxValue)
     }
 
@@ -455,17 +429,14 @@ internal fun ConsoleContent(
     // entries dropped past the window, page the older entries back in.
     // The load is one-shot: a `loading` flag suppresses re-entry while the
     // batch is in flight, otherwise rapid scroll-to-top events would queue
-    // overlapping reads. Loaded entries land at the start of logs.toList()
-    // (the next snapshotFlow tick rebuilds the AnnotatedString), and we
-    // shift scrollState by the approximate height of the loaded block so
-    // the user's visual line stays put.
+    // overlapping reads. The drainer prepends the loaded entries and the next
+    // published snapshot carries them; we shift scrollState by the approximate
+    // height of the loaded block so the user's visual line stays put.
     var historyLoading by remember { mutableStateOf(false) }
-    // File-backed views load the whole (tail-bounded) file up front, so
-    // there is nothing to page; historyOffset is meaningful only for the
-    // live sliding window.
-    val historyOffset by remember {
-        derivedStateOf { if (isLive) gameConsole.historyOffset else 0 }
-    }
+    // historyOffset comes from the published snapshot (live only); file-backed
+    // views load the whole tail-bounded file up front, so there is nothing to
+    // page. loadHistoryBefore prepends to the buffer on the drainer and the next
+    // snapshot carries the older entries; we only do the scroll-anchor shift.
     LaunchedEffect(scrollState.value, historyOffset, isLive) {
         if (!isLive) return@LaunchedEffect
         if (historyLoading) return@LaunchedEffect
@@ -475,13 +446,9 @@ internal fun ConsoleContent(
         try {
             val loaded = gameConsole.loadHistoryBefore(count = 500)
             if (loaded.isNotEmpty()) {
-                // prependHistory bumps the content revision so the
-                // coalescer rebuilds matchIndex with the new front.
-                // ScrollState shifts by an approximate line height per
-                // loaded entry; not exact because line height under wrap
-                // depends on glyph metrics, but the miss is sub-100 px
-                // and unnoticeable in practice.
-                gameConsole.prependHistory(loaded)
+                // ScrollState shifts by an approximate line height per loaded
+                // entry so the user's visual line stays put; not exact (wrap
+                // line height depends on glyph metrics) but the miss is sub-100 px.
                 val approxLineHeightPx = with(density) { (fontSize * 1.4f).sp.toPx() }
                 val shift = (loaded.size * approxLineHeightPx).toInt()
                 scrollState.scrollTo((scrollState.value + shift).coerceAtMost(scrollState.maxValue))
@@ -492,17 +459,17 @@ internal fun ConsoleContent(
     }
 
     // ── TextFieldValue source of truth ─────────────────────────────────────
-    // Text comes from `matchIndex.annotated` (system-controlled). Selection
+    // Text comes from `render.annotated` (system-controlled). Selection
     // is user-controlled and persists across rebuilds; the read-only field
     // only routes selection changes (drag-select, Ctrl+A, click-position)
     // through onValueChange.
-    val textFieldValue = remember(matchIndex.annotated, selection) {
-        TextFieldValue(annotatedString = matchIndex.annotated, selection = selection)
+    val textFieldValue = remember(render.annotated, selection) {
+        TextFieldValue(annotatedString = render.annotated, selection = selection)
     }
 
     // ── Copy actions ───────────────────────────────────────────────────────
     fun copyAll() {
-        val text = logsCopy.joinToString("\n") { e ->
+        val text = entries.joinToString("\n") { e ->
             if (e.type == LogType.DIVIDER) e.text else "[${e.timestamp}] ${e.text}"
         }
         scope.launch { clipboard.setClipEntry(ClipEntry(StringSelection(text))) }
@@ -521,7 +488,7 @@ internal fun ConsoleContent(
     // the click + the toast that goes with it. One entry equals one
     // logical line in our builder, so '\n' bounds are authoritative.
     fun copyLine() {
-        val annotated = matchIndex.annotated
+        val annotated = render.annotated
         if (annotated.isEmpty()) return
         val text = annotated.text
         val pos = selection.start.coerceIn(0, text.length)
@@ -544,7 +511,7 @@ internal fun ConsoleContent(
     // the user can switch to copy-line for that case via the same menu.
     fun copySelection() {
         if (selection.collapsed) return
-        val annotated = matchIndex.annotated
+        val annotated = render.annotated
         val start = selection.start.coerceIn(0, annotated.length)
         val end   = selection.end.coerceIn(0, annotated.length)
         if (start >= end) return
@@ -559,15 +526,15 @@ internal fun ConsoleContent(
 
     // ── Match jumping ──────────────────────────────────────────────────────
     // The layout result may be from the PREVIOUS frame's BasicTextField measure
-    // while matchIndex.ranges references char positions in the JUST-rebuilt
+    // while render.ranges references char positions in the JUST-rebuilt
     // annotated string. Under flood, an offset can exceed the old layout's
     // text length -- MultiParagraph.getLineForOffset would throw. Guard on
     // text length first, then runCatching the layout call so a transient
     // out-of-range only loses one F3 press instead of crashing.
     fun scrollToMatch(idx: Int) {
         val layout = layoutResult ?: return
-        if (idx !in matchIndex.ranges.indices) return
-        val range = matchIndex.ranges[idx]
+        if (idx !in render.ranges.indices) return
+        val range = render.ranges[idx]
         val start = range.first
         val end   = range.last + 1
         if (start >= layout.layoutInput.text.length) return
@@ -578,19 +545,19 @@ internal fun ConsoleContent(
         // Selection mirrors the match span exactly -- in regex mode this
         // visualises the full matched text rather than collapsing to a
         // zero-width caret as the prior queryLength-based form did.
-        val safeEnd = end.coerceAtMost(matchIndex.annotated.length)
+        val safeEnd = end.coerceAtMost(render.annotated.length)
         selection = TextRange(start, safeEnd)
     }
 
     fun jumpNext() {
-        if (matchIndex.ranges.isEmpty()) return
-        currentMatch = (currentMatch + 1) % matchIndex.ranges.size
+        if (render.ranges.isEmpty()) return
+        currentMatch = (currentMatch + 1) % render.ranges.size
         scrollToMatch(currentMatch)
     }
 
     fun jumpPrev() {
-        if (matchIndex.ranges.isEmpty()) return
-        currentMatch = if (currentMatch == 0) matchIndex.ranges.lastIndex
+        if (render.ranges.isEmpty()) return
+        currentMatch = if (currentMatch == 0) render.ranges.lastIndex
                        else currentMatch - 1
         scrollToMatch(currentMatch)
     }
@@ -626,14 +593,14 @@ internal fun ConsoleContent(
     PuppetToggle("console.searchOpen",  searchOpen)  { if (it) openSearch() else closeSearch() }
     PuppetField ("console.search", searchQuery)      { searchQuery = it }
     PuppetClick ("console.clearSearch", enabled = searchQuery.isNotEmpty()) { searchQuery = "" }
-    PuppetClick ("console.saveToFile")   { gameConsole.exportEntries(logsCopy) }
+    PuppetClick ("console.saveToFile")   { gameConsole.exportEntries(entries) }
     PuppetClick ("console.copyAll")      { copyAll() }
     PuppetClick ("console.clear", enabled = isLive) { if (isLive) gameConsole.clear() }
-    PuppetClick ("console.jumpToBottom", enabled = filtered.isNotEmpty()) {
+    PuppetClick ("console.jumpToBottom", enabled = render.filteredCount > 0) {
         scope.launch { scrollState.animateScrollTo(scrollState.maxValue) }
     }
-    PuppetClick ("console.matchNext",    enabled = matchIndex.ranges.isNotEmpty()) { jumpNext() }
-    PuppetClick ("console.matchPrev",    enabled = matchIndex.ranges.isNotEmpty()) { jumpPrev() }
+    PuppetClick ("console.matchNext",    enabled = render.ranges.isNotEmpty()) { jumpNext() }
+    PuppetClick ("console.matchPrev",    enabled = render.ranges.isNotEmpty()) { jumpPrev() }
     FONT_SIZES.forEach { sz ->
         PuppetClick("console.fontSize.$sz") { onSettingsChange(settings.copy(fontSize = sz)) }
     }
@@ -651,7 +618,7 @@ internal fun ConsoleContent(
                 handleKey(
                     ev          = ev,
                     searchFocus = searchHasFocus,
-                    matchCount  = matchIndex.ranges.size,
+                    matchCount  = render.ranges.size,
                     onOpenSearch = { openSearch() },
                     onCloseSearch = {
                         if (searchQuery.isNotEmpty()) searchQuery = "" else closeSearch()
@@ -670,10 +637,10 @@ internal fun ConsoleContent(
         // ── Toolbar ─────────────────────────────────────────────────────────
         Toolbar(
             strings       = s,
-            filtered      = filtered.size,
-            total         = logsCopy.size,
-            warnCount     = warnCount,
-            errorCount    = errorCount,
+            filtered      = render.filteredCount,
+            total         = entries.size,
+            warnCount     = render.warnCount,
+            errorCount    = render.errorCount,
             filterInfo    = filterInfo,
             filterWarn    = filterWarn,
             filterError   = filterError,
@@ -691,9 +658,9 @@ internal fun ConsoleContent(
             onCopyAll     = { copyAll() },
             // Export what's on screen, not the live buffer: in a file-
             // backed Logs-tab view the live buffer may hold a different
-            // pack's session, so exportEntries(logsCopy) writes the
+            // pack's session, so exportEntries(entries) writes the
             // session the user is actually looking at.
-            onSave        = { gameConsole.exportEntries(logsCopy) },
+            onSave        = { gameConsole.exportEntries(entries) },
             // Clear only acts on the live buffer; a file-backed view is
             // read-only, so the button no-ops there rather than wiping
             // the running session's buffer behind the user's back.
@@ -722,17 +689,27 @@ internal fun ConsoleContent(
             // the actual rendered baseline rather than the canvas top.
             val gutterWidthPx = with(density) { 3.dp.toPx() }
             val verticalPaddingPx = with(density) { 4.dp.toPx() }
-            val gutterModifier = if (showGutter) {
+            // Precompute the WARN/ERROR strip rects once per (layout, severities,
+            // palette) change rather than walking every entry + querying the
+            // layout on every draw frame -- a 5000-line buffer would otherwise
+            // re-measure the gutter on each scroll tick.
+            val gutterRects = remember(
+                layoutResult, render.lineSeverities,
+                themeColors.warnAccent, themeColors.criticalAccent, verticalPaddingPx,
+            ) {
+                computeGutterRects(
+                    layout     = layoutResult,
+                    severities = render.lineSeverities,
+                    warnColor  = themeColors.warnAccent,
+                    errorColor = themeColors.criticalAccent,
+                    yOffsetPx  = verticalPaddingPx,
+                )
+            }
+            val gutterModifier = if (showGutter && gutterRects.isNotEmpty()) {
                 Modifier.drawBehind {
-                    val layout = layoutResult ?: return@drawBehind
-                    drawSeverityGutter(
-                        layout         = layout,
-                        severities     = matchIndex.lineSeverities,
-                        warnColor      = themeColors.warnAccent,
-                        errorColor     = themeColors.criticalAccent,
-                        gutterWidthPx  = gutterWidthPx,
-                        yOffsetPx      = verticalPaddingPx,
-                    )
+                    for (r in gutterRects) {
+                        drawRect(color = r.color, topLeft = Offset(0f, r.top), size = Size(gutterWidthPx, r.height))
+                    }
                 }
             } else {
                 Modifier
@@ -819,7 +796,7 @@ internal fun ConsoleContent(
                 ) {
                     SelectionContainer {
                         Text(
-                            text         = matchIndex.annotated,
+                            text         = render.annotated,
                             softWrap     = false,
                             style        = baseStyle,
                             onTextLayout = { layoutResult = it },
@@ -899,7 +876,7 @@ internal fun ConsoleContent(
             SearchPrompt(
                 query          = searchQuery,
                 // Position preserved across query refinements; the
-                // LaunchedEffect(matchIndex.ranges.size) clamp resets
+                // LaunchedEffect(render.ranges.size) clamp resets
                 // currentMatch only when the new match set has fewer
                 // entries than the cursor position. Refining 'NullPoint'
                 // to 'NullPointer' keeps the user at hit 5 of 12 instead
@@ -974,15 +951,15 @@ internal fun ConsoleContent(
 
         StatusFooter(
             strings        = s,
-            filtered       = filtered.size,
-            total          = logsCopy.size,
+            filtered       = render.filteredCount,
+            total          = entries.size,
             historyOffset  = historyOffset,
-            warnCount      = warnCount,
-            errorCount     = errorCount,
+            warnCount      = render.warnCount,
+            errorCount     = render.errorCount,
             following      = isAtBottom,
             searchActive   = effectiveQuery.isNotBlank(),
-            matchCurrent   = if (matchIndex.ranges.isNotEmpty()) currentMatch + 1 else 0,
-            matchTotal     = matchIndex.ranges.size,
+            matchCurrent   = if (render.ranges.isNotEmpty()) currentMatch + 1 else 0,
+            matchTotal     = render.ranges.size,
             onResumeFollow = {
                 scope.launch { scrollState.animateScrollTo(scrollState.maxValue) }
             },
@@ -1544,14 +1521,48 @@ private fun handleKey(
 // match's absolute offset for F3/n jumping. DIVIDERs render inline as their
 // own dimmed line.
 
-private fun buildConsoleAnnotated(
-    entries: List<LogEntry>,
+private fun buildConsoleRender(
+    all: List<LogEntry>,
+    filterInfo: Boolean,
+    filterWarn: Boolean,
+    filterError: Boolean,
+    searchAsFilter: Boolean,
     rawQuery: String,
     regexMode: Boolean,
     regexCompiled: Regex?,
     palette: ConsolePalette,
     showTimestamps: Boolean,
-): MatchIndex {
+): ConsoleRender {
+    // One pass for counts (over ALL entries) + the severity/query filter that
+    // produces the displayed list. Severity gates first; query-narrowing only
+    // when search-as-filter is on. Dividers always pass so session boundaries
+    // stay visible.
+    var warnCount = 0
+    var errorCount = 0
+    val entries = ArrayList<LogEntry>(all.size)
+    for (e in all) {
+        when (e.type) {
+            LogType.WARN  -> warnCount++
+            LogType.ERROR -> errorCount++
+            else          -> {}
+        }
+        val severityOk = when (e.type) {
+            LogType.INFO    -> filterInfo
+            LogType.WARN    -> filterWarn
+            LogType.ERROR   -> filterError
+            LogType.DIVIDER -> true
+        }
+        if (!severityOk) continue
+        val queryOk = if (!searchAsFilter || rawQuery.isBlank() || e.type == LogType.DIVIDER) {
+            true
+        } else if (regexMode) {
+            regexCompiled?.containsMatchIn(e.text) ?: false
+        } else {
+            e.text.contains(rawQuery, ignoreCase = true)
+        }
+        if (queryOk) entries.add(e)
+    }
+
     val matches = mutableListOf<IntRange>()
     val severities = mutableListOf<LineSeverity>()
 
@@ -1621,10 +1632,14 @@ private fun buildConsoleAnnotated(
         }
     }
 
-    return MatchIndex(
+    return ConsoleRender(
         annotated      = annotated,
         ranges         = matches,
         lineSeverities = severities,
+        filteredCount  = entries.size,
+        totalCount     = all.size,
+        warnCount      = warnCount,
+        errorCount     = errorCount,
     )
 }
 
@@ -1667,22 +1682,26 @@ private class ConsoleTextContextMenu(
     }
 }
 
-// Paint a thin vertical strip at the left edge of each rendered line whose
-// severity isn't INFO / DIVIDER. WARN / ERROR each get their own accent.
-// Layout-source-of-truth: the TextLayoutResult captured by the field /
-// Text's onTextLayout; runCatching guards keep a transient stale layout
-// from crashing the paint pass while the buffer catches up.
-private fun DrawScope.drawSeverityGutter(
-    layout: TextLayoutResult,
+// A precomputed gutter strip rect: a thin vertical bar at the left edge of a
+// rendered WARN / ERROR line. Computed off the draw frame (see
+// [computeGutterRects]) so the paint pass is a flat list iteration.
+private class GutterRect(val top: Float, val height: Float, val color: Color)
+
+// Map every WARN/ERROR entry's char range to its visual line extent via the
+// TextLayoutResult, once per layout / severities change. runCatching guards a
+// transient stale layout while the buffer catches up. INFO / DIVIDER lines get
+// no bar.
+private fun computeGutterRects(
+    layout: TextLayoutResult?,
     severities: List<LineSeverity>,
     warnColor: Color,
     errorColor: Color,
-    gutterWidthPx: Float,
     yOffsetPx: Float,
-) {
-    if (severities.isEmpty()) return
+): List<GutterRect> {
+    if (layout == null || severities.isEmpty()) return emptyList()
     val textLen = layout.layoutInput.text.length
-    if (textLen == 0) return
+    if (textLen == 0) return emptyList()
+    val rects = ArrayList<GutterRect>()
     for (sev in severities) {
         if (sev.type == LogType.INFO || sev.type == LogType.DIVIDER) continue
         val color = if (sev.type == LogType.ERROR) errorColor else warnColor
@@ -1694,13 +1713,10 @@ private fun DrawScope.drawSeverityGutter(
         for (line in startLine..endLine) {
             val top    = runCatching { layout.getLineTop(line) }.getOrNull() ?: continue
             val bottom = runCatching { layout.getLineBottom(line) }.getOrNull() ?: continue
-            drawRect(
-                color   = color,
-                topLeft = Offset(0f, yOffsetPx + top),
-                size    = Size(gutterWidthPx, bottom - top),
-            )
+            rects.add(GutterRect(yOffsetPx + top, bottom - top, color))
         }
     }
+    return rects
 }
 
 private fun findAllSubstring(text: String, query: String): List<IntRange> {
