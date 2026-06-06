@@ -49,9 +49,19 @@ object OptionalContentRules {
     }
 
     /**
-     * Applies a single user toggle to [current], enforcing incompatibilities:
-     * enabling a mod disables every mod that conflicts with it. Disabling never
-     * cascades. Returns the new state (only optional + present entries change).
+     * Applies a single user toggle to [current], dependency-aware:
+     *
+     * - ENABLING pulls the mod on PLUS the transitive closure of its non-optional
+     *   `display.requires` -- so a library (e.g. Mixinbooter) can ship optional +
+     *   `default_enabled=false` and follow its consumers on, instead of being
+     *   flat-`required`. For each newly-on mod, mutual exclusions are enforced:
+     *   same-`role` members (one active per interchangeable group) and declared
+     *   `incompatibleWith` are turned off.
+     * - DISABLING never cascades: a library that was auto-enabled for another mod
+     *   stays put (harmlessly loaded-but-unused) rather than risking the surprise
+     *   of pulling content the user never touched.
+     *
+     * Returns the new state; only optional + present entries change.
      */
     fun applyToggle(
         mods: List<SmrtModEntry>,
@@ -60,14 +70,43 @@ object OptionalContentRules {
         enable: Boolean,
     ): Map<String, Boolean> {
         val next = current.toMutableMap()
-        next[filename] = enable
-        if (enable) {
+        if (!enable) {
+            next[filename] = false
+            return next
+        }
+        val byName = mods.associateBy { it.filename }
+        val toEnable = requiredClosure(byName, filename)
+        for (f in toEnable) next[f] = true
+        for (f in toEnable) {
+            val role = byName[f]?.display?.role
             for (other in mods) {
-                if (other.filename != filename && conflicts(mods, filename, other.filename)) {
+                if (other.filename == f) continue
+                val sameRole = role != null && other.display?.role == role
+                if (sameRole || conflicts(mods, f, other.filename)) {
                     next[other.filename] = false
                 }
             }
         }
         return next
+    }
+
+    /**
+     * [filename] plus the transitive closure of its NON-optional `requires`
+     * (optional/soft deps do not follow). Cycle-safe -- a `requires` cycle in a
+     * bad manifest terminates instead of looping. References to filenames absent
+     * from [byName] are skipped (the resolver surfaces those as warnings).
+     */
+    private fun requiredClosure(byName: Map<String, SmrtModEntry>, filename: String): Set<String> {
+        val out = LinkedHashSet<String>()
+        val stack = ArrayDeque<String>()
+        stack.addLast(filename)
+        while (stack.isNotEmpty()) {
+            val f = stack.removeLast()
+            if (!out.add(f)) continue
+            for (req in byName[f]?.display?.requires.orEmpty()) {
+                if (!req.optional && req.filename in byName) stack.addLast(req.filename)
+            }
+        }
+        return out
     }
 }
