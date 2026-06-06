@@ -38,6 +38,15 @@ sealed class LaunchError {
     data class HelperUnavailable(val mcVersion: String) : LaunchError()
 
     /**
+     * An SC-bound pack needs SmartyCraft's patched authlib (the vanilla one
+     * provisioned from official CDNs sends the join to Mojang and is rejected),
+     * but it could not be sourced from the SC client distribution for
+     * [mcVersion] (no manifest entry / network error / hash mismatch). The
+     * launch is blocked rather than spawning a guaranteed join rejection.
+     */
+    data class AuthlibUnavailable(val mcVersion: String) : LaunchError()
+
+    /**
      * Pack declares an auth requirement the user has no live session
      * for. The UI renders a "sign in with <provider> to play this
      * pack" hint -- distinct from [AuthFail] (where the user IS

@@ -8,6 +8,7 @@ import hivens.core.data.FileManifest
 import hivens.core.data.SessionData
 import hivens.core.util.ZipUtils
 import hivens.core.util.retryWithBackoff
+import hivens.launcher.smrt.ModInjector
 import hivens.launcher.util.ClientRootDirs
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -113,7 +114,7 @@ class FileDownloadService(
             strictPruneMods(targetDir, strictAllowed, injectName, helperKeepGlobs)
         }
         if (injectModJar != null) {
-            injectHelperJar(targetDir, injectModJar)
+            ModInjector.injectHelperJar(targetDir, injectModJar)
         }
 
         // ── Manifest cache short-circuit ─────────────────────────────────
@@ -235,7 +236,7 @@ class FileDownloadService(
         val modsDir = baseDir.resolve("mods")
         if (!Files.isDirectory(modsDir)) return
 
-        val keepPatterns = helperKeepGlobs.map { globToRegex(it) }
+        val keepPatterns = helperKeepGlobs.map { ModInjector.globToRegex(it) }
         val baseNorm = baseDir.normalize()
 
         var removed = 0
@@ -262,39 +263,6 @@ class FileDownloadService(
             logger.error("Strict mod check: error walking mods folder", e)
         }
         if (removed > 0) logger.info("Strict mod check: pruned {} foreign jar(s) from mods/", removed)
-    }
-
-    private fun globToRegex(glob: String): Regex {
-        val sb = StringBuilder()
-        for (c in glob) {
-            when (c) {
-                '*' -> sb.append(".*")
-                '?' -> sb.append('.')
-                else -> sb.append(Regex.escape(c.toString()))
-            }
-        }
-        return Regex(sb.toString(), RegexOption.IGNORE_CASE)
-    }
-
-    /**
-     * Copies the open-smrt-network helper into `mods/`, replacing the upstream
-     * Smarty coremod the caller stripped via `ignoredFiles`. Always overwrites:
-     * the source bytes were already SHA-256 verified by `OpenSmrtHelperResolver`,
-     * and a size-only skip would miss a same-size helper rebuild. The jar is tiny
-     * (single-digit KB), so an unconditional copy per sync is negligible.
-     */
-    private fun injectHelperJar(baseDir: Path, jar: Path) {
-        if (!Files.isRegularFile(jar)) {
-            logger.warn("open-smrt helper: jar {} missing at inject time; skipping", jar)
-            return
-        }
-        runCatching {
-            val modsDir = baseDir.resolve("mods")
-            Files.createDirectories(modsDir)
-            val dest = modsDir.resolve(jar.fileName.toString())
-            Files.copy(jar, dest, java.nio.file.StandardCopyOption.REPLACE_EXISTING)
-            logger.info("open-smrt helper: injected {}", dest.fileName)
-        }.onFailure { logger.warn("open-smrt helper: failed to inject {}", jar, it) }
     }
 
     /**

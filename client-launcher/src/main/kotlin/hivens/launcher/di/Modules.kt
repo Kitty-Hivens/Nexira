@@ -46,6 +46,7 @@ import hivens.launcher.cache.CacheFactory
 import hivens.launcher.cache.SmrtPackCaches
 import hivens.launcher.smrt.OpenSmrtHelperResolver
 import hivens.launcher.smrt.SmartyModPlanner
+import hivens.launcher.smrt.SmrtAuthlibSwapper
 import hivens.launcher.smrt.SmrtPackClient
 import hivens.launcher.smrt.SmrtSyncService
 import hivens.launcher.update.UpdateApplicators
@@ -448,6 +449,9 @@ val appModule = module {
     // both sync paths (LauncherController, AutoSyncService) consult.
     single { OpenSmrtHelperResolver(get(named("direct")), get(), get()) }
     single { SmartyModPlanner(get<OpenSmrtHelperResolver>()::resolve, get()) }
+    // SC-bound pack authlib swap. Default (smartycraft) channel: the patched jar
+    // is pulled from the SC client distribution, same source as the server-list sync.
+    single { SmrtAuthlibSwapper(get(), get<ServerProtocolConfig>(), get()) }
     single { PackInstaller(syncService = get(), runtimeProvisioner = get(), repository = get(), dataDir = get()) }
     single {
         MrpackInstaller(
@@ -626,6 +630,8 @@ val appModule = module {
             runtimeProvisioner = get(),
             profilerStore      = get(),
             agentExtractor     = get(),
+            authlibSwapper     = get(),
+            openSmrtResolver   = get(),
             sharedAssetsDir    = get<PlatformPaths>().assetsDir,
             sharedLibrariesDir = get<PlatformPaths>().librariesDir,
         )
