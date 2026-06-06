@@ -292,12 +292,13 @@ class RuntimeProvisionerTest {
         assertEquals("com.mojang:patchy", result.libraries[0].coord.groupArtifact)
         assertEquals(librariesDir.resolve("com/mojang/patchy/1.1/patchy-1.1.jar"), result.libraries[0].path)
 
-        // Second call: metadata is re-read, but the heavy files are skipped (present + right size).
+        // Second call is FULLY OFFLINE: the version json is cached, the asset
+        // index sha already matches on disk, and every heavy file is present, so
+        // nothing touches the network. This is the offline-launch guarantee.
         requests.clear()
         val again = p.ensureVanilla("1.12.2")
         assertEquals("1.12", again.assetIndexId)
-        assertTrue(LIB_URL !in requests && CLIENT_URL !in requests, "downloaded jars must not be re-fetched, got: $requests")
-        assertTrue(requests.none { it.startsWith(RES_BASE) }, "asset objects must not be re-fetched, got: $requests")
+        assertTrue(requests.isEmpty(), "a warm relaunch must make ZERO network requests, got: $requests")
     }
 
     @Test

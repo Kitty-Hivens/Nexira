@@ -178,15 +178,16 @@ class RuntimeProvisioner(
         mcVersion: String,
         progress: DownloadProgress = { _, _, _ -> },
     ): VanillaRuntime = withContext(Dispatchers.IO) {
-        val versionUrl = resolveVersionUrl(mcVersion)
-        val version = json.decodeFromString(MojangVersion.serializer(), fetchText(versionUrl))
+        // Offline-friendly resolve. A Mojang version json is immutable per MC
+        // version, so cache it and reuse the on-disk copy -- a relaunch then skips
+        // BOTH the version-manifest and the version fetch. The asset index is
+        // reused when the on-disk copy already matches its sha (no refetch, no
+        // rewrite). With every library/object already present (fetchIfNeeded skips
+        // on size), a relaunch needs ZERO network -- the last thing that blocked
+        // offline launch.
+        val version = loadOrFetchVersion(mcVersion)
         val assetIndexId = version.assetIndex.id
-
-        // Fetch + persist the asset index, then enumerate its objects.
-        val indexBytes = fetchBytes(version.assetIndex.url)
-        verifyOrThrow(indexBytes, version.assetIndex.sha1, "asset index $assetIndexId")
-        writeBytes(assetsDir.resolve(assetIndexRelPath(assetIndexId)), indexBytes)
-        val assetIndex = json.decodeFromString(MojangAssetIndex.serializer(), indexBytes.decodeToString())
+        val assetIndex = ensureAssetIndex(assetIndexId, version.assetIndex.url, version.assetIndex.sha1)
 
         val tasks = planVanillaDownloads(mcVersion, version, assetIndex)
         log.info("vanilla runtime {}: {} files to verify/fetch (assetIndex={})", mcVersion, tasks.size, assetIndexId)
@@ -346,6 +347,10 @@ class RuntimeProvisioner(
     internal fun clientJarRelPath(mcVersion: String): String =
         "net/minecraft/minecraft/$mcVersion/minecraft-$mcVersion.jar"
 
+    /** Cached Mojang version json, next to the client jar in the shared root. */
+    internal fun versionJsonRelPath(mcVersion: String): String =
+        "net/minecraft/minecraft/$mcVersion/$mcVersion.json"
+
     internal fun assetIndexRelPath(assetIndexId: String): String = "indexes/$assetIndexId.json"
 
     internal fun assetObjectRelPath(hash: String): String = "objects/${hash.take(2)}/$hash"
@@ -359,6 +364,45 @@ class RuntimeProvisioner(
         val manifest = json.decodeFromString(MojangVersionManifest.serializer(), fetchText(versionManifestUrl))
         return manifest.versions.firstOrNull { it.id == mcVersion }?.url
             ?: throw IOException("Minecraft version $mcVersion not found in Mojang version manifest")
+    }
+
+    /**
+     * The Mojang version json for [mcVersion], from the on-disk cache when
+     * present (a released version's json never changes), else fetched from the
+     * manifest + persisted. The cache is what lets a relaunch skip the network.
+     * A corrupt/partial cache (rare; writes are atomic) falls back to a refetch.
+     */
+    private suspend fun loadOrFetchVersion(mcVersion: String): MojangVersion {
+        val cachePath = librariesDir.resolve(versionJsonRelPath(mcVersion))
+        if (Files.isRegularFile(cachePath)) {
+            runCatching { json.decodeFromString(MojangVersion.serializer(), Files.readString(cachePath)) }
+                .onSuccess { return it }
+                .onFailure { log.warn("cached version json for {} unreadable; refetching", mcVersion) }
+        }
+        val text = fetchText(resolveVersionUrl(mcVersion))
+        val parsed = json.decodeFromString(MojangVersion.serializer(), text)
+        runCatching { writeBytes(cachePath, text.toByteArray()) }
+            .onFailure { log.warn("could not cache version json for {}", mcVersion, it) }
+        return parsed
+    }
+
+    /**
+     * Returns the parsed asset index for [id], reusing the on-disk copy when it
+     * already matches [sha1] (no refetch, no rewrite -- the offline path), else
+     * fetching + verifying + persisting it.
+     */
+    private suspend fun ensureAssetIndex(id: String, url: String, sha1: String): MojangAssetIndex {
+        val indexPath = assetsDir.resolve(assetIndexRelPath(id))
+        val onDisk = if (Files.isRegularFile(indexPath)) runCatching { Files.readAllBytes(indexPath) }.getOrNull() else null
+        val bytes = if (onDisk != null && sha1Of(onDisk).equals(sha1, ignoreCase = true)) {
+            onDisk
+        } else {
+            val fetched = fetchBytes(url)
+            verifyOrThrow(fetched, sha1, "asset index $id")
+            writeBytes(indexPath, fetched)
+            fetched
+        }
+        return json.decodeFromString(MojangAssetIndex.serializer(), bytes.decodeToString())
     }
 
     private suspend fun fetchText(url: String): String =
