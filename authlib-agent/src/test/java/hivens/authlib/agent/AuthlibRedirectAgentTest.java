@@ -8,7 +8,9 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.fail;
 
 class AuthlibRedirectAgentTest {
 
@@ -27,8 +29,10 @@ class AuthlibRedirectAgentTest {
                 str(r.get("https://sessionserver.mojang.com/session/minecraft/join")));
         assertEquals("http://www.smartycraft.ru/launcher/auth_has_joined.php",
                 str(r.get("https://sessionserver.mojang.com/session/minecraft/hasJoined")));
+        assertEquals("http://www.smartycraft.ru/launcher/auth_profile.php?user=",
+                str(r.get("https://sessionserver.mojang.com/session/minecraft/profile/")));
         assertEquals(".smartycraft.ru", str(r.get(".minecraft.net")));
-        assertEquals(".www.smartycraft.ru", str(r.get(".mojang.com")));
+        assertEquals(".smartycraft.ru", str(r.get(".mojang.com")));
     }
 
     @Test
@@ -41,14 +45,45 @@ class AuthlibRedirectAgentTest {
         // Define the transformed bytes under the same FQN in an isolated loader so
         // it does not clash with the already-loaded fixture; reading the fields
         // proves the rewrite produced a valid, loadable class.
-        Class<?> swapped = new IsolatedLoader(rewritten).load("hivens.authlib.agent.Sample");
+        Class<?> swapped = new IsolatedLoader("hivens.authlib.agent.Sample", rewritten).load("hivens.authlib.agent.Sample");
         assertEquals("http://www.smartycraft.ru/launcher/auth_joinserver.php", field(swapped, "JOIN"));
         assertEquals("http://www.smartycraft.ru/launcher/auth_has_joined.php", field(swapped, "HAS_JOINED"));
+        assertEquals("http://www.smartycraft.ru/launcher/auth_profile.php?user=", field(swapped, "PROFILE"));
         String[] domains = (String[]) swapped.getField("DOMAINS").get(null);
         assertEquals(".smartycraft.ru", domains[0]);
-        assertEquals(".www.smartycraft.ru", domains[1]);
+        assertEquals(".smartycraft.ru", domains[1]);
         // Non-target constant survives.
-        assertEquals("https://sessionserver.mojang.com/session/minecraft/", field(swapped, "KEEP"));
+        assertEquals("https://authserver.mojang.com/authenticate", field(swapped, "KEEP"));
+    }
+
+    @Test
+    void acceptUnsignedTexturesDropsTheSecureGate() throws Exception {
+        byte[] original = readClassBytes(TextureSample.class);
+        byte[] patched = AuthlibRedirectAgent.acceptUnsignedTextures(original);
+        assertNotSame(original, patched, "the iload_2 ; ifeq gate must be found and patched");
+
+        // Patched: getTextures(..., requireSecure=true) no longer throws -> returns the texture.
+        Class<?> c = new IsolatedLoader("hivens.authlib.agent.TextureSample", patched)
+                .load("hivens.authlib.agent.TextureSample");
+        Object instance = c.getDeclaredConstructor().newInstance();
+        Object result = c.getMethod("getTextures", Object.class, boolean.class).invoke(instance, null, true);
+        assertEquals("ok", ((Map<?, ?>) result).get("SKIN"),
+                "with requireSecure forced false the texture is returned, not rejected");
+
+        // Control: the unpatched fixture still throws on requireSecure=true.
+        try {
+            new TextureSample().getTextures(null, true);
+            fail("unpatched getTextures must throw when requireSecure is true");
+        } catch (IllegalStateException expected) {
+            // the gate is intact without the patch
+        }
+    }
+
+    @Test
+    void acceptUnsignedTexturesNoOpWhenGateAbsent() {
+        // Sample has no getTextures(...Z) method -> the array is returned unchanged.
+        byte[] original = readClassBytes(Sample.class);
+        assertSame(original, AuthlibRedirectAgent.acceptUnsignedTextures(original));
     }
 
     @Test
@@ -83,12 +118,14 @@ class AuthlibRedirectAgentTest {
         }
     }
 
-    /** Defines exactly one class (the rewritten fixture) from bytes; delegates the rest. */
+    /** Defines exactly one named class (the rewritten fixture) from bytes; delegates the rest. */
     private static final class IsolatedLoader extends ClassLoader {
+        private final String target;
         private final byte[] bytes;
 
-        IsolatedLoader(byte[] bytes) {
+        IsolatedLoader(String target, byte[] bytes) {
             super(AuthlibRedirectAgentTest.class.getClassLoader());
+            this.target = target;
             this.bytes = bytes;
         }
 
@@ -98,7 +135,7 @@ class AuthlibRedirectAgentTest {
 
         @Override
         protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
-            if ("hivens.authlib.agent.Sample".equals(name)) {
+            if (target.equals(name)) {
                 Class<?> c = findLoadedClass(name);
                 if (c == null) c = defineClass(name, bytes, 0, bytes.length);
                 if (resolve) resolveClass(c);
