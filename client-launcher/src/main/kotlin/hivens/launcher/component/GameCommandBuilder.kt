@@ -291,6 +291,7 @@ internal class GameCommandBuilder(
         redirectAuthHost: Boolean = true,
         agentJarPath: Path? = null,
         metricsOutPath: Path? = null,
+        authlibAgentJarPath: Path? = null,
     ): List<String> {
         val args = ArrayList<String>()
         args.add(javaExec)
@@ -336,6 +337,7 @@ internal class GameCommandBuilder(
         args.add("-Xms${minOf(memoryMB, 512)}M")
         args.add("-Xmx${memoryMB}M")
         addProfilerArgs(args, agentJarPath, metricsOutPath)
+        addAuthlibAgentArg(args, authlibAgentJarPath)
 
         args.add("-cp")
         args.add(if (usesModernArgs) modernClasspath(runtime) else packClasspath(runtime))
@@ -461,6 +463,20 @@ internal class GameCommandBuilder(
         if (agentJarPath == null || metricsOutPath == null) return
         args.add("-Dnexira.profiler.out=${metricsOutPath.toAbsolutePath()}")
         args.add("-javaagent:${agentJarPath.toAbsolutePath()}")
+    }
+
+    /**
+     * Attaches the authlib-redirect agent for an SC-bound join. The SC host
+     * rides the `=host=<host>` agent-option suffix: the JVM splits the jar path
+     * from options on the FIRST `=`, and the host is a bare hostname (no `=`, no
+     * path), so the split is unambiguous -- unlike the profiler's metrics path
+     * (a user-data path that could carry an `=`), which goes via `-D`. The host
+     * matches the `-Dminecraft.api.*.host` redirect above so legacy and modern
+     * authlib aim at the same SC backend. No-op unless an agent path is present.
+     */
+    private fun addAuthlibAgentArg(args: MutableList<String>, authlibAgentJarPath: Path?) {
+        if (authlibAgentJarPath == null) return
+        args.add("-javaagent:${authlibAgentJarPath.toAbsolutePath()}=host=${protocolConfig.sslBypassHost}")
     }
 
     private fun addSessionAuthArgs(args: MutableList<String>, session: SessionData) {

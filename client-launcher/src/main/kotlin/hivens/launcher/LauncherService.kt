@@ -135,10 +135,13 @@ internal class LauncherService(
         allocatedMemoryMB: Int,
         adaptiveEnabled: Boolean,
         redirectAuthHost: Boolean,
+        useNetworkAgent: Boolean,
+        useSmartycraftAuthLib: Boolean,
         displayName: String,
         onLog: (String, LauncherLogType) -> Unit
     ): Process {
         val mcVersion = manifest.minecraftVersion
+        val scBound = manifest.authRequirement is PackAuthRequirement.SmartyCraft
 
         // 1. Heap: same tiering as the SC path -- pinned -> explicit value, else the
         // machine-aware Automatic baseline that the adaptive sizer refines from.
@@ -163,9 +166,26 @@ internal class LauncherService(
         ) { current, total, file -> onLog("Runtime $current/$total: $file", LauncherLogType.INFO) }
 
         // 2b. SC binding: an SC-bound pack provisions the VANILLA authlib (sends the
-        // join to Mojang -> 403 for an SC token), so swap in SC's patched authlib
-        // and inject the open-smrt interop helper. No-op for Hivens-native packs.
-        val resolved = applySmrtBinding(manifest, sessionData, clientRootPath, mcVersion, baseRuntime, onLog)
+        // join to Mojang -> 403 for an SC token). Two mechanisms steer it back to
+        // SC: the authlib-redirect agent (default, attached at step 5 below) and
+        // SC's patched authlib jar (opt-in fallback, swapped onto the classpath
+        // here). open-smrt interop is injected regardless. No-op for Hivens-native
+        // packs.
+        val resolved = applySmrtBinding(
+            manifest, sessionData, clientRootPath, mcVersion, baseRuntime,
+            swapAuthlib = useSmartycraftAuthLib, onLog = onLog,
+        )
+
+        // An SC-bound join needs at least one mechanism; with neither, the vanilla
+        // authlib hits Mojang and the server rejects the session. Surface it rather
+        // than spawn a guaranteed-to-fail join silently.
+        if (scBound && !useNetworkAgent && !useSmartycraftAuthLib) {
+            onLog(
+                "Neither the network agent nor the SmartyCraft authlib is enabled; the SC join will be rejected",
+                LauncherLogType.WARN,
+            )
+        }
+        val authlibAgent = if (scBound && useNetworkAgent) agentExtractor.ensureAuthlibAgent() else null
 
         // 3. Java. Major precedence: loader-resolved override -> the pack manifest's
         // own declaration (authoritative for the pack) -> Mojang's per-version field
@@ -209,6 +229,7 @@ internal class LauncherService(
             redirectAuthHost = redirectAuthHost,
             agentJarPath = adaptive.agentJar,
             metricsOutPath = adaptive.metricsOut,
+            authlibAgentJarPath = authlibAgent,
         )
 
         return spawnProcess(command, clientRootPath, onLog)
@@ -216,13 +237,18 @@ internal class LauncherService(
 
     /**
      * Applies SC-binding to a freshly provisioned pack [runtime]: returns it
-     * unchanged for non-SC packs; for an SC-bound pack swaps the vanilla authlib
-     * classpath entry to SC's patched jar and injects the open-smrt-network
-     * helper into the instance mods. Throws [PackPrepBlocked] (mapped to a
-     * [LaunchError] by the controller) ONLY when the patched authlib cannot be
-     * sourced -- without it the join is a guaranteed rejection. The open-smrt
-     * helper is best-effort interop (a miss only degrades connection stability),
-     * so it never blocks the launch.
+     * unchanged for non-SC packs; for an SC-bound pack injects the
+     * open-smrt-network helper into the instance mods and, when [swapAuthlib] is
+     * on, swaps the vanilla authlib classpath entry to SC's patched jar.
+     *
+     * The authlib swap is the OPT-IN fallback to the authlib-redirect agent (the
+     * default mechanism, wired in [launchPackClient] / [GameCommandBuilder]); it
+     * does not run unless the user enabled it. When it does run it throws
+     * [PackPrepBlocked] (mapped to a [LaunchError] by the controller) if the
+     * patched authlib cannot be sourced -- with the swap selected, vanilla authlib
+     * is a guaranteed rejection. The open-smrt helper is best-effort interop (a
+     * miss only degrades connection stability), so it never blocks the launch and
+     * is injected regardless of [swapAuthlib].
      *
      * The patched authlib comes from the SC session's own file manifest
      * ([SessionData.fileManifest], populated by the pre-spawn re-auth), so it is
@@ -237,27 +263,18 @@ internal class LauncherService(
         clientRootPath: Path,
         mcVersion: String,
         runtime: ResolvedRuntime,
+        swapAuthlib: Boolean,
         onLog: (String, LauncherLogType) -> Unit,
     ): ResolvedRuntime {
         val requirement = manifest.authRequirement
         if (requirement !is PackAuthRequirement.SmartyCraft) return runtime
 
-        // authlib swap: intrinsic to SC-bound packs (no toggle -- vanilla authlib
-        // is a guaranteed 403, there is no "original works" alternative).
-        val authlib = findAuthlibLibrary(runtime)
-            ?: throw PackPrepBlocked(LaunchError.AuthlibUnavailable(mcVersion))
-        val patched = authlibSwapper.ensurePatchedAuthlib(requirement.serverId, sessionData.fileManifest)
-            ?: throw PackPrepBlocked(LaunchError.AuthlibUnavailable(mcVersion))
-        onLog("Using SmartyCraft authlib for ${requirement.serverId}", LauncherLogType.INFO)
-        val bound = swapAuthlibPath(runtime, authlib, patched)
-
         // open-smrt-network helper: always attempted for an SC-bound pack (no toggle --
         // a pack ships no proprietary Smarty, so the server-list useOpenSmrtHelper
-        // choice of "keep the original" is meaningless here). But this is interop
+        // choice of "keep the original" is meaningless here). This is interop
         // infrastructure, NOT an auth gate: without it the SC connection may be less
         // stable, the join itself is not rejected. So a resolve miss is best-effort
-        // (log + continue), never a block -- the authlib swap above is the only hard
-        // requirement.
+        // (log + continue), never a block.
         val helper = openSmrtResolver.resolve(mcVersion)
         if (helper != null) {
             ModInjector.stripByGlobs(clientRootPath, helper.smartyNames)
@@ -269,7 +286,16 @@ internal class LauncherService(
                 LauncherLogType.WARN,
             )
         }
-        return bound
+
+        // authlib swap: opt-in fallback to the redirect agent. When selected the
+        // patched jar is mandatory (vanilla authlib is a guaranteed 403).
+        if (!swapAuthlib) return runtime
+        val authlib = findAuthlibLibrary(runtime)
+            ?: throw PackPrepBlocked(LaunchError.AuthlibUnavailable(mcVersion))
+        val patched = authlibSwapper.ensurePatchedAuthlib(requirement.serverId, sessionData.fileManifest)
+            ?: throw PackPrepBlocked(LaunchError.AuthlibUnavailable(mcVersion))
+        onLog("Using SmartyCraft authlib for ${requirement.serverId}", LauncherLogType.INFO)
+        return swapAuthlibPath(runtime, authlib, patched)
     }
 
     /**
@@ -326,7 +352,7 @@ internal class LauncherService(
             )
         }
 
-        val agentJar = agentExtractor.ensureExtracted()
+        val agentJar = agentExtractor.ensureProfilerAgent()
         val metricsOut = if (agentJar != null) profilerStore.metricsPath(instanceDir) else null
         return AdaptiveLaunch(derived ?: baseMemoryMb, agentJar, metricsOut)
     }

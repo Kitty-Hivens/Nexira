@@ -401,6 +401,10 @@ object GermanStrings : AppStrings {
     override val settingsOpenSmrtHelperDesc       = "Ersetzt den originalen Smarty-Mod auf Smarty-Servern durch unseren quelloffenen Helfer. Dieselben Netzwerkfunktionen, aber ohne Überwachung. Gibt es für die Spielversion keinen Ersatz, wird der Start blockiert statt den Original-Mod auszuführen."
     override val settingsStrictModCheckTitle      = "Genaue Mod-Prüfung"
     override val settingsStrictModCheckDesc       = "Löscht nach der Synchronisierung alles im Mods-Ordner, was der Server nicht angefordert hat. Hält die Installation sauber, entfernt aber auch von Hand hinzugefügte Mods."
+    override val settingsNetworkAgentTitle        = "Netzwerk-Agent verwenden?"
+    override val settingsNetworkAgentDesc         = "Richtet die Anmeldung des Spiels beim Start auf SmartyCraft aus: den Server-Beitritt und die Skin-Prüfung. Der Beitritt läuft dann über SmartyCraft und Skins werden weiterhin geladen, ohne SmartyCrafts gepatchte Anmelde-Bibliothek einzuspielen. Nötig, um SmartyCraft-Servern beizutreten."
+    override val settingsSmartyAuthLibTitle       = "SmartyCrafts Anmelde-Bibliothek verwenden?"
+    override val settingsSmartyAuthLibDesc        = "Der ältere Weg: SmartyCrafts gepatchte Anmelde-Bibliothek aus dessen Client nehmen und statt der originalen in die Sammlung legen. Durch den Netzwerk-Agenten oben ersetzt und als Reserve behalten. Lässt sich die Datei nicht beziehen, wird der Start blockiert. Standardmäßig aus."
 
     override val settingsSectionDataDir       = "Datenverzeichnis"
     override val settingsDataDirCurrent       = "Aktueller Pfad:"

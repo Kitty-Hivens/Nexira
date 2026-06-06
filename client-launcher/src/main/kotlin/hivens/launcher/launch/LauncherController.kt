@@ -521,6 +521,11 @@ class LauncherController(
                     // the default Mojang hosts so its own auth provider stands.
                     redirectAuthHost     = refreshedInstance.packRef.origin
                         .let { it == PackOrigin.Smartycraft || it == PackOrigin.Mirror },
+                    // Auth mechanism for an SC-bound join: the redirect agent
+                    // (default on) and/or SC's patched authlib jar (default off,
+                    // fallback). Both no-op on non-SC packs.
+                    useNetworkAgent       = settings.useNetworkAgent,
+                    useSmartycraftAuthLib = settings.useSmartycraftAuthLib,
                     displayName          = refreshedInstance.displayName,
                 ) { text, type ->
                     emit(LaunchLogEvent.ProcessOutput(text, type))

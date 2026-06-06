@@ -402,6 +402,10 @@ object RussianStrings : AppStrings {
     override val settingsStrictModCheckTitle      = "Точная проверка модификаций"
     override val settingsOpenSmrtHelperDesc       = "Подменяет родной мод Smarty нашим открытым хелпером на серверах Smarty. Те же сетевые функции, но без слежки. Если для версии игры замены нет, запуск блокируется, а не запускает родной мод."
     override val settingsStrictModCheckDesc       = "После синхронизации удаляет из папки mods всё, чего сервер не запрашивал. Держит сборку чистой, но заодно сносит и моды, которые ты добавил вручную."
+    override val settingsNetworkAgentTitle        = "Использовать агента для поддержки работы сети?"
+    override val settingsNetworkAgentDesc         = "Направляет авторизацию игры на SmartyCraft прямо при запуске: вход на сервер и проверку скинов. Вход проходит через SmartyCraft, скины грузятся, и при этом не нужно подставлять пропатченную библиотеку авторизации от SmartyCraft. Нужно для входа на серверы SmartyCraft."
+    override val settingsSmartyAuthLibTitle       = "Использовать библиотеку авторизации с SmartyCraft?"
+    override val settingsSmartyAuthLibDesc        = "Старый способ: берёт пропатченную библиотеку авторизации из клиента SmartyCraft и кладёт её в сборку вместо родной. Заменён агентом выше, оставлен как запасной вариант. Если файл не удаётся получить, запуск блокируется. По умолчанию выключено."
 
     override val settingsSectionDataDir       = "Каталог данных"
     override val settingsDataDirCurrent       = "Текущий путь:"
