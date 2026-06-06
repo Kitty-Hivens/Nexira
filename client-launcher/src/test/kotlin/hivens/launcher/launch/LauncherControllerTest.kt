@@ -474,7 +474,7 @@ class LauncherControllerTest {
         // authlib; it throws PackPrepBlocked carrying the semantic reason.
         coEvery {
             launcherService.launchPackClient(
-                any(), any(), any(), any(), any(), any(), any(), any(), any(),
+                any(), any(), any(), any(), any(), any(), any(), any(), any(), any(),
             )
         } throws PackPrepBlocked(LaunchError.AuthlibUnavailable("1.12.2"))
 
@@ -517,7 +517,7 @@ class LauncherControllerTest {
             state.reason,
         )
         coVerify(exactly = 0) {
-            launcherService.launchPackClient(any(), any(), any(), any(), any(), any(), any(), any(), any())
+            launcherService.launchPackClient(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
         }
         coVerify(exactly = 0) { authService.login(any(), any(), any()) }
     }
@@ -619,7 +619,7 @@ class LauncherControllerTest {
         assertIs<LaunchState.Error>(state)
         assertEquals(LaunchError.TwoFactorExpired, state.reason)
         coVerify(exactly = 0) {
-            launcherService.launchPackClient(any(), any(), any(), any(), any(), any(), any(), any(), any())
+            launcherService.launchPackClient(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
         }
     }
 

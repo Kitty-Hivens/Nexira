@@ -134,6 +134,7 @@ internal class LauncherService(
         javaPathOverride: Path?,
         allocatedMemoryMB: Int,
         adaptiveEnabled: Boolean,
+        redirectAuthHost: Boolean,
         displayName: String,
         onLog: (String, LauncherLogType) -> Unit
     ): Process {
@@ -205,6 +206,7 @@ internal class LauncherService(
             runtime = resolved,
             session = sessionData,
             jvmArgsOverride = runtime.jvmArgs,
+            redirectAuthHost = redirectAuthHost,
             agentJarPath = adaptive.agentJar,
             metricsOutPath = adaptive.metricsOut,
         )
