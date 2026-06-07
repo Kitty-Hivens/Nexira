@@ -102,13 +102,14 @@ kotlin {
             }
         }
 
-        // The profiler agent jar ships as an OPAQUE resource under /runtime/, NOT a
-        // compile dependency: it lands in the ProGuard'd uber jar where
-        // -repackageclasses would rename its Premain-Class and break -javaagent.
-        // AgentExtractor reads /runtime/profiler-agent.jar at runtime. The
-        // bundleProfilerAgent task (below) fills this generated dir; every
-        // *ProcessResources task depends on it.
+        // The agent jars ship as OPAQUE resources under /runtime/, NOT compile
+        // dependencies: they land in the ProGuard'd uber jar where -repackageclasses
+        // would rename their Premain-Class and break -javaagent. AgentExtractor reads
+        // /runtime/profiler-agent.jar (heap sampling) and /runtime/authlib-agent.jar
+        // (SC-bound auth redirect) at runtime. The bundle* tasks (below) fill these
+        // generated dirs; every *ProcessResources task depends on them.
         desktopMain.resources.srcDir(layout.buildDirectory.dir("generated/profilerAgent"))
+        desktopMain.resources.srcDir(layout.buildDirectory.dir("generated/authlibAgent"))
 
         // First UI-side test source set. Compose-MP auto-creates the
         // task `desktopTest`; explicit source-set wiring lets the
@@ -578,7 +579,16 @@ val bundleProfilerAgent = tasks.register<Copy>("bundleProfilerAgent") {
     from(project(":profiler-agent").tasks.named("jar")) { rename { "profiler-agent.jar" } }
     into(layout.buildDirectory.dir("generated/profilerAgent/runtime"))
 }
-tasks.matching { it.name.endsWith("ProcessResources") }.configureEach { dependsOn(bundleProfilerAgent) }
+
+// Same staging for the authlib-redirect agent (separate generated dir / stable
+// name so AgentExtractor.AUTHLIB_RESOURCE resolves it).
+val bundleAuthlibAgent = tasks.register<Copy>("bundleAuthlibAgent") {
+    from(project(":authlib-agent").tasks.named("jar")) { rename { "authlib-agent.jar" } }
+    into(layout.buildDirectory.dir("generated/authlibAgent/runtime"))
+}
+tasks.matching { it.name.endsWith("ProcessResources") }.configureEach {
+    dependsOn(bundleProfilerAgent, bundleAuthlibAgent)
+}
 
 // Portable ZIP packaging lives in the build_release workflow's
 // PowerShell step, not in a Gradle task. The previous local-dev task

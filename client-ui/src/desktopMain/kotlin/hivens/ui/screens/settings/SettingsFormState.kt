@@ -42,6 +42,8 @@ internal class SettingsFormState(initial: SettingsData) {
     var mimicVersionText       by mutableStateOf(initial.mimicVersionOverride ?: "")
     var useOpenSmrtHelper      by mutableStateOf(initial.useOpenSmrtHelper)
     var strictModVerification  by mutableStateOf(initial.strictModVerification)
+    var useNetworkAgent        by mutableStateOf(initial.useNetworkAgent)
+    var useSmartycraftAuthLib  by mutableStateOf(initial.useSmartycraftAuthLib)
 
     /**
      * Build a [SettingsData] suitable for persistence by overlaying this
@@ -69,6 +71,8 @@ internal class SettingsFormState(initial: SettingsData) {
             mimicVersionOverride        = normalisedMimic,
             useOpenSmrtHelper           = useOpenSmrtHelper,
             strictModVerification       = strictModVerification,
+            useNetworkAgent             = useNetworkAgent,
+            useSmartycraftAuthLib       = useSmartycraftAuthLib,
         )
     }
 }
