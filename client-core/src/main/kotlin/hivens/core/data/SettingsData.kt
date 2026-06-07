@@ -167,4 +167,26 @@ data class SettingsData(
      * too -- that is the point, and the Settings copy says so.
      */
     val strictModVerification: Boolean = true,
+
+    /**
+     * Attach the network-support `-javaagent` when launching an SC-bound pack.
+     * The agent redirects the game's authlib endpoints to SmartyCraft at
+     * class-load -- the in-game join and the skin/texture whitelist -- so the
+     * join authenticates against SC and skins still load, WITHOUT shipping or
+     * swapping SC's patched authlib jar. On by default: this is how an SC-bound
+     * pack reaches the server. No effect on non-SC packs. Turning it off while
+     * [useSmartycraftAuthLib] is also off leaves an SC join with the vanilla
+     * authlib, which the server rejects.
+     */
+    val useNetworkAgent: Boolean = true,
+
+    /**
+     * Source SmartyCraft's own patched `authlib` from the SC client distribution
+     * and swap it onto the pack's classpath instead of the vanilla one. The older
+     * mechanism, superseded by [useNetworkAgent] and kept as an opt-in fallback;
+     * off by default. No effect on non-SC packs. When on, the patched jar is
+     * mandatory -- the launch is blocked if it cannot be sourced, since vanilla
+     * authlib is a guaranteed rejection.
+     */
+    val useSmartycraftAuthLib: Boolean = false,
 )

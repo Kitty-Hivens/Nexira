@@ -474,7 +474,7 @@ class LauncherControllerTest {
         // authlib; it throws PackPrepBlocked carrying the semantic reason.
         coEvery {
             launcherService.launchPackClient(
-                any(), any(), any(), any(), any(), any(), any(), any(), any(), any(),
+                any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(),
             )
         } throws PackPrepBlocked(LaunchError.AuthlibUnavailable("1.12.2"))
 
@@ -517,7 +517,7 @@ class LauncherControllerTest {
             state.reason,
         )
         coVerify(exactly = 0) {
-            launcherService.launchPackClient(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            launcherService.launchPackClient(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
         }
         coVerify(exactly = 0) { authService.login(any(), any(), any()) }
     }
@@ -590,6 +590,45 @@ class LauncherControllerTest {
     }
 
     @Test
+    fun `auth-mechanism settings are forwarded to launchPackClient`() = runTest {
+        // The two Smarty auth knobs (network agent / SC authlib swap) must reach
+        // the service verbatim -- the service decides what to attach, the
+        // controller only threads the user's choice.
+        every { settingsService.getSettings() } returns
+            SettingsData(useNetworkAgent = false, useSmartycraftAuthLib = true)
+        coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk8/bin/java")
+        credentialsManager.save(
+            SessionData(playerName = "tester", uuid = "u", accessToken = "stale", cachedPassword = "pw"),
+        )
+        coEvery { authService.login("tester", "pw", "Industrial") } returns
+            SessionData(playerName = "tester", uuid = "u", accessToken = "fresh")
+
+        val process = mockk<Process>()
+        every { process.waitFor() } returns 0
+        val agentFlag = slot<Boolean>()
+        val swapFlag = slot<Boolean>()
+        coEvery {
+            launcherService.launchPackClient(
+                sessionData = any(), manifest = any(), runtime = any(), clientRootPath = any(),
+                javaPathOverride = any(), allocatedMemoryMB = any(), adaptiveEnabled = any(),
+                redirectAuthHost = any(), useNetworkAgent = capture(agentFlag),
+                useSmartycraftAuthLib = capture(swapFlag), displayName = any(), onLog = any(),
+            )
+        } returns process
+        coJustRun { packRepository.put(any()) }
+
+        val controller = newController(this)
+        controller.launchPackInstance(
+            currentSession = SessionData(playerName = "tester", uuid = "u", accessToken = "stale"),
+            packInstance   = scBoundPackInstance(),
+        )
+        advanceUntilIdle()
+
+        assertEquals(false, agentFlag.captured, "useNetworkAgent must be forwarded as set")
+        assertEquals(true, swapFlag.captured, "useSmartycraftAuthLib must be forwarded as set")
+    }
+
+    @Test
     fun `pack with SC requirement and 2FA without cached manifest fails with TwoFactorExpired`() = runTest {
         every { settingsService.getSettings() } returns SettingsData()
         coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk8/bin/java")
@@ -619,7 +658,7 @@ class LauncherControllerTest {
         assertIs<LaunchState.Error>(state)
         assertEquals(LaunchError.TwoFactorExpired, state.reason)
         coVerify(exactly = 0) {
-            launcherService.launchPackClient(any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+            launcherService.launchPackClient(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
         }
     }
 

@@ -8,14 +8,18 @@ import java.nio.file.Path
 import java.security.MessageDigest
 
 /**
- * Makes the profiler agent jar available on disk so the launcher can pass
- * `-javaagent:<path>` to the game JVM. The jar ships as an opaque resource
+ * Makes the bundled `-javaagent` jars available on disk so the launcher can pass
+ * `-javaagent:<path>` to the game JVM. Each jar ships as an opaque resource
  * inside the launcher (bundled by the build, never on the compile classpath --
- * see client-ui's resource wiring) and is extracted once to
- * `<dataDir>/runtime/`.
+ * see client-ui's resource wiring) and is extracted once to `<dataDir>/runtime/`.
+ *
+ * Two agents share this path:
+ *  - the profiler agent (heap sampling for adaptive memory), and
+ *  - the authlib-redirect agent (points an SC-bound join + skin whitelist at
+ *    SmartyCraft, the alternative to swapping SC's patched authlib jar).
  *
  * The on-disk name carries a short content hash, so a launcher update that
- * changes the agent re-extracts under a new name instead of silently reusing the
+ * changes an agent re-extracts under a new name instead of silently reusing the
  * stale jar. Returns null when the resource isn't bundled (e.g. a dev run before
  * the build wiring lands) -- the caller then launches without the agent rather
  * than failing.
@@ -24,13 +28,19 @@ class AgentExtractor(private val dataDir: Path) {
 
     private val log = LoggerFactory.getLogger(AgentExtractor::class.java)
 
-    fun ensureExtracted(): Path? {
-        val bytes = javaClass.getResourceAsStream(RESOURCE_PATH)?.use { it.readBytes() }
+    /** Heap-profiler agent for adaptive memory; null if not bundled / extraction fails. */
+    fun ensureProfilerAgent(): Path? = extract(PROFILER_RESOURCE, "profiler-agent")
+
+    /** Authlib-redirect agent for an SC-bound join; null if not bundled / extraction fails. */
+    fun ensureAuthlibAgent(): Path? = extract(AUTHLIB_RESOURCE, "authlib-agent")
+
+    private fun extract(resourcePath: String, namePrefix: String): Path? {
+        val bytes = javaClass.getResourceAsStream(resourcePath)?.use { it.readBytes() }
             ?: run {
-                log.warn("Profiler agent resource {} not bundled; launching without it", RESOURCE_PATH)
+                log.warn("Agent resource {} not bundled; launching without it", resourcePath)
                 return null
             }
-        val target = dataDir.resolve(Storage.RUNTIME_DIR).resolve("profiler-agent-${shortHash(bytes)}.jar")
+        val target = dataDir.resolve(Storage.RUNTIME_DIR).resolve("$namePrefix-${shortHash(bytes)}.jar")
         if (Files.exists(target) && runCatching { Files.size(target) }.getOrNull() == bytes.size.toLong()) {
             return target
         }
@@ -38,7 +48,7 @@ class AgentExtractor(private val dataDir: Path) {
             AtomicFiles.writeBytes(target, bytes)
             target
         } catch (e: Exception) {
-            log.error("Failed to extract profiler agent to {}; launching without it", target, e)
+            log.error("Failed to extract agent to {}; launching without it", target, e)
             null
         }
     }
@@ -49,6 +59,7 @@ class AgentExtractor(private val dataDir: Path) {
             .substring(0, 12)
 
     companion object {
-        const val RESOURCE_PATH = "/runtime/profiler-agent.jar"
+        const val PROFILER_RESOURCE = "/runtime/profiler-agent.jar"
+        const val AUTHLIB_RESOURCE = "/runtime/authlib-agent.jar"
     }
 }

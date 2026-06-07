@@ -30,4 +30,19 @@ class SettingsFormStateTest {
         assertTrue(form.useOpenSmrtHelper)
         assertTrue(form.strictModVerification)
     }
+
+    @Test
+    fun `auth-mechanism toggles seed and round-trip with their distinct defaults`() {
+        // Network agent defaults ON, SC authlib swap defaults OFF.
+        val form = SettingsFormState(SettingsData())
+        assertTrue(form.useNetworkAgent, "network agent seeds ON")
+        assertFalse(form.useSmartycraftAuthLib, "SC authlib swap seeds OFF")
+
+        form.useNetworkAgent = false
+        form.useSmartycraftAuthLib = true
+
+        val merged = form.mergeInto(SettingsData())
+        assertFalse(merged.useNetworkAgent)
+        assertTrue(merged.useSmartycraftAuthLib)
+    }
 }

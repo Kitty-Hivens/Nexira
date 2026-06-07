@@ -4,8 +4,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Rule
+import androidx.compose.material.icons.filled.Lan
 import androidx.compose.material.icons.filled.Rule
 import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -61,6 +63,32 @@ internal fun SmartySection(
         )
         PuppetToggle("settings.strictModVerification", form.strictModVerification) {
             form.strictModVerification = it; save()
+        }
+
+        SettingsRowWithDescription(
+            title           = s.settingsNetworkAgentTitle,
+            description     = s.settingsNetworkAgentDesc,
+            icon            = Icons.Default.Lan,
+            iconTint        = CelestiaTheme.colors.primary,
+            checked         = form.useNetworkAgent,
+            enabled         = true,
+            onCheckedChange = { form.useNetworkAgent = it; save() },
+        )
+        PuppetToggle("settings.useNetworkAgent", form.useNetworkAgent) {
+            form.useNetworkAgent = it; save()
+        }
+
+        SettingsRowWithDescription(
+            title           = s.settingsSmartyAuthLibTitle,
+            description     = s.settingsSmartyAuthLibDesc,
+            icon            = Icons.Default.VpnKey,
+            iconTint        = CelestiaTheme.colors.primary,
+            checked         = form.useSmartycraftAuthLib,
+            enabled         = true,
+            onCheckedChange = { form.useSmartycraftAuthLib = it; save() },
+        )
+        PuppetToggle("settings.useSmartycraftAuthLib", form.useSmartycraftAuthLib) {
+            form.useSmartycraftAuthLib = it; save()
         }
     }
 }

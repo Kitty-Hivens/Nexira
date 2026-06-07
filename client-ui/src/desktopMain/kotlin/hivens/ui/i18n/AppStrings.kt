@@ -404,6 +404,10 @@ interface AppStrings {
     val settingsOpenSmrtHelperDesc: String
     val settingsStrictModCheckTitle: String
     val settingsStrictModCheckDesc: String
+    val settingsNetworkAgentTitle: String
+    val settingsNetworkAgentDesc: String
+    val settingsSmartyAuthLibTitle: String
+    val settingsSmartyAuthLibDesc: String
 
     // --- Data directory (Settings → Data dir) ---
     val settingsSectionDataDir: String

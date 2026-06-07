@@ -87,6 +87,12 @@ interface ILauncherService {
         // host. Mirror-derived packs only; a Modrinth / local / own pack leaves
         // the default Mojang hosts so its own auth provider is not redirected.
         redirectAuthHost: Boolean = true,
+        // Attach the authlib-redirect agent for an SC-bound join (default
+        // mechanism). No effect on non-SC packs.
+        useNetworkAgent: Boolean = true,
+        // Swap SC's patched authlib jar onto the classpath instead (opt-in
+        // fallback to the agent). No effect on non-SC packs.
+        useSmartycraftAuthLib: Boolean = false,
         displayName: String,
         onLog: (String, LauncherLogType) -> Unit,
     ): Process

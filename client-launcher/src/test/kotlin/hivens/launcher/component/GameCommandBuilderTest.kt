@@ -528,6 +528,7 @@ class GameCommandBuilderTest {
         runtime: ResolvedRuntime = forgeRuntime(),
         javaMajor: Int = 8,
         redirectAuthHost: Boolean = true,
+        authlibAgentJarPath: Path? = null,
     ) = builder.buildPackCommand(
         javaExec = "/usr/bin/java",
         memoryMB = 4096,
@@ -541,6 +542,7 @@ class GameCommandBuilderTest {
         session = session(),
         jvmArgsOverride = null,
         redirectAuthHost = redirectAuthHost,
+        authlibAgentJarPath = authlibAgentJarPath,
     )
 
     @Test
@@ -559,6 +561,26 @@ class GameCommandBuilderTest {
         assertFalse(cmd.any { it.startsWith("-Dminecraft.api.auth.host=") })
         assertFalse(cmd.any { it.startsWith("-Dminecraft.api.account.host=") })
         assertFalse(cmd.any { it.startsWith("-Dminecraft.api.session.host=") })
+    }
+
+    @Test
+    fun `buildPackCommand attaches the authlib agent pointed at the SC host when given a jar`() {
+        val agent = Path.of("/tmp/runtime/authlib-agent-deadbeef.jar")
+        val cmd = packCommand(authlibAgentJarPath = agent)
+        // The agent flag carries the jar path plus the host as an option suffix;
+        // sslBypassHost of the default config is the production SC host.
+        val flag = cmd.firstOrNull { it.startsWith("-javaagent:") && it.contains("authlib-agent") }
+        assertNotNull(flag, "authlib agent must be on the command; got: $cmd")
+        assertTrue(flag.replace('\\', '/').contains("/tmp/runtime/authlib-agent-deadbeef.jar"),
+            "agent jar path must be in the flag; got: $flag")
+        assertTrue(flag.endsWith("=host=www.smartycraft.ru"),
+            "host option must point at the SC host; got: $flag")
+    }
+
+    @Test
+    fun `buildPackCommand omits the authlib agent when no jar is given`() {
+        val cmd = packCommand(authlibAgentJarPath = null)
+        assertFalse(cmd.any { it.startsWith("-javaagent:") && it.contains("authlib-agent") })
     }
 
     @Test
