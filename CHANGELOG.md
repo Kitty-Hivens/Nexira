@@ -12,6 +12,62 @@ below are for the GitHub release page and CHANGELOG readers.
 
 ## [Unreleased]
 
+## [2.3.4-beta4] - 2026-06-07
+
+The SmartyCraft-pack release. A modpack that targets a SmartyCraft
+server now connects and joins -- other players' skins included --
+without shipping anything of SmartyCraft's. Alongside that: offline
+relaunch of an installed pack, dependency-aware optional mods, a console
+that no longer freezes under a log flood, and adaptive-memory fixes.
+
+### Highlights
+- **SmartyCraft modpacks join their servers**. A pack from the mirror that
+  targets a SmartyCraft server now connects and joins, and other players'
+  custom skins load.
+- **Offline relaunch**. An already-installed pack starts with the network off;
+  a warm relaunch makes no network requests at all.
+- **Optional mods follow their dependencies**. Enabling an optional mod also
+  enables the shared libraries it needs, and switching one mod in an
+  interchangeable group (e.g. a recipe viewer) swaps the other out.
+- **A console that keeps up**. A heavy mod-load log flood no longer freezes or
+  crashes the launcher window.
+- **Adaptive memory reads your real RAM**. The installed build now detects the
+  host's RAM correctly, and adaptive sizing works under ZGC and Shenandoah.
+
+### Added
+- SmartyCraft join through a small agent: for a pack bound to a SmartyCraft
+  server, the launcher attaches a zero-dependency `-javaagent` that redirects
+  authlib to SmartyCraft at class load (the join, session, and profile calls
+  and the texture-domain whitelist), and loads other players' unsigned skins.
+  Two Settings -> Smarty toggles: "network agent" (on) and the older
+  authlib-library swap (off, kept as a fallback).
+- Offline warm relaunch: the version metadata and a matching asset index are
+  reused from disk, so an installed pack relaunches with zero network requests;
+  a missing or changed file still fetches exactly itself.
+- Dependency-aware optional-mod toggling: enabling a mod enables the libraries
+  it requires; mods sharing a role stay mutually exclusive.
+- Profiler periodic flush: session metrics are written every 30 seconds, so a
+  hard exit (a mod's `Runtime.halt`, a native crash) no longer loses the whole
+  session.
+- Russian and German changelogs (`CHANGELOG_RU.md`, `CHANGELOG_DE.md`),
+  starting from this release.
+
+### Changed
+- The game console runs fully off the UI thread, end to end, so a log flood can
+  no longer block or crash the window.
+- Adaptive heap sizing detects the live set under ZGC and Shenandoah, not only
+  G1 / Parallel / CMS / Serial.
+- The pack auth-host redirect is gated by pack origin: only SmartyCraft and
+  mirror packs are redirected; Modrinth, local, and own packs keep the default
+  hosts.
+- The SmartyCraft skin patch logs one line when a present-but-changed
+  `getTextures` can no longer be patched, instead of dropping other players'
+  skins silently.
+
+### Fixed
+- Adaptive memory reads true host RAM on the installed build (it had fallen
+  back to a fixed 16 GB on the packaged runtime, mis-sizing the heap).
+
 ## [2.3.4-beta3] - 2026-06-04
 
 Matures the adaptive memory from 2.3.4-beta2 into a three-tier model
