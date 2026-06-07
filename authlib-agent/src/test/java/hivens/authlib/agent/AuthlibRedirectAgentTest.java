@@ -4,12 +4,14 @@ import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
+import java.io.PrintStream;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 class AuthlibRedirectAgentTest {
@@ -87,6 +89,25 @@ class AuthlibRedirectAgentTest {
     }
 
     @Test
+    void acceptUnsignedTexturesWarnsOnlyWhenGetTexturesPresentButGateMissing() throws Exception {
+        // getTextures(...Z) is present but never branches on requireSecure, so there is
+        // no gate to flip: the bytes come back unchanged AND a breadcrumb is logged,
+        // because a present-but-unpatchable legacy method means the authlib shape moved
+        // under us and other players' skins will silently regress.
+        byte[] reshaped = readClassBytes(TextureSampleNoGate.class);
+        byte[][] out = new byte[1][];
+        String warned = captureErr(() -> out[0] = AuthlibRedirectAgent.acceptUnsignedTextures(reshaped));
+        assertSame(reshaped, out[0], "a getTextures with no requireSecure gate must be left untouched");
+        assertTrue(warned.contains("[authlib-agent]") && warned.contains("skins"),
+                "a present-but-unpatchable getTextures must leave a stderr breadcrumb: " + warned);
+
+        // getTextures(...Z) absent entirely (e.g. modern authlib): no-op AND silent.
+        byte[] absent = readClassBytes(Sample.class);
+        String quiet = captureErr(() -> AuthlibRedirectAgent.acceptUnsignedTextures(absent));
+        assertEquals("", quiet, "an absent getTextures must not warn");
+    }
+
+    @Test
     void rewriteReturnsSameArrayWhenNothingMatches() {
         // Empty map -> no entry can match -> the rewriter must return the input
         // array untouched (the no-op fast path).
@@ -98,6 +119,19 @@ class AuthlibRedirectAgentTest {
     private static String str(byte[] b) {
         assertNotNull(b);
         return new String(b, java.nio.charset.StandardCharsets.UTF_8);
+    }
+
+    /** Runs [body] with System.err captured and returns everything it printed. */
+    private static String captureErr(Runnable body) throws Exception {
+        PrintStream original = System.err;
+        ByteArrayOutputStream buf = new ByteArrayOutputStream();
+        System.setErr(new PrintStream(buf, true, "UTF-8"));
+        try {
+            body.run();
+        } finally {
+            System.setErr(original);
+        }
+        return buf.toString("UTF-8");
     }
 
     private static String field(Class<?> c, String name) throws Exception {

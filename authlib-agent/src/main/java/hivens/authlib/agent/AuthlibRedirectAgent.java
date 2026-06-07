@@ -173,8 +173,11 @@ public final class AuthlibRedirectAgent {
      * to {@code iconst_0}, so the following {@code ifeq} always branches past the
      * check straight to the decode + (already-repointed) whitelist step. The swap is
      * length- and stack-preserving, so no offsets, exception table, or stack-map need
-     * touching. Returns [classBytes] untouched when the method or the exact gate
-     * pattern is absent (e.g. modern authlib), never throws.
+     * touching. Returns [classBytes] untouched, and never throws, when the gate is
+     * not patched: silently if the method is simply absent (e.g. modern authlib),
+     * but with one stderr breadcrumb if the method is present yet its gate could not
+     * be located -- the legacy shape changed under us, so other players' skins will
+     * silently fall back to default while the join (URL rewrite) still works.
      */
     static byte[] acceptUnsignedTextures(byte[] classBytes) {
         int cpCount = u2(classBytes, 8);
@@ -185,11 +188,17 @@ public final class AuthlibRedirectAgent {
         int fields = u2(classBytes, p); p += 2;
         for (int f = 0; f < fields; f++) p = skipMember(classBytes, p, utf8, null);
         int methods = u2(classBytes, p); p += 2;
-        int[] gate = { -1 };
+        int[] gate = { -1, 0 }; // [0] requireSecure gate offset; [1] set once getTextures(...Z) is seen
         for (int m = 0; m < methods && gate[0] < 0; m++) {
             p = skipMember(classBytes, p, utf8, gate);
         }
-        if (gate[0] < 0) return classBytes;
+        if (gate[0] < 0) {
+            if (gate[1] != 0) {
+                System.err.println("[authlib-agent] legacy getTextures present but its requireSecure "
+                    + "gate was not found; other players' SmartyCraft skins may not load");
+            }
+            return classBytes;
+        }
         byte[] copy = classBytes.clone();
         copy[gate[0]] = 0x03; // iconst_0
         return copy;
@@ -216,8 +225,10 @@ public final class AuthlibRedirectAgent {
 
     /**
      * Advances past one field/method member at [p], returning the next member's
-     * offset. When [gateOut] is non-null and the member is the getTextures(...Z) Code
-     * attribute, records the absolute offset of its requireSecure iload_2 in gateOut[0].
+     * offset. When [gateOut] is non-null and the member is the getTextures(...Z)
+     * method, sets {@code gateOut[1]} to 1 (so the caller can tell "method absent"
+     * from "method present, gate missing") and records the absolute offset of its
+     * requireSecure iload_2 in {@code gateOut[0]}, leaving it -1 if not located.
      */
     private static int skipMember(byte[] b, int p, String[] utf8, int[] gateOut) {
         p += 2; // access_flags
@@ -227,6 +238,7 @@ public final class AuthlibRedirectAgent {
         boolean target = gateOut != null
             && TEXTURES_METHOD.equals(utf8[nameIdx])
             && utf8[descIdx].endsWith("Z)Ljava/util/Map;");
+        if (target) gateOut[1] = 1;
         for (int a = 0; a < attrs; a++) {
             int anIdx = u2(b, p); p += 2;
             int alen = u4(b, p); p += 4;
