@@ -460,11 +460,29 @@ jobs:
           path: Nexira-${{ env.APP_VERSION }}-aarch64.dmg
 
   # ─────────────────────────────────────────────────────────────────────────
+  # PORTABILITY GATE — the freshly built AppImage must start across distros
+  # before we publish. Reuses appimage-portability.yml against this run's
+  # linux-artifacts (not a published asset), so a distro regression blocks the
+  # release instead of reaching users. Runs in parallel with the OS builds; it
+  # only needs the Linux AppImage.
+  # ─────────────────────────────────────────────────────────────────────────
+  portability:
+    name: AppImage Portability
+    needs: build-linux
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/appimage-portability.yml
+    with:
+      artifact_name: linux-artifacts
+    secrets: inherit
+
+  # ─────────────────────────────────────────────────────────────────────────
   # RELEASE — collect artifacts, publish with proper changelog body
   # ─────────────────────────────────────────────────────────────────────────
   release:
     name: Publish GitHub Release
-    needs: [changelog, build-windows, build-linux, build-macos]
+    needs: [changelog, build-windows, build-linux, build-macos, portability]
     runs-on: ubuntu-latest
     permissions:
       contents: write
