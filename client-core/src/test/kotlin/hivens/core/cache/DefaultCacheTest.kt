@@ -284,7 +284,7 @@ class DefaultCacheTest {
 
     @Test
     fun `a store during a pending write conflates to the latest value (no reorder)`() = runTest {
-        // Codex P2: a second store for the same key while the first is still
+        // A second store for the same key while the first is still
         // pending must not let an older value land last. The single per-key
         // writer conflates onto the newest value and writes it exactly once.
         val clock = TestClock()
