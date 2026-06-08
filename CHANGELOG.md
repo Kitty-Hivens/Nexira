@@ -18,8 +18,7 @@ full writeup consolidating its betas.
 Author each entry -- version summaries and the Added/Changed/Fixed bullets --
 as one physical line, no manual line wrapping. A `.md` renders the same either
 way, and these notes feed the GitHub Release / in-app updater verbatim, where a
-hand-wrapped line would render as a <br> staircase. (The release pipeline also
-reflows as a backstop, but author one-line so it never has to.)
+hand-wrapped line would render as a <br> staircase.
 
 `CHANGELOG_RU.md` and `CHANGELOG_DE.md` carry the Highlights only. They
 are for users, who do not read class names; the developer-level detail
