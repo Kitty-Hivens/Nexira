@@ -4,11 +4,20 @@ All notable changes to Nexira (formerly Aura Launcher) will be
 documented in this file. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-※ Each released entry opens with a short `### Highlights` block --
+Note: each released entry opens with a short `### Highlights` block --
 2-5 plain-English bullets summarizing what the user actually notices.
-The launcher's in-app update dialog renders just the Highlights; the
-detailed `### Added`/`### Changed`/`### Fixed`/`### Removed` sections
-below are for the GitHub release page and CHANGELOG readers.
+The launcher's in-app update dialog renders just the Highlights.
+
+The detailed `### Added`/`### Changed`/`### Fixed`/`### Removed` sections
+below are an engineering log. Name the actual classes, files, and
+mechanism, and the reason behind the change -- not just the user-facing
+feature (see 2.2.12 for the reference depth). Scale the depth to the
+release weight: a fast beta can stay thin, a stable rollup carries the
+full writeup consolidating its betas.
+
+`CHANGELOG_RU.md` and `CHANGELOG_DE.md` carry the Highlights only. They
+are for users, who do not read class names; the developer-level detail
+lives in this English file.
 
 ## [Unreleased]
 
