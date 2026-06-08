@@ -221,17 +221,13 @@ jobs:
 
           # Keep a Changelog format: ## [1.3.0] - 2025-xx-xx
           # Grab everything between the target version header and the next one (or EOF).
-          # reflow-changelog.sh joins the entry's ~72-col hard wraps into one line
-          # per bullet/paragraph: this `notes` feeds two GFM-with-breaks surfaces
-          # (the Release body and the in-app updater highlights), where each wrap
-          # newline would otherwise render as a <br> staircase.
           NOTES=$(awk -v ver="$VERSION" '
             /^## \[/ {
               if (found) exit
               if (index($0, "["ver"]") > 0) { found=1; next }
             }
             found { print }
-          ' CHANGELOG.md | sed '/./,$!d' | sed 's/[[:space:]]*$//' | ./scripts/reflow-changelog.sh)
+          ' CHANGELOG.md | sed '/./,$!d' | sed 's/[[:space:]]*$//')
 
           if [ -z "$NOTES" ]; then
             NOTES="No changelog entry for v${VERSION}. See [CHANGELOG.md](./CHANGELOG.md)."
