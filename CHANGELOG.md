@@ -15,6 +15,12 @@ feature (see 2.2.12 for the reference depth). Scale the depth to the
 release weight: a fast beta can stay thin, a stable rollup carries the
 full writeup consolidating its betas.
 
+Author each entry -- version summaries and the Added/Changed/Fixed bullets --
+as one physical line, no manual line wrapping. A `.md` renders the same either
+way, and these notes feed the GitHub Release / in-app updater verbatim, where a
+hand-wrapped line would render as a <br> staircase. (The release pipeline also
+reflows as a backstop, but author one-line so it never has to.)
+
 `CHANGELOG_RU.md` and `CHANGELOG_DE.md` carry the Highlights only. They
 are for users, who do not read class names; the developer-level detail
 lives in this English file.
@@ -22,22 +28,8 @@ lives in this English file.
 ## [Unreleased]
 
 ### Fixed
-- `Nbt.read` no longer pre-allocates an array from an untrusted length. A
-  corrupt `TAG_Byte_Array` / `TAG_Int_Array` / `TAG_Long_Array` (or `TAG_List`)
-  header with a negative or near-`Int.MAX_VALUE` length used to call
-  `ByteArray(len)` / `IntArray(len)` / `ArrayList(len)` and throw
-  `OutOfMemoryError`. `OutOfMemoryError` is an `Error`, not an `Exception`, so it
-  slipped past the `catch (Exception)` guard in the world and server NBT scanners
-  and took the launcher down. The reader now rejects a negative length, reads
-  byte arrays in bounded chunks via `readNBytes` (raising `NbtException` on a
-  short stream), and grows the int/long arrays element-by-element so a bogus
-  length EOFs into a catchable `NbtException` instead of reserving gigabytes up
-  front.
-- `GitHubRelease.name` is nullable. GitHub returns `"name": null` for a release
-  published without a title; the non-null field failed to decode, and the
-  exception turned `UpdateService.checkForUpdate` into "no update" for every user
-  until a titled release was published. The field now defaults to `null` and the
-  `[CRITICAL]` gate reads it null-safely.
+- `Nbt.read` no longer pre-allocates an array from an untrusted length. A corrupt `TAG_Byte_Array` / `TAG_Int_Array` / `TAG_Long_Array` (or `TAG_List`) header with a negative or near-`Int.MAX_VALUE` length used to call `ByteArray(len)` / `IntArray(len)` / `ArrayList(len)` and throw `OutOfMemoryError`. `OutOfMemoryError` is an `Error`, not an `Exception`, so it slipped past the `catch (Exception)` guard in the world and server NBT scanners and took the launcher down. The reader now rejects a negative length, reads byte arrays in bounded chunks via `readNBytes` (raising `NbtException` on a short stream), and grows the int/long arrays element-by-element so a bogus length EOFs into a catchable `NbtException` instead of reserving gigabytes up front.
+- `GitHubRelease.name` is nullable. GitHub returns `"name": null` for a release published without a title; the non-null field failed to decode, and the exception turned `UpdateService.checkForUpdate` into "no update" for every user until a titled release was published. The field now defaults to `null` and the `[CRITICAL]` gate reads it null-safely.
 
 ## [2.3.4-beta4] - 2026-06-07
 
