@@ -33,7 +33,6 @@ import hivens.core.api.model.ServerProfile
 import hivens.launcher.platform.PlatformPaths
 import hivens.ui.components.GlassCard
 import hivens.ui.customization.glassSurfaceAlpha
-import hivens.ui.debug.SkiaTracker
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
@@ -86,9 +85,7 @@ fun ServerDetailsSurface(
             val imgFile = File(assetsPath, "banner.png")
             if (imgFile.exists()) {
                 runCatching {
-                    bannerImage.value = ImageIO.read(imgFile)?.toComposeImageBitmap()?.also {
-                        SkiaTracker.track("Detail.banner[${server.assetDir}]", it)
-                    }
+                    bannerImage.value = ImageIO.read(imgFile)?.toComposeImageBitmap()
                 }
             }
             isLoading = false
