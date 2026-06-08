@@ -155,7 +155,7 @@ class UpdateService(
             }
             val highlights = manifest.highlights?.takeIf { it.isNotBlank() }
 
-            val isCritical = release.name.contains("[CRITICAL]", ignoreCase = true) ||
+            val isCritical = release.name?.contains("[CRITICAL]", ignoreCase = true) == true ||
                              release.body?.contains("CRITICAL", ignoreCase = true) == true
 
             logger.info(
@@ -677,7 +677,7 @@ class UpdateService(
 @Serializable
 data class GitHubRelease(
     @SerialName("tag_name") val tagName: String,
-    @SerialName("name") val name: String,
+    @SerialName("name") val name: String? = null,
     @SerialName("body") val body: String? = null,
     @SerialName("assets") val assets: List<GitHubAsset>,
     @SerialName("prerelease") val prerelease: Boolean = false,

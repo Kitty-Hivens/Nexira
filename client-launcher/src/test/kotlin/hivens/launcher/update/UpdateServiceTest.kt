@@ -6,6 +6,7 @@ import hivens.test.MockResponse
 import hivens.test.buildMockClient
 import io.ktor.http.*
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import java.nio.file.Files
 import kotlin.test.*
@@ -912,5 +913,36 @@ class UpdateServiceTest {
         val update = svc.checkForUpdate(force = true)
         assertNotNull(update)
         assertTrue(update.isMandatory)
+    }
+
+    @Test
+    fun githubReleaseWithNullNameIsDecodable() {
+        // GitHub's REST API returns "name": null for any release published
+        // without a title. Production decodes releases with the DI Json, which
+        // sets coerceInputValues=true -- replicated here so this proves the DTO
+        // shape, not a test-only Json divergence. coerceInputValues only rescues
+        // a null when the field has a default; GitHubRelease.name is a non-null
+        // String with no default, so the decode throws and checkForUpdate's
+        // catch turns it into "no update" for every user until a titled release
+        // is cut.
+        val prodJson = Json {
+            ignoreUnknownKeys = true
+            isLenient = true
+            coerceInputValues = true
+        }
+        val body = """
+            {
+              "tag_name": "v2.3.5",
+              "name": null,
+              "body": "notes",
+              "assets": [],
+              "prerelease": false,
+              "draft": false,
+              "published_at": "2026-06-08T00:00:00Z"
+            }
+        """.trimIndent()
+
+        val release = prodJson.decodeFromString<GitHubRelease>(body)
+        assertEquals("v2.3.5", release.tagName)
     }
 }
