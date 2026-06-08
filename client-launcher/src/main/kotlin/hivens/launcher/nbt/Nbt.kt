@@ -95,15 +95,21 @@ object Nbt {
         TYPE_DOUBLE     -> NbtValue.Double(readDouble())
         TYPE_BYTE_ARRAY -> {
             val len = readInt()
-            val bytes = ByteArray(len)
-            readFully(bytes)
+            if (len < 0) throw NbtException("Negative byte-array length=$len")
+            // readNBytes reads in bounded chunks, so a corrupt/oversized length
+            // can't pre-allocate gigabytes: a short stream yields fewer bytes,
+            // which we reject rather than letting ByteArray(len) OOM.
+            val bytes = readNBytes(len)
+            if (bytes.size != len) throw NbtException("Truncated byte array: expected $len, got ${bytes.size}")
             NbtValue.ByteArray(bytes)
         }
         TYPE_STRING     -> NbtValue.String(readUtf())
         TYPE_LIST       -> {
             val elementType = readByte().toInt()
             val len = readInt()
-            val items = ArrayList<NbtValue>(len.coerceAtLeast(0))
+            // No len-sized pre-alloc: a bogus length must not reserve memory up
+            // front; each element below reads from the stream and EOFs cleanly.
+            val items = ArrayList<NbtValue>()
             // List<TAG_End> with len > 0 is malformed; spec says
             // TAG_End is only valid as an empty-list element marker.
             if (elementType == TYPE_END && len > 0) {
@@ -115,15 +121,19 @@ object Nbt {
         TYPE_COMPOUND   -> NbtValue.Compound(readCompoundPayload())
         TYPE_INT_ARRAY  -> {
             val len = readInt()
-            val ints = IntArray(len)
-            repeat(len) { ints[it] = readInt() }
-            NbtValue.IntArray(ints)
+            if (len < 0) throw NbtException("Negative int-array length=$len")
+            // Grow as elements arrive instead of IntArray(len): a corrupt length
+            // EOFs mid-read (caught upstream) rather than pre-allocating the array.
+            val ints = ArrayList<Int>()
+            repeat(len) { ints += readInt() }
+            NbtValue.IntArray(ints.toIntArray())
         }
         TYPE_LONG_ARRAY -> {
             val len = readInt()
-            val longs = LongArray(len)
-            repeat(len) { longs[it] = readLong() }
-            NbtValue.LongArray(longs)
+            if (len < 0) throw NbtException("Negative long-array length=$len")
+            val longs = ArrayList<Long>()
+            repeat(len) { longs += readLong() }
+            NbtValue.LongArray(longs.toLongArray())
         }
         else -> throw NbtException("Unknown NBT tag typeId=$typeId")
     }

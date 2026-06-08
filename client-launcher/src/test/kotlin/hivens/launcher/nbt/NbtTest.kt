@@ -124,4 +124,34 @@ class NbtTest {
 
         assertEquals(keys, readBack.value.entries.keys.toList())
     }
+
+    @Test
+    fun `corrupt byte-array length is rejected, not OOM`() {
+        // Entry declares an Int.MAX_VALUE-long byte array but provides no payload.
+        // The reader must treat this as malformed (NbtException, which the world /
+        // servers scanners catch), not pre-allocate ByteArray(len) and throw
+        // OutOfMemoryError straight past the catch (Exception) guard.
+        val bytes = byteArrayOf(
+            Nbt.TYPE_COMPOUND.toByte(),
+            0, 0,                                                // root name ""
+            Nbt.TYPE_BYTE_ARRAY.toByte(),
+            0, 0,                                                // entry name ""
+            0x7F, 0xFF.toByte(), 0xFF.toByte(), 0xFF.toByte(),  // length = Int.MAX_VALUE
+        )
+        assertFailsWith<NbtException> { Nbt.read(ByteArrayInputStream(bytes), gzipped = false) }
+    }
+
+    @Test
+    fun `corrupt int-array length is rejected, not OOM`() {
+        // Same shape for TAG_Int_Array: a bogus length must EOF per-element into a
+        // catchable Exception, never IntArray(len) -> OutOfMemoryError.
+        val bytes = byteArrayOf(
+            Nbt.TYPE_COMPOUND.toByte(),
+            0, 0,
+            Nbt.TYPE_INT_ARRAY.toByte(),
+            0, 0,
+            0x7F, 0xFF.toByte(), 0xFF.toByte(), 0xFF.toByte(),  // length = Int.MAX_VALUE
+        )
+        assertFailsWith<Exception> { Nbt.read(ByteArrayInputStream(bytes), gzipped = false) }
+    }
 }
