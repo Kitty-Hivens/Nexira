@@ -545,6 +545,10 @@ object GermanStrings : AppStrings {
 
     override val profileCategorySkin    = "Skin"
     override val profileCategoryAccount = "Konto"
+    override val profileCategorySignIn      = "Anmelden"
+    override val profileCategorySecurity    = "Sicherheit"
+    override val profileForgetSavedSignIn   = "Gespeicherte Anmeldung vergessen"
+    override val profileSecurityHint        = "Deine Anmeldung ist auf diesem Gerät für die automatische Anmeldung gespeichert."
 
     override val backgroundLoopMode      = "Schleife"
     override val backgroundLoopUseCodec  = "Aus Codec"
@@ -774,7 +778,6 @@ object GermanStrings : AppStrings {
         "widget.appshell.region.right" to "Rechte Leiste",
         "widget.appshell.region.showDivider" to "Trennlinie",
         "widget.appshell.region.widthDp" to "Breite (0 = flexibel)",
-        "widget.appshell.rightrail.authpanel" to "Anmeldebereich",
         "widget.appshell.rightrail.compactnews" to "Neuigkeiten",
         "widget.bg.enable.toggle" to "Hintergrund an/aus",
         "widget.bg.fx.animspeed" to "Animationstempo",
@@ -855,6 +858,7 @@ object GermanStrings : AppStrings {
         "widget.library.header.title" to "Überschrift",
         "widget.nav.entry" to "Navigationspunkt",
         "widget.profile.account.section" to "Konto",
+        "widget.profile.signin" to "Anmelden",
         "widget.profile.nav" to "Profilnavigation",
         "widget.profile.skin.section" to "Skin",
         "widget.profile.skin.section.previewHeight" to "Vorschauhöhe",

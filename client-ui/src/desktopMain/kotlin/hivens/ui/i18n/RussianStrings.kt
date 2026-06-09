@@ -546,6 +546,10 @@ object RussianStrings : AppStrings {
 
     override val profileCategorySkin    = "Скин"
     override val profileCategoryAccount = "Аккаунт"
+    override val profileCategorySignIn      = "Вход"
+    override val profileCategorySecurity    = "Безопасность"
+    override val profileForgetSavedSignIn   = "Забыть сохранённый вход"
+    override val profileSecurityHint        = "Твой вход сохранён на этом устройстве для авто-входа."
 
     override val backgroundLoopMode      = "Луп"
     override val backgroundLoopUseCodec  = "Из кодека"
@@ -775,7 +779,6 @@ object RussianStrings : AppStrings {
         "widget.appshell.region.right" to "Правая панель",
         "widget.appshell.region.showDivider" to "Разделитель",
         "widget.appshell.region.widthDp" to "Ширина (0 — гибкая)",
-        "widget.appshell.rightrail.authpanel" to "Панель входа",
         "widget.appshell.rightrail.compactnews" to "Лента новостей",
         "widget.bg.enable.toggle" to "Фон вкл/выкл",
         "widget.bg.fx.animspeed" to "Скорость анимации",
@@ -856,6 +859,7 @@ object RussianStrings : AppStrings {
         "widget.library.header.title" to "Заголовок",
         "widget.nav.entry" to "Пункт навигации",
         "widget.profile.account.section" to "Аккаунт",
+        "widget.profile.signin" to "Вход",
         "widget.profile.nav" to "Навигация профиля",
         "widget.profile.skin.section" to "Скин",
         "widget.profile.skin.section.previewHeight" to "Высота превью",

@@ -75,7 +75,8 @@ fun ProfileSkinSectionWidget(instance: WidgetInstance) {
     val skinManager: SkinManager       = koinInject()
     val skinRepository: SkinRepository = koinInject()
     val scope = rememberCoroutineScope()
-    val session = ctx.session
+    // The nav only mounts this slot with a session; guard defensively.
+    val session = ctx.session ?: return
 
     var frontSkin    by remember { mutableStateOf<ImageBitmap?>(null) }
     var backSkin     by remember { mutableStateOf<ImageBitmap?>(null) }

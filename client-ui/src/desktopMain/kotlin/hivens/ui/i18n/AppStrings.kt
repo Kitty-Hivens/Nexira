@@ -570,6 +570,10 @@ interface AppStrings {
     // --- Profile two-column nav labels ---
     val profileCategorySkin: String
     val profileCategoryAccount: String
+    val profileCategorySignIn: String
+    val profileCategorySecurity: String
+    val profileForgetSavedSignIn: String
+    val profileSecurityHint: String
 
     // --- Background loop mode ---
     val backgroundLoopMode: String
