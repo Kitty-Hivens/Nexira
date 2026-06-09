@@ -154,4 +154,46 @@ class NbtTest {
         )
         assertFailsWith<Exception> { Nbt.read(ByteArrayInputStream(bytes), gzipped = false) }
     }
+
+    @Test
+    fun `corrupt long-array length is rejected, not OOM`() {
+        val bytes = byteArrayOf(
+            Nbt.TYPE_COMPOUND.toByte(),
+            0, 0,
+            Nbt.TYPE_LONG_ARRAY.toByte(),
+            0, 0,
+            0x7F, 0xFF.toByte(), 0xFF.toByte(), 0xFF.toByte(),  // length = Int.MAX_VALUE
+        )
+        assertFailsWith<Exception> { Nbt.read(ByteArrayInputStream(bytes), gzipped = false) }
+    }
+
+    @Test
+    fun `negative list length is rejected, not parsed as empty`() {
+        // The stream is otherwise well-formed (TAG_End follows), so without the
+        // len < 0 guard this parses "successfully" into an empty list -- a silent
+        // misparse rather than the NbtException callers are built to catch.
+        val bytes = byteArrayOf(
+            Nbt.TYPE_COMPOUND.toByte(),
+            0, 0,                                                // root name ""
+            Nbt.TYPE_LIST.toByte(),
+            0, 0,                                                // entry name ""
+            Nbt.TYPE_INT.toByte(),                               // element type
+            0xFF.toByte(), 0xFF.toByte(), 0xFF.toByte(), 0xFF.toByte(),  // length = -1
+            Nbt.TYPE_END.toByte(),
+        )
+        assertFailsWith<NbtException> { Nbt.read(ByteArrayInputStream(bytes), gzipped = false) }
+    }
+
+    @Test
+    fun `list of TAG_End with positive length is rejected`() {
+        val bytes = byteArrayOf(
+            Nbt.TYPE_COMPOUND.toByte(),
+            0, 0,
+            Nbt.TYPE_LIST.toByte(),
+            0, 0,
+            Nbt.TYPE_END.toByte(),  // element type: only valid for empty lists
+            0, 0, 0, 1,             // length = 1
+        )
+        assertFailsWith<NbtException> { Nbt.read(ByteArrayInputStream(bytes), gzipped = false) }
+    }
 }

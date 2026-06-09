@@ -107,6 +107,7 @@ object Nbt {
         TYPE_LIST       -> {
             val elementType = readByte().toInt()
             val len = readInt()
+            if (len < 0) throw NbtException("Negative list length=$len")
             // No len-sized pre-alloc: a bogus length must not reserve memory up
             // front; each element below reads from the stream and EOFs cleanly.
             val items = ArrayList<NbtValue>()
