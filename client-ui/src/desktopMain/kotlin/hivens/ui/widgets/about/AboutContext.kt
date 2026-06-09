@@ -29,6 +29,7 @@ sealed class UpdateCheckState {
 class AboutContext(
     val updateState: MutableState<UpdateCheckState>,
     val showUpdateDialog: MutableState<Boolean>,
+    val showUpdateManager: MutableState<Boolean>,
     val triggerUpdateCheck: () -> Unit,
     val systemRam: Int,
     val displayRes: String,
@@ -42,6 +43,7 @@ val LocalAboutContext: ProvidableCompositionLocal<AboutContext> =
 internal val STUB_ABOUT: AboutContext = AboutContext(
     updateState        = mutableStateOf(UpdateCheckState.Idle),
     showUpdateDialog   = mutableStateOf(false),
+    showUpdateManager  = mutableStateOf(false),
     triggerUpdateCheck = {},
     systemRam          = 0,
     displayRes         = "Unknown",

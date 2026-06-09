@@ -1,7 +1,6 @@
 package hivens.ui.widgets.about
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -10,30 +9,28 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.NewReleases
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import hivens.config.Branding
+import hivens.core.data.ReleaseChannel
 import hivens.ui.components.GlassCard
+import hivens.ui.components.channelColor
+import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.easter.LocalAprilFools
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
@@ -48,12 +45,10 @@ data class AboutUpdateProps(
     @PropLabel("widget.about.update.panel.title") val title: String = "",
 )
 
-// Update check + state machine: Idle (check button) -> Checking
-// (spinner) -> UpToDate / Available / Error. Reads + writes
-// ctx.updateState; opens the modal UpdateDialog via
-// ctx.showUpdateDialog. Removing this widget loses the in-pane
-// update affordance but the puppet check / dialog routes still
-// work because the state lives in the surface composable.
+// Update panel. The surface auto-checks in the background, so there is no manual
+// "check" button and no "up to date" line: the panel shows the current version
+// (channel-coloured) with the "i" that opens the full update manager, and a
+// download card only when an update is actually available.
 @Widget(id = "about.update.panel", displayName = "widget.about.update.panel", propsClass = AboutUpdateProps::class)
 @Composable
 fun AboutUpdatePanelWidget(instance: WidgetInstance) {
@@ -63,137 +58,66 @@ fun AboutUpdatePanelWidget(instance: WidgetInstance) {
     val s = LocalStrings.current
     val state by ctx.updateState
 
+    val versionText = remember { "v${Branding.VERSION.removePrefix("v")}" }
+    val channel = remember { ReleaseChannel.classify(Branding.VERSION.removePrefix("v")) }
+    val accent = channelColor(channel)
+
     GlassCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(20.dp)) {
             SectionLabel(p.title.ifBlank { s.aboutSectionUpdates })
             Spacer(Modifier.height(16.dp))
-            InfoRow(Icons.Default.Info, s.aboutCurrentVersion, "v${Branding.VERSION.removePrefix("v")}")
-            Spacer(Modifier.height(16.dp))
 
-            when (val current = state) {
-                UpdateCheckState.Idle -> {
-                    af.ChaosButton(
-                        id      = "about_check_updates_btn",
-                        text    = s.aboutCheckUpdates,
-                        onClick = { ctx.triggerUpdateCheck() },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors   = ButtonDefaults.buttonColors(
-                            containerColor = CelestiaTheme.colors.primary,
-                        ),
+            // Current version. Only the "i" opens the manager -- the tap target
+            // is the icon, not the whole row.
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector        = Icons.Default.Info,
+                    contentDescription = s.updateManagerOpenHint,
+                    tint               = CelestiaTheme.colors.primary,
+                    modifier           = Modifier
+                        .size(18.dp)
+                        .clip(CircleShape)
+                        .clickable { ctx.showUpdateManager.value = true },
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(s.aboutCurrentVersion, color = CelestiaTheme.colors.textSecondary, fontSize = 13.sp)
+                Spacer(Modifier.weight(1f))
+                Text(
+                    text       = versionText,
+                    color      = accent,
+                    fontSize   = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    fontFamily = FontFamily.Monospace,
+                )
+            }
+
+            // Only an actual available update renders below; up-to-date stays silent.
+            (state as? UpdateCheckState.Available)?.let { current ->
+                val availChannel = ReleaseChannel.classify(current.update.version.removePrefix("v"))
+                val availAccent = if (current.update.isCritical) CelestiaTheme.colors.error else channelColor(availChannel)
+
+                Spacer(Modifier.height(16.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.NewReleases, null, tint = availAccent, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text       = current.update.version,
+                        color      = availAccent,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace,
                     )
                 }
-
-                UpdateCheckState.Checking -> {
-                    Row(
-                        modifier              = Modifier.fillMaxWidth().padding(12.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment     = Alignment.CenterVertically,
-                    ) {
-                        CircularProgressIndicator(
-                            modifier    = Modifier.size(20.dp),
-                            strokeWidth = 2.dp,
-                            color       = CelestiaTheme.colors.primary,
-                        )
-                        Spacer(Modifier.width(12.dp))
-                        Text(s.aboutChecking, color = CelestiaTheme.colors.textSecondary)
-                    }
-                }
-
-                UpdateCheckState.UpToDate -> {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(CelestiaTheme.colors.success.copy(alpha = 0.1f))
-                            .padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(Icons.Default.CheckCircle, null, tint = CelestiaTheme.colors.success, modifier = Modifier.size(20.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text(s.aboutUpToDate, color = CelestiaTheme.colors.success, fontWeight = FontWeight.Medium)
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    TextButton(onClick = { ctx.updateState.value = UpdateCheckState.Idle }) {
-                        Text(s.aboutCheckAgain, color = CelestiaTheme.colors.textSecondary, fontSize = 12.sp)
-                    }
-                }
-
-                is UpdateCheckState.Available -> {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(CelestiaTheme.colors.primary.copy(alpha = 0.08f))
-                            .padding(12.dp),
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.NewReleases, null, tint = CelestiaTheme.colors.primary, modifier = Modifier.size(20.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text(
-                                text       = s.aboutUpdateAvailable(current.update.version),
-                                fontWeight = FontWeight.Bold,
-                                color      = CelestiaTheme.colors.primary,
-                            )
-                        }
-                        if (current.update.isCritical) {
-                            Spacer(Modifier.height(4.dp))
-                            Text(
-                                text       = "⚠ ${s.aboutCriticalUpdate}",
-                                fontSize   = 12.sp,
-                                color      = CelestiaTheme.colors.error,
-                                fontWeight = FontWeight.Bold,
-                            )
-                        }
-                    }
-
-                    Spacer(Modifier.height(12.dp))
-
-                    Button(
-                        onClick  = { ctx.showUpdateDialog.value = true },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape    = MaterialTheme.shapes.small,
-                        colors   = ButtonDefaults.buttonColors(
-                            containerColor = if (current.update.isCritical)
-                                CelestiaTheme.colors.error
-                            else
-                                CelestiaTheme.colors.primary,
-                        ),
-                    ) {
-                        Icon(Icons.Default.CloudDownload, null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            text       = if (current.update.isCritical) s.updateDownloadNow else s.updateDownload,
-                            fontWeight = FontWeight.Bold,
-                            color      = Color.White,
-                        )
-                    }
-
-                    Spacer(Modifier.height(8.dp))
-
-                    TextButton(onClick = { ctx.updateState.value = UpdateCheckState.Idle }) {
-                        Text(s.aboutCheckAgain, color = CelestiaTheme.colors.textSecondary, fontSize = 12.sp)
-                    }
-                }
-
-                is UpdateCheckState.Error -> {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(CelestiaTheme.colors.error.copy(alpha = 0.08f))
-                            .padding(12.dp),
-                    ) {
-                        Text(
-                            text     = s.stateError(current.message),
-                            color    = CelestiaTheme.colors.error,
-                            fontSize = 13.sp,
-                        )
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    TextButton(onClick = { ctx.updateState.value = UpdateCheckState.Idle }) {
-                        Text(s.updateRetry, color = CelestiaTheme.colors.textSecondary)
-                    }
-                }
+                Spacer(Modifier.height(12.dp))
+                af.ChaosButton(
+                    id      = "about_open_update_btn",
+                    text    = if (current.update.isCritical) s.updateDownloadNow else s.updateDownload,
+                    onClick = { ctx.showUpdateDialog.value = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors   = ButtonDefaults.buttonColors(
+                        containerColor = if (current.update.isCritical) CelestiaTheme.colors.error else glassSurfaceAlpha(0.55f),
+                        contentColor   = CelestiaTheme.colors.textPrimary,
+                    ),
+                )
             }
         }
     }

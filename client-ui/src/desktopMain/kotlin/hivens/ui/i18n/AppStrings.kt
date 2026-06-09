@@ -142,6 +142,26 @@ interface AppStrings {
     fun updateVersion(version: String): String
     val updateDetails: String
 
+    // --- Update manager ---
+    val updateManagerTitle: String
+    val updateManagerChannel: String
+    val updateChannelRelease: String
+    val updateChannelBeta: String
+    val updateChannelAlpha: String
+    val updateChannelDev: String
+    val updateChannelGit: String
+    val updateManagerCurrentTag: String
+    val updateManagerInstall: String
+    val updateManagerRollback: String
+    val updateManagerBuild: String
+    val updateManagerInstallDesktop: String
+    val updateManagerDesktopDone: String
+    val updateManagerEmpty: String
+    val updateManagerNeedsExperimental: String
+    val updateManagerBuilding: String
+    val updateManagerOpenHint: String
+    fun updateManagerNeedsTools(tools: String): String
+
     // --- Console ---
     val consoleTitle: String
     /** Header showing how many entries pass the active filter, e.g. "Game Output (12/847)". */
@@ -286,8 +306,6 @@ interface AppStrings {
     val aboutCurrentVersion: String
     val aboutCheckUpdates: String
     val aboutChecking: String
-    val aboutUpToDate: String
-    val aboutCheckAgain: String
     fun aboutUpdateAvailable(version: String): String
     val aboutCriticalUpdate: String
     val aboutSectionSystem: String
@@ -327,8 +345,6 @@ interface AppStrings {
     val settingsExperimentalMasterDesc: String
     val settingsMandatoryUpdates: String
     val settingsMandatoryUpdatesDesc: String
-    val settingsPrereleaseChannel: String
-    val settingsPrereleaseChannelDesc: String
     val settingsAutoSyncAllPacks: String
     val settingsAutoSyncAllPacksDesc: String
     val settingsJvmBuilder: String
