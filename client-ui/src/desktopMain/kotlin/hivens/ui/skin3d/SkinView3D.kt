@@ -3,6 +3,7 @@ package hivens.ui.skin3d
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -58,12 +59,16 @@ fun SkinView3D(
 ) {
     val legacy = remember(skin) { skin.height <= skin.width / 2 }
     val model = remember(skin) {
-        val k = (skin.width / 64).coerceAtLeast(1)
         val pixels = skin.toPixelMap()
-        guessModel { x, y -> (pixels[x * k, y * k].alpha * 255f).toInt() }
+        guessModel(skin.width, skin.height) { x, y -> (pixels[x, y].alpha * 255f).toInt() }
     }
     val figure = remember(model, legacy) { buildFigure(model, legacy) }
     val image = remember(skin) { Image.makeFromBitmap(skin.asSkiaBitmap()) }
+    // The Skia Image owns native memory; free it when the skin changes or the
+    // view leaves composition instead of waiting for the finalizer.
+    DisposableEffect(image) {
+        onDispose { image.close() }
+    }
     val sampling = remember { FilterMipmap(FilterMode.NEAREST, MipmapMode.NONE) }
     val paint = remember { Paint().apply { isAntiAlias = false } }
 
