@@ -99,6 +99,11 @@ class SourceBuildService(
 
             onProgress(Progress.Phase("Packaging AppImage"))
             val output = File(workspace, "Nexira-$version-x86_64.AppImage")
+            // build-appimage.sh (and jlink) refuse to overwrite an existing
+            // AppDir / output, so a fresh build must clear the previous run's
+            // scratch -- otherwise the second source build aborts.
+            File(workspace, "AppDir").deleteRecursively()
+            output.delete()
             run(
                 listOf(File(workspace, "scripts/build-appimage.sh").absolutePath, version, jar.absolutePath),
                 onProgress,

@@ -29,9 +29,10 @@ import kotlin.time.Duration.Companion.milliseconds
  * feature at once. Children stay grayed out (not hidden) when the
  * master is off, so the user can see what they're opting back into.
  *
- * Includes: mandatory-updates floor, prerelease channel, autosync,
- * JVM-args builder unlock, mimic-launcher-version override (with a
- * debounced text input revealed when its toggle is on).
+ * Includes: mandatory-updates floor, autosync, JVM-args builder unlock,
+ * mimic-launcher-version override (with a debounced text input revealed
+ * when its toggle is on). The update channel itself moved to the update
+ * manager (the experimental master still gates the Dev/Git source channels).
  */
 @Composable
 internal fun ExperimentalSection(

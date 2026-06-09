@@ -54,7 +54,6 @@ import hivens.core.data.ReleaseEntry
 import hivens.launcher.update.DesktopIntegration
 import hivens.launcher.update.SourceBuildService
 import hivens.launcher.update.UpdateService
-import hivens.ui.customization.scaledAlpha
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
@@ -87,8 +86,9 @@ fun UpdateManagerDialog(onDismiss: () -> Unit) {
     val logger = remember { LoggerFactory.getLogger("UpdateManager") }
 
     val experimentalOn = remember { settingsService.getSettings().experimentalFeaturesEnabled }
-    val toolchainReady = remember { sourceBuild.isSupported() && sourceBuild.detectToolchain().ready }
-    val missingTools = remember { sourceBuild.detectToolchain().missing.joinToString(", ") }
+    val toolchain = remember { sourceBuild.detectToolchain() }
+    val toolchainReady = remember { sourceBuild.isSupported() && toolchain.ready }
+    val missingTools = remember { toolchain.missing.joinToString(", ") }
 
     var channel by remember { mutableStateOf(settingsService.getSettings().updateChannel) }
     var allReleases by remember { mutableStateOf<List<ReleaseEntry>>(emptyList()) }
@@ -167,8 +167,11 @@ fun UpdateManagerDialog(onDismiss: () -> Unit) {
 
     BasicAlertDialog(onDismissRequest = { if (!busy) onDismiss() }) {
         GlassCard(
+            // A modal stays readable regardless of the glass-intensity knob, so
+            // this is a fixed near-opaque dark panel, not glassIntensity-scaled
+            // (BasicAlertDialog draws no scrim behind it).
             modifier = Modifier.width(560.dp).wrapContentHeight(),
-            backgroundColor = scaledAlpha(CelestiaTheme.colors.background, 0.97f),
+            backgroundColor = CelestiaTheme.colors.background.copy(alpha = 0.97f),
         ) {
             Column(Modifier.padding(24.dp)) {
                 // ── Header ───────────────────────────────────────────────────────
