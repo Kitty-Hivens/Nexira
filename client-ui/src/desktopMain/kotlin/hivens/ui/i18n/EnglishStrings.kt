@@ -69,8 +69,6 @@ object EnglishStrings : AppStrings {
     override val profileTopUp              = "Top up balance"
     override val profileUploadSkin         = "Upload skin"
     override val profileUploadSkinLoading  = "Uploading..."
-    override val profileSkinFront          = "Front"
-    override val profileSkinBack           = "Back"
     override val profileSkinLoading        = "Loading skin..."
     override val profileRefresh            = "Refresh"
     override val profileUploadSuccess      = "Skin uploaded successfully"
@@ -546,7 +544,6 @@ object EnglishStrings : AppStrings {
     override val settingsCategoryAdvanced     = "Advanced"
     override val settingsCategoryDiagnostics  = "Diagnostics"
 
-    override val profileCategorySkin    = "Skin"
     override val profileCategoryAccount = "Account"
     override val profileCategorySignIn      = "Sign in"
     override val profileCategorySecurity    = "Security"

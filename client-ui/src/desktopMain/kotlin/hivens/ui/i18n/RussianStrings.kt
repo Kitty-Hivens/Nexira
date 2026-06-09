@@ -66,8 +66,6 @@ object RussianStrings : AppStrings {
     override val profileTopUp              = "Пополнить баланс"
     override val profileUploadSkin         = "Загрузить скин"
     override val profileUploadSkinLoading  = "Загрузка..."
-    override val profileSkinFront          = "Перёд"
-    override val profileSkinBack           = "Зад"
     override val profileSkinLoading        = "Загрузка скина..."
     override val profileRefresh            = "Обновить"
     override val profileUploadSuccess      = "Скин успешно загружен"
@@ -544,7 +542,6 @@ object RussianStrings : AppStrings {
     override val settingsCategoryAdvanced     = "Расширенные"
     override val settingsCategoryDiagnostics  = "Диагностика"
 
-    override val profileCategorySkin    = "Скин"
     override val profileCategoryAccount = "Аккаунт"
     override val profileCategorySignIn      = "Вход"
     override val profileCategorySecurity    = "Безопасность"
