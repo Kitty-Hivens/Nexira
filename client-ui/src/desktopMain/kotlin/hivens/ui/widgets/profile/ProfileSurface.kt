@@ -1,4 +1,5 @@
 package hivens.ui.widgets.profile
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -7,7 +8,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -15,6 +18,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -49,6 +53,11 @@ private const val SURFACE = "profile"
 // unmounted so the editor's chrome decorator does not paint phantom chrome
 // around the hidden section.
 //
+// While startup auto-login is still resolving ([authResolving]) the card
+// shows a spinner instead of mounting the sign-in form -- the same Loading
+// treatment Home gives, so the ~1s credential check doesn't flash a full
+// login form at an already signed-in user.
+//
 // No verticalScroll on the right pane. A scroll modifier hands
 // children a maxHeight = Infinity constraint, and LazyList-based
 // widgets (CompactNewsFeed, LibraryBody, ...) abort with an
@@ -61,6 +70,7 @@ private const val SURFACE = "profile"
 @Composable
 fun ProfileSurface(
     session: SessionData?,
+    authResolving: Boolean,
     onLogin: (SessionData) -> Unit,
     onLogout: () -> Unit,
 ) {
@@ -109,14 +119,27 @@ fun ProfileSurface(
                 modifier        = Modifier.weight(1f).fillMaxWidth(),
                 backgroundColor = glassSurfaceAlpha(0.7f),
             ) {
-                Row(Modifier.fillMaxSize().padding(16.dp)) {
-                    SlotRenderer(SurfaceId(SURFACE), SlotId("nav"), Modifier.width(200.dp).fillMaxHeight())
-                    when (selectedCategory.value) {
-                        ProfileCategory.SignIn  ->
-                            SlotRenderer(SurfaceId(SURFACE), SlotId("signin"), Modifier.weight(1f).fillMaxHeight())
-                        ProfileCategory.Account ->
-                            if (session != null)
+                if (authResolving && session == null) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(
+                            color       = CelestiaTheme.colors.primary.copy(alpha = 0.35f),
+                            modifier    = Modifier.size(28.dp),
+                            strokeWidth = 2.dp,
+                        )
+                    }
+                } else {
+                    Row(Modifier.fillMaxSize().padding(16.dp)) {
+                        SlotRenderer(SurfaceId(SURFACE), SlotId("nav"), Modifier.width(200.dp).fillMaxHeight())
+                        when {
+                            // Sign-in also covers the frame right after logout where
+                            // Account is still selected but the session is gone (the
+                            // LaunchedEffect above resets the category next
+                            // composition) -- otherwise the right pane goes blank.
+                            selectedCategory.value == ProfileCategory.SignIn || session == null ->
+                                SlotRenderer(SurfaceId(SURFACE), SlotId("signin"), Modifier.weight(1f).fillMaxHeight())
+                            else ->
                                 SlotRenderer(SurfaceId(SURFACE), SlotId("account"), Modifier.weight(1f).fillMaxHeight())
+                        }
                     }
                 }
             }

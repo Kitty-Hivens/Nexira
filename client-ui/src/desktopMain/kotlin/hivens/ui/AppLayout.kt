@@ -148,9 +148,10 @@ fun AppLayout(
 
                     Screen.Profile ->
                         ProfileSurface(
-                            session  = currentSession,
-                            onLogin  = onLogin,
-                            onLogout = onLogout,
+                            session       = currentSession,
+                            authResolving = appState is AppState.Loading,
+                            onLogin       = onLogin,
+                            onLogout      = onLogout,
                         )
 
                     Screen.Settings ->
