@@ -34,7 +34,6 @@ class UpdateService(
     private val logger = LoggerFactory.getLogger(UpdateService::class.java)
     private val httpClient get() = clientProvider.current
     private val updateDir = dataDirectory.resolve("updates")
-    private val lastCheckFile = updateDir.resolve(".last_check")
     private val lastMetaCheckFile = updateDir.resolve(".last_meta_check")
 
     // Raw releases from the last listReleases() call, so prepareUpdate() can
@@ -47,16 +46,14 @@ class UpdateService(
         private const val GITHUB_API_LATEST    = "https://api.github.com/repos/$GITHUB_REPO/releases/latest"
         private const val GITHUB_API_RELEASES  = "https://api.github.com/repos/$GITHUB_REPO/releases"
         private const val GITHUB_RELEASE_PAGE  = "https://github.com/$GITHUB_REPO/releases/tag"
-        private const val CHECK_INTERVAL_HOURS = 12L
-
         /**
-         * Meta-only poll cadence. Far tighter than [CHECK_INTERVAL_HOURS]
-         * because the meta endpoint is `update-channel.json` on raw GitHub --
-         * a few hundred bytes, no API rate limit (raw.githubusercontent.com
-         * is throttled per-IP but not per-hour like the v3 API). At 5 min
-         * the launcher hits 12 reqs/hour against raw, well below any
-         * realistic ceiling, while still surfacing mandatory rollouts
-         * to long-running launcher sessions in near-real-time.
+         * Meta-only poll cadence for the mandatory-update probe. The meta
+         * endpoint is `update-channel.json` on raw GitHub -- a few hundred
+         * bytes, no API rate limit (raw.githubusercontent.com is throttled
+         * per-IP but not per-hour like the v3 API). At 5 min the launcher
+         * hits 12 reqs/hour against raw, well below any realistic ceiling,
+         * while still surfacing mandatory rollouts to long-running launcher
+         * sessions in near-real-time.
          */
         private const val META_CHECK_INTERVAL_MINUTES = 5L
         private const val MANIFEST_ASSET_NAME  = "release-manifest.json"
@@ -82,7 +79,7 @@ class UpdateService(
     }
 
     /**
-     * Checks availability of updates with caching.
+     * Checks availability of updates.
      *
      * The selected channel (stable vs prerelease) and whether mandatory updates
      * are honoured both come from [ISettingsService] -- see the experimental
@@ -90,13 +87,8 @@ class UpdateService(
      * gates both children: if it's off, both sub-toggles are forced to false
      * regardless of their stored values.
      */
-    suspend fun checkForUpdate(force: Boolean = false): LauncherUpdate? = withContext(Dispatchers.IO) {
+    suspend fun checkForUpdate(): LauncherUpdate? = withContext(Dispatchers.IO) {
         try {
-            if (!force && !shouldCheck()) {
-                logger.debug("Update check skipped (cooldown)")
-                return@withContext null
-            }
-
             val settings = settingsService.getSettings()
             val channel = settings.updateChannel
             // Beta and up (including the source-build channels) track the newest
@@ -114,7 +106,6 @@ class UpdateService(
 
             val release = fetchLatestRelease(includePrereleases = includePrereleases)
                 ?: return@withContext null
-            updateLastCheck()
 
             val currentVersion = Branding.VERSION.removePrefix("v")
             val latestVersion = release.tagName.removePrefix("v")
@@ -419,25 +410,6 @@ class UpdateService(
 
     // ========== INTERNAL (visible for testing) ==========
 
-    internal fun shouldCheck(): Boolean {
-        if (!Files.exists(lastCheckFile)) return true
-
-        return runCatching {
-            val lastCheck = Files.readString(lastCheckFile).toLongOrNull() ?: return true
-            val hoursSince = ChronoUnit.HOURS.between(
-                Instant.ofEpochMilli(lastCheck),
-                Instant.now()
-            )
-            hoursSince >= CHECK_INTERVAL_HOURS
-        }.getOrDefault(true)
-    }
-
-    private fun updateLastCheck() {
-        runCatching {
-            Files.writeString(lastCheckFile, System.currentTimeMillis().toString())
-        }
-    }
-
     internal fun shouldCheckMeta(): Boolean {
         if (!Files.exists(lastMetaCheckFile)) return true
 
@@ -463,9 +435,9 @@ class UpdateService(
      * Polls only `meta/update-channel.json` (a few hundred bytes on raw
      * GitHub, no v3 API rate limit) at the [META_CHECK_INTERVAL_MINUTES]
      * cadence. When the published `mandatory_min_version` rises above the
-     * installed version it bypasses [shouldCheck]'s 12 h cooldown to fetch
-     * the actual release immediately -- by definition, a mandatory rollout
-     * needs to reach the user *now*, not on the next routine check.
+     * installed version it fetches the actual release immediately -- by
+     * definition, a mandatory rollout needs to reach the user *now*, not on
+     * the next routine check.
      *
      * Returns null when:
      *   - the meta cooldown hasn't elapsed yet,
@@ -503,8 +475,7 @@ class UpdateService(
                 "Mandatory floor {} > installed {}; forcing release check (reason: {})",
                 floor, current, meta.reason ?: "<none>"
             )
-            // force=true skips the 12h release-check cooldown
-            checkForUpdate(force = true)?.takeIf { it.isMandatory }
+            checkForUpdate()?.takeIf { it.isMandatory }
         } catch (e: Exception) {
             logger.warn("Mandatory poll failed", e)
             null

@@ -89,7 +89,7 @@ fun AboutSurface(onBack: () -> Unit) {
             updateState.value = UpdateCheckState.Checking
             scope.launch {
                 updateState.value = try {
-                    val update = updateService.checkForUpdate(force = true)
+                    val update = updateService.checkForUpdate()
                     if (update != null) UpdateCheckState.Available(update)
                     else UpdateCheckState.UpToDate
                 } catch (e: Exception) {
@@ -115,7 +115,14 @@ fun AboutSurface(onBack: () -> Unit) {
     // sits comfortably under GitHub's ~60/hour unauthenticated API ceiling.
     LaunchedEffect(Unit) {
         while (true) {
-            if (updateState.value !is UpdateCheckState.Available) triggerUpdateCheck()
+            // Skip when a result is already shown (Available) or a check is
+            // still running (Checking) -- a tick that lands on an in-flight or
+            // manual check would otherwise launch a second concurrent
+            // checkForUpdate that races to overwrite updateState.
+            val state = updateState.value
+            if (state !is UpdateCheckState.Available && state !is UpdateCheckState.Checking) {
+                triggerUpdateCheck()
+            }
             delay(5 * 60_000L)
         }
     }
