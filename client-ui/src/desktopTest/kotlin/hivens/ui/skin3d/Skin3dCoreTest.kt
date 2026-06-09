@@ -119,7 +119,30 @@ class Skin3dCoreTest {
     // ── slim detection ───────────────────────────────────────────────────────
 
     @Test fun `guessModel reads an opaque arm column as Classic, transparent as Slim`() {
-        assertEquals(SkinModel.Classic, guessModel { _, _ -> 255 })
-        assertEquals(SkinModel.Slim, guessModel { _, _ -> 0 })
+        assertEquals(SkinModel.Classic, guessModel(64, 64) { _, _ -> 255 })
+        assertEquals(SkinModel.Slim, guessModel(64, 64) { _, _ -> 0 })
+    }
+
+    @Test fun `guessModel forces Classic for legacy 64x32`() {
+        // The legacy layout predates the Slim model; whatever the sniff
+        // region's texels carry there, it must never read as Slim.
+        assertEquals(SkinModel.Classic, guessModel(64, 32) { _, _ -> 0 })
+    }
+
+    @Test fun `guessModel never samples an undersized texture out of bounds`() {
+        // A valid-but-undersized PNG (e.g. a 48x48 upload from the skin
+        // endpoint) must default to Classic without touching texels past the
+        // edge -- the accessor trips on any out-of-bounds read.
+        val model = guessModel(48, 48) { x, y ->
+            check(x in 0 until 48 && y in 0 until 48) { "sampled ($x,$y) outside 48x48" }
+            0
+        }
+        assertEquals(SkinModel.Classic, model)
+    }
+
+    @Test fun `guessModel scales the sniff column for HD skins`() {
+        // 128x128 (k = 2): the 4th arm column sits at raw x = 108..111.
+        assertEquals(SkinModel.Classic, guessModel(128, 128) { x, _ -> if (x >= 108) 255 else 0 })
+        assertEquals(SkinModel.Slim,    guessModel(128, 128) { x, _ -> if (x >= 108) 0 else 255 })
     }
 }

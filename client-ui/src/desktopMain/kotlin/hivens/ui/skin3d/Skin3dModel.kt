@@ -129,17 +129,22 @@ fun buildFigure(model: SkinModel = SkinModel.Classic, legacy: Boolean = false): 
 /**
  * Best-effort Classic/Slim guess from the raw skin's alpha. A Slim (3-wide)
  * skin leaves the 4th arm column transparent; if those texels are opaque the
- * skin is Classic. [alphaAt] returns 0..255 for a 1x texel coordinate (the
- * caller scales by the HD factor). Defaults to Classic when ambiguous -- the
- * same default the old 2D renderer used (armW = 4).
+ * skin is Classic. [alphaAt] returns 0..255 for a raw texel coordinate and is
+ * never called outside [width] x [height]. Defaults to Classic when the sniff
+ * region does not exist: legacy 64x32 predates the Slim model, and a valid
+ * but undersized texture carries no 4th arm column to read -- the same
+ * default the old 2D renderer used (armW = 4).
  */
-fun guessModel(alphaAt: (x: Int, y: Int) -> Int): SkinModel {
+fun guessModel(width: Int, height: Int, alphaAt: (x: Int, y: Int) -> Int): SkinModel {
+    if (height <= width / 2) return SkinModel.Classic
+    val k = (width / 64).coerceAtLeast(1)
+    if (55 * k >= width || 31 * k >= height) return SkinModel.Classic
     // The right arm's 4th column on a 64x64 skin spans texels x=54..55 across
     // the front/side faces at y=20..31. If any are opaque, it's Classic.
     var opaque = 0
     for (y in 20..31) {
-        if (alphaAt(54, y) > 16) opaque++
-        if (alphaAt(55, y) > 16) opaque++
+        if (alphaAt(54 * k, y * k) > 16) opaque++
+        if (alphaAt(55 * k, y * k) > 16) opaque++
     }
     return if (opaque > 0) SkinModel.Classic else SkinModel.Slim
 }
