@@ -68,7 +68,7 @@ object Protocol {
      */
     const val DEFAULT_LAUNCHER_HASH = "0714d6ea824454d0af31a02373eef703"
 
-    /** AES key derivation salt for session-token round-trip ([hivens.core.api.AuthService]). */
+    /** AES key derivation salt for the SmartyCraft session-token round-trip. */
     const val AUTH_SALT = "sdgsdfhgosd8dfrg"
 
     /** Cargo-cult field in auth payload -- server requires presence, content ignored. */

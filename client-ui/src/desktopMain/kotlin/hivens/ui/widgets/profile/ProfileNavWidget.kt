@@ -35,6 +35,11 @@ fun ProfileNavWidget(instance: WidgetInstance) {
     val s = LocalStrings.current
     val style = LocalStyle.current
     val current by ctx.selectedCategory
+    val signedIn = ctx.session != null
+
+    // Signed out, only Sign in is meaningful (Account / Skin need an identity).
+    // Signed in, Sign in re-labels to Security (credential management, no form).
+    val categories = if (signedIn) ProfileCategory.entries else listOf(ProfileCategory.SignIn)
 
     Column(
         modifier = Modifier
@@ -42,8 +47,10 @@ fun ProfileNavWidget(instance: WidgetInstance) {
             .padding(end = 12.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        ProfileCategory.entries.forEach { category ->
+        categories.forEach { category ->
             val isSelected = category == current
+            val label = if (category == ProfileCategory.SignIn && signedIn) s.profileCategorySecurity
+                        else category.label(s)
             PuppetClick("profile.category.${category.name}") {
                 ctx.selectedCategory.value = category
             }
@@ -61,7 +68,7 @@ fun ProfileNavWidget(instance: WidgetInstance) {
             ) {
                 NavItemRowContent(
                     icon = category.icon,
-                    label = category.label(s),
+                    label = label,
                     isSelected = isSelected,
                 )
             }

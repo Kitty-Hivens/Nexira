@@ -86,7 +86,6 @@ fun NavEntry(instance: WidgetInstance) {
             icon    = Icons.Default.Person,
             phase   = 1.1f,
             active  = screen is Screen.Profile,
-            enabled = ctx.isAuthenticated,
             onClick = { ctx.onScreenChange(Screen.Profile) },
         )
         NavTarget.Settings -> NavSlot(

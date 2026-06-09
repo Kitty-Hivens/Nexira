@@ -22,7 +22,6 @@ import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import hivens.ui.debug.SkiaTracker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -242,11 +241,7 @@ private fun decodeBackground(file: File, onPreview: (DecodedBg) -> Unit = {}): D
         // the preview emit for multi-frame formats so the user sees
         // the image immediately instead of grey while the remaining
         // N-1 frames decode.
-        val frame0 = decodeFrame(
-            codec, info,
-            frame    = 0,
-            trackTag = if (frameCount > 1) "BG.animated" else "BG.static",
-        )
+        val frame0 = decodeFrame(codec, info, frame = 0)
         val preview = DecodedBg(
             frames          = listOf(frame0),
             durationsMs     = listOf(0),
@@ -272,7 +267,7 @@ private fun decodeBackground(file: File, onPreview: (DecodedBg) -> Unit = {}): D
         val durations = ArrayList<Int>(frameCount).also { it.add(codec.framesInfo[0].duration.coerceAtLeast(1)) }
         val infos     = codec.framesInfo
         for (i in 1 until frameCount) {
-            frames.add(decodeFrame(codec, info, frame = i, trackTag = "BG.animated"))
+            frames.add(decodeFrame(codec, info, frame = i))
             // delay() of 0 spins -- guarantee positive duration per frame.
             durations.add(infos[i].duration.coerceAtLeast(1))
         }
@@ -286,11 +281,11 @@ private fun decodeBackground(file: File, onPreview: (DecodedBg) -> Unit = {}): D
     }
 }
 
-private fun decodeFrame(codec: Codec, info: ImageInfo, frame: Int, trackTag: String): ImageBitmap {
+private fun decodeFrame(codec: Codec, info: ImageInfo, frame: Int): ImageBitmap {
     val bmp = org.jetbrains.skia.Bitmap().apply { allocPixels(info) }
     return bmp.use { bmp ->
         codec.readPixels(bmp, frame)
         val img = org.jetbrains.skia.Image.makeFromBitmap(bmp)
-        img.use { it.toComposeImageBitmap().also { ib -> SkiaTracker.track(trackTag, ib) } }
+        img.use { it.toComposeImageBitmap() }
     }
 }

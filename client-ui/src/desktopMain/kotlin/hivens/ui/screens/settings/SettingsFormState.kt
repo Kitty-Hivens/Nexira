@@ -33,7 +33,6 @@ internal class SettingsFormState(initial: SettingsData) {
     var isOfflineMode          by mutableStateOf(initial.isOfflineMode)
     var experimentalEnabled    by mutableStateOf(initial.experimentalFeaturesEnabled)
     var mandatoryUpdates       by mutableStateOf(initial.mandatoryUpdatesEnabled)
-    var prereleaseChannel      by mutableStateOf(initial.prereleaseChannelEnabled)
     var autoSyncAllPacks       by mutableStateOf(initial.autoSyncAllPacks)
     var jvmBuilderEnabled      by mutableStateOf(initial.jvmBuilderEnabled)
     var adaptiveMemoryEnabled  by mutableStateOf(initial.adaptiveMemoryEnabled)
@@ -63,7 +62,6 @@ internal class SettingsFormState(initial: SettingsData) {
             isOfflineMode               = isOfflineMode,
             experimentalFeaturesEnabled = experimentalEnabled,
             mandatoryUpdatesEnabled     = mandatoryUpdates,
-            prereleaseChannelEnabled    = prereleaseChannel,
             autoSyncAllPacks            = autoSyncAllPacks,
             jvmBuilderEnabled           = jvmBuilderEnabled,
             adaptiveMemoryEnabled       = adaptiveMemoryEnabled,

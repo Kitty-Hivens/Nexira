@@ -27,9 +27,7 @@ jobs:
         with:
           python-version: "3.12"
 
-      # warn-only on PRs (does not block merge) -- catches NEW additions
-      # of banned patterns without forcing a full backlog cleanup before
-      # the first scan lands. Switch to --strict once existing baseline
-      # hits are zeroed via the audit pass.
+      # Strict: the scan fails on any banned pattern. The baseline is clean,
+      # so this only ever fires on a newly introduced one.
       - name: Scan for Style-D anti-patterns
-        run: python3 scripts/check-comments.py
+        run: python3 scripts/check-comments.py --strict

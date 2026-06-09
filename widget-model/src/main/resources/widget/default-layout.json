@@ -71,11 +71,6 @@
       },
       "appshell.rightrail": {
         "slots": {
-          "auth": {
-            "widgets": [
-              { "kind": "appshell.rightrail.authpanel", "instance_id": "appshell-rightrail-authpanel-default" }
-            ]
-          },
           "news": {
             "widgets": [
               { "kind": "appshell.rightrail.compactnews", "instance_id": "appshell-rightrail-compactnews-default" }
@@ -202,6 +197,11 @@
           "account": {
             "widgets": [
               { "kind": "profile.account.section", "instance_id": "profile-account-section-default" }
+            ]
+          },
+          "signin": {
+            "widgets": [
+              { "kind": "profile.signin", "instance_id": "profile-signin-default" }
             ]
           }
         }

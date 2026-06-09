@@ -1,5 +1,7 @@
-package hivens.core.api
+package hivens.auth.smartycraft
 
+import hivens.core.api.AuthException
+import hivens.core.api.TwoFactorRequiredException
 import hivens.core.api.protocol.LoginResponse
 import hivens.core.api.protocol.StatusOnlyResponse
 import hivens.core.data.AuthStatus
@@ -13,17 +15,17 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
- * Post-Conduit-Phase-1 AuthService tests use [FakeServerProtocol] instead of
+ * Post-Conduit-Phase-1 SmartyCraftAuthProvider tests use [FakeServerProtocol] instead of
  * MockEngine -- same coverage of the response->[hivens.core.data.SessionData]
  * mapping, status enum routing, and edge cases like AES token decryption,
  * but no Ktor wire-format ceremony.
  *
  * Network-level failures (HTTP 500, malformed JSON, etc.) now belong in
  * [hivens.launcher.protocol.SmartycraftV1ProtocolTest] -- that's where the
- * actual HTTP client lives. Here we test what AuthService DOES with a
+ * actual HTTP client lives. Here we test what SmartyCraftAuthProvider DOES with a
  * protocol response, not how the protocol assembles HTTP requests.
  */
-class AuthServiceTest {
+class SmartyCraftAuthProviderTest {
 
     private fun ok(
         playername: String = "TestPlayer",
@@ -46,7 +48,7 @@ class AuthServiceTest {
 
     @Test
     fun `login returns SessionData on OK response`() = runTest {
-        val session = AuthService(protocol(ok())).login("user", "pass", "Industrial")
+        val session = SmartyCraftAuthProvider(protocol(ok())).login("user", "pass", "Industrial")
         assertEquals("TestPlayer", session.playerName)
         assertEquals("550e8400e29b41d4a716446655440000", session.uuid)
         assertEquals(AuthStatus.OK, session.status)
@@ -56,7 +58,7 @@ class AuthServiceTest {
     @Test
     fun `login throws AuthException on PASSWORD status`() = runTest {
         val ex = assertFailsWith<AuthException> {
-            AuthService(protocol(LoginResponse(status = "PASSWORD")))
+            SmartyCraftAuthProvider(protocol(LoginResponse(status = "PASSWORD")))
                 .login("user", "wrongpass", "Industrial")
         }
         assertEquals(AuthStatus.PASSWORD, ex.status)
@@ -66,7 +68,7 @@ class AuthServiceTest {
     fun `login throws AuthException with BAD_LOGIN status when server returns LOGIN`() = runTest {
         // Wire status "LOGIN" maps to UX status BAD_LOGIN ("user not found")
         val ex = assertFailsWith<AuthException> {
-            AuthService(protocol(LoginResponse(status = "LOGIN")))
+            SmartyCraftAuthProvider(protocol(LoginResponse(status = "LOGIN")))
                 .login("unknown", "pass", "Industrial")
         }
         assertEquals(AuthStatus.BAD_LOGIN, ex.status)
@@ -78,7 +80,7 @@ class AuthServiceTest {
         // shows minimal status-only example but real responses carry uid
         // so the client can sign the twoauth follow-up).
         val ex = assertFailsWith<TwoFactorRequiredException> {
-            AuthService(protocol(LoginResponse(status = "TWOAUTH", uid = "abc-uid-128")))
+            SmartyCraftAuthProvider(protocol(LoginResponse(status = "TWOAUTH", uid = "abc-uid-128")))
                 .login("2fa_user", "pass", "Industrial")
         }
         assertEquals(AuthStatus.NEED_2FA, ex.status)
@@ -94,7 +96,7 @@ class AuthServiceTest {
         // UI can decide to retry the full login rather than show a 2FA prompt
         // that can never succeed.
         val ex = assertFailsWith<TwoFactorRequiredException> {
-            AuthService(protocol(LoginResponse(status = "TWOAUTH")))
+            SmartyCraftAuthProvider(protocol(LoginResponse(status = "TWOAUTH")))
                 .login("2fa_user", "pass", "Industrial")
         }
         assertEquals(null, ex.uid)
@@ -122,7 +124,7 @@ class AuthServiceTest {
             }
             twoauthResult = { _, _, _ -> StatusOnlyResponse(status = "OK") }
         }
-        val service = AuthService(proto)
+        val service = SmartyCraftAuthProvider(proto)
         val ex = assertFailsWith<TwoFactorRequiredException> {
             service.login("user", "pass", "Industrial")
         }
@@ -160,7 +162,7 @@ class AuthServiceTest {
             }
             twoauthResult = { _, _, _ -> StatusOnlyResponse(status = "OK") }
         }
-        val service = AuthService(proto)
+        val service = SmartyCraftAuthProvider(proto)
         val ex = assertFailsWith<TwoFactorRequiredException> {
             service.login("user", "pass", "Industrial")
         }
@@ -189,7 +191,7 @@ class AuthServiceTest {
             }
             twoauthResult = { _, _, _ -> StatusOnlyResponse(status = "OK") }
         }
-        val service = AuthService(proto)
+        val service = SmartyCraftAuthProvider(proto)
         val ex = assertFailsWith<TwoFactorRequiredException> {
             service.login("user", "pass", "Industrial")
         }
@@ -230,7 +232,7 @@ class AuthServiceTest {
             loginResult = { responses.removeAt(0) }
             twoauthResult = { _, _, _ -> StatusOnlyResponse(status = "OK") }
         }
-        val service = AuthService(proto)
+        val service = SmartyCraftAuthProvider(proto)
 
         // 1) First TWOAUTH -- uid is "first-uid". User abandons the dialog.
         val first = assertFailsWith<TwoFactorRequiredException> {
@@ -273,7 +275,7 @@ class AuthServiceTest {
             loginResult = { LoginResponse(status = "TWOAUTH", uid = "abc-uid-128") }
             twoauthResult = { _, _, _ -> StatusOnlyResponse(status = "OK") }
         }
-        val service = AuthService(proto)
+        val service = SmartyCraftAuthProvider(proto)
         val firstEx = assertFailsWith<TwoFactorRequiredException> {
             service.login("user", "pass", "Industrial")
         }
@@ -295,7 +297,7 @@ class AuthServiceTest {
             twoauthResult = { _, _, _ -> StatusOnlyResponse(status = "CODE") }
         }
         val ex = assertFailsWith<AuthException> {
-            AuthService(proto).completeTwoFactor("user", "pass", "Industrial",
+            SmartyCraftAuthProvider(proto).completeTwoFactor("user", "pass", "Industrial",
                 uid = "abc-uid-128", code = "000000")
         }
         assertEquals(AuthStatus.WRONG_CODE, ex.status)
@@ -308,7 +310,7 @@ class AuthServiceTest {
             twoauthResult = { _, _, _ -> StatusOnlyResponse(status = "LOGIN") }
         }
         val ex = assertFailsWith<AuthException> {
-            AuthService(proto).completeTwoFactor("user", "pass", "Industrial",
+            SmartyCraftAuthProvider(proto).completeTwoFactor("user", "pass", "Industrial",
                 uid = "abc-uid-128", code = "123456")
         }
         assertEquals(AuthStatus.TWO_FACTOR_EXPIRED, ex.status)
@@ -326,7 +328,7 @@ class AuthServiceTest {
             twoauthResult = { _, _, _ -> StatusOnlyResponse(status = "ERROR") }
         }
         val ex = assertFailsWith<AuthException> {
-            AuthService(proto).completeTwoFactor("user", "pass", "Industrial",
+            SmartyCraftAuthProvider(proto).completeTwoFactor("user", "pass", "Industrial",
                 uid = "abc-uid-128", code = "123456")
         }
         assertEquals(AuthStatus.TWO_FACTOR_EXPIRED, ex.status)
@@ -340,7 +342,7 @@ class AuthServiceTest {
         // re-login instead of showing a 2FA dialog that can never succeed.
         val proto = FakeServerProtocol()
         val ex = assertFailsWith<AuthException> {
-            AuthService(proto).completeTwoFactor("user", "pass", "Industrial",
+            SmartyCraftAuthProvider(proto).completeTwoFactor("user", "pass", "Industrial",
                 uid = "", code = "123456")
         }
         assertEquals(AuthStatus.TWO_FACTOR_EXPIRED, ex.status)
@@ -350,7 +352,7 @@ class AuthServiceTest {
     @Test
     fun `login throws AuthException on ACTIVE status`() = runTest {
         val ex = assertFailsWith<AuthException> {
-            AuthService(protocol(LoginResponse(status = "ACTIVE")))
+            SmartyCraftAuthProvider(protocol(LoginResponse(status = "ACTIVE")))
                 .login("inactive_user", "pass", "Industrial")
         }
         assertEquals(AuthStatus.ACTIVE, ex.status)
@@ -359,7 +361,7 @@ class AuthServiceTest {
     @Test
     fun `login throws INTERNAL_ERROR for unknown status`() = runTest {
         val ex = assertFailsWith<AuthException> {
-            AuthService(protocol(LoginResponse(status = "BANNED")))
+            SmartyCraftAuthProvider(protocol(LoginResponse(status = "BANNED")))
                 .login("banned_user", "pass", "Industrial")
         }
         // Unknown status -> ProtocolStatus.ERROR -> AuthStatus.INTERNAL_ERROR
@@ -369,7 +371,7 @@ class AuthServiceTest {
     @Test
     fun `login throws INTERNAL_ERROR when OK but uuid is missing`() = runTest {
         val ex = assertFailsWith<AuthException> {
-            AuthService(protocol(ok(uuid = "12345").copy(uuid = null)))
+            SmartyCraftAuthProvider(protocol(ok(uuid = "12345").copy(uuid = null)))
                 .login("user", "pass", "Industrial")
         }
         assertEquals(AuthStatus.INTERNAL_ERROR, ex.status)
@@ -378,7 +380,7 @@ class AuthServiceTest {
     @Test
     fun `login throws INTERNAL_ERROR when OK but playername is missing`() = runTest {
         val ex = assertFailsWith<AuthException> {
-            AuthService(protocol(ok().copy(playername = null)))
+            SmartyCraftAuthProvider(protocol(ok().copy(playername = null)))
                 .login("user", "pass", "Industrial")
         }
         assertEquals(AuthStatus.INTERNAL_ERROR, ex.status)
@@ -390,14 +392,14 @@ class AuthServiceTest {
             loginResult = { throw java.io.IOException("connection reset") }
         }
         val ex = assertFailsWith<AuthException> {
-            AuthService(proto).login("user", "pass", "Industrial")
+            SmartyCraftAuthProvider(proto).login("user", "pass", "Industrial")
         }
         assertEquals(AuthStatus.INTERNAL_ERROR, ex.status)
     }
 
     @Test
     fun `login succeeds when AES token decryption fails (degrades to raw token)`() = runTest {
-        val session = AuthService(protocol(ok(session = "THIS_IS_NOT_VALID_BASE64!!!###")))
+        val session = SmartyCraftAuthProvider(protocol(ok(session = "THIS_IS_NOT_VALID_BASE64!!!###")))
             .login("user", "pass", "Industrial")
         assertEquals("TestPlayer", session.playerName)
         assertNotNull(session.accessToken)
@@ -405,13 +407,13 @@ class AuthServiceTest {
 
     @Test
     fun `login preserves serverId in returned SessionData`() = runTest {
-        val session = AuthService(protocol(ok())).login("user", "pass", "Nevermine")
+        val session = SmartyCraftAuthProvider(protocol(ok())).login("user", "pass", "Nevermine")
         assertEquals("Nevermine", session.serverId)
     }
 
     @Test
     fun `login strips dashes from uuid`() = runTest {
-        val session = AuthService(protocol(ok(uuid = "550e8400-e29b-41d4-a716-446655440000")))
+        val session = SmartyCraftAuthProvider(protocol(ok(uuid = "550e8400-e29b-41d4-a716-446655440000")))
             .login("user", "pass", "Industrial")
         assertFalse(session.uuid.contains("-"))
         assertEquals(32, session.uuid.length)
@@ -420,7 +422,7 @@ class AuthServiceTest {
     @Test
     fun `cache hit on second login with same credentials skips network`() = runTest {
         val proto = protocol(ok())
-        val service = AuthService(proto)
+        val service = SmartyCraftAuthProvider(proto)
         service.login("user", "pass", "Industrial")
         service.login("user", "pass", "Industrial")
         // Second call hit the cache; protocol invoked exactly once.
@@ -430,7 +432,7 @@ class AuthServiceTest {
     @Test
     fun `cache miss when different password -- different cache key`() = runTest {
         val proto = protocol(ok())
-        val service = AuthService(proto)
+        val service = SmartyCraftAuthProvider(proto)
         service.login("user", "pass1", "Industrial")
         service.login("user", "pass2", "Industrial")
         assertEquals(2, proto.loginCalls.size)

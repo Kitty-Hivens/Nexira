@@ -3,7 +3,7 @@ package hivens.launcher.bootstrap
 import hivens.config.Protocol
 import hivens.core.api.AuthException
 import hivens.core.api.TwoFactorRequiredException
-import hivens.core.api.interfaces.IAuthService
+import hivens.auth.AuthProvider
 import hivens.core.data.SessionData
 import hivens.core.data.SettingsData
 import hivens.core.diag.ActionRing
@@ -47,8 +47,8 @@ object AutoLoginCoordinator {
         settings: SettingsData,
         saved: SessionData?,
         lastServerId: String?,
-        authService: IAuthService,
-        insecureAuthService: IAuthService,
+        authService: AuthProvider,
+        insecureAuthService: AuthProvider,
         protocolConfig: ServerProtocolConfig,
     ): SessionData? {
         if (settings.isOfflineMode) {
@@ -114,7 +114,7 @@ object AutoLoginCoordinator {
         saved: SessionData,
         cachedPass: String,
         server: String,
-        insecureAuthService: IAuthService,
+        insecureAuthService: AuthProvider,
         protocolConfig: ServerProtocolConfig,
     ): SessionData? {
         val until = Instant.now().plus(30, ChronoUnit.DAYS)

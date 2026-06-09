@@ -4,9 +4,9 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * UX-layer auth status. Derived from wire `ProtocolStatus` via
- * `AuthService.mapStatus`; unknown wire values collapse into
- * [INTERNAL_ERROR] (mirrors upstream `bf.java`; see
+ * UX-layer auth status. Derived from wire `ProtocolStatus` by the
+ * SmartyCraft auth provider's status mapping; unknown wire values collapse
+ * into [INTERNAL_ERROR] (mirrors upstream `bf.java`; see
  * `docs/dev/smartycraft-v1-protocol.md`).
  *
  * The server also emits `LOGIN` on the wire which is not modeled here;

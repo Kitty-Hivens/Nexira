@@ -8,18 +8,21 @@ import hivens.core.data.SessionData
 
 // Surface-scoped state the profile widgets share. nav writes
 // `selectedCategory.value` on tap; the surface composable reads it
-// to pick which content slot to render. session is read by skin /
-// account widgets for player name + balance + token-sniff.
-// SkinRepository + SkinManager live in Koin and the skin widget
-// pulls them via koinInject directly -- kept out of the context to
-// match the precedent set by HomeNewContext / LibraryContext, where
-// services live per-widget and the context only carries navigation
-// + per-surface state. Plain class, not data class -- holds a
-// MutableState reference, so generated equals / hashCode would lie
-// about value semantics.
+// to pick which content slot to render. session is nullable: null
+// means signed out, where only the Sign-in category renders -- the
+// skin / account widgets are never mounted without a session. onLogin
+// / onLogout thread through to the Sign-in widget so the login form
+// (signed out) and logout (signed in) live inside the surface.
+// SkinRepository + SkinManager live in Koin and the skin widget pulls
+// them via koinInject directly -- kept out of the context to match the
+// precedent set by HomeNewContext / LibraryContext. Plain class, not
+// data class -- holds a MutableState reference, so generated equals /
+// hashCode would lie about value semantics.
 class ProfileContext(
-    val session: SessionData,
+    val session: SessionData?,
     val selectedCategory: MutableState<ProfileCategory>,
+    val onLogin: (SessionData) -> Unit,
+    val onLogout: () -> Unit,
 )
 
 val LocalProfileContext: ProvidableCompositionLocal<ProfileContext> =
@@ -29,5 +32,7 @@ val LocalProfileContext: ProvidableCompositionLocal<ProfileContext> =
 
 internal val STUB_PROFILE: ProfileContext = ProfileContext(
     session          = SessionData(),
-    selectedCategory = mutableStateOf(ProfileCategory.Skin),
+    selectedCategory = mutableStateOf(ProfileCategory.Account),
+    onLogin          = {},
+    onLogout         = {},
 )

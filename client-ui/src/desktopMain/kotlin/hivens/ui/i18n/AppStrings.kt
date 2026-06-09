@@ -61,8 +61,6 @@ interface AppStrings {
     val profileTopUp: String
     val profileUploadSkin: String
     val profileUploadSkinLoading: String
-    val profileSkinFront: String
-    val profileSkinBack: String
     val profileSkinLoading: String
     val profileRefresh: String
     /** Shown in green after a successful skin upload. */
@@ -143,6 +141,26 @@ interface AppStrings {
     val updateScheduleFailed: String
     fun updateVersion(version: String): String
     val updateDetails: String
+
+    // --- Update manager ---
+    val updateManagerTitle: String
+    val updateManagerChannel: String
+    val updateChannelRelease: String
+    val updateChannelBeta: String
+    val updateChannelAlpha: String
+    val updateChannelDev: String
+    val updateChannelGit: String
+    val updateManagerCurrentTag: String
+    val updateManagerInstall: String
+    val updateManagerRollback: String
+    val updateManagerBuild: String
+    val updateManagerInstallDesktop: String
+    val updateManagerDesktopDone: String
+    val updateManagerEmpty: String
+    val updateManagerNeedsExperimental: String
+    val updateManagerBuilding: String
+    val updateManagerOpenHint: String
+    fun updateManagerNeedsTools(tools: String): String
 
     // --- Console ---
     val consoleTitle: String
@@ -288,8 +306,6 @@ interface AppStrings {
     val aboutCurrentVersion: String
     val aboutCheckUpdates: String
     val aboutChecking: String
-    val aboutUpToDate: String
-    val aboutCheckAgain: String
     fun aboutUpdateAvailable(version: String): String
     val aboutCriticalUpdate: String
     val aboutSectionSystem: String
@@ -329,8 +345,6 @@ interface AppStrings {
     val settingsExperimentalMasterDesc: String
     val settingsMandatoryUpdates: String
     val settingsMandatoryUpdatesDesc: String
-    val settingsPrereleaseChannel: String
-    val settingsPrereleaseChannelDesc: String
     val settingsAutoSyncAllPacks: String
     val settingsAutoSyncAllPacksDesc: String
     val settingsJvmBuilder: String
@@ -568,8 +582,11 @@ interface AppStrings {
     val settingsCategoryDiagnostics: String
 
     // --- Profile two-column nav labels ---
-    val profileCategorySkin: String
     val profileCategoryAccount: String
+    val profileCategorySignIn: String
+    val profileCategorySecurity: String
+    val profileForgetSavedSignIn: String
+    val profileSecurityHint: String
 
     // --- Background loop mode ---
     val backgroundLoopMode: String

@@ -1,11 +1,13 @@
 package hivens.launcher.update
 
 import hivens.core.api.interfaces.ISettingsService
+import hivens.core.data.ReleaseChannel
 import hivens.core.data.SettingsData
 import hivens.test.MockResponse
 import hivens.test.buildMockClient
 import io.ktor.http.*
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import java.nio.file.Files
 import kotlin.test.*
@@ -32,12 +34,12 @@ class UpdateServiceTest {
     private fun fakeSettings(
         experimentalFeaturesEnabled: Boolean = true,
         mandatoryUpdatesEnabled: Boolean = true,
-        prereleaseChannelEnabled: Boolean = false  // default OFF in tests so existing /releases/latest mocks work
+        updateChannel: ReleaseChannel = ReleaseChannel.Release  // Release so existing /releases/latest mocks work
     ): ISettingsService = FakeSettingsService(
         SettingsData(
             experimentalFeaturesEnabled = experimentalFeaturesEnabled,
             mandatoryUpdatesEnabled = mandatoryUpdatesEnabled,
-            prereleaseChannelEnabled = prereleaseChannelEnabled
+            updateChannel = updateChannel
         )
     )
 
@@ -56,8 +58,17 @@ class UpdateServiceTest {
         } else {
             listOf(MockResponse(urlContains = "release-manifest", body = releaseManifestJson())) + responses
         }
+        // Auto-append a 404 for update-channel.json unless staged: checkForUpdate
+        // probes the channel meta on every run, and an unmatched request falls
+        // back to the queue's LAST entry -- usually a releases list that only
+        // passes for null because UpdateChannelMeta fails to decode a JSON array.
+        val withMeta = if (withManifest.any { it.urlContains?.contains("update-channel") == true }) {
+            withManifest
+        } else {
+            withManifest + MockResponse(urlContains = "update-channel.json", body = "Not Found", status = HttpStatusCode.NotFound)
+        }
         return UpdateService(
-            clientProvider = buildMockClient(*withManifest.toTypedArray()),
+            clientProvider = buildMockClient(*withMeta.toTypedArray()),
             json = json,
             dataDirectory = tempDir,
             settingsService = settings
@@ -77,7 +88,11 @@ class UpdateServiceTest {
                 // than "releases/latest" and must win the match.
                 MockResponse(urlContains = "release-manifest", body = releaseManifestJson()),
                 MockResponse(urlContains = "releases/latest",  body = body,      status = status),
-                MockResponse(urlContains = "releases",         body = "[$body]", status = status)
+                MockResponse(urlContains = "releases",         body = "[$body]", status = status),
+                // checkForUpdate always probes the channel meta; without this it
+                // falls back to the "[$body]" entry above and relies on
+                // UpdateChannelMeta failing to decode it.
+                MockResponse(urlContains = "update-channel.json", body = "Not Found", status = HttpStatusCode.NotFound)
             ),
             json = json,
             dataDirectory = tempDir,
@@ -538,7 +553,7 @@ class UpdateServiceTest {
     @Test
     fun `checkForUpdate returns LauncherUpdate when newer version exists`() = runTest {
         val svc = createService(githubReleaseJson(tagName = "v99.0.0"))
-        val update = svc.checkForUpdate(force = true)
+        val update = svc.checkForUpdate()
 
         assertNotNull(update, "Should detect v99.0.0 as an update")
         assertEquals("v99.0.0", update.version)
@@ -548,7 +563,7 @@ class UpdateServiceTest {
     @Test
     fun `checkForUpdate returns null when current version is up to date`() = runTest {
         val svc = createService(githubReleaseJson(tagName = "v0.0.0"))
-        val update = svc.checkForUpdate(force = true)
+        val update = svc.checkForUpdate()
 
         assertNull(update, "Should not offer downgrade")
     }
@@ -558,7 +573,7 @@ class UpdateServiceTest {
         // Use the actual client version from config
         val currentVersion = hivens.config.Branding.VERSION.removePrefix("v")
         val svc = createService(githubReleaseJson(tagName = "v$currentVersion"))
-        val update = svc.checkForUpdate(force = true)
+        val update = svc.checkForUpdate()
 
         assertNull(update, "Same version should not trigger update")
     }
@@ -571,7 +586,7 @@ class UpdateServiceTest {
                 name = "[CRITICAL] Aura Launcher v99.0.0"
             )
         )
-        val update = svc.checkForUpdate(force = true)
+        val update = svc.checkForUpdate()
 
         assertNotNull(update)
         assertTrue(update.isCritical, "Should flag as critical")
@@ -585,7 +600,7 @@ class UpdateServiceTest {
                 body = "This update contains CRITICAL security patches."
             )
         )
-        val update = svc.checkForUpdate(force = true)
+        val update = svc.checkForUpdate()
 
         assertNotNull(update)
         assertTrue(update.isCritical)
@@ -594,14 +609,14 @@ class UpdateServiceTest {
     @Test
     fun `checkForUpdate returns null on HTTP error`() = runTest {
         val svc = createService(body = "Rate limited", status = HttpStatusCode.Forbidden)
-        val update = svc.checkForUpdate(force = true)
+        val update = svc.checkForUpdate()
         assertNull(update)
     }
 
     @Test
     fun `checkForUpdate returns null on malformed JSON`() = runTest {
         val svc = createService(body = "not json {{{")
-        val update = svc.checkForUpdate(force = true)
+        val update = svc.checkForUpdate()
         assertNull(update)
     }
 
@@ -615,7 +630,7 @@ class UpdateServiceTest {
                 )
             )
         )
-        val update = svc.checkForUpdate(force = true)
+        val update = svc.checkForUpdate()
         assertNull(update, "No matching installer asset should return null")
     }
 
@@ -641,7 +656,7 @@ class UpdateServiceTest {
             MockResponse(urlContains = "releases/latest",  body = release),
             MockResponse(urlContains = "releases",         body = "[$release]"),
         )
-        val update = svc.checkForUpdate(force = true)
+        val update = svc.checkForUpdate()
         assertNull(update, "Auto-update must refuse when manifest is missing -- no silent skip")
     }
 
@@ -661,27 +676,17 @@ class UpdateServiceTest {
             MockResponse(urlContains = "releases/latest",  body = release),
             MockResponse(urlContains = "releases",         body = "[$release]"),
         )
-        val update = svc.checkForUpdate(force = true)
+        val update = svc.checkForUpdate()
         assertNull(update, "Manifest without the selected asset's hash must refuse update")
     }
 
     @Test
     fun `checkForUpdate uses fallback changelog when body is null`() = runTest {
         val svc = createService(githubReleaseJson(tagName = "v99.0.0", body = null))
-        val update = svc.checkForUpdate(force = true)
+        val update = svc.checkForUpdate()
 
         assertNotNull(update)
         assertEquals("No changelog available", update.changelog)
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // shouldCheck (cooldown logic)
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    @Test
-    fun `shouldCheck returns true on fresh install (no last-check file)`() {
-        val svc = createService("{}")
-        assertTrue(svc.shouldCheck())
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -700,7 +705,6 @@ class UpdateServiceTest {
         Files.writeString(updatesDir.resolve("AuraLauncher-1.0.0-Windows-Portable.zip"), "fake")
         Files.writeString(updatesDir.resolve("AuraLauncher-1.0.0.dmg"), "fake")
         Files.writeString(updatesDir.resolve("AuraLauncher-1.0.0-x86_64.AppImage"), "fake")
-        Files.writeString(updatesDir.resolve(".last_check"), "123456")   // should survive
         Files.writeString(updatesDir.resolve("notes.txt"), "keep me")   // should survive
 
         val svc = UpdateService(
@@ -715,7 +719,6 @@ class UpdateServiceTest {
         assertFalse(Files.exists(updatesDir.resolve("AuraLauncher-1.0.0-Windows-Portable.zip")))
         assertFalse(Files.exists(updatesDir.resolve("AuraLauncher-1.0.0.dmg")))
         assertFalse(Files.exists(updatesDir.resolve("AuraLauncher-1.0.0-x86_64.AppImage")))
-        assertTrue(Files.exists(updatesDir.resolve(".last_check")), ".last_check should survive")
         assertTrue(Files.exists(updatesDir.resolve("notes.txt")), "notes.txt should survive")
     }
 
@@ -734,11 +737,35 @@ class UpdateServiceTest {
         val svc = createService(
             MockResponse(urlContains = "releases/latest", body = "BOOM", status = HttpStatusCode.InternalServerError),
             MockResponse(urlContains = "releases",        body = "[$draft,$rc]"),
-            settings = fakeSettings(prereleaseChannelEnabled = true)
+            settings = fakeSettings(updateChannel = ReleaseChannel.Beta)
         )
-        val update = svc.checkForUpdate(force = true)
+        val update = svc.checkForUpdate()
         assertNotNull(update)
         assertEquals("v99.0.0-rc1", update.version)
+    }
+
+    @Test
+    fun `prerelease check builds the changelog from the already-fetched list`() = runTest {
+        // The mock queue consumes a matched entry only when it sits at the
+        // head: the first /releases hit eats the good list, so a second hit
+        // (the old double-fetch) lands on BOOM and produces an empty
+        // changelog. One check must cost one list call -- the unauthenticated
+        // API allows 60 req/hour.
+        val rc = githubReleaseJson(tagName = "v99.0.0-rc1")
+        val svc = createService(
+            MockResponse(urlContains = "releases",            body = "[$rc]"),
+            MockResponse(urlContains = "releases",            body = "BOOM", status = HttpStatusCode.InternalServerError),
+            MockResponse(urlContains = "update-channel.json", body = "Not Found", status = HttpStatusCode.NotFound),
+            MockResponse(urlContains = "release-manifest",    body = releaseManifestJson()),
+            settings = fakeSettings(updateChannel = ReleaseChannel.Beta),
+        )
+        val update = svc.checkForUpdate()
+        assertNotNull(update)
+        assertEquals("v99.0.0-rc1", update.version)
+        assertTrue(
+            "Bug fixes" in update.changelog,
+            "changelog must reuse the single /releases fetch, got: '${update.changelog}'",
+        )
     }
 
     @Test
@@ -748,11 +775,68 @@ class UpdateServiceTest {
         val svc = createService(
             MockResponse(urlContains = "releases/latest", body = githubReleaseJson(tagName = "v99.0.0")),
             MockResponse(urlContains = "releases",        body = "BOOM",            status = HttpStatusCode.InternalServerError),
-            settings = fakeSettings(prereleaseChannelEnabled = false)
+            settings = fakeSettings(updateChannel = ReleaseChannel.Release)
         )
-        val update = svc.checkForUpdate(force = true)
+        val update = svc.checkForUpdate()
         assertNotNull(update)
         assertEquals("v99.0.0", update.version)
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // listReleases / prepareUpdate (update manager)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    private fun releasesListJson(vararg tags: String): String =
+        "[" + tags.joinToString(",") { githubReleaseJson(tagName = it) } + "]"
+
+    @Test
+    fun `listReleases Alpha is cumulative and newest-first`() = runTest {
+        val svc = createService(
+            MockResponse(urlContains = "releases", body = releasesListJson("v3.0.0-alpha1", "v2.5.0-beta2", "v2.0.0")),
+        )
+        val list = svc.listReleases(ReleaseChannel.Alpha)
+        assertEquals(listOf("v3.0.0-alpha1", "v2.5.0-beta2", "v2.0.0"), list.map { it.version })
+        assertEquals(
+            listOf(ReleaseChannel.Alpha, ReleaseChannel.Beta, ReleaseChannel.Release),
+            list.map { it.channel },
+        )
+    }
+
+    @Test
+    fun `listReleases Release shows only stable`() = runTest {
+        val svc = createService(
+            MockResponse(urlContains = "releases", body = releasesListJson("v3.0.0-alpha1", "v2.5.0-beta2", "v2.0.0")),
+        )
+        assertEquals(listOf("v2.0.0"), svc.listReleases(ReleaseChannel.Release).map { it.version })
+    }
+
+    @Test
+    fun `listReleases Beta excludes alpha`() = runTest {
+        val svc = createService(
+            MockResponse(urlContains = "releases", body = releasesListJson("v3.0.0-alpha1", "v2.5.0-beta2", "v2.0.0")),
+        )
+        assertEquals(listOf("v2.5.0-beta2", "v2.0.0"), svc.listReleases(ReleaseChannel.Beta).map { it.version })
+    }
+
+    @Test
+    fun `prepareUpdate resolves an older cached version for rollback`() = runTest {
+        val svc = createService(
+            MockResponse(urlContains = "releases", body = releasesListJson("v3.0.0", "v2.0.0")),
+        )
+        svc.listReleases(ReleaseChannel.Release)  // populate the cache
+        val update = svc.prepareUpdate("v2.0.0")
+        assertNotNull(update, "a cached version with an OS asset + manifest must resolve")
+        assertEquals("v2.0.0", update.version)
+        assertTrue(update.checksum.isNotBlank())
+    }
+
+    @Test
+    fun `prepareUpdate returns null for an unknown version`() = runTest {
+        val svc = createService(
+            MockResponse(urlContains = "releases", body = releasesListJson("v2.0.0")),
+        )
+        svc.listReleases(ReleaseChannel.Release)
+        assertNull(svc.prepareUpdate("v9.9.9"))
     }
 
     @Test
@@ -767,7 +851,7 @@ class UpdateServiceTest {
             MockResponse(urlContains = "update-channel.json", body = channelMeta),
             settings = fakeSettings(experimentalFeaturesEnabled = false)
         )
-        val update = svc.checkForUpdate(force = true)
+        val update = svc.checkForUpdate()
         assertNotNull(update)
         assertFalse(update.isMandatory, "Master off must force mandatory off even when floor > current")
     }
@@ -785,7 +869,7 @@ class UpdateServiceTest {
             MockResponse(urlContains = "update-channel.json", body = channelMeta),
             settings = fakeSettings()  // mandatory ON, prereleases OFF (default)
         )
-        val update = svc.checkForUpdate(force = true)
+        val update = svc.checkForUpdate()
         assertNotNull(update)
         assertTrue(update.isMandatory, "Floor 999.0.0 > installed should mandate the update")
         assertEquals("upstream protocol broke", update.mandatoryReason)
@@ -801,7 +885,7 @@ class UpdateServiceTest {
             MockResponse(urlContains = "update-channel.json", body = channelMeta),
             settings = fakeSettings()
         )
-        val update = svc.checkForUpdate(force = true)
+        val update = svc.checkForUpdate()
         assertNotNull(update)
         assertFalse(update.isMandatory)
         assertNull(update.mandatoryReason)
@@ -816,7 +900,7 @@ class UpdateServiceTest {
             MockResponse(urlContains = "update-channel.json", body = "Not Found", status = HttpStatusCode.NotFound),
             settings = fakeSettings()
         )
-        val update = svc.checkForUpdate(force = true)
+        val update = svc.checkForUpdate()
         assertNotNull(update)
         assertFalse(update.isMandatory, "Missing channel meta must not block startup")
     }
@@ -830,7 +914,7 @@ class UpdateServiceTest {
             MockResponse(urlContains = "update-channel.json", body = channelMeta),
             settings = fakeSettings(mandatoryUpdatesEnabled = false)
         )
-        val update = svc.checkForUpdate(force = true)
+        val update = svc.checkForUpdate()
         assertNotNull(update)
         assertFalse(update.isMandatory)
     }
@@ -909,8 +993,39 @@ class UpdateServiceTest {
             MockResponse(urlContains = "update-channel.json", body = channelMeta),
             settings = fakeSettings()
         )
-        val update = svc.checkForUpdate(force = true)
+        val update = svc.checkForUpdate()
         assertNotNull(update)
         assertTrue(update.isMandatory)
+    }
+
+    @Test
+    fun githubReleaseWithNullNameIsDecodable() {
+        // GitHub's REST API returns "name": null for any release published
+        // without a title. Production decodes releases with the DI Json, which
+        // sets coerceInputValues=true -- replicated here so this proves the DTO
+        // shape, not a test-only Json divergence. coerceInputValues only rescues
+        // a null when the field has a default; GitHubRelease.name is a non-null
+        // String with no default, so the decode throws and checkForUpdate's
+        // catch turns it into "no update" for every user until a titled release
+        // is cut.
+        val prodJson = Json {
+            ignoreUnknownKeys = true
+            isLenient = true
+            coerceInputValues = true
+        }
+        val body = """
+            {
+              "tag_name": "v2.3.5",
+              "name": null,
+              "body": "notes",
+              "assets": [],
+              "prerelease": false,
+              "draft": false,
+              "published_at": "2026-06-08T00:00:00Z"
+            }
+        """.trimIndent()
+
+        val release = prodJson.decodeFromString<GitHubRelease>(body)
+        assertEquals("v2.3.5", release.tagName)
     }
 }

@@ -288,33 +288,6 @@ class LayoutGraphMutationsTest {
         assertSame(graph, out)
     }
 
-    // ── Compat overloads still work ───────────────────────────────────
-
-    @Test
-    fun `compat overload of insertWidget on a flat SurfaceId-SlotId pair still works`() {
-        val out = seed(w1).insertWidget(home, main, w2, 999)
-        assertEquals(listOf(w1, w2), out.mainWidgets())
-    }
-
-    @Test
-    fun `compat overload of moveWidget on a SlotAddress pair still works`() {
-        val twoSlots = LayoutGraph(
-            surfaces = mapOf(
-                home to SurfaceLayout(slots = mapOf(
-                    SlotId("top")    to SlotContent(listOf(w1)),
-                    SlotId("bottom") to SlotContent(listOf(w2)),
-                )),
-            ),
-        )
-        val out = twoSlots.moveWidget(
-            from       = SlotAddress(home, SlotId("top")),
-            to         = SlotAddress(home, SlotId("bottom")),
-            instanceId = "i1",
-            toIndex    = 0,
-        )
-        assertEquals(listOf(w1, w2), out.surfaces[home]!!.slots[SlotId("bottom")]!!.widgets)
-    }
-
     // ── Nested transforms ─────────────────────────────────────────────
 
     private val container = WidgetInstance(

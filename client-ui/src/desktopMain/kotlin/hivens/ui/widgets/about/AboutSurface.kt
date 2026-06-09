@@ -17,9 +17,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -27,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import hivens.core.jvm.SystemMemory
 import hivens.launcher.update.UpdateService
 import hivens.ui.components.UpdateDialog
+import hivens.ui.components.UpdateManagerDialog
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
@@ -65,8 +68,9 @@ fun AboutSurface(onBack: () -> Unit) {
     val updateService: UpdateService = koinInject()
     val scope = rememberCoroutineScope()
 
-    val updateState      = remember { mutableStateOf<UpdateCheckState>(UpdateCheckState.Idle) }
-    val showUpdateDialog = remember { mutableStateOf(false) }
+    val updateState       = remember { mutableStateOf<UpdateCheckState>(UpdateCheckState.Idle) }
+    val showUpdateDialog  = remember { mutableStateOf(false) }
+    val showUpdateManager = remember { mutableStateOf(false) }
 
     // OrNull (not the sizing fallback): the System-info card shows "Unknown" on a 0,
     // so a broken runtime reads as unknown rather than a fabricated 16 GB.
@@ -85,7 +89,7 @@ fun AboutSurface(onBack: () -> Unit) {
             updateState.value = UpdateCheckState.Checking
             scope.launch {
                 updateState.value = try {
-                    val update = updateService.checkForUpdate(force = true)
+                    val update = updateService.checkForUpdate()
                     if (update != null) UpdateCheckState.Available(update)
                     else UpdateCheckState.UpToDate
                 } catch (e: Exception) {
@@ -95,14 +99,32 @@ fun AboutSurface(onBack: () -> Unit) {
         }
     }
 
-    val ctx = remember(updateState, showUpdateDialog, triggerUpdateCheck, systemRam, displayRes) {
+    val ctx = remember(updateState, showUpdateDialog, showUpdateManager, triggerUpdateCheck, systemRam, displayRes) {
         AboutContext(
             updateState        = updateState,
             showUpdateDialog   = showUpdateDialog,
+            showUpdateManager  = showUpdateManager,
             triggerUpdateCheck = triggerUpdateCheck,
             systemRam          = systemRam,
             displayRes         = displayRes,
         )
+    }
+
+    // Background auto-check every 5 minutes while the About screen is open,
+    // stopping once an update is found (the panel then shows it). 12 checks/hour
+    // sits comfortably under GitHub's ~60/hour unauthenticated API ceiling.
+    LaunchedEffect(Unit) {
+        while (true) {
+            // Skip when a result is already shown (Available) or a check is
+            // still running (Checking) -- a tick that lands on an in-flight or
+            // manual check would otherwise launch a second concurrent
+            // checkForUpdate that races to overwrite updateState.
+            val state = updateState.value
+            if (state !is UpdateCheckState.Available && state !is UpdateCheckState.Checking) {
+                triggerUpdateCheck()
+            }
+            delay(5 * 60_000L)
+        }
     }
 
     // Modal update dialog -- mounted at surface level so it persists
@@ -117,7 +139,14 @@ fun AboutSurface(onBack: () -> Unit) {
         )
     }
 
+    // Full update manager (channels, version picker/rollback, .desktop,
+    // build-from-source) -- opened from the version "i" in the update panel.
+    if (showUpdateManager.value) {
+        UpdateManagerDialog(onDismiss = { showUpdateManager.value = false })
+    }
+
     PuppetScreen("About")
+    PuppetClick("about.openUpdateManager") { showUpdateManager.value = true }
     PuppetClick("about.back") { onBack() }
     PuppetClick("about.checkUpdates", enabled = updateState.value is UpdateCheckState.Idle) {
         triggerUpdateCheck()

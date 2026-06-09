@@ -37,6 +37,18 @@ exclude:
   # pragmatic floor.
   - name: AssignedValueIsNeverRead
   #
+  # Qodana JVM Community 2025.2's Kotlin flow analysis regressed against the
+  # Kotlin 2.4.0 toolchain we bumped to (0a22579): KotlinUnreachableCode now
+  # flags ordinary control flow -- a `?: return`, an if/else assignment, a
+  # `when` over an enum -- as unreachable, and KotlinConstantConditions calls a
+  # platform-typed comparison "always false". Spot-checked the flagged sites
+  # (WorldScanner, SkinRepository, RuntimeProvisioner's offline asset-index
+  # reuse, ConsoleWindow's severity `when`); every one is reachable and correct.
+  # Both are dataflow inspections -- exclude until the linter's Kotlin analysis
+  # catches up to 2.4.0, then re-evaluate (same as the entries above/below).
+  - name: KotlinUnreachableCode
+  - name: KotlinConstantConditions
+  #
   # Historically also excluded: UnusedAssignment, UnusedSymbol,
   # HasPlatformType. Removed 2026-05-17 -- they were muted because an
   # older Qodana JVM Community release mis-flagged Compose composables

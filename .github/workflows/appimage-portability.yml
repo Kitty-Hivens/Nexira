@@ -13,8 +13,9 @@ name: AppImage Portability
 #   - musl libc (Alpine, default Void) — fundamentally incompatible with
 #     glibc-linked binaries; documented as "won't fix" rather than tested
 #
-# This workflow downloads the latest released AppImage, extracts it, and
-# verifies the launcher gets past its init phase on each distro by
+# This workflow takes an AppImage -- the just-built artifact when called as a
+# release gate, or the latest released asset on a manual run -- extracts it,
+# and verifies the launcher gets past its init phase on each distro by
 # grepping captured stdout for the `Display: toolkit=...` log line that
 # Main.kt emits after toolkit init.
 #
@@ -24,18 +25,28 @@ name: AppImage Portability
 # distro-portability problem with our AppImage.
 #
 # Triggers:
-#   - workflow_dispatch  — run any time, ad hoc
-#   - schedule (weekly)  — pick up regressions from upstream distro updates
-#                          without waiting for a release tag
+#   - workflow_call      — gate the release pipeline: build_release.yml calls
+#                          this against the just-built AppImage artifact, so a
+#                          distro regression blocks publish instead of shipping
+#   - workflow_dispatch  — run any time, ad hoc, against the latest release
 
 on:
+  workflow_call:
+    inputs:
+      artifact_name:
+        description: >-
+          Build artifact in the calling run holding the AppImage to test. When
+          set, the AppImage is pulled from that artifact via `gh run download`
+          instead of the latest release -- this is how build_release.yml gates
+          a publish. Empty (the workflow_dispatch case) uses the released asset.
+        type: string
+        required: false
+        default: ""
   workflow_dispatch:
-  schedule:
-    - cron: "0 8 * * 1"   # Mondays, 08:00 UTC
 
-concurrency:
-  group: appimage-portability
-  cancel-in-progress: false
+permissions:
+  contents: read
+  actions: read
 
 jobs:
   portability:
@@ -124,16 +135,25 @@ jobs:
       - name: Install runtime deps for ${{ matrix.distro_name }}
         run: ${{ matrix.install_cmd }}
 
-      - name: Download latest AppImage from GH releases
+      - name: Get the AppImage (build artifact when gating, else latest release)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p /tmp/nexira
-          gh release download --repo ${{ github.repository }} \
-            --pattern "*x86_64.AppImage" \
-            --dir /tmp/nexira
+          if [ -n "${{ inputs.artifact_name }}" ]; then
+            # Gate mode: the AppImage just built in the calling run, before the
+            # release is cut. Same run id, so the artifact is in reach.
+            gh run download "${{ github.run_id }}" \
+              --repo "${{ github.repository }}" \
+              --name "${{ inputs.artifact_name }}" \
+              --dir /tmp/nexira
+          else
+            gh release download --repo "${{ github.repository }}" \
+              --pattern "*x86_64.AppImage" \
+              --dir /tmp/nexira
+          fi
           chmod +x /tmp/nexira/*.AppImage
-          echo "Downloaded:"
+          echo "Got:"
           ls -la /tmp/nexira/
 
       - name: Extract AppImage (skip FUSE — not always available in containers)
