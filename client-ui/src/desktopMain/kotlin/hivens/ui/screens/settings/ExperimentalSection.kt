@@ -3,7 +3,6 @@ package hivens.ui.screens.settings
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Memory
-import androidx.compose.material.icons.filled.NewReleases
 import androidx.compose.material.icons.filled.Science
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Tag
@@ -70,21 +69,6 @@ internal fun ExperimentalSection(
     // Mirror the UI's enabled-gating: master switch off => can't touch sub-toggles.
     PuppetToggle("settings.mandatoryUpdates", form.mandatoryUpdates, enabled = form.experimentalEnabled) {
         form.mandatoryUpdates = it; save()
-    }
-
-    Spacer(Modifier.height(4.dp))
-
-    SettingsRowWithDescription(
-        title          = s.settingsPrereleaseChannel,
-        description    = s.settingsPrereleaseChannelDesc,
-        icon           = Icons.Default.NewReleases,
-        iconTint       = CelestiaTheme.colors.primary,
-        checked        = form.experimentalEnabled && form.prereleaseChannel,
-        enabled        = form.experimentalEnabled,
-        onCheckedChange = { form.prereleaseChannel = it; save() }
-    )
-    PuppetToggle("settings.prereleaseChannel", form.prereleaseChannel, enabled = form.experimentalEnabled) {
-        form.prereleaseChannel = it; save()
     }
 
     Spacer(Modifier.height(4.dp))

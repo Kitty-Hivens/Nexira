@@ -50,6 +50,8 @@ import hivens.launcher.smrt.SmartyModPlanner
 import hivens.launcher.smrt.SmrtAuthlibSwapper
 import hivens.launcher.smrt.SmrtPackClient
 import hivens.launcher.smrt.SmrtSyncService
+import hivens.launcher.update.DesktopIntegration
+import hivens.launcher.update.SourceBuildService
 import hivens.launcher.update.UpdateApplicators
 import hivens.launcher.update.UpdateService
 import hivens.widget.model.DefaultLayout
@@ -653,6 +655,12 @@ val appModule = module {
     // Per-platform update applicator selected at startup. Kept as a singleton
     // so the shutdown hook each implementation registers fires exactly once.
     single<IUpdateApplicator> { UpdateApplicators.forCurrentPlatform() }
+
+    // Desktop-entry install (Linux/AppImage) + build-from-source (Dev/Git
+    // channels). Both back the update manager; both no-op / report unsupported
+    // off Linux.
+    single { DesktopIntegration() }
+    single { SourceBuildService(dataDirectory = get(), applicator = get()) }
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
