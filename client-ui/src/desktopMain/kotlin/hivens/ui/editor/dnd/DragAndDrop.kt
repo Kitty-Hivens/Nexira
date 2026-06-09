@@ -6,12 +6,10 @@ import androidx.compose.foundation.gestures.awaitTouchSlopOrCancellation
 import androidx.compose.foundation.gestures.drag
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ProvidableCompositionLocal
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.mutableStateMapOf
-import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -276,6 +274,3 @@ fun Modifier.widgetBounds(
 ): Modifier = this.onGloballyPositioned { coords: LayoutCoordinates ->
     registry.registerWidget(path, instanceId, index, coords.boundsInWindow())
 }
-
-@Suppress("unused") private fun touchDerivedStateOf() = derivedStateOf { 0 }
-@Suppress("unused") private fun touchSnapshot() = Snapshot.current
