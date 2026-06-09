@@ -722,8 +722,12 @@ class UpdateServiceTest {
             .replace("\"prerelease\": false", "\"prerelease\": false,\n            \"draft\": true")
         val rc = githubReleaseJson(tagName = "v99.0.0-rc1", body = "rc body")
         val svc = createService(
-            MockResponse(urlContains = "releases/latest", body = "BOOM", status = HttpStatusCode.InternalServerError),
-            MockResponse(urlContains = "releases",        body = "[$draft,$rc]"),
+            MockResponse(urlContains = "releases/latest",     body = "BOOM", status = HttpStatusCode.InternalServerError),
+            MockResponse(urlContains = "releases",            body = "[$draft,$rc]"),
+            // Explicit 404 so the channel-meta fetch doesn't fall back to the
+            // queue's last entry (the releases list) and depend on
+            // UpdateChannelMeta failing to decode it.
+            MockResponse(urlContains = "update-channel.json", body = "Not Found", status = HttpStatusCode.NotFound),
             settings = fakeSettings(updateChannel = ReleaseChannel.Beta)
         )
         val update = svc.checkForUpdate()
