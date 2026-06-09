@@ -58,8 +58,17 @@ class UpdateServiceTest {
         } else {
             listOf(MockResponse(urlContains = "release-manifest", body = releaseManifestJson())) + responses
         }
+        // Auto-append a 404 for update-channel.json unless staged: checkForUpdate
+        // probes the channel meta on every run, and an unmatched request falls
+        // back to the queue's LAST entry -- usually a releases list that only
+        // passes for null because UpdateChannelMeta fails to decode a JSON array.
+        val withMeta = if (withManifest.any { it.urlContains?.contains("update-channel") == true }) {
+            withManifest
+        } else {
+            withManifest + MockResponse(urlContains = "update-channel.json", body = "Not Found", status = HttpStatusCode.NotFound)
+        }
         return UpdateService(
-            clientProvider = buildMockClient(*withManifest.toTypedArray()),
+            clientProvider = buildMockClient(*withMeta.toTypedArray()),
             json = json,
             dataDirectory = tempDir,
             settingsService = settings
@@ -79,7 +88,11 @@ class UpdateServiceTest {
                 // than "releases/latest" and must win the match.
                 MockResponse(urlContains = "release-manifest", body = releaseManifestJson()),
                 MockResponse(urlContains = "releases/latest",  body = body,      status = status),
-                MockResponse(urlContains = "releases",         body = "[$body]", status = status)
+                MockResponse(urlContains = "releases",         body = "[$body]", status = status),
+                // checkForUpdate always probes the channel meta; without this it
+                // falls back to the "[$body]" entry above and relies on
+                // UpdateChannelMeta failing to decode it.
+                MockResponse(urlContains = "update-channel.json", body = "Not Found", status = HttpStatusCode.NotFound)
             ),
             json = json,
             dataDirectory = tempDir,
@@ -722,12 +735,8 @@ class UpdateServiceTest {
             .replace("\"prerelease\": false", "\"prerelease\": false,\n            \"draft\": true")
         val rc = githubReleaseJson(tagName = "v99.0.0-rc1", body = "rc body")
         val svc = createService(
-            MockResponse(urlContains = "releases/latest",     body = "BOOM", status = HttpStatusCode.InternalServerError),
-            MockResponse(urlContains = "releases",            body = "[$draft,$rc]"),
-            // Explicit 404 so the channel-meta fetch doesn't fall back to the
-            // queue's last entry (the releases list) and depend on
-            // UpdateChannelMeta failing to decode it.
-            MockResponse(urlContains = "update-channel.json", body = "Not Found", status = HttpStatusCode.NotFound),
+            MockResponse(urlContains = "releases/latest", body = "BOOM", status = HttpStatusCode.InternalServerError),
+            MockResponse(urlContains = "releases",        body = "[$draft,$rc]"),
             settings = fakeSettings(updateChannel = ReleaseChannel.Beta)
         )
         val update = svc.checkForUpdate()
