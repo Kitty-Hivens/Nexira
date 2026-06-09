@@ -26,9 +26,39 @@ lives in this English file.
 
 ## [Unreleased]
 
+## [2.3.4-beta5] - 2026-06-09
+
+A profile-and-updates release. The Profile is rebuilt around a live 3D
+render of your skin, with sign-in moved inside it and reachable while
+logged out. A new in-app update manager adds release channels, rollback
+to an earlier version, a desktop-shortcut install, and -- for developers
+-- building the launcher from source.
+
+### Highlights
+- **Your skin in 3D**. The Profile's account tab leads with a live, rotatable 3D render of your skin, drawn from scratch with no extra dependency.
+- **Sign in from the Profile**. The login form lives in the Profile and is reachable while logged out; the cramped right-rail login is gone.
+- **An update manager with channels**. The "i" by the version opens a manager: pick a channel (Release / Beta / Alpha, plus Dev / Git source builds), update or roll back to a recent version, and install a desktop shortcut.
+- **Background update checks**. The About screen checks for updates on its own every few minutes and tints the running version by its channel.
+
+### Added
+- 3D skin renderer (`client-ui/.../ui/skin3d`): a Compose-free core (box model + the standard Minecraft UV layout, orthographic projection, back-face cull, painter sort) and a `SkinView3D` composable that maps each face with one Skia `drawImageRect` under its affine at NEAREST sampling; drag rotates, the idle auto-spin honours the style engine's motion token. `SkinManager` now serves the raw skin texture (`getRawSkin`); the baked 2D front/back paper-doll is gone.
+- In-app update manager (`UpdateManagerDialog`, opened from the version "i" in About): release channels via `ReleaseChannel`, `UpdateService.listReleases`/`prepareUpdate` over a single cached GitHub fetch, install or roll back to any listed version through the same release-manifest + SHA-256 gate as the auto-check, and a `.desktop` entry install (`DesktopIntegration`, Linux/AppImage).
+- Build-from-source channels (`SourceBuildService`): Dev and Git build the launcher from the repository (clone + checkout `dev` or `stable`, run the AppImage build, schedule it), gated behind the experimental switch and a detected local toolchain (git + JDK + appimagetool); Linux/AppImage only.
+
+### Changed
+- The Profile surface is state-aware: sign-in is its own category reachable while signed out, signing in completes in place, the account tab leads with the 3D skin, and the right-rail auth panel was removed (`ProfileSurface`, `ProfileSignInSectionWidget`, `ProfileAccountSectionWidget`).
+- Auth extracted into `:client-auth` + `:client-auth-smartycraft` (an `AuthProvider` SPI with capabilities); the login form branches on the provider's capabilities instead of hardcoding SmartyCraft.
+- The prerelease-channel Settings toggle was replaced by the channel picker in the update manager; the experimental master switch now gates the Dev/Git source channels.
+- The About update panel auto-checks every 5 minutes while open and colours the running version by its channel -- a `git describe` dirty/commits-ahead build reads as a source build.
+- Dependency bump: Kotlin 2.4.0, ktor 3.5.0, Gradle 9.5.1.
+
 ### Fixed
+- `LayoutGraphRepository` now seeds slots added to a surface that already exists in a saved layout, not only whole new surfaces. A slot introduced in a later release (the new Profile sign-in slot) otherwise rendered as a blank pane for users with a persisted layout graph, with no in-product way back; slots are structural (the editor has no create/delete-slot op), so the merge is additive and cannot resurrect a user removal.
 - `Nbt.read` no longer pre-allocates an array from an untrusted length. A corrupt `TAG_Byte_Array` / `TAG_Int_Array` / `TAG_Long_Array` (or `TAG_List`) header with a negative or near-`Int.MAX_VALUE` length used to call `ByteArray(len)` / `IntArray(len)` / `ArrayList(len)` and throw `OutOfMemoryError`. `OutOfMemoryError` is an `Error`, not an `Exception`, so it slipped past the `catch (Exception)` guard in the world and server NBT scanners and took the launcher down. The reader now rejects a negative length, reads byte arrays in bounded chunks via `readNBytes` (raising `NbtException` on a short stream), and grows the int/long arrays element-by-element so a bogus length EOFs into a catchable `NbtException` instead of reserving gigabytes up front.
 - `GitHubRelease.name` is nullable. GitHub returns `"name": null` for a release published without a title; the non-null field failed to decode, and the exception turned `UpdateService.checkForUpdate` into "no update" for every user until a titled release was published. The field now defaults to `null` and the `[CRITICAL]` gate reads it null-safely.
+
+### Removed
+- The dead `SkiaTracker` debug instrumentation, the migrated-away `SlotAddress` compatibility overloads, and the no-op Compose keep-alive touch functions.
 
 ## [2.3.4-beta4] - 2026-06-07
 
