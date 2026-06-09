@@ -2,7 +2,8 @@ package hivens.launcher.di
 
 import hivens.config.Protocol
 import hivens.config.Storage
-import hivens.core.api.AuthService
+import hivens.auth.AuthProvider
+import hivens.auth.smartycraft.SmartyCraftAuthProvider
 import hivens.launcher.network.ChannelRouter
 import hivens.launcher.network.NetworkState
 import hivens.launcher.network.ServerProtocolConfig
@@ -148,7 +149,7 @@ val networkModule = module {
      * granted bypass via `NetworkState.grantBypass()` can switch back
      * to the regular `authService` and reach the same transport. The
      * `named("insecure")` chain (this client + dependent ChannelRouter
-     * / IServerProtocol / IAuthService) is therefore redundant for the
+     * / IServerProtocol / AuthProvider) is therefore redundant for the
      * standard "Connect anyway" flow and is slated for removal once
      * the UI call sites are migrated. Until then it stays -- still
      * useful as a one-shot insecure transport that doesn't require
@@ -193,7 +194,7 @@ val networkModule = module {
      * Default (smartycraft) [HttpClientProvider] -- thin wrapper that resolves
      * the correct channel + cert mode on every request.
      *
-     * Per-request decision (mirrors [ChannelRouter] for AuthService):
+     * Per-request decision (mirrors [ChannelRouter] for AuthProvider):
      *   - SSL bypass active for the smartycraft host -> insecure (proxy + no TLS check)
      *   - forceProxyMode toggle on -> secure proxy
      *   - default -> direct (no proxy)
@@ -518,15 +519,15 @@ val appModule = module {
         )
     }
 
-    single<IAuthService> { AuthService(get<IServerProtocol>()) }
+    single<AuthProvider> { SmartyCraftAuthProvider(get<IServerProtocol>()) }
 
     /**
-     * Insecure [IAuthService] -- used exclusively for the SSL bypass login retry.
+     * Insecure [AuthProvider] -- used exclusively for the SSL bypass login retry.
      * Always connects without certificate verification (via the insecure-channel
      * IServerProtocol variant bound above in coreModule).
      */
-    single<IAuthService>(named("insecure")) {
-        AuthService(get<IServerProtocol>(named("insecure")))
+    single<AuthProvider>(named("insecure")) {
+        SmartyCraftAuthProvider(get<IServerProtocol>(named("insecure")))
     }
 
     // Cache feeds the tray menu's first published DBusMenu layout before

@@ -1,7 +1,7 @@
 package hivens.launcher.launch
 
+import hivens.auth.AuthProvider
 import hivens.core.api.TwoFactorRequiredException
-import hivens.core.api.interfaces.IAuthService
 import hivens.core.api.interfaces.IFileDownloadService
 import hivens.core.api.interfaces.IJavaManager
 import hivens.core.api.interfaces.ILauncherService
@@ -47,7 +47,7 @@ import kotlin.test.assertTrue
 /**
  * Smoke + edge tests for the post-B1 [LauncherController]. Mocking strategy:
  *
- * - **Interfaces** (`IAuthService`, `IFileDownloadService`, …) are mocked
+ * - **Interfaces** (`AuthProvider`, `IFileDownloadService`, …) are mocked
  *   with `mockk()` since they go through `java.lang.reflect.Proxy` and do
  *   not require Byte Buddy class retransformation.
  * - **Final classes** (`ProfileManager`, `ManifestCache`, `CredentialsManager`)
@@ -70,7 +70,7 @@ import kotlin.test.assertTrue
 class LauncherControllerTest {
 
     private lateinit var sandbox: Path
-    private lateinit var authService: IAuthService
+    private lateinit var authService: AuthProvider
     private lateinit var settingsService: ISettingsService
     private lateinit var downloadService: IFileDownloadService
     private lateinit var javaManagerService: IJavaManager

@@ -25,8 +25,8 @@ import coil3.ImageLoader
 import coil3.compose.setSingletonImageLoaderFactory
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import hivens.config.Branding
+import hivens.auth.AuthProvider
 import hivens.core.api.TwoFactorRequiredException
-import hivens.core.api.interfaces.IAuthService
 import hivens.core.api.interfaces.IServerListService
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.api.model.ServerProfile
@@ -184,7 +184,7 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
     val controller: LauncherController         = koinInject()
     val launchDriver: LaunchDriver             = koinInject()
     val credentialsManager: CredentialsManager = koinInject()
-    val authService: IAuthService              = koinInject()
+    val authService: AuthProvider              = koinInject()
     val profileManager: ProfileManager         = koinInject()
     val gameConsole: GameConsoleService        = koinInject()
     val layoutGraphRepo: LayoutGraphRepository = koinInject()
@@ -779,12 +779,12 @@ fun AppRoot(
     onCustomizationChanged: (CustomizationSettings) -> Unit,
 ) {
     val credentialsManager: CredentialsManager = koinInject()
-    val authService: IAuthService              = koinInject()
+    val authService: AuthProvider              = koinInject()
     val profileManager: ProfileManager         = koinInject()
     val settingsService: ISettingsService      = koinInject()
     val dataDirectory: java.nio.file.Path      = koinInject()
     val json: Json                             = koinInject()
-    val insecureAuthService: IAuthService      = koinInject(named("insecure"))
+    val insecureAuthService: AuthProvider      = koinInject(named("insecure"))
     val protocolConfig: ServerProtocolConfig   = koinInject()
     // Smartycraft-routed Call.Factory for Coil's image fetcher. The
     // bypass / forceProxy / direct routing rule lives in Modules.kt

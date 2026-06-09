@@ -6,6 +6,8 @@ plugins {
 dependencies {
     implementation(project(":client-core"))
     implementation(project(":client-config"))
+    implementation(project(":client-auth"))
+    implementation(project(":client-auth-smartycraft"))
     implementation(project(":widget-model"))
 
     implementation(libs.commons.compress)
