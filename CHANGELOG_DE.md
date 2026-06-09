@@ -17,6 +17,7 @@ des Launchers aus dem Quellcode.
 - **Anmeldung aus dem Profil**. Das Login-Formular liegt im Profil und ist auch abgemeldet erreichbar; das beengte Login in der rechten Leiste ist weg.
 - **Ein Update-Manager mit Kanälen**. Das "i" neben der Version öffnet einen Manager: Kanal wählen (Release / Beta / Alpha, dazu Dev / Git aus dem Quellcode), auf eine neuere Version aktualisieren oder zurückrollen, und eine Desktop-Verknüpfung installieren.
 - **Update-Prüfung im Hintergrund**. Der Info-Bildschirm prüft selbst alle paar Minuten auf Updates und färbt die laufende Version nach ihrem Kanal.
+- **Eine kaputte Welt- oder Server-Datei stürzt den Launcher nicht mehr ab**. Eine fehlerhafte NBT-Länge legte beim Scan den ganzen Launcher lahm.
 
 ## [2.3.4-beta4] - 2026-06-07
 
