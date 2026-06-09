@@ -732,6 +732,30 @@ class UpdateServiceTest {
     }
 
     @Test
+    fun `prerelease check builds the changelog from the already-fetched list`() = runTest {
+        // The mock queue consumes a matched entry only when it sits at the
+        // head: the first /releases hit eats the good list, so a second hit
+        // (the old double-fetch) lands on BOOM and produces an empty
+        // changelog. One check must cost one list call -- the unauthenticated
+        // API allows 60 req/hour.
+        val rc = githubReleaseJson(tagName = "v99.0.0-rc1")
+        val svc = createService(
+            MockResponse(urlContains = "releases",            body = "[$rc]"),
+            MockResponse(urlContains = "releases",            body = "BOOM", status = HttpStatusCode.InternalServerError),
+            MockResponse(urlContains = "update-channel.json", body = "Not Found", status = HttpStatusCode.NotFound),
+            MockResponse(urlContains = "release-manifest",    body = releaseManifestJson()),
+            settings = fakeSettings(updateChannel = ReleaseChannel.Beta),
+        )
+        val update = svc.checkForUpdate()
+        assertNotNull(update)
+        assertEquals("v99.0.0-rc1", update.version)
+        assertTrue(
+            "Bug fixes" in update.changelog,
+            "changelog must reuse the single /releases fetch, got: '${update.changelog}'",
+        )
+    }
+
+    @Test
     fun `prerelease channel OFF still uses releases-latest endpoint`() = runTest {
         // /releases (the list endpoint) is broken -- if the code accidentally
         // hits it when prereleases are off, the test will fail.

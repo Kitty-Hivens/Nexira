@@ -36,8 +36,8 @@ class UpdateService(
     private val updateDir = dataDirectory.resolve("updates")
     private val lastMetaCheckFile = updateDir.resolve(".last_meta_check")
 
-    // Raw releases from the last listReleases() call, so prepareUpdate() can
-    // resolve a manager-picked version without re-listing.
+    // Raw releases from the last fetchReleasesPage() call, so prepareUpdate()
+    // can resolve a manager-picked version without re-listing.
     @Volatile
     private var cachedReleases: List<GitHubRelease> = emptyList()
 
@@ -104,8 +104,20 @@ class UpdateService(
                 if (mandatoryEnabled) "enforced" else "advisory"
             )
 
-            val release = fetchLatestRelease(includePrereleases = includePrereleases)
-                ?: return@withContext null
+            // Prerelease channels pick their target from the /releases list; the
+            // same decoded page then feeds the changelog below, so one check
+            // costs one list call against the unauthenticated API's 60 req/hour.
+            val releasesPage = if (includePrereleases) fetchReleasesPage() else null
+            val release = (
+                if (releasesPage != null) {
+                    releasesPage.firstOrNull() ?: run {
+                        logger.warn("No non-draft releases found in /releases response")
+                        null
+                    }
+                } else {
+                    fetchLatestRelease()
+                }
+            ) ?: return@withContext null
 
             val currentVersion = Branding.VERSION.removePrefix("v")
             val latestVersion = release.tagName.removePrefix("v")
@@ -144,7 +156,7 @@ class UpdateService(
             val update = buildUpdate(
                 release = release,
                 manifest = manifest,
-                changelog = fetchChangelogBetween(currentVersion, latestVersion),
+                changelog = fetchChangelogBetween(currentVersion, latestVersion, releasesPage),
                 isMandatory = belowMandatoryFloor,
                 mandatoryReason = if (belowMandatoryFloor) channelMeta.reason else null,
             ) ?: return@withContext null
@@ -162,41 +174,47 @@ class UpdateService(
     }
 
     /**
-     * Picks the update target.
-     *
-     * - [includePrereleases] = false -> hits `/releases/latest`, which by
-     *   GitHub's contract excludes drafts and prereleases.
-     * - [includePrereleases] = true -> lists the most recent
-     *   [PRERELEASE_PAGE_SIZE] releases and returns the first non-draft one.
-     *   GitHub returns them by `published_at` descending, so this matches
-     *   "newest published thing of either kind".
+     * The newest stable release via `/releases/latest`, which by GitHub's
+     * contract excludes drafts and prereleases. Prerelease channels pick
+     * their target from [fetchReleasesPage] instead -- GitHub returns that
+     * list by `published_at` descending, so its head matches "newest
+     * published thing of either kind".
      */
-    internal suspend fun fetchLatestRelease(includePrereleases: Boolean): GitHubRelease? {
-        return if (includePrereleases) {
-            val response = httpClient.get(GITHUB_API_RELEASES) {
-                header("Accept", "application/vnd.github.v3+json")
-                parameter("per_page", PRERELEASE_PAGE_SIZE)
-            }
-            if (response.status.value != 200) {
-                logger.warn("GitHub /releases returned {}", response.status)
-                return null
-            }
-            json.decodeFromString<List<GitHubRelease>>(response.bodyAsText())
-                .firstOrNull { !it.draft }
-                ?: run {
-                    logger.warn("No non-draft releases found in /releases response")
-                    null
-                }
-        } else {
-            val response = httpClient.get(GITHUB_API_LATEST) {
-                header("Accept", "application/vnd.github.v3+json")
-            }
-            if (response.status.value != 200) {
-                logger.warn("GitHub /releases/latest returned {}", response.status)
-                return null
-            }
-            json.decodeFromString<GitHubRelease>(response.bodyAsText())
+    internal suspend fun fetchLatestRelease(): GitHubRelease? {
+        val response = httpClient.get(GITHUB_API_LATEST) {
+            header("Accept", "application/vnd.github.v3+json")
         }
+        if (response.status.value != 200) {
+            logger.warn("GitHub /releases/latest returned {}", response.status)
+            return null
+        }
+        return json.decodeFromString<GitHubRelease>(response.bodyAsText())
+    }
+
+    /**
+     * One page (the most recent [PRERELEASE_PAGE_SIZE]) of `/releases`,
+     * newest first, drafts dropped. Single chokepoint for the list endpoint:
+     * the prerelease auto-check, the changelog assembly, and the manager
+     * listing all go through here, and the raw result is cached so
+     * [prepareUpdate] can resolve a picked version without re-listing.
+     * Empty on any network/parse failure.
+     */
+    internal suspend fun fetchReleasesPage(): List<GitHubRelease> = try {
+        val response = httpClient.get(GITHUB_API_RELEASES) {
+            header("Accept", "application/vnd.github.v3+json")
+            parameter("per_page", PRERELEASE_PAGE_SIZE)
+        }
+        if (response.status.value != 200) {
+            logger.warn("GitHub /releases returned {}", response.status)
+            emptyList()
+        } else {
+            json.decodeFromString<List<GitHubRelease>>(response.bodyAsText())
+                .filter { !it.draft }
+                .also { cachedReleases = it }
+        }
+    } catch (e: Exception) {
+        logger.warn("Failed to list GitHub releases", e)
+        emptyList()
     }
 
     /**
@@ -348,50 +366,32 @@ class UpdateService(
      * cumulative -- the chosen tier plus every stabler one (Alpha -> alpha + beta
      * + release). dev/git build from source, so for the GitHub listing they clamp
      * to Alpha (the user still sees every published build and builds from source
-     * separately). Caches the raw releases so [prepareUpdate] can resolve a picked
-     * version without re-listing. Empty on any network/parse failure.
+     * separately). Empty on any network/parse failure.
      */
     suspend fun listReleases(channel: ReleaseChannel): List<ReleaseEntry> = withContext(Dispatchers.IO) {
-        try {
-            val response = httpClient.get(GITHUB_API_RELEASES) {
-                header("Accept", "application/vnd.github.v3+json")
-                parameter("per_page", PRERELEASE_PAGE_SIZE)
+        val maxRank = minOf(channel.ordinal, ReleaseChannel.Alpha.ordinal)
+        val current = Branding.VERSION.removePrefix("v")
+        fetchReleasesPage()
+            .map { it to ReleaseChannel.classify(it.tagName.removePrefix("v")) }
+            .filter { (_, ch) -> ch.ordinal <= maxRank }
+            .map { (release, ch) ->
+                ReleaseEntry(
+                    version = release.tagName,
+                    channel = ch,
+                    isCurrent = compareVersions(release.tagName.removePrefix("v"), current) == 0,
+                    installable = findAssetForCurrentOS(release.assets) != null,
+                    releasePageUrl = "$GITHUB_RELEASE_PAGE/${release.tagName}",
+                )
             }
-            if (response.status.value != 200) {
-                logger.warn("GitHub /releases returned {} for manager listing", response.status)
-                return@withContext emptyList()
-            }
-            val releases = json.decodeFromString<List<GitHubRelease>>(response.bodyAsText())
-                .filter { !it.draft }
-            cachedReleases = releases
-
-            val maxRank = minOf(channel.ordinal, ReleaseChannel.Alpha.ordinal)
-            val current = Branding.VERSION.removePrefix("v")
-            releases
-                .map { it to ReleaseChannel.classify(it.tagName.removePrefix("v")) }
-                .filter { (_, ch) -> ch.ordinal <= maxRank }
-                .map { (release, ch) ->
-                    ReleaseEntry(
-                        version = release.tagName,
-                        channel = ch,
-                        isCurrent = compareVersions(release.tagName.removePrefix("v"), current) == 0,
-                        installable = findAssetForCurrentOS(release.assets) != null,
-                        releasePageUrl = "$GITHUB_RELEASE_PAGE/${release.tagName}",
-                    )
-                }
-                .sortedWith(Comparator { a, b ->
-                    compareVersions(b.version.removePrefix("v"), a.version.removePrefix("v"))
-                })
-        } catch (e: Exception) {
-            logger.warn("Failed to list releases for manager", e)
-            emptyList()
-        }
+            .sortedWith(Comparator { a, b ->
+                compareVersions(b.version.removePrefix("v"), a.version.removePrefix("v"))
+            })
     }
 
     /**
      * Resolves a manager-picked [version] (newer OR older, for a rollback) into a
      * verifiable [LauncherUpdate]: finds it among the releases cached by the last
-     * [listReleases], fetches its manifest, and runs the same asset + SHA-256 gate
+     * [fetchReleasesPage], fetches its manifest, and runs the same asset + SHA-256 gate
      * as the auto-check. Null when the version is unknown, ships no asset for this
      * OS, or pins no checksum. Installing an older version is a rollback -- there
      * is deliberately no downgrade guard.
@@ -689,18 +689,18 @@ class UpdateService(
         else -> 0
     }
 
+    /**
+     * Stitches the per-release "What's Changed" sections between the installed
+     * and the target version. [releases] is the page an earlier step already
+     * fetched (the prerelease check); null means no list exists yet (the
+     * stable path picks via `/releases/latest`) and one is fetched here.
+     */
     private suspend fun fetchChangelogBetween(
         currentVersion: String,
-        latestVersion: String
+        latestVersion: String,
+        releases: List<GitHubRelease>?,
     ): String {
-        val response = httpClient.get(GITHUB_API_RELEASES) {
-            header("Accept", "application/vnd.github.v3+json")
-        }
-        if (response.status.value != 200) return ""
-
-        val releases = json.decodeFromString<List<GitHubRelease>>(response.bodyAsText())
-
-        return releases
+        return (releases ?: fetchReleasesPage())
             .filter { release ->
                 val v = release.tagName.removePrefix("v")
                 compareVersions(v, currentVersion) > 0 &&
@@ -745,7 +745,6 @@ data class GitHubRelease(
     @SerialName("assets") val assets: List<GitHubAsset>,
     @SerialName("prerelease") val prerelease: Boolean = false,
     @SerialName("draft") val draft: Boolean = false,
-    @SerialName("published_at") val publishedAt: String
 )
 
 @Serializable

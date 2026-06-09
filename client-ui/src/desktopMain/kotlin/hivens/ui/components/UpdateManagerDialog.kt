@@ -60,6 +60,7 @@ import hivens.ui.puppet.PuppetScreen
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.LocalStyle
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
@@ -138,15 +139,24 @@ fun UpdateManagerDialog(onDismiss: () -> Unit) {
         if (busy) return
         busy = true; error = null; buildLog.clear(); progressText = s.updateManagerBuilding
         scope.launch {
-            sourceBuild.buildAndApply(channel) { p ->
-                when (p) {
+            // buildAndApply emits progress from its IO worker, but buildLog is
+            // snapshot state the composition reads on the UI thread -- funnel
+            // every event through a channel drained here (scope = Main).
+            val progress = Channel<SourceBuildService.Progress>(Channel.UNLIMITED)
+            val drainer = launch {
+                for (p in progress) when (p) {
                     is SourceBuildService.Progress.Phase -> progressText = p.message
                     is SourceBuildService.Progress.Line -> {
                         buildLog.add(p.text)
                         if (buildLog.size > 200) buildLog.removeAt(0)
                     }
                 }
-            }.onSuccess { exitProcess(0) }
+            }
+            val result = sourceBuild.buildAndApply(channel) { progress.trySend(it) }
+            progress.close()
+            drainer.join()
+            result
+                .onSuccess { exitProcess(0) }
                 .onFailure {
                     error = it.message ?: s.updateErrorUnknown
                     busy = false; progressText = null
