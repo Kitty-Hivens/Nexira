@@ -4,6 +4,7 @@ import hivens.core.api.AuthException
 import hivens.core.data.AuthStatus
 import hivens.core.data.SessionData
 import hivens.core.util.retryWithBackoff
+import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.util.concurrent.ConcurrentHashMap
 
@@ -17,7 +18,7 @@ import java.util.concurrent.ConcurrentHashMap
  */
 abstract class AbstractCachingAuthProvider : AuthProvider {
 
-    protected val logger = LoggerFactory.getLogger(this::class.java)
+    protected val logger: Logger = LoggerFactory.getLogger(this::class.java)
 
     /**
      * Per-server session cache key. Includes [passwordHash] because otherwise
