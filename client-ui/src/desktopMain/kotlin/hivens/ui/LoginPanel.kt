@@ -68,7 +68,13 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
     // SmartyCraft provider sets supports2FA = false, so the demand surfaces the
     // [twoFactorUnsupported] banner instead (its 2FA login succeeds on the wire
     // but breaks every game-side authenticated call after).
-    data class TwoFactorPending(val uid: String, val username: String, val password: String, val serverId: String)
+    //
+    // [service] is the provider that raised the demand. The SSL-bypass retry
+    // logs in through insecureAuthService, whose pendingTwoFactor cache is a
+    // different instance from the secure provider's -- completing the code
+    // against the wrong one would miss the cached login and re-dial the very
+    // TLS channel the user just bypassed.
+    data class TwoFactorPending(val uid: String, val username: String, val password: String, val serverId: String, val service: AuthProvider)
     var twoFactorPending      by remember { mutableStateOf<TwoFactorPending?>(null) }
     var twoFactorError        by remember { mutableStateOf<String?>(null) }
     var twoFactorBusy         by remember { mutableStateOf(false) }
@@ -106,7 +112,7 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
                 onLogin(session)
             } catch (e: TwoFactorRequiredException) {
                 isLoading = false
-                if (authService.capabilities.supports2FA) {
+                if (service.capabilities.supports2FA) {
                     // Provider runs a real second factor: open the code dialog.
                     hivens.core.diag.ActionRing.record("Login: 2FA required, prompting for code")
                     val lastServer = profileManager.lastServerId ?: Protocol.DEFAULT_SERVER_ID
@@ -115,6 +121,7 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
                         username = login,
                         password = password,
                         serverId = lastServer,
+                        service = service,
                     )
                 } else {
                     // The wire-side completeTwoFactor() works for the login
@@ -154,7 +161,7 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
         scope.launch {
             try {
                 val session = withContext(Dispatchers.IO) {
-                    val sess = authService.completeTwoFactor(
+                    val sess = pending.service.completeTwoFactor(
                         username = pending.username, password = pending.password,
                         serverId = pending.serverId, uid = pending.uid, code = code,
                     )
