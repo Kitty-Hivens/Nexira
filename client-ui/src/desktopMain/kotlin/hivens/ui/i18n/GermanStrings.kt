@@ -66,8 +66,6 @@ object GermanStrings : AppStrings {
     override val profileTopUp              = "Guthaben aufladen"
     override val profileUploadSkin         = "Skin hochladen"
     override val profileUploadSkinLoading  = "Hochladen..."
-    override val profileSkinFront          = "Vorderseite"
-    override val profileSkinBack           = "Rückseite"
     override val profileSkinLoading        = "Skin wird geladen..."
     override val profileRefresh            = "Aktualisieren"
     override val profileUploadSuccess      = "Skin erfolgreich hochgeladen"
@@ -543,7 +541,6 @@ object GermanStrings : AppStrings {
     override val settingsCategoryAdvanced     = "Erweitert"
     override val settingsCategoryDiagnostics  = "Diagnose"
 
-    override val profileCategorySkin    = "Skin"
     override val profileCategoryAccount = "Konto"
     override val profileCategorySignIn      = "Anmelden"
     override val profileCategorySecurity    = "Sicherheit"

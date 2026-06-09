@@ -61,8 +61,6 @@ interface AppStrings {
     val profileTopUp: String
     val profileUploadSkin: String
     val profileUploadSkinLoading: String
-    val profileSkinFront: String
-    val profileSkinBack: String
     val profileSkinLoading: String
     val profileRefresh: String
     /** Shown in green after a successful skin upload. */
@@ -568,7 +566,6 @@ interface AppStrings {
     val settingsCategoryDiagnostics: String
 
     // --- Profile two-column nav labels ---
-    val profileCategorySkin: String
     val profileCategoryAccount: String
     val profileCategorySignIn: String
     val profileCategorySecurity: String

@@ -35,18 +35,19 @@ import org.koin.compose.koinInject
 private const val SURFACE = "profile"
 
 // profile surface composable. AppLayout routes Screen.Profile here.
-// Three slots: `nav` (left rail, fixed width), `skin` (right pane,
-// shown when category = Skin), `account` (right pane, shown when
-// category = Account). Header title stays in surface chrome -- the
-// title is a per-screen invariant the user cannot meaningfully
-// remove without losing the screen's identity. Inner glass frame
-// opted out of style.cardSurface so the screen stays glassy under
-// Brut, matching the Settings frame.
+// Slots: `nav` (left rail, fixed width), `signin` (right pane, the login
+// form when signed out / credential management when signed in), `account`
+// (right pane, the skin-forward identity hero when signed in). The `skin`
+// slot stays seeded but unrendered -- its widget is dormant until a
+// dedicated skin screen is built; the skin now leads the Account tab.
+// Header title stays in surface chrome -- a per-screen invariant the user
+// cannot meaningfully remove without losing the screen's identity. Inner
+// glass frame opts out of style.cardSurface so the screen stays glassy
+// under Brut, matching the Settings frame.
 //
-// Only one of `skin` / `account` slots renders at a time; the
-// inactive slot is unmounted entirely so the editor's chrome
-// decorator does not paint phantom chrome around the hidden section.
-// To edit the inactive section the user switches tabs via the nav.
+// Only one of `signin` / `account` renders at a time; the inactive slot is
+// unmounted so the editor's chrome decorator does not paint phantom chrome
+// around the hidden section.
 //
 // No verticalScroll on the right pane. A scroll modifier hands
 // children a maxHeight = Infinity constraint, and LazyList-based
@@ -113,9 +114,6 @@ fun ProfileSurface(
                     when (selectedCategory.value) {
                         ProfileCategory.SignIn  ->
                             SlotRenderer(SurfaceId(SURFACE), SlotId("signin"), Modifier.weight(1f).fillMaxHeight())
-                        ProfileCategory.Skin    ->
-                            if (session != null)
-                                SlotRenderer(SurfaceId(SURFACE), SlotId("skin"), Modifier.weight(1f).fillMaxHeight())
                         ProfileCategory.Account ->
                             if (session != null)
                                 SlotRenderer(SurfaceId(SURFACE), SlotId("account"), Modifier.weight(1f).fillMaxHeight())
