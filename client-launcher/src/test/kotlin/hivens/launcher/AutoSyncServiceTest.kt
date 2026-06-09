@@ -1,6 +1,6 @@
 package hivens.launcher
 
-import hivens.core.api.interfaces.IAuthService
+import hivens.auth.AuthProvider
 import hivens.core.api.interfaces.IFileDownloadService
 import hivens.core.api.interfaces.IManifestProcessorService
 import hivens.core.api.model.ServerProfile
@@ -25,7 +25,7 @@ import kotlin.io.path.deleteRecursively
 class AutoSyncServiceTest {
 
     private lateinit var sandbox: Path
-    private lateinit var authService: IAuthService
+    private lateinit var authService: AuthProvider
     private lateinit var downloadService: IFileDownloadService
     private lateinit var manifestProcessor: IManifestProcessorService
     private lateinit var manifestCache: ManifestCache

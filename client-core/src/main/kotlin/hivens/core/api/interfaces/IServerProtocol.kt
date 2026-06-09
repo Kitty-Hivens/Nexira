@@ -8,10 +8,10 @@ import hivens.core.api.protocol.StatusOnlyResponse
 /**
  * Wire-protocol abstraction over a SmartyCraft-compatible launcher
  * backend. Encapsulates all communication with the upstream
- * `*.smartycraft.ru` endpoints; repositories
- * ([hivens.core.api.AuthService], [hivens.core.api.ServerRepository],
- * etc.) consume this interface and no longer know URL paths, `action=`
- * strings, or signature schemes.
+ * `*.smartycraft.ru` endpoints; the repositories
+ * ([hivens.core.api.ServerRepository], [hivens.core.api.SkinRepository],
+ * etc.) and the SmartyCraft auth provider consume this interface and no
+ * longer know URL paths, `action=` strings, or signature schemes.
  *
  * Two implementations planned:
  * - `SmartycraftV1Protocol` (in `client-launcher`) speaks the legacy
