@@ -29,7 +29,6 @@ class SourceBuildService(
     private val onPath: (String) -> Boolean = ::defaultOnPath,
 ) {
     private val logger = LoggerFactory.getLogger(SourceBuildService::class.java)
-    private val osName = System.getProperty("os.name", "").lowercase()
     private val workspace: File = dataDirectory.resolve("source").toFile()
 
     /** Which external tools are present. [ready] gates a build attempt. */
@@ -50,8 +49,7 @@ class SourceBuildService(
     }
 
     /** Building from source + replacing the AppImage is Linux-AppImage only. */
-    fun isSupported(): Boolean =
-        osName.contains("linux") && !System.getenv("APPIMAGE").isNullOrBlank()
+    fun isSupported(): Boolean = runningAsLinuxAppImage()
 
     fun detectToolchain(): Toolchain = Toolchain(
         git = onPath("git"),

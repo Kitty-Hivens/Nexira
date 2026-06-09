@@ -15,11 +15,9 @@ import java.nio.file.Paths
  */
 class DesktopIntegration {
     private val logger = LoggerFactory.getLogger(DesktopIntegration::class.java)
-    private val osName = System.getProperty("os.name", "").lowercase()
 
     /** Only meaningful when running as an AppImage on Linux. */
-    fun isSupported(): Boolean =
-        osName.contains("linux") && !System.getenv("APPIMAGE").isNullOrBlank()
+    fun isSupported(): Boolean = runningAsLinuxAppImage()
 
     /**
      * Writes `~/.local/share/applications/dev.hivens.nexira.desktop` for the
