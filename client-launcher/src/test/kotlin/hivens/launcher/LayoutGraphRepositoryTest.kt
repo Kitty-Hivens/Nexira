@@ -633,6 +633,75 @@ class LayoutGraphRepositoryTest {
         )
     }
 
+    @Test
+    fun `bundled-default slot added to an existing surface auto-seeds into the user graph`() = runBlocking {
+        // Persist a graph whose `profile` surface pre-dates a slot the
+        // next release adds to that same surface.
+        val priorDefault = LayoutGraph(
+            surfaces = mapOf(
+                SurfaceId("profile") to SurfaceLayout(
+                    slots = mapOf(
+                        SlotId("nav")     to SlotContent(listOf(WidgetInstance(WidgetKind("profile.nav"), "nav-1"))),
+                        SlotId("account") to SlotContent(listOf(WidgetInstance(WidgetKind("profile.account"), "acct-1"))),
+                    ),
+                ),
+            ),
+        )
+        val priorRepo = LayoutGraphRepository(file, json, scope) { priorDefault }
+        priorRepo.flush()
+        assertTrue(Files.exists(file))
+
+        // New release adds a `signin` slot to the existing `profile` surface.
+        val signin = WidgetInstance(WidgetKind("profile.signin"), "signin-default")
+        val nextDefault = LayoutGraph(
+            surfaces = mapOf(
+                SurfaceId("profile") to SurfaceLayout(
+                    slots = priorDefault.surfaces[SurfaceId("profile")]!!.slots +
+                        (SlotId("signin") to SlotContent(listOf(signin))),
+                ),
+            ),
+        )
+        val loaded = LayoutGraphRepository(file, json, scope) { nextDefault }.value()
+        val profile = loaded.surfaces[SurfaceId("profile")]!!
+
+        assertTrue(SlotId("signin") in profile.slots, "new bundled-default slot must auto-seed into the existing surface")
+        assertEquals(
+            listOf(signin),
+            profile.slots[SlotId("signin")]!!.widgets,
+            "seeded slot must match the bundled default",
+        )
+        // The user's pre-existing slots in the same surface are untouched.
+        assertEquals("nav-1",  profile.slots[SlotId("nav")]!!.widgets.single().instanceId)
+        assertEquals("acct-1", profile.slots[SlotId("account")]!!.widgets.single().instanceId)
+    }
+
+    @Test
+    fun `a slot the user already has is not re-seeded over with the default`() = runBlocking {
+        // The user has reordered/edited the `nav` slot. A later default
+        // for that same slot must NOT clobber the user's version.
+        val userNav = WidgetInstance(WidgetKind("profile.nav"), "user-edited-nav")
+        val priorDefault = LayoutGraph(
+            surfaces = mapOf(
+                SurfaceId("profile") to SurfaceLayout(slots = mapOf(SlotId("nav") to SlotContent(listOf(userNav)))),
+            ),
+        )
+        LayoutGraphRepository(file, json, scope) { priorDefault }.flush()
+
+        val nextDefault = LayoutGraph(
+            surfaces = mapOf(
+                SurfaceId("profile") to SurfaceLayout(
+                    slots = mapOf(SlotId("nav") to SlotContent(listOf(WidgetInstance(WidgetKind("profile.nav"), "fresh-default-nav")))),
+                ),
+            ),
+        )
+        val loaded = LayoutGraphRepository(file, json, scope) { nextDefault }.value()
+        assertEquals(
+            "user-edited-nav",
+            loaded.surfaces[SurfaceId("profile")]!!.slots[SlotId("nav")]!!.widgets.single().instanceId,
+            "an existing slot keeps the user's content; only MISSING slots seed",
+        )
+    }
+
     // SlotPath compile-touch: ensure tests can construct one without
     // relying on widget-model internals leaking.
     @Suppress("unused")
