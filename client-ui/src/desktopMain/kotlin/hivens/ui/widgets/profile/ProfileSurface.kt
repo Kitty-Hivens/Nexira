@@ -12,6 +12,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -57,26 +58,39 @@ private const val SURFACE = "profile"
 // the pane overflows off-screen; the user resets the surface to
 // recover.
 @Composable
-fun ProfileSurface(session: SessionData) {
+fun ProfileSurface(
+    session: SessionData?,
+    onLogin: (SessionData) -> Unit,
+    onLogout: () -> Unit,
+) {
     val s = LocalStrings.current
     val skinManager: SkinManager = koinInject()
-    val selectedCategory = remember { mutableStateOf(ProfileCategory.Skin) }
+    val selectedCategory = remember {
+        mutableStateOf(if (session != null) ProfileCategory.Account else ProfileCategory.SignIn)
+    }
+
+    // Keep the category coherent with auth state: signing in lands on Account
+    // in place; signing out forces back to Sign in -- the only category that
+    // renders without a session.
+    LaunchedEffect(session != null) {
+        if (session == null) selectedCategory.value = ProfileCategory.SignIn
+        else if (selectedCategory.value == ProfileCategory.SignIn) selectedCategory.value = ProfileCategory.Account
+    }
 
     val ctx = remember(session, selectedCategory) {
         ProfileContext(
             session          = session,
             selectedCategory = selectedCategory,
+            onLogin          = onLogin,
+            onLogout         = onLogout,
         )
     }
 
-    // Puppet handlers stay at surface scope so automation drivers
-    // can invoke them regardless of which tab is active. The legacy
-    // ProfileScreen registered both at the screen body and the
-    // refresh / top-up effects are session-global -- not tab-bound.
-    // The visible buttons inside the per-tab widgets still call the
-    // same actions; this just keeps the automation contract stable.
+    // Puppet handlers stay at surface scope so automation drivers can invoke
+    // them regardless of the active tab. Skin refresh / top-up are signed-in
+    // only, so they no-op without a session.
     PuppetScreen("Profile")
-    PuppetClick("profile.refreshSkin") { skinManager.invalidate(session.playerName) }
+    PuppetClick("profile.refreshSkin") { session?.let { skinManager.invalidate(it.playerName) } }
     PuppetClick("profile.topUp")       { SystemActions.openUrl("http://smartycraft.ru/cabinet") }
 
     CompositionLocalProvider(LocalProfileContext provides ctx) {
@@ -97,10 +111,14 @@ fun ProfileSurface(session: SessionData) {
                 Row(Modifier.fillMaxSize().padding(16.dp)) {
                     SlotRenderer(SurfaceId(SURFACE), SlotId("nav"), Modifier.width(200.dp).fillMaxHeight())
                     when (selectedCategory.value) {
+                        ProfileCategory.SignIn  ->
+                            SlotRenderer(SurfaceId(SURFACE), SlotId("signin"), Modifier.weight(1f).fillMaxHeight())
                         ProfileCategory.Skin    ->
-                            SlotRenderer(SurfaceId(SURFACE), SlotId("skin"), Modifier.weight(1f).fillMaxHeight())
+                            if (session != null)
+                                SlotRenderer(SurfaceId(SURFACE), SlotId("skin"), Modifier.weight(1f).fillMaxHeight())
                         ProfileCategory.Account ->
-                            SlotRenderer(SurfaceId(SURFACE), SlotId("account"), Modifier.weight(1f).fillMaxHeight())
+                            if (session != null)
+                                SlotRenderer(SurfaceId(SURFACE), SlotId("account"), Modifier.weight(1f).fillMaxHeight())
                     }
                 }
             }

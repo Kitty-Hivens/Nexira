@@ -548,6 +548,10 @@ object EnglishStrings : AppStrings {
 
     override val profileCategorySkin    = "Skin"
     override val profileCategoryAccount = "Account"
+    override val profileCategorySignIn      = "Sign in"
+    override val profileCategorySecurity    = "Security"
+    override val profileForgetSavedSignIn   = "Forget saved sign-in"
+    override val profileSecurityHint        = "Your sign-in is saved on this device for auto-login."
 
     override val backgroundLoopMode      = "Loop"
     override val backgroundLoopUseCodec  = "Use codec"
@@ -774,7 +778,6 @@ object EnglishStrings : AppStrings {
         "widget.appshell.region.right" to "Right panel",
         "widget.appshell.region.showDivider" to "Divider",
         "widget.appshell.region.widthDp" to "Width (0 = flexible)",
-        "widget.appshell.rightrail.authpanel" to "Auth panel",
         "widget.appshell.rightrail.compactnews" to "News feed",
         "widget.bg.enable.toggle" to "Background on/off",
         "widget.bg.fx.animspeed" to "Animation speed",
@@ -855,6 +858,7 @@ object EnglishStrings : AppStrings {
         "widget.library.header.title" to "Heading",
         "widget.nav.entry" to "Nav item",
         "widget.profile.account.section" to "Account",
+        "widget.profile.signin" to "Sign in",
         "widget.profile.nav" to "Profile navigation",
         "widget.profile.skin.section" to "Skin",
         "widget.profile.skin.section.previewHeight" to "Preview height",

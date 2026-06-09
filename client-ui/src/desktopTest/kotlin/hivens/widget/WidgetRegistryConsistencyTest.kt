@@ -40,7 +40,6 @@ class WidgetRegistryConsistencyTest {
             "home.new.quicklaunch",
             "library.header",
             "library.body",
-            "appshell.rightrail.authpanel",
             "appshell.rightrail.compactnews",
             // shell-as-surface region widgets
             "appshell.region.left",
@@ -109,6 +108,7 @@ class WidgetRegistryConsistencyTest {
             "profile.nav",
             "profile.skin.section",
             "profile.account.section",
+            "profile.signin",
             "server.details.title",
             "server.details.tagbar",
             "server.details.description",
@@ -128,7 +128,7 @@ class WidgetRegistryConsistencyTest {
             .toSet()
         assertEquals(
             setOf(
-                "appshell.rightrail.authpanel",
+                "profile.signin",                // sign-in form: a user must not strand themselves logged-out
                 "appshell.region.left",          // shell regions: the frame must stay whole
                 "appshell.region.center",
                 "appshell.region.right",

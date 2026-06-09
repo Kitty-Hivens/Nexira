@@ -3,13 +3,11 @@ package hivens.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import hivens.core.data.SessionData
-import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.widgets.shell.LocalRightRailContext
 import hivens.ui.widgets.shell.RightRailContext
@@ -18,9 +16,10 @@ import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId
 
 /**
- * Right-side panel. Surface composable: owns the column container and
- * the divider between auth + news slots; widget content (auth panel,
- * news feed) resolves through SlotRenderer against the layout graph.
+ * Right-side panel. Surface composable: owns the column container; the
+ * news feed resolves through SlotRenderer against the layout graph.
+ * Sign-in moved to the Profile section, so the rail no longer carries an
+ * auth slot.
  */
 @Composable
 fun RightPanel(
@@ -40,8 +39,6 @@ fun RightPanel(
     }
     CompositionLocalProvider(LocalRightRailContext provides ctx) {
         Column(modifier = modifier.background(CelestiaTheme.colors.background)) {
-            SlotRenderer(SurfaceId(SURFACE), SlotId("auth"), Modifier.fillMaxWidth())
-            HorizontalDivider(color = glassSurfaceAlpha(0.7f))
             SlotRenderer(SurfaceId(SURFACE), SlotId("news"), Modifier.weight(1f).fillMaxWidth())
         }
     }

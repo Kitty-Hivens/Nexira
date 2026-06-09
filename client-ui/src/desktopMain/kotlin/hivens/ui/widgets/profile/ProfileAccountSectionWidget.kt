@@ -17,6 +17,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -27,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.easter.LocalAprilFools
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.platform.SystemActions
+import hivens.ui.puppet.PuppetClick
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.LocalStyle
 import hivens.widget.model.Widget
@@ -43,7 +45,8 @@ fun ProfileAccountSectionWidget(instance: WidgetInstance) {
     val s = LocalStrings.current
     val af = LocalAprilFools.current
     val style = LocalStyle.current
-    val session = ctx.session
+    // The nav only mounts this slot with a session; guard defensively.
+    val session = ctx.session ?: return
 
     Column(Modifier.fillMaxWidth()) {
         Text(
@@ -94,5 +97,14 @@ fun ProfileAccountSectionWidget(instance: WidgetInstance) {
                 containerColor = CelestiaTheme.colors.primary,
             ),
         )
+
+        Spacer(Modifier.height(8.dp))
+
+        // Logout is the primary identity action; never chaos-wrapped so the
+        // user can always sign out.
+        TextButton(onClick = ctx.onLogout, modifier = Modifier.fillMaxWidth()) {
+            Text(s.navLogout, color = CelestiaTheme.colors.error.copy(alpha = 0.7f))
+        }
+        PuppetClick("account.logout") { ctx.onLogout() }
     }
 }
