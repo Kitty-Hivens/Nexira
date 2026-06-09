@@ -540,7 +540,7 @@ class UpdateServiceTest {
     @Test
     fun `checkForUpdate returns LauncherUpdate when newer version exists`() = runTest {
         val svc = createService(githubReleaseJson(tagName = "v99.0.0"))
-        val update = svc.checkForUpdate(force = true)
+        val update = svc.checkForUpdate()
 
         assertNotNull(update, "Should detect v99.0.0 as an update")
         assertEquals("v99.0.0", update.version)
@@ -550,7 +550,7 @@ class UpdateServiceTest {
     @Test
     fun `checkForUpdate returns null when current version is up to date`() = runTest {
         val svc = createService(githubReleaseJson(tagName = "v0.0.0"))
-        val update = svc.checkForUpdate(force = true)
+        val update = svc.checkForUpdate()
 
         assertNull(update, "Should not offer downgrade")
     }
@@ -560,7 +560,7 @@ class UpdateServiceTest {
         // Use the actual client version from config
         val currentVersion = hivens.config.Branding.VERSION.removePrefix("v")
         val svc = createService(githubReleaseJson(tagName = "v$currentVersion"))
-        val update = svc.checkForUpdate(force = true)
+        val update = svc.checkForUpdate()
 
         assertNull(update, "Same version should not trigger update")
     }
@@ -573,7 +573,7 @@ class UpdateServiceTest {
                 name = "[CRITICAL] Aura Launcher v99.0.0"
             )
         )
-        val update = svc.checkForUpdate(force = true)
+        val update = svc.checkForUpdate()
 
         assertNotNull(update)
         assertTrue(update.isCritical, "Should flag as critical")
@@ -587,7 +587,7 @@ class UpdateServiceTest {
                 body = "This update contains CRITICAL security patches."
             )
         )
-        val update = svc.checkForUpdate(force = true)
+        val update = svc.checkForUpdate()
 
         assertNotNull(update)
         assertTrue(update.isCritical)
@@ -596,14 +596,14 @@ class UpdateServiceTest {
     @Test
     fun `checkForUpdate returns null on HTTP error`() = runTest {
         val svc = createService(body = "Rate limited", status = HttpStatusCode.Forbidden)
-        val update = svc.checkForUpdate(force = true)
+        val update = svc.checkForUpdate()
         assertNull(update)
     }
 
     @Test
     fun `checkForUpdate returns null on malformed JSON`() = runTest {
         val svc = createService(body = "not json {{{")
-        val update = svc.checkForUpdate(force = true)
+        val update = svc.checkForUpdate()
         assertNull(update)
     }
 
@@ -617,7 +617,7 @@ class UpdateServiceTest {
                 )
             )
         )
-        val update = svc.checkForUpdate(force = true)
+        val update = svc.checkForUpdate()
         assertNull(update, "No matching installer asset should return null")
     }
 
@@ -643,7 +643,7 @@ class UpdateServiceTest {
             MockResponse(urlContains = "releases/latest",  body = release),
             MockResponse(urlContains = "releases",         body = "[$release]"),
         )
-        val update = svc.checkForUpdate(force = true)
+        val update = svc.checkForUpdate()
         assertNull(update, "Auto-update must refuse when manifest is missing -- no silent skip")
     }
 
@@ -663,27 +663,17 @@ class UpdateServiceTest {
             MockResponse(urlContains = "releases/latest",  body = release),
             MockResponse(urlContains = "releases",         body = "[$release]"),
         )
-        val update = svc.checkForUpdate(force = true)
+        val update = svc.checkForUpdate()
         assertNull(update, "Manifest without the selected asset's hash must refuse update")
     }
 
     @Test
     fun `checkForUpdate uses fallback changelog when body is null`() = runTest {
         val svc = createService(githubReleaseJson(tagName = "v99.0.0", body = null))
-        val update = svc.checkForUpdate(force = true)
+        val update = svc.checkForUpdate()
 
         assertNotNull(update)
         assertEquals("No changelog available", update.changelog)
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // shouldCheck (cooldown logic)
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    @Test
-    fun `shouldCheck returns true on fresh install (no last-check file)`() {
-        val svc = createService("{}")
-        assertTrue(svc.shouldCheck())
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -702,7 +692,6 @@ class UpdateServiceTest {
         Files.writeString(updatesDir.resolve("AuraLauncher-1.0.0-Windows-Portable.zip"), "fake")
         Files.writeString(updatesDir.resolve("AuraLauncher-1.0.0.dmg"), "fake")
         Files.writeString(updatesDir.resolve("AuraLauncher-1.0.0-x86_64.AppImage"), "fake")
-        Files.writeString(updatesDir.resolve(".last_check"), "123456")   // should survive
         Files.writeString(updatesDir.resolve("notes.txt"), "keep me")   // should survive
 
         val svc = UpdateService(
@@ -717,7 +706,6 @@ class UpdateServiceTest {
         assertFalse(Files.exists(updatesDir.resolve("AuraLauncher-1.0.0-Windows-Portable.zip")))
         assertFalse(Files.exists(updatesDir.resolve("AuraLauncher-1.0.0.dmg")))
         assertFalse(Files.exists(updatesDir.resolve("AuraLauncher-1.0.0-x86_64.AppImage")))
-        assertTrue(Files.exists(updatesDir.resolve(".last_check")), ".last_check should survive")
         assertTrue(Files.exists(updatesDir.resolve("notes.txt")), "notes.txt should survive")
     }
 
@@ -738,7 +726,7 @@ class UpdateServiceTest {
             MockResponse(urlContains = "releases",        body = "[$draft,$rc]"),
             settings = fakeSettings(updateChannel = ReleaseChannel.Beta)
         )
-        val update = svc.checkForUpdate(force = true)
+        val update = svc.checkForUpdate()
         assertNotNull(update)
         assertEquals("v99.0.0-rc1", update.version)
     }
@@ -752,7 +740,7 @@ class UpdateServiceTest {
             MockResponse(urlContains = "releases",        body = "BOOM",            status = HttpStatusCode.InternalServerError),
             settings = fakeSettings(updateChannel = ReleaseChannel.Release)
         )
-        val update = svc.checkForUpdate(force = true)
+        val update = svc.checkForUpdate()
         assertNotNull(update)
         assertEquals("v99.0.0", update.version)
     }
@@ -826,7 +814,7 @@ class UpdateServiceTest {
             MockResponse(urlContains = "update-channel.json", body = channelMeta),
             settings = fakeSettings(experimentalFeaturesEnabled = false)
         )
-        val update = svc.checkForUpdate(force = true)
+        val update = svc.checkForUpdate()
         assertNotNull(update)
         assertFalse(update.isMandatory, "Master off must force mandatory off even when floor > current")
     }
@@ -844,7 +832,7 @@ class UpdateServiceTest {
             MockResponse(urlContains = "update-channel.json", body = channelMeta),
             settings = fakeSettings()  // mandatory ON, prereleases OFF (default)
         )
-        val update = svc.checkForUpdate(force = true)
+        val update = svc.checkForUpdate()
         assertNotNull(update)
         assertTrue(update.isMandatory, "Floor 999.0.0 > installed should mandate the update")
         assertEquals("upstream protocol broke", update.mandatoryReason)
@@ -860,7 +848,7 @@ class UpdateServiceTest {
             MockResponse(urlContains = "update-channel.json", body = channelMeta),
             settings = fakeSettings()
         )
-        val update = svc.checkForUpdate(force = true)
+        val update = svc.checkForUpdate()
         assertNotNull(update)
         assertFalse(update.isMandatory)
         assertNull(update.mandatoryReason)
@@ -875,7 +863,7 @@ class UpdateServiceTest {
             MockResponse(urlContains = "update-channel.json", body = "Not Found", status = HttpStatusCode.NotFound),
             settings = fakeSettings()
         )
-        val update = svc.checkForUpdate(force = true)
+        val update = svc.checkForUpdate()
         assertNotNull(update)
         assertFalse(update.isMandatory, "Missing channel meta must not block startup")
     }
@@ -889,7 +877,7 @@ class UpdateServiceTest {
             MockResponse(urlContains = "update-channel.json", body = channelMeta),
             settings = fakeSettings(mandatoryUpdatesEnabled = false)
         )
-        val update = svc.checkForUpdate(force = true)
+        val update = svc.checkForUpdate()
         assertNotNull(update)
         assertFalse(update.isMandatory)
     }
@@ -968,7 +956,7 @@ class UpdateServiceTest {
             MockResponse(urlContains = "update-channel.json", body = channelMeta),
             settings = fakeSettings()
         )
-        val update = svc.checkForUpdate(force = true)
+        val update = svc.checkForUpdate()
         assertNotNull(update)
         assertTrue(update.isMandatory)
     }

@@ -24,7 +24,7 @@ fun UpdateManager() {
             // new one in the updates dir.
             updateService.cleanupOldUpdates()
 
-            val update = updateService.checkForUpdate(force = false)
+            val update = updateService.checkForUpdate()
             if (update != null) {
                 availableUpdate = update
                 // Critical AND mandatory both skip the corner-notification step
@@ -41,7 +41,7 @@ fun UpdateManager() {
 
     // Mandatory poll loop. Long-running launcher sessions (someone leaves it
     // open all afternoon) need a path for emergency upstream-protocol-broke
-    // updates that doesn't wait for the next 12h release-check cycle. The
+    // updates that doesn't wait for the next launcher restart. The
     // service-side cooldown (5 min) caps the actual network rate; the UI
     // tick is intentionally faster (1 min) so a cooldown that elapses
     // mid-tick still gets picked up promptly.
