@@ -28,7 +28,7 @@ import org.koin.compose.koinInject
 // signing in completes in place -- onLogin flips the app to Authenticated and
 // the surface re-renders on the Account tab. Signed in it manages the saved
 // credential: forget it so the next launch does not auto-login (the only UI
-// for that today). Logout lives on the Account tab.
+// for that today). Logout lives in the left-rail nav.
 //
 // Both states are capped to a comfortable column width so the form/buttons read
 // as controls in a card, not full-pane bars across the wide profile content.

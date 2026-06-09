@@ -47,9 +47,10 @@ import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 
 // Account tab, skin-forward (option 7): the account panel (name + status,
-// balance + top-up, logout) sits on top, with the 3D skin and its upload/refresh
+// balance + top-up) sits on top, with the 3D skin and its upload/refresh
 // controls directly below. Reads session from LocalProfileContext; online status
-// keeps the token-length sniff from the legacy panel.
+// keeps the token-length sniff from the legacy panel. Logout itself is the
+// left-rail nav entry; the account.logout puppet hook below stays for automation.
 @Widget(id = "profile.account.section", displayName = "widget.profile.account.section")
 @Composable
 fun ProfileAccountSectionWidget(instance: WidgetInstance) {
