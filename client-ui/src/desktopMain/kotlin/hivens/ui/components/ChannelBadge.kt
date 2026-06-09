@@ -33,9 +33,9 @@ fun channelColor(channel: ReleaseChannel): Color = when (channel) {
 }
 
 /**
- * Channel pill, colour-coded per the user's scheme: release green, beta blue,
- * alpha yellow, dev gradient, git monochrome. Reads its corner from the style
- * engine so it follows Celestia/Brut.
+ * Channel pill: release green, beta blue, alpha yellow, git orange, dev
+ * monochrome (a greyscale gradient rather than a flat tint). Reads its corner
+ * from the style engine so it follows Celestia/Brut.
  */
 @Composable
 fun ChannelBadge(channel: ReleaseChannel, modifier: Modifier = Modifier) {
