@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
-# Scans source files for documentation anti-patterns banned under Style D
-# (see ~/.claude/.../memory/feedback_documentation_style_d.md).
+# Scans source files for the comment anti-patterns banned under the project's
+# "Style D" doc convention: process metadata and dated history that git blame
+# and commit messages already carry -- PR/issue numbers, Codex/audit markers,
+# dated action verbs, "previously X now Y", and version-tied notes.
 #
 # Catches the mechanical / process-metadata violations that are objectively
 # wrong in any reasonable style. Semantic violations (KDoc bloat on

@@ -4,13 +4,72 @@ All notable changes to Nexira (formerly Aura Launcher) will be
 documented in this file. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-※ Each released entry opens with a short `### Highlights` block --
+Note: each released entry opens with a short `### Highlights` block --
 2-5 plain-English bullets summarizing what the user actually notices.
-The launcher's in-app update dialog renders just the Highlights; the
-detailed `### Added`/`### Changed`/`### Fixed`/`### Removed` sections
-below are for the GitHub release page and CHANGELOG readers.
+The launcher's in-app update dialog renders just the Highlights.
+
+The detailed `### Added`/`### Changed`/`### Fixed`/`### Removed` sections
+below are an engineering log. Name the actual classes, files, and
+mechanism, and the reason behind the change -- not just the user-facing
+feature (see 2.2.12 for the reference depth). Scale the depth to the
+release weight: a fast beta can stay thin, a stable rollup carries the
+full writeup consolidating its betas.
+
+Author each entry -- version summaries and the Added/Changed/Fixed bullets --
+as one physical line, no manual line wrapping. A `.md` renders the same either
+way, and these notes feed the GitHub Release / in-app updater verbatim, where a
+hand-wrapped line would render as a <br> staircase.
+
+`CHANGELOG_RU.md` and `CHANGELOG_DE.md` carry the Highlights only. They
+are for users, who do not read class names; the developer-level detail
+lives in this English file.
 
 ## [Unreleased]
+
+## [2.3.4-beta5] - 2026-06-09
+
+A profile-and-updates release. The Profile is rebuilt around a live 3D
+render of your skin, with sign-in moved inside it and reachable while
+logged out. A new in-app update manager adds release channels, rollback,
+a desktop-shortcut install, and -- for developers -- building the launcher
+from source. Underneath: the launcher no longer dies on a corrupt world
+file, auth is carved into its own modules, and the AppImage gains a
+cross-distro release gate.
+
+### Highlights
+- **Your skin in 3D**. The Profile's account tab leads with a live, rotatable 3D render of your skin, drawn from scratch with no extra dependency.
+- **Sign in from the Profile**. The login form lives in the Profile and is reachable while logged out; the cramped right-rail login is gone.
+- **An update manager with channels**. The "i" by the version opens a manager: pick a channel (Release / Beta / Alpha, plus Dev / Git source builds), update or roll back to a recent version, and install a desktop shortcut.
+- **Background update checks**. The About screen checks for updates on its own every few minutes and tints the running version by its channel.
+- **A corrupt world or server file no longer crashes the launcher**. A malformed NBT length used to take the whole launcher down on scan.
+
+### Added
+- 3D skin renderer in a new `hivens.ui.skin3d` package. A Compose-free core builds the player as textured boxes (head/body/arms/legs plus the overlay layer, classic vs slim arm width, legacy 64x32) from the standard Minecraft UV layout, rotates by yaw/pitch, projects orthographically, back-face culls, and depth-sorts (painter's). `SkinView3D` draws each surviving face with a single Skia `Canvas.drawImageRect` under a per-face affine `Matrix33` at NEAREST sampling, so texels stay sharp with no extra dependency; drag rotates and an idle auto-spin runs while the style engine's motion token is non-zero (Brut holds it still). The geometry, projection, cull and face-affine are unit-tested without a renderer.
+- `SkinManager.getRawSkin(nickname)` returns the raw skin texture (`ImageBitmap`) for the 3D view, reusing the existing disk + bounded-LRU cache and the path-traversal-safe cache filename. The baked 2D front/back paper-doll (`assembleSkin`, `getSkinFront`/`getSkinBack`) is removed.
+- In-app update manager (`UpdateManagerDialog`), opened from the version "i" in About. `UpdateService.listReleases(channel)` fetches the GitHub releases once, classifies and cumulative-filters them by channel, and caches them; `prepareUpdate(version)` resolves a picked version from that cache, fetches its `release-manifest.json`, and runs the same OS-asset + manifest-pinned SHA-256 gate as the auto-check (`buildUpdate`), so install and rollback share one verified path. Installing an older version is a rollback -- there is no downgrade guard, and the integrity gate still applies.
+- Release channels: `ReleaseChannel { Release, Beta, Alpha, Dev, Git }` in `client-core`, replacing the `prereleaseChannelEnabled` boolean on `SettingsData`. A tag is classified by its prerelease suffix (`-alpha*` -> Alpha, other prerelease -> Beta, none -> Release), and a `git describe` of a non-release checkout (commits-ahead `-<n>-g<sha>` or `-dirty`) reads as a source build (`Dev`). Channel selection is cumulative (Alpha shows alpha + beta + release).
+- Build-from-source channels (`SourceBuildService`, Linux/AppImage only). Dev builds the `dev` branch, Git the `stable` branch: it detects the toolchain (git + a JDK + appimagetool), clones/fetches into `<dataDir>/source`, runs `:client-ui:packageReleaseUberJarForCurrentOS` + `:client-ui:emitAppImageProfile` then `scripts/build-appimage.sh`, and hands the produced AppImage to the standard applicator. Gated behind the experimental master switch and a present toolchain; the manager shows what is missing otherwise.
+- `DesktopIntegration.installEntry()` writes `~/.local/share/applications/dev.hivens.nexira.desktop` with `Exec`/`Icon` pointed at the running `$APPIMAGE` and nudges `update-desktop-database`. Linux/AppImage only; surfaced as the manager's "Install .desktop entry" action.
+
+### Changed
+- The Profile is decoupled from auth and is the home for identity (foundation of the onboarding epic, #365). `ProfileSurface` takes a nullable `SessionData` and threads `onLogin`/`onLogout`: a new Sign-in category renders the relocated `LoginPanel` while signed out (its SSL-bypass, capability-driven 2FA, and remember-me intact) and completes in place; signed in it re-labels to Security and is the only UI for `CredentialsManager.clear()` ("Forget saved sign-in") outside logout, while Account carries the primary logout. The nav entry is ungated. The right rail's auth panel is gone -- `RightRailAuthPanel` and `AccountPanel` are deleted and the auth slot is dropped from `RightPanel` and the default-layout seed. `profile.signin` is `removable=false`.
+- The Account tab is rebuilt skin-forward: an identity panel (name + online status, balance + glass top-up, skin upload + refresh) above the 3D skin stage. The standalone Skin tab is disabled (its `profile.skin.section` widget stays registered for a future detailed screen) and the sign-in form is width-constrained.
+- Auth extracted from the launcher god-module into `:client-auth` (the provider-agnostic `AuthProvider` SPI + `AbstractCachingAuthProvider`: session cache, retry/error-translation funnel, transient/SSL classifiers) and `:client-auth-smartycraft` (`SmartyCraftAuthProvider`: the `AUTH_SALT`+AES token, V1 login, status mapping, TWOAUTH/2FA flow lifted from the old core `AuthService`). `AuthProvider` replaces `IAuthService` and carries `AuthCapabilities(supports2FA)`; SmartyCraft sets it false (its 2FA logs in on the wire but breaks the game-side session), and `LoginPanel` branches on the capability instead of hardcoding SmartyCraft. `core/AuthService.kt` and `IAuthService.kt` are deleted; the new modules carry no Koin and the seam is acyclic.
+- The prerelease-channel Settings toggle is replaced by the channel picker in the update manager; the experimental master switch now gates the Dev/Git source channels. The About update panel auto-checks every 5 minutes while open (stopping once an update is found) and colours the running version by its channel.
+- Dependencies: Kotlin 2.3.21 -> 2.4.0 (the compose-compiler, serialization and multiplatform plugins follow the version ref; KSP stays 2.3.9 and compiles clean), ktor 3.4.3 -> 3.5.0, logback 1.5.34, buildconfig 6.0.10, mockk 1.14.11, JUnit 5.12.2 / platform 1.12.2, Gradle wrapper 9.5.1. JUnit is held on the 5.x line: 6.x drops Java 8, which `authlib-agent` and `profiler-agent` still target as bytecode for the legacy 1.12.2 game JVM.
+- CI: the AppImage cross-distro portability check (`appimage-portability.yml`) is now a reusable workflow that `build_release.yml` runs as a publish-blocking gate against this run's freshly built AppImage on Fedora / Arch / Debian-stable, instead of a weekly schedule against an already-shipped asset. The `check-comments.py` Style-D scan runs `--strict` as a hard gate (a stray review marker in `DefaultCacheTest` was the last baseline hit), and the linter header no longer points at a private `~/.claude` memory path.
+
+### Fixed
+- `LayoutGraphRepository.load` now seeds slots added to a surface that already exists in a saved layout, not only whole missing surfaces (`mergeMissingSlots` alongside `mergeMissingSurfaces`). A slot introduced in a later release -- here the new `profile.signin` slot -- otherwise rendered as a blank pane for any user with a persisted layout graph, with no in-product way back. Slots are structural (the editor has no create/delete-slot op), so a missing slot is always an upstream addition and the merge is additive: it cannot resurrect something the user removed.
+- `Nbt.read` no longer pre-allocates an array from an untrusted length. A corrupt `TAG_Byte_Array` / `TAG_Int_Array` / `TAG_Long_Array` (or `TAG_List`) header with a negative or near-`Int.MAX_VALUE` length used to call `ByteArray(len)` / `IntArray(len)` / `ArrayList(len)` and throw `OutOfMemoryError`. `OutOfMemoryError` is an `Error`, not an `Exception`, so it slipped past the `catch (Exception)` guard in the world and server NBT scanners and took the launcher down. The reader now rejects a negative length, reads byte arrays in bounded chunks via `readNBytes` (raising `NbtException` on a short stream), and grows the int/long arrays element-by-element so a bogus length EOFs into a catchable `NbtException` instead of reserving gigabytes up front.
+- `GitHubRelease.name` is nullable. GitHub returns `"name": null` for a release published without a title; the non-null field failed to decode, and the exception turned `UpdateService.checkForUpdate` into "no update" for every user until a titled release was published. The field now defaults to `null` and the `[CRITICAL]` gate reads it null-safely.
+- A second Dev/Git source build aborted: `build-appimage.sh` and `jlink` refuse a pre-existing `AppDir`/output, which the first build leaves behind. `SourceBuildService` now clears the scratch `AppDir` and stale output before packaging.
+- The update-manager modal scaled its background alpha by the glass-intensity knob, so a low setting left it near-transparent over the scrimless `BasicAlertDialog`; it is pinned to a fixed near-opaque dark panel. `detectToolchain` ran twice on the composition thread; it is resolved once.
+
+### Removed
+- The dead `SkiaTracker` debug instrumentation. Its overlay (`SkiaDebugOverlay`) was never mounted, but the `track()` calls stayed live in `CustomBackground`, `SquareServerCard`, `ServerSettingsScreen` and `ServerDetailsSurface`; only the dead overlay drained the tracking queue, so it grew unbounded over a session (a slow leak -- weak refs free the bitmaps, but the queue wrappers never drain). The four call sites, the `decodeFrame` trackTag plumbing and the `SkiaTracker` file are gone; the diagnostics capability is tracked for a proper mounted, dev-gated replacement.
+- The migrated-away `SlotAddress` compatibility overloads: the flat `(SurfaceId, SlotId)` forms of `insertWidget`/`removeWidget`/`reorderInSlot`/`moveWidget` on `LayoutGraph` and `Modifier.slotBounds(SlotAddress)`, transitional shims for the move onto `SlotPath` with no remaining production callers, plus their two compat tests. `SlotAddress` itself stays as the flat leaf identifier behind `EmptySlotDecorator` and the `SlotPath.leafAddress`/`SlotAddress.toPath` bridge.
+- Two no-op Compose keep-alive functions (`touchDerivedStateOf`/`touchSnapshot` in `DragAndDrop`): unused private methods the shrinker strips anyway (and the ProGuard config keeps `androidx.compose.**`/`hivens.ui.**` wholesale), so they kept nothing alive; `derivedStateOf` is genuinely used in `ConsoleWindow`.
 
 ## [2.3.4-beta4] - 2026-06-07
 

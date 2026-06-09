@@ -6,12 +6,10 @@ import androidx.compose.foundation.gestures.awaitTouchSlopOrCancellation
 import androidx.compose.foundation.gestures.drag
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ProvidableCompositionLocal
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.mutableStateMapOf
-import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -20,7 +18,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
-import hivens.widget.model.SlotAddress
 import hivens.widget.model.SlotOrientation
 import hivens.widget.model.SlotPath
 import hivens.widget.model.WidgetInstance
@@ -277,16 +274,3 @@ fun Modifier.widgetBounds(
 ): Modifier = this.onGloballyPositioned { coords: LayoutCoordinates ->
     registry.registerWidget(path, instanceId, index, coords.boundsInWindow())
 }
-
-// SlotAddress-keyed compat for callers that have not migrated yet.
-// Internally promotes to a root-level SlotPath -- safe for flat
-// surfaces, lossy for nested ones.
-@Deprecated(
-    message     = "Use the SlotPath form; SlotAddress loses nested context",
-    replaceWith = ReplaceWith("slotBounds(registry, SlotPath(slot.surface, slot.slot))"),
-)
-fun Modifier.slotBounds(registry: DropTargetRegistry, slot: SlotAddress): Modifier =
-    slotBounds(registry, SlotPath(slot.surface, slot.slot))
-
-@Suppress("unused") private fun touchDerivedStateOf() = derivedStateOf { 0 }
-@Suppress("unused") private fun touchSnapshot() = Snapshot.current

@@ -1,6 +1,6 @@
 package hivens.launcher
 
-import hivens.core.api.AuthService
+import hivens.auth.smartycraft.SmartyCraftAuthProvider
 import hivens.core.api.model.ServerProfile
 import hivens.core.api.protocol.LoginResponse
 import hivens.core.data.FileData
@@ -95,7 +95,7 @@ class LaunchPipelineIntegrationTest {
     @Test
     fun `auth via fake protocol produces a SessionData with embedded manifest`() = runTest {
         val protocol = protocolWithLaunchwrapperManifest()
-        val session = AuthService(protocol).login("user", "pass", "Industrial")
+        val session = SmartyCraftAuthProvider(protocol).login("user", "pass", "Industrial")
 
         assertEquals("TestPlayer", session.playerName)
         assertEquals("550e8400e29b41d4a716446655440000", session.uuid)
@@ -114,7 +114,7 @@ class LaunchPipelineIntegrationTest {
         Files.createFile(libDir / "launchwrapper-1.12.jar")
 
         val protocol = protocolWithLaunchwrapperManifest()
-        val session = AuthService(protocol).login("user", "pass", "Industrial")
+        val session = SmartyCraftAuthProvider(protocol).login("user", "pass", "Industrial")
 
         val manifestProcessor = ManifestProcessorService(json)
         val classpathProvider = ClasspathProvider(manifestProcessor)
@@ -131,7 +131,7 @@ class LaunchPipelineIntegrationTest {
         Files.createFile(libDir / "launchwrapper-1.12.jar")
 
         val protocol = protocolWithLaunchwrapperManifest()
-        val session = AuthService(protocol).login("user", "pass", "Industrial")
+        val session = SmartyCraftAuthProvider(protocol).login("user", "pass", "Industrial")
 
         val manifestProcessor = ManifestProcessorService(json)
         val classpath = ClasspathProvider(manifestProcessor)
@@ -173,7 +173,7 @@ class LaunchPipelineIntegrationTest {
             loginResult = { LoginResponse(status = "PASSWORD") }
         }
         val ex = kotlin.runCatching {
-            AuthService(protocol).login("user", "wrong", "Industrial")
+            SmartyCraftAuthProvider(protocol).login("user", "wrong", "Industrial")
         }.exceptionOrNull()
         assertNotNull(ex, "PASSWORD-status response must throw, not produce a SessionData")
         // We deliberately don't assert the specific exception type here -- the

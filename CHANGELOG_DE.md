@@ -3,6 +3,22 @@
 Changelog von Nexira auf Deutsch. Gepflegt ab Version 2.3.4-beta4; die
 vollständige Historie auf Englisch steht in [CHANGELOG.md](./CHANGELOG.md).
 
+## [2.3.4-beta5] - 2026-06-09
+
+Ein Profil-und-Updates-Release. Das Profil ist um einen lebendigen
+3D-Render deines Skins herum neu aufgebaut, die Anmeldung ist ins Profil
+gewandert und auch abgemeldet erreichbar. Ein neuer Update-Manager bringt
+Release-Kanäle, das Zurückrollen auf eine frühere Version, die
+Installation einer Desktop-Verknüpfung und -- für Entwickler -- das Bauen
+des Launchers aus dem Quellcode.
+
+### Highlights
+- **Dein Skin in 3D**. Der Konto-Tab im Profil führt jetzt mit einem lebendigen, drehbaren 3D-Render deines Skins, von Grund auf ohne zusätzliche Abhängigkeit gezeichnet.
+- **Anmeldung aus dem Profil**. Das Login-Formular liegt im Profil und ist auch abgemeldet erreichbar; das beengte Login in der rechten Leiste ist weg.
+- **Ein Update-Manager mit Kanälen**. Das "i" neben der Version öffnet einen Manager: Kanal wählen (Release / Beta / Alpha, dazu Dev / Git aus dem Quellcode), auf eine neuere Version aktualisieren oder zurückrollen, und eine Desktop-Verknüpfung installieren.
+- **Update-Prüfung im Hintergrund**. Der Info-Bildschirm prüft selbst alle paar Minuten auf Updates und färbt die laufende Version nach ihrem Kanal.
+- **Eine kaputte Welt- oder Server-Datei stürzt den Launcher nicht mehr ab**. Eine fehlerhafte NBT-Länge legte beim Scan den ganzen Launcher lahm.
+
 ## [2.3.4-beta4] - 2026-06-07
 
 Das SmartyCraft-Modpack-Release. Ein Modpack, das auf einen

@@ -69,8 +69,6 @@ object EnglishStrings : AppStrings {
     override val profileTopUp              = "Top up balance"
     override val profileUploadSkin         = "Upload skin"
     override val profileUploadSkinLoading  = "Uploading..."
-    override val profileSkinFront          = "Front"
-    override val profileSkinBack           = "Back"
     override val profileSkinLoading        = "Loading skin..."
     override val profileRefresh            = "Refresh"
     override val profileUploadSuccess      = "Skin uploaded successfully"
@@ -151,6 +149,26 @@ object EnglishStrings : AppStrings {
     override val updateScheduleFailed  = "Failed to schedule update"
     override fun updateVersion(version: String) = "Version $version"
     override val updateDetails         = "Details"
+
+    // Update manager
+    override val updateManagerTitle          = "Update manager"
+    override val updateManagerChannel        = "Channel"
+    override val updateChannelRelease        = "Release"
+    override val updateChannelBeta           = "Beta"
+    override val updateChannelAlpha          = "Alpha"
+    override val updateChannelDev            = "Dev"
+    override val updateChannelGit            = "Git"
+    override val updateManagerCurrentTag     = "current"
+    override val updateManagerInstall        = "Install"
+    override val updateManagerRollback       = "Roll back"
+    override val updateManagerBuild          = "Build & install"
+    override val updateManagerInstallDesktop = "Install .desktop entry"
+    override val updateManagerDesktopDone    = "Desktop entry installed"
+    override val updateManagerEmpty          = "No versions found"
+    override val updateManagerNeedsExperimental = "Enable experimental features in Settings to use source channels."
+    override val updateManagerBuilding       = "Building from source..."
+    override val updateManagerOpenHint       = "Open update manager"
+    override fun updateManagerNeedsTools(tools: String) = "Requires developer tools: $tools"
 
     // Console
     override val consoleTitle = "Debug Console"
@@ -289,8 +307,6 @@ object EnglishStrings : AppStrings {
     override val aboutCurrentVersion       = "Current version"
     override val aboutCheckUpdates         = "Check for updates"
     override val aboutChecking             = "Checking..."
-    override val aboutUpToDate             = "You're up to date!"
-    override val aboutCheckAgain           = "Check again"
     override fun aboutUpdateAvailable(version: String) = "Version $version available"
     override val aboutCriticalUpdate       = "Critical update"
     override val aboutSectionSystem        = "System"
@@ -328,8 +344,6 @@ object EnglishStrings : AppStrings {
     override val settingsExperimentalMasterDesc = "Master toggle. Disabling this forces both knobs below to off, regardless of their stored values."
     override val settingsMandatoryUpdates       = "Mandatory updates"
     override val settingsMandatoryUpdatesDesc   = "Block startup until critical updates are installed when the upstream protocol breaks. Currently ON by default."
-    override val settingsPrereleaseChannel      = "Pre-release update channel"
-    override val settingsPrereleaseChannelDesc  = "Receive RC and beta builds. Lets you get protocol fixes before the next stable release. Currently ON by default."
     override val settingsAutoSyncAllPacks       = "Auto-sync installed packs on launch"
     override val settingsAutoSyncAllPacksDesc   = "Quietly refresh every server pack you've already installed when the launcher starts. Costs background bandwidth — useful if you switch between many servers and want fresh state without clicking each one."
     override val settingsJvmBuilder             = "Visual JVM args builder"
@@ -546,8 +560,11 @@ object EnglishStrings : AppStrings {
     override val settingsCategoryAdvanced     = "Advanced"
     override val settingsCategoryDiagnostics  = "Diagnostics"
 
-    override val profileCategorySkin    = "Skin"
     override val profileCategoryAccount = "Account"
+    override val profileCategorySignIn      = "Sign in"
+    override val profileCategorySecurity    = "Security"
+    override val profileForgetSavedSignIn   = "Forget saved sign-in"
+    override val profileSecurityHint        = "Your sign-in is saved on this device for auto-login."
 
     override val backgroundLoopMode      = "Loop"
     override val backgroundLoopUseCodec  = "Use codec"
@@ -774,7 +791,6 @@ object EnglishStrings : AppStrings {
         "widget.appshell.region.right" to "Right panel",
         "widget.appshell.region.showDivider" to "Divider",
         "widget.appshell.region.widthDp" to "Width (0 = flexible)",
-        "widget.appshell.rightrail.authpanel" to "Auth panel",
         "widget.appshell.rightrail.compactnews" to "News feed",
         "widget.bg.enable.toggle" to "Background on/off",
         "widget.bg.fx.animspeed" to "Animation speed",
@@ -855,6 +871,7 @@ object EnglishStrings : AppStrings {
         "widget.library.header.title" to "Heading",
         "widget.nav.entry" to "Nav item",
         "widget.profile.account.section" to "Account",
+        "widget.profile.signin" to "Sign in",
         "widget.profile.nav" to "Profile navigation",
         "widget.profile.skin.section" to "Skin",
         "widget.profile.skin.section.previewHeight" to "Preview height",

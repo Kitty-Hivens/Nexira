@@ -22,7 +22,7 @@ import hivens.config.Protocol
 import hivens.core.api.AuthException
 import hivens.core.api.TwoFactorRequiredException
 import hivens.core.data.AuthStatus
-import hivens.core.api.interfaces.IAuthService
+import hivens.auth.AuthProvider
 import hivens.core.data.SessionData
 import hivens.launcher.CredentialsManager
 import hivens.launcher.network.NetworkState
@@ -45,8 +45,8 @@ import org.koin.core.qualifier.named
 
 @Composable
 fun LoginPanel(onLogin: (SessionData) -> Unit) {
-    val authService: IAuthService              = koinInject()
-    val insecureAuthService: IAuthService      = koinInject(named("insecure"))
+    val authService: AuthProvider              = koinInject()
+    val insecureAuthService: AuthProvider      = koinInject(named("insecure"))
     val credentialsManager: CredentialsManager = koinInject()
     val profileManager: ProfileManager         = koinInject()
     val protocolConfig: ServerProtocolConfig   = koinInject()
@@ -62,13 +62,19 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var sslWarning   by remember { mutableStateOf(false) }
 
-    // 2FA flow state. The current SmartyCraft provider does not support
-    // 2FA -- when the server demands a code we surface
-    // [twoFactorUnsupported] instead of opening the dialog. The
-    // [twoFactorPending] / completeTwoFactor / ConfirmCodeDialog path
-    // remains as dead-code scaffolding for future auth providers that
-    // DO support 2FA (see [[project_client_auth_extraction]]).
-    data class TwoFactorPending(val uid: String, val username: String, val password: String, val serverId: String)
+    // 2FA flow state. Which path a TWOAUTH demand takes is decided by the
+    // provider's AuthCapabilities.supports2FA: a capable provider opens the
+    // [twoFactorPending] / completeTwoFactor / ConfirmCodeDialog path; the
+    // SmartyCraft provider sets supports2FA = false, so the demand surfaces the
+    // [twoFactorUnsupported] banner instead (its 2FA login succeeds on the wire
+    // but breaks every game-side authenticated call after).
+    //
+    // [service] is the provider that raised the demand. The SSL-bypass retry
+    // logs in through insecureAuthService, whose pendingTwoFactor cache is a
+    // different instance from the secure provider's -- completing the code
+    // against the wrong one would miss the cached login and re-dial the very
+    // TLS channel the user just bypassed.
+    data class TwoFactorPending(val uid: String, val username: String, val password: String, val serverId: String, val service: AuthProvider)
     var twoFactorPending      by remember { mutableStateOf<TwoFactorPending?>(null) }
     var twoFactorError        by remember { mutableStateOf<String?>(null) }
     var twoFactorBusy         by remember { mutableStateOf(false) }
@@ -86,7 +92,7 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
         unfocusedContainerColor = Color.Transparent
     )
 
-    fun doLogin(service: IAuthService = authService) {
+    fun doLogin(service: AuthProvider = authService) {
         if (login.isBlank() || password.isBlank()) { errorMessage = s.loginErrorEmpty; return }
         focusManager.clearFocus()
         isLoading             = true
@@ -105,17 +111,29 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
                 hivens.core.diag.ActionRing.record("Login OK: user=$login")
                 onLogin(session)
             } catch (e: TwoFactorRequiredException) {
-                // SmartyCraft demands a 2FA code. We don't support it -- the
-                // wire-side completion path through completeTwoFactor() works
-                // for the login itself, but the issued accessToken breaks
-                // every game-side authenticated call after that. Rather than
-                // shipping a half-functional flow, the banner explains and
-                // asks the user to disable 2FA on the site.
                 isLoading = false
-                hivens.core.diag.ActionRing.record(
-                    "Login: 2FA detected, rejected (unsupported on SmartyCraft provider)"
-                )
-                twoFactorUnsupported = true
+                if (service.capabilities.supports2FA) {
+                    // Provider runs a real second factor: open the code dialog.
+                    hivens.core.diag.ActionRing.record("Login: 2FA required, prompting for code")
+                    val lastServer = profileManager.lastServerId ?: Protocol.DEFAULT_SERVER_ID
+                    twoFactorPending = TwoFactorPending(
+                        uid = e.uid.orEmpty(),
+                        username = login,
+                        password = password,
+                        serverId = lastServer,
+                        service = service,
+                    )
+                } else {
+                    // The wire-side completeTwoFactor() works for the login
+                    // itself, but the issued accessToken breaks every game-side
+                    // authenticated call after that. Rather than ship a
+                    // half-functional flow, the banner explains and asks the
+                    // user to disable 2FA on the site.
+                    hivens.core.diag.ActionRing.record(
+                        "Login: 2FA detected, rejected (unsupported on this provider)"
+                    )
+                    twoFactorUnsupported = true
+                }
             } catch (e: AuthException) {
                 isLoading = false
                 hivens.core.diag.ActionRing.record(
@@ -143,7 +161,7 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
         scope.launch {
             try {
                 val session = withContext(Dispatchers.IO) {
-                    val sess = authService.completeTwoFactor(
+                    val sess = pending.service.completeTwoFactor(
                         username = pending.username, password = pending.password,
                         serverId = pending.serverId, uid = pending.uid, code = code,
                     )

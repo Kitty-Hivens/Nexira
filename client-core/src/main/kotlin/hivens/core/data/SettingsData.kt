@@ -72,8 +72,13 @@ data class SettingsData(
     /** Block startup when installed version < `mandatory_min_version` from `meta/update-channel.json`. */
     val mandatoryUpdatesEnabled: Boolean = true,
 
-    /** Include GitHub prereleases (RC / beta) when picking the update target. */
-    val prereleaseChannelEnabled: Boolean = true,
+    /**
+     * Update channel the user follows (Release / Beta / Alpha / Dev / Git).
+     * Release/Beta/Alpha pick a GitHub release; Dev/Git build from source and
+     * are only reachable when [experimentalFeaturesEnabled] is on. Defaults to
+     * [ReleaseChannel.Release]; the user picks a channel in the update manager.
+     */
+    val updateChannel: ReleaseChannel = ReleaseChannel.Release,
 
     /**
      * Sync all installed server packs in background on startup.

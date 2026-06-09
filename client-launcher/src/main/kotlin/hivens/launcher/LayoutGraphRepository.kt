@@ -184,8 +184,9 @@ class LayoutGraphRepository(
         }
         return try {
             val envelope = json.decodeFromString<Envelope>(Files.readString(file))
+            val def      = defaultGraph()
             val migrated = Migrations.apply(envelope.schemaVersion, envelope.graph)
-            mergeMissingSurfaces(migrated, defaultGraph())
+            mergeMissingSlots(mergeMissingSurfaces(migrated, def), def)
         } catch (e: Exception) {
             log.error("Failed to load layout graph at {} -- falling back to bundled default", file, e)
             defaultGraph()
@@ -209,6 +210,39 @@ class LayoutGraphRepository(
         if (missing.isEmpty()) return user
         log.info("Layout graph: seeding {} new surface(s) from bundled default: {}", missing.size, missing.keys.map { it.value })
         return user.copy(surfaces = user.surfaces + missing)
+    }
+
+    // Merge slots from the bundled default into a surface the user
+    // already has, when the default declares a slot the user file lacks.
+    // mergeMissingSurfaces only adds whole NEW surfaces; a slot ADDED to
+    // an existing surface in a later release (e.g. the profile sign-in
+    // slot) would otherwise stay invisible, because the user's surface
+    // is the source of truth on load and SlotRenderer finds nothing at
+    // the new slot id -- a blank pane with no in-product way back.
+    //
+    // Slots are structural: the editor arranges widgets WITHIN slots but
+    // has no create-slot or delete-slot operation. So a slot present in
+    // the default but absent from the user graph is always an upstream
+    // addition, never a user deletion -- which makes this merge purely
+    // additive and safe (it cannot resurrect something the user removed).
+    // Slot REMOVALS (a slot dropped from the default) are left in place;
+    // a stale slot is inert in production -- surface composables render
+    // slots by explicit id -- and a true removal that must reclaim the
+    // data needs an explicit migration step instead.
+    private fun mergeMissingSlots(user: LayoutGraph, def: LayoutGraph): LayoutGraph {
+        var changed = false
+        val merged = user.surfaces.mapValues { (surfaceId, layout) ->
+            val defLayout = def.surfaces[surfaceId] ?: return@mapValues layout
+            val missing   = defLayout.slots.filterKeys { it !in layout.slots }
+            if (missing.isEmpty()) return@mapValues layout
+            changed = true
+            log.info(
+                "Layout graph: seeding {} new slot(s) into surface '{}' from bundled default: {}",
+                missing.size, surfaceId.value, missing.keys.map { it.value },
+            )
+            layout.copy(slots = layout.slots + missing)
+        }
+        return if (changed) user.copy(surfaces = merged) else user
     }
 
     // Synchronous file ops. Caller MUST hold [mutex] when invoking.

@@ -4,14 +4,19 @@
 
 [versions]
 # ── Toolchain & language plugins ─────────────────────────────────────────────
-kotlin            = "2.3.21"
+kotlin            = "2.4.0"
 compose           = "1.11.0"
-buildconfigPlugin = "6.0.9"
+buildconfigPlugin = "6.0.10"
 versionsPlugin    = "0.54.0"
+# ksp tracks its own release line, decoupled from the Kotlin version. 2.3.9 is
+# the latest published KSP and has no 2.4.0-numbered build yet; KSP2 runs on the
+# Analysis API and compiles cleanly against the Kotlin 2.4.0 toolchain here
+# (:widget-processor / :client-ui kspKotlinDesktop both green). Bump when a newer
+# KSP ships; it does not need to match the Kotlin minor.
 ksp               = "2.3.9"
 
 # ── Core libraries ───────────────────────────────────────────────────────────
-ktor              = "3.4.3"
+ktor              = "3.5.0"
 koin              = "4.2.1"
 serialization     = "1.11.0"
 coroutines        = "1.11.0"
@@ -32,7 +37,7 @@ filekit           = "0.14.1"
 
 # ── Logging ──────────────────────────────────────────────────────────────────
 slf4j             = "2.0.18"
-logback           = "1.5.32"
+logback           = "1.5.34"
 
 # ── Misc runtime ─────────────────────────────────────────────────────────────
 commonsCompress   = "1.28.0"
@@ -45,9 +50,16 @@ proguard          = "7.8.2"
 libtray           = "0.1.0"
 
 # ── Test ─────────────────────────────────────────────────────────────────────
-mockk             = "1.13.12"
-junit             = "5.11.4"
-junitPlatform     = "1.11.4"
+# junit held on the 5.x line: 6.x drops Java 8 and requires JVM runtime 17+,
+# which authlib-agent / profiler-agent can't honour -- those modules compile to
+# Java 8 bytecode (injected into the legacy 1.12.2 game JVM, which is Java 8).
+# Gradle's variant resolution rejects junit-jupiter 6 on their testCompileClasspath
+# ("compatible with JVM runtime 8, but 6.x needs 17+"). Track latest 5.x instead.
+# junit (Jupiter) and junitPlatform version independently: Jupiter 5.x pairs with
+# Platform 1.x.
+mockk             = "1.14.11"
+junit             = "5.12.2"
+junitPlatform     = "1.12.2"
 
 [libraries]
 # Logging

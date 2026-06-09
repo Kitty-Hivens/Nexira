@@ -41,7 +41,6 @@ import hivens.ui.components.JvmArgsBuilderDialog
 import hivens.ui.components.ModItemCard
 import hivens.ui.components.RamSelector
 import hivens.ui.customization.glassSurfaceAlpha
-import hivens.ui.debug.SkiaTracker
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetField
@@ -239,9 +238,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                                         StandardCopyOption.REPLACE_EXISTING
                                     )
                                     runCatching {
-                                        serverIcon = ImageIO.read(targetFile)?.toComposeImageBitmap()?.also {
-                                            SkiaTracker.track("Settings.icon[${server.assetDir}]", it)
-                                        }
+                                        serverIcon = ImageIO.read(targetFile)?.toComposeImageBitmap()
                                     }
                                 }
                             }

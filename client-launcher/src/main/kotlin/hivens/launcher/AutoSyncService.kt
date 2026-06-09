@@ -1,7 +1,7 @@
 package hivens.launcher
 
 import hivens.core.api.TwoFactorRequiredException
-import hivens.core.api.interfaces.IAuthService
+import hivens.auth.AuthProvider
 import hivens.core.api.interfaces.IFileDownloadService
 import hivens.core.api.interfaces.IManifestProcessorService
 import hivens.core.api.model.ServerProfile
@@ -38,7 +38,7 @@ import java.nio.file.Path
  * and surfaced via `serverStates` for the dashboard badges.
  */
 class AutoSyncService(
-    private val authService: IAuthService,
+    private val authService: AuthProvider,
     private val downloadService: IFileDownloadService,
     private val manifestProcessor: IManifestProcessorService,
     private val manifestCache: ManifestCache,

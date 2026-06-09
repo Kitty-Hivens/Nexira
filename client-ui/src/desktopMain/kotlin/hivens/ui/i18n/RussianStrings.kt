@@ -66,8 +66,6 @@ object RussianStrings : AppStrings {
     override val profileTopUp              = "Пополнить баланс"
     override val profileUploadSkin         = "Загрузить скин"
     override val profileUploadSkinLoading  = "Загрузка..."
-    override val profileSkinFront          = "Перёд"
-    override val profileSkinBack           = "Зад"
     override val profileSkinLoading        = "Загрузка скина..."
     override val profileRefresh            = "Обновить"
     override val profileUploadSuccess      = "Скин успешно загружен"
@@ -148,6 +146,26 @@ object RussianStrings : AppStrings {
     override val updateScheduleFailed  = "Не удалось запланировать обновление"
     override fun updateVersion(version: String) = "Версия $version"
     override val updateDetails         = "Подробнее"
+
+    // Update manager
+    override val updateManagerTitle          = "Управление обновлениями"
+    override val updateManagerChannel        = "Канал"
+    override val updateChannelRelease        = "Релиз"
+    override val updateChannelBeta           = "Бета"
+    override val updateChannelAlpha          = "Альфа"
+    override val updateChannelDev            = "Dev"
+    override val updateChannelGit            = "Git"
+    override val updateManagerCurrentTag     = "текущая"
+    override val updateManagerInstall        = "Установить"
+    override val updateManagerRollback       = "Откатиться"
+    override val updateManagerBuild          = "Собрать и установить"
+    override val updateManagerInstallDesktop = "Установить ярлык .desktop"
+    override val updateManagerDesktopDone    = "Ярлык установлен"
+    override val updateManagerEmpty          = "Версии не найдены"
+    override val updateManagerNeedsExperimental = "Включите экспериментальные функции в настройках, чтобы собирать из исходников."
+    override val updateManagerBuilding       = "Сборка из исходников..."
+    override val updateManagerOpenHint       = "Открыть менеджер обновлений"
+    override fun updateManagerNeedsTools(tools: String) = "Нужны инструменты разработчика: $tools"
 
     // Console
     override val consoleTitle = "Консоль отладки"
@@ -286,8 +304,6 @@ object RussianStrings : AppStrings {
     override val aboutCurrentVersion       = "Текущая версия"
     override val aboutCheckUpdates         = "Проверить обновления"
     override val aboutChecking             = "Проверяем..."
-    override val aboutUpToDate             = "У вас последняя версия!"
-    override val aboutCheckAgain           = "Проверить ещё раз"
     override fun aboutUpdateAvailable(version: String) = "Доступна версия $version"
     override val aboutCriticalUpdate       = "Критическое обновление"
     override val aboutSectionSystem        = "Система"
@@ -326,8 +342,6 @@ object RussianStrings : AppStrings {
     override val settingsExperimentalMasterDesc = "Главный выключатель. Если выключить, оба переключателя ниже принудительно гасятся, независимо от их сохранённых значений."
     override val settingsMandatoryUpdates       = "Обязательные обновления"
     override val settingsMandatoryUpdatesDesc   = "Блокировать запуск до установки критических обновлений, когда ломается совместимость с протоколом. Сейчас включено по умолчанию."
-    override val settingsPrereleaseChannel      = "Канал нестабильных обновлений"
-    override val settingsPrereleaseChannelDesc  = "Получать RC и beta-сборки. Позволяет получать фиксы до выхода стабильного релиза. Сейчас временно включено по умолчанию."
     override val settingsAutoSyncAllPacks       = "Автосинхронизация всех сборок при запуске"
     override val settingsAutoSyncAllPacksDesc   = "Тихо обновлять все уже установленные сборки в фоне при старте лаунчера. Тратит фоновый трафик — полезно если играешь на нескольких серверах и хочешь свежее состояние без клика по каждому."
     override val settingsJvmBuilder             = "Визуальный конструктор JVM-аргументов"
@@ -544,8 +558,11 @@ object RussianStrings : AppStrings {
     override val settingsCategoryAdvanced     = "Расширенные"
     override val settingsCategoryDiagnostics  = "Диагностика"
 
-    override val profileCategorySkin    = "Скин"
     override val profileCategoryAccount = "Аккаунт"
+    override val profileCategorySignIn      = "Вход"
+    override val profileCategorySecurity    = "Безопасность"
+    override val profileForgetSavedSignIn   = "Забыть сохранённый вход"
+    override val profileSecurityHint        = "Твой вход сохранён на этом устройстве для авто-входа."
 
     override val backgroundLoopMode      = "Луп"
     override val backgroundLoopUseCodec  = "Из кодека"
@@ -775,7 +792,6 @@ object RussianStrings : AppStrings {
         "widget.appshell.region.right" to "Правая панель",
         "widget.appshell.region.showDivider" to "Разделитель",
         "widget.appshell.region.widthDp" to "Ширина (0 — гибкая)",
-        "widget.appshell.rightrail.authpanel" to "Панель входа",
         "widget.appshell.rightrail.compactnews" to "Лента новостей",
         "widget.bg.enable.toggle" to "Фон вкл/выкл",
         "widget.bg.fx.animspeed" to "Скорость анимации",
@@ -856,6 +872,7 @@ object RussianStrings : AppStrings {
         "widget.library.header.title" to "Заголовок",
         "widget.nav.entry" to "Пункт навигации",
         "widget.profile.account.section" to "Аккаунт",
+        "widget.profile.signin" to "Вход",
         "widget.profile.nav" to "Навигация профиля",
         "widget.profile.skin.section" to "Скин",
         "widget.profile.skin.section.previewHeight" to "Высота превью",

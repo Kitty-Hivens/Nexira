@@ -48,7 +48,6 @@ import androidx.compose.ui.unit.sp
 import hivens.core.api.model.ServerProfile
 import hivens.launcher.AutoSyncService
 import hivens.launcher.platform.PlatformPaths
-import hivens.ui.debug.SkiaTracker
 import hivens.ui.easter.LocalAprilFools
 import hivens.ui.effects.neonBorder
 import hivens.ui.effects.shimmerOverlay
@@ -105,9 +104,7 @@ fun SquareServerCard(
             val iconFile = paths.clientDir(profile.assetDir).resolve("icon.png").toFile()
             if (iconFile.exists()) {
                 runCatching {
-                    serverIcon = ImageIO.read(iconFile)?.toComposeImageBitmap()?.also {
-                        SkiaTracker.track("Card.icon[${profile.assetDir}]", it)
-                    }
+                    serverIcon = ImageIO.read(iconFile)?.toComposeImageBitmap()
                 }
             }
         }

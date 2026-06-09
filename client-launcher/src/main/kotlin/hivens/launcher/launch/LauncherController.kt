@@ -1,5 +1,6 @@
 package hivens.launcher.launch
 
+import hivens.auth.AuthProvider
 import hivens.core.api.TwoFactorRequiredException
 import hivens.core.api.interfaces.*
 import hivens.core.api.model.ServerProfile
@@ -52,7 +53,7 @@ import kotlinx.coroutines.slf4j.MDCContext
  * leave the spawned game process and its sockets hanging.
  */
 class LauncherController(
-    private val authService: IAuthService,
+    private val authService: AuthProvider,
     private val credentialsManager: CredentialsManager,
     private val settingsService: ISettingsService,
     private val downloadService: IFileDownloadService,
