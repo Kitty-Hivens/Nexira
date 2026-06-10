@@ -24,6 +24,7 @@ internal fun SourceBadge(source: SmrtSource) {
         is SmrtSource.Modrinth   -> "Modrinth" to Color(0xFF22C55E)
         is SmrtSource.SmrtCache  -> "Mirror"   to Color(0xFF3B82F6)
         is SmrtSource.SmrtStatic -> "Static"   to Color(0xFF94A3B8)
+        is SmrtSource.Unknown    -> "Unknown"  to Color(0xFF6B7280)
     }
     Box(
         modifier = Modifier

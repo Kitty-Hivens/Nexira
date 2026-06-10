@@ -263,6 +263,12 @@ class SmrtSyncService(
         source: SmrtSource,
         label: String,
     ) {
+        if (source is SmrtSource.Unknown) {
+            // Forward-compat: a source type this launcher version does not
+            // understand. Skip the entry instead of failing the whole sync.
+            log.warn("smrt sync: skipping {} -- unsupported source type; update the launcher to install it", label)
+            return
+        }
         if (isUpToDate(dest, expectedSha1, expectedSize)) {
             return
         }
@@ -299,6 +305,9 @@ class SmrtSyncService(
             val v = client.resolveModrinthVersion(source.projectId, source.versionId)
             v.primaryFile().url
         }
+        // Unreachable: downloadIfNeeded skips Unknown before resolving a URL.
+        // Kept exhaustive so a new SmrtSource variant forces a decision here.
+        is SmrtSource.Unknown    -> error("resolveUrl called on an unsupported source")
     }
 
     /**

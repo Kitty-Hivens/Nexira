@@ -164,6 +164,50 @@ class SmrtManifestParseTest {
     }
 
     @Test
+    fun `unknown source type folds to Unknown without failing the whole manifest`() {
+        // Forward-compat: a mirror that gains github_release / curseforge on a
+        // single entry must not abort the entire decode. The unknown entry
+        // becomes SmrtSource.Unknown (install skips it); siblings still parse.
+        val payload = """
+        {
+            "schema_version": 2,
+            "pack_id": "FutureSource",
+            "pack_version": "2027.01.01",
+            "generated_at": "2027-01-01T00:00:00Z",
+            "minecraft": {"version": "1.12.2"},
+            "loader": {"name": "forge", "version": "14.23.5.2922"},
+            "java": {"major": 8},
+            "mods": [
+                {
+                    "filename": "FromTheFuture.jar",
+                    "sha1": "0000000000000000000000000000000000000000",
+                    "size_bytes": 100,
+                    "source": {"type": "github_release", "repo": "owner/repo", "tag": "v1"}
+                },
+                {
+                    "filename": "Known.jar",
+                    "sha1": "1111111111111111111111111111111111111111",
+                    "size_bytes": 200,
+                    "source": {"type": "smrt_cache", "url": "https://example/v1/cache/x.jar"}
+                }
+            ]
+        }
+        """.trimIndent()
+        val pm: SmrtPackManifest = json.decodeFromString(payload)
+        assertEquals("FutureSource", pm.packId, "the rest of the manifest must decode normally")
+        assertEquals(2, pm.mods.size)
+        assertIs<SmrtSource.Unknown>(pm.mods.first { it.filename == "FromTheFuture.jar" }.source)
+        assertIs<SmrtSource.SmrtCache>(pm.mods.first { it.filename == "Known.jar" }.source)
+
+        // Encode path: a known source round-trips and the unknown folds back to
+        // Unknown (its provider-specific payload is intentionally not preserved).
+        val reDecoded: SmrtPackManifest =
+            json.decodeFromString(json.encodeToString(SmrtPackManifest.serializer(), pm))
+        assertIs<SmrtSource.SmrtCache>(reDecoded.mods.first { it.filename == "Known.jar" }.source)
+        assertIs<SmrtSource.Unknown>(reDecoded.mods.first { it.filename == "FromTheFuture.jar" }.source)
+    }
+
+    @Test
     fun `manifest without auth block parses with null and round-trips`() {
         val payload = """
         {
