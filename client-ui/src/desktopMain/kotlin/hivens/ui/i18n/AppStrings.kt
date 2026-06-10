@@ -716,6 +716,8 @@ interface AppStrings {
     val worldsTabLocalEmpty: String
     fun worldsTabServersSection(count: Int): String
     val worldsTabServersEmpty: String
+    val worldsTabErrorTitle: String
+    val worldsTabErrorMessage: String
     /** Receives a short label like `5h`, `2d`, or `—` when never played. */
     fun worldsTabLastPlayed(rel: String): String
     val worldsTabServerHiddenLabel: String
