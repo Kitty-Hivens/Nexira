@@ -67,6 +67,7 @@ import hivens.ui.notifications.drivers.LaunchDriver
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
+import hivens.ui.screens.CenteredProgress
 import hivens.ui.screens.ConsoleContent
 import hivens.ui.screens.ConsoleSource
 import hivens.ui.screens.library.FileBrowserPane
@@ -119,7 +120,7 @@ fun PackDetailScreen(
     }
 
     if (!resolved) {
-        Box(Modifier.fillMaxSize())
+        CenteredProgress(Modifier.fillMaxSize())
         return
     }
     val pack = instance
@@ -279,8 +280,9 @@ private fun PackLogsTab(packId: String, instanceDir: Path, dataDir: Path) {
             HorizontalDivider(color = CelestiaTheme.colors.outline.copy(alpha = 0.3f))
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 if (source == null) {
-                    // A file is selected but still reading -- brief flash.
-                    Box(Modifier.fillMaxSize())
+                    // A file is selected but still reading -- show the spinner
+                    // rather than a blank pane (a slow disk makes this visible).
+                    CenteredProgress(Modifier.fillMaxSize())
                 } else {
                     ConsoleContent(
                         settings = consoleSettings,

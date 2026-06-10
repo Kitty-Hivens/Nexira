@@ -690,6 +690,8 @@ object GermanStrings : AppStrings {
     override val worldsTabLocalEmpty            = "Noch keine gespeicherten Welten. Starte eine neue Einzelspieler-Welt im Spiel und sie erscheint hier."
     override fun worldsTabServersSection(count: Int) = "Server aus dem Verlauf ($count)"
     override val worldsTabServersEmpty          = "Keine Server im Multiplayer-Verlauf dieser Instanz."
+    override val worldsTabErrorTitle            = "Welten konnten nicht gelesen werden"
+    override val worldsTabErrorMessage          = "Die Spielstände oder die Serverliste dieser Instanz konnten nicht gelesen werden. Die Dateien sind möglicherweise beschädigt oder nicht lesbar."
     override fun worldsTabLastPlayed(rel: String) = "Zuletzt gespielt: $rel"
     override val worldsTabServerHiddenLabel     = "Aus der Spielinternen Liste ausgeblendet"
     override val worldsTabGameSurvival          = "Überleben"

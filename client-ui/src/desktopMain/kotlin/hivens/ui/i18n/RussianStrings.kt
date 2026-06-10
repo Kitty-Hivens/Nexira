@@ -694,6 +694,8 @@ object RussianStrings : AppStrings {
     override val worldsTabLocalEmpty            = "Сохранённых миров пока нет. Начни новый одиночный мир внутри игры и он появится здесь."
     override fun worldsTabServersSection(count: Int) = "Серверы из истории ($count)"
     override val worldsTabServersEmpty          = "В мультиплеер-истории этого экземпляра пока нет серверов."
+    override val worldsTabErrorTitle            = "Не удалось прочитать миры"
+    override val worldsTabErrorMessage          = "Не удалось прочитать сохранения или список серверов этого экземпляра. Возможно, файлы повреждены или недоступны."
     override fun worldsTabLastPlayed(rel: String) = "Был в игре: $rel"
     override val worldsTabServerHiddenLabel     = "скрыт из ванильного списка"
     override val worldsTabGameSurvival          = "Выживание"
