@@ -36,6 +36,7 @@ import hivens.launcher.CredentialsManager
 import hivens.launcher.ProfileManager
 import hivens.launcher.ProfilerProfileStore
 import hivens.ui.components.CelestiaButton
+import hivens.ui.components.DestructiveConfirmDialog
 import hivens.ui.components.GlassCard
 import hivens.ui.components.JvmArgsBuilderDialog
 import hivens.ui.components.ModItemCard
@@ -100,6 +101,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
     var autoConnect by remember { mutableStateOf(true) }
     var serverIcon by remember { mutableStateOf<ImageBitmap?>(null) }
     var spawnResetState by remember { mutableStateOf<SpawnResetState>(SpawnResetState.Idle) }
+    var pendingReset by remember { mutableStateOf(false) }
 
     val modStates  = remember { mutableStateMapOf<String, Boolean>() }
     var modsLoaded by remember { mutableStateOf(false) }
@@ -176,6 +178,14 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
 
     val borderColor = CelestiaTheme.colors.textSecondary.copy(alpha = 0.2f)
 
+    // Wipes clients/<assetDir> irrecoverably. The visible button gates this on a
+    // confirm dialog; the puppet hook runs it directly (automation bypass).
+    val performResetClient = {
+        dataDirectory.resolve("clients").resolve(server.assetDir).toFile().deleteRecursively()
+        saveProfile()
+        onBack()
+    }
+
     // Puppet ids prefixed with the server's assetDir so concurrent settings
     // dialogs (theoretical -- Nexira keeps only one open at a time today) stay
     // disambiguated, and tests can verify they're acting on the intended server.
@@ -193,12 +203,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
         if (!path.toFile().exists()) path.toFile().mkdirs()
         SystemActions.openFile(path.toFile())
     }
-    PuppetClick("$pkey.resetClient") {
-        val path = dataDirectory.resolve("clients").resolve(server.assetDir)
-        path.toFile().deleteRecursively()
-        saveProfile()
-        onBack()
-    }
+    PuppetClick("$pkey.resetClient") { performResetClient() }
     PuppetClick("$pkey.openJvmBuilder", enabled = jvmBuilderEnabled) { showJvmBuilder = true }
     // Per-mod toggle. Mods load asynchronously -- registry mirrors what's
     // currently composed, so puppet calls before modsLoaded return 404.
@@ -451,12 +456,22 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                     Spacer(Modifier.height(12.dp))
 
                     // Reset client -- NOT chaos-wrapped (destructive action)
-                    CelestiaButton(s.serverSettingsReset, onClick = {
-                        val path = dataDirectory.resolve("clients").resolve(server.assetDir)
-                        path.toFile().deleteRecursively()
-                        saveProfile()
-                        onBack()
-                    }, modifier = Modifier.fillMaxWidth(), primary = false)
+                    CelestiaButton(
+                        s.serverSettingsReset,
+                        onClick  = { pendingReset = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        primary  = false,
+                    )
+
+                    if (pendingReset) {
+                        DestructiveConfirmDialog(
+                            title        = s.serverSettingsResetConfirmTitle,
+                            body         = s.serverSettingsResetConfirmBody,
+                            confirmLabel = s.serverSettingsReset,
+                            onConfirm    = performResetClient,
+                            onDismiss    = { pendingReset = false },
+                        )
+                    }
 
                     // ── Return to spawn (only 1.12.2) -- chaos target in Idle ──
                     if (server.version.startsWith("1.12")) {
