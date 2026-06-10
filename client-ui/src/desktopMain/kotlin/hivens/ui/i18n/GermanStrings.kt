@@ -353,6 +353,9 @@ object GermanStrings : AppStrings {
     override fun dashboardAutoSyncProgress(serverName: String, current: Int, total: Int) =
         "Synchronisiere $serverName ($current/$total)"
     override fun dashboardAutoSyncBytes(readMB: Long, totalMB: Long) = "$readMB / $totalMB MB"
+    override val widgetProgressTitle = "Hintergrundaktivität"
+    override val widgetProgressIdle = "Momentan wird nichts heruntergeladen."
+    override fun widgetTabDefaultLabel(index: Int) = "Tab $index"
 
     // April Fools
     override fun aprilCloseTitle(escapes: Int) = when {

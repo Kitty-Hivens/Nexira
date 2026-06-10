@@ -361,6 +361,13 @@ interface AppStrings {
     /** Auto-sync byte progress — `123 / 456 MB` */
     fun dashboardAutoSyncBytes(readMB: Long, totalMB: Long): String
 
+    /** Background-activity widget title, shown when the user hasn't set a custom one. */
+    val widgetProgressTitle: String
+    /** Background-activity widget body, shown when no sync is in flight. */
+    val widgetProgressIdle: String
+    /** Tab-container default label for an unnamed tab — receives the 1-based tab number, e.g. `Tab 2`. */
+    fun widgetTabDefaultLabel(index: Int): String
+
     // ─── April Fools close dialog ─────────────────────────────────────────────────
     /** Dialog title — changes tone as the user fails more attempts */
     fun aprilCloseTitle(escapes: Int): String
