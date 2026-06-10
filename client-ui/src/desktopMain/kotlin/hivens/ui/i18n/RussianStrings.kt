@@ -354,6 +354,9 @@ object RussianStrings : AppStrings {
     override fun dashboardAutoSyncProgress(serverName: String, current: Int, total: Int) =
         "Синхронизация $serverName ($current/$total)"
     override fun dashboardAutoSyncBytes(readMB: Long, totalMB: Long) = "$readMB / $totalMB МБ"
+    override val widgetProgressTitle = "Фоновая активность"
+    override val widgetProgressIdle = "Сейчас ничего не качается."
+    override fun widgetTabDefaultLabel(index: Int) = "Вкладка $index"
 
     // April Fools
     override fun aprilCloseTitle(escapes: Int) = when {

@@ -23,6 +23,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.launcher.AutoSyncService
 import hivens.ui.customization.glassSurfaceAlpha
+import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
@@ -33,8 +34,10 @@ import org.koin.compose.koinInject
 
 @Serializable
 data class ProgressProps(
-    @PropLabel("widget.home.new.progress.title") val title: String = "Фоновая активность",
-    @PropLabel("widget.home.new.progress.idleText") val idleText: String = "Сейчас ничего не качается.",
+    // Blank defaults resolve to the localized text at render; a non-blank
+    // value is the user's own override (single language, by choice).
+    @PropLabel("widget.home.new.progress.title") val title: String = "",
+    @PropLabel("widget.home.new.progress.idleText") val idleText: String = "",
 )
 
 // Compact background-activity card. Shows AutoSyncService state when
@@ -45,6 +48,7 @@ data class ProgressProps(
 @Composable
 fun ProgressWidget(instance: WidgetInstance) {
     val p = instance.rememberProps<ProgressProps>()
+    val s = LocalStrings.current
     val autoSyncService: AutoSyncService = koinInject()
     val snapshot by autoSyncService.snapshot.collectAsState()
     val overall  = snapshot.overall
@@ -58,16 +62,16 @@ fun ProgressWidget(instance: WidgetInstance) {
             .padding(horizontal = 16.dp, vertical = 14.dp),
     ) {
         Text(
-            text       = p.title,
+            text       = p.title.ifBlank { s.widgetProgressTitle },
             style      = MaterialTheme.typography.labelLarge,
             color      = CelestiaTheme.colors.textSecondary,
             fontWeight = FontWeight.Medium,
         )
         Spacer(Modifier.height(8.dp))
 
-        when (val s = overall) {
-            is AutoSyncService.OverallState.InProgress -> InProgressBody(s)
-            else                                       -> IdleBody(p.idleText)
+        when (val state = overall) {
+            is AutoSyncService.OverallState.InProgress -> InProgressBody(state)
+            else                                       -> IdleBody(p.idleText.ifBlank { s.widgetProgressIdle })
         }
     }
 }
