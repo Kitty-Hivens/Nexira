@@ -11,6 +11,7 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.JsonClassDiscriminator
 import kotlinx.serialization.json.JsonDecoder
+import kotlinx.serialization.json.JsonEncoder
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
@@ -134,6 +135,7 @@ data class SmrtModEntry(
      * which are always installed.
      */
     @SerialName("default_enabled") val defaultEnabled: Boolean = true,
+    @Serializable(with = SmrtSourceLenientSerializer::class)
     val source: SmrtSource,
     val display: SmrtDisplay? = null,
 )
@@ -144,6 +146,7 @@ data class SmrtAssetEntry(
     val sha1: String,
     @SerialName("size_bytes") val sizeBytes: Long,
     val required: Boolean = true,
+    @Serializable(with = SmrtSourceLenientSerializer::class)
     val source: SmrtSource,
     val display: SmrtDisplay? = null,
 )
@@ -166,6 +169,53 @@ sealed class SmrtSource {
     @Serializable
     @SerialName("smrt_static")
     data class SmrtStatic(val url: String) : SmrtSource()
+
+    /**
+     * A `type` this client does not understand -- a mirror that gained
+     * `github_release` / `curseforge` before the launcher learned it. The
+     * entry is kept so the rest of the manifest still decodes; the install
+     * path skips it rather than failing the whole pack. Never emitted by us,
+     * so the sentinel discriminator only appears on a cache round-trip.
+     */
+    @Serializable
+    @SerialName("__unknown__")
+    data object Unknown : SmrtSource()
+}
+
+/**
+ * Wire decoder that accepts the known [SmrtSource] variants and folds any
+ * other `type` value (or a malformed payload) to [SmrtSource.Unknown] --
+ * forward-compat for manifests that gain new source providers. Without this
+ * the default sealed-class serializer throws on an unknown discriminator and
+ * aborts the entire [SmrtPackManifest] decode, breaking browse + install for
+ * every entry, not just the new one.
+ *
+ * Encoding stays on the standard sealed path so a known source round-trips
+ * byte-identically.
+ */
+object SmrtSourceLenientSerializer : KSerializer<SmrtSource> {
+    private val delegate = SmrtSource.serializer()
+    override val descriptor: SerialDescriptor = delegate.descriptor
+
+    override fun deserialize(decoder: Decoder): SmrtSource {
+        val jsonDecoder = decoder as? JsonDecoder ?: return delegate.deserialize(decoder)
+        val obj = jsonDecoder.decodeJsonElement() as? JsonObject ?: return SmrtSource.Unknown
+        return when (obj["type"]?.jsonPrimitive?.contentOrNull) {
+            "modrinth"    -> jsonDecoder.json.decodeFromJsonElement(SmrtSource.Modrinth.serializer(), obj)
+            "smrt_cache"  -> jsonDecoder.json.decodeFromJsonElement(SmrtSource.SmrtCache.serializer(), obj)
+            "smrt_static" -> jsonDecoder.json.decodeFromJsonElement(SmrtSource.SmrtStatic.serializer(), obj)
+            else          -> SmrtSource.Unknown
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: SmrtSource) {
+        // Go through the Json instance, not delegate.serialize(encoder, value):
+        // a direct call emits the generic `["type", {...}]` array form and
+        // skips the @JsonClassDiscriminator flattening, which would then decode
+        // back as Unknown. encodeToJsonElement applies the discriminator.
+        val jsonEncoder = encoder as? JsonEncoder ?: return delegate.serialize(encoder, value)
+        jsonEncoder.encodeJsonElement(jsonEncoder.json.encodeToJsonElement(delegate, value))
+    }
 }
 
 /**
