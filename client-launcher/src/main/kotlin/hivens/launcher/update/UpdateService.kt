@@ -29,7 +29,8 @@ class UpdateService(
     private val clientProvider: HttpClientProvider,
     private val json: Json,
     dataDirectory: Path,
-    private val settingsService: ISettingsService
+    private val settingsService: ISettingsService,
+    private val currentVersion: String = Branding.VERSION.removePrefix("v"),
 ) {
     private val logger = LoggerFactory.getLogger(UpdateService::class.java)
     private val httpClient get() = clientProvider.current
@@ -79,6 +80,19 @@ class UpdateService(
     }
 
     /**
+     * A build made from source -- a `dev` describe (dirty tree or commits ahead
+     * of a tag) or the `0.0.0` "no reachable tag" fallback -- rather than an
+     * installed release artifact. Such a build is never auto-updated: the
+     * updater would install a release binary it is not even running from, and a
+     * critical or mandatory release would otherwise force the very person
+     * building the launcher to "update". The update manager stays available for
+     * manual installs.
+     */
+    private fun isSourceBuild(): Boolean =
+        ReleaseChannel.classify(currentVersion).isSourceBuild ||
+            currentVersion.substringBefore('-') == "0.0.0"
+
+    /**
      * Checks availability of updates.
      *
      * The selected channel (stable vs prerelease) and whether mandatory updates
@@ -89,6 +103,10 @@ class UpdateService(
      */
     suspend fun checkForUpdate(): LauncherUpdate? = withContext(Dispatchers.IO) {
         try {
+            if (isSourceBuild()) {
+                logger.info("Source build ({}); skipping auto-update", currentVersion)
+                return@withContext null
+            }
             val settings = settingsService.getSettings()
             val channel = settings.updateChannel
             // Beta and up (including the source-build channels) track the newest
@@ -119,7 +137,6 @@ class UpdateService(
                 }
             ) ?: return@withContext null
 
-            val currentVersion = Branding.VERSION.removePrefix("v")
             val latestVersion = release.tagName.removePrefix("v")
 
             // Out-of-band channel meta -- fetched even when "up to date" so a
@@ -370,7 +387,7 @@ class UpdateService(
      */
     suspend fun listReleases(channel: ReleaseChannel): List<ReleaseEntry> = withContext(Dispatchers.IO) {
         val maxRank = minOf(channel.ordinal, ReleaseChannel.Alpha.ordinal)
-        val current = Branding.VERSION.removePrefix("v")
+        val current = currentVersion
         fetchReleasesPage()
             .map { it to ReleaseChannel.classify(it.tagName.removePrefix("v")) }
             .filter { (_, ch) -> ch.ordinal <= maxRank }
@@ -452,6 +469,7 @@ class UpdateService(
      */
     suspend fun checkForMandatoryUpdate(): LauncherUpdate? = withContext(Dispatchers.IO) {
         try {
+            if (isSourceBuild()) return@withContext null
             if (!shouldCheckMeta()) return@withContext null
 
             val settings = settingsService.getSettings()
@@ -468,7 +486,7 @@ class UpdateService(
                 ?.takeIf { it.isNotBlank() }
                 ?: return@withContext null
 
-            val current = Branding.VERSION.removePrefix("v")
+            val current = currentVersion
             if (compareVersions(current, floor) >= 0) return@withContext null
 
             logger.warn(
