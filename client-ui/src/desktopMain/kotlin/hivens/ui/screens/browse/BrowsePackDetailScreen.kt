@@ -432,7 +432,7 @@ private fun DescriptionPlaceholder(modsCount: Int, assetsCount: Int) {
     val s = LocalStrings.current
     Section(title = s.browseDetailAboutTitle) {
         Text(
-            text  = s.browseDetailAboutPlaceholder.format(modsCount, assetsCount),
+            text  = s.browseDetailAbout(modsCount, assetsCount),
             style = MaterialTheme.typography.bodyMedium,
             color = CelestiaTheme.colors.textPrimary.copy(alpha = 0.9f),
         )

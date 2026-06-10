@@ -635,7 +635,8 @@ interface AppStrings {
     val browseDetailInstallButton: String
     val browseDetailTagsTitle: String
     val browseDetailAboutTitle: String
-    val browseDetailAboutPlaceholder: String
+    /** Placeholder pack blurb shown until the mirror ships a real description. Receives the mod and asset counts. */
+    fun browseDetailAbout(mods: Int, assets: Int): String
     val browseDetailAboutNote: String
     val browseDetailCompatTitle: String
     val browseDetailCompatMc: String
