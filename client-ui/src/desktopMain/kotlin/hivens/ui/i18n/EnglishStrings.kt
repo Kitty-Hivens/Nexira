@@ -122,6 +122,16 @@ object EnglishStrings : AppStrings {
     override val serverSettingsJavaHint        = "Leave empty to use bundled Java"
     override val serverSettingsOpenFolder      = "Open folder"
     override val serverSettingsReset           = "Reset client"
+
+    override val serverSettingsResetConfirmTitle = "Reset this client?"
+    override val serverSettingsResetConfirmBody  = "All downloaded files for this server's client are deleted permanently. This cannot be undone."
+    override val customizationResetConfirmTitle  = "Reset customization?"
+    override val customizationResetConfirmBody   = "Every customization override (colors, density, shape) returns to its default."
+    override val backgroundResetConfirmTitle     = "Reset background?"
+    override val backgroundResetConfirmBody      = "The entire custom background configuration returns to its defaults."
+    override val logoutConfirmTitle              = "Log out?"
+    override val logoutConfirmBody               = "Your saved sign-in is removed from this device. You will need to enter your credentials again to log back in."
+
     override val serverSettingsNoMods          = "No optional mods"
     override val serverSettingsPickJava        = "Select Java"
 

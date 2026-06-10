@@ -119,6 +119,16 @@ object RussianStrings : AppStrings {
     override val serverSettingsJavaHint        = "Оставьте пустым для использования встроенной Java"
     override val serverSettingsOpenFolder      = "Открыть папку"
     override val serverSettingsReset           = "Сбросить клиент"
+
+    override val serverSettingsResetConfirmTitle = "Сбросить клиент?"
+    override val serverSettingsResetConfirmBody  = "Все скачанные файлы клиента этого сервера будут удалены без возможности восстановления."
+    override val customizationResetConfirmTitle  = "Сбросить кастомизацию?"
+    override val customizationResetConfirmBody   = "Все переопределения кастомизации (цвета, плотность, форма) вернутся к значениям по умолчанию."
+    override val backgroundResetConfirmTitle     = "Сбросить фон?"
+    override val backgroundResetConfirmBody      = "Вся конфигурация пользовательского фона вернётся к значениям по умолчанию."
+    override val logoutConfirmTitle              = "Выйти из аккаунта?"
+    override val logoutConfirmBody               = "Сохранённый вход будет удалён с этого устройства. Для повторного входа понадобится снова ввести данные."
+
     override val serverSettingsNoMods          = "Нет опциональных модов"
     override val serverSettingsPickJava        = "Выберите Java"
 

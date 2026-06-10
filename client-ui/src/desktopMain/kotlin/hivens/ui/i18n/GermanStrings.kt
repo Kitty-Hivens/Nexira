@@ -119,6 +119,16 @@ object GermanStrings : AppStrings {
     override val serverSettingsJavaHint        = "Leer lassen für das integrierte Java"
     override val serverSettingsOpenFolder      = "Ordner öffnen"
     override val serverSettingsReset           = "Client zurücksetzen"
+
+    override val serverSettingsResetConfirmTitle = "Client zurücksetzen?"
+    override val serverSettingsResetConfirmBody  = "Alle heruntergeladenen Dateien des Clients dieses Servers werden unwiderruflich gelöscht."
+    override val customizationResetConfirmTitle  = "Anpassungen zurücksetzen?"
+    override val customizationResetConfirmBody   = "Alle Anpassungs-Überschreibungen (Farben, Dichte, Form) kehren auf die Standardwerte zurück."
+    override val backgroundResetConfirmTitle     = "Hintergrund zurücksetzen?"
+    override val backgroundResetConfirmBody      = "Die gesamte Konfiguration des eigenen Hintergrunds kehrt auf die Standardwerte zurück."
+    override val logoutConfirmTitle              = "Abmelden?"
+    override val logoutConfirmBody               = "Deine gespeicherte Anmeldung wird von diesem Gerät entfernt. Zum erneuten Anmelden musst du deine Zugangsdaten wieder eingeben."
+
     override val serverSettingsNoMods          = "Keine optionalen Mods"
     override val serverSettingsPickJava        = "Java auswählen"
 

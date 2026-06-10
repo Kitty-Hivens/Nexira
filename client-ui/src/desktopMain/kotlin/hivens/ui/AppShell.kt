@@ -45,6 +45,7 @@ import hivens.launcher.platform.computeSafeWindowMinSize
 import hivens.launcher.ProfileManager
 import hivens.ui.background.BackgroundManager
 import hivens.ui.background.CustomBackground
+import hivens.ui.components.DestructiveConfirmDialog
 import hivens.ui.components.UpdateManager
 import hivens.ui.customization.CustomizationManager
 import hivens.ui.customization.CustomizationSettings
@@ -58,6 +59,7 @@ import hivens.ui.generated.resources.icon
 import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.i18n.LocaleProvider
+import hivens.ui.puppet.PuppetClick
 import hivens.ui.notifications.LaunchTarget
 import hivens.ui.notifications.drivers.LaunchDriver
 import hivens.ui.notifications.render.NotificationStack
@@ -804,6 +806,8 @@ fun AppRoot(
 
     var appState      by remember { mutableStateOf<AppState>(AppState.Loading) }
     var currentScreen by remember { mutableStateOf<Screen>(Screen.Home) }
+    var pendingLogout by remember { mutableStateOf(false) }
+    val doLogout = { credentialsManager.clear(); appState = AppState.Unauthenticated }
 
     // ── Background settings ───────────────────────────────────────────────
     val backgroundManager = remember { BackgroundManager(dataDirectory, json) }
@@ -864,7 +868,7 @@ fun AppRoot(
                 currentScreen = currentScreen,
                 onScreenChange = { currentScreen = it },
                 onLogin = { session -> appState = AppState.Authenticated(session) },
-                onLogout = { credentialsManager.clear(); appState = AppState.Unauthenticated },
+                onLogout = { pendingLogout = true },
                 isDarkTheme = isDarkTheme,
                 onToggleDarkTheme = onToggleDarkTheme,
                 customTheme = customTheme,
@@ -888,6 +892,19 @@ fun AppRoot(
             )
 
             NotificationStack()
+
+            if (pendingLogout) {
+                val s = LocalStrings.current
+                DestructiveConfirmDialog(
+                    title        = s.logoutConfirmTitle,
+                    body         = s.logoutConfirmBody,
+                    confirmLabel = s.navLogout,
+                    onConfirm    = doLogout,
+                    onDismiss    = { pendingLogout = false },
+                )
+            }
+            // Automation bypass for the now two-step logout (request -> confirm).
+            PuppetClick("logout.confirm") { doLogout() }
         }
     }
 }

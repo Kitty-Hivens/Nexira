@@ -116,6 +116,17 @@ interface AppStrings {
     val serverSettingsJavaHint: String
     val serverSettingsOpenFolder: String
     val serverSettingsReset: String
+
+    // --- Destructive-action confirm dialogs ---
+    val serverSettingsResetConfirmTitle: String
+    val serverSettingsResetConfirmBody: String
+    val customizationResetConfirmTitle: String
+    val customizationResetConfirmBody: String
+    val backgroundResetConfirmTitle: String
+    val backgroundResetConfirmBody: String
+    val logoutConfirmTitle: String
+    val logoutConfirmBody: String
+
     val serverSettingsNoMods: String
     val serverSettingsPickJava: String
 
