@@ -206,7 +206,8 @@ object RussianStrings : AppStrings {
     override val settingsReportOnGithub          = "Сообщить на GitHub с пакетом"
 
     // File Manager
-    override fun fileDownloading(n: Int) = "Загрузка обновлений ($n файлов)..."
+    override fun fileDownloading(n: Int) =
+        "Загрузка обновлений ($n ${russianPlural(n, "файл", "файла", "файлов")})..."
 
     // --- Settings: Offline Mode ---
     override val settingsOfflineMode       = "Оффлайн-режим"
@@ -451,7 +452,7 @@ object RussianStrings : AppStrings {
     override val jvmTabCustom  = "Свои"
     override val jvmCancel     = "Отмена"
     override val jvmApply      = "Записать в jvmArgs"
-    override fun jvmPreviewFlagsCount(n: Int) = "Превью ($n флагов)"
+    override fun jvmPreviewFlagsCount(n: Int) = "Превью ($n ${russianPlural(n, "флаг", "флага", "флагов")})"
 
     override val jvmGcHeader            = "Сборщик мусора"
     override val jvmGcG1Hint            = "Рекомендуемый для модового MC, хип 4-32 ГБ."
@@ -525,7 +526,8 @@ object RussianStrings : AppStrings {
     override val migrationDescription  = "Nexira теперь называется Nexira. Перед запуском лаунчера нужно перенести существующие данные в новое расположение. Старая папка остаётся нетронутой как резервная копия; удалите её вручную когда убедитесь что всё работает."
     override val migrationFromHeader   = "Откуда"
     override val migrationToHeader     = "Куда"
-    override fun migrationSize(megabytes: Int, files: Int) = "$megabytes МБ, $files файлов"
+    override fun migrationSize(megabytes: Int, files: Int) =
+        "$megabytes МБ, $files ${russianPlural(files, "файл", "файла", "файлов")}"
     override val migrationStart        = "Перенести данные"
     override val migrationInProgress   = "Перенос в Nexira"
     override fun migrationCurrentFile(file: String) = "Копируется $file"
@@ -603,7 +605,8 @@ object RussianStrings : AppStrings {
     override val browseDetailInstallButton = "Установить"
     override val browseDetailTagsTitle     = "Теги"
     override val browseDetailAboutTitle       = "О сборке"
-    override val browseDetailAboutPlaceholder = "Сборка включает %d модов и %d ассетов."
+    override fun browseDetailAbout(mods: Int, assets: Int) =
+        "Сборка включает $mods ${russianPlural(mods, "мод", "мода", "модов")} и $assets ${russianPlural(assets, "ассет", "ассета", "ассетов")}."
     override val browseDetailAboutNote        = "Развёрнутое описание появится здесь когда зеркало начнёт заполнять его в manifest."
     override val browseDetailCompatTitle      = "Совместимость"
     override val browseDetailCompatMc         = "Minecraft"
@@ -638,19 +641,26 @@ object RussianStrings : AppStrings {
     override fun contentTabModsSection(count: Int) = "Моды ($count)"
     override fun contentTabAssetsSection(count: Int) = "Ассеты ($count)"
     override val contentTabResolverIssuesTitle  = "Найдены проблемы в манифесте"
-    override fun contentTabResolverMissing(count: Int) =
-        if (count == 1) "1 зависимость ссылается на мод, которого нет в сборке."
-        else "$count зависимостей ссылаются на моды, которых нет в сборке."
-    override fun contentTabResolverCycles(count: Int) =
-        if (count == 1) "Найден 1 цикл в зависимостях — авторy сборки стоит перепроверить requires."
-        else "Найдено $count циклов в зависимостях — авторy сборки стоит перепроверить requires."
+    override fun contentTabResolverMissing(count: Int) = russianPlural(
+        count,
+        "$count зависимость ссылается на мод, которого нет в сборке.",
+        "$count зависимости ссылаются на моды, которых нет в сборке.",
+        "$count зависимостей ссылаются на моды, которых нет в сборке.",
+    )
+    override fun contentTabResolverCycles(count: Int) = russianPlural(
+        count,
+        "Найден $count цикл в зависимостях — автору сборки стоит перепроверить requires.",
+        "Найдено $count цикла в зависимостях — автору сборки стоит перепроверить requires.",
+        "Найдено $count циклов в зависимостях — автору сборки стоит перепроверить requires.",
+    )
     override val contentTabRoleRecipeViewer     = "Просмотр рецептов"
     override val contentTabRoleMinimap          = "Миникарта"
     override val contentTabRoleBlockInfo        = "Инфо о блоке"
     override val contentTabRolePerformance      = "Производительность"
     override val contentTabRoleInventorySearch  = "Поиск в инвентаре"
     override fun contentTabRoleAltCount(count: Int) =
-        if (count == 0) "один вариант" else "$count альтернатив"
+        if (count == 0) "один вариант"
+        else "$count ${russianPlural(count, "альтернатива", "альтернативы", "альтернатив")}"
     override val contentTabRoleAlternativesHeader = "Альтернативы в этой сборке"
     override val contentTabModNoDescription     = "Описания пока нет в манифесте."
     override fun contentTabModLicensePrefix(license: String) = "Лицензия: $license"

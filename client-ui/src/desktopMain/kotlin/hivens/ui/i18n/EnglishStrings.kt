@@ -209,7 +209,7 @@ object EnglishStrings : AppStrings {
     override val settingsReportOnGithub          = "Report on GitHub with bundle"
 
     // File Manager
-    override fun fileDownloading(n: Int) = "Downloading updates ($n files)..."
+    override fun fileDownloading(n: Int) = "Downloading updates ($n ${twoFormPlural(n, "file", "files")})..."
 
     // --- Settings: Offline Mode ---
     override val settingsOfflineMode       = "Offline mode"
@@ -453,7 +453,7 @@ object EnglishStrings : AppStrings {
     override val jvmTabCustom  = "Custom"
     override val jvmCancel     = "Cancel"
     override val jvmApply      = "Apply to jvmArgs"
-    override fun jvmPreviewFlagsCount(n: Int) = "Preview ($n flags)"
+    override fun jvmPreviewFlagsCount(n: Int) = "Preview ($n ${twoFormPlural(n, "flag", "flags")})"
 
     override val jvmGcHeader            = "Garbage Collector"
     override val jvmGcG1Hint            = "Recommended for modded MC, 4-32 GB heap."
@@ -527,7 +527,8 @@ object EnglishStrings : AppStrings {
     override val migrationDescription  = "Nexira is now Nexira. Your existing data needs to be copied to the new location before the launcher can start. Your old folder is left untouched as a backup; you can delete it manually once everything works."
     override val migrationFromHeader   = "From"
     override val migrationToHeader     = "To"
-    override fun migrationSize(megabytes: Int, files: Int) = "$megabytes MB across $files files"
+    override fun migrationSize(megabytes: Int, files: Int) =
+        "$megabytes MB across $files ${twoFormPlural(files, "file", "files")}"
     override val migrationStart        = "Migrate now"
     override val migrationInProgress   = "Migrating to Nexira"
     override fun migrationCurrentFile(file: String) = "Copying $file"
@@ -605,7 +606,8 @@ object EnglishStrings : AppStrings {
     override val browseDetailInstallButton = "Install"
     override val browseDetailTagsTitle     = "Tags"
     override val browseDetailAboutTitle       = "About this pack"
-    override val browseDetailAboutPlaceholder = "This pack ships %d mods and %d assets."
+    override fun browseDetailAbout(mods: Int, assets: Int) =
+        "This pack ships $mods ${twoFormPlural(mods, "mod", "mods")} and $assets ${twoFormPlural(assets, "asset", "assets")}."
     override val browseDetailAboutNote        = "A long-form description appears here once the mirror starts populating it on the manifest."
     override val browseDetailCompatTitle      = "Compatibility"
     override val browseDetailCompatMc         = "Minecraft"
@@ -640,19 +642,23 @@ object EnglishStrings : AppStrings {
     override fun contentTabModsSection(count: Int) = "Mods ($count)"
     override fun contentTabAssetsSection(count: Int) = "Assets ($count)"
     override val contentTabResolverIssuesTitle  = "Manifest issues detected"
-    override fun contentTabResolverMissing(count: Int) =
-        if (count == 1) "1 dependency references a mod that is not in this pack."
-        else "$count dependencies reference mods that are not in this pack."
-    override fun contentTabResolverCycles(count: Int) =
-        if (count == 1) "1 dependency cycle found — pack author should re-check the requires graph."
-        else "$count dependency cycles found — pack author should re-check the requires graph."
+    override fun contentTabResolverMissing(count: Int) = twoFormPlural(
+        count,
+        "$count dependency references a mod that is not in this pack.",
+        "$count dependencies reference mods that are not in this pack.",
+    )
+    override fun contentTabResolverCycles(count: Int) = twoFormPlural(
+        count,
+        "$count dependency cycle found — pack author should re-check the requires graph.",
+        "$count dependency cycles found — pack author should re-check the requires graph.",
+    )
     override val contentTabRoleRecipeViewer     = "Recipe viewer"
     override val contentTabRoleMinimap          = "Minimap"
     override val contentTabRoleBlockInfo        = "Block info"
     override val contentTabRolePerformance      = "Performance"
     override val contentTabRoleInventorySearch  = "Inventory search"
     override fun contentTabRoleAltCount(count: Int) =
-        if (count == 0) "single option" else "$count alternative${if (count == 1) "" else "s"}"
+        if (count == 0) "single option" else "$count ${twoFormPlural(count, "alternative", "alternatives")}"
     override val contentTabRoleAlternativesHeader = "Alternatives in this pack"
     override val contentTabModNoDescription     = "No description in the manifest yet."
     override fun contentTabModLicensePrefix(license: String) = "License: $license"
