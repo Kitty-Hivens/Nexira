@@ -39,40 +39,8 @@ class EnvironmentPreparerTest {
         Files.walk(workDir).sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }
     }
 
-    // ── getOsSuffix: os.name -> LWJGL Maven Central classifier suffix ─────
-
-    @Test
-    fun `getOsSuffix maps Linux variants to linux`() {
-        withSystemProp("os.name", "Linux") {
-            assertEquals("linux", svc.getOsSuffix())
-        }
-    }
-
-    @Test
-    fun `getOsSuffix maps Windows variants to windows`() {
-        withSystemProp("os.name", "Windows 11") {
-            assertEquals("windows", svc.getOsSuffix())
-        }
-        withSystemProp("os.name", "Windows 10") {
-            assertEquals("windows", svc.getOsSuffix())
-        }
-    }
-
-    @Test
-    fun `getOsSuffix maps macOS to macos`() {
-        // Note: this is the LWJGL 3 form ("macos"). The legacy LWJGL 2
-        // form ("macosx") is handled by downloadLegacyLWJGL2 internally.
-        withSystemProp("os.name", "Mac OS X") {
-            assertEquals("macos", svc.getOsSuffix())
-        }
-    }
-
-    @Test
-    fun `getOsSuffix returns unknown for unrecognised OSes`() {
-        withSystemProp("os.name", "Plan9") {
-            assertEquals("unknown", svc.getOsSuffix())
-        }
-    }
+    // os.name -> LWJGL classifier suffix now lives on Platform.lwjgl; see
+    // client-core OSTest.
 
     // ── isFolderValidForOs: per-platform native-extension presence check ──
 

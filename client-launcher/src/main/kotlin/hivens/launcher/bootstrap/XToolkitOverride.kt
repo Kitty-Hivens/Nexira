@@ -1,6 +1,7 @@
 package hivens.launcher.bootstrap
 
 import hivens.config.Branding
+import hivens.core.platform.OS
 import org.slf4j.LoggerFactory
 import java.awt.Toolkit
 
@@ -23,7 +24,7 @@ object XToolkitOverride {
     private val log = LoggerFactory.getLogger(XToolkitOverride::class.java)
 
     fun applyLinuxAppClassName() {
-        if (!System.getProperty("os.name").lowercase().contains("linux")) return
+        if (!OS.isLinux) return
         runCatching {
             // Triggers XToolkit class load + initial awtAppClassName assignment.
             Toolkit.getDefaultToolkit()

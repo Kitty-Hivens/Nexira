@@ -3,6 +3,7 @@ package hivens.launcher.smrt
 import hivens.core.api.HttpClientProvider
 import hivens.core.data.FileData
 import hivens.core.data.FileManifest
+import hivens.core.data.flatten
 import hivens.core.util.retryWithBackoff
 import hivens.launcher.network.ServerProtocolConfig
 import io.ktor.client.request.prepareGet
@@ -122,17 +123,7 @@ class SmrtAuthlibSwapper(
      * that happens to share the prefix.
      */
     private fun findAuthlibEntry(manifest: FileManifest): Pair<String, FileData>? {
-        val flat = LinkedHashMap<String, FileData>()
-        fun walk(m: FileManifest, prefix: String) {
-            m.files.forEach { (name, data) ->
-                flat[if (prefix.isEmpty()) name else "$prefix/$name"] = data
-            }
-            m.directories.forEach { (name, sub) ->
-                walk(sub, if (prefix.isEmpty()) name else "$prefix/$name")
-            }
-        }
-        walk(manifest, "")
-        return flat.entries.firstOrNull { (path, _) ->
+        return manifest.flatten().entries.firstOrNull { (path, _) ->
             val segments = path.split("/")
             val base = segments.lastOrNull() ?: return@firstOrNull false
             AUTHLIB_JAR.matches(base) && segments.any { it.startsWith("libraries") }

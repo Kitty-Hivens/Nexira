@@ -1,7 +1,7 @@
 package hivens.launcher.update
 
 import hivens.core.api.interfaces.IUpdateApplicator
-import hivens.launcher.platform.OS
+import hivens.core.platform.OS
 import java.nio.file.Path
 
 /**

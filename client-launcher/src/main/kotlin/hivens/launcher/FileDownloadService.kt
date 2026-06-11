@@ -6,6 +6,7 @@ import hivens.core.api.interfaces.IFileDownloadService
 import hivens.core.data.FileData
 import hivens.core.data.FileManifest
 import hivens.core.data.SessionData
+import hivens.core.data.flatten
 import hivens.core.util.ZipUtils
 import hivens.core.util.retryWithBackoff
 import hivens.launcher.smrt.ModInjector
@@ -67,7 +68,7 @@ class FileDownloadService(
         val manifest = session.fileManifest ?: throw IOException("File manifest is empty!")
         Files.createDirectories(targetDir)
 
-        val filesMap = flattenManifest(manifest)
+        val filesMap = manifest.flatten().toMutableMap()
 
         // ── Disabled-mod cleanup runs UNCONDITIONALLY ────────────────────
         // Must precede the cache short-circuit below: a stale jar in
@@ -263,24 +264,6 @@ class FileDownloadService(
             logger.error("Strict mod check: error walking mods folder", e)
         }
         if (removed > 0) logger.info("Strict mod check: pruned {} foreign jar(s) from mods/", removed)
-    }
-
-    /**
-     * Recursively traverses the manifest and collects all files into one map.
-     */
-    internal fun flattenManifest(manifest: FileManifest): MutableMap<String, FileData> {
-        val result = HashMap<String, FileData>()
-        fun traverse(m: FileManifest, currentPath: String) {
-            m.files.forEach { (name, data) ->
-                val fullPath = if (currentPath.isEmpty()) name else "$currentPath/$name"
-                result[fullPath] = data
-            }
-            m.directories.forEach { (name, subManifest) ->
-                traverse(subManifest, if (currentPath.isEmpty()) name else "$currentPath/$name")
-            }
-        }
-        traverse(manifest, "")
-        return result
     }
 
     private suspend fun downloadMissingFiles(

@@ -6,7 +6,7 @@ import java.nio.file.Path
  * Schedules a downloaded update installer to apply at JVM exit via
  * [Runtime.addShutdownHook]. Wired through Koin in
  * `client-launcher/.../di/Modules.kt`, implementation picked per
- * [hivens.launcher.platform.OS]. Lives in `client-core` so UI can
+ * [hivens.core.platform.OS]. Lives in `client-core` so UI can
  * inject without seeing platform-specific classes.
  */
 interface IUpdateApplicator {

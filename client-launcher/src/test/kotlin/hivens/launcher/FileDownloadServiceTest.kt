@@ -1,7 +1,5 @@
 package hivens.launcher
 
-import hivens.core.data.FileData
-import hivens.core.data.FileManifest
 import hivens.test.buildMockClient
 import kotlinx.serialization.json.Json
 import java.nio.file.Files
@@ -81,59 +79,8 @@ class FileDownloadServiceTest {
         assertEquals("modsArchive/old.jar", svc.normalizePath("modsArchive/old.jar"))
     }
 
-    // ── flattenManifest: nested directories -> flat (path, FileData) map ──
-
-    @Test
-    fun `flattenManifest empty manifest yields empty map`() {
-        val flat = svc.flattenManifest(FileManifest())
-        assertTrue(flat.isEmpty())
-    }
-
-    @Test
-    fun `flattenManifest puts root-level files at their bare key`() {
-        val manifest = FileManifest(
-            files = mapOf("extra.zip" to FileData(md5 = "abc", size = 100L)),
-        )
-        val flat = svc.flattenManifest(manifest)
-        assertEquals(1, flat.size)
-        assertTrue(flat.containsKey("extra.zip"))
-    }
-
-    @Test
-    fun `flattenManifest joins directory keys with slashes`() {
-        val manifest = FileManifest(
-            directories = mapOf(
-                "mods" to FileManifest(
-                    files = mapOf(
-                        "industrialcraft.jar" to FileData(md5 = "111", size = 1000L),
-                        "buildcraft.jar"      to FileData(md5 = "222", size = 2000L),
-                    ),
-                ),
-            ),
-        )
-        val flat = svc.flattenManifest(manifest)
-        assertEquals(2, flat.size)
-        assertTrue(flat.containsKey("mods/industrialcraft.jar"))
-        assertTrue(flat.containsKey("mods/buildcraft.jar"))
-    }
-
-    @Test
-    fun `flattenManifest recurses into deeply nested directory trees`() {
-        val manifest = FileManifest(
-            directories = mapOf(
-                "config" to FileManifest(
-                    directories = mapOf(
-                        "industrialcraft" to FileManifest(
-                            files = mapOf("recipes.cfg" to FileData(md5 = "x", size = 10L)),
-                        ),
-                    ),
-                ),
-            ),
-        )
-        val flat = svc.flattenManifest(manifest)
-        assertEquals(1, flat.size)
-        assertTrue(flat.containsKey("config/industrialcraft/recipes.cfg"))
-    }
+    // Manifest flattening now lives on FileManifest.flatten(); see
+    // client-core FileManifestFlattenTest.
 
     // ── calculateMD5: known content -> known hash ─────────────────────────
 
