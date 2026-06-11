@@ -5,6 +5,7 @@ import hivens.core.api.model.ServerProfile
 import hivens.core.data.FileData
 import hivens.core.data.FileManifest
 import hivens.core.data.OptionalMod
+import hivens.core.data.flatten
 import kotlinx.serialization.json.*
 import org.slf4j.LoggerFactory
 
@@ -14,20 +15,7 @@ class ManifestProcessorService(
 
     private val log = LoggerFactory.getLogger(ManifestProcessorService::class.java)
 
-    override fun flattenManifest(manifest: FileManifest): Map<String, FileData> {
-        val result = HashMap<String, FileData>()
-        flattenRecursive(manifest, "", result)
-        return result
-    }
-
-    private fun flattenRecursive(manifest: FileManifest, currentPath: String, result: MutableMap<String, FileData>) {
-        manifest.files.forEach { (k, v) ->
-            result[currentPath + k] = v
-        }
-        manifest.directories.forEach { (k, v) ->
-            flattenRecursive(v, "$currentPath$k/", result)
-        }
-    }
+    override fun flattenManifest(manifest: FileManifest): Map<String, FileData> = manifest.flatten()
 
     override fun getOptionalModsForClient(profile: ServerProfile): List<OptionalMod> {
         val result = ArrayList<OptionalMod>()

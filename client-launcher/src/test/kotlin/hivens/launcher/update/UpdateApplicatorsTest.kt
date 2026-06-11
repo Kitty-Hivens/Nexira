@@ -1,6 +1,6 @@
 package hivens.launcher.update
 
-import hivens.launcher.platform.OS
+import hivens.core.platform.OS
 import kotlin.test.Test
 import kotlin.test.assertTrue
 

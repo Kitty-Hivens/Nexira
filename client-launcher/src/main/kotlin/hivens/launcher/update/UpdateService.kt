@@ -8,6 +8,9 @@ import hivens.core.data.ReleaseChannel
 import hivens.core.data.ReleaseEntry
 import hivens.core.data.ReleaseManifest
 import hivens.core.data.UpdateChannelMeta
+import hivens.core.platform.Arch
+import hivens.core.platform.OS
+import hivens.core.platform.Platform
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.contentLength
@@ -510,33 +513,27 @@ class UpdateService(
      * Linux:   `.AppImage`
      */
     internal fun findAssetForCurrentOS(assets: List<GitHubAsset>): GitHubAsset? {
-        val osName = System.getProperty("os.name").lowercase()
-
-        return when {
+        return when (OS.platform) {
             // Windows installer is Inno Setup (`.exe`), not MSI -- see
             // `setup.iss` + `build_release.yml`.
-            osName.contains("windows") -> assets.find {
+            Platform.WINDOWS -> assets.find {
                 it.name.endsWith(".exe") && it.name.contains("Setup", ignoreCase = true)
             }
-            osName.contains("mac") -> {
+            Platform.MACOS -> {
                 // Match on arch first. Picking the first `.dmg` blindly
                 // breaks dual-arch releases: aarch64 + x86_64 both ship
                 // and the alphabetically-first one would leave Intel
                 // users with an ARM64 DMG that fails with "not
                 // supported on this Mac" before Gatekeeper fires.
-                val arch = System.getProperty("os.arch", "").lowercase()
-                val archSuffix = when {
-                    arch.contains("aarch64") || arch.contains("arm64") -> "aarch64.dmg"
-                    else -> "x86_64.dmg"
-                }
+                val archSuffix = if (OS.arch == Arch.ARM64) "aarch64.dmg" else "x86_64.dmg"
                 assets.find { it.name.endsWith(archSuffix) }
                     // Legacy fallback for releases predating dual-arch
                     // (single .dmg with no arch suffix). Will return wrong
                     // arch in degraded cases but better than no update at all.
                     ?: assets.find { it.name.endsWith(".dmg") }
             }
-            osName.contains("linux") -> assets.find { it.name.endsWith(".AppImage") }
-            else -> null
+            Platform.LINUX -> assets.find { it.name.endsWith(".AppImage") }
+            Platform.UNKNOWN -> null
         }
     }
 

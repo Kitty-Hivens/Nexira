@@ -2,6 +2,7 @@ package hivens.launcher.component
 
 import hivens.core.api.interfaces.IManifestProcessorService
 import hivens.core.data.FileManifest
+import hivens.core.platform.Platform
 import hivens.launcher.util.ClientRootDirs
 import org.slf4j.LoggerFactory
 import java.io.File
@@ -41,15 +42,14 @@ class ClasspathProvider(
      * `Set.any` lookup, not a per-call OS sniff.
      */
     private val foreignNativeSuffixes: Set<String> = run {
-        val lower = osName.lowercase()
         val all = setOf("linux", "windows", "macos", "osx")
-        when {
-            lower.contains("linux")   -> all - setOf("linux")
-            lower.contains("windows") -> all - setOf("windows")
-            lower.contains("mac") || lower.contains("darwin") -> all - setOf("macos", "osx")
-            else -> emptySet()  // Unknown OS -- drop nothing rather than risk
-                                // stripping the platform's own native and
-                                // crashing on launch with no recourse.
+        when (Platform.classify(osName)) {
+            Platform.LINUX   -> all - setOf("linux")
+            Platform.WINDOWS -> all - setOf("windows")
+            Platform.MACOS   -> all - setOf("macos", "osx")
+            Platform.UNKNOWN -> emptySet()  // Unknown OS -- drop nothing rather than risk
+                                            // stripping the platform's own native and
+                                            // crashing on launch with no recourse.
         }
     }
 

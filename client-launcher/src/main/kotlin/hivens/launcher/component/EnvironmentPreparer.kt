@@ -1,6 +1,7 @@
 package hivens.launcher.component
 
 import hivens.core.api.HttpClientProvider
+import hivens.core.platform.OS
 import hivens.core.util.ZipUtils
 import hivens.launcher.util.ClientFileHelper
 import io.ktor.client.request.prepareGet
@@ -15,7 +16,6 @@ import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
-import java.util.*
 import java.util.stream.Collectors
 
 class EnvironmentPreparer(private val clientProvider: HttpClientProvider) {
@@ -47,7 +47,7 @@ class EnvironmentPreparer(private val clientProvider: HttpClientProvider) {
     suspend fun prepareNatives(clientRoot: Path, nativesDirName: String, version: String) = withContext(Dispatchers.IO) {
         val binDir = clientRoot.resolve("bin")
         val nativesDir = clientRoot.resolve(nativesDirName)
-        val osSuffix = getOsSuffix()
+        val osSuffix = OS.platform.lwjgl
 
         // 1. Check: If the folder is valid, we do nothing
         if (isFolderValidForOs(nativesDir, osSuffix)) {
@@ -126,7 +126,7 @@ class EnvironmentPreparer(private val clientProvider: HttpClientProvider) {
         nativeJars: List<Path>,
     ) = withContext(Dispatchers.IO) {
         val nativesDir = clientRoot.resolve(nativesDirName)
-        val osSuffix = getOsSuffix()
+        val osSuffix = OS.platform.lwjgl
 
         if (isFolderValidForOs(nativesDir, osSuffix)) {
             log.info("Natives valid for $osSuffix.")
@@ -336,13 +336,4 @@ class EnvironmentPreparer(private val clientProvider: HttpClientProvider) {
         }
     }
 
-    internal fun getOsSuffix(): String {
-        val osName = System.getProperty("os.name").lowercase(Locale.getDefault())
-        return when {
-            osName.contains("win") -> "windows"
-            osName.contains("mac") -> "macos"
-            osName.contains("nix") || osName.contains("nux") || osName.contains("aix") -> "linux"
-            else -> "unknown"
-        }
-    }
 }

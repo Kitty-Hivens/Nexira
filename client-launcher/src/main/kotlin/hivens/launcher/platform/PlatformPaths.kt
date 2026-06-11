@@ -1,5 +1,6 @@
 package hivens.launcher.platform
 
+import hivens.core.platform.Platform
 import java.nio.file.Path
 import java.nio.file.Paths
 
@@ -28,9 +29,9 @@ class PlatformPaths(
     bootstrapDataDir: () -> Path? = { BootstrapConf.read()[BootstrapConf.KEY_DATA_DIR]?.let { Paths.get(it) } },
     private val env: (String) -> String?,
 ) {
-    private val isWindows = osName.contains("windows", ignoreCase = true)
-    private val isMacOs = osName.contains("mac", ignoreCase = true) ||
-            osName.contains("darwin", ignoreCase = true)
+    private val platform = Platform.classify(osName)
+    private val isWindows = platform == Platform.WINDOWS
+    private val isMacOs = platform == Platform.MACOS
 
     val dataDir: Path = run {
         val envOverride = env("NEXIRA_DATA_DIR")
