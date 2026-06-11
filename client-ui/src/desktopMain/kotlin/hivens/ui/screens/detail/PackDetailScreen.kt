@@ -558,6 +558,7 @@ private fun originGradient(origin: PackOrigin): Brush {
         PackOrigin.Mirror      -> Color(0xFF1E3A8A) to Color(0xFF1D4ED8)
         PackOrigin.Modrinth    -> Color(0xFF14532D) to Color(0xFF15803D)
         PackOrigin.Local       -> Color(0xFF374151) to Color(0xFF4B5563)
+        PackOrigin.Unknown     -> Color(0xFF374151) to Color(0xFF4B5563)
     }
     return Brush.linearGradient(listOf(pair.first, pair.second))
 }

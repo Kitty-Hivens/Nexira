@@ -1,5 +1,6 @@
 package hivens.core.data
 
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 
 /**
@@ -8,7 +9,7 @@ import kotlinx.serialization.Serializable
  * use for fetching files, which auth (if any) is required to play
  * on the bound server, which UI badges to show.
  *
- * Currently four shipped values. Adding a new origin is additive
+ * Four shipped values plus [Unknown]. Adding a new origin is additive
  * (existing serialized packs continue to decode); removing one is
  * a wire break -- don't.
  */
@@ -44,7 +45,24 @@ enum class PackOrigin {
      * choose to publish.
      */
     Local,
+
+    /**
+     * An origin a newer build wrote that this build does not know.
+     * Never emitted intentionally -- [PackOriginSerializer] folds an
+     * unrecognised wire value here so an older build does not silently
+     * misread it as [Smartycraft] (which would pick the wrong auth /
+     * sync path). Callers treat it as "source unknown": no SC auth
+     * redirect, no install path.
+     */
+    Unknown,
 }
+
+/** Persistence codec that folds an unknown wire origin to [PackOrigin.Unknown]. */
+object PackOriginSerializer : KSerializer<PackOrigin> by LenientEnumSerializer(
+    PackOrigin.entries.toTypedArray(),
+    PackOrigin.Unknown,
+    PackOrigin.serializer(),
+)
 
 /**
  * Cross-origin pack identifier. Used wherever a piece of state has
@@ -54,6 +72,7 @@ enum class PackOrigin {
  */
 @Serializable
 data class PackReference(
+    @Serializable(with = PackOriginSerializer::class)
     val origin: PackOrigin,
     /** Origin-specific identifier, same shape as [Pack.id]. */
     val id: String,
