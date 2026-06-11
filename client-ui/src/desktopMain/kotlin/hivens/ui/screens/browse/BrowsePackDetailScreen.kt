@@ -339,7 +339,7 @@ private fun InstallRunningRow(state: InstallState.Running) {
                 trackColor = CelestiaTheme.colors.outline.copy(alpha = 0.25f),
             )
             Text(
-                text  = s.browseDetailInstallProgress.format(state.filename, state.current, state.total),
+                text  = s.browseDetailInstallProgress(state.filename, state.current, state.total),
                 style = MaterialTheme.typography.bodySmall,
                 color = CelestiaTheme.colors.textSecondary,
             )

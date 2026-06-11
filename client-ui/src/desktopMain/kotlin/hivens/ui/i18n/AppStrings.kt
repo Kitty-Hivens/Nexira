@@ -656,7 +656,8 @@ interface AppStrings {
     val browseDetailVersionTitle: String
 
     val browseDetailInstallRunningTitle: String
-    val browseDetailInstallProgress: String
+    /** Per-file install progress line. Receives the current filename and the file counter. */
+    fun browseDetailInstallProgress(filename: String, current: Int, total: Int): String
     val browseDetailInstallStarting: String
     val browseDetailInstallDoneTitle: String
     val browseDetailInstallDoneHint: String
