@@ -626,7 +626,8 @@ object EnglishStrings : AppStrings {
     override val browseDetailVersionTitle     = "Version"
 
     override val browseDetailInstallRunningTitle  = "Installing..."
-    override val browseDetailInstallProgress      = "%s  (%d / %d)"
+    override fun browseDetailInstallProgress(filename: String, current: Int, total: Int) =
+        "$filename  ($current / $total)"
     override val browseDetailInstallStarting      = "Starting..."
     override val browseDetailInstallDoneTitle     = "Installed"
     override val browseDetailInstallDoneHint      = "Added to your Library."
