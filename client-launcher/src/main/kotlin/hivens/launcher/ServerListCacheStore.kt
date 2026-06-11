@@ -74,10 +74,25 @@ class JsonServerListCacheStore(
 
     private val log = LoggerFactory.getLogger(JsonServerListCacheStore::class.java)
 
+    // Set by load() when the file's schema_version is newer than this build
+    // understands. The cache self-heals from the next live fetch, so the only
+    // cost of not writing back is one cold tray render -- worth it to never let
+    // an older binary downgrade a newer build's file.
+    @Volatile private var readOnly = false
+
     override fun load(): List<ServerProfile> {
         if (!Files.exists(file)) return emptyList()
         return try {
-            json.decodeFromString<ServersCacheFile>(Files.readString(file)).servers
+            val parsed = json.decodeFromString<ServersCacheFile>(Files.readString(file))
+            if (parsed.schemaVersion > SCHEMA_VERSION) {
+                readOnly = true
+                log.warn(
+                    "Servers cache at {} is schema_version {} > supported {} -- written by a newer build. " +
+                        "Loading read-only; this session will not write it back.",
+                    file, parsed.schemaVersion, SCHEMA_VERSION,
+                )
+            }
+            parsed.servers
         } catch (e: Exception) {
             log.error("Failed to load servers cache at {} -- starting empty", file, e)
             emptyList()
@@ -85,6 +100,10 @@ class JsonServerListCacheStore(
     }
 
     override suspend fun save(servers: List<ServerProfile>) {
+        if (readOnly) {
+            log.debug("Servers cache at {} is from a newer build -- skipping write-back", file)
+            return
+        }
         withContext(Dispatchers.IO) {
             try {
                 val snapshot = ServersCacheFile(schemaVersion = SCHEMA_VERSION, servers = servers)

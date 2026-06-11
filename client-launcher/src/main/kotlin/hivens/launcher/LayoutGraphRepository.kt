@@ -61,6 +61,14 @@ class LayoutGraphRepository(
 
     private val log   = LoggerFactory.getLogger(LayoutGraphRepository::class.java)
     private val mutex = Mutex()
+
+    // Set by load() when the file's schema_version is newer than this build
+    // understands. A newer build wrote it; we read best-effort (and keep the
+    // UI live) but never write back, so an older binary cannot downgrade and
+    // discard layout data it can't represent. Symmetric to Migrations.apply's
+    // lower-bound rejection.
+    @Volatile private var readOnly = false
+
     private val state: MutableStateFlow<LayoutGraph> = MutableStateFlow(load())
 
     // Pending debounced persist. Replaced on each update; cancelled by
@@ -184,6 +192,14 @@ class LayoutGraphRepository(
         }
         return try {
             val envelope = json.decodeFromString<Envelope>(Files.readString(file))
+            if (envelope.schemaVersion > SCHEMA_VERSION) {
+                readOnly = true
+                log.warn(
+                    "Layout graph at {} is schema_version {} > supported {} -- written by a newer build. " +
+                        "Loading read-only; this session will not write it back to avoid clobbering newer data.",
+                    file, envelope.schemaVersion, SCHEMA_VERSION,
+                )
+            }
             val def      = defaultGraph()
             val migrated = Migrations.apply(envelope.schemaVersion, envelope.graph)
             mergeMissingSlots(mergeMissingSurfaces(migrated, def), def)
@@ -249,6 +265,10 @@ class LayoutGraphRepository(
     // The debounce coroutine acquires the mutex inside its launched
     // block; flush() invokes from inside its own mutex.withLock.
     private fun writeNow() {
+        if (readOnly) {
+            log.debug("Layout graph at {} is from a newer build -- skipping write-back", file)
+            return
+        }
         try {
             val envelope = Envelope(schemaVersion = SCHEMA_VERSION, graph = state.value)
             AtomicFiles.writeString(file, json.encodeToString(envelope))

@@ -166,6 +166,23 @@ class JsonPackRepositoryTest {
     }
 
     @Test
+    fun `newer schema_version loads read-only and put does not write back`() = runBlocking {
+        // A future build bumped the packs schema. The older binary reads
+        // best-effort but must not overwrite the file -- packs.json is the
+        // source of truth for installed instances, not regenerated, so a
+        // downgrade-clobber would lose instances the newer build wrote.
+        val newer = """{"schema_version":99,"instances":[]}"""
+        Files.writeString(file, newer)
+        val before = Files.readString(file)
+
+        val repo = JsonPackRepository(file, json)
+        repo.put(sampleInstance(id = "id-1", name = "A"))
+
+        assertEquals(1, repo.list().size, "in-memory state still reflects the put under read-only")
+        assertEquals(before, Files.readString(file), "an older build must not overwrite a newer-schema packs file")
+    }
+
+    @Test
     fun `persisted file is wrapped in versioned envelope`() = runBlocking {
         val repo = JsonPackRepository(file, json)
         repo.put(sampleInstance(id = "id-1", name = "A"))

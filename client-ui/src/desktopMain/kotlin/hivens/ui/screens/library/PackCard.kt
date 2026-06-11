@@ -184,6 +184,7 @@ private fun SourceBadge(origin: PackOrigin) {
         PackOrigin.Mirror      -> "Mirror"   to Color(0xFF3B82F6)
         PackOrigin.Modrinth    -> "Modrinth" to Color(0xFF22C55E)
         PackOrigin.Local       -> "Local"    to Color(0xFF9CA3AF)
+        PackOrigin.Unknown     -> "?"        to Color(0xFF9CA3AF)
     }
     Box(
         modifier = Modifier
@@ -237,6 +238,7 @@ private fun originGradient(origin: PackOrigin): Brush {
         PackOrigin.Mirror      -> Color(0xFF1E3A8A) to Color(0xFF1D4ED8)
         PackOrigin.Modrinth    -> Color(0xFF14532D) to Color(0xFF15803D)
         PackOrigin.Local       -> Color(0xFF374151) to Color(0xFF4B5563)
+        PackOrigin.Unknown     -> Color(0xFF374151) to Color(0xFF4B5563)
     }
     return Brush.linearGradient(listOf(pair.first, pair.second))
 }
@@ -246,6 +248,7 @@ private fun originAvatarColor(origin: PackOrigin): Color = when (origin) {
     PackOrigin.Mirror      -> Color(0xFF2563EB)
     PackOrigin.Modrinth    -> Color(0xFF16A34A)
     PackOrigin.Local       -> Color(0xFF6B7280)
+    PackOrigin.Unknown     -> Color(0xFF6B7280)
 }
 
 /**

@@ -56,6 +56,12 @@ class JsonPackRepository(
 
     private val log   = LoggerFactory.getLogger(JsonPackRepository::class.java)
     private val mutex = Mutex()
+
+    // Set by load() when the file's schema_version is newer than this build
+    // understands. A newer build wrote it; we read best-effort but never write
+    // back, so an older binary cannot downgrade and clobber the newer data.
+    @Volatile private var readOnly = false
+
     private val state: MutableStateFlow<List<PackInstance>> = MutableStateFlow(load())
 
     override fun observe(): Flow<List<PackInstance>> = state.asStateFlow()
@@ -84,7 +90,16 @@ class JsonPackRepository(
     private fun load(): List<PackInstance> {
         if (!Files.exists(file)) return emptyList()
         return try {
-            json.decodeFromString<PacksFile>(Files.readString(file)).instances
+            val parsed = json.decodeFromString<PacksFile>(Files.readString(file))
+            if (parsed.schemaVersion > SCHEMA_VERSION) {
+                readOnly = true
+                log.warn(
+                    "Packs registry at {} is schema_version {} > supported {} -- written by a newer build. " +
+                        "Loading read-only; this session will not write it back to avoid clobbering newer data.",
+                    file, parsed.schemaVersion, SCHEMA_VERSION,
+                )
+            }
+            parsed.instances
         } catch (e: Exception) {
             log.error("Failed to load packs registry at {} -- starting empty", file, e)
             emptyList()
@@ -92,6 +107,10 @@ class JsonPackRepository(
     }
 
     private suspend fun persist() = withContext(Dispatchers.IO) {
+        if (readOnly) {
+            log.debug("Packs registry at {} is from a newer build -- skipping write-back", file)
+            return@withContext
+        }
         try {
             val snapshot = PacksFile(schemaVersion = SCHEMA_VERSION, instances = state.value)
             AtomicFiles.writeString(file, json.encodeToString(snapshot))

@@ -139,6 +139,23 @@ class LayoutGraphRepositoryTest {
     }
 
     @Test
+    fun `newer schema_version loads read-only and is never written back`() = runBlocking {
+        // A future build bumped the layout schema. An older binary that opens
+        // the file must read it best-effort but never overwrite it -- otherwise
+        // it downgrades the envelope and discards layout it can't represent.
+        val newer = """{"schema_version":99,"graph":{"surfaces":{}}}"""
+        Files.writeString(file, newer)
+        val before = Files.readString(file)
+
+        val repo = repo()
+        repo.update { LayoutGraph.EMPTY }   // in-memory mutation still applies
+        repo.flush()
+
+        assertEquals(LayoutGraph.EMPTY, repo.value(), "in-memory state still mutates under read-only")
+        assertEquals(before, Files.readString(file), "an older build must not overwrite a newer-schema file")
+    }
+
+    @Test
     fun `observe re-emits after update`() = runBlocking {
         val repo = repo()
         val flow = repo.observe()

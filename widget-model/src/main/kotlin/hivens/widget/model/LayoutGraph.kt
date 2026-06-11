@@ -1,5 +1,6 @@
 package hivens.widget.model
 
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
@@ -49,9 +50,19 @@ data class WidgetChrome(
 // Phase G: how a slot arranges its widgets. Column (default) reproduces
 // the pre-Phase-G vertical stack; Row lays them horizontally; Grid flows
 // them into `gridColumns` uniform cells; Canvas places each widget at an
-// absolute offset + size (free-canvas mode).
+// absolute offset + size (free-canvas mode). Unknown is the forward-compat
+// sentinel: a newer build's orientation read here folds to Unknown (never
+// emitted intentionally) and renders as Column, rather than silently
+// coercing to Column and discarding the real value's identity.
 @Serializable
-enum class SlotOrientation { Column, Row, Grid, Canvas }
+enum class SlotOrientation { Column, Row, Grid, Canvas, Unknown }
+
+/** Persistence codec that folds an unknown wire orientation to [SlotOrientation.Unknown]. */
+object SlotOrientationSerializer : KSerializer<SlotOrientation> by LenientEnumSerializer(
+    SlotOrientation.entries.toTypedArray(),
+    SlotOrientation.Unknown,
+    SlotOrientation.serializer(),
+)
 
 // Absolute placement of a widget inside a Canvas slot. x/y are dp offsets
 // from the slot's top-left; width/height 0 means intrinsic/wrap (dp when set);
@@ -68,6 +79,7 @@ data class CanvasPlacement(
 @Serializable
 data class SlotContent(
     val widgets: List<WidgetInstance> = emptyList(),
+    @Serializable(with = SlotOrientationSerializer::class)
     val orientation: SlotOrientation = SlotOrientation.Column,
     // Column count when orientation == Grid; ignored otherwise.
     val gridColumns: Int = 2,
