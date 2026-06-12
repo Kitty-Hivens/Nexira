@@ -68,6 +68,7 @@ import okhttp3.Call
 import okhttp3.OkHttpClient
 import org.koin.core.module.dsl.singleOf
 import org.koin.core.qualifier.named
+import org.koin.core.scope.Scope
 import org.koin.dsl.module
 import java.net.InetSocketAddress
 import java.net.PasswordAuthentication
@@ -334,28 +335,19 @@ val networkModule = module {
     single { PlayerRepository(get<IServerProtocol>()) }
 }
 
-val appModule = module {
-    /**
-     * Per-OS application paths. See [PlatformPaths] for layout.
-     */
-    single(createdAtStart = true) { PlatformPaths.system() }
+// ── App composition modules ─────────────────────────────────────────────────
+// The former monolithic appModule, split into intent-named modules so the
+// auth/mirror extraction has clean seams to grab and the inline assembly
+// (LoaderRegistry, SmrtPackCaches, the dashboard cache) lives in named
+// factories below. All are registered together in LauncherBootstrap, so a
+// definition's module membership does not affect resolution -- only grouping.
 
-    /**
-     * Application data directory. Resolved via [PlatformPaths] so that all
-     * subsystems (settings, profiles, credentials, downloaded clients,
-     * skin cache, logs, crash reports) share one platform-correct root.
-     */
-    single<Path>(createdAtStart = true) { get<PlatformPaths>().dataDir }
-
-    /**
-     * Crash report generator + dialog presenter. Main.kt constructs its
-     * own instance pre-Koin for the uncaught-exception handler; this
-     * registration covers post-Koin consumers (none today, but the
-     * dependency contract makes it injectable for future Composables
-     * that want to trigger a manual report).
-     */
-    single { CrashReporter(get()) }
-
+/**
+ * Auth + credential storage seam. The load-bearing target of the client-auth
+ * extraction: keyring, credential manager, and the SmartyCraft auth provider
+ * (secure + insecure-bypass variants).
+ */
+val authModule = module {
     // IKeyringStorage picked at startup via KeyringStorageFactory.system()
     // -- libsecret on Linux, Credential Manager / DPAPI on Windows,
     // Keychain on macOS, NoOp fallback when no daemon is reachable.
@@ -371,80 +363,34 @@ val appModule = module {
     // the single instance rather than building a second.
     single<ICredentialStore> { get<CredentialsManager>() }
 
-    single<ISettingsService> {
-        val dataDir: Path = get()
-        SettingsService(get(), dataDir.resolve(Storage.SETTINGS_FILE))
-    }
-
-    // Replays persisted user-experimental overrides (forceProxyMode,
-    // mimicVersionOverride) into their respective global state holders
-    // on Koin start. `createdAtStart = true` makes this run during
-    // `startKoin { modules(...) }` so the values are live before the
-    // first protocol call.
-    single(createdAtStart = true) { SettingsRestoreHook(get()) }
+    single<AuthProvider> { SmartyCraftAuthProvider(get<IServerProtocol>()) }
 
     /**
-     * Process-lifetime coroutine scope for fire-and-forget background
-     * work (tray-launch flow, AutoSync, `LauncherController.launch`).
-     * SupervisorJob so a single failed child doesn't take down the
-     * rest. Single shared scope across the whole launcher so the JVM
-     * shutdown hook installed by [AppCoroutineScopeHook] cancels every
-     * coroutine on process exit.
+     * Insecure [AuthProvider] -- used exclusively for the SSL bypass login retry.
+     * Always connects without certificate verification (via the insecure-channel
+     * IServerProtocol variant bound above in coreModule).
      */
-    single<CoroutineScope>(createdAtStart = true) {
-        CoroutineScope(
-            SupervisorJob() + Dispatchers.IO
-        )
+    single<AuthProvider>(named("insecure")) {
+        SmartyCraftAuthProvider(get<IServerProtocol>(named("insecure")))
     }
+}
 
-    // Installs the shutdown hook that cancels the scope above. Separated
-    // from the scope's own factory so the factory stays a one-liner and
-    // the hook can be tested independently if needed.
-    single(createdAtStart = true) { AppCoroutineScopeHook(get()) }
-
-    /**
-     * Launch-flow orchestrator. Consumes client-core interfaces, the shared
-     * coroutine scope, and SmartyModPlanner -- the one concrete collaborator
-     * left, since its nested Plan return type resists a clean interface. No UI
-     * types (i18n strings, console service) leak in.
-     */
-    singleOf(::LauncherController)
-
-    single {
-        val dataDir: Path = get()
-        ProtectedPaths(dataDir.resolve(Storage.PROTECTED_PATHS_FILE), get())
-    }
-    single {
-        val dataDir: Path = get()
-        ManifestCache(dataDir.resolve("manifest-cache"), get())
-    }
-    single<IManifestStore> { get<ManifestCache>() }
-    single<IFileDownloadService> { FileDownloadService(get(), get(), get(), get<ServerProtocolConfig>()) }
-
-    // Cross-cutting cache layer. CacheFactory shares the app Json, the
-    // process-lifetime IO scope, and a system clock; each pack-metadata endpoint
-    // gets its own disk-backed, TTL + stale-while-revalidate namespace.
+/**
+ * Cross-cutting disk cache layer (TTL + stale-while-revalidate). CacheFactory
+ * shares the app Json, the process-lifetime IO scope, and a system clock; the
+ * per-endpoint pack-metadata namespaces live in the [smrtPackCaches] factory.
+ */
+val cacheModule = module {
     single<Clock> { SystemClock }
     single { CacheFactory(rootDir = get<Path>().resolve("cache"), json = get(), scope = get(), clock = get()) }
-    single {
-        val f: CacheFactory = get()
-        val min = 60_000L
-        val hour = 60 * min
-        val day = 24 * hour
-        SmrtPackCaches(
-            // Browse listing + per-pack summary: change occasionally; serve stale
-            // for a day on outage.
-            listing = f.create("pack-listing", SmrtPackListing.serializer(), CacheConfig(ttlMs = 5 * min, staleTtlMs = day)),
-            summary = f.create("pack-summary", SmrtPackSummary.serializer(), CacheConfig(ttlMs = 10 * min, staleTtlMs = day)),
-            // Manifests change on a pack release; pinned-version manifests are
-            // immutable and ride the same namespace as long-lived hits.
-            manifest = f.create("pack-manifest", SmrtPackManifest.serializer(), CacheConfig(ttlMs = 10 * min, staleTtlMs = 7 * day)),
-            // Modrinth project metadata (icons) rarely changes; a version is immutable.
-            modrinthProject = f.create("modrinth-project", ModrinthProject.serializer(), CacheConfig(ttlMs = hour, staleTtlMs = 7 * day)),
-            modrinthVersion = f.create("modrinth-version", ModrinthVersion.serializer(), CacheConfig(ttlMs = 7 * day, staleTtlMs = 30 * day)),
-        )
-    }
+    single { smrtPackCaches() }
+}
 
+/**
+ * Hivens mirror: pack client + sync, the Smarty -> open-smrt interop swap, the
+ * SC-bound authlib swap, the pack installers, and the per-mod icon resolver.
+ */
+val mirrorModule = module {
     // Hivens Mirror sync. Uses the "direct" HttpClient because
     // smrt.hivens.dev and Modrinth are public CDN-fronted endpoints
     // that don't need the SC channel's SOCKS proxy or SSL bypass.
@@ -484,14 +430,17 @@ val appModule = module {
             client.resolveModrinthProject(projectId).iconUrl
         }
     }
+}
 
-    single<IManifestProcessorService> { ManifestProcessorService(get()) }
-    single { ProfileManager(get(), get()) }
-    single<IInstanceProfileStore> { get<ProfileManager>() }
+/**
+ * Runtime provisioning + JVM command assembly: managed Java, natives + classpath
+ * + command building, loader resolution (the [loaderRegistry] factory), vanilla /
+ * loader library provisioning, and the adaptive-heap profiler.
+ */
+val runtimeModule = module {
     // Direct channel -- BellSoft JDK CDN does not require the SMARTYcraft proxy.
     single<IJavaManager> { JavaManagerService(get(), get(named("direct"))) }
 
-    // Launch pipeline collaborators
     // Direct channel -- Maven Central LWJGL/JInput natives don't need the proxy.
     single { EnvironmentPreparer(get(named("direct"))) }
     single { ClasspathProvider(get()) }
@@ -502,23 +451,7 @@ val appModule = module {
     // official Mojang/Forge CDNs into the shared roots. Direct channel: these
     // CDNs do not use the SMARTYcraft proxy (same rationale as JavaManagerService).
     single { ForgeLegacyResolver(get(named("direct")), get()) }
-    single {
-        // Modern loaders run the official installer headless, caching its
-        // output here so re-launches skip the multi-minute install.
-        val loaderCacheDir: Path = get<Path>().resolve("loader-cache")
-        LoaderRegistry(
-            listOf(
-                // "forge" routes to legacy (<=1.12.2) or the modern installer by MC version.
-                ForgeResolver(
-                    legacy = get<ForgeLegacyResolver>(),
-                    modern = ModernInstallerResolver.forge(get(named("direct")), get(), get(), loaderCacheDir),
-                ),
-                ModernInstallerResolver.neoforge(get(named("direct")), get(), get(), loaderCacheDir),
-                FabricLikeResolver(get(named("direct")), get(), "fabric", FabricLikeResolver.FABRIC_META),
-                FabricLikeResolver(get(named("direct")), get(), "quilt", FabricLikeResolver.QUILT_META),
-            ),
-        )
-    }
+    single { loaderRegistry() }
     single {
         RuntimeProvisioner(
             librariesDir = get<PlatformPaths>().librariesDir,
@@ -529,15 +462,166 @@ val appModule = module {
         )
     }
 
-    single<AuthProvider> { SmartyCraftAuthProvider(get<IServerProtocol>()) }
+    // Adaptive-memory profiler: reads the agent's per-session metrics + persists
+    // the per-instance derived-heap profile; extracts the agent jar to the data dir.
+    single { ProfilerProfileStore(get()) }
+    single { AgentExtractor(get<Path>()) }
+}
+
+/**
+ * The launch flow: the orchestrator [LauncherController], the [ILauncherService]
+ * that spawns the process, the file-download + manifest + profile collaborators
+ * it drives, and the background AutoSyncService.
+ */
+val launchPipelineModule = module {
+    single {
+        val dataDir: Path = get()
+        ManifestCache(dataDir.resolve("manifest-cache"), get())
+    }
+    single<IManifestStore> { get<ManifestCache>() }
+    single<IFileDownloadService> { FileDownloadService(get(), get(), get(), get<ServerProtocolConfig>()) }
+    single<IManifestProcessorService> { ManifestProcessorService(get()) }
+    single { ProfileManager(get(), get()) }
+    single<IInstanceProfileStore> { get<ProfileManager>() }
 
     /**
-     * Insecure [AuthProvider] -- used exclusively for the SSL bypass login retry.
-     * Always connects without certificate verification (via the insecure-channel
-     * IServerProtocol variant bound above in coreModule).
+     * Launch-flow orchestrator. Consumes client-core interfaces, the shared
+     * coroutine scope, and SmartyModPlanner -- the one concrete collaborator
+     * left, since its nested Plan return type resists a clean interface. No UI
+     * types (i18n strings, console service) leak in.
      */
-    single<AuthProvider>(named("insecure")) {
-        SmartyCraftAuthProvider(get<IServerProtocol>(named("insecure")))
+    singleOf(::LauncherController)
+
+    /**
+     * Basic launch service. All collaborators are constructor-injected so the
+     * facade is fully replaceable / mockable in tests.
+     */
+    single<ILauncherService> {
+        LauncherService(
+            profileManager     = get(),
+            javaManager        = get(),
+            envPreparer        = get(),
+            classpathProvider  = get(),
+            commandBuilder     = get(),
+            logHandler         = get(),
+            runtimeProvisioner = get(),
+            profilerStore      = get(),
+            agentExtractor     = get(),
+            authlibSwapper     = get(),
+            openSmrtResolver   = get(),
+            sharedAssetsDir    = get<PlatformPaths>().assetsDir,
+            sharedLibrariesDir = get<PlatformPaths>().librariesDir,
+        )
+    }
+
+    single {
+        val dataDir: Path = get()
+        val profiles: ProfileManager = get()
+        val credentials: CredentialsManager = get()
+        val settings: ISettingsService = get()
+        AutoSyncService(
+            authService = get(),
+            downloadService = get(),
+            manifestProcessor = get(),
+            manifestCache = get(),
+            dataDirectory = dataDir,
+            credentialsProvider = { credentials.load() },
+            optionalModsStateProvider = { serverId ->
+                profiles.getProfile(serverId).optionalModsState
+            },
+            smartyPlanner = get(),
+            settingsProvider = { settings.getSettings() },
+        )
+    }
+}
+
+/**
+ * In-app update + build-from-source stack. Direct channel only -- GitHub
+ * releases must stay reachable even when the SMARTYcraft proxy is down,
+ * otherwise the auto-updater cannot ship the fix that restores connectivity.
+ */
+val updateModule = module {
+    single {
+        UpdateService(
+            clientProvider  = get(named("direct")),
+            json            = get(),
+            dataDirectory   = get(),
+            settingsService = get()
+        )
+    }
+
+    // Per-platform update applicator selected at startup. Kept as a singleton
+    // so the shutdown hook each implementation registers fires exactly once.
+    single<IUpdateApplicator> { UpdateApplicators.forCurrentPlatform() }
+
+    // Desktop-entry install (Linux/AppImage) + build-from-source (Dev/Git
+    // channels). Both back the update manager; both no-op / report unsupported
+    // off Linux.
+    single { DesktopIntegration() }
+    single { SourceBuildService(dataDirectory = get(), applicator = get()) }
+}
+
+/**
+ * Core platform + persistence remainder: paths, settings, the shared coroutine
+ * scope and its lifecycle hooks, crash reporting, and the server-list / pack /
+ * layout-graph repositories -- the pieces every other module sits on.
+ */
+val appModule = module {
+    /**
+     * Per-OS application paths. See [PlatformPaths] for layout.
+     */
+    single(createdAtStart = true) { PlatformPaths.system() }
+
+    /**
+     * Application data directory. Resolved via [PlatformPaths] so that all
+     * subsystems (settings, profiles, credentials, downloaded clients,
+     * skin cache, logs, crash reports) share one platform-correct root.
+     */
+    single<Path>(createdAtStart = true) { get<PlatformPaths>().dataDir }
+
+    /**
+     * Crash report generator + dialog presenter. Main.kt constructs its
+     * own instance pre-Koin for the uncaught-exception handler; this
+     * registration covers post-Koin consumers (none today, but the
+     * dependency contract makes it injectable for future Composables
+     * that want to trigger a manual report).
+     */
+    single { CrashReporter(get()) }
+
+    single<ISettingsService> {
+        val dataDir: Path = get()
+        SettingsService(get(), dataDir.resolve(Storage.SETTINGS_FILE))
+    }
+
+    // Replays persisted user-experimental overrides (forceProxyMode,
+    // mimicVersionOverride) into their respective global state holders
+    // on Koin start. `createdAtStart = true` makes this run during
+    // `startKoin { modules(...) }` so the values are live before the
+    // first protocol call.
+    single(createdAtStart = true) { SettingsRestoreHook(get()) }
+
+    /**
+     * Process-lifetime coroutine scope for fire-and-forget background
+     * work (tray-launch flow, AutoSync, `LauncherController.launch`).
+     * SupervisorJob so a single failed child doesn't take down the
+     * rest. Single shared scope across the whole launcher so the JVM
+     * shutdown hook installed by [AppCoroutineScopeHook] cancels every
+     * coroutine on process exit.
+     */
+    single<CoroutineScope>(createdAtStart = true) {
+        CoroutineScope(
+            SupervisorJob() + Dispatchers.IO
+        )
+    }
+
+    // Installs the shutdown hook that cancels the scope above. Separated
+    // from the scope's own factory so the factory stays a one-liner and
+    // the hook can be tested independently if needed.
+    single(createdAtStart = true) { AppCoroutineScopeHook(get()) }
+
+    single {
+        val dataDir: Path = get()
+        ProtectedPaths(dataDir.resolve(Storage.PROTECTED_PATHS_FILE), get())
     }
 
     // Cache feeds the tray menu's first published DBusMenu layout before
@@ -552,19 +636,7 @@ val appModule = module {
     }
 
     single<IServerListService> {
-        // In-memory dashboard cache (single-flight + 10-min SWR). The disk seed
-        // for the tray stays in ServerListCacheStore (servers-only, read
-        // synchronously before any coroutine); empty results don't get stored.
-        val dashboardCache = get<CacheFactory>().createInMemory<DashboardData>(
-            "dashboard",
-            CacheConfig(
-                ttlMs = 10 * 60_000L,
-                staleTtlMs = Long.MAX_VALUE,
-                maxEntries = 4,
-                shouldStore = { it.servers.isNotEmpty() },
-            ),
-        )
-        SmartyCraftServerListService(get(), get(), get(), dashboardCache)
+        SmartyCraftServerListService(get(), get(), get(), dashboardCache())
     }
 
     // JSON-on-disk pack registry. Persists installed PackInstances
@@ -600,75 +672,64 @@ val appModule = module {
     // (JVM shutdown hooks run concurrently); flush() is mutex-locked
     // and cancellation-safe, so racing with scope cancellation is OK.
     single(createdAtStart = true) { LayoutGraphFlushHook(get()) }
+}
 
-    single {
-        val dataDir: Path = get()
-        val profiles: ProfileManager = get()
-        val credentials: CredentialsManager = get()
-        val settings: ISettingsService = get()
-        AutoSyncService(
-            authService = get(),
-            downloadService = get(),
-            manifestProcessor = get(),
-            manifestCache = get(),
-            dataDirectory = dataDir,
-            credentialsProvider = { credentials.load() },
-            optionalModsStateProvider = { serverId ->
-                profiles.getProfile(serverId).optionalModsState
-            },
-            smartyPlanner = get(),
-            settingsProvider = { settings.getSettings() },
-        )
-    }
+// ── Module factories ────────────────────────────────────────────────────────
 
-    // Adaptive-memory profiler: reads the agent's per-session metrics + persists
-    // the per-instance derived-heap profile; extracts the agent jar to the data dir.
-    single { ProfilerProfileStore(get()) }
-    single { AgentExtractor(get<Path>()) }
+/**
+ * Pack-metadata cache namespaces. Browse listing + per-pack summary change
+ * occasionally (serve stale for a day on outage); manifests change on a pack
+ * release but pinned-version manifests are immutable (a week stale); Modrinth
+ * project / version metadata rarely changes (a version is immutable).
+ */
+private fun Scope.smrtPackCaches(): SmrtPackCaches {
+    val f: CacheFactory = get()
+    val min = 60_000L
+    val hour = 60 * min
+    val day = 24 * hour
+    return SmrtPackCaches(
+        listing = f.create("pack-listing", SmrtPackListing.serializer(), CacheConfig(ttlMs = 5 * min, staleTtlMs = day)),
+        summary = f.create("pack-summary", SmrtPackSummary.serializer(), CacheConfig(ttlMs = 10 * min, staleTtlMs = day)),
+        manifest = f.create("pack-manifest", SmrtPackManifest.serializer(), CacheConfig(ttlMs = 10 * min, staleTtlMs = 7 * day)),
+        modrinthProject = f.create("modrinth-project", ModrinthProject.serializer(), CacheConfig(ttlMs = hour, staleTtlMs = 7 * day)),
+        modrinthVersion = f.create("modrinth-version", ModrinthVersion.serializer(), CacheConfig(ttlMs = 7 * day, staleTtlMs = 30 * day)),
+    )
+}
 
-    /**
-     * Basic launch service. All collaborators are constructor-injected so the
-     * facade is fully replaceable / mockable in tests.
-     */
-    single<ILauncherService> {
-        LauncherService(
-            profileManager     = get(),
-            javaManager        = get(),
-            envPreparer        = get(),
-            classpathProvider  = get(),
-            commandBuilder     = get(),
-            logHandler         = get(),
-            runtimeProvisioner = get(),
-            profilerStore      = get(),
-            agentExtractor     = get(),
-            authlibSwapper     = get(),
-            openSmrtResolver   = get(),
-            sharedAssetsDir    = get<PlatformPaths>().assetsDir,
-            sharedLibrariesDir = get<PlatformPaths>().librariesDir,
-        )
-    }
+/**
+ * In-memory dashboard cache (single-flight + 10-min SWR). The disk seed for the
+ * tray stays in ServerListCacheStore (servers-only, read synchronously before
+ * any coroutine); empty results don't get stored.
+ */
+private fun Scope.dashboardCache() =
+    get<CacheFactory>().createInMemory<DashboardData>(
+        "dashboard",
+        CacheConfig(
+            ttlMs = 10 * 60_000L,
+            staleTtlMs = Long.MAX_VALUE,
+            maxEntries = 4,
+            shouldStore = { it.servers.isNotEmpty() },
+        ),
+    )
 
-    // Update Service -- direct channel. GitHub releases must remain reachable
-    // even when the SMARTYcraft proxy is down, otherwise the auto-updater
-    // cannot ship the very fix that restores proxy connectivity.
-    single {
-        UpdateService(
-            clientProvider  = get(named("direct")),
-            json            = get(),
-            dataDirectory   = get(),
-            settingsService = get()
-        )
-    }
-
-    // Per-platform update applicator selected at startup. Kept as a singleton
-    // so the shutdown hook each implementation registers fires exactly once.
-    single<IUpdateApplicator> { UpdateApplicators.forCurrentPlatform() }
-
-    // Desktop-entry install (Linux/AppImage) + build-from-source (Dev/Git
-    // channels). Both back the update manager; both no-op / report unsupported
-    // off Linux.
-    single { DesktopIntegration() }
-    single { SourceBuildService(dataDirectory = get(), applicator = get()) }
+/**
+ * Loader resolution registry. "forge" routes to legacy (<=1.12.2) or the modern
+ * installer by MC version; modern loaders run the official installer headless,
+ * caching output under loader-cache/ so re-launches skip the multi-minute install.
+ */
+private fun Scope.loaderRegistry(): LoaderRegistry {
+    val loaderCacheDir: Path = get<Path>().resolve("loader-cache")
+    return LoaderRegistry(
+        listOf(
+            ForgeResolver(
+                legacy = get<ForgeLegacyResolver>(),
+                modern = ModernInstallerResolver.forge(get(named("direct")), get(), get(), loaderCacheDir),
+            ),
+            ModernInstallerResolver.neoforge(get(named("direct")), get(), get(), loaderCacheDir),
+            FabricLikeResolver(get(named("direct")), get(), "fabric", FabricLikeResolver.FABRIC_META),
+            FabricLikeResolver(get(named("direct")), get(), "quilt", FabricLikeResolver.QUILT_META),
+        ),
+    )
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

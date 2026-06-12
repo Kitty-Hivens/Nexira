@@ -38,7 +38,7 @@ import kotlinx.coroutines.slf4j.MDCContext
 /**
  * Constructor injection (not `KoinComponent` + `by inject()`) so the
  * controller is testable without bootstrapping Koin. `singleOf(::LauncherController)`
- * in [hivens.launcher.di.appModule] resolves every parameter from the
+ * in [hivens.launcher.di.launchPipelineModule] resolves every parameter from the
  * graph automatically; production wiring stays a one-liner.
  *
  * Note: [appScope] is the shared `single<CoroutineScope>(createdAtStart)`
