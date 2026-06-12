@@ -72,6 +72,7 @@ import androidx.compose.ui.unit.dp
 import hivens.core.data.HomeView
 import hivens.core.data.UiStyle
 import hivens.launcher.LayoutGraphRepository
+import hivens.launcher.LayoutReconcile
 import hivens.ui.Screen
 import hivens.ui.customization.CustomizationSettings
 import hivens.ui.i18n.AppStrings
@@ -123,12 +124,14 @@ import hivens.widget.api.LocalWidgetDecorator
 import hivens.widget.api.SlotControlDecorator
 import hivens.widget.api.SlotDividerDecorator
 import hivens.widget.api.WidgetDecorator
+import hivens.widget.model.DefaultLayout
 import hivens.widget.model.SlotOrientation
 import hivens.widget.model.SlotPath
 import hivens.widget.model.SurfaceId
 import hivens.widget.model.traverse
 import kotlinx.coroutines.CoroutineScope
 import org.koin.compose.koinInject
+import org.slf4j.LoggerFactory
 
 // EditorSurfaceHost is the single coordinator for everything edit-mode
 // related on the active surface. It:
@@ -144,6 +147,8 @@ import org.koin.compose.koinInject
 
 // Which widget instance the prop panel is currently editing.
 private data class PropTarget(val path: SlotPath, val instanceId: String)
+
+private val log = LoggerFactory.getLogger("EditorSurfaceHost")
 
 @Composable
 fun EditorSurfaceHost(
@@ -479,6 +484,7 @@ fun EditorSurfaceHost(
                     onDismiss     = { presetPanelOpen = false },
                     onSaveCurrent = { name ->
                         val envelope = PresetEnvelope(
+                            schemaVersion = LayoutReconcile.CURRENT_SCHEMA,
                             name          = name,
                             createdAt     = System.currentTimeMillis(),
                             graph         = currentGraph,
@@ -496,10 +502,31 @@ fun EditorSurfaceHost(
                             val env = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                                 presetRepo.load(meta.name)
                             } ?: return@launch
-                            layoutRepo.update { env.graph }
-                            onCustomizationChanged(env.customization)
-                            onUiStyleChanged(env.uiStyle)
-                            presetPanelOpen = false
+                            // Route the preset through the same migrate + merge +
+                            // uniqueness pipeline as a normal on-disk load, so a
+                            // preset from an older schema (retired kinds) or app
+                            // version (missing surfaces/slots) reconciles instead
+                            // of landing in live state verbatim.
+                            val result = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                runCatching {
+                                    LayoutReconcile.reconcile(env.schemaVersion, env.graph, DefaultLayout.load())
+                                }
+                                    .onFailure { log.error("Preset '{}' failed to reconcile, not loading", meta.name, it) }
+                                    .getOrNull()
+                            } ?: return@launch
+                            when (result) {
+                                is LayoutReconcile.Result.Ok -> {
+                                    layoutRepo.update { result.graph }
+                                    onCustomizationChanged(env.customization)
+                                    onUiStyleChanged(env.uiStyle)
+                                    presetPanelOpen = false
+                                }
+                                is LayoutReconcile.Result.DuplicateId ->
+                                    log.error(
+                                        "Preset '{}' yields a duplicate instanceId '{}' after {}; not loading to protect the live layout.",
+                                        meta.name, result.id, result.stage,
+                                    )
+                            }
                         }
                     },
                     onDelete = { meta ->
