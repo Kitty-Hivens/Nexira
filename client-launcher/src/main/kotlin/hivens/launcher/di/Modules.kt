@@ -366,8 +366,8 @@ val appModule = module {
         KeyringStorageFactory.system()
     }
     single { CredentialsManager(get(), get(), get()) }
-    // Interface aliases for the launch-flow seam (#326). LauncherController binds
-    // the I* slices; other consumers keep the concrete type. get<Concrete>() reuses
+    // Interface aliases for the launch-flow seam. LauncherController binds the
+    // I* slices; other consumers keep the concrete type. get<Concrete>() reuses
     // the single instance rather than building a second.
     single<ICredentialStore> { get<CredentialsManager>() }
 
