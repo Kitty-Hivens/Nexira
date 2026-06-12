@@ -50,10 +50,22 @@ class NotificationCenter(
                 ) + current
             } else {
                 val existing = current[existingIndex]
+                // Coalesce a run of live progress: while the group head is a
+                // Progress event and the incoming one is too, REPLACE it rather
+                // than stacking. A ~10/sec download tick would otherwise bury the
+                // group in identical "Syncing X" rows. A terminal (non-Progress)
+                // event prepends normally, so history keeps the outcome plus the
+                // last progress snapshot.
+                val coalesce = kind == Kind.Progress && existing.latest.kind == Kind.Progress
+                val mergedEvents = if (coalesce) {
+                    listOf(event) + existing.events.drop(1)
+                } else {
+                    (listOf(event) + existing.events).take(historyPerGroup)
+                }
                 val merged = existing.copy(
                     sender  = sender,
                     iconUrl = iconUrl,
-                    events  = (listOf(event) + existing.events).take(historyPerGroup),
+                    events  = mergedEvents,
                 )
                 val others = current.toMutableList().also { it.removeAt(existingIndex) }
                 listOf(merged) + others
