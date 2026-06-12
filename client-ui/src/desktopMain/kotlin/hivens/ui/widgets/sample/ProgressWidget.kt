@@ -14,7 +14,6 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -25,12 +24,13 @@ import hivens.launcher.AutoSyncService
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
+import hivens.ui.widgets.Sources
 import hivens.widget.api.rememberProps
+import hivens.widget.api.rememberSource
 import hivens.widget.model.PropLabel
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 import kotlinx.serialization.Serializable
-import org.koin.compose.koinInject
 
 @Serializable
 data class ProgressProps(
@@ -49,8 +49,9 @@ data class ProgressProps(
 fun ProgressWidget(instance: WidgetInstance) {
     val p = instance.rememberProps<ProgressProps>()
     val s = LocalStrings.current
-    val autoSyncService: AutoSyncService = koinInject()
-    val snapshot by autoSyncService.snapshot.collectAsState()
+    // Bound declaratively to the autosync source -- the widget no longer knows
+    // which service backs it (the SourceKey is wired in Sources + Main DI).
+    val snapshot by rememberSource(Sources.AutoSync)
     val overall  = snapshot.overall
 
     Column(

@@ -116,6 +116,15 @@ val LocalWidgetServiceRegistry: ProvidableCompositionLocal<WidgetServiceRegistry
         error("LocalWidgetServiceRegistry not provided -- wire WidgetServiceRegistry in Koin and at the composition root")
     }
 
+// App-provided reactive data sources widgets bind to via rememberSource(key).
+// Provided once at the composition root from the Koin-bound singleton, like the
+// service registry above. Static: the source set is fixed at startup; the
+// reactivity is inside each source's StateFlow, not the registry membership.
+val LocalWidgetDataRegistry: ProvidableCompositionLocal<WidgetDataRegistry> =
+    staticCompositionLocalOf {
+        error("LocalWidgetDataRegistry not provided -- wire WidgetDataRegistry in Koin and at the composition root")
+    }
+
 // Edit-mode slot reflow duration (ms). 0 = no animation (the production
 // default, since the only provider is the editor host). While editing, the
 // host supplies the active style's duration, so add / remove / resize reflow

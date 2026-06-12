@@ -22,8 +22,12 @@ import hivens.ui.utils.GameConsoleService
 import java.nio.file.Path
 import javax.swing.SwingUtilities
 import org.slf4j.LoggerFactory
+import hivens.launcher.AutoSyncService
+import hivens.ui.widgets.Sources
+import hivens.widget.api.WidgetDataRegistry
 import hivens.widget.api.WidgetRegistry
 import hivens.widget.api.WidgetServiceRegistry
+import hivens.widget.api.flowSource
 import hivens.widget.generated.GeneratedWidgetRegistry
 import org.jetbrains.compose.resources.ExperimentalResourceApi
 import org.koin.core.context.stopKoin
@@ -53,6 +57,16 @@ val uiModule = module {
     // siblings. Wired into the composition root from AppShell so
     // LocalWidgetServiceRegistry resolves before any @Widget renders.
     single { WidgetServiceRegistry() }
+
+    // Reactive data sources widgets bind to via rememberSource -- decouples a
+    // widget from the concrete service backing its data. Populated eagerly so
+    // the registry is complete before the first widget composes.
+    single {
+        WidgetDataRegistry().apply {
+            register(Sources.AutoSync, flowSource(get<AutoSyncService>().snapshot))
+            register(Sources.Notifications, flowSource(get<NotificationArchiveStore>().log))
+        }
+    }
 
     // Editor mutation facade. Holds no state itself; fires LayoutGraph
     // updates into the shared CoroutineScope so callers stay

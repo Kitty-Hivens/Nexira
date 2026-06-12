@@ -85,7 +85,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
+import hivens.widget.api.LocalWidgetDataRegistry
 import hivens.widget.api.LocalWidgetServiceRegistry
+import hivens.widget.api.WidgetDataRegistry
 import hivens.widget.api.WidgetServiceRegistry
 import hivens.widget.api.WidgetRegistry
 import hivens.widget.model.DefaultLayout
@@ -195,6 +197,7 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
     val layoutGraphRepo: LayoutGraphRepository = koinInject()
     val widgetRegistry: WidgetRegistry         = koinInject()
     val widgetServiceRegistry: WidgetServiceRegistry = koinInject()
+    val widgetDataRegistry: WidgetDataRegistry = koinInject()
     val editModeController: EditModeController  = koinInject()
     // Shared process-lifetime scope (createdAtStart in appModule; canceled
     // by AppCoroutineScopeHook on JVM shutdown). Same instance backs
@@ -682,6 +685,7 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
                 LocalLayoutGraph                         provides layoutGraph,
                 LocalWidgetRegistry                      provides widgetRegistry,
                 LocalWidgetServiceRegistry               provides widgetServiceRegistry,
+                LocalWidgetDataRegistry                  provides widgetDataRegistry,
                 LocalWidgetChromeRenderer                provides chromeRenderer,
             ) {
             val effectiveStyle = if (customization.experimentalColorOverridesEnabled) {
