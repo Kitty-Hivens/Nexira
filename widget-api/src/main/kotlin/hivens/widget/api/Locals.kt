@@ -64,6 +64,17 @@ typealias EmptySlotDecorator = @Composable (address: SlotAddress) -> Unit
 val LocalEmptySlotDecorator: ProvidableCompositionLocal<EmptySlotDecorator> =
     staticCompositionLocalOf { {} }
 
+// Rendered by SlotRenderer in place of a widget whose kind is absent from the
+// registry (renamed, removed, or a plugin not loaded). Default = nothing --
+// production keeps the slot clean while the instance's props / children stay on
+// disk (non-destructive). The editor swaps in an "unsupported widget" placeholder
+// so the user can see the orphan and remove it; the schema-bump prune reaps the
+// truly-dead ones. Kept editor-agnostic here; the implementation lives in :client-ui.
+typealias UnknownWidgetDecorator = @Composable (address: SlotAddress, index: Int, instance: WidgetInstance) -> Unit
+
+val LocalUnknownWidgetDecorator: ProvidableCompositionLocal<UnknownWidgetDecorator> =
+    staticCompositionLocalOf { { _, _, _ -> } }
+
 // Phase G: rendered by SlotRenderer at the start of a non-empty slot in
 // edit mode. Default = nothing (production: no control). The editor swaps
 // in a small control that changes the slot's orientation (Column/Row/Grid)

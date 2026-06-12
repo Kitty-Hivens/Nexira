@@ -792,6 +792,7 @@ object EnglishStrings : AppStrings {
     override val editorCancel  = "Cancel"
     override val editorDelete  = "Delete"
     override val editorReset   = "Reset"
+    override val editorUnsupportedWidget = "Unsupported widget"
     override val editorResetAll = "Reset everything"
     override val editorToFront = "Bring to front"
     override val editorToBack = "Send to back"

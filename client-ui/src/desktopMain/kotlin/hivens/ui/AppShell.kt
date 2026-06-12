@@ -88,6 +88,8 @@ import androidx.compose.ui.draw.clip
 import hivens.widget.api.LocalWidgetServiceRegistry
 import hivens.widget.api.WidgetServiceRegistry
 import hivens.widget.api.WidgetRegistry
+import hivens.widget.model.DefaultLayout
+import hivens.widget.model.walkInstances
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -243,11 +245,21 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
     // a healthy graph reconciles to itself and writes nothing.
     LaunchedEffect(Unit) {
         val before = layoutGraphRepo.value()
-        val result = WidgetGraphReconciler.reconcile(before, widgetRegistry)
+        val defaultKinds = DefaultLayout.load().walkInstances().map { it.kind }.toSet()
+        val result = WidgetGraphReconciler.reconcile(
+            graph        = before,
+            registry     = widgetRegistry,
+            defaultKinds = defaultKinds,
+            // Prune removed kinds only when a schema bump actually happened --
+            // a deliberate app update is the safe moment to reap orphans.
+            prune        = layoutGraphRepo.migratedFromSchema != null,
+        )
         if (result.graph != before) {
-            LoggerFactory.getLogger("Main").info(
-                "Layout reconcile: seeded {} declared container child slot(s)", result.seededSlots,
-            )
+            val reconcileLog = LoggerFactory.getLogger("Main")
+            if (result.seededSlots > 0)
+                reconcileLog.info("Layout reconcile: seeded {} declared container child slot(s)", result.seededSlots)
+            if (result.prunedWidgets > 0)
+                reconcileLog.info("Layout reconcile: pruned {} widget(s) of removed kinds after a schema bump", result.prunedWidgets)
             layoutGraphRepo.update { result.graph }
         }
     }

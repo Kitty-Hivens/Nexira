@@ -83,6 +83,7 @@ import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
 import hivens.ui.editor.decoration.EditableWidgetChrome
 import hivens.ui.editor.decoration.EmptySlotPlaceholder
+import hivens.ui.editor.decoration.UnsupportedWidgetPlaceholder
 import hivens.ui.editor.dnd.DragController
 import hivens.ui.editor.dnd.DragPayload
 import hivens.ui.editor.dnd.DropTargetRegistry
@@ -113,6 +114,7 @@ import hivens.ui.widgets.themepicker.LocalThemePickerContext
 import hivens.ui.widgets.themepicker.STUB_THEME_PICKER
 import hivens.widget.api.EmptySlotDecorator
 import hivens.widget.api.LocalEmptySlotDecorator
+import hivens.widget.api.LocalUnknownWidgetDecorator
 import hivens.widget.api.LocalSlotControlDecorator
 import hivens.widget.api.LocalSlotDividerDecorator
 import hivens.widget.api.LocalSlotBoundsReporter
@@ -123,6 +125,7 @@ import hivens.ui.theme.LocalStyle
 import hivens.widget.api.LocalWidgetDecorator
 import hivens.widget.api.SlotControlDecorator
 import hivens.widget.api.SlotDividerDecorator
+import hivens.widget.api.UnknownWidgetDecorator
 import hivens.widget.api.WidgetDecorator
 import hivens.widget.model.DefaultLayout
 import hivens.widget.model.SlotOrientation
@@ -329,6 +332,25 @@ fun EditorSurfaceHost(
         }
     }
 
+    // Unknown-widget decorator: an "unsupported widget" placeholder for any
+    // instance whose kind left the registry (rename / removal / a plugin not
+    // loaded), shown on every surface while editing so the orphan is visible
+    // and one-tap removable. Identity off / previewing -- production renders
+    // nothing and the instance keeps its props / children on disk.
+    val unknownDecorator: UnknownWidgetDecorator = remember(state, previewing) {
+        if (state is EditModeState.On && !previewing) {
+            { _, _, instance ->
+                val path = LocalSlotPath.current
+                UnsupportedWidgetPlaceholder(
+                    instance = instance,
+                    onRemove = { controller.removeWidget(path, instance.instanceId) },
+                )
+            }
+        } else {
+            { _, _, _ -> }
+        }
+    }
+
     // Slot control decorator: a compact orientation + grid-columns
     // control at the start of every non-empty slot on the selected
     // surface. Identity (renders nothing) when off, previewing, or for a
@@ -375,6 +397,7 @@ fun EditorSurfaceHost(
         LocalDropTargetRegistry provides registry,
         LocalWidgetDecorator    provides chromeDecorator,
         LocalEmptySlotDecorator provides emptyDecorator,
+        LocalUnknownWidgetDecorator provides unknownDecorator,
         LocalSlotControlDecorator provides slotControlDecorator,
         LocalSlotDividerDecorator provides slotDividerDecorator,
         // Edit-mode reflow duration -- slot add / remove / resize animates while
