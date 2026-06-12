@@ -6,6 +6,7 @@ import hivens.core.api.dto.smrt.ModrinthVersion
 import hivens.core.api.dto.smrt.SmrtPackListing
 import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.dto.smrt.SmrtPackSummary
+import hivens.core.api.interfaces.IMirrorPackClient
 import hivens.launcher.cache.SmrtPackCaches
 import io.ktor.client.request.get
 import io.ktor.client.request.prepareGet
@@ -29,7 +30,7 @@ class SmrtPackClient(
     private val mirrorBase: String = DEFAULT_MIRROR_BASE,
     private val json: Json = DEFAULT_JSON,
     private val caches: SmrtPackCaches = SmrtPackCaches.passthrough(),
-) {
+) : IMirrorPackClient {
     companion object {
         const val DEFAULT_MIRROR_BASE = "https://smrt.hivens.dev"
         const val MODRINTH_API_BASE = "https://api.modrinth.com"
@@ -47,7 +48,7 @@ class SmrtPackClient(
         }
     }
 
-    suspend fun fetchManifest(packId: String): SmrtPackManifest {
+    override suspend fun fetchManifest(packId: String): SmrtPackManifest {
         val url = "$mirrorBase/v1/packs/$packId/manifest"
         return caches.manifest.get(url) { getJson(url) }
     }
@@ -61,7 +62,7 @@ class SmrtPackClient(
      * manifest's MC version / loader / Java major would not match
      * the files that were synced to disk.
      */
-    suspend fun fetchManifestVersion(packId: String, version: String): SmrtPackManifest {
+    override suspend fun fetchManifestVersion(packId: String, version: String): SmrtPackManifest {
         // Same cache as the latest endpoint, keyed by the version-pinned URL; a
         // pinned historical manifest is immutable so it stays a warm cache hit.
         val url = "$mirrorBase/v1/packs/$packId/manifest/$version"

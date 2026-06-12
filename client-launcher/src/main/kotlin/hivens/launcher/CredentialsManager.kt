@@ -1,5 +1,6 @@
 package hivens.launcher
 
+import hivens.core.api.interfaces.ICredentialStore
 import hivens.core.data.SessionData
 import hivens.core.security.IKeyringStorage
 import kotlinx.serialization.Serializable
@@ -58,7 +59,7 @@ class CredentialsManager(
     workDir: Path,
     private val json: Json,
     private val keyring: IKeyringStorage,
-) {
+) : ICredentialStore {
     private val log = LoggerFactory.getLogger(CredentialsManager::class.java)
     private val credentialsFile = workDir.resolve("credentials.json")
 
@@ -186,7 +187,7 @@ class CredentialsManager(
         }
     }
 
-    fun load(): SessionData? {
+    override fun load(): SessionData? {
         if (!Files.exists(credentialsFile)) return null
 
         return try {

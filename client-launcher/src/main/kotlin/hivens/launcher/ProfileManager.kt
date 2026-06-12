@@ -1,6 +1,7 @@
 package hivens.launcher
 
 import hivens.config.Storage
+import hivens.core.api.interfaces.IInstanceProfileStore
 import hivens.core.data.InstanceProfile
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -14,7 +15,7 @@ import java.util.concurrent.ConcurrentHashMap
 class ProfileManager(
     private val workDir: Path,
     private val json: Json
-) {
+) : IInstanceProfileStore {
     private val log = LoggerFactory.getLogger(ProfileManager::class.java)
     private val fileName = Storage.PROFILES_FILE
 
@@ -69,7 +70,7 @@ class ProfileManager(
         save()
     }
 
-    fun getProfile(serverId: String): InstanceProfile {
+    override fun getProfile(serverId: String): InstanceProfile {
         // Never-configured servers fall under the global adaptive sizer like every
         // other instance; an explicit RAM pick in ServerSettingsScreen sets
         // fixedMemory to opt back out.

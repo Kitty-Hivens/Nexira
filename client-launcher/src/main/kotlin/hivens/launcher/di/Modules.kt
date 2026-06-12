@@ -366,6 +366,10 @@ val appModule = module {
         KeyringStorageFactory.system()
     }
     single { CredentialsManager(get(), get(), get()) }
+    // Interface aliases for the launch-flow seam (#326). LauncherController binds
+    // the I* slices; other consumers keep the concrete type. get<Concrete>() reuses
+    // the single instance rather than building a second.
+    single<ICredentialStore> { get<CredentialsManager>() }
 
     single<ISettingsService> {
         val dataDir: Path = get()
@@ -399,10 +403,10 @@ val appModule = module {
     single(createdAtStart = true) { AppCoroutineScopeHook(get()) }
 
     /**
-     * Launch-flow orchestrator. Consumes only `client-core` interfaces
-     * + the shared coroutine scope, so it sits cleanly on the
-     * client-launcher side of the module layering -- no UI types
-     * (i18n strings, console service) leak in.
+     * Launch-flow orchestrator. Consumes client-core interfaces, the shared
+     * coroutine scope, and SmartyModPlanner -- the one concrete collaborator
+     * left, since its nested Plan return type resists a clean interface. No UI
+     * types (i18n strings, console service) leak in.
      */
     singleOf(::LauncherController)
 
@@ -414,6 +418,7 @@ val appModule = module {
         val dataDir: Path = get()
         ManifestCache(dataDir.resolve("manifest-cache"), get())
     }
+    single<IManifestStore> { get<ManifestCache>() }
     single<IFileDownloadService> { FileDownloadService(get(), get(), get(), get<ServerProtocolConfig>()) }
 
     // Cross-cutting cache layer. CacheFactory shares the app Json, the
@@ -445,7 +450,9 @@ val appModule = module {
     // that don't need the SC channel's SOCKS proxy or SSL bypass.
     // Always wired so toggling on at runtime requires no graph rebuild.
     single { SmrtPackClient(get(named("direct")), caches = get()) }
+    single<IMirrorPackClient> { get<SmrtPackClient>() }
     single { SmrtSyncService(get(), get()) }
+    single<IPackSyncService> { get<SmrtSyncService>() }
 
     // Smarty -> open-smrt-network swap. Direct channel: GitHub releases +
     // raw.githubusercontent.com are public, no SC proxy. The planner is what
@@ -480,6 +487,7 @@ val appModule = module {
 
     single<IManifestProcessorService> { ManifestProcessorService(get()) }
     single { ProfileManager(get(), get()) }
+    single<IInstanceProfileStore> { get<ProfileManager>() }
     // Direct channel -- BellSoft JDK CDN does not require the SMARTYcraft proxy.
     single<IJavaManager> { JavaManagerService(get(), get(named("direct"))) }
 
