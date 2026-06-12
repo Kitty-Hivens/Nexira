@@ -16,7 +16,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,6 +30,8 @@ import hivens.ui.notifications.Severity
 import hivens.ui.notifications.render.NotificationAvatar
 import hivens.ui.theme.CelestiaColors
 import hivens.ui.theme.CelestiaTheme
+import hivens.ui.widgets.Sources
+import hivens.widget.api.rememberSource
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 import org.koin.compose.koinInject
@@ -45,8 +46,10 @@ import java.time.Instant
 @Widget(id = "notifications.history", displayName = "widget.notifications.history")
 @Composable
 fun NotificationHistoryWidget(instance: WidgetInstance) {
+    // Read side bound to the notifications source; the store stays injected
+    // only for the clear() command (WidgetDataSource is read-only by design).
     val store: NotificationArchiveStore = koinInject()
-    val log by store.log.collectAsState()
+    val log by rememberSource(Sources.Notifications)
     val strings = LocalStrings.current
     val palette = CelestiaTheme.colors
 
