@@ -54,6 +54,7 @@ import hivens.ui.easter.AprilFools
 import hivens.ui.easter.AprilFoolsLoader
 import hivens.ui.easter.LocalAprilFools
 import hivens.ui.editor.EditModeController
+import hivens.ui.editor.WidgetGraphReconciler
 import hivens.ui.generated.resources.Res
 import hivens.ui.generated.resources.icon
 import hivens.ui.i18n.AppLocale
@@ -232,6 +233,23 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
     LaunchedEffect(styleSpec) {
         AprilFools.styleAnimationMultiplier = styleSpec.animationMultiplier
         AprilFools.useFlatSurface           = styleSpec.cardSurface == hivens.ui.theme.CardSurface.Flat
+    }
+
+    // One-time registry-aware reconcile of the loaded layout graph. The
+    // launcher seeds missing bundled-default surfaces/slots but has no
+    // WidgetRegistry, so descriptor-declared container child slots are seeded
+    // here -- otherwise a container persisted before child-slot seeding (or one
+    // whose descriptor gained a slot) silently refuses nested drops. Idempotent:
+    // a healthy graph reconciles to itself and writes nothing.
+    LaunchedEffect(Unit) {
+        val before = layoutGraphRepo.value()
+        val result = WidgetGraphReconciler.reconcile(before, widgetRegistry)
+        if (result.graph != before) {
+            LoggerFactory.getLogger("Main").info(
+                "Layout reconcile: seeded {} declared container child slot(s)", result.seededSlots,
+            )
+            layoutGraphRepo.update { result.graph }
+        }
     }
 
     val launchState by controller.state.collectAsState()
