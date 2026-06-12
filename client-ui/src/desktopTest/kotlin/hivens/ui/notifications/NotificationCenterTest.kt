@@ -38,7 +38,7 @@ class NotificationCenterTest {
     }
 
     @Test
-    fun `re-push with same sourceKey appends event to existing group`() = runTest {
+    fun `progress coalesces in place but a terminal event still appends`() = runTest {
         val center = newCenter()
         center.push("pack:X", "X", null, Severity.Info, Kind.Progress, "Preparing")
         clock.advance(seconds = 2)
@@ -47,9 +47,34 @@ class NotificationCenterTest {
         center.push("pack:X", "X", null, Severity.Success, Kind.OneShot, "Done")
 
         val g = center.groups.first().single()
-        assertEquals(3, g.count)
+        // The two Progress ticks collapse to one entry; the OneShot terminal appends.
+        assertEquals(2, g.count)
         assertEquals("Done", g.latest.title)
-        assertEquals("Preparing", g.events.last().title, "oldest at tail")
+        assertEquals("Downloading 47%", g.events.last().title, "coalesced progress kept at tail")
+    }
+
+    @Test
+    fun `consecutive progress events coalesce into a single entry`() = runTest {
+        val center = newCenter()
+        repeat(10) { i ->
+            center.push("pack:X", "X", null, Severity.Info, Kind.Progress, "Downloading ${i * 10}%")
+            clock.advance(seconds = 1)
+        }
+
+        val g = center.groups.first().single()
+        assertEquals(1, g.count, "a run of progress ticks stays a single live entry")
+        assertEquals("Downloading 90%", g.latest.title, "latest tick wins")
+    }
+
+    @Test
+    fun `a progress run before a terminal collapses to progress-plus-terminal`() = runTest {
+        val center = newCenter()
+        repeat(5) { center.push("pack:X", "X", null, Severity.Info, Kind.Progress, "tick") }
+        center.push("pack:X", "X", null, Severity.Critical, Kind.Sticky, "failed")
+
+        val g = center.groups.first().single()
+        assertEquals(2, g.count, "the whole progress run is one entry; the terminal is the other")
+        assertEquals("failed", g.latest.title)
     }
 
     @Test

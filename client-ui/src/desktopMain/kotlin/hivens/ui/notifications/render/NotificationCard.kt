@@ -60,6 +60,23 @@ import hivens.ui.theme.CelestiaColors
 import hivens.ui.theme.CelestiaTheme
 import java.time.Duration
 import java.time.Instant
+import androidx.compose.animation.core.Animatable
+import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.layout.offset
+import androidx.compose.material.icons.outlined.Inventory2
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
+import coil3.compose.AsyncImage
+import hivens.ui.theme.CardSurface
+import hivens.ui.theme.LocalStyle
+import kotlinx.coroutines.launch
+import kotlin.math.abs
 
 @Composable
 fun NotificationCard(
@@ -73,14 +90,60 @@ fun NotificationCard(
     // appears already opened into stale history.
     var expanded by remember(group.sourceKey, group.count) { mutableStateOf(false) }
     val palette = CelestiaTheme.colors
+    val style = LocalStyle.current
     val accentColor = severityAccent(group.severity, group.kind, palette)
-    val accentAlpha = if (group.severity == Severity.Critical) criticalPulse() else 1f
+    // Critical pulses only when the active style allows motion; Brut stays static.
+    val accentAlpha = if (group.severity == Severity.Critical && style.softGlowEnabled) criticalPulse() else 1f
+
+    val scope = rememberCoroutineScope()
+    val offsetX = remember(group.sourceKey) { Animatable(0f) }
+    val cardShape = RoundedCornerShape(style.cardCorner)
+    val density = LocalDensity.current
+    // Fade the card as it is dragged toward the edge; the slide-off + the
+    // stack's exit fade finish the gesture on release.
+    val swipeFrac = (abs(offsetX.value) / with(density) { 380.dp.toPx() }).coerceIn(0f, 1f)
 
     Box(
         modifier = Modifier
             .widthIn(min = 320.dp, max = 420.dp)
-            .clip(RoundedCornerShape(6.dp))
-            .background(CelestiaTheme.colors.surface)
+            .offset { IntOffset(offsetX.value.toInt(), 0) }
+            .alpha(1f - 0.55f * swipeFrac)
+            // Glass styles float on a soft shadow; flat (Brut) styles lean on a
+            // hard border instead -- the shadow has no flat-style mapping.
+            .then(if (style.softGlowEnabled) Modifier.shadow(8.dp, cardShape, clip = false) else Modifier)
+            .clip(cardShape)
+            .background(
+                if (style.cardSurface == CardSurface.Glass) palette.surface.copy(alpha = 0.97f)
+                else palette.surface,
+            )
+            .then(
+                if (style.cardBorder > 0.dp) Modifier.border(style.cardBorder, palette.outline, cardShape)
+                else Modifier,
+            )
+            // Swipe-to-dismiss: drag horizontally; past ~40% of the card width it
+            // slides off and dismisses, otherwise it springs back. The close
+            // button stays the keyboard / screen-reader path.
+            .pointerInput(group.sourceKey) {
+                val threshold = size.width * 0.4f
+                detectHorizontalDragGestures(
+                    onDragEnd = {
+                        val dx = offsetX.value
+                        if (abs(dx) >= threshold) {
+                            val target = if (dx > 0) size.width.toFloat() else -size.width.toFloat()
+                            scope.launch {
+                                offsetX.animateTo(target, tween(style.animationDurationMs(180)))
+                                onDismiss()
+                            }
+                        } else {
+                            scope.launch { offsetX.animateTo(0f, tween(style.animationDurationMs(180))) }
+                        }
+                    },
+                    onHorizontalDrag = { change, delta ->
+                        change.consume()
+                        scope.launch { offsetX.snapTo(offsetX.value + delta) }
+                    },
+                )
+            },
     ) {
         Row(modifier = Modifier.fillMaxWidth()) {
             if (accentColor != Color.Transparent) {
@@ -231,18 +294,20 @@ private fun EventBody(event: NotificationEvent, accentColor: Color) {
     val progress = event.progress
     if (progress != null) {
         Spacer(Modifier.height(8.dp))
+        // Track is surfaceVariant, not surface -- against the card's own surface
+        // fill the old track was invisible, so the bar read as a bare sliver.
         if (progress.isNaN()) {
             LinearProgressIndicator(
-                modifier   = Modifier.fillMaxWidth().height(2.dp).clip(RoundedCornerShape(1.dp)),
+                modifier   = Modifier.fillMaxWidth().height(3.dp).clip(RoundedCornerShape(2.dp)),
                 color      = accentColor,
-                trackColor = CelestiaTheme.colors.surface,
+                trackColor = CelestiaTheme.colors.surfaceVariant,
             )
         } else {
             LinearProgressIndicator(
                 progress   = { progress.coerceIn(0f, 1f) },
-                modifier   = Modifier.fillMaxWidth().height(2.dp).clip(RoundedCornerShape(1.dp)),
+                modifier   = Modifier.fillMaxWidth().height(3.dp).clip(RoundedCornerShape(2.dp)),
                 color      = accentColor,
-                trackColor = CelestiaTheme.colors.surface,
+                trackColor = CelestiaTheme.colors.surfaceVariant,
             )
         }
     }
@@ -293,13 +358,36 @@ private fun HistoryRow(event: NotificationEvent, now: Instant) {
 
 @Composable
 private fun AvatarSlot(group: NotificationGroup) {
-    // Neutral placeholder; wired to Coil + Url once PackInstance carries icon_url.
+    val palette = CelestiaTheme.colors
+    val style = LocalStyle.current
+    val shape = RoundedCornerShape((style.cardCorner / 2).coerceAtMost(8.dp))
+    val iconUrl = group.iconUrl
     Box(
-        modifier = Modifier
-            .size(28.dp)
-            .clip(RoundedCornerShape(4.dp))
-            .background(CelestiaTheme.colors.textSecondary.copy(alpha = 0.18f))
-    )
+        modifier         = Modifier
+            .size(30.dp)
+            .clip(shape)
+            .background(palette.surfaceVariant),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (!iconUrl.isNullOrBlank()) {
+            // Loads through the app's singleton Coil ImageLoader (set in AppShell).
+            AsyncImage(
+                model              = iconUrl,
+                contentDescription = null,
+                modifier           = Modifier.size(30.dp),
+                contentScale       = ContentScale.Crop,
+            )
+        } else {
+            // Fallback when a source has no icon (the common case until pack
+            // icon_url is authored): a neutral package glyph, not an empty box.
+            Icon(
+                imageVector        = Icons.Outlined.Inventory2,
+                contentDescription = null,
+                modifier           = Modifier.size(17.dp),
+                tint               = palette.textSecondary,
+            )
+        }
+    }
 }
 
 @Composable
