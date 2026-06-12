@@ -38,7 +38,7 @@ import hivens.launcher.ServerListCacheStore
 import hivens.launcher.bootstrap.AutoLoginCoordinator
 import hivens.launcher.bootstrap.LauncherBootstrap
 import hivens.launcher.CredentialsManager
-import hivens.launcher.launch.LaunchState
+import hivens.core.launch.LaunchState
 import hivens.launcher.launch.LauncherController
 import hivens.launcher.network.ServerProtocolConfig
 import hivens.launcher.platform.computeSafeWindowMinSize

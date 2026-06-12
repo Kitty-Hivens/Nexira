@@ -1,7 +1,7 @@
 package hivens.ui.notifications.drivers
 
-import hivens.launcher.launch.LaunchError
-import hivens.launcher.launch.LaunchState
+import hivens.core.launch.LaunchError
+import hivens.core.launch.LaunchState
 import hivens.launcher.launch.LauncherController
 import hivens.ui.i18n.AppStrings
 import hivens.ui.notifications.IndicationCenter
@@ -157,7 +157,7 @@ class LaunchDriver(
         // Best-effort: IOExceptions on a dead process surface as warn
         // logs without halting the driver. onError / onIdle both
         // detach so a stale sink doesn't outlive the process.
-        val stdin = state.process.outputStream
+        val stdin = state.handle.stdin
         gameConsole.attachCommandSink { text ->
             try {
                 stdin.write((text + "\n").toByteArray(Charsets.UTF_8))
@@ -223,9 +223,6 @@ class LaunchDriver(
         is LaunchError.Internal            -> reason.message.ifBlank { null }
                                                 ?.let { s.notifReasonInternalDetail(it) }
                                                 ?: s.notifReasonInternal
-        is LaunchError.AuthFail            -> reason.cause?.ifBlank { null }
-                                                ?.let { s.notifReasonAuthFailDetail(it) }
-                                                ?: s.notifReasonAuthFail
         is LaunchError.MissingAuthProvider -> s.notifReasonMissingAuthProvider(reason.providerKey)
         is LaunchError.HelperUnavailable   -> s.stateHelperUnavailable(reason.mcVersion)
         is LaunchError.AuthlibUnavailable  -> s.stateAuthlibUnavailable(reason.mcVersion)
