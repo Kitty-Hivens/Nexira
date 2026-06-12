@@ -7,6 +7,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -47,6 +49,13 @@ fun ConfirmCodeDialog(
 ) {
     val s = LocalStrings.current
     var code by remember { mutableStateOf("") }
+
+    // The code is time-boxed, so put the caret in the field the moment the
+    // dialog opens -- otherwise the user has to click it first, friction on a
+    // focus-finicky Wayland stack. runCatching guards the node-not-yet-attached
+    // race the way the rest of the UI does.
+    val codeFocus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { codeFocus.requestFocus() } }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -112,7 +121,7 @@ fun ConfirmCodeDialog(
                         color = CelestiaTheme.colors.textPrimary,
                     ),
                     isError = errorMessage != null,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().focusRequester(codeFocus),
                 )
 
                 if (errorMessage != null) {
