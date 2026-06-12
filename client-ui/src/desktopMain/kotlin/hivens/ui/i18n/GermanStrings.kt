@@ -725,6 +725,8 @@ object GermanStrings : AppStrings {
     override val notificationExpandHistory   = "Benachrichtigungsverlauf einblenden"
     override val notificationCollapseHistory = "Benachrichtigungsverlauf ausblenden"
     override val notificationDismiss         = "Benachrichtigung schliessen"
+    override val notifHistoryEmpty           = "Noch keine Nachrichten"
+    override val notifHistoryClear           = "Leeren"
     override fun notificationShowMore(count: Int)               = "+$count weitere"
     override fun notificationAbsoluteTime(instant: java.time.Instant): String =
         java.time.format.DateTimeFormatter
@@ -894,6 +896,7 @@ object GermanStrings : AppStrings {
         "widget.library.header.subtitle" to "Untertitel",
         "widget.library.header.title" to "Überschrift",
         "widget.nav.entry" to "Navigationspunkt",
+        "widget.notifications.history" to "Nachrichtenverlauf",
         "widget.profile.account.section" to "Konto",
         "widget.profile.signin" to "Anmelden",
         "widget.profile.nav" to "Profilnavigation",

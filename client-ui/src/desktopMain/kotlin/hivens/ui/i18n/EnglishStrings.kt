@@ -727,6 +727,8 @@ object EnglishStrings : AppStrings {
     override val notificationExpandHistory   = "Expand notification history"
     override val notificationCollapseHistory = "Collapse notification history"
     override val notificationDismiss         = "Dismiss notification"
+    override val notifHistoryEmpty           = "No messages yet"
+    override val notifHistoryClear           = "Clear"
     override fun notificationShowMore(count: Int)               = "+$count more"
     override fun notificationAbsoluteTime(instant: java.time.Instant): String =
         notificationTimeFormatter(java.util.Locale.ENGLISH).format(instant)
@@ -893,6 +895,7 @@ object EnglishStrings : AppStrings {
         "widget.library.header.subtitle" to "Subtitle",
         "widget.library.header.title" to "Heading",
         "widget.nav.entry" to "Nav item",
+        "widget.notifications.history" to "Message history",
         "widget.profile.account.section" to "Account",
         "widget.profile.signin" to "Sign in",
         "widget.profile.nav" to "Profile navigation",

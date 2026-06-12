@@ -160,6 +160,23 @@ class NotificationCenterTest {
         assertEquals(30, Kind.OneShot.autoDismissAfter(Severity.Critical)?.inWholeSeconds)
     }
 
+    @Test
+    fun `push forwards a serializable projection to the archive hook`() = runTest {
+        val recorded = mutableListOf<PersistedNotification>()
+        val center = NotificationCenter(clock = clock::now, archive = { recorded += it })
+        center.push("pack:X", "Create", "http://i.png", Severity.Warn, Kind.OneShot, "Done", body = "ok")
+
+        assertEquals(1, recorded.size)
+        val p = recorded.single()
+        assertEquals("pack:X", p.sourceKey)
+        assertEquals("Create", p.sender)
+        assertEquals("http://i.png", p.iconUrl)
+        assertEquals(Severity.Warn, p.severity)
+        assertEquals(Kind.OneShot, p.kind)
+        assertEquals("Done", p.title)
+        assertEquals("ok", p.body)
+    }
+
     private class FixedClock(start: Instant = Instant.parse("2026-05-26T00:00:00Z")) {
         private var current: Instant = start
         fun now(): Instant = current

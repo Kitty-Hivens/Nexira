@@ -729,6 +729,8 @@ object RussianStrings : AppStrings {
     override val notificationExpandHistory   = "Раскрыть историю уведомления"
     override val notificationCollapseHistory = "Свернуть историю уведомления"
     override val notificationDismiss         = "Закрыть уведомление"
+    override val notifHistoryEmpty           = "Сообщений пока нет"
+    override val notifHistoryClear           = "Очистить"
     override fun notificationShowMore(count: Int)               = "ещё $count"
     override fun notificationAbsoluteTime(instant: java.time.Instant): String =
         java.time.format.DateTimeFormatter
@@ -898,6 +900,7 @@ object RussianStrings : AppStrings {
         "widget.library.header.subtitle" to "Подзаголовок",
         "widget.library.header.title" to "Заголовок",
         "widget.nav.entry" to "Пункт навигации",
+        "widget.notifications.history" to "История сообщений",
         "widget.profile.account.section" to "Аккаунт",
         "widget.profile.signin" to "Вход",
         "widget.profile.nav" to "Навигация профиля",

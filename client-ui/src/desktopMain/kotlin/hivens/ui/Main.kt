@@ -9,6 +9,7 @@ import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.stringsFor
 import hivens.ui.identity.SkinManager
 import hivens.ui.notifications.IndicationCenter
+import hivens.ui.notifications.NotificationArchiveStore
 import hivens.ui.notifications.NotificationCenter
 import hivens.ui.notifications.SessionRegistry
 import hivens.ui.notifications.drivers.LaunchDriver
@@ -79,7 +80,17 @@ val uiModule = module {
     // LauncherController for both pack and SC-server flows (the
     // observer is keyed by LaunchTarget so the same singleton handles
     // both kinds of launches without aliasing notifications).
-    single { NotificationCenter() }
+    // Durable message log feeding the notification-history widget. Disk-backed
+    // (<dataDir>/notifications.json), survives auto-dismiss + restart.
+    single {
+        val dataDir: Path = get()
+        NotificationArchiveStore(
+            file  = dataDir.resolve("notifications.json"),
+            json  = get(),
+            scope = get(),
+        )
+    }
+    single { NotificationCenter(archive = get<NotificationArchiveStore>()::record) }
     single { IndicationCenter() }
     single { SessionRegistry(appScope = get()) }
     single {
