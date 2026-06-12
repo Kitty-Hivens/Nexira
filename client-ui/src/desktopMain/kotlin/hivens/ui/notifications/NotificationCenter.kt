@@ -12,6 +12,9 @@ class NotificationCenter(
     private val historyPerGroup: Int = DEFAULT_HISTORY_PER_GROUP,
     private val maxGroups: Int = DEFAULT_MAX_GROUPS,
     private val clock: () -> Instant = Instant::now,
+    // Durable-log hook. Every push forwards a serializable projection here; the
+    // default no-op keeps the center disk-free and testable on its own.
+    private val archive: (PersistedNotification) -> Unit = {},
 ) {
     private val _groups = MutableStateFlow<List<NotificationGroup>>(emptyList())
     val groups: StateFlow<List<NotificationGroup>> = _groups
@@ -36,6 +39,18 @@ class NotificationCenter(
             progress  = progress,
             actions   = actions,
             createdAt = clock(),
+        )
+        archive(
+            PersistedNotification(
+                sourceKey      = sourceKey,
+                sender         = sender,
+                iconUrl        = iconUrl,
+                severity       = severity,
+                kind           = kind,
+                title          = title,
+                body           = body,
+                createdAtEpoch = event.createdAt.epochSecond,
+            )
         )
         _groups.update { current ->
             val existingIndex = current.indexOfFirst { it.sourceKey == sourceKey }

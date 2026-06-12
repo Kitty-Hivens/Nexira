@@ -115,6 +115,8 @@ class WidgetRegistryConsistencyTest {
             "server.details.banner",
             "theme.picker.grid",
             "theme.picker.preview",
+            // persistent notification history
+            "notifications.history",
         )
         val actual = GeneratedWidgetRegistry.all().keys.map { it.value }.toSet()
         assertEquals(expected, actual, "registry drift -- expected exactly these widgets")

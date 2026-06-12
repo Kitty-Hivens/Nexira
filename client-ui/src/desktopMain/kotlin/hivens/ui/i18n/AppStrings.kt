@@ -756,6 +756,9 @@ interface AppStrings {
     val notificationExpandHistory: String
     val notificationCollapseHistory: String
     val notificationDismiss: String
+    // Notification-history widget.
+    val notifHistoryEmpty: String
+    val notifHistoryClear: String
     /** "+N more" footer text + screen-reader label. Receives the overflow count. */
     fun notificationShowMore(count: Int): String
     /** Absolute timestamp shown on hover tooltip over the relative-time label. */

@@ -64,15 +64,12 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.offset
-import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
-import coil3.compose.AsyncImage
 import hivens.ui.theme.CardSurface
 import hivens.ui.theme.LocalStyle
 import kotlinx.coroutines.launch
@@ -201,7 +198,7 @@ private fun HeaderRow(
 ) {
     val strings = LocalStrings.current
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-        AvatarSlot(group)
+        NotificationAvatar(group.iconUrl)
         Spacer(Modifier.width(10.dp))
         Text(
             text       = group.sender,
@@ -353,40 +350,6 @@ private fun HistoryRow(event: NotificationEvent, now: Instant) {
             style = MaterialTheme.typography.labelSmall,
             color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.55f),
         )
-    }
-}
-
-@Composable
-private fun AvatarSlot(group: NotificationGroup) {
-    val palette = CelestiaTheme.colors
-    val style = LocalStyle.current
-    val shape = RoundedCornerShape((style.cardCorner / 2).coerceAtMost(8.dp))
-    val iconUrl = group.iconUrl
-    Box(
-        modifier         = Modifier
-            .size(30.dp)
-            .clip(shape)
-            .background(palette.surfaceVariant),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (!iconUrl.isNullOrBlank()) {
-            // Loads through the app's singleton Coil ImageLoader (set in AppShell).
-            AsyncImage(
-                model              = iconUrl,
-                contentDescription = null,
-                modifier           = Modifier.size(30.dp),
-                contentScale       = ContentScale.Crop,
-            )
-        } else {
-            // Fallback when a source has no icon (the common case until pack
-            // icon_url is authored): a neutral package glyph, not an empty box.
-            Icon(
-                imageVector        = Icons.Outlined.Inventory2,
-                contentDescription = null,
-                modifier           = Modifier.size(17.dp),
-                tint               = palette.textSecondary,
-            )
-        }
     }
 }
 
