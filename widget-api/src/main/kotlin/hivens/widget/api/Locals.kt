@@ -125,6 +125,15 @@ val LocalWidgetDataRegistry: ProvidableCompositionLocal<WidgetDataRegistry> =
         error("LocalWidgetDataRegistry not provided -- wire WidgetDataRegistry in Koin and at the composition root")
     }
 
+// App-provided commands widgets fire via rememberCommand(key) / rememberAction(key)
+// -- the write counterpart of LocalWidgetDataRegistry. Provided once at the
+// composition root from the Koin-bound singleton. Static for the same reason: the
+// command set is fixed at startup.
+val LocalWidgetCommandRegistry: ProvidableCompositionLocal<WidgetCommandRegistry> =
+    staticCompositionLocalOf {
+        error("LocalWidgetCommandRegistry not provided -- wire WidgetCommandRegistry in Koin and at the composition root")
+    }
+
 // Edit-mode slot reflow duration (ms). 0 = no animation (the production
 // default, since the only provider is the editor host). While editing, the
 // host supplies the active style's duration, so add / remove / resize reflow

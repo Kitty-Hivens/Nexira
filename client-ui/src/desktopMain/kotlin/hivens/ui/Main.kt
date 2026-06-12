@@ -23,12 +23,18 @@ import java.nio.file.Path
 import javax.swing.SwingUtilities
 import org.slf4j.LoggerFactory
 import hivens.launcher.AutoSyncService
+import hivens.launcher.update.UpdateService
+import hivens.ui.widgets.Commands
 import hivens.ui.widgets.Sources
+import hivens.widget.api.WidgetCommandRegistry
 import hivens.widget.api.WidgetDataRegistry
 import hivens.widget.api.WidgetRegistry
 import hivens.widget.api.WidgetServiceRegistry
+import hivens.widget.api.command
 import hivens.widget.api.flowSource
+import hivens.widget.api.suspendCommand
 import hivens.widget.generated.GeneratedWidgetRegistry
+import kotlinx.coroutines.CoroutineScope
 import org.jetbrains.compose.resources.ExperimentalResourceApi
 import org.koin.core.context.stopKoin
 import org.koin.dsl.module
@@ -65,6 +71,22 @@ val uiModule = module {
         WidgetDataRegistry().apply {
             register(Sources.AutoSync, flowSource(get<AutoSyncService>().snapshot))
             register(Sources.Notifications, flowSource(get<NotificationArchiveStore>().log))
+        }
+    }
+
+    // Reactive write side: commands widgets fire via rememberCommand /
+    // rememberAction without injecting the backing service. Services resolved
+    // eagerly, like the data registry above. ClearNotifications is consumed by the
+    // notification-history widget; CheckUpdate exercises the suspend adapter in the
+    // real graph (scope captured at registration) and stays a seam until a
+    // dispatcher uses it.
+    single {
+        val archive: NotificationArchiveStore = get()
+        val updates: UpdateService = get()
+        val scope: CoroutineScope = get()
+        WidgetCommandRegistry().apply {
+            register(Commands.ClearNotifications, command { archive.clear() })
+            register(Commands.CheckUpdate, suspendCommand(scope) { updates.checkForUpdate() })
         }
     }
 

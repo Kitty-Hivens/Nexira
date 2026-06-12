@@ -20,6 +20,8 @@ dependencies {
     implementation(libs.compose.foundation)
 
     testImplementation(kotlin("test"))
+    // runTest / TestScope for the suspendCommand fire-and-forget test.
+    testImplementation(libs.kotlinx.coroutines.test)
 }
 
 tasks.test {
