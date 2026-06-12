@@ -1,18 +1,17 @@
-package hivens.launcher.launch
+package hivens.core.launch
 
 /**
- * Domain state machine for a launch attempt. Lives in `client-launcher`
- * (not `client-ui`) so the orchestrator [LauncherController] can sit on
- * the right side of the module layering -- previously the controller
- * imported `client-ui` strings to produce localized state text, which
- * inverted the dependency direction.
+ * Domain state machine for a launch attempt. Lives in `client-core` so the
+ * launch SPI and every frontend (the Compose UI today, a headless/TUI frontend
+ * tomorrow) share one Compose-free contract.
  *
- * State carries **no localized strings**. Stage labels and error messages
- * are semantic codes ([PrepareStage], [LaunchError]); the UI side
- * (`LaunchControlPanel`) resolves them against `AppStrings` at render
- * time. Same goes for download progress -- only raw byte counters are
- * exposed, the UI divides for the progress fraction and applies any
- * cosmetic effects (April Fools regression, etc.) locally.
+ * State carries **no localized strings**. Stage labels and error messages are
+ * semantic codes ([PrepareStage], [LaunchError]); the UI resolves them against
+ * its string table at render time. Download progress exposes only raw byte
+ * counters -- the UI divides for the fraction and formats the speed locally.
+ *
+ * The running process is held behind [LaunchHandle], not a raw `java.lang.Process`,
+ * so the JVM process type stays internal to the launcher implementation.
  */
 sealed class LaunchState {
     data object Idle : LaunchState()
@@ -33,7 +32,7 @@ sealed class LaunchState {
     ) : LaunchState()
 
     data class GameRunning(
-        val process: Process,
+        val handle: LaunchHandle,
     ) : LaunchState()
 
     data class Error(

@@ -14,11 +14,13 @@ import hivens.core.data.SessionData
 import hivens.core.jvm.AutomaticHeap
 import hivens.core.jvm.HeapDeriver
 import hivens.core.jvm.SystemMemory
+import hivens.core.launch.LaunchError
+import hivens.core.launch.LaunchHandle
+import hivens.core.launch.SpawnResult
 import hivens.launcher.component.ClasspathProvider
 import hivens.launcher.component.EnvironmentPreparer
 import hivens.launcher.component.GameCommandBuilder
 import hivens.launcher.component.ProcessLogHandler
-import hivens.launcher.launch.LaunchError
 import hivens.launcher.launch.PackPrepBlocked
 import hivens.launcher.runtime.RuntimeProvisioner
 import hivens.launcher.runtime.loader.ResolvedLibrary
@@ -26,8 +28,9 @@ import hivens.launcher.runtime.loader.ResolvedRuntime
 import hivens.launcher.smrt.ModInjector
 import hivens.launcher.smrt.OpenSmrtHelperResolver
 import hivens.launcher.smrt.SmrtAuthlibSwapper
+import kotlinx.coroutines.CancellationException
 import org.slf4j.LoggerFactory
-import java.io.IOException
+import java.io.OutputStream
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -62,7 +65,6 @@ internal class LauncherService(
      *
      * @see [ILauncherService.launchClientWithLogs]
      */
-    @Throws(IOException::class)
     override suspend fun launchClientWithLogs(
         sessionData: SessionData,
         serverProfile: ServerProfile,
@@ -71,7 +73,7 @@ internal class LauncherService(
         allocatedMemoryMB: Int,
         adaptiveEnabled: Boolean,
         onLog: (String, LauncherLogType) -> Unit
-    ): Process {
+    ): SpawnResult = try {
         val profile: InstanceProfile = profileManager.getProfile(serverProfile.assetDir)
         val version = serverProfile.version
 
@@ -109,7 +111,12 @@ internal class LauncherService(
             metricsOutPath = adaptive.metricsOut,
         )
 
-        return spawnProcess(command, clientRootPath, onLog)
+        SpawnResult.Started(ProcessLaunchHandle(spawnProcess(command, clientRootPath, onLog)))
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        log.error("Launch failed for {}", serverProfile.name, e)
+        SpawnResult.Failed(LaunchError.Internal(e.message ?: ""))
     }
 
     override suspend fun launchClient(
@@ -118,14 +125,13 @@ internal class LauncherService(
         clientRootPath: Path,
         javaExecutablePath: Path,
         allocatedMemoryMB: Int
-    ): Process {
+    ): SpawnResult {
         return launchClientWithLogs(
             sessionData, serverProfile, clientRootPath, javaExecutablePath, allocatedMemoryMB,
             adaptiveEnabled = false,
         ) { _, _ -> /* Logs are ignored */ }
     }
 
-    @Throws(IOException::class)
     override suspend fun launchPackClient(
         sessionData: SessionData,
         manifest: CachedManifestSnapshot,
@@ -139,7 +145,7 @@ internal class LauncherService(
         useSmartycraftAuthLib: Boolean,
         displayName: String,
         onLog: (String, LauncherLogType) -> Unit
-    ): Process {
+    ): SpawnResult = try {
         val mcVersion = manifest.minecraftVersion
         val scBound = manifest.authRequirement is PackAuthRequirement.SmartyCraft
 
@@ -232,7 +238,15 @@ internal class LauncherService(
             authlibAgentJarPath = authlibAgent,
         )
 
-        return spawnProcess(command, clientRootPath, onLog)
+        SpawnResult.Started(ProcessLaunchHandle(spawnProcess(command, clientRootPath, onLog)))
+    } catch (e: PackPrepBlocked) {
+        // SC-binding step could not complete; surface the carried reason.
+        SpawnResult.Failed(e.error)
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        log.error("Pack launch failed for {}", displayName, e)
+        SpawnResult.Failed(LaunchError.Internal(e.message ?: ""))
     }
 
     /**
@@ -448,4 +462,17 @@ internal class LauncherService(
             return "java"
         }
     }
+}
+
+/**
+ * Wraps the spawned [Process] so the core SPI hands back a [LaunchHandle]
+ * instead of the JVM type. [awaitExit] blocks the calling dispatcher (the
+ * launcher's IO launch coroutine), mirroring the prior in-coroutine
+ * `process.waitFor()` -- cancelling the launch job does not interrupt it, so
+ * the orchestrator sends [terminate] first to let the wait return.
+ */
+private class ProcessLaunchHandle(private val process: Process) : LaunchHandle {
+    override suspend fun awaitExit(): Int = process.waitFor()
+    override fun terminate() { runCatching { process.destroy() } }
+    override val stdin: OutputStream get() = process.outputStream
 }

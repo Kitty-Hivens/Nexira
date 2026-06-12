@@ -15,6 +15,12 @@ import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.core.data.SessionData
 import hivens.core.diag.ActionRing
+import hivens.core.launch.LaunchError
+import hivens.core.launch.LaunchHandle
+import hivens.core.launch.LaunchLogEvent
+import hivens.core.launch.LaunchState
+import hivens.core.launch.PrepareStage
+import hivens.core.launch.SpawnResult
 import hivens.launcher.di.AppCoroutineScopeHook
 import hivens.launcher.smrt.ClientSyncCoordinator
 import hivens.launcher.smrt.OpenSmrtHelperResolver
@@ -142,13 +148,13 @@ class LauncherController(
 
     private var launchJob: Job? = null
     /**
-     * Tracked separately from [launchJob] so [abort] can kill the live
-     * Process even after the coroutine completes the spawn step. Cleared
-     * after `process.waitFor()` returns so subsequent abort() calls don't
-     * try to destroy an already-finished process. Volatile so the abort
-     * thread sees the latest write done from the launch coroutine.
+     * Tracked separately from [launchJob] so [abort] can terminate the live
+     * process even after the coroutine completes the spawn step. Cleared after
+     * [LaunchHandle.awaitExit] returns so a later abort() does not try to
+     * terminate an already-finished process. Volatile so the abort thread sees
+     * the latest write done from the launch coroutine.
      */
-    @Volatile private var runningProcess: Process? = null
+    @Volatile private var runningHandle: LaunchHandle? = null
     private val launchLock = Any()
 
     /**
@@ -194,7 +200,7 @@ class LauncherController(
      */
     private sealed interface Prepared {
         class Ready(
-            val spawn: suspend (onLog: (String, LauncherLogType) -> Unit) -> Process,
+            val spawn: suspend (onLog: (String, LauncherLogType) -> Unit) -> SpawnResult,
             /** Runs once after the process spawns. [launchInternal] guards it, so it never fails the launch. */
             val onSpawned: (suspend () -> Unit)? = null,
         ) : Prepared
@@ -252,36 +258,36 @@ class LauncherController(
                 ActionRing.record("Game running: $label")
                 emit(LaunchLogEvent.Launching)
 
-                val process = prepared.spawn { text, type -> emit(LaunchLogEvent.ProcessOutput(text, type)) }
-                runningProcess = process
-                _state.value = LaunchState.GameRunning(process)
-                // Post-spawn hook guarded centrally: a throwing hook must not
-                // flip the running game into an Error state.
-                prepared.onSpawned?.let { hook ->
-                    runCatching { hook() }.onFailure { logger.warn("Post-spawn hook failed for {}", label, it) }
-                }
+                when (val result = prepared.spawn { text, type -> emit(LaunchLogEvent.ProcessOutput(text, type)) }) {
+                    // The service maps its own failures (provisioning, spawn IO,
+                    // SC-binding block) to a semantic LaunchError; surface it.
+                    is SpawnResult.Failed -> fail(result.error)
+                    is SpawnResult.Started -> {
+                        val handle = result.handle
+                        runningHandle = handle
+                        _state.value = LaunchState.GameRunning(handle)
+                        // Post-spawn hook guarded centrally: a throwing hook must
+                        // not flip the running game into an Error state.
+                        prepared.onSpawned?.let { hook ->
+                            runCatching { hook() }.onFailure { logger.warn("Post-spawn hook failed for {}", label, it) }
+                        }
 
-                // Reads its OWN captured abortToken, never the currentAbortToken
-                // field -- see that field's KDoc for the abort-A-then-launch-B
-                // race a shared flag would reopen.
-                val exitCode = process.waitFor()
-                runningProcess = null
-                ActionRing.record("Game exited: $label (code $exitCode)")
+                        // Reads its OWN captured abortToken, never the
+                        // currentAbortToken field -- see that field's KDoc for the
+                        // abort-A-then-launch-B race a shared flag would reopen.
+                        val exitCode = handle.awaitExit()
+                        runningHandle = null
+                        ActionRing.record("Game exited: $label (code $exitCode)")
 
-                if (exitCode != 0 && !abortToken.get()) {
-                    fail(LaunchError.ExitCode(exitCode))
-                } else {
-                    _state.value = LaunchState.Idle
+                        if (exitCode != 0 && !abortToken.get()) {
+                            fail(LaunchError.ExitCode(exitCode))
+                        } else {
+                            _state.value = LaunchState.Idle
+                        }
+                    }
                 }
-            } catch (e: PackPrepBlocked) {
-                // SC-binding step could not complete (patched authlib / open-smrt
-                // helper unavailable). Surface the semantic reason, not Internal.
-                // Thrown only by the pack spawn; dead for the SC server path.
-                runningProcess = null
-                logger.warn("Launch blocked for {}: {}", label, e.error)
-                fail(e.error)
             } catch (e: Exception) {
-                runningProcess = null
+                runningHandle = null
                 if (e !is CancellationException) {
                     logger.error("Launch flow failed for {}", label, e)
                     fail(LaunchError.Internal(e.message ?: ""), e)
@@ -419,14 +425,14 @@ class LauncherController(
                     extraCheckSum = server.extraCheckSum,
                     ignoredFiles = ignoredFiles + smartyPlan.ignoredAddon,
                     messageUI = { /* log */ },
-                    progressUI = { current, total, bytesRead, totalBytes, speed ->
+                    progressUI = { progress ->
                         if (!isActive) return@processSession
                         _state.value = LaunchState.Downloading(
-                            currentFileIdx   = current,
-                            totalFiles       = total,
-                            downloadedBytes  = bytesRead,
-                            totalBytes       = totalBytes,
-                            speedBytesPerSec = parseSpeedString(speed),
+                            currentFileIdx   = progress.currentFileIdx,
+                            totalFiles       = progress.totalFiles,
+                            downloadedBytes  = progress.downloadedBytes,
+                            totalBytes       = progress.totalBytes,
+                            speedBytesPerSec = progress.bytesPerSec,
                         )
                     },
                     // Map integrity-walk progress onto the SYNC stage's 0.2..0.7
@@ -711,17 +717,16 @@ class LauncherController(
     }
 
     /**
-     * Stops the in-flight launch. If the game process has already
-     * spawned, sends SIGTERM via [Process.destroy] before resetting
-     * state -- canceling the coroutine alone would orphan the
-     * spawned Process and the next [launch] click would happily
-     * spawn a second game.
+     * Stops the in-flight launch. If the game process has already spawned,
+     * terminates it via [LaunchHandle.terminate] before resetting state --
+     * canceling the coroutine alone would orphan the spawned process and the
+     * next [launch] click would happily spawn a second game.
      */
     fun abort() {
         currentAbortToken?.set(true)
-        val proc = runningProcess
-        runningProcess = null
-        runCatching { proc?.destroy() }
+        val handle = runningHandle
+        runningHandle = null
+        runCatching { handle?.terminate() }
         launchJob?.cancel()
         _state.value = LaunchState.Idle
     }
@@ -744,26 +749,4 @@ class LauncherController(
         plan.injectJar != null ||
             Files.isRegularFile(clientDir.resolve("mods").resolve(OpenSmrtHelperResolver.helperFileName(mcVersion)))
 
-    /**
-     * Best-effort parse of FileDownloadService's pre-formatted speed string
-     * (`"2.5 MB/s"`, `"812 KB/s"`, etc.) into bytes/second. The UI side
-     * formats freshly from this number so locale conventions stay correct;
-     * the raw string from FileDownloadService is in the launcher's locale
-     * which may not match the user's UI locale.
-     *
-     * Returns 0 on unparseable input -- the UI just shows no speed in that
-     * case rather than displaying a nonsensical figure.
-     */
-    private fun parseSpeedString(speed: String): Long {
-        val trimmed = speed.trim()
-        val match = Regex("""([\d.,]+)\s*([KMG]?)B?/s""", RegexOption.IGNORE_CASE).find(trimmed) ?: return 0L
-        val value = match.groupValues[1].replace(',', '.').toDoubleOrNull() ?: return 0L
-        val multiplier = when (match.groupValues[2].uppercase()) {
-            "K" -> 1_024L
-            "M" -> 1_048_576L
-            "G" -> 1_073_741_824L
-            else -> 1L
-        }
-        return (value * multiplier).toLong()
-    }
 }

@@ -41,7 +41,7 @@ import hivens.core.api.interfaces.ISettingsService
 import hivens.core.api.model.ServerProfile
 import hivens.launcher.AutoSyncService
 import hivens.launcher.ProfileManager
-import hivens.launcher.launch.LaunchState
+import hivens.core.launch.LaunchState
 import hivens.launcher.launch.LauncherController
 import hivens.launcher.network.NetworkState
 import hivens.ui.components.LaunchControlPanel

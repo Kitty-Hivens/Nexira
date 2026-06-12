@@ -3,6 +3,7 @@ package hivens.launcher
 import hivens.launcher.network.ServerProtocolConfig
 import hivens.core.api.HttpClientProvider
 import hivens.core.api.interfaces.IFileDownloadService
+import hivens.core.launch.SyncProgress
 import hivens.core.data.FileData
 import hivens.core.data.FileManifest
 import hivens.core.data.SessionData
@@ -32,7 +33,6 @@ import java.nio.file.attribute.BasicFileAttributes
 import java.security.MessageDigest
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
-import kotlin.math.roundToInt
 import kotlin.time.Duration.Companion.milliseconds
 
 
@@ -59,7 +59,7 @@ class FileDownloadService(
         extraCheckSum: String?,
         ignoredFiles: Set<String>?,
         messageUI: ((String) -> Unit)?,
-        progressUI: ((Int, Int, Long, Long, String) -> Unit)?,
+        progressUI: ((SyncProgress) -> Unit)?,
         verifyUI: ((Int, Int) -> Unit)?,
         injectModJar: Path?,
         strictModCheck: Boolean,
@@ -270,7 +270,7 @@ class FileDownloadService(
         baseDir: Path,
         files: Map<String, FileData>,
         messageUI: ((String) -> Unit)?,
-        progressUI: ((Int, Int, Long, Long, String) -> Unit)?,
+        progressUI: ((SyncProgress) -> Unit)?,
         verifyUI: ((Int, Int) -> Unit)?,
     ) {
         // STEP 1: Checking hashes
@@ -334,14 +334,16 @@ class FileDownloadService(
 
                     val now = System.currentTimeMillis()
                     val durationSec = (now - startTime) / 1000.0
-                    val speed = if (durationSec > 0.1) formatSpeed(currentBytes / durationSec) else "..."
+                    val bytesPerSec = if (durationSec > 0.1) (currentBytes / durationSec).toLong() else 0L
 
                     progressUI?.invoke(
-                        currentFiles,
-                        totalFilesCount,
-                        currentBytes,
-                        totalBytesToDownload,
-                        speed
+                        SyncProgress(
+                            currentFileIdx  = currentFiles,
+                            totalFiles      = totalFilesCount,
+                            downloadedBytes = currentBytes,
+                            totalBytes      = totalBytesToDownload,
+                            bytesPerSec     = bytesPerSec,
+                        )
                     )
 
                     delay(100.milliseconds)
@@ -381,9 +383,13 @@ class FileDownloadService(
             // Final update (100%)
             if (isActive) {
                 progressUI?.invoke(
-                    totalFilesCount, totalFilesCount,
-                    totalBytesToDownload, totalBytesToDownload,
-                    ""
+                    SyncProgress(
+                        currentFileIdx  = totalFilesCount,
+                        totalFiles      = totalFilesCount,
+                        downloadedBytes = totalBytesToDownload,
+                        totalBytes      = totalBytesToDownload,
+                        bytesPerSec     = 0L,
+                    )
                 )
             }
         }
@@ -491,13 +497,6 @@ class FileDownloadService(
             cause = cause.cause
         }
         return false
-    }
-
-    private fun formatSpeed(bytesPerSec: Double): String {
-        val kb = bytesPerSec / 1024
-        if (kb < 1024) return "${kb.roundToInt()} KB/s"
-        val mb = kb / 1024
-        return String.format("%.1f MB/s", mb)
     }
 
     /**

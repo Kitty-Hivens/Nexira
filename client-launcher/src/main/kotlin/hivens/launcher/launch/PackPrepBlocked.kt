@@ -1,5 +1,7 @@
 package hivens.launcher.launch
 
+import hivens.core.launch.LaunchError
+
 /**
  * Thrown from the pack launch service when an SC-bound preparation step cannot
  * complete (patched authlib or open-smrt helper unavailable). Carries the
