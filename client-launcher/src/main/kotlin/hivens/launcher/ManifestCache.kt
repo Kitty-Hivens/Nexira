@@ -1,5 +1,6 @@
 package hivens.launcher
 
+import hivens.core.api.interfaces.IManifestStore
 import hivens.core.data.FileManifest
 import hivens.launcher.component.ClasspathProvider
 import hivens.launcher.platform.ServerNameValidator
@@ -32,7 +33,7 @@ import java.security.MessageDigest
 class ManifestCache(
     private val cacheDir: Path,
     private val json: Json,
-) {
+) : IManifestStore {
     private val log = LoggerFactory.getLogger(ManifestCache::class.java)
 
     /**
@@ -119,7 +120,7 @@ class ManifestCache(
      * files are presumed unchanged; if they aren't, the game itself will
      * complain on launch.
      */
-    fun loadManifest(serverId: String): FileManifest? = read(serverId)?.manifest
+    override fun loadManifest(serverId: String): FileManifest? = read(serverId)?.manifest
 
     /**
      * Drops the cache for [serverId] -- call when the user explicitly

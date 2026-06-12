@@ -3,6 +3,7 @@ package hivens.launcher.smrt
 import hivens.core.api.dto.smrt.SmrtAssetEntry
 import hivens.core.api.dto.smrt.SmrtModEntry
 import hivens.core.api.dto.smrt.SmrtSource
+import hivens.core.api.interfaces.IPackSyncService
 import hivens.launcher.FileDownloadService
 import hivens.launcher.ProtectedPaths
 import hivens.launcher.util.sha1Of
@@ -32,7 +33,7 @@ import java.util.Comparator
 class SmrtSyncService(
     private val client: SmrtPackClient,
     private val protectedPaths: ProtectedPaths,
-) {
+) : IPackSyncService {
     private val log = LoggerFactory.getLogger(SmrtSyncService::class.java)
 
     /**
@@ -112,7 +113,7 @@ class SmrtSyncService(
      * name (and thus whether Forge loads it) changes. A variant that is missing
      * on disk is left for the next full sync to fetch.
      */
-    fun relabel(clientDir: Path, mods: List<SmrtModEntry>, enabledState: Map<String, Boolean>) {
+    override fun relabel(clientDir: Path, mods: List<SmrtModEntry>, enabledState: Map<String, Boolean>) {
         val modsDir = clientDir.resolve("mods")
         if (!Files.isDirectory(modsDir)) return
         for (mod in mods) {

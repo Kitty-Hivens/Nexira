@@ -14,15 +14,10 @@ import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.core.data.SessionData
 import hivens.core.diag.ActionRing
-import hivens.launcher.CredentialsManager
-import hivens.launcher.ManifestCache
-import hivens.launcher.ProfileManager
 import hivens.launcher.di.AppCoroutineScopeHook
 import hivens.launcher.smrt.ClientSyncCoordinator
 import hivens.launcher.smrt.OpenSmrtHelperResolver
 import hivens.launcher.smrt.SmartyModPlanner
-import hivens.launcher.smrt.SmrtPackClient
-import hivens.launcher.smrt.SmrtSyncService
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -54,17 +49,17 @@ import kotlinx.coroutines.slf4j.MDCContext
  */
 class LauncherController(
     private val authService: AuthProvider,
-    private val credentialsManager: CredentialsManager,
+    private val credentialsManager: ICredentialStore,
     private val settingsService: ISettingsService,
     private val downloadService: IFileDownloadService,
     private val javaManagerService: IJavaManager,
     private val launcherService: ILauncherService,
     private val manifestProcessor: IManifestProcessorService,
-    private val manifestCache: ManifestCache,
-    private val profileManager: ProfileManager,
+    private val manifestCache: IManifestStore,
+    private val profileManager: IInstanceProfileStore,
     private val packRepository: IPackRepository,
-    private val smrtPackClient: SmrtPackClient,
-    private val smrtSyncService: SmrtSyncService,
+    private val smrtPackClient: IMirrorPackClient,
+    private val smrtSyncService: IPackSyncService,
     private val smartyPlanner: SmartyModPlanner,
     private val dataDirectory: Path,
     private val appScope: CoroutineScope,
