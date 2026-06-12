@@ -50,7 +50,9 @@ import kotlin.time.Duration.Companion.milliseconds
  * Phase C, or a paste-with-children that does not rewrite ids) is
  * rejected with a warn log and identity return -- a single duplicate
  * instanceId would otherwise corrupt every findByInstanceId-style
- * traversal in the editor.
+ * traversal in the editor. [load] runs the same sweep on the
+ * post-migration graph and falls back to the bundled default on a
+ * collision, so a migration that mints a clashing id can't persist one.
  */
 class LayoutGraphRepository(
     private val file: Path,
@@ -99,16 +101,13 @@ class LayoutGraphRepository(
             // size / z / weight) that fire per drag frame and provably cannot
             // introduce a duplicate id -- otherwise this walk runs ~60x/sec.
             if (validate) {
-                val seen = HashSet<String>()
-                for (widget in next.walkInstances()) {
-                    if (!seen.add(widget.instanceId)) {
-                        log.warn(
-                            "Layout update rejected: duplicate instanceId '{}' in tree. " +
+                firstDuplicateInstanceId(next)?.let { dup ->
+                    log.warn(
+                        "Layout update rejected: duplicate instanceId '{}' in tree. " +
                             "Keeping previous graph to protect findByInstanceId-style traversals.",
-                            widget.instanceId,
-                        )
-                        return@withLock
-                    }
+                        dup,
+                    )
+                    return@withLock
                 }
             }
 
@@ -176,6 +175,17 @@ class LayoutGraphRepository(
         }
     }
 
+    // First instanceId that occurs more than once across the whole graph
+    // (nested children included), or null when every id is unique. Backs both
+    // the live-update guard and the post-load sweep.
+    private fun firstDuplicateInstanceId(graph: LayoutGraph): String? {
+        val seen = HashSet<String>()
+        for (widget in graph.walkInstances()) {
+            if (!seen.add(widget.instanceId)) return widget.instanceId
+        }
+        return null
+    }
+
     private fun load(): LayoutGraph {
         if (!Files.exists(file)) {
             // First run: write the bundled default so subsequent loads
@@ -202,7 +212,29 @@ class LayoutGraphRepository(
             }
             val def      = defaultGraph()
             val migrated = Migrations.apply(envelope.schemaVersion, envelope.graph)
-            mergeMissingSlots(mergeMissingSurfaces(migrated, def), def)
+            // A migration that mints a colliding instanceId (or a hand-edited
+            // file that already carries one) would silently break every
+            // findByInstanceId-style traversal. update() guards live edits;
+            // this is the load-time backstop -- serve the bundled default
+            // rather than a corrupted tree.
+            firstDuplicateInstanceId(migrated)?.let { dup ->
+                log.error(
+                    "Layout graph at {} has a duplicate instanceId '{}' after migrating schema_version {} -> {}. " +
+                        "Falling back to the bundled default to protect instanceId-keyed traversals.",
+                    file, dup, envelope.schemaVersion, SCHEMA_VERSION,
+                )
+                return defaultGraph()
+            }
+            val merged = mergeMissingSlots(mergeMissingSurfaces(migrated, def), def)
+            firstDuplicateInstanceId(merged)?.let { dup ->
+                log.error(
+                    "Layout graph at {} has a duplicate instanceId '{}' after seeding bundled-default " +
+                        "surfaces/slots. Falling back to the bundled default to protect instanceId-keyed traversals.",
+                    file, dup,
+                )
+                return defaultGraph()
+            }
+            merged
         } catch (e: Exception) {
             log.error("Failed to load layout graph at {} -- falling back to bundled default", file, e)
             defaultGraph()
@@ -352,7 +384,8 @@ private fun migrateNavToEntries(graph: LayoutGraph): LayoutGraph =
                 // painted six bare rail items under one frame, so a single
                 // backing or weighted share must not replicate onto all six.
                 // The id derives from the (unique) original, so the six stay
-                // unique without the load-path uniqueness guard.
+                // unique; the load-path sweep backstops the case where a
+                // derived id still clashes with a pre-existing one.
                 WidgetInstance(
                     kind       = NAV_ENTRY,
                     instanceId = "${w.instanceId}-$token",

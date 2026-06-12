@@ -327,8 +327,9 @@ private fun SlotContent.walkInstances(): Sequence<WidgetInstance> = sequence {
 // children are rewritten before the widget itself is handed to `transform`,
 // so the transform always sees an already-converted subtree. Pure; the
 // schema migrations use it to restructure widget kinds across the whole
-// graph. The caller owns instanceId uniqueness across the produced set --
-// the load() migration path does not run the tree-wide uniqueness guard.
+// graph. The caller owns instanceId uniqueness across the produced set;
+// load() sweeps the post-migration graph and falls back to the bundled
+// default if a migration mints a collision.
 fun LayoutGraph.flatMapInstances(
     transform: (WidgetInstance) -> List<WidgetInstance>,
 ): LayoutGraph = copy(
