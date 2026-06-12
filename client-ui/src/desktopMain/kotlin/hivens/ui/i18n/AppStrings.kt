@@ -824,6 +824,8 @@ interface AppStrings {
     val editorResetAll: String
     val editorToFront: String
     val editorToBack: String
+    // Edit-mode placeholder for a widget whose kind is no longer in the registry.
+    val editorUnsupportedWidget: String
 
     // --- Widget palette / prop-editor labels (key-indirection) ---
     // @Widget(displayName) and @PropLabel carry a key; the palette and prop

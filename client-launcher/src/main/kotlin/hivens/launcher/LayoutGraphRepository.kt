@@ -70,6 +70,16 @@ class LayoutGraphRepository(
     // lower-bound rejection.
     @Volatile private var readOnly = false
 
+    @Volatile private var _migratedFromSchema: Int? = null
+
+    /**
+     * The schema version the just-loaded file was migrated UP from, or null
+     * when the file was already current, a newer build's, first-run, or
+     * unreadable. Read once at startup to gate destructive reconciliation
+     * (the unknown-kind prune) on an actual schema bump.
+     */
+    val migratedFromSchema: Int? get() = _migratedFromSchema
+
     private val state: MutableStateFlow<LayoutGraph> = MutableStateFlow(load())
 
     // Pending debounced persist. Replaced on each update; cancelled by
@@ -197,6 +207,9 @@ class LayoutGraphRepository(
                         "Loading read-only; this session will not write it back to avoid clobbering newer data.",
                     file, envelope.schemaVersion, SCHEMA_VERSION,
                 )
+            }
+            if (envelope.schemaVersion in 1 until SCHEMA_VERSION) {
+                _migratedFromSchema = envelope.schemaVersion
             }
             val def = defaultGraph()
             // Migrate + seed missing default surfaces/slots + sweep instanceId

@@ -793,6 +793,7 @@ object GermanStrings : AppStrings {
     override val editorCancel  = "Abbrechen"
     override val editorDelete  = "Löschen"
     override val editorReset   = "Zurücksetzen"
+    override val editorUnsupportedWidget = "Nicht unterstütztes Widget"
     override val editorResetAll = "Alles zurücksetzen"
     override val editorToFront = "In den Vordergrund"
     override val editorToBack = "In den Hintergrund"

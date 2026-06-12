@@ -38,8 +38,10 @@ class WidgetGraphReconcilerTest {
             SurfaceId("s") to SurfaceLayout(slots = mapOf(SlotId("main") to SlotContent(widgets.toList()))),
         ))
 
-    private fun LayoutGraph.firstWidget() =
-        surfaces[SurfaceId("s")]!!.slots[SlotId("main")]!!.widgets.first()
+    private fun LayoutGraph.slotWidgets() =
+        surfaces[SurfaceId("s")]!!.slots[SlotId("main")]!!.widgets
+
+    private fun LayoutGraph.firstWidget() = slotWidgets().first()
 
     @Test
     fun `seeds a declared child slot missing from a container`() {
@@ -82,10 +84,32 @@ class WidgetGraphReconcilerTest {
     }
 
     @Test
-    fun `leaves a widget whose kind is absent from the registry untouched`() {
-        // Seeding only: unknown kinds are not pruned here (that is the
-        // schema-bump path); the placeholder handles them at render time.
+    fun `keeps an unknown kind when not pruning (no schema bump)`() {
+        // Without a schema bump the data is preserved verbatim; the placeholder
+        // surfaces it at render time.
         val g = graphWith(WidgetInstance(WidgetKind("gone"), "g1"))
-        assertEquals(g, WidgetGraphReconciler.reconcile(g, registryOf()).graph)
+        val result = WidgetGraphReconciler.reconcile(g, registryOf(), prune = false)
+        assertEquals(g, result.graph)
+        assertEquals(0, result.prunedWidgets)
+    }
+
+    @Test
+    fun `prune drops an unknown kind absent from registry and default on a bump`() {
+        val g = graphWith(WidgetInstance(WidgetKind("gone"), "g1"), WidgetInstance(WidgetKind("known"), "k1"))
+        val result = WidgetGraphReconciler.reconcile(
+            g, registryOf("known" to emptyList()), defaultKinds = emptySet(), prune = true,
+        )
+        assertEquals(listOf("k1"), result.graph.slotWidgets().map { it.instanceId })
+        assertEquals(1, result.prunedWidgets)
+    }
+
+    @Test
+    fun `prune keeps an unknown kind the bundled default still declares`() {
+        val g = graphWith(WidgetInstance(WidgetKind("defaultonly"), "d1"))
+        val result = WidgetGraphReconciler.reconcile(
+            g, registryOf(), defaultKinds = setOf(WidgetKind("defaultonly")), prune = true,
+        )
+        assertEquals(listOf("d1"), result.graph.slotWidgets().map { it.instanceId })
+        assertEquals(0, result.prunedWidgets)
     }
 }
