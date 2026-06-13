@@ -199,11 +199,11 @@ fun UpdateManagerDialog(onDismiss: () -> Unit) {
                 // ── Channel picker (chips sit to the right of the label) ─────────
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(s.updateManagerChannel, style = MaterialTheme.typography.labelMedium, color = CelestiaTheme.colors.textSecondary)
-                    Spacer(Modifier.width(12.dp))
+                    Spacer(Modifier.width(8.dp))
                     FlowRow(
                         modifier = Modifier.weight(1f),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         // Git sits left of Dev (dev is the more bleeding-edge one --
                         // it also pulls the dev branch).
@@ -269,9 +269,12 @@ fun UpdateManagerDialog(onDismiss: () -> Unit) {
                     Text(s.updateManagerEmpty, color = CelestiaTheme.colors.textSecondary)
                 } else {
                     val currentIdx = releases.indexOfFirst { it.isCurrent }
+                    // Tighten the gap as the list grows so more versions stay
+                    // visible before the 300dp cap starts scrolling.
+                    val rowGap = if (releases.size > 6) 3.dp else 6.dp
                     Column(
                         Modifier.fillMaxWidth().heightIn(max = 300.dp).verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(rowGap),
                     ) {
                         releases.forEachIndexed { idx, entry ->
                             VersionRow(
@@ -321,11 +324,18 @@ fun UpdateManagerDialog(onDismiss: () -> Unit) {
 private fun ChannelChip(channel: ReleaseChannel, selected: Boolean, enabled: Boolean, onClick: () -> Unit) {
     val style = LocalStyle.current
     val shape = RoundedCornerShape(style.cardCorner)
+    // Dim the unselected channels so the picker reads as "one chosen" rather than
+    // a wall of equally-loud chips; disabled ones dim further.
+    val alpha = when {
+        !enabled  -> 0.4f
+        !selected -> 0.55f
+        else      -> 1f
+    }
     Box(
         Modifier
             .clip(shape)
-            .then(if (selected) Modifier.border(1.5.dp, CelestiaTheme.colors.primary, shape) else Modifier)
-            .alpha(if (enabled) 1f else 0.45f)
+            .then(if (selected) Modifier.border(1.dp, CelestiaTheme.colors.primary, shape) else Modifier)
+            .alpha(alpha)
             .clickable(enabled = enabled) { onClick() }
             .padding(2.dp),
     ) {
@@ -341,7 +351,7 @@ private fun VersionRow(entry: ReleaseEntry, isOlder: Boolean, enabled: Boolean, 
         Modifier.fillMaxWidth()
             .clip(RoundedCornerShape(style.cardCorner))
             .background(CelestiaTheme.colors.background.copy(alpha = 0.3f))
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+            .padding(horizontal = 12.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (entry.isCurrent) {
