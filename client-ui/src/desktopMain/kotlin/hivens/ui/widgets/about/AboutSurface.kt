@@ -6,9 +6,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Icon
@@ -31,6 +34,8 @@ import hivens.launcher.update.UpdateService
 import hivens.ui.components.UpdateDialog
 import hivens.ui.components.UpdateManagerDialog
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.layout.AdaptiveWidth
+import hivens.ui.layout.WidthClass
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.theme.CelestiaTheme
@@ -163,38 +168,67 @@ fun AboutSurface(onBack: () -> Unit) {
     }
 
     CompositionLocalProvider(LocalAboutContext provides ctx) {
-        Column(Modifier.fillMaxSize().padding(24.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onBack) {
-                    Icon(
-                        imageVector        = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = s.navBack,
-                        tint               = CelestiaTheme.colors.textPrimary,
+        AdaptiveWidth(Modifier.fillMaxSize()) { widthClass, _ ->
+            val pad = when (widthClass) {
+                WidthClass.Expanded -> 24.dp
+                WidthClass.Medium   -> 16.dp
+                WidthClass.Compact  -> 12.dp
+            }
+            Column(Modifier.fillMaxSize().padding(pad)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector        = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = s.navBack,
+                            tint               = CelestiaTheme.colors.textPrimary,
+                        )
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text       = s.aboutTitle,
+                        style      = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        color      = CelestiaTheme.colors.textPrimary,
                     )
                 }
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    text       = s.aboutTitle,
-                    style      = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                    color      = CelestiaTheme.colors.textPrimary,
-                )
-            }
-            Spacer(Modifier.height(20.dp))
+                Spacer(Modifier.height(if (widthClass == WidthClass.Expanded) 20.dp else 12.dp))
 
-            Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-                SlotRenderer(
-                    SurfaceId(SURFACE),
-                    SlotId("left"),
-                    modifier = Modifier.weight(1f).fillMaxHeight(),
-                    spacing  = 16.dp,
-                )
-                SlotRenderer(
-                    SurfaceId(SURFACE),
-                    SlotId("right"),
-                    modifier = Modifier.weight(1f).fillMaxHeight(),
-                    spacing  = 16.dp,
-                )
+                if (widthClass == WidthClass.Expanded) {
+                    Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                        SlotRenderer(
+                            SurfaceId(SURFACE),
+                            SlotId("left"),
+                            modifier = Modifier.weight(1f).fillMaxHeight(),
+                            spacing  = 16.dp,
+                        )
+                        SlotRenderer(
+                            SurfaceId(SURFACE),
+                            SlotId("right"),
+                            modifier = Modifier.weight(1f).fillMaxHeight(),
+                            spacing  = 16.dp,
+                        )
+                    }
+                } else {
+                    // Too narrow to split side by side: stack the columns. Each
+                    // half stays height-bounded (weight) so the credits widget's
+                    // own scroll keeps working; the right half has no inner scroll,
+                    // so it gets one to keep its fixed cards reachable. (A single
+                    // outer scroll would collide with the credits' inner scroll.)
+                    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        SlotRenderer(
+                            SurfaceId(SURFACE),
+                            SlotId("left"),
+                            modifier = Modifier.weight(1f).fillMaxWidth(),
+                            spacing  = 16.dp,
+                        )
+                        SlotRenderer(
+                            SurfaceId(SURFACE),
+                            SlotId("right"),
+                            modifier = Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),
+                            spacing  = 16.dp,
+                        )
+                    }
+                }
             }
         }
     }
