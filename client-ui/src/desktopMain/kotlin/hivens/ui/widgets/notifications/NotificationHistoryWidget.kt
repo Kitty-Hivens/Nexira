@@ -51,10 +51,20 @@ import hivens.ui.theme.CelestiaTheme
 import hivens.ui.widgets.Commands
 import hivens.ui.widgets.Sources
 import hivens.widget.api.rememberAction
+import hivens.widget.api.rememberProps
 import hivens.widget.api.rememberSource
+import hivens.widget.model.PropLabel
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
+import kotlinx.serialization.Serializable
 import java.time.Instant
+
+@Serializable
+data class NotificationHistoryProps(
+    // false: header on top, list opens downward. true: header at the bottom,
+    // list opens upward (anchor the panel to the bottom of its footprint).
+    @PropLabel("widget.notifications.history.expandUp") val expandUp: Boolean = false,
+)
 
 /**
  * Placeable message-history widget: the durable counterpart to the live
@@ -62,20 +72,20 @@ import java.time.Instant
  * [hivens.ui.notifications.NotificationArchiveStore] log (survives auto-dismiss
  * and restart).
  *
- * Self-contained outlined panel: collapsed it is just a small bar -- an
- * expand chevron pill and a "<N> messages" pill. Expanding animates the panel
- * open and the messages live inside it; the clear (trash) pill appears only
- * while expanded. Consecutive identical entries fold into one row with a count,
- * mirroring how the live stack coalesces a progress run.
+ * Self-contained outlined panel: collapsed it is a compact bar -- an expand
+ * chevron pill and a "<N> messages" pill. Expanding animates the panel open with
+ * the messages inside it; the clear (trash) pill appears only while expanded.
+ * The expand direction is a per-instance prop. Consecutive identical entries
+ * fold into one row with a count, mirroring the live stack's progress coalescing.
  */
-@Widget(id = "notifications.history", displayName = "widget.notifications.history")
+@Widget(id = "notifications.history", displayName = "widget.notifications.history", propsClass = NotificationHistoryProps::class)
 @Composable
 fun NotificationHistoryWidget(instance: WidgetInstance) {
+    val props = instance.rememberProps<NotificationHistoryProps>()
     // Bound declaratively to the notifications source for the read and the clear
     // command for the write -- the widget drives no service directly.
     val log by rememberSource(Sources.Notifications)
     val clearLog = rememberAction(Commands.ClearNotifications)
-    val strings = LocalStrings.current
     val palette = CelestiaTheme.colors
     var expanded by remember { mutableStateOf(false) }
     val groups = remember(log) { groupHistory(log) }
@@ -91,29 +101,64 @@ fun NotificationHistoryWidget(instance: WidgetInstance) {
             .border(1.dp, outline, RoundedCornerShape(16.dp))
             .padding(8.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            PillButton(
-                icon               = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                contentDescription = if (expanded) strings.notificationCollapseHistory else strings.notificationExpandHistory,
-                outline            = outline,
-                onClick            = { expanded = !expanded },
+        if (props.expandUp) {
+            NotificationDrawer(expanded = expanded, log = log, groups = groups, fromTop = false)
+            HistoryHeader(
+                expanded     = expanded,
+                expandUp     = true,
+                messageCount = log.size,
+                showTrash    = expanded && log.isNotEmpty(),
+                outline      = outline,
+                onToggle     = { expanded = !expanded },
+                onClear      = clearLog,
             )
-            Spacer(Modifier.width(6.dp))
-            CountPill(text = strings.notifCountTitle(log.size), outline = outline)
-            Spacer(Modifier.weight(1f))
-            // Trash only once expanded (and only when there is something to clear).
-            if (expanded && log.isNotEmpty()) {
-                PillButton(
-                    icon               = Icons.Default.Delete,
-                    contentDescription = strings.notifHistoryClear,
-                    outline            = outline,
-                    onClick            = clearLog,
-                )
-            }
+        } else {
+            HistoryHeader(
+                expanded     = expanded,
+                expandUp     = false,
+                messageCount = log.size,
+                showTrash    = expanded && log.isNotEmpty(),
+                outline      = outline,
+                onToggle     = { expanded = !expanded },
+                onClear      = clearLog,
+            )
+            NotificationDrawer(expanded = expanded, log = log, groups = groups, fromTop = true)
         }
+    }
+}
 
-        // Messages live inside the panel; the drawer opens downward with animation.
-        NotificationDrawer(expanded = expanded, log = log, groups = groups)
+@Composable
+private fun HistoryHeader(
+    expanded: Boolean,
+    expandUp: Boolean,
+    messageCount: Int,
+    showTrash: Boolean,
+    outline: Color,
+    onToggle: () -> Unit,
+    onClear: () -> Unit,
+) {
+    val strings = LocalStrings.current
+    // The chevron points toward where the list will go: down for a downward
+    // drawer (and up to close it), inverted for an upward one.
+    val pointsUp = if (expandUp) !expanded else expanded
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        PillButton(
+            icon               = if (pointsUp) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+            contentDescription = if (expanded) strings.notificationCollapseHistory else strings.notificationExpandHistory,
+            outline            = outline,
+            onClick            = onToggle,
+        )
+        Spacer(Modifier.width(6.dp))
+        CountPill(text = strings.notifCountTitle(messageCount), outline = outline)
+        Spacer(Modifier.weight(1f))
+        if (showTrash) {
+            PillButton(
+                icon               = Icons.Default.Delete,
+                contentDescription = strings.notifHistoryClear,
+                outline            = outline,
+                onClick            = onClear,
+            )
+        }
     }
 }
 
@@ -166,13 +211,15 @@ private fun NotificationDrawer(
     expanded: Boolean,
     log: List<PersistedNotification>,
     groups: List<HistoryGroup>,
+    fromTop: Boolean,
 ) {
     val strings = LocalStrings.current
     val palette = CelestiaTheme.colors
+    val edge = if (fromTop) Alignment.Top else Alignment.Bottom
     AnimatedVisibility(
         visible = expanded,
-        enter   = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
-        exit    = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut(),
+        enter   = expandVertically(expandFrom = edge) + fadeIn(),
+        exit    = shrinkVertically(shrinkTowards = edge) + fadeOut(),
     ) {
         if (log.isEmpty()) {
             Box(
@@ -193,7 +240,7 @@ private fun NotificationDrawer(
                     .fillMaxWidth()
                     .heightIn(max = 260.dp)
                     .verticalScroll(rememberScrollState())
-                    .padding(top = 6.dp),
+                    .padding(vertical = 6.dp),
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 groups.forEach { group -> HistoryRow(group.head, group.count) }
