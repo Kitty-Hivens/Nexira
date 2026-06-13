@@ -77,6 +77,8 @@ import hivens.ui.Screen
 import hivens.ui.customization.CustomizationSettings
 import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.layout.AdaptiveWidth
+import hivens.ui.layout.WidthClass
 import hivens.widget.api.LocalLayoutGraph
 import kotlinx.coroutines.CoroutineScope as KotlinCoroutineScope
 import kotlinx.coroutines.launch
@@ -630,99 +632,113 @@ private fun EditModePill(
         exit     = fadeOut(tween(motionMs)) + slideOutVertically(tween(motionMs)) { -it },
         modifier = modifier,
     ) {
-        Surface(
-            color   = CelestiaTheme.colors.surface.copy(alpha = 0.94f),
-            shape   = RoundedCornerShape(20.dp),
-            shadowElevation = 6.dp,
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(start = 12.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
+        AdaptiveWidth { widthClass, _ ->
+            // Below Expanded the full-label pill no longer fits the center pane
+            // (at/below the min window the rails squeeze it): drop to icon-only
+            // chips and hide the Esc hint so the Row never overflows.
+            val compact = widthClass != WidthClass.Expanded
+            Surface(
+                color   = CelestiaTheme.colors.surface.copy(alpha = 0.94f),
+                shape   = RoundedCornerShape(20.dp),
+                shadowElevation = 6.dp,
             ) {
-                Icon(
-                    imageVector        = Icons.Default.Tune,
-                    contentDescription = null,
-                    tint               = CelestiaTheme.colors.primary,
-                    modifier           = Modifier.size(16.dp),
-                )
-                Spacer(Modifier.width(8.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(start = 12.dp, end = if (compact) 8.dp else 4.dp, top = 6.dp, bottom = 6.dp),
+                ) {
+                    Icon(
+                        imageVector        = Icons.Default.Tune,
+                        contentDescription = null,
+                        tint               = CelestiaTheme.colors.primary,
+                        modifier           = Modifier.size(16.dp),
+                    )
+                    Spacer(Modifier.width(8.dp))
 
-                // Surface picker chips. One chip per available surface;
-                // the active surface has a primary tint.
-                surfaces.forEach { sid ->
-                    SurfaceChip(
-                        surface  = sid,
-                        active   = sid == selectedSurface,
-                        onClick  = { onSurfacePicked(sid) },
+                    // Surface picker chips. One chip per available surface;
+                    // the active surface has a primary tint.
+                    surfaces.forEach { sid ->
+                        SurfaceChip(
+                            surface  = sid,
+                            active   = sid == selectedSurface,
+                            compact  = compact,
+                            onClick  = { onSurfacePicked(sid) },
+                        )
+                        Spacer(Modifier.width(4.dp))
+                    }
+
+                    Spacer(Modifier.width(6.dp))
+
+                    // Preview toggle -- hides chrome temporarily so the
+                    // user can see the real look without leaving edit
+                    // mode. Drag becomes impossible during preview (no
+                    // handles), which matches user intent.
+                    ToolChip(
+                        icon       = if (previewing) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                        label      = if (previewing) s.editorPreviewHidden else s.editorPreview,
+                        selected   = previewing,
+                        onClick    = onTogglePreview,
+                        compact    = compact,
                     )
                     Spacer(Modifier.width(4.dp))
+
+                    // Palette toggle.
+                    ToolChip(
+                        icon     = Icons.Default.Widgets,
+                        label    = if (paletteOpen) s.editorPaletteToggleHide else s.editorWidgets,
+                        selected = paletteOpen,
+                        onClick  = onTogglePalette,
+                        compact  = compact,
+                    )
+                    Spacer(Modifier.width(4.dp))
+
+                    // Presets dialog.
+                    ToolChip(
+                        icon     = Icons.Default.Inventory2,
+                        label    = s.editorPresetsTitle,
+                        selected = false,
+                        onClick  = onOpenPresets,
+                        compact  = compact,
+                    )
+                    Spacer(Modifier.width(4.dp))
+
+                    // Escape hatch: reset the currently selected surface
+                    // to its bundled default. Destructive tint signals it
+                    // is a different class of action from the neutral
+                    // toggles next to it; confirmation dialog handled at
+                    // host level. Disabled when no surface is selected so
+                    // the chip cannot pretend to be live.
+                    ToolChip(
+                        icon        = Icons.Default.RestartAlt,
+                        label       = s.editorReset,
+                        selected    = false,
+                        onClick     = onRequestReset,
+                        destructive = true,
+                        enabled     = selectedSurface != null,
+                        compact     = compact,
+                    )
+
+                    if (!compact) {
+                        Spacer(Modifier.width(10.dp))
+                        Text(
+                            text  = s.editorEscHint,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = CelestiaTheme.colors.textSecondary,
+                            modifier = Modifier.padding(end = 8.dp),
+                        )
+                    }
                 }
-
-                Spacer(Modifier.width(6.dp))
-
-                // Preview toggle -- hides chrome temporarily so the
-                // user can see the real look without leaving edit
-                // mode. Drag becomes impossible during preview (no
-                // handles), which matches user intent.
-                ToolChip(
-                    icon       = if (previewing) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                    label      = if (previewing) s.editorPreviewHidden else s.editorPreview,
-                    selected   = previewing,
-                    onClick    = onTogglePreview,
-                )
-                Spacer(Modifier.width(4.dp))
-
-                // Palette toggle.
-                ToolChip(
-                    icon     = Icons.Default.Widgets,
-                    label    = if (paletteOpen) s.editorPaletteToggleHide else s.editorWidgets,
-                    selected = paletteOpen,
-                    onClick  = onTogglePalette,
-                )
-                Spacer(Modifier.width(4.dp))
-
-                // Presets dialog.
-                ToolChip(
-                    icon     = Icons.Default.Inventory2,
-                    label    = s.editorPresetsTitle,
-                    selected = false,
-                    onClick  = onOpenPresets,
-                )
-                Spacer(Modifier.width(4.dp))
-
-                // Escape hatch: reset the currently selected surface
-                // to its bundled default. Destructive tint signals it
-                // is a different class of action from the neutral
-                // toggles next to it; confirmation dialog handled at
-                // host level. Disabled when no surface is selected so
-                // the chip cannot pretend to be live.
-                ToolChip(
-                    icon        = Icons.Default.RestartAlt,
-                    label       = s.editorReset,
-                    selected    = false,
-                    onClick     = onRequestReset,
-                    destructive = true,
-                    enabled     = selectedSurface != null,
-                )
-                Spacer(Modifier.width(10.dp))
-
-                Text(
-                    text  = s.editorEscHint,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = CelestiaTheme.colors.textSecondary,
-                    modifier = Modifier.padding(end = 8.dp),
-                )
             }
         }
     }
 }
 
 @Composable
-private fun SurfaceChip(surface: SurfaceId, active: Boolean, onClick: () -> Unit) {
+private fun SurfaceChip(surface: SurfaceId, active: Boolean, compact: Boolean, onClick: () -> Unit) {
     val s = LocalStrings.current
     val bg = if (active) CelestiaTheme.colors.primary.copy(alpha = 0.18f)
              else Color.Transparent
     val fg = if (active) CelestiaTheme.colors.primary else CelestiaTheme.colors.textSecondary
+    val name = humanSurfaceShortName(surface, s)
     Surface(
         color    = bg,
         shape    = RoundedCornerShape(12.dp),
@@ -732,21 +748,24 @@ private fun SurfaceChip(surface: SurfaceId, active: Boolean, onClick: () -> Unit
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .clickable { onClick() }
-                .padding(horizontal = 10.dp, vertical = 5.dp),
+                .padding(horizontal = if (compact) 7.dp else 10.dp, vertical = 5.dp),
         ) {
             Icon(
                 imageVector        = surfaceIcon(surface),
-                contentDescription = null,
+                // Compact hides the label, so the icon carries the name for a11y.
+                contentDescription = if (compact) name else null,
                 tint               = fg,
                 modifier           = Modifier.size(14.dp),
             )
-            Spacer(Modifier.width(5.dp))
-            Text(
-                text       = humanSurfaceShortName(surface, s),
-                style      = MaterialTheme.typography.labelSmall,
-                color      = fg,
-                fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
-            )
+            if (!compact) {
+                Spacer(Modifier.width(5.dp))
+                Text(
+                    text       = name,
+                    style      = MaterialTheme.typography.labelSmall,
+                    color      = fg,
+                    fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
+                )
+            }
         }
     }
 }
@@ -759,6 +778,7 @@ private fun ToolChip(
     onClick: () -> Unit,
     destructive: Boolean = false,
     enabled: Boolean = true,
+    compact: Boolean = false,
 ) {
     val bg = when {
         !enabled    -> CelestiaTheme.colors.surfaceVariant.copy(alpha = 0.3f)
@@ -777,21 +797,24 @@ private fun ToolChip(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .clickable(enabled = enabled) { onClick() }
-                .padding(horizontal = 10.dp, vertical = 5.dp),
+                .padding(horizontal = if (compact) 7.dp else 10.dp, vertical = 5.dp),
         ) {
             Icon(
                 imageVector        = icon,
-                contentDescription = null,
+                // Compact hides the label, so the icon carries it for a11y.
+                contentDescription = if (compact) label else null,
                 tint               = fg,
                 modifier           = Modifier.size(14.dp),
             )
-            Spacer(Modifier.width(5.dp))
-            Text(
-                text       = label,
-                style      = MaterialTheme.typography.labelSmall,
-                color      = fg,
-                fontWeight = if (selected || destructive) FontWeight.SemiBold else FontWeight.Medium,
-            )
+            if (!compact) {
+                Spacer(Modifier.width(5.dp))
+                Text(
+                    text       = label,
+                    style      = MaterialTheme.typography.labelSmall,
+                    color      = fg,
+                    fontWeight = if (selected || destructive) FontWeight.SemiBold else FontWeight.Medium,
+                )
+            }
         }
     }
 }
