@@ -16,6 +16,7 @@ data class CompactNewsProps(
     // 0 = show the whole feed; > 0 caps it (after the title filter).
     @PropLabel("widget.appshell.rightrail.compactnews.maxItems") @PropRange(0.0, 50.0)
     val maxItems: Int = 0,
+    @PropLabel("widget.appshell.rightrail.compactnews.showTitle") val showTitle: Boolean = true,
 )
 
 @Widget(
@@ -30,6 +31,7 @@ fun RightRailCompactNews(instance: WidgetInstance) {
     CompactNewsFeed(
         sslBypass = ctx.sslBypass,
         maxItems  = props.maxItems,
+        showTitle = props.showTitle,
         modifier  = Modifier.fillMaxSize(),
     )
 }
