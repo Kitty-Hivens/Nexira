@@ -1,30 +1,28 @@
 package hivens.ui.widgets.shell
 
-import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChevronLeft
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import hivens.core.data.SessionData
 import hivens.ui.AppSidebar
@@ -35,14 +33,13 @@ import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.editor.EditModeController
 import hivens.ui.editor.EditModeState
 import hivens.ui.editor.LocalEditMode
-import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.CelestiaTheme
 import hivens.widget.api.LocalSlotPath
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
 import hivens.widget.model.PropRange
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
+import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -59,6 +56,7 @@ data class ShellRegionProps(
     @PropLabel("widget.appshell.region.glassAlphaPct") @PropRange(0.0, 100.0) val glassAlphaPct: Int = 0,
     @PropLabel("widget.appshell.region.showDivider") val showDivider: Boolean = true,
     @PropLabel("widget.appshell.region.collapsed") val collapsed: Boolean = false,
+    @PropLabel("widget.appshell.region.swipeToCollapse") val swipeToCollapse: Boolean = true,
 ) {
     val glassAlpha: Float get() = glassAlphaPct / 100f
 }
@@ -102,8 +100,8 @@ private fun RowScope.RegionDivider(show: Boolean) {
 }
 
 // Shown for a collapsed region while editing: thin but visible, so the region's
-// edit chrome (and its Tune affordance -- the only un-collapse path) stays
-// hoverable. A fully-returned region leaves nothing to hover, stranding the user.
+// edit chrome (and its Tune affordance -- the only un-collapse path in edit
+// mode) stays hoverable. A fully-returned region leaves nothing to hover.
 @Composable
 private fun CollapsedRegionStrip() {
     Box(Modifier.width(22.dp).fillMaxHeight().background(glassSurfaceAlpha(0.4f)))
@@ -118,8 +116,6 @@ private fun CollapsedRegionStrip() {
 fun ShellLeftRegion(instance: WidgetInstance) {
     val props = instance.rememberProps<ShellRegionProps>()
     if (props.collapsed) {
-        // Render nothing in production; keep a thin visible strip in edit mode so
-        // the prop panel (the only un-collapse path) stays reachable via Tune.
         if (LocalEditMode.current is EditModeState.On) CollapsedRegionStrip()
         return
     }
@@ -151,14 +147,13 @@ fun ShellCenterRegion(instance: WidgetInstance) {
     }
 }
 
-private const val RAIL_COLLAPSED_WIDTH = 20      // dp of the collapsed strip
-private const val RAIL_SWIPE_THRESHOLD_PX = 48f  // horizontal travel that toggles
+private const val RAIL_COLLAPSED_WIDTH = 12 // dp of the collapsed edge strip
 
 /**
- * Right region: the divider plus the news panel. removable=false. Collapsible at
- * runtime -- a chevron at the rail's top-right corner (beside the panel title)
- * or a horizontal swipe flips the persisted [ShellRegionProps.collapsed]; the
- * width animates and the center pane reclaims the space.
+ * Right region: the divider plus the news panel. removable=false. Collapsed
+ * with no buttons -- a horizontal swipe drags the rail open/shut (the width
+ * tracks the pointer and snaps on release), and Ctrl+N toggles it from anywhere.
+ * Edit mode keeps the static prop-driven behaviour so arranging widgets is calm.
  */
 @Widget(id = "appshell.region.right", displayName = "widget.appshell.region.right", removable = false, propsClass = ShellRegionProps::class)
 @Composable
@@ -167,20 +162,26 @@ fun ShellRightRegion(instance: WidgetInstance) {
     val editing = LocalEditMode.current is EditModeState.On
     val path = LocalSlotPath.current
     val controller: EditModeController = koinInject()
-    val s = LocalStrings.current
     val toggleCollapse: () -> Unit = {
-        // Merge over the raw stored props so widthDp (and any other tuning)
-        // survives the flip -- updateProps replaces the whole object.
+        // Merge over the raw stored props so widthDp (and other tuning) survives
+        // the flip -- updateProps replaces the whole object.
         controller.updateProps(
             path,
             instance.instanceId,
             JsonObject(instance.props + ("collapsed" to JsonPrimitive(!props.collapsed))),
         )
     }
+    // Ctrl+N (window-level, see AppShell) toggles the rail. rememberUpdatedState
+    // keeps the flip reading the latest collapsed value across recompositions.
+    val currentToggle by rememberUpdatedState(toggleCollapse)
+    LaunchedEffect(Unit) {
+        var seen = controller.rightRailToggleSignal.value
+        snapshotFlow { controller.rightRailToggleSignal.value }.collect { tick ->
+            if (tick != seen) { seen = tick; currentToggle() }
+        }
+    }
 
-    // Edit mode keeps the static behavior: the collapsed region shows the
-    // Tune-reachable strip (the prop panel is the editor's un-collapse path),
-    // and runtime swipe/animation stay out of the way of arranging widgets.
+    // Edit mode: static, no swipe/animation.
     if (editing) {
         if (props.collapsed) { CollapsedRegionStrip(); return }
         val ctx = LocalShellContext.current
@@ -191,59 +192,57 @@ fun ShellRightRegion(instance: WidgetInstance) {
         return
     }
 
+    val density = LocalDensity.current
     val expandedWidth = if (props.widthDp > 0) props.widthDp.dp else 265.dp
-    val width by animateDpAsState(
-        targetValue = if (props.collapsed) RAIL_COLLAPSED_WIDTH.dp else expandedWidth,
-        label       = "rail-width",
-    )
+    val collapsedPx = with(density) { RAIL_COLLAPSED_WIDTH.dp.toPx() }
+    val expandedPx  = with(density) { expandedWidth.toPx() }
+    val widthAnim = remember { Animatable(if (props.collapsed) collapsedPx else expandedPx) }
+    val scope = rememberCoroutineScope()
+
+    // Snap to the target whenever it changes from outside a drag (prop edit /
+    // Ctrl+N / width change). A drag never changes these keys mid-flight, so it
+    // is not interrupted.
+    LaunchedEffect(props.collapsed, expandedPx, collapsedPx) {
+        widthAnim.animateTo(if (props.collapsed) collapsedPx else expandedPx)
+    }
+
+    val swipe = if (props.swipeToCollapse) {
+        Modifier.pointerInput(collapsedPx, expandedPx) {
+            detectHorizontalDragGestures(
+                onHorizontalDrag = { change, delta ->
+                    change.consume()
+                    // Rail sits on the right: dragging left (negative delta) widens it.
+                    scope.launch { widthAnim.snapTo((widthAnim.value - delta).coerceIn(collapsedPx, expandedPx)) }
+                },
+                onDragEnd = {
+                    val collapse = widthAnim.value < (collapsedPx + expandedPx) / 2f
+                    scope.launch { widthAnim.animateTo(if (collapse) collapsedPx else expandedPx) }
+                    if (collapse != props.collapsed) toggleCollapse()
+                },
+            )
+        }
+    } else {
+        Modifier
+    }
+
     val bg = if (props.glassAlpha > 0f) glassSurfaceAlpha(props.glassAlpha) else Color.Transparent
+    val ctx = LocalShellContext.current
 
     Box(
         modifier = Modifier
-            .width(width)
+            .width(with(density) { widthAnim.value.toDp() })
             .fillMaxHeight()
             .background(bg)
-            .pointerInput(props.collapsed) {
-                var total = 0f
-                detectHorizontalDragGestures(
-                    onDragStart = { total = 0f },
-                    onDragEnd   = {
-                        // Swipe right tucks the rail away; swipe left on the strip reopens it.
-                        if (!props.collapsed && total > RAIL_SWIPE_THRESHOLD_PX) toggleCollapse()
-                        else if (props.collapsed && total < -RAIL_SWIPE_THRESHOLD_PX) toggleCollapse()
-                    },
-                ) { change, dragAmount -> change.consume(); total += dragAmount }
-            },
+            .then(swipe),
     ) {
-        if (props.collapsed) {
-            Box(
-                modifier         = Modifier.fillMaxSize().background(glassSurfaceAlpha(0.4f)).clickable(onClick = toggleCollapse),
-                contentAlignment = Alignment.TopCenter,
-            ) {
-                Icon(
-                    imageVector        = Icons.Default.ChevronLeft,
-                    contentDescription = s.railExpand,
-                    tint               = CelestiaTheme.colors.textSecondary,
-                    modifier           = Modifier.padding(top = 14.dp).size(18.dp),
-                )
-            }
-        } else {
-            val ctx = LocalShellContext.current
-            Row(Modifier.fillMaxSize()) {
-                RegionDivider(props.showDivider)
+        Row(Modifier.fillMaxSize()) {
+            RegionDivider(props.showDivider)
+            // Below ~the collapsed strip the panel has no room; drop it so a thin
+            // edge does not try to lay out the whole news rail.
+            if (widthAnim.value > collapsedPx + 1f) {
                 RightPanel(ctx.appState, ctx.onLogin, ctx.onLogout, ctx.sslBypass, Modifier.weight(1f).fillMaxHeight())
-            }
-            // Collapse chevron at the rail's top-right, beside the panel title.
-            IconButton(
-                onClick  = toggleCollapse,
-                modifier = Modifier.align(Alignment.TopEnd).padding(top = 6.dp, end = 6.dp).size(26.dp),
-            ) {
-                Icon(
-                    imageVector        = Icons.Default.ChevronRight,
-                    contentDescription = s.railCollapse,
-                    tint               = CelestiaTheme.colors.textSecondary,
-                    modifier           = Modifier.size(18.dp),
-                )
+            } else {
+                Spacer(Modifier.weight(1f).fillMaxHeight())
             }
         }
     }

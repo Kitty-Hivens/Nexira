@@ -580,23 +580,25 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
             resizable = true,
             icon      = windowIcon,
             onPreviewKeyEvent = { ev ->
-                // Ctrl+E toggles widget edit mode. Handled at Window
-                // scope (preview = before focus dispatch) so it fires no
-                // matter which composable holds focus -- the side rails
-                // own focus, so a host Box-level handler misses the chord.
-                // The EditorSurfaceHost observes the controller signal and
-                // gates on whether its surface is editable.
-                if (ev.isCtrlPressed && ev.key == Key.E) {
-                    // Consume both edges so the chord never reaches a
-                    // focused control (e.g. the palette search field); act
-                    // on release only, so holding the key toggles once
-                    // instead of repeating on auto-repeat KeyDowns.
-                    if (ev.type == KeyEventType.KeyUp) {
-                        editModeController.requestEditToggle()
+                // Window-scoped chords (preview = before focus dispatch) so they
+                // fire no matter which composable holds focus -- the side rails
+                // own focus, so a host Box-level handler misses them. Consume
+                // both edges so they never reach a focused control, and act on
+                // release only so holding does not repeat on auto-repeat KeyDowns.
+                when {
+                    // Ctrl+E toggles widget edit mode. EditorSurfaceHost observes
+                    // the controller signal and gates on its surface being editable.
+                    ev.isCtrlPressed && ev.key == Key.E -> {
+                        if (ev.type == KeyEventType.KeyUp) editModeController.requestEditToggle()
+                        true
                     }
-                    true
-                } else {
-                    false
+                    // Ctrl+N collapses / expands the right rail. ShellRightRegion
+                    // observes the signal and flips its collapsed prop.
+                    ev.isCtrlPressed && ev.key == Key.N -> {
+                        if (ev.type == KeyEventType.KeyUp) editModeController.requestRightRailToggle()
+                        true
+                    }
+                    else -> false
                 }
             },
         ) {
