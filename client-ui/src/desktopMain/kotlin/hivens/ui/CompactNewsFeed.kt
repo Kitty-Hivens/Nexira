@@ -46,6 +46,7 @@ private val log = LoggerFactory.getLogger("CompactNewsFeed")
 fun CompactNewsFeed(
     sslBypass: Boolean = false,
     maxItems: Int = 0,
+    showTitle: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     val serverListService: IServerListService = koinInject()
@@ -99,16 +100,17 @@ fun CompactNewsFeed(
     }
 
     Column(modifier = modifier) {
-        // Section header
-        Text(
-            text       = s.newsTitle,
-            style      = MaterialTheme.typography.bodySmall,
-            fontWeight = FontWeight.Bold,
-            color      = CelestiaTheme.colors.textSecondary,
-            modifier   = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
-        )
-
-        HorizontalDivider(color = glassSurfaceAlpha(0.6f))
+        // Section header (optional -- a tight rail may prefer to drop it).
+        if (showTitle) {
+            Text(
+                text       = s.newsTitle,
+                style      = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.Bold,
+                color      = CelestiaTheme.colors.textSecondary,
+                modifier   = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
+            )
+            HorizontalDivider(color = glassSurfaceAlpha(0.6f))
+        }
 
         // Filter field -- only once a loaded, non-empty feed gives something to
         // filter; the search narrows by title.
