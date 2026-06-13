@@ -117,6 +117,8 @@ class WidgetRegistryConsistencyTest {
             "theme.picker.preview",
             // persistent notification history
             "notifications.history",
+            // per-instance persisted state scratchpad
+            "notes.scratch",
         )
         val actual = GeneratedWidgetRegistry.all().keys.map { it.value }.toSet()
         assertEquals(expected, actual, "registry drift -- expected exactly these widgets")
@@ -177,6 +179,8 @@ class WidgetRegistryConsistencyTest {
             "appshell.region.right",
             // unified nav rail item (target prop)
             "nav.entry",
+            // scratchpad (title prop alongside its runtime state)
+            "notes.scratch",
         )
         assertEquals(
             expected,

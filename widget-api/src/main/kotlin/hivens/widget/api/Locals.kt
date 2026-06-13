@@ -134,6 +134,14 @@ val LocalWidgetCommandRegistry: ProvidableCompositionLocal<WidgetCommandRegistry
         error("LocalWidgetCommandRegistry not provided -- wire WidgetCommandRegistry in Koin and at the composition root")
     }
 
+// Backs per-instance widget state (rememberWidgetState). Provided once at the
+// composition root from the Koin-bound store. Static: the host reference is fixed
+// at startup; the per-instance state lives in the store, not in this Local.
+val LocalWidgetStateHost: ProvidableCompositionLocal<WidgetStateHost> =
+    staticCompositionLocalOf {
+        error("LocalWidgetStateHost not provided -- wire WidgetStateStore in Koin and at the composition root")
+    }
+
 // Edit-mode slot reflow duration (ms). 0 = no animation (the production
 // default, since the only provider is the editor host). While editing, the
 // host supplies the active style's duration, so add / remove / resize reflow
