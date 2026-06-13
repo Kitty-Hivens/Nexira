@@ -18,11 +18,11 @@ import hivens.ui.puppet.PuppetClick
 import hivens.ui.theme.CelestiaTheme
 
 /**
- * Adaptive server list. Wide: a square-card grid (favorites section first).
- * Narrow (Compact width class): a paginated vertical list of [ServerPill]s --
- * one per row, favorites first -- so the launcher stays usable when the center
- * pane is squeezed by the rails. The grid scrolls; the pill list pages, since
- * stacked rows overflow a small window faster than a grid does.
+ * Adaptive server list. Expanded width: a square-card grid (favorites section
+ * first). Below Expanded (the near-min-window case, where the cards crowd into
+ * a few wide tiles): a paginated vertical list of [ServerPill]s -- one per row,
+ * favorites first. The grid scrolls; the pill list pages, since stacked rows
+ * overflow a small window faster than a grid does.
  */
 @Composable
 fun ServerGrid(
@@ -51,7 +51,7 @@ fun ServerGrid(
     }
 
     AdaptiveWidth(modifier.fillMaxSize()) { widthClass, _ ->
-        if (widthClass == WidthClass.Compact) {
+        if (widthClass != WidthClass.Expanded) {
             ServerPillList(
                 ordered        = favoriteServers + regularServers,
                 favorites      = favorites,
