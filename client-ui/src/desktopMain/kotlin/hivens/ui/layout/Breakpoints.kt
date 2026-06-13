@@ -1,7 +1,7 @@
 package hivens.ui.layout
 
-import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.BoxWithConstraintsScope
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
@@ -33,12 +33,13 @@ fun widthClassFor(width: Dp): WidthClass = when {
 /**
  * BoxWithConstraints that hands its content the resolved [WidthClass] for the
  * box's own max width. Branch layouts off [widthClass]; [maxWidth] is there for
- * finer thresholds (e.g. a paginator sizing its page by height too).
+ * finer thresholds. The receiver is [BoxWithConstraintsScope], so content can
+ * also read `maxHeight` (e.g. a paginator sizing its page by available height).
  */
 @Composable
 fun AdaptiveWidth(
     modifier: Modifier = Modifier,
-    content: @Composable BoxScope.(widthClass: WidthClass, maxWidth: Dp) -> Unit,
+    content: @Composable BoxWithConstraintsScope.(widthClass: WidthClass, maxWidth: Dp) -> Unit,
 ) {
     BoxWithConstraints(modifier) {
         content(widthClassFor(maxWidth), maxWidth)
