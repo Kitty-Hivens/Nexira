@@ -26,6 +26,9 @@ import hivens.launcher.AutoSyncService
 import hivens.launcher.update.UpdateService
 import hivens.ui.widgets.Commands
 import hivens.ui.widgets.Sources
+import hivens.ui.widgets.state.WidgetStateFlushHook
+import hivens.ui.widgets.state.WidgetStateGc
+import hivens.ui.widgets.state.WidgetStateStore
 import hivens.widget.api.WidgetCommandRegistry
 import hivens.widget.api.WidgetDataRegistry
 import hivens.widget.api.WidgetRegistry
@@ -89,6 +92,14 @@ val uiModule = module {
             register(Commands.CheckUpdate, suspendCommand(scope) { updates.checkForUpdate() })
         }
     }
+
+    // Per-instance widget runtime state (rememberWidgetState): the store backs the
+    // WidgetStateHost local; the GC collector prunes orphans off the live layout
+    // graph; the flush hook lands the debounced write on quit. GC + flush hook are
+    // createdAtStart so they wire up before any stateful widget composes / before exit.
+    single { WidgetStateStore(get<Path>().resolve("widget-state.json"), get(), get()) }
+    single(createdAtStart = true) { WidgetStateGc(repo = get(), store = get(), scope = get()) }
+    single(createdAtStart = true) { WidgetStateFlushHook(get()) }
 
     // Editor mutation facade. Holds no state itself; fires LayoutGraph
     // updates into the shared CoroutineScope so callers stay
