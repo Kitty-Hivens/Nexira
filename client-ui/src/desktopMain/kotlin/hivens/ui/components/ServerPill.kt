@@ -3,6 +3,7 @@ package hivens.ui.components
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -30,26 +32,38 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.painter.BitmapPainter
+import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import hivens.core.api.model.ServerProfile
+import hivens.launcher.platform.PlatformPaths
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.theme.CelestiaTheme
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import org.koin.compose.koinInject
+import javax.imageio.ImageIO
 import kotlin.math.abs
 
 // ─── Per-server gradient (shared with SquareServerCard) ─────────────────────
@@ -72,7 +86,9 @@ internal fun serverPalette(name: String): Pair<Color, Color> =
 /**
  * Compact full-width capsule row for a server -- the narrow-width alternative to
  * [SquareServerCard]. One per row, stacked vertically. Click selects, Enter
- * launches the selected one; fav/settings/details surface on hover.
+ * launches the selected one; fav/settings/details surface on hover. Shows the
+ * server's icon.png when present (same source as the square card), else a
+ * gradient two-letter avatar.
  */
 @Composable
 fun ServerPill(
@@ -91,6 +107,17 @@ fun ServerPill(
     val isFocused by interaction.collectIsFocusedAsState()
     val showActions = isHovered || isFocused
     val (colorA, colorB) = remember(profile.name) { serverPalette(profile.name) }
+
+    var serverIcon by remember(profile.assetDir) { mutableStateOf<ImageBitmap?>(null) }
+    val paths: PlatformPaths = koinInject()
+    LaunchedEffect(profile.assetDir) {
+        withContext(Dispatchers.IO) {
+            val iconFile = paths.clientDir(profile.assetDir).resolve("icon.png").toFile()
+            if (iconFile.exists()) {
+                runCatching { serverIcon = ImageIO.read(iconFile)?.toComposeImageBitmap() }
+            }
+        }
+    }
 
     val borderColor = when {
         isSelected -> CelestiaTheme.colors.primary
@@ -122,17 +149,31 @@ fun ServerPill(
             modifier = Modifier
                 .size(34.dp)
                 .clip(RoundedCornerShape(10.dp))
-                .background(
-                    Brush.linearGradient(listOf(colorA.copy(alpha = 0.85f), colorB.copy(alpha = 0.70f))),
+                .then(
+                    if (serverIcon == null) {
+                        Modifier.background(
+                            Brush.linearGradient(listOf(colorA.copy(alpha = 0.85f), colorB.copy(alpha = 0.70f))),
+                        )
+                    } else Modifier,
                 ),
             contentAlignment = Alignment.Center,
         ) {
-            Text(
-                text       = profile.name.take(2).uppercase(),
-                fontSize   = 13.sp,
-                fontWeight = FontWeight.Black,
-                color      = Color.White,
-            )
+            val icon = serverIcon
+            if (icon != null) {
+                Image(
+                    painter            = BitmapPainter(icon),
+                    contentDescription = null,
+                    modifier           = Modifier.fillMaxSize(),
+                    contentScale       = ContentScale.Crop,
+                )
+            } else {
+                Text(
+                    text       = profile.name.take(2).uppercase(),
+                    fontSize   = 13.sp,
+                    fontWeight = FontWeight.Black,
+                    color      = Color.White,
+                )
+            }
         }
 
         Column(Modifier.weight(1f)) {
