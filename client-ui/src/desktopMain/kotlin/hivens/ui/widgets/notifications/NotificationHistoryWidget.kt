@@ -18,13 +18,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -71,22 +71,11 @@ fun NotificationHistoryWidget(instance: WidgetInstance) {
     val groups = remember(log) { groupHistory(log) }
 
     Column(modifier = Modifier.fillMaxSize().padding(12.dp)) {
-        // Drawer body sits above the header and grows upward; the header is
-        // pinned to the bottom of the footprint by this weighted spacer-Box.
-        Box(
-            modifier         = Modifier.weight(1f).fillMaxWidth(),
-            contentAlignment = Alignment.BottomCenter,
-        ) {
-            // Extracted so AnimatedVisibility resolves to its non-scoped overload
-            // rather than the ColumnScope one the enclosing Column would shadow in.
-            NotificationDrawer(expanded = expanded, log = log, groups = groups)
-        }
-
-        // Header bar -- always visible; the chevron toggles the drawer.
+        // Header at the top; the chevron opens the drawer downward.
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             IconButton(onClick = { expanded = !expanded }, modifier = Modifier.size(28.dp)) {
                 Icon(
-                    imageVector        = if (expanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
+                    imageVector        = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                     contentDescription = if (expanded) strings.notificationCollapseHistory else strings.notificationExpandHistory,
                     tint               = palette.textSecondary,
                     modifier           = Modifier.size(18.dp),
@@ -106,14 +95,23 @@ fun NotificationHistoryWidget(instance: WidgetInstance) {
                     style = MaterialTheme.typography.labelMedium,
                     color = palette.textSecondary.copy(alpha = 0.7f),
                 )
-                TextButton(onClick = clearLog) {
-                    Text(
-                        text  = strings.notifHistoryClear,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = palette.primary,
+                Spacer(Modifier.width(2.dp))
+                IconButton(onClick = clearLog, modifier = Modifier.size(28.dp)) {
+                    Icon(
+                        imageVector        = Icons.Default.Delete,
+                        contentDescription = strings.notifHistoryClear,
+                        tint               = palette.textSecondary,
+                        modifier           = Modifier.size(16.dp),
                     )
                 }
             }
+        }
+
+        // Drawer body grows downward below the header.
+        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+            // Extracted so AnimatedVisibility resolves to its non-scoped overload
+            // rather than the ColumnScope one the enclosing Column would shadow in.
+            NotificationDrawer(expanded = expanded, log = log, groups = groups)
         }
     }
 }
@@ -128,8 +126,8 @@ private fun NotificationDrawer(
     val palette = CelestiaTheme.colors
     AnimatedVisibility(
         visible = expanded,
-        enter   = expandVertically(expandFrom = Alignment.Bottom) + fadeIn(),
-        exit    = shrinkVertically(shrinkTowards = Alignment.Bottom) + fadeOut(),
+        enter   = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
+        exit    = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut(),
     ) {
         if (log.isEmpty()) {
             Box(
