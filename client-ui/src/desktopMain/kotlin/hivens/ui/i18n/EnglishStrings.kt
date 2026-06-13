@@ -81,7 +81,8 @@ object EnglishStrings : AppStrings {
     override val settingsThemePicker        = "Choose theme"
     override val settingsThemePickerSub     = "Customize the color scheme"
     override val settingsDarkTheme          = "Dark theme"
-    override val settingsCloseAfterLaunch   = "Hide launcher to tray after server starts"
+    override val settingsCloseAfterLaunch   = "Hide launcher to tray after the game starts"
+    override val settingsCloseAfterLaunchDesc = "Hides the launcher to the system tray once the game starts."
     override val settingsSaved              = "Settings saved"
     override val settingsLanguage           = "Language"
 
@@ -942,7 +943,7 @@ object EnglishStrings : AppStrings {
     // --- Layout editor: prop panel ---
     override val editorResetToDefault = "Reset to default"
     override val editorBackingTitle   = "Backing"
-    override val editorBackingGlass   = "Glass"
+    override val editorBackingGlass   = "Glass opacity"
     override val editorBackingCorner  = "Corner"
     override val editorBackingPadding = "Padding"
 

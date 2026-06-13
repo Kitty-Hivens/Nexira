@@ -8,6 +8,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.Minimize
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Wallpaper
@@ -245,9 +246,13 @@ internal fun AppearanceSection(
 
     // ── Behavior subsection ──────────────────────────────────────────
     SettingsSectionTitle(s.settingsSectionBehavior)
-    SettingsSwitchRow(
+    SettingsRowWithDescription(
         title           = s.settingsCloseAfterLaunch,
+        description     = s.settingsCloseAfterLaunchDesc,
+        icon            = Icons.Default.Minimize,
+        iconTint        = CelestiaTheme.colors.textSecondary,
         checked         = form.closeAfterStart,
+        enabled         = true,
         onCheckedChange = { form.closeAfterStart = it; save() }
     )
     PuppetToggle("settings.closeAfterStart", form.closeAfterStart) { form.closeAfterStart = it; save() }

@@ -78,7 +78,8 @@ object RussianStrings : AppStrings {
     override val settingsThemePicker        = "Выбор темы"
     override val settingsThemePickerSub     = "Кастомизируйте цветовую схему"
     override val settingsDarkTheme          = "Тёмная тема"
-    override val settingsCloseAfterLaunch   = "Свернуть лаунчер в трей после запуска сервера"
+    override val settingsCloseAfterLaunch   = "Свернуть лаунчер в трей после запуска игры"
+    override val settingsCloseAfterLaunchDesc = "Прячет лаунчер в системный трей, как только запускается игра."
     override val settingsSaved              = "Настройки сохранены"
     override val settingsLanguage           = "Язык"
 
@@ -947,7 +948,7 @@ object RussianStrings : AppStrings {
     // --- Layout editor: prop panel ---
     override val editorResetToDefault = "Сбросить к умолчанию"
     override val editorBackingTitle   = "Подложка"
-    override val editorBackingGlass   = "Стекло"
+    override val editorBackingGlass   = "Непрозрачность стекла"
     override val editorBackingCorner  = "Скругление"
     override val editorBackingPadding = "Отступ"
 
