@@ -78,7 +78,8 @@ object GermanStrings : AppStrings {
     override val settingsThemePicker        = "Design auswählen"
     override val settingsThemePickerSub     = "Farbschema anpassen"
     override val settingsDarkTheme          = "Dunkles Design"
-    override val settingsCloseAfterLaunch   = "Launcher nach Serverstart in Tray minimieren"
+    override val settingsCloseAfterLaunch   = "Launcher nach Spielstart in Tray minimieren"
+    override val settingsCloseAfterLaunchDesc = "Versteckt den Launcher im System-Tray, sobald das Spiel startet."
     override val settingsSaved              = "Einstellungen gespeichert"
     override val settingsLanguage           = "Sprache"
 
@@ -943,7 +944,7 @@ object GermanStrings : AppStrings {
     // --- Layout editor: prop panel ---
     override val editorResetToDefault = "Auf Standard zurücksetzen"
     override val editorBackingTitle   = "Hintergrund"
-    override val editorBackingGlass   = "Glas"
+    override val editorBackingGlass   = "Glas-Deckkraft"
     override val editorBackingCorner  = "Ecke"
     override val editorBackingPadding = "Abstand"
 

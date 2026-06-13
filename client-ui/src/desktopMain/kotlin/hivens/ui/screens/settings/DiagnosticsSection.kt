@@ -259,7 +259,7 @@ internal fun DiagnosticsSection(
             Column {
                 Text(Branding.TITLE, color = CelestiaTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
                 Text(
-                    "v${Branding.VERSION.removePrefix("v")} -- GPLv3",
+                    "v${Branding.VERSION.removePrefix("v")} — GPLv3",
                     style = MaterialTheme.typography.bodySmall,
                     color = CelestiaTheme.colors.textSecondary
                 )
