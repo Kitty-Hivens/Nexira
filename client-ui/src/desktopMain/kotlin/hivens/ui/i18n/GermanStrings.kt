@@ -735,6 +735,7 @@ object GermanStrings : AppStrings {
     override val notifHistoryEmpty           = "Noch keine Nachrichten"
     override val notifHistoryClear           = "Leeren"
     override fun notifGroupCount(count: Int) = "×$count"
+    override fun notifCountTitle(count: Int) = if (count == 1) "$count Nachricht" else "$count Nachrichten"
     override fun notificationShowMore(count: Int)               = "+$count weitere"
     override fun notificationAbsoluteTime(instant: java.time.Instant): String =
         java.time.format.DateTimeFormatter

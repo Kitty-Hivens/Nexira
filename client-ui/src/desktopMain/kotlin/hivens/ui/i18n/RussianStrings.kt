@@ -739,6 +739,17 @@ object RussianStrings : AppStrings {
     override val notifHistoryEmpty           = "Сообщений пока нет"
     override val notifHistoryClear           = "Очистить"
     override fun notifGroupCount(count: Int) = "×$count"
+    override fun notifCountTitle(count: Int): String {
+        val n  = count % 100
+        val n1 = count % 10
+        val word = when {
+            n in 11..14 -> "сообщений"
+            n1 == 1     -> "сообщение"
+            n1 in 2..4  -> "сообщения"
+            else        -> "сообщений"
+        }
+        return "$count $word"
+    }
     override fun notificationShowMore(count: Int)               = "ещё $count"
     override fun notificationAbsoluteTime(instant: java.time.Instant): String =
         java.time.format.DateTimeFormatter

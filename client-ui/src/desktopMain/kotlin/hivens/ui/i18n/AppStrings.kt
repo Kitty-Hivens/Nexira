@@ -772,6 +772,8 @@ interface AppStrings {
     val notifHistoryClear: String
     /** Count badge on a collapsed group of repeated notifications, e.g. "x3". */
     fun notifGroupCount(count: Int): String
+    /** Panel title with the message count folded in, e.g. "6 messages". */
+    fun notifCountTitle(count: Int): String
     /** "+N more" footer text + screen-reader label. Receives the overflow count. */
     fun notificationShowMore(count: Int): String
     /** Absolute timestamp shown on hover tooltip over the relative-time label. */
