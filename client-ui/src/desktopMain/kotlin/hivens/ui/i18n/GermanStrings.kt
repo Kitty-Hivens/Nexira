@@ -825,6 +825,7 @@ object GermanStrings : AppStrings {
         "widget.appshell.region.showDivider" to "Trennlinie",
         "widget.appshell.region.widthDp" to "Breite (0 = flexibel)",
         "widget.appshell.rightrail.compactnews" to "Neuigkeiten",
+        "widget.appshell.rightrail.compactnews.maxItems" to "Max. Einträge (0 = alle)",
         "widget.bg.enable.toggle" to "Hintergrund an/aus",
         "widget.bg.fx.animspeed" to "Animationstempo",
         "widget.bg.fx.blur" to "Unschärfe",

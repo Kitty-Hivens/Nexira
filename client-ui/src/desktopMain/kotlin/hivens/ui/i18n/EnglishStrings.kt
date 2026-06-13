@@ -824,6 +824,7 @@ object EnglishStrings : AppStrings {
         "widget.appshell.region.showDivider" to "Divider",
         "widget.appshell.region.widthDp" to "Width (0 = flexible)",
         "widget.appshell.rightrail.compactnews" to "News feed",
+        "widget.appshell.rightrail.compactnews.maxItems" to "Max items (0 = all)",
         "widget.bg.enable.toggle" to "Background on/off",
         "widget.bg.fx.animspeed" to "Animation speed",
         "widget.bg.fx.blur" to "Blur",

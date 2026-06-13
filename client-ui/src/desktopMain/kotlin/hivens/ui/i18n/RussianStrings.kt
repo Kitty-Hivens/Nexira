@@ -829,6 +829,7 @@ object RussianStrings : AppStrings {
         "widget.appshell.region.showDivider" to "Разделитель",
         "widget.appshell.region.widthDp" to "Ширина (0 — гибкая)",
         "widget.appshell.rightrail.compactnews" to "Лента новостей",
+        "widget.appshell.rightrail.compactnews.maxItems" to "Макс. элементов (0 = все)",
         "widget.bg.enable.toggle" to "Фон вкл/выкл",
         "widget.bg.fx.animspeed" to "Скорость анимации",
         "widget.bg.fx.blur" to "Размытие",
