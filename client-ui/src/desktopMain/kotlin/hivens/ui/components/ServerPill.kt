@@ -10,6 +10,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -52,6 +53,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -116,6 +118,15 @@ fun ServerPill(
             if (iconFile.exists()) {
                 runCatching { serverIcon = ImageIO.read(iconFile)?.toComposeImageBitmap() }
             }
+        }
+    }
+
+    // Clear focus when a press is cancelled (press, then drag away) so the focus
+    // frame does not linger on a card the user did not actually pick.
+    val focusManager = LocalFocusManager.current
+    LaunchedEffect(interaction) {
+        interaction.interactions.collect { i ->
+            if (i is PressInteraction.Cancel) focusManager.clearFocus()
         }
     }
 
