@@ -103,6 +103,12 @@ object EnglishStrings : AppStrings {
     // News
     override val newsTitle   = "Project news"
     override val newsEmpty   = "No news yet..."
+    override val newsFilterPlaceholder = "Filter news"
+    override val newsFilterClear        = "Clear filter"
+    override val railCollapse           = "Collapse panel"
+    override val railExpand             = "Expand panel"
+    override val paginationPrev         = "Previous page"
+    override val paginationNext         = "Next page"
 
     // Server Detail
     override val serverDetailTitle         = "Server information"
@@ -729,6 +735,7 @@ object EnglishStrings : AppStrings {
     override val notificationDismiss         = "Dismiss notification"
     override val notifHistoryEmpty           = "No messages yet"
     override val notifHistoryClear           = "Clear"
+    override fun notifGroupCount(count: Int) = "×$count"
     override fun notificationShowMore(count: Int)               = "+$count more"
     override fun notificationAbsoluteTime(instant: java.time.Instant): String =
         notificationTimeFormatter(java.util.Locale.ENGLISH).format(instant)

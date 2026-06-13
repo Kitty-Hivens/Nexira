@@ -100,6 +100,12 @@ object RussianStrings : AppStrings {
     // News
     override val newsTitle   = "Новости проекта"
     override val newsEmpty   = "Новостей пока нет..."
+    override val newsFilterPlaceholder = "Фильтр новостей"
+    override val newsFilterClear        = "Сбросить фильтр"
+    override val railCollapse           = "Свернуть панель"
+    override val railExpand             = "Развернуть панель"
+    override val paginationPrev         = "Предыдущая страница"
+    override val paginationNext         = "Следующая страница"
 
     // Server Detail
     override val serverDetailTitle         = "Информация о сервере"
@@ -731,6 +737,7 @@ object RussianStrings : AppStrings {
     override val notificationDismiss         = "Закрыть уведомление"
     override val notifHistoryEmpty           = "Сообщений пока нет"
     override val notifHistoryClear           = "Очистить"
+    override fun notifGroupCount(count: Int) = "×$count"
     override fun notificationShowMore(count: Int)               = "ещё $count"
     override fun notificationAbsoluteTime(instant: java.time.Instant): String =
         java.time.format.DateTimeFormatter

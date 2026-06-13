@@ -100,6 +100,12 @@ object GermanStrings : AppStrings {
     // News
     override val newsTitle   = "Projektneuigkeiten"
     override val newsEmpty   = "Noch keine Neuigkeiten..."
+    override val newsFilterPlaceholder = "Neuigkeiten filtern"
+    override val newsFilterClear        = "Filter zurücksetzen"
+    override val railCollapse           = "Leiste einklappen"
+    override val railExpand             = "Leiste ausklappen"
+    override val paginationPrev         = "Vorherige Seite"
+    override val paginationNext         = "Nächste Seite"
 
     // Server Detail
     override val serverDetailTitle         = "SERVER-INFORMATIONEN"
@@ -727,6 +733,7 @@ object GermanStrings : AppStrings {
     override val notificationDismiss         = "Benachrichtigung schliessen"
     override val notifHistoryEmpty           = "Noch keine Nachrichten"
     override val notifHistoryClear           = "Leeren"
+    override fun notifGroupCount(count: Int) = "×$count"
     override fun notificationShowMore(count: Int)               = "+$count weitere"
     override fun notificationAbsoluteTime(instant: java.time.Instant): String =
         java.time.format.DateTimeFormatter

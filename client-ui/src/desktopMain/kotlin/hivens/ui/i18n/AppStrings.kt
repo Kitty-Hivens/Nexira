@@ -97,6 +97,16 @@ interface AppStrings {
     // --- News ---
     val newsTitle: String
     val newsEmpty: String
+    val newsFilterPlaceholder: String
+    val newsFilterClear: String
+
+    // --- Right rail ---
+    val railCollapse: String
+    val railExpand: String
+
+    // --- Pagination ---
+    val paginationPrev: String
+    val paginationNext: String
 
     // --- Server Detail ---
     val serverDetailTitle: String
@@ -759,6 +769,8 @@ interface AppStrings {
     // Notification-history widget.
     val notifHistoryEmpty: String
     val notifHistoryClear: String
+    /** Count badge on a collapsed group of repeated notifications, e.g. "x3". */
+    fun notifGroupCount(count: Int): String
     /** "+N more" footer text + screen-reader label. Receives the overflow count. */
     fun notificationShowMore(count: Int): String
     /** Absolute timestamp shown on hover tooltip over the relative-time label. */
