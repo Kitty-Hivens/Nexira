@@ -5,24 +5,27 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -32,10 +35,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.notifications.PersistedNotification
 import hivens.ui.notifications.Severity
@@ -52,11 +58,15 @@ import java.time.Instant
 
 /**
  * Placeable message-history widget: the durable counterpart to the live
- * top-right toast stack. Reads the persisted [hivens.ui.notifications.NotificationArchiveStore]
- * log (survives auto-dismiss and restart). Starts collapsed -- a bottom-pinned
- * header bar -- and a chevron opens the list upward over the widget footprint.
- * Consecutive identical entries collapse into one row with a count, mirroring
- * how the live stack coalesces a progress run.
+ * top-right toast stack. Reads the persisted
+ * [hivens.ui.notifications.NotificationArchiveStore] log (survives auto-dismiss
+ * and restart).
+ *
+ * Self-contained outlined panel: collapsed it is just a small bar -- an
+ * expand chevron pill and a "<N> messages" pill. Expanding animates the panel
+ * open and the messages live inside it; the clear (trash) pill appears only
+ * while expanded. Consecutive identical entries fold into one row with a count,
+ * mirroring how the live stack coalesces a progress run.
  */
 @Widget(id = "notifications.history", displayName = "widget.notifications.history")
 @Composable
@@ -69,50 +79,85 @@ fun NotificationHistoryWidget(instance: WidgetInstance) {
     val palette = CelestiaTheme.colors
     var expanded by remember { mutableStateOf(false) }
     val groups = remember(log) { groupHistory(log) }
+    val outline = palette.outline.copy(alpha = 0.4f)
 
-    Column(modifier = Modifier.fillMaxSize().padding(12.dp)) {
-        // Header at the top; the chevron opens the drawer downward.
+    // The whole widget is one outlined, rounded panel that wraps its content --
+    // a compact bar when collapsed, growing as the drawer opens.
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(glassSurfaceAlpha(0.5f))
+            .border(1.dp, outline, RoundedCornerShape(16.dp))
+            .padding(8.dp),
+    ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            IconButton(onClick = { expanded = !expanded }, modifier = Modifier.size(28.dp)) {
-                Icon(
-                    imageVector        = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                    contentDescription = if (expanded) strings.notificationCollapseHistory else strings.notificationExpandHistory,
-                    tint               = palette.textSecondary,
-                    modifier           = Modifier.size(18.dp),
-                )
-            }
-            Spacer(Modifier.width(4.dp))
-            Text(
-                text       = strings.widgetLabel("widget.notifications.history"),
-                style      = MaterialTheme.typography.labelLarge,
-                color      = palette.textSecondary,
-                fontWeight = FontWeight.Medium,
-                modifier   = Modifier.weight(1f),
+            PillButton(
+                icon               = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                contentDescription = if (expanded) strings.notificationCollapseHistory else strings.notificationExpandHistory,
+                outline            = outline,
+                onClick            = { expanded = !expanded },
             )
-            if (log.isNotEmpty()) {
-                Text(
-                    text  = "${log.size}",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = palette.textSecondary.copy(alpha = 0.7f),
+            Spacer(Modifier.width(6.dp))
+            CountPill(text = strings.notifCountTitle(log.size), outline = outline)
+            Spacer(Modifier.weight(1f))
+            // Trash only once expanded (and only when there is something to clear).
+            if (expanded && log.isNotEmpty()) {
+                PillButton(
+                    icon               = Icons.Default.Delete,
+                    contentDescription = strings.notifHistoryClear,
+                    outline            = outline,
+                    onClick            = clearLog,
                 )
-                Spacer(Modifier.width(2.dp))
-                IconButton(onClick = clearLog, modifier = Modifier.size(28.dp)) {
-                    Icon(
-                        imageVector        = Icons.Default.Delete,
-                        contentDescription = strings.notifHistoryClear,
-                        tint               = palette.textSecondary,
-                        modifier           = Modifier.size(16.dp),
-                    )
-                }
             }
         }
 
-        // Drawer body grows downward below the header.
-        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-            // Extracted so AnimatedVisibility resolves to its non-scoped overload
-            // rather than the ColumnScope one the enclosing Column would shadow in.
-            NotificationDrawer(expanded = expanded, log = log, groups = groups)
-        }
+        // Messages live inside the panel; the drawer opens downward with animation.
+        NotificationDrawer(expanded = expanded, log = log, groups = groups)
+    }
+}
+
+@Composable
+private fun PillButton(
+    icon: ImageVector,
+    contentDescription: String,
+    outline: Color,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(glassSurfaceAlpha(0.45f))
+            .border(1.dp, outline, RoundedCornerShape(50))
+            .clickable(onClick = onClick)
+            .padding(6.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector        = icon,
+            contentDescription = contentDescription,
+            tint               = CelestiaTheme.colors.textSecondary,
+            modifier           = Modifier.size(16.dp),
+        )
+    }
+}
+
+@Composable
+private fun CountPill(text: String, outline: Color) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(glassSurfaceAlpha(0.35f))
+            .border(1.dp, outline, RoundedCornerShape(50))
+            .padding(horizontal = 12.dp, vertical = 5.dp),
+    ) {
+        Text(
+            text       = text,
+            style      = MaterialTheme.typography.labelMedium,
+            color      = CelestiaTheme.colors.textSecondary,
+            fontWeight = FontWeight.Medium,
+            maxLines   = 1,
+        )
     }
 }
 
@@ -131,7 +176,7 @@ private fun NotificationDrawer(
     ) {
         if (log.isEmpty()) {
             Box(
-                modifier         = Modifier.fillMaxWidth().padding(vertical = 24.dp),
+                modifier         = Modifier.fillMaxWidth().padding(vertical = 16.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
@@ -141,8 +186,14 @@ private fun NotificationDrawer(
                 )
             }
         } else {
+            // Bounded so the inner scroll has a height to work with (the panel
+            // wraps its content, so without a cap the list would grow unbounded).
             Column(
-                modifier            = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
+                modifier            = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 260.dp)
+                    .verticalScroll(rememberScrollState())
+                    .padding(top = 6.dp),
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 groups.forEach { group -> HistoryRow(group.head, group.count) }

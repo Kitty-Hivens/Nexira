@@ -737,6 +737,7 @@ object EnglishStrings : AppStrings {
     override val notifHistoryEmpty           = "No messages yet"
     override val notifHistoryClear           = "Clear"
     override fun notifGroupCount(count: Int) = "×$count"
+    override fun notifCountTitle(count: Int) = if (count == 1) "$count message" else "$count messages"
     override fun notificationShowMore(count: Int)               = "+$count more"
     override fun notificationAbsoluteTime(instant: java.time.Instant): String =
         notificationTimeFormatter(java.util.Locale.ENGLISH).format(instant)
