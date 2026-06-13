@@ -1,24 +1,30 @@
 package hivens.ui.widgets.shell
 
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import hivens.core.data.SessionData
 import hivens.ui.AppSidebar
@@ -145,11 +151,14 @@ fun ShellCenterRegion(instance: WidgetInstance) {
     }
 }
 
+private const val RAIL_COLLAPSED_WIDTH = 20      // dp of the collapsed strip
+private const val RAIL_SWIPE_THRESHOLD_PX = 48f  // horizontal travel that toggles
+
 /**
  * Right region: the divider plus the news panel. removable=false. Collapsible at
- * runtime (not just via the editor) -- a chevron handle flips the persisted
- * [ShellRegionProps.collapsed] through the editor controller, so the user can
- * tuck the rail away and the center pane reclaims the width.
+ * runtime -- a chevron at the rail's top-right corner (beside the panel title)
+ * or a horizontal swipe flips the persisted [ShellRegionProps.collapsed]; the
+ * width animates and the center pane reclaims the space.
  */
 @Widget(id = "appshell.region.right", displayName = "widget.appshell.region.right", removable = false, propsClass = ShellRegionProps::class)
 @Composable
@@ -158,6 +167,7 @@ fun ShellRightRegion(instance: WidgetInstance) {
     val editing = LocalEditMode.current is EditModeState.On
     val path = LocalSlotPath.current
     val controller: EditModeController = koinInject()
+    val s = LocalStrings.current
     val toggleCollapse: () -> Unit = {
         // Merge over the raw stored props so widthDp (and any other tuning)
         // survives the flip -- updateProps replaces the whole object.
@@ -168,47 +178,73 @@ fun ShellRightRegion(instance: WidgetInstance) {
         )
     }
 
-    if (props.collapsed) {
-        // Edit mode keeps the Tune-reachable strip (the prop panel is the
-        // editor's un-collapse path); production gets a clickable handle.
-        if (editing) CollapsedRegionStrip() else RailHandle(collapsed = true, onToggle = toggleCollapse)
+    // Edit mode keeps the static behavior: the collapsed region shows the
+    // Tune-reachable strip (the prop panel is the editor's un-collapse path),
+    // and runtime swipe/animation stay out of the way of arranging widgets.
+    if (editing) {
+        if (props.collapsed) { CollapsedRegionStrip(); return }
+        val ctx = LocalShellContext.current
+        Row(regionModifier(props)) {
+            RegionDivider(props.showDivider)
+            RightPanel(ctx.appState, ctx.onLogin, ctx.onLogout, ctx.sslBypass, Modifier.weight(1f).fillMaxHeight())
+        }
         return
     }
-    val ctx = LocalShellContext.current
-    Row(regionModifier(props)) {
-        // Collapse handle only in production: collapsing mid-edit would yank the
-        // surface the user is arranging out from under them.
-        if (!editing) RailHandle(collapsed = false, onToggle = toggleCollapse)
-        RegionDivider(props.showDivider)
-        RightPanel(
-            appState  = ctx.appState,
-            onLogin   = ctx.onLogin,
-            onLogout  = ctx.onLogout,
-            sslBypass = ctx.sslBypass,
-            modifier  = Modifier.weight(1f).fillMaxHeight(),
-        )
-    }
-}
 
-// Slim collapse/expand handle at the rail's inner edge. Collapsed: a faint
-// strip (the whole rail shrinks to it) with a left chevron to reopen.
-// Expanded: a near-invisible strip with a right chevron to tuck away.
-@Composable
-private fun RailHandle(collapsed: Boolean, onToggle: () -> Unit) {
-    val s = LocalStrings.current
+    val expandedWidth = if (props.widthDp > 0) props.widthDp.dp else 265.dp
+    val width by animateDpAsState(
+        targetValue = if (props.collapsed) RAIL_COLLAPSED_WIDTH.dp else expandedWidth,
+        label       = "rail-width",
+    )
+    val bg = if (props.glassAlpha > 0f) glassSurfaceAlpha(props.glassAlpha) else Color.Transparent
+
     Box(
         modifier = Modifier
-            .width(if (collapsed) 20.dp else 16.dp)
+            .width(width)
             .fillMaxHeight()
-            .background(if (collapsed) glassSurfaceAlpha(0.4f) else Color.Transparent)
-            .clickable(onClick = onToggle),
-        contentAlignment = Alignment.Center,
+            .background(bg)
+            .pointerInput(props.collapsed) {
+                var total = 0f
+                detectHorizontalDragGestures(
+                    onDragStart = { total = 0f },
+                    onDragEnd   = {
+                        // Swipe right tucks the rail away; swipe left on the strip reopens it.
+                        if (!props.collapsed && total > RAIL_SWIPE_THRESHOLD_PX) toggleCollapse()
+                        else if (props.collapsed && total < -RAIL_SWIPE_THRESHOLD_PX) toggleCollapse()
+                    },
+                ) { change, dragAmount -> change.consume(); total += dragAmount }
+            },
     ) {
-        Icon(
-            imageVector        = if (collapsed) Icons.Default.ChevronLeft else Icons.Default.ChevronRight,
-            contentDescription = if (collapsed) s.railExpand else s.railCollapse,
-            tint               = CelestiaTheme.colors.textSecondary,
-            modifier           = Modifier.size(18.dp),
-        )
+        if (props.collapsed) {
+            Box(
+                modifier         = Modifier.fillMaxSize().background(glassSurfaceAlpha(0.4f)).clickable(onClick = toggleCollapse),
+                contentAlignment = Alignment.TopCenter,
+            ) {
+                Icon(
+                    imageVector        = Icons.Default.ChevronLeft,
+                    contentDescription = s.railExpand,
+                    tint               = CelestiaTheme.colors.textSecondary,
+                    modifier           = Modifier.padding(top = 14.dp).size(18.dp),
+                )
+            }
+        } else {
+            val ctx = LocalShellContext.current
+            Row(Modifier.fillMaxSize()) {
+                RegionDivider(props.showDivider)
+                RightPanel(ctx.appState, ctx.onLogin, ctx.onLogout, ctx.sslBypass, Modifier.weight(1f).fillMaxHeight())
+            }
+            // Collapse chevron at the rail's top-right, beside the panel title.
+            IconButton(
+                onClick  = toggleCollapse,
+                modifier = Modifier.align(Alignment.TopEnd).padding(top = 6.dp, end = 6.dp).size(26.dp),
+            ) {
+                Icon(
+                    imageVector        = Icons.Default.ChevronRight,
+                    contentDescription = s.railCollapse,
+                    tint               = CelestiaTheme.colors.textSecondary,
+                    modifier           = Modifier.size(18.dp),
+                )
+            }
+        }
     }
 }
