@@ -315,6 +315,7 @@ object RussianStrings : AppStrings {
     override fun aboutDescription(branding: String) = "Неофициальный лаунчер для $branding"
     override val locale = java.util.Locale.of("ru", "RU")
     override fun aboutBuildDate(date: String) = "Собрано: $date"
+    override val aboutRenderer = "Отрисовщик"
     override val aboutSectionCreator       = "Создатель"
     override val aboutSectionTechnologies  = "Технологии"
     override val aboutSectionLicense       = "Лицензия"

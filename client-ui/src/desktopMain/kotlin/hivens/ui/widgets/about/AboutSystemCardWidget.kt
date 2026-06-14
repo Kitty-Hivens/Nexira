@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Computer
+import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Tv
@@ -49,18 +50,33 @@ fun AboutSystemCardWidget(instance: WidgetInstance) {
             val osVer      = System.getProperty("os.version")
             val javaVer    = System.getProperty("java.version")
             val javaVendor = System.getProperty("java.vendor")
-            val cores      = Runtime.getRuntime().availableProcessors()
             val maxHeap    = Runtime.getRuntime().maxMemory() / (1024 * 1024)
 
+            val c        = ctx.cpu
+            val physical = c.physicalCores
+            val maxMhz   = c.maxMhz
+            val minMhz   = c.minMhz
+            val cpuValue = buildString {
+                if (physical != null) append("$physical cores / ")
+                append("${c.logicalThreads} threads")
+                if (maxMhz != null) {
+                    val hi = "%.1f".format(maxMhz / 1000.0)
+                    val lo = minMhz?.let { "%.1f".format(it / 1000.0) }
+                    append(if (lo != null) " · $lo–$hi GHz" else " · $hi GHz")
+                }
+            }
+            val ramValue = buildString {
+                append(if (ctx.systemRam > 0) "${ctx.systemRam} MB" else "Unknown")
+                append(" (Heap: $maxHeap MB)")
+                ctx.swapMb?.takeIf { it > 0 }?.let { append(" · swap $it MB") }
+            }
+
             InfoRow(Icons.Default.Computer, s.aboutOs, "$osName $osVer ($osArch)")
-            InfoRow(Icons.Default.Memory,   "CPU",     "$cores threads")
-            InfoRow(
-                icon  = Icons.Default.Storage,
-                label = "RAM",
-                value = "${if (ctx.systemRam > 0) "${ctx.systemRam} MB" else "Unknown"} (Heap: $maxHeap MB)",
-            )
-            InfoRow(Icons.Default.Code, "Java",    "$javaVer ($javaVendor)")
-            InfoRow(Icons.Default.Tv,   "Display", ctx.displayRes)
+            InfoRow(Icons.Default.Memory,   "CPU",     cpuValue)
+            InfoRow(Icons.Default.Storage,  "RAM",     ramValue)
+            InfoRow(Icons.Default.Code,     "Java",    "$javaVer ($javaVendor)")
+            InfoRow(Icons.Default.Tv,       "Display", ctx.displayInfo)
+            InfoRow(Icons.Default.Layers,   s.aboutRenderer, ctx.renderer)
         }
     }
 }

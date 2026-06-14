@@ -317,6 +317,7 @@ object EnglishStrings : AppStrings {
     override fun aboutDescription(branding: String) = "Unofficial launcher for $branding"
     override val locale = java.util.Locale.ENGLISH
     override fun aboutBuildDate(date: String) = "Built: $date"
+    override val aboutRenderer = "Renderer"
     override val aboutSectionCreator       = "Creator"
     override val aboutSectionTechnologies  = "Technologies"
     override val aboutSectionLicense       = "License"
