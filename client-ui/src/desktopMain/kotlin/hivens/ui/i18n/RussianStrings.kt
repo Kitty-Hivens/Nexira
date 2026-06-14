@@ -339,7 +339,7 @@ object RussianStrings : AppStrings {
     override val techComposeDesc = "UI фреймворк"
     override val techKtorDesc    = "HTTP клиент"
     override val techKoinDesc    = "Dependency Injection"
-    override val techSkiaDesc    = "Рендеринг скинов"
+    override val techSkiaDesc    = "Графический рендер"
     override val techCoilDesc    = "Загрузка изображений"
 
     // --- Spawn Reset ---

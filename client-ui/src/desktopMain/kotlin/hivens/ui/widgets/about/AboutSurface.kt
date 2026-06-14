@@ -96,13 +96,15 @@ fun AboutSurface(onBack: () -> Unit) {
         }.getOrDefault("Unknown")
     }
 
-    // Renderer "future hook": windowing from env (reliable), Skiko render API from
-    // its system property when pinned (else "default" -- Skiko picks at runtime).
+    // Renderer "future hook". Skiko has no native Wayland yet: on a Wayland session
+    // it renders through XWayland, i.e. still Xorg -- so report Xorg (noting
+    // XWayland) rather than the session type. Native Wayland is the future hook;
+    // flip this when Skiko-on-Wayland lands. The render API comes from the skiko
+    // system property when pinned (else "default" -- Skiko picks at runtime).
     val renderer = remember {
         val windowing = when {
-            System.getenv("WAYLAND_DISPLAY") != null -> "Wayland"
-            System.getenv("DISPLAY") != null ||
-                System.getenv("XDG_SESSION_TYPE")?.equals("x11", ignoreCase = true) == true -> "X11"
+            System.getenv("DISPLAY") != null ->
+                if (System.getenv("WAYLAND_DISPLAY") != null) "Xorg (XWayland)" else "Xorg"
             else -> System.getProperty("os.name") ?: "?"
         }
         val api = System.getProperty("skiko.renderApi")?.takeIf { it.isNotBlank() } ?: "default"

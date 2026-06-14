@@ -339,7 +339,7 @@ object GermanStrings : AppStrings {
     override val techComposeDesc = "UI-Framework"
     override val techKtorDesc    = "HTTP-Client"
     override val techKoinDesc    = "Dependency Injection"
-    override val techSkiaDesc    = "Skin-Rendering"
+    override val techSkiaDesc    = "Grafik-Renderer"
     override val techCoilDesc    = "Bildladen"
 
     // --- Spawn Reset ---
