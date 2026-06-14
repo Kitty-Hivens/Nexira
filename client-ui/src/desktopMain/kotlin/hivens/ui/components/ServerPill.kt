@@ -62,28 +62,11 @@ import hivens.core.api.model.ServerProfile
 import hivens.launcher.platform.PlatformPaths
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.decorativePair
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 import javax.imageio.ImageIO
-import kotlin.math.abs
-
-// ─── Per-server gradient (shared with SquareServerCard) ─────────────────────
-// Each server gets a stable unique gradient derived from its name.
-
-internal val SERVER_PALETTES = listOf(
-    Pair(Color(0xFF7C3AED), Color(0xFF4F46E5)), // violet -> indigo
-    Pair(Color(0xFF0EA5E9), Color(0xFF6366F1)), // sky -> violet
-    Pair(Color(0xFF10B981), Color(0xFF0EA5E9)), // emerald -> sky
-    Pair(Color(0xFFF59E0B), Color(0xFFEF4444)), // amber -> red
-    Pair(Color(0xFFEC4899), Color(0xFF8B5CF6)), // pink -> purple
-    Pair(Color(0xFF14B8A6), Color(0xFF3B82F6)), // teal -> blue
-    Pair(Color(0xFFF97316), Color(0xFFEAB308)), // orange -> yellow
-    Pair(Color(0xFF6366F1), Color(0xFFEC4899)), // indigo -> pink
-)
-
-internal fun serverPalette(name: String): Pair<Color, Color> =
-    SERVER_PALETTES[abs(name.hashCode()) % SERVER_PALETTES.size]
 
 /**
  * Compact full-width capsule row for a server -- the narrow-width alternative to
@@ -108,7 +91,8 @@ fun ServerPill(
     val isHovered by interaction.collectIsHoveredAsState()
     val isFocused by interaction.collectIsFocusedAsState()
     val showActions = isHovered || isFocused
-    val (colorA, colorB) = remember(profile.name) { serverPalette(profile.name) }
+    val palette = CelestiaTheme.colors
+    val (colorA, colorB) = remember(profile.name, palette) { palette.decorativePair(profile.name) }
 
     var serverIcon by remember(profile.assetDir) { mutableStateOf<ImageBitmap?>(null) }
     val paths: PlatformPaths = koinInject()

@@ -25,7 +25,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.ui.i18n.LocalStrings
@@ -71,7 +70,7 @@ fun SessionChip(session: ActiveSession) {
                 modifier = Modifier
                     .size(8.dp)
                     .clip(RoundedCornerShape(50))
-                    .background(Color(0xFF4FC76E))
+                    .background(CelestiaTheme.colors.success)
             )
             Spacer(Modifier.width(8.dp))
             Column(modifier = Modifier.weight(1f)) {

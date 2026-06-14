@@ -46,6 +46,11 @@ object ColorRole {
     const val PROGRESS_ACCENT  = "progressAccent"
     const val WARN_ACCENT      = "warnAccent"
     const val CRITICAL_ACCENT  = "criticalAccent"
+    // Source/origin brand colors (overridable; the decorative ramp is not).
+    const val ORIGIN_SMARTYCRAFT = "originSmartycraft"
+    const val ORIGIN_MIRROR      = "originMirror"
+    const val ORIGIN_MODRINTH    = "originModrinth"
+    const val ORIGIN_LOCAL       = "originLocal"
 }
 
 /**

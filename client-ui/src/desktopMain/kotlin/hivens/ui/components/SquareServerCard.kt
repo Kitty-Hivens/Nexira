@@ -55,6 +55,7 @@ import hivens.ui.effects.neonBorder
 import hivens.ui.effects.shimmerOverlay
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.LocalStyle
+import hivens.ui.theme.decorativePair
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
@@ -62,7 +63,8 @@ import javax.imageio.ImageIO
 import kotlin.time.Duration.Companion.milliseconds
 
 // ─── Card ─────────────────────────────────────────────────────────────────────
-// The per-server gradient (serverPalette / SERVER_PALETTES) lives in ServerPill.kt.
+// The per-server gradient is derived from CelestiaColors.decorativePair, keyed on
+// the server name, so it follows the active theme ramp.
 
 @Composable
 fun SquareServerCard(
@@ -134,7 +136,8 @@ fun SquareServerCard(
 
     val showActions = isHovered || isFocused
     val scale by animateFloatAsState(if (showActions) 1.02f else 1.0f)
-    val (colorA, colorB) = remember(profile.name) { serverPalette(profile.name) }
+    val palette = CelestiaTheme.colors
+    val (colorA, colorB) = remember(profile.name, palette) { palette.decorativePair(profile.name) }
 
     // ── Theme-aware overlay colors ─────────────────────────────────────────
     val bgBase      = CelestiaTheme.colors.background
@@ -373,11 +376,12 @@ private fun SyncBadge(state: AutoSyncService.ServerState, modifier: Modifier = M
         exit = fadeOut(),
         modifier = modifier,
     ) {
+        val c = CelestiaTheme.colors
         val (icon, tint) = when (state) {
-            AutoSyncService.ServerState.QUEUED   -> Icons.Default.HourglassEmpty to Color(0xFFEAB308)  // amber
-            AutoSyncService.ServerState.SYNCING  -> Icons.Default.Sync           to Color(0xFF38BDF8)  // sky
-            AutoSyncService.ServerState.SYNCED   -> Icons.Default.Check          to Color(0xFF22C55E)  // green
-            AutoSyncService.ServerState.FAILED   -> Icons.Default.Close          to Color(0xFFEF4444)  // red
+            AutoSyncService.ServerState.QUEUED   -> Icons.Default.HourglassEmpty to c.warnAccent
+            AutoSyncService.ServerState.SYNCING  -> Icons.Default.Sync           to c.progressAccent
+            AutoSyncService.ServerState.SYNCED   -> Icons.Default.Check          to c.success
+            AutoSyncService.ServerState.FAILED   -> Icons.Default.Close          to c.criticalAccent
             AutoSyncService.ServerState.SKIPPED  -> return@AnimatedVisibility
         }
         Box(

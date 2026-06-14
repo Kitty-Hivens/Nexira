@@ -39,13 +39,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.dto.smrt.SmrtPackSummary
+import hivens.core.data.PackOrigin
 import hivens.launcher.PackInstaller
 import hivens.launcher.smrt.SmrtPackClient
 import hivens.ui.customization.glassSurfaceAlpha
@@ -53,6 +53,7 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.originGradient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -183,7 +184,7 @@ fun BrowsePackDetailScreen(
 
 @Composable
 private fun Hero(packId: String, summary: SmrtPackSummary?, onBack: () -> Unit) {
-    val gradient = Brush.linearGradient(listOf(Color(0xFF1E3A8A), Color(0xFF1D4ED8)))
+    val gradient = CelestiaTheme.colors.originGradient(PackOrigin.Mirror)
     Box(
         modifier = Modifier
             .fillMaxWidth()

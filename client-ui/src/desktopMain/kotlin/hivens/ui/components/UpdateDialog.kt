@@ -349,7 +349,7 @@ fun UpdateDialog(
                             Button(
                                 onClick = { installUpdate(path) },
                                 modifier = Modifier.focusRequester(primaryFocus),
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
+                                colors = ButtonDefaults.buttonColors(containerColor = CelestiaTheme.colors.success),
                                 shape  = MaterialTheme.shapes.small
                             ) {
                                 Text(s.updateInstall, color = Color.White, fontWeight = FontWeight.Bold)
