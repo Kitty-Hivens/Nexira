@@ -461,20 +461,6 @@ fun EditorSurfaceHost(
             EditModeVignette(active = editing)
 
             if (availableSurfaces.isNotEmpty()) {
-                EditModePill(
-                    active            = editing,
-                    surfaces          = availableSurfaces,
-                    selectedSurface   = selectedSurface,
-                    onSurfacePicked   = { selectedSurface = it },
-                    paletteOpen       = paletteOpen,
-                    onTogglePalette   = { paletteOpen = !paletteOpen },
-                    previewing        = previewing,
-                    onTogglePreview   = { previewing = !previewing },
-                    onOpenPresets     = { presetPanelOpen = true },
-                    onRequestReset    = { if (selectedSurface != null) resetSurfaceConfirm = true },
-                    modifier          = Modifier.align(Alignment.TopCenter).padding(top = 16.dp),
-                )
-
                 val surfaceForReset = selectedSurface
                 if (resetSurfaceConfirm && surfaceForReset != null) {
                     AlertDialog(
@@ -600,6 +586,26 @@ fun EditorSurfaceHost(
                 // edit mode and Escape exits, so a dedicated button is redundant.
             }
             } // end center-anchored chrome layer
+
+            // Editor toolbar pill: centered over the WHOLE window, NOT the inset
+            // center pane. The inset is a fixed 65/265, but the rails collapse
+            // (Ctrl+N) and resize, so centering inside it drifted the pill across
+            // rail states. The full-window box keeps it put.
+            if (availableSurfaces.isNotEmpty()) {
+                EditModePill(
+                    active            = editing,
+                    surfaces          = availableSurfaces,
+                    selectedSurface   = selectedSurface,
+                    onSurfacePicked   = { selectedSurface = it },
+                    paletteOpen       = paletteOpen,
+                    onTogglePalette   = { paletteOpen = !paletteOpen },
+                    previewing        = previewing,
+                    onTogglePreview   = { previewing = !previewing },
+                    onOpenPresets     = { presetPanelOpen = true },
+                    onRequestReset    = { if (selectedSurface != null) resetSurfaceConfirm = true },
+                    modifier          = Modifier.align(Alignment.TopCenter).padding(top = 16.dp),
+                )
+            }
 
             // The drag ghost follows the pointer across the WHOLE shell (rails
             // included), so it stays full-window, above the inset chrome layer.
