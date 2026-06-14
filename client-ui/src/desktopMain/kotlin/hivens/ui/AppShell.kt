@@ -679,12 +679,11 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
                 val glass = glassSurfaceAlpha(chrome.glassAlphaPct / 100f)
                 androidx.compose.foundation.layout.Box(
                     Modifier
-                        .then(
-                            if (chrome.cornerRadiusDp > 0)
-                                Modifier.clip(RoundedCornerShape(chrome.cornerRadiusDp.dp))
-                            else Modifier,
-                        )
-                        .background(glass)
+                        // Padding is an OUTER inset, applied before the backing, so
+                        // the rounded glass hugs the widget's own view -- the corner
+                        // radius describes the widget, not the padded footprint.
+                        // Padding the right panel insets it from the edges without
+                        // the rounding detaching onto the padded box.
                         .padding(
                             PaddingValues(
                                 start  = chrome.effectiveStart.dp,
@@ -692,7 +691,13 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
                                 end    = chrome.effectiveEnd.dp,
                                 bottom = chrome.effectiveBottom.dp,
                             ),
-                        ),
+                        )
+                        .then(
+                            if (chrome.cornerRadiusDp > 0)
+                                Modifier.clip(RoundedCornerShape(chrome.cornerRadiusDp.dp))
+                            else Modifier,
+                        )
+                        .background(glass),
                 ) { content() }
             }
             CompositionLocalProvider(
