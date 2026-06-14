@@ -169,6 +169,8 @@ class WidgetRegistryConsistencyTest {
             // Library
             "library.header",
             "library.body",
+            // right-rail compact news (show-title prop)
+            "appshell.rightrail.compactnews",
             // expressive knobs on otherwise data-driven sections
             "server.details.banner",
             "profile.skin.section",
@@ -180,6 +182,8 @@ class WidgetRegistryConsistencyTest {
             "appshell.region.right",
             // unified nav rail item (target prop)
             "nav.entry",
+            // persistent notification history (expand-direction + clock props)
+            "notifications.history",
             // per-instance state widgets (props alongside their runtime state)
             "notes.scratch",
             "checklist",
