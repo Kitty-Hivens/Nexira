@@ -918,6 +918,8 @@ object GermanStrings : AppStrings {
         "widget.notes.scratch.title" to "Titel",
         "widget.notifications.history" to "Nachrichtenverlauf",
         "widget.notifications.history.expandUp" to "Nach oben ausklappen",
+        "widget.notifications.history.clock12h" to "12-Stunden-Format (am/pm)",
+        "widget.notifications.history.verticalTime" to "Zeit gestapelt",
         "widget.profile.account.section" to "Konto",
         "widget.profile.signin" to "Anmelden",
         "widget.profile.nav" to "Profilnavigation",

@@ -70,6 +70,8 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
 import java.time.Instant
+import java.time.LocalDateTime
+import java.time.ZoneId
 import kotlin.math.roundToInt
 
 @Serializable
@@ -77,6 +79,10 @@ data class NotificationHistoryProps(
     // false: header on top, list opens downward. true: header at the bottom,
     // list opens upward (anchor the panel to the bottom of its footprint).
     @PropLabel("widget.notifications.history.expandUp") val expandUp: Boolean = false,
+    // 12-hour clock with an am/pm marker instead of 24-hour.
+    @PropLabel("widget.notifications.history.clock12h") val clock12h: Boolean = false,
+    // Stack the timestamp vertically (hh / mm / ss|am) for narrow placements.
+    @PropLabel("widget.notifications.history.verticalTime") val verticalTime: Boolean = false,
 )
 
 /**
@@ -130,11 +136,11 @@ fun NotificationHistoryWidget(instance: WidgetInstance) {
             .padding(8.dp),
     ) {
         if (props.expandUp) {
-            NotificationDrawer(expanded, groups, log.isEmpty(), clearOffset.value, onDismissGroup, fromTop = false)
+            NotificationDrawer(expanded, groups, log.isEmpty(), clearOffset.value, onDismissGroup, props.clock12h, props.verticalTime, fromTop = false)
             HistoryHeader(expanded, true, log.size, expanded && log.isNotEmpty(), outline, { expanded = !expanded }, animatedClear)
         } else {
             HistoryHeader(expanded, false, log.size, expanded && log.isNotEmpty(), outline, { expanded = !expanded }, animatedClear)
-            NotificationDrawer(expanded, groups, log.isEmpty(), clearOffset.value, onDismissGroup, fromTop = true)
+            NotificationDrawer(expanded, groups, log.isEmpty(), clearOffset.value, onDismissGroup, props.clock12h, props.verticalTime, fromTop = true)
         }
     }
 }
@@ -225,6 +231,8 @@ private fun NotificationDrawer(
     isEmpty: Boolean,
     clearOffsetPx: Float,
     onDismissGroup: (HistoryGroup) -> Unit,
+    ampm: Boolean,
+    verticalTime: Boolean,
     fromTop: Boolean,
 ) {
     val strings = LocalStrings.current
@@ -261,9 +269,11 @@ private fun NotificationDrawer(
                 groups.forEach { group ->
                     key(group.head.sourceKey, group.head.createdAtEpoch, group.head.title) {
                         SwipeableHistoryRow(
-                            entry     = group.head,
-                            count     = group.count,
-                            onDismiss = { onDismissGroup(group) },
+                            entry        = group.head,
+                            count        = group.count,
+                            ampm         = ampm,
+                            verticalTime = verticalTime,
+                            onDismiss    = { onDismissGroup(group) },
                         )
                     }
                 }
@@ -275,7 +285,13 @@ private fun NotificationDrawer(
 // Swipe a row to the right to dismiss it: the offset tracks the drag, snaps back
 // if released early, or slides off and removes the group once past the threshold.
 @Composable
-private fun SwipeableHistoryRow(entry: PersistedNotification, count: Int, onDismiss: () -> Unit) {
+private fun SwipeableHistoryRow(
+    entry: PersistedNotification,
+    count: Int,
+    ampm: Boolean,
+    verticalTime: Boolean,
+    onDismiss: () -> Unit,
+) {
     val scope = rememberCoroutineScope()
     val offsetX = remember { Animatable(0f) }
     var widthPx by remember { mutableStateOf(1f) }
@@ -302,7 +318,7 @@ private fun SwipeableHistoryRow(entry: PersistedNotification, count: Int, onDism
             .offset { IntOffset(offsetX.value.roundToInt(), 0) }
             .graphicsLayer { alpha = (1f - offsetX.value / widthPx).coerceIn(0f, 1f) },
     ) {
-        HistoryRow(entry, count)
+        HistoryRow(entry, count, ampm, verticalTime)
     }
 }
 
@@ -342,7 +358,7 @@ private fun groupHistory(log: List<PersistedNotification>): List<HistoryGroup> {
 }
 
 @Composable
-private fun HistoryRow(entry: PersistedNotification, count: Int) {
+private fun HistoryRow(entry: PersistedNotification, count: Int, ampm: Boolean, verticalTime: Boolean) {
     val strings = LocalStrings.current
     val palette = CelestiaTheme.colors
     Row(
@@ -384,10 +400,38 @@ private fun HistoryRow(entry: PersistedNotification, count: Int) {
             }
         }
         Spacer(Modifier.width(8.dp))
+        TimeStamp(
+            epoch    = entry.createdAtEpoch,
+            ampm     = ampm,
+            vertical = verticalTime,
+            color    = palette.textSecondary.copy(alpha = 0.6f),
+        )
+    }
+}
+
+// Time-only stamp (the full date is noise in the history). Horizontal HH:MM:SS,
+// or the parts stacked for narrow placements; 12-hour adds an am/pm marker.
+@Composable
+private fun TimeStamp(epoch: Long, ampm: Boolean, vertical: Boolean, color: Color) {
+    val ldt = LocalDateTime.ofInstant(Instant.ofEpochSecond(epoch), ZoneId.systemDefault())
+    val hour = if (ampm) ((ldt.hour + 11) % 12) + 1 else ldt.hour
+    val hh = "%02d".format(hour)
+    val mm = "%02d".format(ldt.minute)
+    val ss = "%02d".format(ldt.second)
+    val meridiem = if (ldt.hour < 12) "am" else "pm"
+    val style = MaterialTheme.typography.labelSmall
+    if (vertical) {
+        Column(horizontalAlignment = Alignment.End) {
+            Text(hh, style = style, color = color)
+            Text(mm, style = style, color = color)
+            Text(if (ampm) meridiem else ss, style = style, color = color)
+        }
+    } else {
         Text(
-            text  = strings.notificationAbsoluteTime(Instant.ofEpochSecond(entry.createdAtEpoch)),
-            style = MaterialTheme.typography.labelSmall,
-            color = palette.textSecondary.copy(alpha = 0.6f),
+            text     = if (ampm) "$hh:$mm:$ss $meridiem" else "$hh:$mm:$ss",
+            style    = style,
+            color    = color,
+            maxLines = 1,
         )
     }
 }
