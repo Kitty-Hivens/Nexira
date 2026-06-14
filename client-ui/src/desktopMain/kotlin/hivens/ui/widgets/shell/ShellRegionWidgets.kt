@@ -2,13 +2,14 @@ package hivens.ui.widgets.shell
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
@@ -19,8 +20,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
@@ -147,7 +151,8 @@ fun ShellCenterRegion(instance: WidgetInstance) {
     }
 }
 
-private const val RAIL_COLLAPSED_WIDTH = 12 // dp of the collapsed edge strip
+private const val RAIL_COLLAPSED_WIDTH = 28 // dp of the collapsed strip (a big tap target)
+private const val RAIL_EDGE_GRIP_WIDTH = 20 // dp of the invisible edge swipe band when expanded
 
 /**
  * Right region: the divider plus the news panel. removable=false. Collapsed
@@ -206,44 +211,59 @@ fun ShellRightRegion(instance: WidgetInstance) {
         widthAnim.animateTo(if (props.collapsed) collapsedPx else expandedPx)
     }
 
-    val swipe = if (props.swipeToCollapse) {
-        Modifier.pointerInput(collapsedPx, expandedPx) {
-            detectHorizontalDragGestures(
-                onHorizontalDrag = { change, delta ->
-                    change.consume()
-                    // Rail sits on the right: dragging left (negative delta) widens it.
-                    scope.launch { widthAnim.snapTo((widthAnim.value - delta).coerceIn(collapsedPx, expandedPx)) }
-                },
-                onDragEnd = {
-                    val collapse = widthAnim.value < (collapsedPx + expandedPx) / 2f
-                    scope.launch { widthAnim.animateTo(if (collapse) collapsedPx else expandedPx) }
-                    if (collapse != props.collapsed) toggleCollapse()
-                },
-            )
-        }
-    } else {
-        Modifier
-    }
-
+    val curWidth = widthAnim.value
+    // 0 collapsed .. 1 expanded; fades the full-width content as the rail shrinks.
+    val progress = ((curWidth - collapsedPx) / (expandedPx - collapsedPx).coerceAtLeast(1f)).coerceIn(0f, 1f)
     val bg = if (props.glassAlpha > 0f) glassSurfaceAlpha(props.glassAlpha) else Color.Transparent
     val ctx = LocalShellContext.current
+    val collapsed = props.collapsed
 
     Box(
         modifier = Modifier
-            .width(with(density) { widthAnim.value.toDp() })
+            .width(with(density) { curWidth.toDp() })
             .fillMaxHeight()
             .background(bg)
-            .then(swipe),
+            .clipToBounds(),
     ) {
-        Row(Modifier.fillMaxSize()) {
+        // Content stays laid out at the full expanded width (requiredWidth) and is
+        // clipped + faded -- never re-measured at intermediate widths, so the
+        // widgets render full-form and their text does not reflow or scale.
+        Row(
+            modifier = Modifier
+                .requiredWidth(expandedWidth)
+                .fillMaxHeight()
+                .graphicsLayer { alpha = progress },
+        ) {
             RegionDivider(props.showDivider)
-            // Below ~the collapsed strip the panel has no room; drop it so a thin
-            // edge does not try to lay out the whole news rail.
-            if (widthAnim.value > collapsedPx + 1f) {
-                RightPanel(ctx.appState, ctx.onLogin, ctx.onLogout, ctx.sslBypass, Modifier.weight(1f).fillMaxHeight())
-            } else {
-                Spacer(Modifier.weight(1f).fillMaxHeight())
-            }
+            RightPanel(ctx.appState, ctx.onLogin, ctx.onLogout, ctx.sslBypass, Modifier.weight(1f).fillMaxHeight())
+        }
+
+        // Gesture surface, confined so it never fights the rail's widgets:
+        //   collapsed -> the whole (wide) strip; tap or swipe-left to reopen.
+        //   expanded  -> a slim invisible band at the inner edge; swipe-right to shut.
+        if (props.swipeToCollapse || collapsed) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .then(if (collapsed) Modifier.fillMaxSize() else Modifier.width(RAIL_EDGE_GRIP_WIDTH.dp).fillMaxHeight())
+                    .then(if (collapsed) Modifier.background(glassSurfaceAlpha(0.4f)) else Modifier)
+                    .then(if (collapsed) Modifier.clickable { toggleCollapse() } else Modifier)
+                    .pointerInput(collapsedPx, expandedPx, props.swipeToCollapse) {
+                        if (!props.swipeToCollapse) return@pointerInput
+                        detectHorizontalDragGestures(
+                            onHorizontalDrag = { change, delta ->
+                                change.consume()
+                                // Rail sits on the right: dragging left (negative delta) widens it.
+                                scope.launch { widthAnim.snapTo((widthAnim.value - delta).coerceIn(collapsedPx, expandedPx)) }
+                            },
+                            onDragEnd = {
+                                val collapseNow = widthAnim.value < (collapsedPx + expandedPx) / 2f
+                                scope.launch { widthAnim.animateTo(if (collapseNow) collapsedPx else expandedPx) }
+                                if (collapseNow != props.collapsed) toggleCollapse()
+                            },
+                        )
+                    },
+            )
         }
     }
 }
