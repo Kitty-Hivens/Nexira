@@ -215,7 +215,7 @@ private fun WorldThumb(iconPath: String?) {
         modifier         = Modifier
             .size(56.dp)
             .clip(RoundedCornerShape(8.dp))
-            .background(Color(0xFF1F2937)),
+            .background(CelestiaTheme.colors.surfaceVariant),
         contentAlignment = Alignment.Center,
     ) {
         if (iconPath != null) {
@@ -287,7 +287,7 @@ private fun ServerThumb(iconBase64: String?) {
         modifier         = Modifier
             .size(48.dp)
             .clip(RoundedCornerShape(8.dp))
-            .background(Color(0xFF1F2937)),
+            .background(CelestiaTheme.colors.surfaceVariant),
         contentAlignment = Alignment.Center,
     ) {
         if (bytes != null) {

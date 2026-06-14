@@ -235,12 +235,12 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(
-                        color = Color(0xFFF59E0B).copy(alpha = 0.12f),
+                        color = CelestiaTheme.colors.warnAccent.copy(alpha = 0.12f),
                         shape = MaterialTheme.shapes.medium
                     )
                     .border(
                         width = 1.dp,
-                        color = Color(0xFFF59E0B).copy(alpha = 0.5f),
+                        color = CelestiaTheme.colors.warnAccent.copy(alpha = 0.5f),
                         shape = MaterialTheme.shapes.medium
                     )
                     .padding(12.dp),
@@ -250,7 +250,7 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
                     text       = "⚠ ${s.sslWarningTitle}",
                     style      = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
-                    color      = Color(0xFFF59E0B)
+                    color      = CelestiaTheme.colors.warnAccent
                 )
                 Text(
                     text  = s.sslWarningBody,
@@ -274,7 +274,7 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
                     style = MaterialTheme.typography.bodySmall,
                     color = CelestiaTheme.colors.textSecondary,
                 )
-                val acceptColors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF59E0B))
+                val acceptColors = ButtonDefaults.buttonColors(containerColor = CelestiaTheme.colors.warnAccent)
                 fun acceptFor(unit: java.time.temporal.ChronoUnit, amount: Long, label: String) {
                     // 100-year future for "always" -- long enough that no user
                     // will outlive it, short enough to not overflow ISO-8601
@@ -318,12 +318,12 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(
-                        color = Color(0xFFF59E0B).copy(alpha = 0.12f),
+                        color = CelestiaTheme.colors.warnAccent.copy(alpha = 0.12f),
                         shape = MaterialTheme.shapes.medium
                     )
                     .border(
                         width = 1.dp,
-                        color = Color(0xFFF59E0B).copy(alpha = 0.5f),
+                        color = CelestiaTheme.colors.warnAccent.copy(alpha = 0.5f),
                         shape = MaterialTheme.shapes.medium
                     )
                     .padding(12.dp),
@@ -333,7 +333,7 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
                     text       = s.auth2faUnsupportedTitle,
                     style      = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
-                    color      = Color(0xFFF59E0B)
+                    color      = CelestiaTheme.colors.warnAccent
                 )
                 Text(
                     text  = s.auth2faUnsupportedBody,

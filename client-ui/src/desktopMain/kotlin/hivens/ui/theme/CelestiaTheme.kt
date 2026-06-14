@@ -36,6 +36,18 @@ data class CelestiaColors(
     val progressAccent: Color,
     val warnAccent: Color,
     val criticalAccent: Color,
+    // Source/origin brand colors -- themeable so customization reaches the most
+    // visible cards. The per-origin gradient + avatar shades are derived from
+    // these in code (theme/BrandColors.kt), not stored as separate literals.
+    val originSmartycraft: Color,
+    val originMirror: Color,
+    val originModrinth: Color,
+    val originLocal: Color,
+    // Decorative hash-assigned ramp for per-server / per-mod avatars: one themed
+    // list the hash indexes into (unifies the old SERVER_PALETTES + AVATAR_PALETTE).
+    // Not a semantic token and not customization-overridable -- just stable,
+    // in-theme variety; the dark and light presets carry their own ramp.
+    val decorativeRamp: List<Color>,
 )
 
 private val DarkColorPalette = CelestiaColors(
@@ -59,6 +71,14 @@ private val DarkColorPalette = CelestiaColors(
     progressAccent = Color(0xFF6A84FF),
     warnAccent     = Color(0xFFE0B341),
     criticalAccent = Color(0xFFD8484A),
+    originSmartycraft = Color(0xFF8B5CF6), // violet
+    originMirror      = Color(0xFF3B82F6), // blue
+    originModrinth    = Color(0xFF22C55E), // green
+    originLocal       = Color(0xFF9CA3AF), // grey
+    decorativeRamp = listOf(
+        Color(0xFF7C3AED), Color(0xFF0EA5E9), Color(0xFF10B981), Color(0xFFF59E0B),
+        Color(0xFFEC4899), Color(0xFF14B8A6), Color(0xFFF97316), Color(0xFF6366F1),
+    ),
 )
 
 private val LightColorPalette = CelestiaColors(
@@ -82,6 +102,14 @@ private val LightColorPalette = CelestiaColors(
     progressAccent = Color(0xFF3C5BD9),
     warnAccent     = Color(0xFFB37A0E),
     criticalAccent = Color(0xFFB3262A),
+    originSmartycraft = Color(0xFF6D28D9), // deeper violet for light bg
+    originMirror      = Color(0xFF2563EB), // deeper blue
+    originModrinth    = Color(0xFF16A34A), // deeper green
+    originLocal       = Color(0xFF64748B), // slate
+    decorativeRamp = listOf(
+        Color(0xFF6D28D9), Color(0xFF0284C7), Color(0xFF059669), Color(0xFFD97706),
+        Color(0xFFDB2777), Color(0xFF0D9488), Color(0xFFEA580C), Color(0xFF4F46E5),
+    ),
 )
 
 val LocalCelestiaColors = staticCompositionLocalOf<CelestiaColors> {
@@ -143,6 +171,10 @@ fun CelestiaTheme(
                 // GLASS_ALPHA stored as plain "0.55" string in the
                 // overrides map; parse to Float and clamp.
                 glassAlpha     = o[ColorRole.GLASS_ALPHA]?.toFloatOrNull()?.coerceIn(0f, 1f) ?: c.glassAlpha,
+                originSmartycraft = o[ColorRole.ORIGIN_SMARTYCRAFT]?.let(::parseHexColorOrNull) ?: c.originSmartycraft,
+                originMirror      = o[ColorRole.ORIGIN_MIRROR]?.let(::parseHexColorOrNull)      ?: c.originMirror,
+                originModrinth    = o[ColorRole.ORIGIN_MODRINTH]?.let(::parseHexColorOrNull)    ?: c.originModrinth,
+                originLocal       = o[ColorRole.ORIGIN_LOCAL]?.let(::parseHexColorOrNull)       ?: c.originLocal,
             )
         }
         c

@@ -42,7 +42,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -74,6 +73,7 @@ import hivens.ui.screens.library.PackMetaChip
 import hivens.ui.screens.library.content.ContentTabPane
 import hivens.ui.screens.library.worlds.WorldsTabPane
 import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.originGradient
 import hivens.ui.utils.ConsoleSettingsManager
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.utils.LogEntry
@@ -439,7 +439,7 @@ private fun LogSessionPicker(
 
 @Composable
 private fun Hero(pack: PackInstance, onBack: () -> Unit) {
-    val bg = originGradient(pack.packRef.origin)
+    val bg = CelestiaTheme.colors.originGradient(pack.packRef.origin)
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -549,15 +549,4 @@ private fun NotFound(onBack: () -> Unit) {
             Button(onClick = onBack) { Text(s.packDetailNotFoundBack) }
         }
     }
-}
-
-private fun originGradient(origin: PackOrigin): Brush {
-    val pair = when (origin) {
-        PackOrigin.Smartycraft -> Color(0xFF4C1D95) to Color(0xFF6D28D9)
-        PackOrigin.Mirror      -> Color(0xFF1E3A8A) to Color(0xFF1D4ED8)
-        PackOrigin.Modrinth    -> Color(0xFF14532D) to Color(0xFF15803D)
-        PackOrigin.Local       -> Color(0xFF374151) to Color(0xFF4B5563)
-        PackOrigin.Unknown     -> Color(0xFF374151) to Color(0xFF4B5563)
-    }
-    return Brush.linearGradient(listOf(pair.first, pair.second))
 }
