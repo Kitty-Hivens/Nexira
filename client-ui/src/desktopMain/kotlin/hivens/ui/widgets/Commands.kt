@@ -15,4 +15,6 @@ import hivens.widget.model.CommandKey
 object Commands {
     val ClearNotifications = CommandKey<Unit>("notifications.clear")
     val CheckUpdate = CommandKey<Unit>("update.check")
+    // Sets the "do not disturb" popup mute; paired with [Sources.DoNotDisturb].
+    val SetDoNotDisturb = CommandKey<Boolean>("notifications.dnd.set")
 }

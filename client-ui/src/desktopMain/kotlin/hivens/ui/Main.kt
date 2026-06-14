@@ -74,6 +74,7 @@ val uiModule = module {
         WidgetDataRegistry().apply {
             register(Sources.AutoSync, flowSource(get<AutoSyncService>().snapshot))
             register(Sources.Notifications, flowSource(get<NotificationArchiveStore>().log))
+            register(Sources.DoNotDisturb, flowSource(get<NotificationCenter>().doNotDisturb))
         }
     }
 
@@ -87,9 +88,11 @@ val uiModule = module {
         val archive: NotificationArchiveStore = get()
         val updates: UpdateService = get()
         val scope: CoroutineScope = get()
+        val center: NotificationCenter = get()
         WidgetCommandRegistry().apply {
             register(Commands.ClearNotifications, command { archive.clear() })
             register(Commands.CheckUpdate, suspendCommand(scope) { updates.checkForUpdate() })
+            register(Commands.SetDoNotDisturb, command { center.setDoNotDisturb(it) })
         }
     }
 
@@ -137,7 +140,18 @@ val uiModule = module {
             scope = get(),
         )
     }
-    single { NotificationCenter(archive = get<NotificationArchiveStore>()::record) }
+    single {
+        val settings: ISettingsService = get()
+        NotificationCenter(
+            archive             = get<NotificationArchiveStore>()::record,
+            // Seed the popup-mute from the persisted preference and write the
+            // flip back, so "do not disturb" survives a restart.
+            initialDoNotDisturb = settings.getSettings().doNotDisturb,
+            persistDoNotDisturb = { value ->
+                settings.saveSettings(settings.getSettings().copy(doNotDisturb = value))
+            },
+        )
+    }
     single { IndicationCenter() }
     single { SessionRegistry(appScope = get()) }
     single {

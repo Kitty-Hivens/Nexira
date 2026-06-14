@@ -198,7 +198,7 @@ private fun HeaderRow(
 ) {
     val strings = LocalStrings.current
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-        NotificationAvatar(group.iconUrl)
+        NotificationAvatar(group.iconUrl, group.glyph)
         Spacer(Modifier.width(10.dp))
         Text(
             text       = group.sender,

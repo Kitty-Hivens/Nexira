@@ -14,6 +14,9 @@ data class PersistedNotification(
     val sourceKey: String,
     val sender: String,
     val iconUrl: String? = null,
+    // Vector-glyph fallback for sources without an `iconUrl`; serialized by
+    // name. Default null keeps old archive files decoding unchanged.
+    val glyph: NotifGlyph? = null,
     val severity: Severity,
     val kind: Kind,
     val title: String,

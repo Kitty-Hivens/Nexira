@@ -770,6 +770,8 @@ interface AppStrings {
     // Notification-history widget.
     val notifHistoryEmpty: String
     val notifHistoryClear: String
+    /** "Do not disturb" mute toggle on the history widget (icon-button label). */
+    val notifDoNotDisturb: String
     /** Count badge on a collapsed group of repeated notifications, e.g. "x3". */
     fun notifGroupCount(count: Int): String
     /** Panel title with the message count folded in, e.g. "6 messages". */

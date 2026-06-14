@@ -28,6 +28,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -61,6 +62,7 @@ import hivens.ui.theme.CelestiaTheme
 import hivens.ui.widgets.Commands
 import hivens.ui.widgets.Sources
 import hivens.widget.api.rememberAction
+import hivens.widget.api.rememberCommand
 import hivens.widget.api.rememberProps
 import hivens.widget.api.rememberSource
 import hivens.widget.model.PropLabel
@@ -85,6 +87,11 @@ data class NotificationHistoryProps(
     @PropLabel("widget.notifications.history.verticalTime") val verticalTime: Boolean = false,
 )
 
+// Footprint of a header pill button (icon 16 + 6dp padding each side); reused as
+// the placeholder width that keeps the chevron pinned left when the trailing
+// action is absent.
+private val PILL_BUTTON_SIZE = 28.dp
+
 /**
  * Placeable message-history widget: the durable counterpart to the live
  * top-right toast stack. Reads the persisted [NotificationArchiveStore] log
@@ -105,6 +112,11 @@ fun NotificationHistoryWidget(instance: WidgetInstance) {
     // command for the write; the store is injected for per-message removal.
     val log by rememberSource(Sources.Notifications)
     val clearLog = rememberAction(Commands.ClearNotifications)
+    // "Do not disturb" lives in the NotificationCenter; the widget reflects it on
+    // the mute toggle and flips it through the command -- the live stack reads the
+    // same flow to gate popups.
+    val doNotDisturb by rememberSource(Sources.DoNotDisturb)
+    val setDoNotDisturb = rememberCommand(Commands.SetDoNotDisturb)
     val store: NotificationArchiveStore = koinInject()
     val palette = CelestiaTheme.colors
     var expanded by remember { mutableStateOf(false) }
@@ -112,17 +124,23 @@ fun NotificationHistoryWidget(instance: WidgetInstance) {
     val outline = palette.outline.copy(alpha = 0.4f)
     val scope = rememberCoroutineScope()
 
-    // Clear slides the whole list out to the right, then wipes it.
+    // Clear slides the whole list out to the right, wipes it, then collapses the
+    // panel -- once there is nothing to show, the expanded drawer is just an empty
+    // box, so it folds shut on its own.
     val clearOffset = remember { Animatable(0f) }
     var panelWidthPx by remember { mutableStateOf(1f) }
     val animatedClear: () -> Unit = {
         scope.launch {
             clearOffset.animateTo(panelWidthPx)
             clearLog()
+            expanded = false
             clearOffset.snapTo(0f)
         }
     }
+    // Dismissing the last remaining group empties the log; collapse with it so the
+    // user is not left staring at an open, empty drawer.
     val onDismissGroup: (HistoryGroup) -> Unit = { group ->
+        if (groups.size <= 1) expanded = false
         store.remove { it in group.members }
     }
 
@@ -137,9 +155,9 @@ fun NotificationHistoryWidget(instance: WidgetInstance) {
     ) {
         if (props.expandUp) {
             NotificationDrawer(expanded, groups, log.isEmpty(), clearOffset.value, onDismissGroup, props.clock12h, props.verticalTime, fromTop = false)
-            HistoryHeader(expanded, true, log.size, expanded && log.isNotEmpty(), outline, { expanded = !expanded }, animatedClear)
+            HistoryHeader(expanded, true, log.size, expanded && log.isNotEmpty(), doNotDisturb, outline, { expanded = !expanded }, animatedClear) { setDoNotDisturb(!doNotDisturb) }
         } else {
-            HistoryHeader(expanded, false, log.size, expanded && log.isNotEmpty(), outline, { expanded = !expanded }, animatedClear)
+            HistoryHeader(expanded, false, log.size, expanded && log.isNotEmpty(), doNotDisturb, outline, { expanded = !expanded }, animatedClear) { setDoNotDisturb(!doNotDisturb) }
             NotificationDrawer(expanded, groups, log.isEmpty(), clearOffset.value, onDismissGroup, props.clock12h, props.verticalTime, fromTop = true)
         }
     }
@@ -151,32 +169,58 @@ private fun HistoryHeader(
     expandUp: Boolean,
     messageCount: Int,
     showTrash: Boolean,
+    dndActive: Boolean,
     outline: Color,
     onToggle: () -> Unit,
     onClear: () -> Unit,
+    onToggleDnd: () -> Unit,
 ) {
     val strings = LocalStrings.current
     // The chevron points toward where the list will go: down for a downward
     // drawer (and up to close it), inverted for an upward one.
     val pointsUp = if (expandUp) !expanded else expanded
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-        PillButton(
-            icon               = if (pointsUp) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-            contentDescription = if (expanded) strings.notificationCollapseHistory else strings.notificationExpandHistory,
-            outline            = outline,
-            onClick            = onToggle,
-        )
-        Spacer(Modifier.width(6.dp))
-        CountPill(text = strings.notifCountTitle(messageCount), outline = outline)
-        Spacer(Modifier.weight(1f))
-        if (showTrash) {
+    // Count pill centers over the edge row; the chevron pins to the start and the
+    // contextual action to the end -- clear while expanded, "do not disturb" while
+    // collapsed. The two trailing actions never coexist, so the count stays put.
+    Box(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier              = Modifier.fillMaxWidth(),
+            verticalAlignment     = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
             PillButton(
-                icon               = Icons.Default.Delete,
-                contentDescription = strings.notifHistoryClear,
+                icon               = if (pointsUp) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                contentDescription = if (expanded) strings.notificationCollapseHistory else strings.notificationExpandHistory,
                 outline            = outline,
-                onClick            = onClear,
+                onClick            = onToggle,
             )
+            if (expanded) {
+                if (showTrash) {
+                    PillButton(
+                        icon               = Icons.Default.Delete,
+                        contentDescription = strings.notifHistoryClear,
+                        outline            = outline,
+                        onClick            = onClear,
+                    )
+                } else {
+                    // Keep the chevron pinned left when there is no trailing action.
+                    Spacer(Modifier.size(PILL_BUTTON_SIZE))
+                }
+            } else {
+                PillButton(
+                    icon               = Icons.Default.NotificationsOff,
+                    contentDescription = strings.notifDoNotDisturb,
+                    outline            = outline,
+                    active             = dndActive,
+                    onClick            = onToggleDnd,
+                )
+            }
         }
+        CountPill(
+            text     = strings.notifCountTitle(messageCount),
+            outline  = outline,
+            modifier = Modifier.align(Alignment.Center),
+        )
     }
 }
 
@@ -185,13 +229,17 @@ private fun PillButton(
     icon: ImageVector,
     contentDescription: String,
     outline: Color,
+    active: Boolean = false,
     onClick: () -> Unit,
 ) {
+    val palette = CelestiaTheme.colors
+    // Active = the toggle is engaged (mute on): tint + fill shift to the accent so
+    // the state reads at a glance without a separate label.
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(50))
-            .background(glassSurfaceAlpha(0.45f))
-            .border(1.dp, outline, RoundedCornerShape(50))
+            .background(if (active) palette.primary.copy(alpha = 0.18f) else glassSurfaceAlpha(0.45f))
+            .border(1.dp, if (active) palette.primary.copy(alpha = 0.6f) else outline, RoundedCornerShape(50))
             .clickable(onClick = onClick)
             .padding(6.dp),
         contentAlignment = Alignment.Center,
@@ -199,16 +247,16 @@ private fun PillButton(
         Icon(
             imageVector        = icon,
             contentDescription = contentDescription,
-            tint               = CelestiaTheme.colors.textSecondary,
+            tint               = if (active) palette.primary else palette.textSecondary,
             modifier           = Modifier.size(16.dp),
         )
     }
 }
 
 @Composable
-private fun CountPill(text: String, outline: Color) {
+private fun CountPill(text: String, outline: Color, modifier: Modifier = Modifier) {
     Box(
-        modifier = Modifier
+        modifier = modifier
             .clip(RoundedCornerShape(50))
             .background(glassSurfaceAlpha(0.35f))
             .border(1.dp, outline, RoundedCornerShape(50))
@@ -365,7 +413,7 @@ private fun HistoryRow(entry: PersistedNotification, count: Int, ampm: Boolean, 
         modifier          = Modifier.fillMaxWidth().padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        NotificationAvatar(entry.iconUrl, size = 26.dp)
+        NotificationAvatar(entry.iconUrl, entry.glyph, size = 26.dp)
         Spacer(Modifier.width(10.dp))
         Column(modifier = Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
