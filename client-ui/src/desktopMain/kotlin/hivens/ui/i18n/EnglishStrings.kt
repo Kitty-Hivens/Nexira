@@ -341,7 +341,7 @@ object EnglishStrings : AppStrings {
     override val techComposeDesc = "UI framework"
     override val techKtorDesc    = "HTTP client"
     override val techKoinDesc    = "Dependency Injection"
-    override val techSkiaDesc    = "Skin rendering"
+    override val techSkiaDesc    = "Graphics renderer"
     override val techCoilDesc    = "Image loading"
 
     // --- Spawn Reset ---
