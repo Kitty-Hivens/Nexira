@@ -2,7 +2,6 @@ package hivens.ui.widgets.shell
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -20,11 +19,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
@@ -151,13 +148,11 @@ fun ShellCenterRegion(instance: WidgetInstance) {
     }
 }
 
-private const val RAIL_COLLAPSED_WIDTH = 28 // dp of the collapsed strip (a big tap target)
-private const val RAIL_EDGE_GRIP_WIDTH = 20 // dp of the invisible edge swipe band when expanded
-
 /**
- * Right region: the divider plus the news panel. removable=false. Collapsed
- * with no buttons -- a horizontal swipe drags the rail open/shut (the width
- * tracks the pointer and snaps on release), and Ctrl+N toggles it from anywhere.
+ * Right region: the divider plus the news panel. removable=false. No handles or
+ * strips: a horizontal swipe anywhere on the rail shuts it (the width tracks the
+ * pointer and snaps on release; vertical scrolls and taps still reach the news),
+ * and Ctrl+N toggles it. Collapsed the rail is zero-width, so Ctrl+N reopens it.
  * Edit mode keeps the static prop-driven behaviour so arranging widgets is calm.
  */
 @Widget(id = "appshell.region.right", displayName = "widget.appshell.region.right", removable = false, propsClass = ShellRegionProps::class)
@@ -199,71 +194,54 @@ fun ShellRightRegion(instance: WidgetInstance) {
 
     val density = LocalDensity.current
     val expandedWidth = if (props.widthDp > 0) props.widthDp.dp else 265.dp
-    val collapsedPx = with(density) { RAIL_COLLAPSED_WIDTH.dp.toPx() }
-    val expandedPx  = with(density) { expandedWidth.toPx() }
-    val widthAnim = remember { Animatable(if (props.collapsed) collapsedPx else expandedPx) }
+    val expandedPx = with(density) { expandedWidth.toPx() }
+    val widthAnim = remember { Animatable(if (props.collapsed) 0f else expandedPx) }
     val scope = rememberCoroutineScope()
 
-    // Snap to the target whenever it changes from outside a drag (prop edit /
-    // Ctrl+N / width change). A drag never changes these keys mid-flight, so it
-    // is not interrupted.
-    LaunchedEffect(props.collapsed, expandedPx, collapsedPx) {
-        widthAnim.animateTo(if (props.collapsed) collapsedPx else expandedPx)
+    // Snap to the target whenever it changes from outside a drag (Ctrl+N / width
+    // edit). A drag never changes these keys mid-flight, so it is not interrupted.
+    LaunchedEffect(props.collapsed, expandedPx) {
+        widthAnim.animateTo(if (props.collapsed) 0f else expandedPx)
     }
 
-    val curWidth = widthAnim.value
-    // 0 collapsed .. 1 expanded; fades the full-width content as the rail shrinks.
-    val progress = ((curWidth - collapsedPx) / (expandedPx - collapsedPx).coerceAtLeast(1f)).coerceIn(0f, 1f)
     val bg = if (props.glassAlpha > 0f) glassSurfaceAlpha(props.glassAlpha) else Color.Transparent
     val ctx = LocalShellContext.current
-    val collapsed = props.collapsed
+
+    // Horizontal swipe anywhere on the rail closes it; vertical scrolls and taps
+    // still reach the news (orthogonal gestures arbitrate by direction), so it
+    // never fights the widgets. Collapsed the rail is zero-width -- nothing to
+    // swipe -- so Ctrl+N reopens it. No handle, no strip, no fade.
+    val swipe = if (props.swipeToCollapse) {
+        Modifier.pointerInput(expandedPx) {
+            detectHorizontalDragGestures(
+                onHorizontalDrag = { change, delta ->
+                    change.consume()
+                    scope.launch { widthAnim.snapTo((widthAnim.value - delta).coerceIn(0f, expandedPx)) }
+                },
+                onDragEnd = {
+                    val collapse = widthAnim.value < expandedPx / 2f
+                    scope.launch { widthAnim.animateTo(if (collapse) 0f else expandedPx) }
+                    if (collapse != props.collapsed) toggleCollapse()
+                },
+            )
+        }
+    } else {
+        Modifier
+    }
 
     Box(
         modifier = Modifier
-            .width(with(density) { curWidth.toDp() })
+            .width(with(density) { widthAnim.value.toDp() })
             .fillMaxHeight()
             .background(bg)
-            .clipToBounds(),
+            .clipToBounds()
+            .then(swipe),
     ) {
-        // Content stays laid out at the full expanded width (requiredWidth) and is
-        // clipped + faded -- never re-measured at intermediate widths, so the
-        // widgets render full-form and their text does not reflow or scale.
-        Row(
-            modifier = Modifier
-                .requiredWidth(expandedWidth)
-                .fillMaxHeight()
-                .graphicsLayer { alpha = progress },
-        ) {
+        // Content laid out at the full width always (requiredWidth) and clipped as
+        // the rail narrows, so the widgets stay full-form -- no reflow, no scaling.
+        Row(modifier = Modifier.requiredWidth(expandedWidth).fillMaxHeight()) {
             RegionDivider(props.showDivider)
             RightPanel(ctx.appState, ctx.onLogin, ctx.onLogout, ctx.sslBypass, Modifier.weight(1f).fillMaxHeight())
-        }
-
-        // Gesture surface, confined so it never fights the rail's widgets:
-        //   collapsed -> the whole (wide) strip; tap or swipe-left to reopen.
-        //   expanded  -> a slim invisible band at the inner edge; swipe-right to shut.
-        if (props.swipeToCollapse || collapsed) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .then(if (collapsed) Modifier.fillMaxSize() else Modifier.width(RAIL_EDGE_GRIP_WIDTH.dp).fillMaxHeight())
-                    .then(if (collapsed) Modifier.background(glassSurfaceAlpha(0.4f)) else Modifier)
-                    .then(if (collapsed) Modifier.clickable { toggleCollapse() } else Modifier)
-                    .pointerInput(collapsedPx, expandedPx, props.swipeToCollapse) {
-                        if (!props.swipeToCollapse) return@pointerInput
-                        detectHorizontalDragGestures(
-                            onHorizontalDrag = { change, delta ->
-                                change.consume()
-                                // Rail sits on the right: dragging left (negative delta) widens it.
-                                scope.launch { widthAnim.snapTo((widthAnim.value - delta).coerceIn(collapsedPx, expandedPx)) }
-                            },
-                            onDragEnd = {
-                                val collapseNow = widthAnim.value < (collapsedPx + expandedPx) / 2f
-                                scope.launch { widthAnim.animateTo(if (collapseNow) collapsedPx else expandedPx) }
-                                if (collapseNow != props.collapsed) toggleCollapse()
-                            },
-                        )
-                    },
-            )
         }
     }
 }
