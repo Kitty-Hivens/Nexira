@@ -148,12 +148,14 @@ fun ShellCenterRegion(instance: WidgetInstance) {
     }
 }
 
+private const val RAIL_COLLAPSED_GRAB = 24 // dp transparent swipe-catch kept when collapsed
+
 /**
  * Right region: the divider plus the news panel. removable=false. No handles or
  * strips: a horizontal swipe anywhere on the rail shuts it (the width tracks the
- * pointer and snaps on release; vertical scrolls and taps still reach the news),
- * and Ctrl+N toggles it. Collapsed the rail is zero-width, so Ctrl+N reopens it.
- * Edit mode keeps the static prop-driven behaviour so arranging widgets is calm.
+ * pointer and snaps on release; vertical scrolls and taps still reach the news).
+ * Collapsed it keeps a slim transparent swipe-catch at the edge, so a swipe back
+ * (or Ctrl+N) reopens it. Edit mode keeps the static prop-driven behaviour.
  */
 @Widget(id = "appshell.region.right", displayName = "widget.appshell.region.right", removable = false, propsClass = ShellRegionProps::class)
 @Composable
@@ -194,33 +196,35 @@ fun ShellRightRegion(instance: WidgetInstance) {
 
     val density = LocalDensity.current
     val expandedWidth = if (props.widthDp > 0) props.widthDp.dp else 265.dp
-    val expandedPx = with(density) { expandedWidth.toPx() }
-    val widthAnim = remember { Animatable(if (props.collapsed) 0f else expandedPx) }
+    val expandedPx  = with(density) { expandedWidth.toPx() }
+    // Collapsed keeps a slim transparent swipe-catch at the screen edge so the
+    // rail can be dragged back open; the drag then ranges over the full width.
+    val collapsedPx = with(density) { RAIL_COLLAPSED_GRAB.dp.toPx() }
+    val widthAnim = remember { Animatable(if (props.collapsed) collapsedPx else expandedPx) }
     val scope = rememberCoroutineScope()
 
     // Snap to the target whenever it changes from outside a drag (Ctrl+N / width
     // edit). A drag never changes these keys mid-flight, so it is not interrupted.
-    LaunchedEffect(props.collapsed, expandedPx) {
-        widthAnim.animateTo(if (props.collapsed) 0f else expandedPx)
+    LaunchedEffect(props.collapsed, expandedPx, collapsedPx) {
+        widthAnim.animateTo(if (props.collapsed) collapsedPx else expandedPx)
     }
 
     val bg = if (props.glassAlpha > 0f) glassSurfaceAlpha(props.glassAlpha) else Color.Transparent
     val ctx = LocalShellContext.current
 
-    // Horizontal swipe anywhere on the rail closes it; vertical scrolls and taps
-    // still reach the news (orthogonal gestures arbitrate by direction), so it
-    // never fights the widgets. Collapsed the rail is zero-width -- nothing to
-    // swipe -- so Ctrl+N reopens it. No handle, no strip, no fade.
+    // Horizontal swipe anywhere on the rail opens / closes it; vertical scrolls
+    // and taps still reach the news (orthogonal gestures arbitrate by direction),
+    // so it never fights the widgets. No handle, no strip, no fade.
     val swipe = if (props.swipeToCollapse) {
-        Modifier.pointerInput(expandedPx) {
+        Modifier.pointerInput(collapsedPx, expandedPx) {
             detectHorizontalDragGestures(
                 onHorizontalDrag = { change, delta ->
                     change.consume()
-                    scope.launch { widthAnim.snapTo((widthAnim.value - delta).coerceIn(0f, expandedPx)) }
+                    scope.launch { widthAnim.snapTo((widthAnim.value - delta).coerceIn(collapsedPx, expandedPx)) }
                 },
                 onDragEnd = {
-                    val collapse = widthAnim.value < expandedPx / 2f
-                    scope.launch { widthAnim.animateTo(if (collapse) 0f else expandedPx) }
+                    val collapse = widthAnim.value < (collapsedPx + expandedPx) / 2f
+                    scope.launch { widthAnim.animateTo(if (collapse) collapsedPx else expandedPx) }
                     if (collapse != props.collapsed) toggleCollapse()
                 },
             )
@@ -237,11 +241,14 @@ fun ShellRightRegion(instance: WidgetInstance) {
             .clipToBounds()
             .then(swipe),
     ) {
-        // Content laid out at the full width always (requiredWidth) and clipped as
-        // the rail narrows, so the widgets stay full-form -- no reflow, no scaling.
-        Row(modifier = Modifier.requiredWidth(expandedWidth).fillMaxHeight()) {
-            RegionDivider(props.showDivider)
-            RightPanel(ctx.appState, ctx.onLogin, ctx.onLogout, ctx.sslBypass, Modifier.weight(1f).fillMaxHeight())
+        // Hide the content while basically collapsed so the slim catch shows no
+        // clipped sliver; it wipes in (at full width, requiredWidth -- no reflow)
+        // as the rail widens.
+        if (widthAnim.value > collapsedPx + 1f) {
+            Row(modifier = Modifier.requiredWidth(expandedWidth).fillMaxHeight()) {
+                RegionDivider(props.showDivider)
+                RightPanel(ctx.appState, ctx.onLogin, ctx.onLogout, ctx.sslBypass, Modifier.weight(1f).fillMaxHeight())
+            }
         }
     }
 }
