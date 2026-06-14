@@ -313,6 +313,7 @@ object RussianStrings : AppStrings {
     // =========================================================================
     override val aboutTitle                = "О ЛАУНЧЕРЕ"
     override fun aboutDescription(branding: String) = "Неофициальный лаунчер для $branding"
+    override val locale = java.util.Locale.of("ru", "RU")
     override fun aboutBuildDate(date: String) = "Собрано: $date"
     override val aboutSectionCreator       = "Создатель"
     override val aboutSectionTechnologies  = "Технологии"
@@ -830,6 +831,9 @@ object RussianStrings : AppStrings {
         "widget.about.links.card.title" to "Заголовок",
         "widget.about.logo" to "Логотип и версия",
         "widget.about.logo.title" to "Заголовок",
+        "widget.about.logo.showVersion" to "Показывать версию",
+        "widget.about.logo.showBuildDate" to "Показывать дату сборки",
+        "widget.about.logo.showTagline" to "Показывать подзаголовок",
         "widget.about.system.card" to "Система",
         "widget.about.system.card.title" to "Заголовок",
         "widget.about.update.panel" to "Обновления",

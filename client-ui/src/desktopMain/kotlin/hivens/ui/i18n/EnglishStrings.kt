@@ -315,6 +315,7 @@ object EnglishStrings : AppStrings {
     // =========================================================================
     override val aboutTitle                = "About"
     override fun aboutDescription(branding: String) = "Unofficial launcher for $branding"
+    override val locale = java.util.Locale.ENGLISH
     override fun aboutBuildDate(date: String) = "Built: $date"
     override val aboutSectionCreator       = "Creator"
     override val aboutSectionTechnologies  = "Technologies"
@@ -815,6 +816,9 @@ object EnglishStrings : AppStrings {
         "widget.about.links.card.title" to "Heading",
         "widget.about.logo" to "Logo and version",
         "widget.about.logo.title" to "Heading",
+        "widget.about.logo.showVersion" to "Show version",
+        "widget.about.logo.showBuildDate" to "Show build date",
+        "widget.about.logo.showTagline" to "Show tagline",
         "widget.about.system.card" to "System",
         "widget.about.system.card.title" to "Heading",
         "widget.about.update.panel" to "Updates",

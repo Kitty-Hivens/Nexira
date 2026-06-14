@@ -114,7 +114,7 @@ fun AboutCreditsWidget(instance: WidgetInstance) {
                     )
                     Spacer(Modifier.width(6.dp))
                     Text(
-                        text     = "-- ${af.maybeGibberish(desc, probability = 0.40f, mode = GibberishMode.JARGON)}",
+                        text     = "— ${af.maybeGibberish(desc, probability = 0.40f, mode = GibberishMode.JARGON)}",
                         color    = CelestiaTheme.colors.textSecondary,
                         fontSize = 13.sp,
                     )
