@@ -957,6 +957,7 @@ object EnglishStrings : AppStrings {
     override val editorBackingPaddingEnd    = "Padding right"
     override val editorBackingPaddingBottom = "Padding bottom"
     override val editorBackingPaddingStart  = "Padding left"
+    override val editorBackingNoGlassHint   = "No glass means no visible backing. Corner and padding still apply to the widget."
 
     // --- Layout editor: presets ---
     override val editorPresetsTitle          = "Presets"

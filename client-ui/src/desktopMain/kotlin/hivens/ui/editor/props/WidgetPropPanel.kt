@@ -232,6 +232,16 @@ private fun PropPanelBody(
                 keyStep       = 1f,
                 onValueChange = { controller.updateChrome(path, instanceId, chrome.copy(glassAlphaPct = it.roundToInt())) },
             )
+            // Glass 0 = no visible card, but the renderer applies the corner clip
+            // and padding outside the glass, so both still shape the widget. Say so
+            // rather than letting the corner/padding controls read as inert.
+            if (chrome.glassAlphaPct == 0) {
+                Text(
+                    text  = s.editorBackingNoGlassHint,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.7f),
+                )
+            }
             LabeledSlider(
                 label         = s.editorBackingCorner,
                 value         = chrome.cornerRadiusDp.toFloat(),
