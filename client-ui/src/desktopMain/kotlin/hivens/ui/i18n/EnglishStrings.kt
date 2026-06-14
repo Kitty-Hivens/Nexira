@@ -949,7 +949,11 @@ object EnglishStrings : AppStrings {
     override val editorBackingTitle   = "Backing"
     override val editorBackingGlass   = "Glass opacity"
     override val editorBackingCorner  = "Corner"
-    override val editorBackingPadding = "Padding"
+    override val editorBackingPadding = "Padding (all sides)"
+    override val editorBackingPaddingTop    = "Padding top"
+    override val editorBackingPaddingEnd    = "Padding right"
+    override val editorBackingPaddingBottom = "Padding bottom"
+    override val editorBackingPaddingStart  = "Padding left"
 
     // --- Layout editor: presets ---
     override val editorPresetsTitle          = "Presets"

@@ -248,6 +248,40 @@ private fun PropPanelBody(
                 keyStep       = 1f,
                 onValueChange = { controller.updateChrome(path, instanceId, chrome.copy(paddingDp = it.roundToInt())) },
             )
+            // Per-side overrides. Each starts at the uniform value (effective*)
+            // and, once moved, pins that side independently of the uniform one.
+            LabeledSlider(
+                label         = s.editorBackingPaddingTop,
+                value         = chrome.effectiveTop.toFloat(),
+                range         = 0f..40f,
+                format        = "%.0f",
+                keyStep       = 1f,
+                onValueChange = { controller.updateChrome(path, instanceId, chrome.copy(paddingTopDp = it.roundToInt())) },
+            )
+            LabeledSlider(
+                label         = s.editorBackingPaddingEnd,
+                value         = chrome.effectiveEnd.toFloat(),
+                range         = 0f..40f,
+                format        = "%.0f",
+                keyStep       = 1f,
+                onValueChange = { controller.updateChrome(path, instanceId, chrome.copy(paddingEndDp = it.roundToInt())) },
+            )
+            LabeledSlider(
+                label         = s.editorBackingPaddingBottom,
+                value         = chrome.effectiveBottom.toFloat(),
+                range         = 0f..40f,
+                format        = "%.0f",
+                keyStep       = 1f,
+                onValueChange = { controller.updateChrome(path, instanceId, chrome.copy(paddingBottomDp = it.roundToInt())) },
+            )
+            LabeledSlider(
+                label         = s.editorBackingPaddingStart,
+                value         = chrome.effectiveStart.toFloat(),
+                range         = 0f..40f,
+                format        = "%.0f",
+                keyStep       = 1f,
+                onValueChange = { controller.updateChrome(path, instanceId, chrome.copy(paddingStartDp = it.roundToInt())) },
+            )
         }
 
         TextButton(

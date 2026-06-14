@@ -964,7 +964,11 @@ object RussianStrings : AppStrings {
     override val editorBackingTitle   = "Подложка"
     override val editorBackingGlass   = "Непрозрачность стекла"
     override val editorBackingCorner  = "Скругление"
-    override val editorBackingPadding = "Отступ"
+    override val editorBackingPadding = "Отступ (все стороны)"
+    override val editorBackingPaddingTop    = "Отступ сверху"
+    override val editorBackingPaddingEnd    = "Отступ справа"
+    override val editorBackingPaddingBottom = "Отступ снизу"
+    override val editorBackingPaddingStart  = "Отступ слева"
 
     // --- Layout editor: presets ---
     override val editorPresetsTitle          = "Пресеты"

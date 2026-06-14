@@ -38,14 +38,26 @@ data class WidgetInstance(
 
 // Optional backing painted around a widget by the kernel: a glass card behind
 // it ([glassAlphaPct] 0 = none), rounded corners ([cornerRadiusDp]), and inner
-// [paddingDp]. Compose-free (widget-model carries no Compose); the kernel turns
-// these scalars into a Modifier via the injected LocalWidgetChromeRenderer.
+// padding. [paddingDp] is the uniform baseline; each side may override it via
+// [paddingTopDp] / [paddingEndDp] / [paddingBottomDp] / [paddingStartDp], where
+// -1 means "inherit the uniform value". Compose-free (widget-model carries no
+// Compose); the kernel turns these scalars into a Modifier via the injected
+// LocalWidgetChromeRenderer.
 @Serializable
 data class WidgetChrome(
     val glassAlphaPct: Int = 0,
     val cornerRadiusDp: Int = 0,
     val paddingDp: Int = 0,
-)
+    val paddingTopDp: Int = -1,
+    val paddingEndDp: Int = -1,
+    val paddingBottomDp: Int = -1,
+    val paddingStartDp: Int = -1,
+) {
+    val effectiveTop: Int    get() = if (paddingTopDp    >= 0) paddingTopDp    else paddingDp
+    val effectiveEnd: Int    get() = if (paddingEndDp    >= 0) paddingEndDp    else paddingDp
+    val effectiveBottom: Int get() = if (paddingBottomDp >= 0) paddingBottomDp else paddingDp
+    val effectiveStart: Int  get() = if (paddingStartDp  >= 0) paddingStartDp  else paddingDp
+}
 
 // Phase G: how a slot arranges its widgets. Column (default) reproduces
 // the pre-Phase-G vertical stack; Row lays them horizontally; Grid flows

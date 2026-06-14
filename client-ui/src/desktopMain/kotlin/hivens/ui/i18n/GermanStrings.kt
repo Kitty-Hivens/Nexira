@@ -950,7 +950,11 @@ object GermanStrings : AppStrings {
     override val editorBackingTitle   = "Hintergrund"
     override val editorBackingGlass   = "Glas-Deckkraft"
     override val editorBackingCorner  = "Ecke"
-    override val editorBackingPadding = "Abstand"
+    override val editorBackingPadding = "Abstand (alle Seiten)"
+    override val editorBackingPaddingTop    = "Abstand oben"
+    override val editorBackingPaddingEnd    = "Abstand rechts"
+    override val editorBackingPaddingBottom = "Abstand unten"
+    override val editorBackingPaddingStart  = "Abstand links"
 
     // --- Layout editor: presets ---
     override val editorPresetsTitle          = "Presets"

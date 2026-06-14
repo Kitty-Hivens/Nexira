@@ -873,6 +873,10 @@ interface AppStrings {
     val editorBackingGlass: String
     val editorBackingCorner: String
     val editorBackingPadding: String
+    val editorBackingPaddingTop: String
+    val editorBackingPaddingEnd: String
+    val editorBackingPaddingBottom: String
+    val editorBackingPaddingStart: String
 
     // --- Layout editor: presets ---
     val editorPresetsTitle: String
