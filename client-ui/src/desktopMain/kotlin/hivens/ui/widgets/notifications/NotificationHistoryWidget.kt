@@ -1,6 +1,7 @@
 package hivens.ui.widgets.notifications
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -8,6 +9,7 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,6 +17,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -30,19 +33,26 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.notifications.NotificationArchiveStore
 import hivens.ui.notifications.PersistedNotification
 import hivens.ui.notifications.Severity
 import hivens.ui.notifications.render.NotificationAvatar
@@ -56,8 +66,11 @@ import hivens.widget.api.rememberSource
 import hivens.widget.model.PropLabel
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
+import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
+import org.koin.compose.koinInject
 import java.time.Instant
+import kotlin.math.roundToInt
 
 @Serializable
 data class NotificationHistoryProps(
@@ -68,61 +81,60 @@ data class NotificationHistoryProps(
 
 /**
  * Placeable message-history widget: the durable counterpart to the live
- * top-right toast stack. Reads the persisted
- * [hivens.ui.notifications.NotificationArchiveStore] log (survives auto-dismiss
- * and restart).
+ * top-right toast stack. Reads the persisted [NotificationArchiveStore] log
+ * (survives auto-dismiss and restart).
  *
  * Self-contained outlined panel: collapsed it is a compact bar -- an expand
  * chevron pill and a "<N> messages" pill. Expanding animates the panel open with
  * the messages inside it; the clear (trash) pill appears only while expanded.
- * The expand direction is a per-instance prop. Consecutive identical entries
- * fold into one row with a count, mirroring the live stack's progress coalescing.
+ * A single message is swiped to the right to dismiss it; the trash pill slides
+ * the whole list out before wiping it. Consecutive identical entries fold into
+ * one row with a count, mirroring the live stack's progress coalescing.
  */
 @Widget(id = "notifications.history", displayName = "widget.notifications.history", propsClass = NotificationHistoryProps::class)
 @Composable
 fun NotificationHistoryWidget(instance: WidgetInstance) {
     val props = instance.rememberProps<NotificationHistoryProps>()
     // Bound declaratively to the notifications source for the read and the clear
-    // command for the write -- the widget drives no service directly.
+    // command for the write; the store is injected for per-message removal.
     val log by rememberSource(Sources.Notifications)
     val clearLog = rememberAction(Commands.ClearNotifications)
+    val store: NotificationArchiveStore = koinInject()
     val palette = CelestiaTheme.colors
     var expanded by remember { mutableStateOf(false) }
     val groups = remember(log) { groupHistory(log) }
     val outline = palette.outline.copy(alpha = 0.4f)
+    val scope = rememberCoroutineScope()
 
-    // The whole widget is one outlined, rounded panel that wraps its content --
-    // a compact bar when collapsed, growing as the drawer opens.
+    // Clear slides the whole list out to the right, then wipes it.
+    val clearOffset = remember { Animatable(0f) }
+    var panelWidthPx by remember { mutableStateOf(1f) }
+    val animatedClear: () -> Unit = {
+        scope.launch {
+            clearOffset.animateTo(panelWidthPx)
+            clearLog()
+            clearOffset.snapTo(0f)
+        }
+    }
+    val onDismissGroup: (HistoryGroup) -> Unit = { group ->
+        store.remove { it in group.members }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .onSizeChanged { panelWidthPx = it.width.toFloat().coerceAtLeast(1f) }
             .clip(RoundedCornerShape(16.dp))
             .background(glassSurfaceAlpha(0.5f))
             .border(1.dp, outline, RoundedCornerShape(16.dp))
             .padding(8.dp),
     ) {
         if (props.expandUp) {
-            NotificationDrawer(expanded = expanded, log = log, groups = groups, fromTop = false)
-            HistoryHeader(
-                expanded     = expanded,
-                expandUp     = true,
-                messageCount = log.size,
-                showTrash    = expanded && log.isNotEmpty(),
-                outline      = outline,
-                onToggle     = { expanded = !expanded },
-                onClear      = clearLog,
-            )
+            NotificationDrawer(expanded, groups, log.isEmpty(), clearOffset.value, onDismissGroup, fromTop = false)
+            HistoryHeader(expanded, true, log.size, expanded && log.isNotEmpty(), outline, { expanded = !expanded }, animatedClear)
         } else {
-            HistoryHeader(
-                expanded     = expanded,
-                expandUp     = false,
-                messageCount = log.size,
-                showTrash    = expanded && log.isNotEmpty(),
-                outline      = outline,
-                onToggle     = { expanded = !expanded },
-                onClear      = clearLog,
-            )
-            NotificationDrawer(expanded = expanded, log = log, groups = groups, fromTop = true)
+            HistoryHeader(expanded, false, log.size, expanded && log.isNotEmpty(), outline, { expanded = !expanded }, animatedClear)
+            NotificationDrawer(expanded, groups, log.isEmpty(), clearOffset.value, onDismissGroup, fromTop = true)
         }
     }
 }
@@ -209,8 +221,10 @@ private fun CountPill(text: String, outline: Color) {
 @Composable
 private fun NotificationDrawer(
     expanded: Boolean,
-    log: List<PersistedNotification>,
     groups: List<HistoryGroup>,
+    isEmpty: Boolean,
+    clearOffsetPx: Float,
+    onDismissGroup: (HistoryGroup) -> Unit,
     fromTop: Boolean,
 ) {
     val strings = LocalStrings.current
@@ -221,7 +235,7 @@ private fun NotificationDrawer(
         enter   = expandVertically(expandFrom = edge) + fadeIn(),
         exit    = shrinkVertically(shrinkTowards = edge) + fadeOut(),
     ) {
-        if (log.isEmpty()) {
+        if (isEmpty) {
             Box(
                 modifier         = Modifier.fillMaxWidth().padding(vertical = 16.dp),
                 contentAlignment = Alignment.Center,
@@ -234,41 +248,96 @@ private fun NotificationDrawer(
             }
         } else {
             // Bounded so the inner scroll has a height to work with (the panel
-            // wraps its content, so without a cap the list would grow unbounded).
+            // wraps its content). The clear animation slides the whole list right.
             Column(
                 modifier            = Modifier
                     .fillMaxWidth()
                     .heightIn(max = 260.dp)
                     .verticalScroll(rememberScrollState())
+                    .offset { IntOffset(clearOffsetPx.roundToInt(), 0) }
                     .padding(vertical = 6.dp),
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
-                groups.forEach { group -> HistoryRow(group.head, group.count) }
+                groups.forEach { group ->
+                    key(group.head.sourceKey, group.head.createdAtEpoch, group.head.title) {
+                        SwipeableHistoryRow(
+                            entry     = group.head,
+                            count     = group.count,
+                            onDismiss = { onDismissGroup(group) },
+                        )
+                    }
+                }
             }
         }
     }
 }
 
-private data class HistoryGroup(val head: PersistedNotification, val count: Int)
+// Swipe a row to the right to dismiss it: the offset tracks the drag, snaps back
+// if released early, or slides off and removes the group once past the threshold.
+@Composable
+private fun SwipeableHistoryRow(entry: PersistedNotification, count: Int, onDismiss: () -> Unit) {
+    val scope = rememberCoroutineScope()
+    val offsetX = remember { Animatable(0f) }
+    var widthPx by remember { mutableStateOf(1f) }
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .onSizeChanged { widthPx = it.width.toFloat().coerceAtLeast(1f) }
+            .pointerInput(Unit) {
+                detectHorizontalDragGestures(
+                    onHorizontalDrag = { change, delta ->
+                        change.consume()
+                        // Dismiss is a rightward swipe; clamp the left side at rest.
+                        scope.launch { offsetX.snapTo((offsetX.value + delta).coerceAtLeast(0f)) }
+                    },
+                    onDragEnd = {
+                        if (offsetX.value > widthPx * 0.4f) {
+                            scope.launch { offsetX.animateTo(widthPx); onDismiss() }
+                        } else {
+                            scope.launch { offsetX.animateTo(0f) }
+                        }
+                    },
+                )
+            }
+            .offset { IntOffset(offsetX.value.roundToInt(), 0) }
+            .graphicsLayer { alpha = (1f - offsetX.value / widthPx).coerceIn(0f, 1f) },
+    ) {
+        HistoryRow(entry, count)
+    }
+}
+
+private data class HistoryGroup(val head: PersistedNotification, val members: List<PersistedNotification>) {
+    val count: Int get() = members.size
+}
 
 // Collapse runs of consecutive identical entries (same source + title +
 // severity). The log is newest-first, so the kept head is the most recent of
 // each run; only adjacent duplicates fold, so a re-occurrence after other
-// activity stays a separate row.
+// activity stays a separate row. Each group keeps its members so a swipe removes
+// exactly that run.
 private fun groupHistory(log: List<PersistedNotification>): List<HistoryGroup> {
     val out = ArrayList<HistoryGroup>(log.size)
-    for (entry in log) {
-        val last = out.lastOrNull()
-        if (last != null &&
-            last.head.sourceKey == entry.sourceKey &&
-            last.head.title == entry.title &&
-            last.head.severity == entry.severity
-        ) {
-            out[out.lastIndex] = last.copy(count = last.count + 1)
-        } else {
-            out.add(HistoryGroup(entry, 1))
+    val cur = ArrayList<PersistedNotification>()
+    fun flush() {
+        if (cur.isNotEmpty()) {
+            out.add(HistoryGroup(cur.first(), cur.toList()))
+            cur.clear()
         }
     }
+    for (entry in log) {
+        val head = cur.firstOrNull()
+        if (head != null &&
+            head.sourceKey == entry.sourceKey &&
+            head.title == entry.title &&
+            head.severity == entry.severity
+        ) {
+            cur.add(entry)
+        } else {
+            flush()
+            cur.add(entry)
+        }
+    }
+    flush()
     return out
 }
 
