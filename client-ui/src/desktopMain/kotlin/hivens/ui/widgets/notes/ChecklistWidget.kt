@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.LocalStyle
 import hivens.ui.widgets.AdaptiveWidget
 import hivens.ui.widgets.scaled
 import hivens.widget.api.rememberProps
@@ -102,7 +103,7 @@ fun ChecklistWidget(instance: WidgetInstance) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .clip(RoundedCornerShape(14.dp * scale))
+                .clip(RoundedCornerShape(LocalStyle.current.cardCorner * scale))
                 .background(glassSurfaceAlpha(0.55f))
                 .padding(14.dp * scale),
         ) {
@@ -216,7 +217,7 @@ private fun AddRow(scale: Float, onAdd: (String) -> Unit) {
             contentAlignment = Alignment.Center,
             modifier         = Modifier
                 .size(24.dp * scale)
-                .clip(RoundedCornerShape(6.dp))
+                .clip(MaterialTheme.shapes.small)
                 .clickable(onClick = { commit() }),
         ) {
             Icon(

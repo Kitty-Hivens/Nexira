@@ -248,7 +248,7 @@ fun UpdateManagerDialog(onDismiss: () -> Unit) {
                         Spacer(Modifier.height(8.dp))
                         Box(
                             Modifier.fillMaxWidth().heightIn(max = 180.dp)
-                                .clip(RoundedCornerShape(8.dp))
+                                .clip(MaterialTheme.shapes.medium)
                                 .background(CelestiaTheme.colors.background.copy(alpha = 0.4f))
                                 .padding(8.dp),
                         ) {

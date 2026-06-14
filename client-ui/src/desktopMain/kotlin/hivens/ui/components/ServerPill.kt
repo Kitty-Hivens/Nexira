@@ -140,9 +140,9 @@ fun ServerPill(
         modifier = modifier
             .fillMaxWidth()
             .height(52.dp)
-            .clip(RoundedCornerShape(14.dp))
+            .clip(MaterialTheme.shapes.medium)
             .background(glassSurfaceAlpha(0.45f))
-            .border(if (isSelected) 1.5.dp else 1.dp, borderColor, RoundedCornerShape(14.dp))
+            .border(if (isSelected) 1.5.dp else 1.dp, borderColor, MaterialTheme.shapes.medium)
             .clickable(interactionSource = interaction, indication = null) { onSelect() }
             .hoverable(interaction)
             .focusable(interactionSource = interaction)

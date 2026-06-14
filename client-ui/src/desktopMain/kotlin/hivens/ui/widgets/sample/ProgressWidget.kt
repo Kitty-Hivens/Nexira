@@ -58,7 +58,7 @@ fun ProgressWidget(instance: WidgetInstance) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = 12.dp)
-            .clip(RoundedCornerShape(14.dp))
+            .clip(MaterialTheme.shapes.medium)
             .background(glassSurfaceAlpha(0.40f))
             .padding(horizontal = 16.dp, vertical = 14.dp),
     ) {

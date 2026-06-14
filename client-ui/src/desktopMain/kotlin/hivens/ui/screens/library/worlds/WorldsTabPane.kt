@@ -159,7 +159,7 @@ private fun EmptyHint(text: String) {
     Box(
         modifier         = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
+            .clip(MaterialTheme.shapes.medium)
             .background(glassSurfaceAlpha(0.4f))
             .padding(20.dp),
         contentAlignment = Alignment.Center,
@@ -178,7 +178,7 @@ private fun WorldCard(world: WorldEntry) {
     Row(
         modifier              = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(MaterialTheme.shapes.medium)
             .background(glassSurfaceAlpha(0.5f))
             .padding(12.dp),
         verticalAlignment     = Alignment.CenterVertically,
@@ -241,7 +241,7 @@ private fun ServerCard(entry: MultiplayerServerEntry) {
     Row(
         modifier              = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(MaterialTheme.shapes.medium)
             .background(glassSurfaceAlpha(0.45f))
             .padding(12.dp),
         verticalAlignment     = Alignment.CenterVertically,
@@ -312,7 +312,7 @@ private fun Chip(text: String, accent: Boolean = false) {
     AssistChip(
         onClick = {},
         enabled = false,
-        shape   = RoundedCornerShape(6.dp),
+        shape   = MaterialTheme.shapes.extraSmall,
         label   = {
             Text(
                 text  = text,

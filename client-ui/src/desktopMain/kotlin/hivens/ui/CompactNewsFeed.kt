@@ -185,7 +185,7 @@ private fun NewsFilterField(query: String, onQueryChange: (String) -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp, vertical = 6.dp)
-            .clip(RoundedCornerShape(8.dp))
+            .clip(MaterialTheme.shapes.medium)
             .background(glassSurfaceAlpha(0.4f))
             .padding(start = 8.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
     ) {

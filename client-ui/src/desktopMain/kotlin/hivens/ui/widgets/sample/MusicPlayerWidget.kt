@@ -138,7 +138,7 @@ fun MusicPlayerWidget(instance: WidgetInstance) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = 12.dp)
-            .clip(RoundedCornerShape(16.dp))
+            .clip(MaterialTheme.shapes.medium)
             .background(
                 Brush.linearGradient(
                     colors = listOf(

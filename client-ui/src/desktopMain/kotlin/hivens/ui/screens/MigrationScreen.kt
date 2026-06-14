@@ -123,7 +123,7 @@ private fun ReadyContent(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
+            .clip(MaterialTheme.shapes.medium)
             .background(glassSurfaceAlpha(0.4f))
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),

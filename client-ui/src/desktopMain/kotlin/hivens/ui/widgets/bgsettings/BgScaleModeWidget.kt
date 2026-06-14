@@ -10,7 +10,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -52,7 +52,7 @@ fun BgScaleModeWidget(instance: WidgetInstance) {
                     modifier = Modifier
                         .weight(1f)
                         .height(32.dp)
-                        .clip(RoundedCornerShape(6.dp))
+                        .clip(MaterialTheme.shapes.small)
                         .background(if (selected) CelestiaTheme.colors.primary else glassSurfaceAlpha(0.4f))
                         .clickable { ctx.update { copy(scaleMode = mode) } },
                     contentAlignment = Alignment.Center,

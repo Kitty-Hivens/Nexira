@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.WifiOff
@@ -239,11 +238,11 @@ fun HomeClassicContent(instance: WidgetInstance) {
                 .border(
                     width = 1.dp,
                     color = CelestiaTheme.colors.outline.copy(alpha = 0.25f),
-                    shape = RoundedCornerShape(14.dp),
+                    shape = MaterialTheme.shapes.medium,
                 )
                 .background(
                     color = glassSurfaceAlpha(0.45f),
-                    shape = RoundedCornerShape(14.dp),
+                    shape = MaterialTheme.shapes.medium,
                 )
                 .padding(horizontal = 16.dp, vertical = 14.dp),
         ) {
@@ -280,11 +279,11 @@ private fun AutoSyncProgressStrip(
             .border(
                 width = 1.dp,
                 color = CelestiaTheme.colors.outline.copy(alpha = 0.20f),
-                shape = RoundedCornerShape(10.dp),
+                shape = MaterialTheme.shapes.medium,
             )
             .background(
                 color = glassSurfaceAlpha(0.35f),
-                shape = RoundedCornerShape(10.dp),
+                shape = MaterialTheme.shapes.medium,
             )
             .padding(horizontal = 14.dp, vertical = 8.dp),
     ) {

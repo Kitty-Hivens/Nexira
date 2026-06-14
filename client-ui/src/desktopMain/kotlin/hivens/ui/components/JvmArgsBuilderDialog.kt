@@ -5,7 +5,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -267,7 +266,7 @@ private fun GcOption(label: String, hint: String, selected: Boolean, onClick: ()
     Row(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
+            .clip(MaterialTheme.shapes.medium)
             .clickable(onClick = onClick)
             .background(
                 if (selected) CelestiaTheme.colors.primary.copy(alpha = 0.12f)
@@ -592,10 +591,10 @@ private fun ArgsPreviewBox(config: JvmConfig) {
             Modifier
                 .fillMaxWidth()
                 .heightIn(min = 60.dp, max = 110.dp)
-                .clip(RoundedCornerShape(8.dp))
+                .clip(MaterialTheme.shapes.medium)
                 .background(CelestiaTheme.colors.background.copy(alpha = 0.6f))
                 .border(1.dp, CelestiaTheme.colors.textSecondary.copy(alpha = 0.2f),
-                    RoundedCornerShape(8.dp))
+                    MaterialTheme.shapes.medium)
                 .verticalScroll(rememberScrollState())
                 .padding(12.dp)
         ) {

@@ -54,6 +54,7 @@ import hivens.ui.easter.LocalAprilFools
 import hivens.ui.effects.neonBorder
 import hivens.ui.effects.shimmerOverlay
 import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.LocalStyle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
@@ -176,12 +177,12 @@ fun SquareServerCard(
         modifier = Modifier
             .aspectRatio(1f)
             .scale(scale)
-            .clip(RoundedCornerShape(20.dp))
+            .clip(MaterialTheme.shapes.medium)
             .let { m ->
                 when {
-                    isSelected -> m.neonBorder(CelestiaTheme.colors.primary, cornerRadius = 20.dp, strokeWidth = 2.dp)
-                    isFocused  -> m.border(2.dp, CelestiaTheme.colors.textPrimary, RoundedCornerShape(20.dp))
-                    else       -> m.border(1.dp, CelestiaTheme.colors.outline.copy(alpha = 0.25f), RoundedCornerShape(20.dp))
+                    isSelected -> m.neonBorder(CelestiaTheme.colors.primary, cornerRadius = LocalStyle.current.cardCorner, strokeWidth = 2.dp)
+                    isFocused  -> m.border(2.dp, CelestiaTheme.colors.textPrimary, MaterialTheme.shapes.medium)
+                    else       -> m.border(1.dp, CelestiaTheme.colors.outline.copy(alpha = 0.25f), MaterialTheme.shapes.medium)
                 }
             }
             // Shimmer on hover (not when already glowing with neon)
@@ -286,7 +287,7 @@ fun SquareServerCard(
             // Version badge
             Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(4.dp))
+                    .clip(MaterialTheme.shapes.extraSmall)
                     .background(
                         if (serverIcon != null) surfaceBase.copy(0.55f) else badgeBgFallback
                     )
@@ -323,9 +324,9 @@ fun SquareServerCard(
         ) {
             Row(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(10.dp))
+                    .clip(MaterialTheme.shapes.medium)
                     .background(actionBarColor)
-                    .border(1.dp, CelestiaTheme.colors.outline.copy(alpha = 0.3f), RoundedCornerShape(10.dp))
+                    .border(1.dp, CelestiaTheme.colors.outline.copy(alpha = 0.3f), MaterialTheme.shapes.medium)
                     .padding(4.dp),
                 horizontalArrangement = Arrangement.spacedBy(2.dp)
             ) {

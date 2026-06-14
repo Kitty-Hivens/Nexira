@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
@@ -65,7 +64,7 @@ fun LaunchButtonWidget(instance: WidgetInstance) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = 12.dp)
-            .clip(RoundedCornerShape(18.dp))
+            .clip(MaterialTheme.shapes.small)
             .background(if (ready) gradient else Brush.linearGradient(listOf(
                 CelestiaTheme.colors.surfaceVariant,
                 CelestiaTheme.colors.surfaceVariant,
@@ -80,7 +79,7 @@ fun LaunchButtonWidget(instance: WidgetInstance) {
             Box(
                 modifier = Modifier
                     .size(48.dp)
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(MaterialTheme.shapes.extraSmall)
                     .background(Color.White.copy(alpha = if (ready) 0.18f else 0.06f)),
                 contentAlignment = Alignment.Center,
             ) {
