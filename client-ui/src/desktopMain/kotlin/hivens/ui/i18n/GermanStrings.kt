@@ -958,6 +958,7 @@ object GermanStrings : AppStrings {
     override val editorBackingPaddingEnd    = "Abstand rechts"
     override val editorBackingPaddingBottom = "Abstand unten"
     override val editorBackingPaddingStart  = "Abstand links"
+    override val editorBackingNoGlassHint   = "Ohne Glas ist keine Unterlage sichtbar. Ecke und Abstand wirken weiterhin auf das Widget."
 
     // --- Layout editor: presets ---
     override val editorPresetsTitle          = "Presets"
