@@ -54,6 +54,13 @@ class NotificationArchiveStore(
         persistAsync()
     }
 
+    // Drop every entry matching [predicate] -- the history widget uses it to
+    // dismiss a single (grouped) message by swipe.
+    fun remove(predicate: (PersistedNotification) -> Boolean) {
+        _log.update { current -> current.filterNot(predicate) }
+        persistAsync()
+    }
+
     // Coalesce a live progress run per source, mirroring the live stack: while
     // the head is a progress entry for the same source and the incoming one is
     // too, replace it instead of stacking. Newest first; capped.
