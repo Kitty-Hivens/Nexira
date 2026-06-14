@@ -736,6 +736,7 @@ object EnglishStrings : AppStrings {
     override val notificationDismiss         = "Dismiss notification"
     override val notifHistoryEmpty           = "No messages yet"
     override val notifHistoryClear           = "Clear"
+    override val notifDoNotDisturb           = "Do not disturb"
     override fun notifGroupCount(count: Int) = "×$count"
     override fun notifCountTitle(count: Int) = if (count == 1) "$count message" else "$count messages"
     override fun notificationShowMore(count: Int)               = "+$count more"

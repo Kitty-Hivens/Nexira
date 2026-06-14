@@ -85,6 +85,21 @@ class NotificationArchiveStoreTest {
     }
 
     @Test
+    fun `glyph survives the persistence round-trip`() = runTest {
+        val file = dir.resolve("n.json")
+        val store = NotificationArchiveStore(file, json, this)
+        store.record(entry(Kind.OneShot, "Update available").copy(glyph = NotifGlyph.Update))
+        advanceUntilIdle()
+
+        val reloaded = NotificationArchiveStore(file, json, this)
+        assertEquals(
+            NotifGlyph.Update,
+            reloaded.log.value.single().glyph,
+            "the glyph projection round-trips through the archive file",
+        )
+    }
+
+    @Test
     fun `clear empties memory and disk`() = runTest {
         val file = dir.resolve("n.json")
         val store = NotificationArchiveStore(file, json, this)

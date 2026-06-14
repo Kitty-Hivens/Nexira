@@ -151,6 +151,14 @@ data class SettingsData(
      */
     val uiStyle: UiStyle = UiStyle.Celestia,
 
+    /**
+     * "Do not disturb": mute the live top-right notification popups. Events are
+     * still recorded to the history log (the notification-history widget keeps
+     * filling) and still auto-dismiss; only the toast rendering is suppressed.
+     * Off by default; toggled from the history widget's mute button.
+     */
+    val doNotDisturb: Boolean = false,
+
     // ── Smarty server controls ───────────────────────────────────────────
 
     /**

@@ -15,9 +15,26 @@ class NotificationCenter(
     // Durable-log hook. Every push forwards a serializable projection here; the
     // default no-op keeps the center disk-free and testable on its own.
     private val archive: (PersistedNotification) -> Unit = {},
+    // "Do not disturb" seed + persist. Default off + no-op keeps the center
+    // disk-free and testable on its own, mirroring `archive`; the app wires the
+    // seed from settings and persists the flip back.
+    initialDoNotDisturb: Boolean = false,
+    private val persistDoNotDisturb: (Boolean) -> Unit = {},
 ) {
     private val _groups = MutableStateFlow<List<NotificationGroup>>(emptyList())
     val groups: StateFlow<List<NotificationGroup>> = _groups
+
+    // When true, the live popup stack is muted -- pushes still record to the
+    // archive (history keeps filling) and still auto-dismiss; only the toast
+    // rendering is suppressed (gated in NotificationStack).
+    private val _doNotDisturb = MutableStateFlow(initialDoNotDisturb)
+    val doNotDisturb: StateFlow<Boolean> = _doNotDisturb
+
+    fun setDoNotDisturb(value: Boolean) {
+        if (_doNotDisturb.value == value) return
+        _doNotDisturb.value = value
+        persistDoNotDisturb(value)
+    }
 
     fun push(
         sourceKey: String,
@@ -29,6 +46,7 @@ class NotificationCenter(
         body: String? = null,
         progress: Float? = null,
         actions: List<NotifAction> = emptyList(),
+        glyph: NotifGlyph? = null,
     ): String {
         val event = NotificationEvent(
             id        = UUID.randomUUID(),
@@ -45,6 +63,7 @@ class NotificationCenter(
                 sourceKey      = sourceKey,
                 sender         = sender,
                 iconUrl        = iconUrl,
+                glyph          = glyph,
                 severity       = severity,
                 kind           = kind,
                 title          = title,
@@ -60,6 +79,7 @@ class NotificationCenter(
                         sourceKey = sourceKey,
                         sender    = sender,
                         iconUrl   = iconUrl,
+                        glyph     = glyph,
                         events    = listOf(event),
                     )
                 ) + current
@@ -80,6 +100,7 @@ class NotificationCenter(
                 val merged = existing.copy(
                     sender  = sender,
                     iconUrl = iconUrl,
+                    glyph   = glyph,
                     events  = mergedEvents,
                 )
                 val others = current.toMutableList().also { it.removeAt(existingIndex) }

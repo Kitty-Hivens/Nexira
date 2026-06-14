@@ -738,6 +738,7 @@ object RussianStrings : AppStrings {
     override val notificationDismiss         = "Закрыть уведомление"
     override val notifHistoryEmpty           = "Сообщений пока нет"
     override val notifHistoryClear           = "Очистить"
+    override val notifDoNotDisturb           = "Не беспокоить"
     override fun notifGroupCount(count: Int) = "×$count"
     override fun notifCountTitle(count: Int): String {
         val n  = count % 100

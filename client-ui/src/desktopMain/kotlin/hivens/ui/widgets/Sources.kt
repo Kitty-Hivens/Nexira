@@ -14,4 +14,7 @@ import hivens.widget.model.SourceKey
 object Sources {
     val AutoSync = SourceKey<AutoSyncService.Snapshot>("autosync")
     val Notifications = SourceKey<List<PersistedNotification>>("notifications.archive")
+    // "Do not disturb" live state -- the notification-history widget reflects it
+    // on its mute toggle; NotificationStack reads the same flow to gate popups.
+    val DoNotDisturb = SourceKey<Boolean>("notifications.dnd")
 }

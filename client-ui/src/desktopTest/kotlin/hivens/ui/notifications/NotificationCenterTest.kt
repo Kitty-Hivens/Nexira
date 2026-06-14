@@ -177,6 +177,44 @@ class NotificationCenterTest {
         assertEquals("ok", p.body)
     }
 
+    @Test
+    fun `push threads the glyph onto the group and the archive projection`() = runTest {
+        val recorded = mutableListOf<PersistedNotification>()
+        val center = NotificationCenter(clock = clock::now, archive = { recorded += it })
+        center.push(
+            sourceKey = "launcher.update",
+            sender    = "Nexira",
+            iconUrl   = null,
+            severity  = Severity.Info,
+            kind      = Kind.ActionRequired,
+            title     = "Update available",
+            glyph     = NotifGlyph.Update,
+        )
+
+        assertEquals(NotifGlyph.Update, center.groups.first().single().glyph, "group carries the glyph for the live card")
+        assertEquals(NotifGlyph.Update, recorded.single().glyph, "history projection carries the glyph too")
+    }
+
+    @Test
+    fun `do not disturb seeds from the initial value`() = runTest {
+        val center = NotificationCenter(clock = clock::now, initialDoNotDisturb = true)
+        assertTrue(center.doNotDisturb.first())
+    }
+
+    @Test
+    fun `set do not disturb flips the flow and persists only real changes`() = runTest {
+        val persisted = mutableListOf<Boolean>()
+        val center = NotificationCenter(clock = clock::now, persistDoNotDisturb = { persisted += it })
+        assertEquals(false, center.doNotDisturb.first())
+
+        center.setDoNotDisturb(true)
+        assertTrue(center.doNotDisturb.first())
+        center.setDoNotDisturb(true)   // no-op: already true
+        center.setDoNotDisturb(false)
+
+        assertEquals(listOf(true, false), persisted, "persist fires once per real change, not on a no-op")
+    }
+
     private class FixedClock(start: Instant = Instant.parse("2026-05-26T00:00:00Z")) {
         private var current: Instant = start
         fun now(): Instant = current
