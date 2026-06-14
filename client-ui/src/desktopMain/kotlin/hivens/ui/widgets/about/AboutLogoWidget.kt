@@ -36,7 +36,6 @@ import kotlinx.serialization.Serializable
 import org.jetbrains.compose.resources.painterResource
 import java.text.SimpleDateFormat
 import java.util.Date
-import java.util.Locale
 
 // Logo + title + version + build-date + description card. The
 // AprilFools wrapper occasionally corrupts these strings -- left
@@ -45,6 +44,11 @@ import java.util.Locale
 @Serializable
 data class AboutLogoProps(
     @PropLabel("widget.about.logo.title") val title: String = "",
+    // The version is already shown in the Updates card, so it is hidden here by
+    // default; build date and tagline stay on but are toggleable.
+    @PropLabel("widget.about.logo.showVersion") val showVersion: Boolean = false,
+    @PropLabel("widget.about.logo.showBuildDate") val showBuildDate: Boolean = true,
+    @PropLabel("widget.about.logo.showTagline") val showTagline: Boolean = true,
 )
 
 @Widget(id = "about.logo", displayName = "widget.about.logo", propsClass = AboutLogoProps::class)
@@ -72,49 +76,57 @@ fun AboutLogoWidget(instance: WidgetInstance) {
                 fontWeight = FontWeight.Black,
                 color      = CelestiaTheme.colors.textPrimary,
             )
-            Spacer(Modifier.height(8.dp))
+            if (p.showVersion) {
+                Spacer(Modifier.height(8.dp))
+                Box(
+                    modifier = Modifier
+                        .clip(MaterialTheme.shapes.extraSmall)
+                        .background(CelestiaTheme.colors.primary.copy(alpha = 0.15f))
+                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                ) {
+                    Text(
+                        text       = af.maybeGibberish(
+                            "v${Branding.VERSION.removePrefix("v")}",
+                            probability = 0.30f,
+                            mode        = GibberishMode.FAKE_VER,
+                        ),
+                        style      = MaterialTheme.typography.labelLarge,
+                        color      = CelestiaTheme.colors.primary,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+            }
 
-            Box(
-                modifier = Modifier
-                    .clip(MaterialTheme.shapes.extraSmall)
-                    .background(CelestiaTheme.colors.primary.copy(alpha = 0.15f))
-                    .padding(horizontal = 10.dp, vertical = 4.dp),
-            ) {
+            if (p.showBuildDate) {
+                // Format with the app locale (s.locale), not Locale.getDefault() --
+                // the latter is the OS locale, so a RU app on an EN system showed
+                // an English month.
+                val buildDate = remember(s.locale) {
+                    runCatching {
+                        SimpleDateFormat("dd MMM yyyy, HH:mm", s.locale)
+                            .format(Date(BuildConfig.BUILD_TIME))
+                    }.getOrDefault("--")
+                }
+                Spacer(Modifier.height(8.dp))
                 Text(
-                    text       = af.maybeGibberish(
-                        "v${Branding.VERSION.removePrefix("v")}",
-                        probability = 0.30f,
-                        mode        = GibberishMode.FAKE_VER,
-                    ),
-                    style      = MaterialTheme.typography.labelLarge,
-                    color      = CelestiaTheme.colors.primary,
-                    fontWeight = FontWeight.Bold,
+                    text  = af.maybeGibberish(s.aboutBuildDate(buildDate), probability = 0.25f),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.6f),
                 )
             }
 
-            val buildDate = remember {
-                runCatching {
-                    SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault())
-                        .format(Date(BuildConfig.BUILD_TIME))
-                }.getOrDefault("--")
+            if (p.showTagline) {
+                Spacer(Modifier.height(16.dp))
+                Text(
+                    text      = af.maybeGibberish(
+                        s.aboutDescription(Branding.UPSTREAM_NAME),
+                        probability = 0.20f,
+                    ),
+                    style     = MaterialTheme.typography.bodyMedium,
+                    color     = CelestiaTheme.colors.textSecondary,
+                    textAlign = TextAlign.Center,
+                )
             }
-
-            Text(
-                text  = af.maybeGibberish(s.aboutBuildDate(buildDate), probability = 0.25f),
-                style = MaterialTheme.typography.bodySmall,
-                color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.6f),
-            )
-            Spacer(Modifier.height(16.dp))
-
-            Text(
-                text      = af.maybeGibberish(
-                    s.aboutDescription(Branding.UPSTREAM_NAME),
-                    probability = 0.20f,
-                ),
-                style     = MaterialTheme.typography.bodyMedium,
-                color     = CelestiaTheme.colors.textSecondary,
-                textAlign = TextAlign.Center,
-            )
         }
     }
 }

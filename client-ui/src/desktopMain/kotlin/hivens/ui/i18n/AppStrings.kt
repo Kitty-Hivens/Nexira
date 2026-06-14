@@ -18,6 +18,8 @@ interface AppStrings {
     // --- Navigation ---
     val navLogout: String
     val navBack: String
+    /** App locale, for date/number formatting in widgets (not the system default). */
+    val locale: java.util.Locale
 
     // --- Dashboard ---
     fun dashboardWelcome(name: String): String
