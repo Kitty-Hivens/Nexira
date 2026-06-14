@@ -82,6 +82,7 @@ import hivens.widget.api.LocalWidgetChromeRenderer
 import hivens.widget.api.WidgetChromeRenderer
 import hivens.ui.customization.glassSurfaceAlpha
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
@@ -684,7 +685,14 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
                             else Modifier,
                         )
                         .background(glass)
-                        .padding(chrome.paddingDp.dp),
+                        .padding(
+                            PaddingValues(
+                                start  = chrome.effectiveStart.dp,
+                                top    = chrome.effectiveTop.dp,
+                                end    = chrome.effectiveEnd.dp,
+                                bottom = chrome.effectiveBottom.dp,
+                            ),
+                        ),
                 ) { content() }
             }
             CompositionLocalProvider(
