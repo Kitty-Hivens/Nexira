@@ -322,6 +322,8 @@ interface AppStrings {
     val aboutTitle: String
     fun aboutDescription(branding: String): String
     fun aboutBuildDate(date: String): String
+    /** System-card row label for the graphics renderer (windowing + Skiko API). */
+    val aboutRenderer: String
     val aboutSectionCreator: String
     val aboutSectionTechnologies: String
     val aboutSectionLicense: String

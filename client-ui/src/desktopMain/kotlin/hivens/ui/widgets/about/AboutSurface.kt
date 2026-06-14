@@ -29,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import hivens.core.jvm.SystemHardware
 import hivens.core.jvm.SystemMemory
 import hivens.launcher.update.UpdateService
 import hivens.ui.components.UpdateDialog
@@ -80,12 +81,32 @@ fun AboutSurface(onBack: () -> Unit) {
     // OrNull (not the sizing fallback): the System-info card shows "Unknown" on a 0,
     // so a broken runtime reads as unknown rather than a fabricated 16 GB.
     val systemRam = remember { SystemMemory.totalPhysicalMbOrNull() ?: 0 }
+    val swapMb    = remember { SystemHardware.swapTotalMb }
+    val cpu       = remember { SystemHardware.cpu }
 
-    val displayRes = remember {
+    val displayInfo = remember {
         runCatching {
-            val size = java.awt.Toolkit.getDefaultToolkit().screenSize
-            "${size.width}x${size.height}"
+            val tk   = java.awt.Toolkit.getDefaultToolkit()
+            val size = tk.screenSize
+            val dpi  = tk.screenResolution
+            val scale = java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment()
+                .defaultScreenDevice.defaultConfiguration.defaultTransform.scaleX
+            val scaleStr = if (scale % 1.0 == 0.0) "${scale.toInt()}x" else "%.2fx".format(scale)
+            "${size.width}x${size.height} · $dpi dpi · $scaleStr"
         }.getOrDefault("Unknown")
+    }
+
+    // Renderer "future hook": windowing from env (reliable), Skiko render API from
+    // its system property when pinned (else "default" -- Skiko picks at runtime).
+    val renderer = remember {
+        val windowing = when {
+            System.getenv("WAYLAND_DISPLAY") != null -> "Wayland"
+            System.getenv("DISPLAY") != null ||
+                System.getenv("XDG_SESSION_TYPE")?.equals("x11", ignoreCase = true) == true -> "X11"
+            else -> System.getProperty("os.name") ?: "?"
+        }
+        val api = System.getProperty("skiko.renderApi")?.takeIf { it.isNotBlank() } ?: "default"
+        "$windowing · $api"
     }
 
     val unknownErrorText = s.updateErrorUnknown
@@ -104,14 +125,17 @@ fun AboutSurface(onBack: () -> Unit) {
         }
     }
 
-    val ctx = remember(updateState, showUpdateDialog, showUpdateManager, triggerUpdateCheck, systemRam, displayRes) {
+    val ctx = remember(updateState, showUpdateDialog, showUpdateManager, triggerUpdateCheck, systemRam, swapMb, cpu, displayInfo, renderer) {
         AboutContext(
             updateState        = updateState,
             showUpdateDialog   = showUpdateDialog,
             showUpdateManager  = showUpdateManager,
             triggerUpdateCheck = triggerUpdateCheck,
             systemRam          = systemRam,
-            displayRes         = displayRes,
+            swapMb             = swapMb,
+            cpu                = cpu,
+            displayInfo        = displayInfo,
+            renderer           = renderer,
         )
     }
 
