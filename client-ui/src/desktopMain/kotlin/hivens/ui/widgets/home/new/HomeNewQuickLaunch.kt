@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Button
@@ -56,7 +55,7 @@ fun HomeNewQuickLaunch(instance: WidgetInstance) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = 12.dp)
-            .clip(RoundedCornerShape(14.dp))
+            .clip(MaterialTheme.shapes.medium)
             .background(glassSurfaceAlpha(0.45f))
             .padding(horizontal = 18.dp, vertical = 14.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -89,7 +88,7 @@ fun HomeNewQuickLaunch(instance: WidgetInstance) {
             Button(
                 onClick = qt.launch,
                 enabled = qt.canLaunch,
-                shape   = RoundedCornerShape(10.dp),
+                shape   = MaterialTheme.shapes.small,
                 colors  = ButtonDefaults.buttonColors(
                     containerColor = CelestiaTheme.colors.primary,
                     contentColor   = Color.White,

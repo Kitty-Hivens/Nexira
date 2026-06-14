@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.ExpandLess
@@ -73,7 +72,7 @@ fun ModRowPanel(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
+            .clip(MaterialTheme.shapes.medium)
             .background(glassSurfaceAlpha(0.45f * rowAlpha))
             .padding(horizontal = 12.dp, vertical = 6.dp),
     ) {
@@ -213,7 +212,7 @@ private fun DependenciesSubsection(mod: SmrtModEntry, graph: DepGraph) {
     Row(
         modifier              = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(6.dp))
+            .clip(MaterialTheme.shapes.small)
             .clickable(enabled = !empty) { open = !open }
             .padding(vertical = 4.dp),
         verticalAlignment     = Alignment.CenterVertically,
@@ -294,7 +293,7 @@ private fun MetaChip(text: String, error: Boolean = false) {
     AssistChip(
         onClick = {},
         enabled = false,
-        shape   = RoundedCornerShape(6.dp),
+        shape   = MaterialTheme.shapes.extraSmall,
         label   = {
             Text(
                 text  = text,
@@ -315,7 +314,7 @@ private fun MetaChip(text: String, error: Boolean = false) {
 private fun LinkChip(text: String, url: String) {
     Row(
         modifier              = Modifier
-            .clip(RoundedCornerShape(6.dp))
+            .clip(MaterialTheme.shapes.extraSmall)
             .background(CelestiaTheme.colors.primary.copy(alpha = 0.2f))
             .clickable { runCatching { Desktop.getDesktop().browse(URI(url)) } }
             .padding(horizontal = 8.dp, vertical = 4.dp),

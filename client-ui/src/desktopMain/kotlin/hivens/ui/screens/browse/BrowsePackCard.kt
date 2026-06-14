@@ -54,7 +54,7 @@ fun BrowsePackCard(
         modifier = modifier
             .fillMaxWidth()
             .height(132.dp)
-            .clip(RoundedCornerShape(14.dp))
+            .clip(MaterialTheme.shapes.medium)
             .background(mirrorGradient())
             .clickable(onClick = onClick),
     ) {
@@ -145,7 +145,7 @@ private fun SourceBadgeMirror(featured: Boolean) {
     val label = if (featured) "Mirror ★" else "Mirror"
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(6.dp))
+            .clip(MaterialTheme.shapes.extraSmall)
             .background(Color(0xFF3B82F6).copy(alpha = 0.85f))
             .padding(horizontal = 8.dp, vertical = 2.dp),
     ) {
@@ -163,7 +163,7 @@ private fun MetaChip(text: String, emphasis: Boolean = false) {
     AssistChip(
         onClick = {},
         enabled = false,
-        shape   = RoundedCornerShape(8.dp),
+        shape   = MaterialTheme.shapes.extraSmall,
         label   = { Text(text, style = MaterialTheme.typography.labelSmall, color = Color.White) },
         colors  = AssistChipDefaults.assistChipColors(
             disabledContainerColor = if (emphasis) Color(0xFF2563EB).copy(alpha = 0.85f)

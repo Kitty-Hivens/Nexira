@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -270,7 +269,7 @@ private fun InstallBar(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
+            .clip(MaterialTheme.shapes.medium)
             .background(glassSurfaceAlpha(0.6f))
             .padding(20.dp),
     ) {
@@ -306,7 +305,7 @@ private fun InstallIdleRow(onInstall: () -> Unit) {
         }
         Button(
             onClick        = onInstall,
-            shape          = RoundedCornerShape(12.dp),
+            shape          = MaterialTheme.shapes.small,
             contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
             colors         = ButtonDefaults.buttonColors(
                 containerColor = CelestiaTheme.colors.primary,
@@ -384,7 +383,7 @@ private fun InstallDoneRow(instanceId: String, onOpenInstalled: (String) -> Unit
         }
         Button(
             onClick        = { onOpenInstalled(instanceId) },
-            shape          = RoundedCornerShape(12.dp),
+            shape          = MaterialTheme.shapes.small,
             contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
             colors         = ButtonDefaults.buttonColors(
                 containerColor = CelestiaTheme.colors.primary,
@@ -417,7 +416,7 @@ private fun InstallFailedRow(message: String, onRetry: () -> Unit) {
         }
         Button(
             onClick        = onRetry,
-            shape          = RoundedCornerShape(12.dp),
+            shape          = MaterialTheme.shapes.small,
             contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp),
             colors         = ButtonDefaults.buttonColors(
                 containerColor = CelestiaTheme.colors.primary,
@@ -516,7 +515,7 @@ private fun Section(title: String, content: @Composable () -> Unit) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
+                .clip(MaterialTheme.shapes.medium)
                 .background(glassSurfaceAlpha(0.6f))
                 .padding(16.dp),
         ) {
@@ -543,7 +542,7 @@ private fun Chip(text: String) {
     AssistChip(
         onClick = {},
         enabled = false,
-        shape   = RoundedCornerShape(8.dp),
+        shape   = MaterialTheme.shapes.extraSmall,
         label   = { Text(text, style = MaterialTheme.typography.labelSmall, color = CelestiaTheme.colors.textPrimary) },
         colors  = AssistChipDefaults.assistChipColors(
             disabledContainerColor = glassSurfaceAlpha(0.4f),

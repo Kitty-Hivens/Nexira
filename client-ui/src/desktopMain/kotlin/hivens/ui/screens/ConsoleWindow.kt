@@ -47,6 +47,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -1033,7 +1034,7 @@ private fun Toolbar(
             // presets.
             Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(4.dp))
+                    .clip(MaterialTheme.shapes.small)
                     .clickable {
                         val idx = FONT_SIZES.indexOf(fontSize).takeIf { it >= 0 } ?: 0
                         onFontSize(FONT_SIZES[(idx + 1) % FONT_SIZES.size])
@@ -1142,7 +1143,7 @@ private fun SeverityToggle(
     // even top / bottom margin around the actual ink.
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(4.dp))
+            .clip(MaterialTheme.shapes.small)
             .background(bg)
             .clickable { onToggle(!active) }
             .padding(horizontal = 8.dp, vertical = 3.dp),
@@ -1289,7 +1290,7 @@ private fun PromptButton(
 ) {
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(4.dp))
+            .clip(MaterialTheme.shapes.small)
             .clickable { onClick() }
             .padding(horizontal = 6.dp, vertical = 3.dp),
         contentAlignment = Alignment.Center,

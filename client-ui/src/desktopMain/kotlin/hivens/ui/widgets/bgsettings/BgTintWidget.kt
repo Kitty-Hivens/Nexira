@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -56,11 +57,11 @@ fun BgTintWidget(instance: WidgetInstance) {
                 Column(
                     modifier = Modifier
                         .weight(1f)
-                        .clip(RoundedCornerShape(6.dp))
+                        .clip(MaterialTheme.shapes.extraSmall)
                         .border(
                             width = if (selected) 2.dp else 0.dp,
                             color = if (selected) CelestiaTheme.colors.primary else Color.Transparent,
-                            shape = RoundedCornerShape(6.dp),
+                            shape = MaterialTheme.shapes.extraSmall,
                         )
                         .clickable {
                             ctx.update {

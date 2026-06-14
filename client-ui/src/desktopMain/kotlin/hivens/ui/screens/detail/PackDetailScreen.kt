@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
@@ -391,7 +390,7 @@ private fun LogSessionPicker(
     Box(Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
         Row(
             modifier = Modifier
-                .clip(RoundedCornerShape(4.dp))
+                .clip(MaterialTheme.shapes.small)
                 .clickable { open = true }
                 .padding(horizontal = 8.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -500,7 +499,7 @@ private fun PlayBar(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
+            .clip(MaterialTheme.shapes.medium)
             .background(glassSurfaceAlpha(0.7f))
             .padding(16.dp),
     ) {
@@ -525,7 +524,7 @@ private fun PlayBar(
             Button(
                 onClick        = onPlay,
                 enabled        = enabled,
-                shape          = RoundedCornerShape(12.dp),
+                shape          = MaterialTheme.shapes.small,
                 contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
                 colors         = ButtonDefaults.buttonColors(
                     containerColor = CelestiaTheme.colors.primary,

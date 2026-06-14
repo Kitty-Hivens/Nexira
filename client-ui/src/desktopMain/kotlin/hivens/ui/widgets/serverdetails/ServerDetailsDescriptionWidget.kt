@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Warning
@@ -65,9 +64,9 @@ private fun MissingDataWarning(title: String, body: String, path: String) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(MaterialTheme.shapes.medium)
             .background(Color(0xFFFFAA00).copy(alpha = 0.12f))
-            .border(1.dp, Color(0xFFFFAA00).copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+            .border(1.dp, Color(0xFFFFAA00).copy(alpha = 0.3f), MaterialTheme.shapes.medium)
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

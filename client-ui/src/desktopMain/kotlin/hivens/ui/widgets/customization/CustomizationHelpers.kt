@@ -120,7 +120,7 @@ internal fun ColorRoleRow(
         if (currentHex != null) {
             OutlinedButton(
                 onClick        = onClear,
-                shape          = RoundedCornerShape(6.dp),
+                shape          = MaterialTheme.shapes.small,
                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
             ) { Text("x", fontSize = 12.sp) }
         }
@@ -154,12 +154,12 @@ internal fun HexField(
             modifier = Modifier
                 .weight(1f)
                 .height(36.dp)
-                .clip(RoundedCornerShape(6.dp))
+                .clip(MaterialTheme.shapes.small)
                 .background(glassSurfaceAlpha(0.4f))
                 .border(
                     width = 1.dp,
                     color = if (valid) CelestiaTheme.colors.outline.copy(alpha = 0.3f) else CelestiaTheme.colors.error,
-                    shape = RoundedCornerShape(6.dp),
+                    shape = MaterialTheme.shapes.small,
                 )
                 .padding(horizontal = 10.dp),
             contentAlignment = Alignment.CenterStart,

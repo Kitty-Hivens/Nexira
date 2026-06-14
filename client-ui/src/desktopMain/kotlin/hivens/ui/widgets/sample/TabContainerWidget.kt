@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -97,7 +96,7 @@ private fun TabChip(label: String, selected: Boolean, onClick: () -> Unit) {
         color      = if (selected) CelestiaTheme.colors.primary else CelestiaTheme.colors.textSecondary,
         fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
         modifier   = Modifier
-            .clip(RoundedCornerShape(8.dp))
+            .clip(MaterialTheme.shapes.small)
             .background(
                 if (selected) CelestiaTheme.colors.primary.copy(alpha = 0.16f)
                 else glassSurfaceAlpha(0.4f),

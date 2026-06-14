@@ -4,7 +4,6 @@ import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
@@ -180,7 +179,7 @@ fun UpdateDialog(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(CelestiaTheme.colors.error.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+                            .background(CelestiaTheme.colors.error.copy(alpha = 0.1f), MaterialTheme.shapes.medium)
                             .padding(12.dp)
                     ) {
                         val bannerText = when {
@@ -224,7 +223,7 @@ fun UpdateDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(max = bodyMaxHeight)
-                        .background(CelestiaTheme.colors.background.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                        .background(CelestiaTheme.colors.background.copy(alpha = 0.3f), MaterialTheme.shapes.medium)
                         .padding(12.dp)
                 ) {
                     Markdown(
@@ -251,7 +250,7 @@ fun UpdateDialog(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(CelestiaTheme.colors.error.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+                            .background(CelestiaTheme.colors.error.copy(alpha = 0.1f), MaterialTheme.shapes.medium)
                             .padding(12.dp)
                     ) {
                         Column {

@@ -76,7 +76,7 @@ fun PackCard(
         modifier = modifier
             .fillMaxWidth()
             .height(132.dp)
-            .clip(RoundedCornerShape(14.dp))
+            .clip(MaterialTheme.shapes.medium)
             .background(bg)
             .clickable(onClick = onOpenDetail),
     ) {
@@ -131,7 +131,7 @@ fun PackCard(
             ) {
                 Button(
                     onClick        = onPlay,
-                    shape          = RoundedCornerShape(10.dp),
+                    shape          = MaterialTheme.shapes.small,
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                     colors         = ButtonDefaults.buttonColors(
                         containerColor = CelestiaTheme.colors.primary,
@@ -188,7 +188,7 @@ private fun SourceBadge(origin: PackOrigin) {
     }
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(6.dp))
+            .clip(MaterialTheme.shapes.extraSmall)
             .background(color.copy(alpha = 0.85f))
             .padding(horizontal = 8.dp, vertical = 2.dp),
     ) {
@@ -201,7 +201,7 @@ private fun MetaChip(text: String, emphasis: Boolean = false) {
     AssistChip(
         onClick   = {},
         enabled   = false,
-        shape     = RoundedCornerShape(8.dp),
+        shape     = MaterialTheme.shapes.extraSmall,
         label     = { Text(text, style = MaterialTheme.typography.labelSmall, color = Color.White) },
         colors    = AssistChipDefaults.assistChipColors(
             disabledContainerColor = if (emphasis) CelestiaTheme.colors.primary.copy(alpha = 0.85f)

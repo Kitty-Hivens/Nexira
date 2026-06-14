@@ -34,6 +34,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.LocalStyle
 import hivens.ui.widgets.AdaptiveWidget
 import hivens.ui.widgets.scaled
 import hivens.ui.widgets.toWidgetColorOrNull
@@ -101,7 +102,7 @@ fun ClockWidget(instance: WidgetInstance) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(top = 12.dp * scale)
-                .clip(RoundedCornerShape(14.dp * scale))
+                .clip(RoundedCornerShape(LocalStyle.current.cardCorner * scale))
                 .background(glassSurfaceAlpha(0.65f))
                 .padding(horizontal = 16.dp * scale, vertical = 14.dp * scale),
             horizontalAlignment = Alignment.CenterHorizontally,

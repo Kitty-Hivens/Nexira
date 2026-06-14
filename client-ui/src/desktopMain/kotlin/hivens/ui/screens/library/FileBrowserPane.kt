@@ -21,7 +21,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.rememberScrollbarAdapter
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
@@ -119,7 +118,7 @@ fun FileBrowserPane(rootDir: Path, modifier: Modifier = Modifier) {
             modifier = Modifier
                 .weight(1f)
                 .fillMaxHeight()
-                .clip(RoundedCornerShape(12.dp))
+                .clip(MaterialTheme.shapes.medium)
                 .background(glassSurfaceAlpha(0.55f)),
         ) {
             val listState = rememberLazyListState()
@@ -161,7 +160,7 @@ fun FileBrowserPane(rootDir: Path, modifier: Modifier = Modifier) {
             modifier = Modifier
                 .weight(2f)
                 .fillMaxHeight()
-                .clip(RoundedCornerShape(12.dp))
+                .clip(MaterialTheme.shapes.medium)
                 .background(glassSurfaceAlpha(0.55f))
                 .padding(16.dp),
         ) {
@@ -242,7 +241,7 @@ private fun FileTreeRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(6.dp))
+            .clip(MaterialTheme.shapes.medium)
             .background(rowBg)
             .clickable(onClick = clickHandler)
             .padding(start = (12 * node.depth).dp, top = 4.dp, bottom = 4.dp, end = 6.dp),
@@ -405,7 +404,7 @@ private fun BinaryPreview(file: Path) {
         PreviewHeader(file = file, sizeLabel = file.fileSizeLabel())
         Spacer(Modifier.height(8.dp))
         Box(
-            modifier         = Modifier.fillMaxWidth().height(140.dp).clip(RoundedCornerShape(8.dp)).background(glassSurfaceAlpha(0.35f)),
+            modifier         = Modifier.fillMaxWidth().height(140.dp).clip(MaterialTheme.shapes.medium).background(glassSurfaceAlpha(0.35f)),
             contentAlignment = Alignment.Center,
         ) {
             Text(
@@ -416,7 +415,7 @@ private fun BinaryPreview(file: Path) {
         }
         Button(
             onClick        = { runCatching { Desktop.getDesktop().open(file.toFile()) } },
-            shape          = RoundedCornerShape(10.dp),
+            shape          = MaterialTheme.shapes.small,
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
             colors         = ButtonDefaults.buttonColors(
                 containerColor = CelestiaTheme.colors.primary,

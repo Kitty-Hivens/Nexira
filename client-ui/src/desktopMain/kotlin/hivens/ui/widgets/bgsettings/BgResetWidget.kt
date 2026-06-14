@@ -5,10 +5,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -33,7 +33,7 @@ fun BgResetWidget(instance: WidgetInstance) {
 
     OutlinedButton(
         onClick        = { confirming = true },
-        shape          = RoundedCornerShape(8.dp),
+        shape          = MaterialTheme.shapes.small,
         modifier       = Modifier.fillMaxWidth(),
         contentPadding = PaddingValues(vertical = 12.dp),
     ) {

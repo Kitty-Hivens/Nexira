@@ -61,7 +61,7 @@ fun SessionChip(session: ActiveSession) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(6.dp))
+            .clip(MaterialTheme.shapes.medium)
             .background(CelestiaTheme.colors.surface)
             .clickable { session.showConsole() }
             .padding(horizontal = 10.dp, vertical = 8.dp)
