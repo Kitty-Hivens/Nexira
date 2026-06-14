@@ -917,6 +917,8 @@ object EnglishStrings : AppStrings {
         "widget.notes.scratch.title" to "Title",
         "widget.notifications.history" to "Message history",
         "widget.notifications.history.expandUp" to "Expand upward",
+        "widget.notifications.history.clock12h" to "12-hour clock (am/pm)",
+        "widget.notifications.history.verticalTime" to "Stacked time",
         "widget.profile.account.section" to "Account",
         "widget.profile.signin" to "Sign in",
         "widget.profile.nav" to "Profile navigation",

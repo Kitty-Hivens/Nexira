@@ -932,6 +932,8 @@ object RussianStrings : AppStrings {
         "widget.notes.scratch.title" to "Заголовок",
         "widget.notifications.history" to "История сообщений",
         "widget.notifications.history.expandUp" to "Раскрывать вверх",
+        "widget.notifications.history.clock12h" to "12-часовой формат (am/pm)",
+        "widget.notifications.history.verticalTime" to "Время в столбик",
         "widget.profile.account.section" to "Аккаунт",
         "widget.profile.signin" to "Вход",
         "widget.profile.nav" to "Навигация профиля",
