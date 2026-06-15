@@ -315,13 +315,13 @@ fun AppSidebar(
             containerColor = glassSurfaceAlpha(0.35f),
             contentColor   = CelestiaTheme.colors.textSecondary
         ) {
-            // Leading breathing room + per-item spacing so the nav icons are
-            // not jammed together at the top edge (the slot's own Column
-            // defaults to 0 spacing). Spacers are layout, not content -- they
-            // stay surface-owned so the top/bottom widgets need no ColumnScope
-            // for the weighted gap, and fillMaxWidth keeps the slot's Column at
-            // rail width so the NavigationRailItems stay centered.
-            Spacer(Modifier.height(8.dp))
+            // Per-item spacing keeps the nav icons from jamming together (the
+            // slot's own Column defaults to 0 spacing). No leading spacer: each
+            // item's own height centers its icon with clickable breathing room,
+            // so the top edge has no dead (non-clickable) gap above the first
+            // entry. Spacers are layout, not content -- surface-owned so the
+            // top/bottom widgets need no ColumnScope for the weighted gap, and
+            // fillMaxWidth keeps the slot's Column at rail width so items center.
             SlotRenderer(SurfaceId(SIDEBAR_SURFACE), SlotId("top"), Modifier.fillMaxWidth(), spacing = 6.dp)
             Spacer(Modifier.weight(1f))
             SlotRenderer(SurfaceId(SIDEBAR_SURFACE), SlotId("bottom"), Modifier.fillMaxWidth(), spacing = 6.dp)

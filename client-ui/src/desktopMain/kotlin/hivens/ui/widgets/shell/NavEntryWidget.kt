@@ -6,7 +6,9 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -27,6 +29,7 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -218,17 +221,22 @@ private fun NavSlot(
     // 13% fill matches the original Material indicator alpha; LeftBar / Dot use
     // the solid accent since they are thin marks, not a backing.
     val fill = accent.copy(alpha = 0.13f)
+    val interaction = remember { MutableInteractionSource() }
 
     Box(Modifier.graphicsLayer { translationY = offsetY }) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(56.dp)
+                .height(48.dp)
                 .selectable(
-                    selected = active,
-                    enabled  = enabled,
-                    role     = Role.Tab,
-                    onClick  = gated,
+                    selected          = active,
+                    enabled           = enabled,
+                    role              = Role.Tab,
+                    interactionSource = interaction,
+                    // The hover/press state layer is user-toggleable; off leaves
+                    // the active item marked only by its NavSelectionStyle.
+                    indication        = if (cz.navHoverHighlight) LocalIndication.current else null,
+                    onClick           = gated,
                 ),
             contentAlignment = Alignment.Center,
         ) {

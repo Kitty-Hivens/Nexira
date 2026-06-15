@@ -43,6 +43,13 @@ data class CustomizationSettings(
      * icon filled (the original look).
      */
     val navSelectionOutlineIcons: Boolean = false,
+    /**
+     * Whether nav entries show the interaction highlight (the hover/press state
+     * layer). On (default) keeps the Material feedback; off renders a clean rail
+     * where the active item is marked only by [navSelectionStyle] -- a natural
+     * fit for the minimal LeftBar / Dot / None selections.
+     */
+    val navHoverHighlight: Boolean = true,
 )
 
 /**

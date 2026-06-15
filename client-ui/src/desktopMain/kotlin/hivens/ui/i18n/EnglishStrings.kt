@@ -590,6 +590,7 @@ object EnglishStrings : AppStrings {
     override val navStyleNone             = "None"
     override val navSelectionOutlineIcons = "Outline unselected icons"
     override val navSelectionAccent       = "Highlight color"
+    override val navHoverHighlight         = "Highlight on hover"
 
     override val settingsCategoryAppearance   = "Appearance"
     override val settingsCategoryNetwork      = "Network"
