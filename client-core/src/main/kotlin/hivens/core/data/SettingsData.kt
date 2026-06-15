@@ -202,4 +202,15 @@ data class SettingsData(
      * authlib is a guaranteed rejection.
      */
     val useSmartycraftAuthLib: Boolean = false,
+
+    // ── Onboarding state (not a user-facing toggle) ──────────────────────
+
+    /**
+     * True once the one-time "still running in the tray" OS notification has
+     * been shown. The first time the launcher hides its window to the tray we
+     * post a system notification (visible while the window is gone) so the user
+     * doesn't think the app vanished; this flag suppresses it on every
+     * subsequent hide. Internal onboarding state -- no Settings UI surfaces it.
+     */
+    val trayHintShown: Boolean = false,
 )

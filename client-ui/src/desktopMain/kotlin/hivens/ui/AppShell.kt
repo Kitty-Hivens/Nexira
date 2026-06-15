@@ -72,6 +72,7 @@ import hivens.ui.theme.applyOverrides
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.CustomTheme
 import hivens.ui.theme.ThemeManager
+import hivens.ui.system.SystemNotifier
 import hivens.ui.tray.TrayManager
 import hivens.ui.utils.ConsoleSettingsManager
 import hivens.ui.utils.GameConsoleService
@@ -121,6 +122,13 @@ import kotlin.time.Duration.Companion.milliseconds
 // AppShell stays a one-liner.
 private const val MIN_WINDOW_WIDTH_DP  = 960
 private const val MIN_WINDOW_HEIGHT_DP = 600
+
+// Windows Application User Model ID for toast routing (libnotify / SystemNotifier).
+// Matches the macOS bundleID for a single cross-platform identity; ignored on
+// Linux. A toast needs this AUMID registered (a Start-menu shortcut carrying
+// it), which a plain install may lack -- the tray hint then no-ops on Windows,
+// by design, while Linux (the primary desktop) shows it.
+private const val NEXIRA_APP_ID = "dev.hivens.nexira"
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
@@ -186,7 +194,10 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
     // Koin out from under the recovery restart loop. It lives in a JVM
     // shutdown hook in Main instead.
     DisposableEffect(Unit) {
-        onDispose { TrayManager.shutdown() }
+        onDispose {
+            TrayManager.shutdown()
+            SystemNotifier.shutdown()
+        }
     }
 
     val windowState      = rememberWindowState(placement = WindowPlacement.Maximized)
@@ -388,6 +399,7 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
                         ),
                         appName    = Branding.TITLE
                     )
+                    SystemNotifier.init(appName = Branding.TITLE, appId = NEXIRA_APP_ID, iconBytes = iconBytes)
                 } catch (_: Exception) {
                     runCatching {
                         val iconBytes = Res.readBytes("drawable/icon.png")
@@ -404,6 +416,7 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
                             ),
                             appName    = Branding.TITLE
                         )
+                        SystemNotifier.init(appName = Branding.TITLE, appId = NEXIRA_APP_ID, iconBytes = iconBytes)
                     }
                 }
             }
@@ -420,6 +433,13 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
 
             // ── Callbacks ─────────────────────────────────────────────
             TrayManager.onShowWindow = {
+                SwingUtilities.invokeLater { isWindowVisible = true }
+            }
+
+            // Same restore behaviour when the user clicks the tray-hint banner
+            // (or its "Show window" action) -- libnotify fires on its own
+            // thread, so hop to the AWT thread before touching window state.
+            SystemNotifier.onShowWindow = {
                 SwingUtilities.invokeLater { isWindowVisible = true }
             }
 
@@ -545,6 +565,27 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
                 applicationScope.launch {
                     autoSyncService.syncAll(dashboardServers)
                 }
+            }
+        }
+
+        // First-time-only OS notification when the window hides to the tray:
+        // a desktop banner (visible while the window is gone) so the user
+        // knows the launcher is still running, not closed. isWindowVisible
+        // only ever goes false via a tray-hide path, so the visible -> hidden
+        // transition is the trigger; it fires once ever, then persists the
+        // suppression flag. Posting + the disk save run off the UI thread.
+        LaunchedEffect(isWindowVisible) {
+            if (isWindowVisible || !SystemNotifier.isSupported) return@LaunchedEffect
+            if (settingsService.getSettings().trayHintShown) return@LaunchedEffect
+            val posted = withContext(Dispatchers.IO) {
+                SystemNotifier.notifyTrayHint(
+                    title     = s.trayHintTitle,
+                    body      = s.trayHintBody,
+                    showLabel = s.trayHintShow,
+                )
+            }
+            if (posted) withContext(Dispatchers.IO) {
+                settingsService.saveSettings(settingsService.getSettings().copy(trayHintShown = true))
             }
         }
 

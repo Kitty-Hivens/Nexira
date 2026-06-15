@@ -78,6 +78,7 @@ kotlin {
                 implementation(libs.kotlinx.coroutines.swing)
                 implementation(libs.logback.classic)
                 implementation(libs.libtray)
+                implementation(libs.libnotify)
                 implementation(libs.ktor.client.core)
             }
         }

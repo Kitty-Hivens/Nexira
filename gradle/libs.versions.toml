@@ -49,6 +49,12 @@ proguard          = "7.8.2"
 # Pinned to a released semver so upstream changes don't silently land here.
 libtray           = "0.1.0"
 
+# Pure-Panama desktop notifications (Kitty-Hivens/libnotify) -- freedesktop
+# Notifications over D-Bus on Linux, WinRT toast on Windows, NSUserNotification
+# on macOS. Used for the OS-level "still running in the tray" hint, distinct
+# from the in-app NotificationCenter. Maven Central as dev.hivens:libnotify.
+libnotify         = "0.1.0"
+
 # ── Test ─────────────────────────────────────────────────────────────────────
 # junit held on the 5.x line: 6.x drops Java 8 and requires JVM runtime 17+,
 # which authlib-agent / profiler-agent can't honour -- those modules compile to
@@ -108,6 +114,7 @@ filekit-dialogs-compose         = { group = "io.github.vinceglb", name = "fileki
 # Misc
 commons-compress                = { group = "org.apache.commons", name = "commons-compress", version.ref = "commonsCompress" }
 libtray                          = { group = "dev.hivens", name = "libtray", version.ref = "libtray" }
+libnotify                        = { group = "dev.hivens", name = "libnotify", version.ref = "libnotify" }
 
 # JNA dropped — was only present for dorkbox/SystemTray. libtray is
 # pure java.lang.foreign (Project Panama) and pulls no JNA transitively.
