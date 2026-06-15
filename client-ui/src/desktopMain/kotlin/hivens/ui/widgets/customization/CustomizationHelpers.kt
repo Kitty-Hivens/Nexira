@@ -1,5 +1,6 @@
 package hivens.ui.widgets.customization
 
+import hivens.ui.theme.LocalMonoFamily
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -109,7 +110,7 @@ internal fun ColorRoleRow(
             modifier   = Modifier.width(100.dp),
             color      = CelestiaTheme.colors.textSecondary,
             style      = MaterialTheme.typography.bodySmall,
-            fontFamily = FontFamily.Monospace,
+            fontFamily = LocalMonoFamily.current,
         )
         HexField(
             initialHex   = currentHex ?: "",
@@ -181,7 +182,7 @@ internal fun HexField(
                 singleLine    = true,
                 textStyle     = TextStyle(
                     color      = CelestiaTheme.colors.textPrimary,
-                    fontFamily = FontFamily.Monospace,
+                    fontFamily = LocalMonoFamily.current,
                     fontSize   = 13.sp,
                 ),
                 cursorBrush   = SolidColor(CelestiaTheme.colors.primary),

@@ -1,5 +1,6 @@
 package hivens.ui.components
 
+import hivens.ui.theme.LocalMonoFamily
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -254,7 +255,7 @@ fun UpdateManagerDialog(onDismiss: () -> Unit) {
                         ) {
                             Column(Modifier.verticalScroll(rememberScrollState())) {
                                 buildLog.takeLast(60).forEach {
-                                    Text(it, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace, color = CelestiaTheme.colors.textSecondary)
+                                    Text(it, style = MaterialTheme.typography.bodySmall, fontFamily = LocalMonoFamily.current, color = CelestiaTheme.colors.textSecondary)
                                 }
                             }
                         }

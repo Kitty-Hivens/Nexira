@@ -1,5 +1,6 @@
 package hivens.ui.components
 
+import hivens.ui.theme.LocalMonoFamily
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -114,7 +115,7 @@ fun ConfirmCodeDialog(
                         onDone = { if (code.length == 6 && !isSubmitting) onSubmit(code) },
                     ),
                     textStyle = TextStyle(
-                        fontFamily = FontFamily.Monospace,
+                        fontFamily = LocalMonoFamily.current,
                         fontSize = 24.sp,
                         textAlign = TextAlign.Center,
                         letterSpacing = 8.sp,

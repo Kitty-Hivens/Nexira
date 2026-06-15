@@ -1,5 +1,6 @@
 package hivens.ui.editor.decoration
 
+import hivens.ui.theme.LocalMonoFamily
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -65,7 +66,7 @@ fun UnsupportedWidgetPlaceholder(
                 instance.kind.value,
                 color = CelestiaTheme.colors.textSecondary,
                 style = MaterialTheme.typography.labelSmall,
-                fontFamily = FontFamily.Monospace,
+                fontFamily = LocalMonoFamily.current,
             )
         }
         IconButton(onClick = onRemove, modifier = Modifier.size(24.dp)) {

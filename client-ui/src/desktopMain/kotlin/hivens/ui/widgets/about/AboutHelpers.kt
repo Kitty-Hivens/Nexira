@@ -1,5 +1,6 @@
 package hivens.ui.widgets.about
 
+import hivens.ui.theme.LocalMonoFamily
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -53,7 +54,7 @@ internal fun InfoRow(icon: ImageVector, label: String, value: String) {
             color      = CelestiaTheme.colors.textPrimary,
             fontSize   = 13.sp,
             fontWeight = FontWeight.Medium,
-            fontFamily = FontFamily.Monospace,
+            fontFamily = LocalMonoFamily.current,
             textAlign  = TextAlign.End,
             modifier   = Modifier.weight(1f),
         )

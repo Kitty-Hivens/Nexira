@@ -1,5 +1,6 @@
 package hivens.ui.screens.library
 
+import hivens.ui.theme.LocalMonoFamily
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -375,7 +376,7 @@ private fun TextPreview(file: Path) {
                 text       = state.text,
                 style      = MaterialTheme.typography.bodySmall,
                 color      = CelestiaTheme.colors.textPrimary,
-                fontFamily = FontFamily.Monospace,
+                fontFamily = LocalMonoFamily.current,
             )
         }
     }
