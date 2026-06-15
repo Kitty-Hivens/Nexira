@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.RestartAlt
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
@@ -78,7 +79,6 @@ import hivens.ui.customization.CustomizationSettings
 import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.layout.AdaptiveWidth
-import hivens.ui.layout.WidthClass
 import hivens.widget.api.LocalLayoutGraph
 import kotlinx.coroutines.CoroutineScope as KotlinCoroutineScope
 import kotlinx.coroutines.launch
@@ -92,6 +92,7 @@ import hivens.ui.editor.dnd.DropTargetRegistry
 import hivens.ui.editor.dnd.LocalDragController
 import hivens.ui.editor.dnd.LocalDropTargetRegistry
 import hivens.ui.editor.palette.WidgetPalettePanel
+import hivens.ui.editor.props.SurfacePropertiesPanel
 import hivens.ui.editor.props.WidgetPropPanel
 import hivens.ui.editor.presets.PresetEnvelope
 import hivens.ui.editor.presets.PresetManagerPanel
@@ -192,10 +193,13 @@ fun EditorSurfaceHost(
     // dismiss, and on leaving edit mode; while set, the palette hides so
     // the two right-edge panels do not overlap.
     var propTarget by remember(availableSurfaces) { mutableStateOf<PropTarget?>(null) }
-    // Any edit-mode exit (FAB / Escape / Ctrl+E) drops the prop target, so
-    // re-entering does not silently reopen the last panel with the palette
-    // still hidden.
-    LaunchedEffect(editing) { if (!editing) propTarget = null }
+    // Surface-level settings panel (currently the left rail's nav-selection
+    // settings). Mutually exclusive with the per-widget prop panel + palette.
+    var surfaceSettingsOpen by remember(availableSurfaces) { mutableStateOf(false) }
+    // Any edit-mode exit (FAB / Escape / Ctrl+E) drops the prop target and the
+    // surface settings panel, so re-entering does not silently reopen the last
+    // panel with the palette still hidden.
+    LaunchedEffect(editing) { if (!editing) { propTarget = null; surfaceSettingsOpen = false } }
     val currentGraph = LocalLayoutGraph.current
     // Leaving a surface drops edit mode -- avoids a stale edit state
     // pointed at the wrong surface after navigation.
@@ -278,7 +282,7 @@ fun EditorSurfaceHost(
                         if (propTarget?.instanceId == instance.instanceId) propTarget = null
                         controller.removeWidget(path, instance.instanceId)
                     },
-                    onEditProps  = { propTarget = PropTarget(path, instance.instanceId) },
+                    onEditProps  = { propTarget = PropTarget(path, instance.instanceId); surfaceSettingsOpen = false },
                     onCommitDrop = { committedPointer ->
                         // Hit-test which slot received the drop. Null =
                         // pointer is off any slot; treat as cancel.
@@ -564,7 +568,7 @@ fun EditorSurfaceHost(
                 )
 
                 WidgetPalettePanel(
-                    visible        = editing && paletteOpen && !previewing && propTarget == null,
+                    visible        = editing && paletteOpen && !previewing && propTarget == null && !surfaceSettingsOpen,
                     dimmed         = dragController.active != null,
                     onDismiss      = { paletteOpen = false },
                     controller     = dragController,
@@ -582,6 +586,18 @@ fun EditorSurfaceHost(
                     modifier   = Modifier.align(Alignment.TopEnd),
                 )
 
+                // Surface-level settings (region's own settings, e.g. the left
+                // rail's selection style) -- shares the right edge with the
+                // widget prop panel; the two are mutually exclusive by flag.
+                SurfacePropertiesPanel(
+                    visible                = editing && !previewing && surfaceSettingsOpen && surfaceHasSettings(selectedSurface),
+                    title                  = selectedSurface?.let { humanSurfaceName(it, s) } ?: "",
+                    customization          = customization,
+                    onCustomizationChanged = onCustomizationChanged,
+                    onDismiss              = { surfaceSettingsOpen = false },
+                    modifier               = Modifier.align(Alignment.TopEnd),
+                )
+
                 // No edit-mode FAB: Ctrl+E (window-level, see AppShell) toggles
                 // edit mode and Escape exits, so a dedicated button is redundant.
             }
@@ -593,17 +609,19 @@ fun EditorSurfaceHost(
             // rail states. The full-window box keeps it put.
             if (availableSurfaces.isNotEmpty()) {
                 EditModePill(
-                    active            = editing,
-                    surfaces          = availableSurfaces,
-                    selectedSurface   = selectedSurface,
-                    onSurfacePicked   = { selectedSurface = it },
-                    paletteOpen       = paletteOpen,
-                    onTogglePalette   = { paletteOpen = !paletteOpen },
-                    previewing        = previewing,
-                    onTogglePreview   = { previewing = !previewing },
-                    onOpenPresets     = { presetPanelOpen = true },
-                    onRequestReset    = { if (selectedSurface != null) resetSurfaceConfirm = true },
-                    modifier          = Modifier.align(Alignment.TopCenter).padding(top = 16.dp),
+                    active                = editing,
+                    surfaces              = availableSurfaces,
+                    selectedSurface       = selectedSurface,
+                    onSurfacePicked       = { selectedSurface = it; surfaceSettingsOpen = false },
+                    surfaceHasSettings    = surfaceHasSettings(selectedSurface),
+                    onOpenSurfaceSettings = { surfaceSettingsOpen = true; propTarget = null },
+                    paletteOpen           = paletteOpen,
+                    onTogglePalette       = { paletteOpen = !paletteOpen },
+                    previewing            = previewing,
+                    onTogglePreview       = { previewing = !previewing },
+                    onOpenPresets         = { presetPanelOpen = true },
+                    onRequestReset        = { if (selectedSurface != null) resetSurfaceConfirm = true },
+                    modifier              = Modifier.align(Alignment.TopCenter).padding(top = 16.dp),
                 )
             }
 
@@ -622,6 +640,8 @@ private fun EditModePill(
     surfaces: List<SurfaceId>,
     selectedSurface: SurfaceId?,
     onSurfacePicked: (SurfaceId) -> Unit,
+    surfaceHasSettings: Boolean,
+    onOpenSurfaceSettings: () -> Unit,
     paletteOpen: Boolean,
     onTogglePalette: () -> Unit,
     previewing: Boolean,
@@ -638,11 +658,13 @@ private fun EditModePill(
         exit     = fadeOut(tween(motionMs)) + slideOutVertically(tween(motionMs)) { -it },
         modifier = modifier,
     ) {
-        AdaptiveWidth { widthClass, _ ->
-            // Below Expanded the full-label pill no longer fits the center pane
-            // (at/below the min window the rails squeeze it): drop to icon-only
-            // chips and hide the Esc hint so the Row never overflows.
-            val compact = widthClass != WidthClass.Expanded
+        AdaptiveWidth { _, maxWidth ->
+            // The pill goes icon-only below this width: the full-label set (with
+            // the surface-settings gear added) overflows around the 960dp min
+            // window, where the "Esc -- exit" hint got squeezed into a vertical
+            // staircase. Threshold on the measured width, not the coarse
+            // WidthClass, so it tracks the real chip count.
+            val compact = maxWidth < 1100.dp
             Surface(
                 color   = CelestiaTheme.colors.surface.copy(alpha = 0.94f),
                 shape   = RoundedCornerShape(20.dp),
@@ -673,6 +695,20 @@ private fun EditModePill(
                     }
 
                     Spacer(Modifier.width(6.dp))
+
+                    // Surface settings: opens the selected surface's own settings
+                    // panel (e.g. the left rail's selection style). Shown only for
+                    // surfaces that expose surface-level settings.
+                    if (surfaceHasSettings) {
+                        ToolChip(
+                            icon     = Icons.Default.Settings,
+                            label    = s.editorSurfaceSettings,
+                            selected = false,
+                            onClick  = onOpenSurfaceSettings,
+                            compact  = compact,
+                        )
+                        Spacer(Modifier.width(4.dp))
+                    }
 
                     // Preview toggle -- hides chrome temporarily so the
                     // user can see the real look without leaving edit
@@ -864,6 +900,11 @@ private fun humanSurfaceName(surface: SurfaceId, s: AppStrings): String = when (
     "theme.picker"        -> s.editorSurfTheme
     else                  -> surface.value
 }
+
+// Surfaces that expose surface-level settings (a SurfacePropertiesPanel),
+// distinct from per-widget props. Currently only the left nav rail.
+private fun surfaceHasSettings(surface: SurfaceId?): Boolean =
+    surface?.value == "appshell.leftrail"
 
 // ── Vignette ────────────────────────────────────────────────────────────────
 

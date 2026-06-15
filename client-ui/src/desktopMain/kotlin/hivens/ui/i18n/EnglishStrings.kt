@@ -971,6 +971,7 @@ object EnglishStrings : AppStrings {
     // --- Layout editor: prop panel ---
     override val editorResetToDefault = "Reset to default"
     override val editorBackingTitle   = "Backing"
+    override val editorSurfaceSettings = "Settings"
     override val editorBackingGlass   = "Glass opacity"
     override val editorBackingCorner  = "Corner"
     override val editorBackingPadding = "Padding (all sides)"
