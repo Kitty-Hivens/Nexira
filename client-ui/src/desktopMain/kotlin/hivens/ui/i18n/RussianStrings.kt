@@ -78,7 +78,8 @@ object RussianStrings : AppStrings {
     override val settingsThemePicker        = "Выбор темы"
     override val settingsThemePickerSub     = "Кастомизируйте цветовую схему"
     override val settingsDarkTheme          = "Тёмная тема"
-    override val settingsCloseAfterLaunch   = "Свернуть лаунчер в трей после запуска сервера"
+    override val settingsCloseAfterLaunch   = "Свернуть лаунчер в трей после запуска игры"
+    override val settingsCloseAfterLaunchDesc = "Прячет лаунчер в системный трей, как только запускается игра."
     override val settingsSaved              = "Настройки сохранены"
     override val settingsLanguage           = "Язык"
 
@@ -100,6 +101,12 @@ object RussianStrings : AppStrings {
     // News
     override val newsTitle   = "Новости проекта"
     override val newsEmpty   = "Новостей пока нет..."
+    override val newsFilterPlaceholder = "Фильтр новостей"
+    override val newsFilterClear        = "Сбросить фильтр"
+    override val railCollapse           = "Свернуть панель"
+    override val railExpand             = "Развернуть панель"
+    override val paginationPrev         = "Предыдущая страница"
+    override val paginationNext         = "Следующая страница"
 
     // Server Detail
     override val serverDetailTitle         = "Информация о сервере"
@@ -119,6 +126,16 @@ object RussianStrings : AppStrings {
     override val serverSettingsJavaHint        = "Оставьте пустым для использования встроенной Java"
     override val serverSettingsOpenFolder      = "Открыть папку"
     override val serverSettingsReset           = "Сбросить клиент"
+
+    override val serverSettingsResetConfirmTitle = "Сбросить клиент?"
+    override val serverSettingsResetConfirmBody  = "Все скачанные файлы клиента этого сервера будут удалены без возможности восстановления."
+    override val customizationResetConfirmTitle  = "Сбросить кастомизацию?"
+    override val customizationResetConfirmBody   = "Все переопределения кастомизации (цвета, плотность, форма) вернутся к значениям по умолчанию."
+    override val backgroundResetConfirmTitle     = "Сбросить фон?"
+    override val backgroundResetConfirmBody      = "Вся конфигурация пользовательского фона вернётся к значениям по умолчанию."
+    override val logoutConfirmTitle              = "Выйти из аккаунта?"
+    override val logoutConfirmBody               = "Сохранённый вход будет удалён с этого устройства. Для повторного входа понадобится снова ввести данные."
+
     override val serverSettingsNoMods          = "Нет опциональных модов"
     override val serverSettingsPickJava        = "Выберите Java"
 
@@ -206,7 +223,8 @@ object RussianStrings : AppStrings {
     override val settingsReportOnGithub          = "Сообщить на GitHub с пакетом"
 
     // File Manager
-    override fun fileDownloading(n: Int) = "Загрузка обновлений ($n файлов)..."
+    override fun fileDownloading(n: Int) =
+        "Загрузка обновлений ($n ${russianPlural(n, "файл", "файла", "файлов")})..."
 
     // --- Settings: Offline Mode ---
     override val settingsOfflineMode       = "Оффлайн-режим"
@@ -295,7 +313,9 @@ object RussianStrings : AppStrings {
     // =========================================================================
     override val aboutTitle                = "О ЛАУНЧЕРЕ"
     override fun aboutDescription(branding: String) = "Неофициальный лаунчер для $branding"
+    override val locale = java.util.Locale.of("ru", "RU")
     override fun aboutBuildDate(date: String) = "Собрано: $date"
+    override val aboutRenderer = "Отрисовщик"
     override val aboutSectionCreator       = "Создатель"
     override val aboutSectionTechnologies  = "Технологии"
     override val aboutSectionLicense       = "Лицензия"
@@ -319,7 +339,7 @@ object RussianStrings : AppStrings {
     override val techComposeDesc = "UI фреймворк"
     override val techKtorDesc    = "HTTP клиент"
     override val techKoinDesc    = "Dependency Injection"
-    override val techSkiaDesc    = "Рендеринг скинов"
+    override val techSkiaDesc    = "Графический рендер"
     override val techCoilDesc    = "Загрузка изображений"
 
     // --- Spawn Reset ---
@@ -334,6 +354,9 @@ object RussianStrings : AppStrings {
     override val trayShow          = "Открыть лаунчер"
     override val trayServers       = "Серверы"
     override val trayNoServers     = "Серверы не загружены"
+    override val trayHintTitle     = "Nexira всё ещё работает"
+    override val trayHintBody      = "Окно свёрнуто в системный трей. Нажмите на значок в трее, чтобы вернуть его."
+    override val trayHintShow      = "Показать окно"
 
 
     // --- Settings: Experimental features ---
@@ -354,6 +377,9 @@ object RussianStrings : AppStrings {
     override fun dashboardAutoSyncProgress(serverName: String, current: Int, total: Int) =
         "Синхронизация $serverName ($current/$total)"
     override fun dashboardAutoSyncBytes(readMB: Long, totalMB: Long) = "$readMB / $totalMB МБ"
+    override val widgetProgressTitle = "Фоновая активность"
+    override val widgetProgressIdle = "Сейчас ничего не качается."
+    override fun widgetTabDefaultLabel(index: Int) = "Вкладка $index"
 
     // April Fools
     override fun aprilCloseTitle(escapes: Int) = when {
@@ -448,7 +474,7 @@ object RussianStrings : AppStrings {
     override val jvmTabCustom  = "Свои"
     override val jvmCancel     = "Отмена"
     override val jvmApply      = "Записать в jvmArgs"
-    override fun jvmPreviewFlagsCount(n: Int) = "Превью ($n флагов)"
+    override fun jvmPreviewFlagsCount(n: Int) = "Превью ($n ${russianPlural(n, "флаг", "флага", "флагов")})"
 
     override val jvmGcHeader            = "Сборщик мусора"
     override val jvmGcG1Hint            = "Рекомендуемый для модового MC, хип 4-32 ГБ."
@@ -522,7 +548,8 @@ object RussianStrings : AppStrings {
     override val migrationDescription  = "Nexira теперь называется Nexira. Перед запуском лаунчера нужно перенести существующие данные в новое расположение. Старая папка остаётся нетронутой как резервная копия; удалите её вручную когда убедитесь что всё работает."
     override val migrationFromHeader   = "Откуда"
     override val migrationToHeader     = "Куда"
-    override fun migrationSize(megabytes: Int, files: Int) = "$megabytes МБ, $files файлов"
+    override fun migrationSize(megabytes: Int, files: Int) =
+        "$megabytes МБ, $files ${russianPlural(files, "файл", "файла", "файлов")}"
     override val migrationStart        = "Перенести данные"
     override val migrationInProgress   = "Перенос в Nexira"
     override fun migrationCurrentFile(file: String) = "Копируется $file"
@@ -550,6 +577,19 @@ object RussianStrings : AppStrings {
     override val settingsUiStyleSub      = "Переключай форму / поверхности / анимации независимо от цветовой палитры. Celestia — текущий вид с мягкими скруглениями и стеклом; Brut — жёсткий, без скруглений, без анимаций."
     override val settingsUiStyleCelestia = "Celestia"
     override val settingsUiStyleBrut     = "Brut"
+
+    // --- Выделение в левой панели ---
+    override val navSelectionTitle        = "Выделение пункта меню"
+    override val navSelectionSub          = "Как подсвечивается активный пункт в левой панели"
+    override val navStylePill             = "Капсула"
+    override val navStyleSquare           = "Квадрат"
+    override val navStyleCircle           = "Круг"
+    override val navStyleBar              = "Полоса"
+    override val navStyleDot              = "Точка"
+    override val navStyleNone             = "Нет"
+    override val navSelectionOutlineIcons = "Контурные иконки у невыбранных"
+    override val navSelectionAccent       = "Цвет выделения"
+    override val navHoverHighlight        = "Подсветка при наведении"
 
     override val settingsCategoryAppearance   = "Внешний вид"
     override val settingsCategoryNetwork      = "Сеть"
@@ -600,7 +640,8 @@ object RussianStrings : AppStrings {
     override val browseDetailInstallButton = "Установить"
     override val browseDetailTagsTitle     = "Теги"
     override val browseDetailAboutTitle       = "О сборке"
-    override val browseDetailAboutPlaceholder = "Сборка включает %d модов и %d ассетов."
+    override fun browseDetailAbout(mods: Int, assets: Int) =
+        "Сборка включает $mods ${russianPlural(mods, "мод", "мода", "модов")} и $assets ${russianPlural(assets, "ассет", "ассета", "ассетов")}."
     override val browseDetailAboutNote        = "Развёрнутое описание появится здесь когда зеркало начнёт заполнять его в manifest."
     override val browseDetailCompatTitle      = "Совместимость"
     override val browseDetailCompatMc         = "Minecraft"
@@ -609,7 +650,8 @@ object RussianStrings : AppStrings {
     override val browseDetailVersionTitle     = "Версия"
 
     override val browseDetailInstallRunningTitle  = "Установка..."
-    override val browseDetailInstallProgress      = "%s  (%d / %d)"
+    override fun browseDetailInstallProgress(filename: String, current: Int, total: Int) =
+        "$filename  ($current / $total)"
     override val browseDetailInstallStarting      = "Запуск..."
     override val browseDetailInstallDoneTitle     = "Установлено"
     override val browseDetailInstallDoneHint      = "Добавлено в Library."
@@ -635,19 +677,26 @@ object RussianStrings : AppStrings {
     override fun contentTabModsSection(count: Int) = "Моды ($count)"
     override fun contentTabAssetsSection(count: Int) = "Ассеты ($count)"
     override val contentTabResolverIssuesTitle  = "Найдены проблемы в манифесте"
-    override fun contentTabResolverMissing(count: Int) =
-        if (count == 1) "1 зависимость ссылается на мод, которого нет в сборке."
-        else "$count зависимостей ссылаются на моды, которых нет в сборке."
-    override fun contentTabResolverCycles(count: Int) =
-        if (count == 1) "Найден 1 цикл в зависимостях — авторy сборки стоит перепроверить requires."
-        else "Найдено $count циклов в зависимостях — авторy сборки стоит перепроверить requires."
+    override fun contentTabResolverMissing(count: Int) = russianPlural(
+        count,
+        "$count зависимость ссылается на мод, которого нет в сборке.",
+        "$count зависимости ссылаются на моды, которых нет в сборке.",
+        "$count зависимостей ссылаются на моды, которых нет в сборке.",
+    )
+    override fun contentTabResolverCycles(count: Int) = russianPlural(
+        count,
+        "Найден $count цикл в зависимостях — автору сборки стоит перепроверить requires.",
+        "Найдено $count цикла в зависимостях — автору сборки стоит перепроверить requires.",
+        "Найдено $count циклов в зависимостях — автору сборки стоит перепроверить requires.",
+    )
     override val contentTabRoleRecipeViewer     = "Просмотр рецептов"
     override val contentTabRoleMinimap          = "Миникарта"
     override val contentTabRoleBlockInfo        = "Инфо о блоке"
     override val contentTabRolePerformance      = "Производительность"
     override val contentTabRoleInventorySearch  = "Поиск в инвентаре"
     override fun contentTabRoleAltCount(count: Int) =
-        if (count == 0) "один вариант" else "$count альтернатив"
+        if (count == 0) "один вариант"
+        else "$count ${russianPlural(count, "альтернатива", "альтернативы", "альтернатив")}"
     override val contentTabRoleAlternativesHeader = "Альтернативы в этой сборке"
     override val contentTabModNoDescription     = "Описания пока нет в манифесте."
     override fun contentTabModLicensePrefix(license: String) = "Лицензия: $license"
@@ -671,6 +720,8 @@ object RussianStrings : AppStrings {
     override val worldsTabLocalEmpty            = "Сохранённых миров пока нет. Начни новый одиночный мир внутри игры и он появится здесь."
     override fun worldsTabServersSection(count: Int) = "Серверы из истории ($count)"
     override val worldsTabServersEmpty          = "В мультиплеер-истории этого экземпляра пока нет серверов."
+    override val worldsTabErrorTitle            = "Не удалось прочитать миры"
+    override val worldsTabErrorMessage          = "Не удалось прочитать сохранения или список серверов этого экземпляра. Возможно, файлы повреждены или недоступны."
     override fun worldsTabLastPlayed(rel: String) = "Был в игре: $rel"
     override val worldsTabServerHiddenLabel     = "скрыт из ванильного списка"
     override val worldsTabGameSurvival          = "Выживание"
@@ -703,6 +754,21 @@ object RussianStrings : AppStrings {
     override val notificationExpandHistory   = "Раскрыть историю уведомления"
     override val notificationCollapseHistory = "Свернуть историю уведомления"
     override val notificationDismiss         = "Закрыть уведомление"
+    override val notifHistoryEmpty           = "Сообщений пока нет"
+    override val notifHistoryClear           = "Очистить"
+    override val notifDoNotDisturb           = "Не беспокоить"
+    override fun notifGroupCount(count: Int) = "×$count"
+    override fun notifCountTitle(count: Int): String {
+        val n  = count % 100
+        val n1 = count % 10
+        val word = when {
+            n in 11..14 -> "сообщений"
+            n1 == 1     -> "сообщение"
+            n1 in 2..4  -> "сообщения"
+            else        -> "сообщений"
+        }
+        return "$count $word"
+    }
     override fun notificationShowMore(count: Int)               = "ещё $count"
     override fun notificationAbsoluteTime(instant: java.time.Instant): String =
         java.time.format.DateTimeFormatter
@@ -771,6 +837,7 @@ object RussianStrings : AppStrings {
     override val editorCancel  = "Отмена"
     override val editorDelete  = "Удалить"
     override val editorReset   = "Сбросить"
+    override val editorUnsupportedWidget = "Неподдерживаемый виджет"
     override val editorResetAll = "Сбросить всё"
     override val editorToFront = "На передний план"
     override val editorToBack = "На задний план"
@@ -781,18 +848,24 @@ object RussianStrings : AppStrings {
         "widget.about.links.card.title" to "Заголовок",
         "widget.about.logo" to "Логотип и версия",
         "widget.about.logo.title" to "Заголовок",
+        "widget.about.logo.showVersion" to "Показывать версию",
+        "widget.about.logo.showBuildDate" to "Показывать дату сборки",
+        "widget.about.logo.showTagline" to "Показывать подзаголовок",
         "widget.about.system.card" to "Система",
         "widget.about.system.card.title" to "Заголовок",
         "widget.about.update.panel" to "Обновления",
         "widget.about.update.panel.title" to "Заголовок",
         "widget.appshell.region.center" to "Центральная область",
         "widget.appshell.region.collapsed" to "Свёрнут",
+        "widget.appshell.region.swipeToCollapse" to "Сворачивать свайпом",
         "widget.appshell.region.glassAlphaPct" to "Стекло, %",
         "widget.appshell.region.left" to "Левая панель",
         "widget.appshell.region.right" to "Правая панель",
         "widget.appshell.region.showDivider" to "Разделитель",
         "widget.appshell.region.widthDp" to "Ширина (0 — гибкая)",
         "widget.appshell.rightrail.compactnews" to "Лента новостей",
+        "widget.appshell.rightrail.compactnews.maxItems" to "Макс. элементов (0 = все)",
+        "widget.appshell.rightrail.compactnews.showTitle" to "Показывать заголовок",
         "widget.bg.enable.toggle" to "Фон вкл/выкл",
         "widget.bg.fx.animspeed" to "Скорость анимации",
         "widget.bg.fx.blur" to "Размытие",
@@ -810,6 +883,11 @@ object RussianStrings : AppStrings {
         "widget.bg.scale.mode" to "Масштабирование",
         "widget.bg.tint" to "Тонировка",
         "widget.container.group" to "Группа",
+        "widget.checklist" to "Чеклист",
+        "widget.checklist.add" to "Добавить пункт...",
+        "widget.checklist.empty" to "Пока пусто",
+        "widget.checklist.hideCompleted" to "Скрывать выполненные",
+        "widget.checklist.title" to "Заголовок",
         "widget.container.tabs" to "Вкладки",
         "widget.container.tabs.label1" to "Вкладка 1",
         "widget.container.tabs.label2" to "Вкладка 2",
@@ -871,6 +949,13 @@ object RussianStrings : AppStrings {
         "widget.library.header.subtitle" to "Подзаголовок",
         "widget.library.header.title" to "Заголовок",
         "widget.nav.entry" to "Пункт навигации",
+        "widget.notes.scratch" to "Заметки",
+        "widget.notes.scratch.placeholder" to "Напишите что-нибудь...",
+        "widget.notes.scratch.title" to "Заголовок",
+        "widget.notifications.history" to "История сообщений",
+        "widget.notifications.history.expandUp" to "Раскрывать вверх",
+        "widget.notifications.history.clock12h" to "12-часовой формат (am/pm)",
+        "widget.notifications.history.verticalTime" to "Время в столбик",
         "widget.profile.account.section" to "Аккаунт",
         "widget.profile.signin" to "Вход",
         "widget.profile.nav" to "Навигация профиля",
@@ -901,9 +986,15 @@ object RussianStrings : AppStrings {
     // --- Layout editor: prop panel ---
     override val editorResetToDefault = "Сбросить к умолчанию"
     override val editorBackingTitle   = "Подложка"
-    override val editorBackingGlass   = "Стекло"
+    override val editorSurfaceSettings = "Настройки"
+    override val editorBackingGlass   = "Непрозрачность стекла"
     override val editorBackingCorner  = "Скругление"
-    override val editorBackingPadding = "Отступ"
+    override val editorBackingPadding = "Отступ (все стороны)"
+    override val editorBackingPaddingTop    = "Отступ сверху"
+    override val editorBackingPaddingEnd    = "Отступ справа"
+    override val editorBackingPaddingBottom = "Отступ снизу"
+    override val editorBackingPaddingStart  = "Отступ слева"
+    override val editorBackingNoGlassHint   = "Без стекла подложка не видна. Скругление и отступ всё равно применяются к виджету."
 
     // --- Layout editor: presets ---
     override val editorPresetsTitle          = "Пресеты"

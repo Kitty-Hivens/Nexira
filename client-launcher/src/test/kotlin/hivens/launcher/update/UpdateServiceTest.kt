@@ -45,7 +45,8 @@ class UpdateServiceTest {
 
     private fun createService(
         vararg responses: MockResponse,
-        settings: ISettingsService = fakeSettings()
+        settings: ISettingsService = fakeSettings(),
+        currentVersion: String = "2.0.0"
     ): UpdateService {
         val tempDir = Files.createTempDirectory("update-test")
         tempDir.toFile().deleteOnExit()
@@ -71,14 +72,16 @@ class UpdateServiceTest {
             clientProvider = buildMockClient(*withMeta.toTypedArray()),
             json = json,
             dataDirectory = tempDir,
-            settingsService = settings
+            settingsService = settings,
+            currentVersion = currentVersion
         )
     }
 
     private fun createService(
         body: String,
         status: HttpStatusCode = HttpStatusCode.OK,
-        settings: ISettingsService = fakeSettings()
+        settings: ISettingsService = fakeSettings(),
+        currentVersion: String = "2.0.0"
     ): UpdateService {
         val tempDir = Files.createTempDirectory("update-test")
         tempDir.toFile().deleteOnExit()
@@ -96,7 +99,8 @@ class UpdateServiceTest {
             ),
             json = json,
             dataDirectory = tempDir,
-            settingsService = settings
+            settingsService = settings,
+            currentVersion = currentVersion
         )
     }
 
@@ -570,12 +574,26 @@ class UpdateServiceTest {
 
     @Test
     fun `checkForUpdate returns null when versions are equal`() = runTest {
-        // Use the actual client version from config
-        val currentVersion = hivens.config.Branding.VERSION.removePrefix("v")
-        val svc = createService(githubReleaseJson(tagName = "v$currentVersion"))
+        // createService injects currentVersion = "2.0.0"; stage the same tag.
+        val svc = createService(githubReleaseJson(tagName = "v2.0.0"))
         val update = svc.checkForUpdate()
 
         assertNull(update, "Same version should not trigger update")
+    }
+
+    @Test
+    fun `source build is never auto-updated even by a critical mandatory release`() = runTest {
+        val channelMeta = """{"mandatory_min_version":"999.0.0","reason":"upstream broke"}"""
+        val criticalRelease = githubReleaseJson(tagName = "v999.0.0", name = "[CRITICAL] v999.0.0")
+        val svc = createService(
+            MockResponse(urlContains = "releases/latest",     body = criticalRelease),
+            MockResponse(urlContains = "releases",            body = "[$criticalRelease]"),
+            MockResponse(urlContains = "update-channel.json", body = channelMeta),
+            currentVersion = "2.3.4-5-gabc1234-dirty",
+        )
+
+        assertNull(svc.checkForUpdate(), "A from-source build must not be auto-updated")
+        assertNull(svc.checkForMandatoryUpdate(), "A from-source build must not be force-updated")
     }
 
     @Test

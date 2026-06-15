@@ -21,6 +21,8 @@ import androidx.compose.ui.unit.Dp
 import coil3.compose.AsyncImage
 import hivens.core.api.dto.smrt.SmrtModEntry
 import hivens.launcher.smrt.ModIconResolver
+import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.decorativeColor
 import org.koin.compose.koinInject
 
 /**
@@ -72,7 +74,7 @@ fun ModIconImage(
             Box(
                 modifier = Modifier
                     .size(size)
-                    .background(avatarColorFor(mod.filename)),
+                    .background(CelestiaTheme.colors.decorativeColor(mod.filename)),
             )
         }
     }
@@ -90,7 +92,7 @@ private fun LetterAvatar(name: String, size: Dp) {
     Box(
         modifier         = Modifier
             .size(size)
-            .background(avatarColorFor(name)),
+            .background(CelestiaTheme.colors.decorativeColor(name)),
         contentAlignment = Alignment.Center,
     ) {
         Text(
@@ -101,28 +103,3 @@ private fun LetterAvatar(name: String, size: Dp) {
         )
     }
 }
-
-/**
- * Deterministic colour from the filename hash. Same input -> same
- * colour across launches, so a user re-encountering "buildcraftcore"
- * sees the same avatar swatch every time. Limited to a curated
- * Material palette so adjacent rows don't clash.
- *
- * [Math.floorMod] (not `%`, not `abs()`) because Kotlin's `%` on a
- * negative `Int.hashCode()` returns a negative remainder, and
- * `abs(Int.MIN_VALUE)` is still `Int.MIN_VALUE`. floorMod always
- * returns a value in `[0, palette.size)` for a positive divisor.
- */
-private val AVATAR_PALETTE = listOf(
-    Color(0xFF2563EB), // blue
-    Color(0xFF7C3AED), // violet
-    Color(0xFF16A34A), // green
-    Color(0xFFCA8A04), // amber
-    Color(0xFFDC2626), // red
-    Color(0xFF0891B2), // cyan
-    Color(0xFFDB2777), // pink
-    Color(0xFF6B7280), // slate
-)
-
-private fun avatarColorFor(name: String): Color =
-    AVATAR_PALETTE[Math.floorMod(name.hashCode(), AVATAR_PALETTE.size)]

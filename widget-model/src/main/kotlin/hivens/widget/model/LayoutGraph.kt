@@ -1,5 +1,6 @@
 package hivens.widget.model
 
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
@@ -37,21 +38,43 @@ data class WidgetInstance(
 
 // Optional backing painted around a widget by the kernel: a glass card behind
 // it ([glassAlphaPct] 0 = none), rounded corners ([cornerRadiusDp]), and inner
-// [paddingDp]. Compose-free (widget-model carries no Compose); the kernel turns
-// these scalars into a Modifier via the injected LocalWidgetChromeRenderer.
+// padding. [paddingDp] is the uniform baseline; each side may override it via
+// [paddingTopDp] / [paddingEndDp] / [paddingBottomDp] / [paddingStartDp], where
+// -1 means "inherit the uniform value". Compose-free (widget-model carries no
+// Compose); the kernel turns these scalars into a Modifier via the injected
+// LocalWidgetChromeRenderer.
 @Serializable
 data class WidgetChrome(
     val glassAlphaPct: Int = 0,
     val cornerRadiusDp: Int = 0,
     val paddingDp: Int = 0,
-)
+    val paddingTopDp: Int = -1,
+    val paddingEndDp: Int = -1,
+    val paddingBottomDp: Int = -1,
+    val paddingStartDp: Int = -1,
+) {
+    val effectiveTop: Int    get() = if (paddingTopDp    >= 0) paddingTopDp    else paddingDp
+    val effectiveEnd: Int    get() = if (paddingEndDp    >= 0) paddingEndDp    else paddingDp
+    val effectiveBottom: Int get() = if (paddingBottomDp >= 0) paddingBottomDp else paddingDp
+    val effectiveStart: Int  get() = if (paddingStartDp  >= 0) paddingStartDp  else paddingDp
+}
 
 // Phase G: how a slot arranges its widgets. Column (default) reproduces
 // the pre-Phase-G vertical stack; Row lays them horizontally; Grid flows
 // them into `gridColumns` uniform cells; Canvas places each widget at an
-// absolute offset + size (free-canvas mode).
+// absolute offset + size (free-canvas mode). Unknown is the forward-compat
+// sentinel: a newer build's orientation read here folds to Unknown (never
+// emitted intentionally) and renders as Column, rather than silently
+// coercing to Column and discarding the real value's identity.
 @Serializable
-enum class SlotOrientation { Column, Row, Grid, Canvas }
+enum class SlotOrientation { Column, Row, Grid, Canvas, Unknown }
+
+/** Persistence codec that folds an unknown wire orientation to [SlotOrientation.Unknown]. */
+object SlotOrientationSerializer : KSerializer<SlotOrientation> by LenientEnumSerializer(
+    SlotOrientation.entries.toTypedArray(),
+    SlotOrientation.Unknown,
+    SlotOrientation.serializer(),
+)
 
 // Absolute placement of a widget inside a Canvas slot. x/y are dp offsets
 // from the slot's top-left; width/height 0 means intrinsic/wrap (dp when set);
@@ -68,6 +91,7 @@ data class CanvasPlacement(
 @Serializable
 data class SlotContent(
     val widgets: List<WidgetInstance> = emptyList(),
+    @Serializable(with = SlotOrientationSerializer::class)
     val orientation: SlotOrientation = SlotOrientation.Column,
     // Column count when orientation == Grid; ignored otherwise.
     val gridColumns: Int = 2,
@@ -315,8 +339,9 @@ private fun SlotContent.walkInstances(): Sequence<WidgetInstance> = sequence {
 // children are rewritten before the widget itself is handed to `transform`,
 // so the transform always sees an already-converted subtree. Pure; the
 // schema migrations use it to restructure widget kinds across the whole
-// graph. The caller owns instanceId uniqueness across the produced set --
-// the load() migration path does not run the tree-wide uniqueness guard.
+// graph. The caller owns instanceId uniqueness across the produced set;
+// load() sweeps the post-migration graph and falls back to the bundled
+// default if a migration mints a collision.
 fun LayoutGraph.flatMapInstances(
     transform: (WidgetInstance) -> List<WidgetInstance>,
 ): LayoutGraph = copy(

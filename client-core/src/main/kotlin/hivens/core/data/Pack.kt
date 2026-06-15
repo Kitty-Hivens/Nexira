@@ -16,9 +16,11 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class Pack(
     val id: String,
+    @Serializable(with = PackOriginSerializer::class)
     val origin: PackOrigin,
     val displayName: String,
     val mcVersion: String,
+    @Serializable(with = PackLoaderSerializer::class)
     val loader: PackLoader,
     val loaderVersion: String? = null,
     /**

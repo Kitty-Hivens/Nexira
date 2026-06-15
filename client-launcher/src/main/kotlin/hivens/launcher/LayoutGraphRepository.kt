@@ -6,7 +6,6 @@ import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
 import hivens.widget.model.flatMapInstances
 import hivens.widget.model.resetSurface
-import hivens.widget.model.walkInstances
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -50,7 +49,9 @@ import kotlin.time.Duration.Companion.milliseconds
  * Phase C, or a paste-with-children that does not rewrite ids) is
  * rejected with a warn log and identity return -- a single duplicate
  * instanceId would otherwise corrupt every findByInstanceId-style
- * traversal in the editor.
+ * traversal in the editor. [load] runs the same sweep on the
+ * post-migration graph and falls back to the bundled default on a
+ * collision, so a migration that mints a clashing id can't persist one.
  */
 class LayoutGraphRepository(
     private val file: Path,
@@ -61,6 +62,24 @@ class LayoutGraphRepository(
 
     private val log   = LoggerFactory.getLogger(LayoutGraphRepository::class.java)
     private val mutex = Mutex()
+
+    // Set by load() when the file's schema_version is newer than this build
+    // understands. A newer build wrote it; we read best-effort (and keep the
+    // UI live) but never write back, so an older binary cannot downgrade and
+    // discard layout data it can't represent. Symmetric to Migrations.apply's
+    // lower-bound rejection.
+    @Volatile private var readOnly = false
+
+    @Volatile private var _migratedFromSchema: Int? = null
+
+    /**
+     * The schema version the just-loaded file was migrated UP from, or null
+     * when the file was already current, a newer build's, first-run, or
+     * unreadable. Read once at startup to gate destructive reconciliation
+     * (the unknown-kind prune) on an actual schema bump.
+     */
+    val migratedFromSchema: Int? get() = _migratedFromSchema
+
     private val state: MutableStateFlow<LayoutGraph> = MutableStateFlow(load())
 
     // Pending debounced persist. Replaced on each update; cancelled by
@@ -91,16 +110,13 @@ class LayoutGraphRepository(
             // size / z / weight) that fire per drag frame and provably cannot
             // introduce a duplicate id -- otherwise this walk runs ~60x/sec.
             if (validate) {
-                val seen = HashSet<String>()
-                for (widget in next.walkInstances()) {
-                    if (!seen.add(widget.instanceId)) {
-                        log.warn(
-                            "Layout update rejected: duplicate instanceId '{}' in tree. " +
+                LayoutReconcile.firstDuplicateInstanceId(next)?.let { dup ->
+                    log.warn(
+                        "Layout update rejected: duplicate instanceId '{}' in tree. " +
                             "Keeping previous graph to protect findByInstanceId-style traversals.",
-                            widget.instanceId,
-                        )
-                        return@withLock
-                    }
+                        dup,
+                    )
+                    return@withLock
                 }
             }
 
@@ -184,71 +200,48 @@ class LayoutGraphRepository(
         }
         return try {
             val envelope = json.decodeFromString<Envelope>(Files.readString(file))
-            val def      = defaultGraph()
-            val migrated = Migrations.apply(envelope.schemaVersion, envelope.graph)
-            mergeMissingSlots(mergeMissingSurfaces(migrated, def), def)
+            if (envelope.schemaVersion > SCHEMA_VERSION) {
+                readOnly = true
+                log.warn(
+                    "Layout graph at {} is schema_version {} > supported {} -- written by a newer build. " +
+                        "Loading read-only; this session will not write it back to avoid clobbering newer data.",
+                    file, envelope.schemaVersion, SCHEMA_VERSION,
+                )
+            }
+            if (envelope.schemaVersion in 1 until SCHEMA_VERSION) {
+                _migratedFromSchema = envelope.schemaVersion
+            }
+            val def = defaultGraph()
+            // Migrate + seed missing default surfaces/slots + sweep instanceId
+            // uniqueness via the shared reconciler. A migration or merge that
+            // mints a colliding id would silently break every findByInstanceId
+            // traversal; update() guards live edits, this is the load-time
+            // backstop -- serve the bundled default over a corrupted tree.
+            when (val result = LayoutReconcile.reconcile(envelope.schemaVersion, envelope.graph, def)) {
+                is LayoutReconcile.Result.Ok -> result.graph
+                is LayoutReconcile.Result.DuplicateId -> {
+                    log.error(
+                        "Layout graph at {} has a duplicate instanceId '{}' after {} (schema_version {} -> {}). " +
+                            "Falling back to the bundled default to protect instanceId-keyed traversals.",
+                        file, result.id, result.stage, envelope.schemaVersion, LayoutReconcile.CURRENT_SCHEMA,
+                    )
+                    defaultGraph()
+                }
+            }
         } catch (e: Exception) {
             log.error("Failed to load layout graph at {} -- falling back to bundled default", file, e)
             defaultGraph()
         }
     }
 
-    // Merge surfaces from the bundled default into the user's persisted
-    // graph when the user file pre-dates the surface. Without this, a
-    // surface added to default-layout.json in a later release stays
-    // invisible because the user file is the source of truth on load.
-    //
-    // Only ADDS missing surfaces. Surfaces the user has edited keep
-    // their persisted form; surfaces the user has reset-via-editor
-    // stay reset (the reset path writes the default explicitly). A
-    // surface dropped from default-layout in a later release likewise
-    // stays in the user file -- there is no automatic deletion path,
-    // because a removed-upstream surface may carry user data we cannot
-    // recreate.
-    private fun mergeMissingSurfaces(user: LayoutGraph, def: LayoutGraph): LayoutGraph {
-        val missing = def.surfaces.filterKeys { it !in user.surfaces }
-        if (missing.isEmpty()) return user
-        log.info("Layout graph: seeding {} new surface(s) from bundled default: {}", missing.size, missing.keys.map { it.value })
-        return user.copy(surfaces = user.surfaces + missing)
-    }
-
-    // Merge slots from the bundled default into a surface the user
-    // already has, when the default declares a slot the user file lacks.
-    // mergeMissingSurfaces only adds whole NEW surfaces; a slot ADDED to
-    // an existing surface in a later release (e.g. the profile sign-in
-    // slot) would otherwise stay invisible, because the user's surface
-    // is the source of truth on load and SlotRenderer finds nothing at
-    // the new slot id -- a blank pane with no in-product way back.
-    //
-    // Slots are structural: the editor arranges widgets WITHIN slots but
-    // has no create-slot or delete-slot operation. So a slot present in
-    // the default but absent from the user graph is always an upstream
-    // addition, never a user deletion -- which makes this merge purely
-    // additive and safe (it cannot resurrect something the user removed).
-    // Slot REMOVALS (a slot dropped from the default) are left in place;
-    // a stale slot is inert in production -- surface composables render
-    // slots by explicit id -- and a true removal that must reclaim the
-    // data needs an explicit migration step instead.
-    private fun mergeMissingSlots(user: LayoutGraph, def: LayoutGraph): LayoutGraph {
-        var changed = false
-        val merged = user.surfaces.mapValues { (surfaceId, layout) ->
-            val defLayout = def.surfaces[surfaceId] ?: return@mapValues layout
-            val missing   = defLayout.slots.filterKeys { it !in layout.slots }
-            if (missing.isEmpty()) return@mapValues layout
-            changed = true
-            log.info(
-                "Layout graph: seeding {} new slot(s) into surface '{}' from bundled default: {}",
-                missing.size, surfaceId.value, missing.keys.map { it.value },
-            )
-            layout.copy(slots = layout.slots + missing)
-        }
-        return if (changed) user.copy(surfaces = merged) else user
-    }
-
     // Synchronous file ops. Caller MUST hold [mutex] when invoking.
     // The debounce coroutine acquires the mutex inside its launched
     // block; flush() invokes from inside its own mutex.withLock.
     private fun writeNow() {
+        if (readOnly) {
+            log.debug("Layout graph at {} is from a newer build -- skipping write-back", file)
+            return
+        }
         try {
             val envelope = Envelope(schemaVersion = SCHEMA_VERSION, graph = state.value)
             AtomicFiles.writeString(file, json.encodeToString(envelope))
@@ -264,7 +257,7 @@ class LayoutGraphRepository(
     )
 
     private companion object {
-        const val SCHEMA_VERSION = 4
+        const val SCHEMA_VERSION = LayoutReconcile.CURRENT_SCHEMA
 
         // 200ms catches a drag-thrash without delaying single drops
         // noticeably. Verification target in the Phase A plan is "<=5
@@ -295,7 +288,7 @@ internal object Migrations {
         return current
     }
 
-    private const val CURRENT = 4
+    private const val CURRENT = LayoutReconcile.CURRENT_SCHEMA
 
     private fun step(toVersion: Int): Step = when (toVersion) {
         // v1 -> v2: WidgetInstance gained a children field.
@@ -332,7 +325,8 @@ private fun migrateNavToEntries(graph: LayoutGraph): LayoutGraph =
                 // painted six bare rail items under one frame, so a single
                 // backing or weighted share must not replicate onto all six.
                 // The id derives from the (unique) original, so the six stay
-                // unique without the load-path uniqueness guard.
+                // unique; the load-path sweep backstops the case where a
+                // derived id still clashes with a pre-existing one.
                 WidgetInstance(
                     kind       = NAV_ENTRY,
                     instanceId = "${w.instanceId}-$token",

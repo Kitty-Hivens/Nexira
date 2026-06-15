@@ -1,5 +1,6 @@
 package hivens.ui.widgets.serverdetails
 
+import hivens.ui.theme.LocalMonoFamily
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Column
@@ -10,7 +11,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Warning
@@ -22,7 +22,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -65,23 +64,23 @@ private fun MissingDataWarning(title: String, body: String, path: String) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(Color(0xFFFFAA00).copy(alpha = 0.12f))
-            .border(1.dp, Color(0xFFFFAA00).copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+            .clip(MaterialTheme.shapes.medium)
+            .background(CelestiaTheme.colors.warnAccent.copy(alpha = 0.12f))
+            .border(1.dp, CelestiaTheme.colors.warnAccent.copy(alpha = 0.3f), MaterialTheme.shapes.medium)
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Icons.Default.Warning, null, tint = Color(0xFFFFAA00))
+        Icon(Icons.Default.Warning, null, tint = CelestiaTheme.colors.warnAccent)
         Spacer(Modifier.width(16.dp))
         Column {
-            Text(title, style = MaterialTheme.typography.titleSmall, color = Color(0xFFFFAA00), fontWeight = FontWeight.Bold)
+            Text(title, style = MaterialTheme.typography.titleSmall, color = CelestiaTheme.colors.warnAccent, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(4.dp))
             Text(body, style = MaterialTheme.typography.bodySmall, color = CelestiaTheme.colors.textPrimary.copy(alpha = 0.7f))
             Text(
                 text       = path,
                 style      = MaterialTheme.typography.bodySmall,
                 color      = CelestiaTheme.colors.textSecondary.copy(alpha = 0.6f),
-                fontFamily = FontFamily.Monospace,
+                fontFamily = LocalMonoFamily.current,
             )
         }
     }

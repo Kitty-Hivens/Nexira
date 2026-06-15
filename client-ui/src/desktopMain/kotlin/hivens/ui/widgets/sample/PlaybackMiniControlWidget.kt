@@ -91,7 +91,7 @@ fun PlaybackMiniControlWidget(instance: WidgetInstance) {
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(MaterialTheme.shapes.medium)
             .background(glassSurfaceAlpha(0.55f))
             .padding(horizontal = 12.dp, vertical = 10.dp),
     ) {
@@ -142,7 +142,7 @@ private fun DisabledPlaceholder() {
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(MaterialTheme.shapes.medium)
             .background(CelestiaTheme.colors.surfaceVariant.copy(alpha = 0.4f))
             .padding(horizontal = 12.dp, vertical = 10.dp),
     ) {

@@ -1,5 +1,6 @@
 package hivens.ui.widgets.themepicker
 
+import hivens.ui.theme.LocalMonoFamily
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -133,7 +134,7 @@ private fun ColorRow(label: String, hexColor: String) {
                 text       = hexColor,
                 style      = MaterialTheme.typography.bodySmall,
                 color      = CelestiaTheme.colors.textPrimary,
-                fontFamily = FontFamily.Monospace,
+                fontFamily = LocalMonoFamily.current,
             )
         }
     }

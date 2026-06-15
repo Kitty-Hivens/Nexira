@@ -19,7 +19,6 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollbarAdapter
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
@@ -326,7 +325,7 @@ private fun CollapsibleSectionHeader(text: String, isOpen: Boolean, onToggle: ()
     Row(
         modifier              = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(6.dp))
+            .clip(MaterialTheme.shapes.small)
             .clickable(onClick = onToggle)
             .padding(vertical = 2.dp),
         verticalAlignment     = Alignment.CenterVertically,
@@ -353,7 +352,7 @@ private fun ResolverWarnings(graph: DepGraph) {
     Column(
         modifier            = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
+            .clip(MaterialTheme.shapes.medium)
             .background(CelestiaTheme.colors.error.copy(alpha = 0.08f))
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),

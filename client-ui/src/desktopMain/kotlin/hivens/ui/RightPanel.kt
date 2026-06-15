@@ -40,6 +40,9 @@ fun RightPanel(
     CompositionLocalProvider(LocalRightRailContext provides ctx) {
         Column(modifier = modifier.background(CelestiaTheme.colors.background)) {
             SlotRenderer(SurfaceId(SURFACE), SlotId("news"), Modifier.weight(1f).fillMaxWidth())
+            // Bottom slot: the message-history widget seeds here by default; the
+            // news slot takes the weight so this stays pinned to the bottom.
+            SlotRenderer(SurfaceId(SURFACE), SlotId("bottom"), Modifier.fillMaxWidth())
         }
     }
 }

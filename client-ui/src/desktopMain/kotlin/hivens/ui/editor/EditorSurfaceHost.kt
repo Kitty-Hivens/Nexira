@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.RestartAlt
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
@@ -72,22 +73,26 @@ import androidx.compose.ui.unit.dp
 import hivens.core.data.HomeView
 import hivens.core.data.UiStyle
 import hivens.launcher.LayoutGraphRepository
+import hivens.launcher.LayoutReconcile
 import hivens.ui.Screen
 import hivens.ui.customization.CustomizationSettings
 import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.layout.AdaptiveWidth
 import hivens.widget.api.LocalLayoutGraph
 import kotlinx.coroutines.CoroutineScope as KotlinCoroutineScope
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
 import hivens.ui.editor.decoration.EditableWidgetChrome
 import hivens.ui.editor.decoration.EmptySlotPlaceholder
+import hivens.ui.editor.decoration.UnsupportedWidgetPlaceholder
 import hivens.ui.editor.dnd.DragController
 import hivens.ui.editor.dnd.DragPayload
 import hivens.ui.editor.dnd.DropTargetRegistry
 import hivens.ui.editor.dnd.LocalDragController
 import hivens.ui.editor.dnd.LocalDropTargetRegistry
 import hivens.ui.editor.palette.WidgetPalettePanel
+import hivens.ui.editor.props.SurfacePropertiesPanel
 import hivens.ui.editor.props.WidgetPropPanel
 import hivens.ui.editor.presets.PresetEnvelope
 import hivens.ui.editor.presets.PresetManagerPanel
@@ -112,6 +117,7 @@ import hivens.ui.widgets.themepicker.LocalThemePickerContext
 import hivens.ui.widgets.themepicker.STUB_THEME_PICKER
 import hivens.widget.api.EmptySlotDecorator
 import hivens.widget.api.LocalEmptySlotDecorator
+import hivens.widget.api.LocalUnknownWidgetDecorator
 import hivens.widget.api.LocalSlotControlDecorator
 import hivens.widget.api.LocalSlotDividerDecorator
 import hivens.widget.api.LocalSlotBoundsReporter
@@ -122,13 +128,16 @@ import hivens.ui.theme.LocalStyle
 import hivens.widget.api.LocalWidgetDecorator
 import hivens.widget.api.SlotControlDecorator
 import hivens.widget.api.SlotDividerDecorator
+import hivens.widget.api.UnknownWidgetDecorator
 import hivens.widget.api.WidgetDecorator
+import hivens.widget.model.DefaultLayout
 import hivens.widget.model.SlotOrientation
 import hivens.widget.model.SlotPath
 import hivens.widget.model.SurfaceId
 import hivens.widget.model.traverse
 import kotlinx.coroutines.CoroutineScope
 import org.koin.compose.koinInject
+import org.slf4j.LoggerFactory
 
 // EditorSurfaceHost is the single coordinator for everything edit-mode
 // related on the active surface. It:
@@ -144,6 +153,8 @@ import org.koin.compose.koinInject
 
 // Which widget instance the prop panel is currently editing.
 private data class PropTarget(val path: SlotPath, val instanceId: String)
+
+private val log = LoggerFactory.getLogger("EditorSurfaceHost")
 
 @Composable
 fun EditorSurfaceHost(
@@ -182,10 +193,13 @@ fun EditorSurfaceHost(
     // dismiss, and on leaving edit mode; while set, the palette hides so
     // the two right-edge panels do not overlap.
     var propTarget by remember(availableSurfaces) { mutableStateOf<PropTarget?>(null) }
-    // Any edit-mode exit (FAB / Escape / Ctrl+E) drops the prop target, so
-    // re-entering does not silently reopen the last panel with the palette
-    // still hidden.
-    LaunchedEffect(editing) { if (!editing) propTarget = null }
+    // Surface-level settings panel (currently the left rail's nav-selection
+    // settings). Mutually exclusive with the per-widget prop panel + palette.
+    var surfaceSettingsOpen by remember(availableSurfaces) { mutableStateOf(false) }
+    // Any edit-mode exit (FAB / Escape / Ctrl+E) drops the prop target and the
+    // surface settings panel, so re-entering does not silently reopen the last
+    // panel with the palette still hidden.
+    LaunchedEffect(editing) { if (!editing) { propTarget = null; surfaceSettingsOpen = false } }
     val currentGraph = LocalLayoutGraph.current
     // Leaving a surface drops edit mode -- avoids a stale edit state
     // pointed at the wrong surface after navigation.
@@ -268,7 +282,16 @@ fun EditorSurfaceHost(
                         if (propTarget?.instanceId == instance.instanceId) propTarget = null
                         controller.removeWidget(path, instance.instanceId)
                     },
-                    onEditProps  = { propTarget = PropTarget(path, instance.instanceId) },
+                    onEditProps  = {
+                        // Toggle: tapping the same widget's tune again closes the
+                        // panel, matching the surface-settings gear below.
+                        if (propTarget?.instanceId == instance.instanceId) {
+                            propTarget = null
+                        } else {
+                            propTarget = PropTarget(path, instance.instanceId)
+                            surfaceSettingsOpen = false
+                        }
+                    },
                     onCommitDrop = { committedPointer ->
                         // Hit-test which slot received the drop. Null =
                         // pointer is off any slot; treat as cancel.
@@ -324,6 +347,25 @@ fun EditorSurfaceHost(
         }
     }
 
+    // Unknown-widget decorator: an "unsupported widget" placeholder for any
+    // instance whose kind left the registry (rename / removal / a plugin not
+    // loaded), shown on every surface while editing so the orphan is visible
+    // and one-tap removable. Identity off / previewing -- production renders
+    // nothing and the instance keeps its props / children on disk.
+    val unknownDecorator: UnknownWidgetDecorator = remember(state, previewing) {
+        if (state is EditModeState.On && !previewing) {
+            { _, _, instance ->
+                val path = LocalSlotPath.current
+                UnsupportedWidgetPlaceholder(
+                    instance = instance,
+                    onRemove = { controller.removeWidget(path, instance.instanceId) },
+                )
+            }
+        } else {
+            { _, _, _ -> }
+        }
+    }
+
     // Slot control decorator: a compact orientation + grid-columns
     // control at the start of every non-empty slot on the selected
     // surface. Identity (renders nothing) when off, previewing, or for a
@@ -370,6 +412,7 @@ fun EditorSurfaceHost(
         LocalDropTargetRegistry provides registry,
         LocalWidgetDecorator    provides chromeDecorator,
         LocalEmptySlotDecorator provides emptyDecorator,
+        LocalUnknownWidgetDecorator provides unknownDecorator,
         LocalSlotControlDecorator provides slotControlDecorator,
         LocalSlotDividerDecorator provides slotDividerDecorator,
         // Edit-mode reflow duration -- slot add / remove / resize animates while
@@ -431,20 +474,6 @@ fun EditorSurfaceHost(
             EditModeVignette(active = editing)
 
             if (availableSurfaces.isNotEmpty()) {
-                EditModePill(
-                    active            = editing,
-                    surfaces          = availableSurfaces,
-                    selectedSurface   = selectedSurface,
-                    onSurfacePicked   = { selectedSurface = it },
-                    paletteOpen       = paletteOpen,
-                    onTogglePalette   = { paletteOpen = !paletteOpen },
-                    previewing        = previewing,
-                    onTogglePreview   = { previewing = !previewing },
-                    onOpenPresets     = { presetPanelOpen = true },
-                    onRequestReset    = { if (selectedSurface != null) resetSurfaceConfirm = true },
-                    modifier          = Modifier.align(Alignment.TopCenter).padding(top = 16.dp),
-                )
-
                 val surfaceForReset = selectedSurface
                 if (resetSurfaceConfirm && surfaceForReset != null) {
                     AlertDialog(
@@ -479,6 +508,7 @@ fun EditorSurfaceHost(
                     onDismiss     = { presetPanelOpen = false },
                     onSaveCurrent = { name ->
                         val envelope = PresetEnvelope(
+                            schemaVersion = LayoutReconcile.CURRENT_SCHEMA,
                             name          = name,
                             createdAt     = System.currentTimeMillis(),
                             graph         = currentGraph,
@@ -496,10 +526,31 @@ fun EditorSurfaceHost(
                             val env = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                                 presetRepo.load(meta.name)
                             } ?: return@launch
-                            layoutRepo.update { env.graph }
-                            onCustomizationChanged(env.customization)
-                            onUiStyleChanged(env.uiStyle)
-                            presetPanelOpen = false
+                            // Route the preset through the same migrate + merge +
+                            // uniqueness pipeline as a normal on-disk load, so a
+                            // preset from an older schema (retired kinds) or app
+                            // version (missing surfaces/slots) reconciles instead
+                            // of landing in live state verbatim.
+                            val result = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                runCatching {
+                                    LayoutReconcile.reconcile(env.schemaVersion, env.graph, DefaultLayout.load())
+                                }
+                                    .onFailure { log.error("Preset '{}' failed to reconcile, not loading", meta.name, it) }
+                                    .getOrNull()
+                            } ?: return@launch
+                            when (result) {
+                                is LayoutReconcile.Result.Ok -> {
+                                    layoutRepo.update { result.graph }
+                                    onCustomizationChanged(env.customization)
+                                    onUiStyleChanged(env.uiStyle)
+                                    presetPanelOpen = false
+                                }
+                                is LayoutReconcile.Result.DuplicateId ->
+                                    log.error(
+                                        "Preset '{}' yields a duplicate instanceId '{}' after {}; not loading to protect the live layout.",
+                                        meta.name, result.id, result.stage,
+                                    )
+                            }
                         }
                     },
                     onDelete = { meta ->
@@ -526,7 +577,7 @@ fun EditorSurfaceHost(
                 )
 
                 WidgetPalettePanel(
-                    visible        = editing && paletteOpen && !previewing && propTarget == null,
+                    visible        = editing && paletteOpen && !previewing && propTarget == null && !surfaceSettingsOpen,
                     dimmed         = dragController.active != null,
                     onDismiss      = { paletteOpen = false },
                     controller     = dragController,
@@ -544,10 +595,44 @@ fun EditorSurfaceHost(
                     modifier   = Modifier.align(Alignment.TopEnd),
                 )
 
+                // Surface-level settings (region's own settings, e.g. the left
+                // rail's selection style) -- shares the right edge with the
+                // widget prop panel; the two are mutually exclusive by flag.
+                SurfacePropertiesPanel(
+                    visible                = editing && !previewing && surfaceSettingsOpen && surfaceHasSettings(selectedSurface),
+                    title                  = selectedSurface?.let { humanSurfaceName(it, s) } ?: "",
+                    customization          = customization,
+                    onCustomizationChanged = onCustomizationChanged,
+                    onDismiss              = { surfaceSettingsOpen = false },
+                    modifier               = Modifier.align(Alignment.TopEnd),
+                )
+
                 // No edit-mode FAB: Ctrl+E (window-level, see AppShell) toggles
                 // edit mode and Escape exits, so a dedicated button is redundant.
             }
             } // end center-anchored chrome layer
+
+            // Editor toolbar pill: centered over the WHOLE window, NOT the inset
+            // center pane. The inset is a fixed 65/265, but the rails collapse
+            // (Ctrl+N) and resize, so centering inside it drifted the pill across
+            // rail states. The full-window box keeps it put.
+            if (availableSurfaces.isNotEmpty()) {
+                EditModePill(
+                    active                = editing,
+                    surfaces              = availableSurfaces,
+                    selectedSurface       = selectedSurface,
+                    onSurfacePicked       = { selectedSurface = it; surfaceSettingsOpen = false },
+                    surfaceHasSettings    = surfaceHasSettings(selectedSurface),
+                    onOpenSurfaceSettings = { surfaceSettingsOpen = !surfaceSettingsOpen; if (surfaceSettingsOpen) propTarget = null },
+                    paletteOpen           = paletteOpen,
+                    onTogglePalette       = { paletteOpen = !paletteOpen },
+                    previewing            = previewing,
+                    onTogglePreview       = { previewing = !previewing },
+                    onOpenPresets         = { presetPanelOpen = true },
+                    onRequestReset        = { if (selectedSurface != null) resetSurfaceConfirm = true },
+                    modifier              = Modifier.align(Alignment.TopCenter).padding(top = 16.dp),
+                )
+            }
 
             // The drag ghost follows the pointer across the WHOLE shell (rails
             // included), so it stays full-window, above the inset chrome layer.
@@ -564,6 +649,8 @@ private fun EditModePill(
     surfaces: List<SurfaceId>,
     selectedSurface: SurfaceId?,
     onSurfacePicked: (SurfaceId) -> Unit,
+    surfaceHasSettings: Boolean,
+    onOpenSurfaceSettings: () -> Unit,
     paletteOpen: Boolean,
     onTogglePalette: () -> Unit,
     previewing: Boolean,
@@ -580,99 +667,129 @@ private fun EditModePill(
         exit     = fadeOut(tween(motionMs)) + slideOutVertically(tween(motionMs)) { -it },
         modifier = modifier,
     ) {
-        Surface(
-            color   = CelestiaTheme.colors.surface.copy(alpha = 0.94f),
-            shape   = RoundedCornerShape(20.dp),
-            shadowElevation = 6.dp,
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(start = 12.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
+        AdaptiveWidth { _, maxWidth ->
+            // The pill goes icon-only below this width: the full-label set (with
+            // the surface-settings gear added) overflows around the 960dp min
+            // window, where the "Esc -- exit" hint got squeezed into a vertical
+            // staircase. Threshold on the measured width, not the coarse
+            // WidthClass, so it tracks the real chip count.
+            val compact = maxWidth < 1100.dp
+            Surface(
+                color   = CelestiaTheme.colors.surface.copy(alpha = 0.94f),
+                shape   = RoundedCornerShape(20.dp),
+                shadowElevation = 6.dp,
             ) {
-                Icon(
-                    imageVector        = Icons.Default.Tune,
-                    contentDescription = null,
-                    tint               = CelestiaTheme.colors.primary,
-                    modifier           = Modifier.size(16.dp),
-                )
-                Spacer(Modifier.width(8.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(start = 12.dp, end = if (compact) 8.dp else 4.dp, top = 6.dp, bottom = 6.dp),
+                ) {
+                    Icon(
+                        imageVector        = Icons.Default.Tune,
+                        contentDescription = null,
+                        tint               = CelestiaTheme.colors.primary,
+                        modifier           = Modifier.size(16.dp),
+                    )
+                    Spacer(Modifier.width(8.dp))
 
-                // Surface picker chips. One chip per available surface;
-                // the active surface has a primary tint.
-                surfaces.forEach { sid ->
-                    SurfaceChip(
-                        surface  = sid,
-                        active   = sid == selectedSurface,
-                        onClick  = { onSurfacePicked(sid) },
+                    // Surface picker chips. One chip per available surface;
+                    // the active surface has a primary tint.
+                    surfaces.forEach { sid ->
+                        SurfaceChip(
+                            surface  = sid,
+                            active   = sid == selectedSurface,
+                            compact  = compact,
+                            onClick  = { onSurfacePicked(sid) },
+                        )
+                        Spacer(Modifier.width(4.dp))
+                    }
+
+                    Spacer(Modifier.width(6.dp))
+
+                    // Surface settings: opens the selected surface's own settings
+                    // panel (e.g. the left rail's selection style). Shown only for
+                    // surfaces that expose surface-level settings.
+                    if (surfaceHasSettings) {
+                        ToolChip(
+                            icon     = Icons.Default.Settings,
+                            label    = s.editorSurfaceSettings,
+                            selected = false,
+                            onClick  = onOpenSurfaceSettings,
+                            compact  = compact,
+                        )
+                        Spacer(Modifier.width(4.dp))
+                    }
+
+                    // Preview toggle -- hides chrome temporarily so the
+                    // user can see the real look without leaving edit
+                    // mode. Drag becomes impossible during preview (no
+                    // handles), which matches user intent.
+                    ToolChip(
+                        icon       = if (previewing) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                        label      = if (previewing) s.editorPreviewHidden else s.editorPreview,
+                        selected   = previewing,
+                        onClick    = onTogglePreview,
+                        compact    = compact,
                     )
                     Spacer(Modifier.width(4.dp))
+
+                    // Palette toggle.
+                    ToolChip(
+                        icon     = Icons.Default.Widgets,
+                        label    = if (paletteOpen) s.editorPaletteToggleHide else s.editorWidgets,
+                        selected = paletteOpen,
+                        onClick  = onTogglePalette,
+                        compact  = compact,
+                    )
+                    Spacer(Modifier.width(4.dp))
+
+                    // Presets dialog.
+                    ToolChip(
+                        icon     = Icons.Default.Inventory2,
+                        label    = s.editorPresetsTitle,
+                        selected = false,
+                        onClick  = onOpenPresets,
+                        compact  = compact,
+                    )
+                    Spacer(Modifier.width(4.dp))
+
+                    // Escape hatch: reset the currently selected surface
+                    // to its bundled default. Destructive tint signals it
+                    // is a different class of action from the neutral
+                    // toggles next to it; confirmation dialog handled at
+                    // host level. Disabled when no surface is selected so
+                    // the chip cannot pretend to be live.
+                    ToolChip(
+                        icon        = Icons.Default.RestartAlt,
+                        label       = s.editorReset,
+                        selected    = false,
+                        onClick     = onRequestReset,
+                        destructive = true,
+                        enabled     = selectedSurface != null,
+                        compact     = compact,
+                    )
+
+                    if (!compact) {
+                        Spacer(Modifier.width(10.dp))
+                        Text(
+                            text  = s.editorEscHint,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = CelestiaTheme.colors.textSecondary,
+                            modifier = Modifier.padding(end = 8.dp),
+                        )
+                    }
                 }
-
-                Spacer(Modifier.width(6.dp))
-
-                // Preview toggle -- hides chrome temporarily so the
-                // user can see the real look without leaving edit
-                // mode. Drag becomes impossible during preview (no
-                // handles), which matches user intent.
-                ToolChip(
-                    icon       = if (previewing) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                    label      = if (previewing) s.editorPreviewHidden else s.editorPreview,
-                    selected   = previewing,
-                    onClick    = onTogglePreview,
-                )
-                Spacer(Modifier.width(4.dp))
-
-                // Palette toggle.
-                ToolChip(
-                    icon     = Icons.Default.Widgets,
-                    label    = if (paletteOpen) s.editorPaletteToggleHide else s.editorWidgets,
-                    selected = paletteOpen,
-                    onClick  = onTogglePalette,
-                )
-                Spacer(Modifier.width(4.dp))
-
-                // Presets dialog.
-                ToolChip(
-                    icon     = Icons.Default.Inventory2,
-                    label    = s.editorPresetsTitle,
-                    selected = false,
-                    onClick  = onOpenPresets,
-                )
-                Spacer(Modifier.width(4.dp))
-
-                // Escape hatch: reset the currently selected surface
-                // to its bundled default. Destructive tint signals it
-                // is a different class of action from the neutral
-                // toggles next to it; confirmation dialog handled at
-                // host level. Disabled when no surface is selected so
-                // the chip cannot pretend to be live.
-                ToolChip(
-                    icon        = Icons.Default.RestartAlt,
-                    label       = s.editorReset,
-                    selected    = false,
-                    onClick     = onRequestReset,
-                    destructive = true,
-                    enabled     = selectedSurface != null,
-                )
-                Spacer(Modifier.width(10.dp))
-
-                Text(
-                    text  = s.editorEscHint,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = CelestiaTheme.colors.textSecondary,
-                    modifier = Modifier.padding(end = 8.dp),
-                )
             }
         }
     }
 }
 
 @Composable
-private fun SurfaceChip(surface: SurfaceId, active: Boolean, onClick: () -> Unit) {
+private fun SurfaceChip(surface: SurfaceId, active: Boolean, compact: Boolean, onClick: () -> Unit) {
     val s = LocalStrings.current
     val bg = if (active) CelestiaTheme.colors.primary.copy(alpha = 0.18f)
              else Color.Transparent
     val fg = if (active) CelestiaTheme.colors.primary else CelestiaTheme.colors.textSecondary
+    val name = humanSurfaceShortName(surface, s)
     Surface(
         color    = bg,
         shape    = RoundedCornerShape(12.dp),
@@ -682,21 +799,24 @@ private fun SurfaceChip(surface: SurfaceId, active: Boolean, onClick: () -> Unit
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .clickable { onClick() }
-                .padding(horizontal = 10.dp, vertical = 5.dp),
+                .padding(horizontal = if (compact) 7.dp else 10.dp, vertical = 5.dp),
         ) {
             Icon(
                 imageVector        = surfaceIcon(surface),
-                contentDescription = null,
+                // Compact hides the label, so the icon carries the name for a11y.
+                contentDescription = if (compact) name else null,
                 tint               = fg,
                 modifier           = Modifier.size(14.dp),
             )
-            Spacer(Modifier.width(5.dp))
-            Text(
-                text       = humanSurfaceShortName(surface, s),
-                style      = MaterialTheme.typography.labelSmall,
-                color      = fg,
-                fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
-            )
+            if (!compact) {
+                Spacer(Modifier.width(5.dp))
+                Text(
+                    text       = name,
+                    style      = MaterialTheme.typography.labelSmall,
+                    color      = fg,
+                    fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
+                )
+            }
         }
     }
 }
@@ -709,6 +829,7 @@ private fun ToolChip(
     onClick: () -> Unit,
     destructive: Boolean = false,
     enabled: Boolean = true,
+    compact: Boolean = false,
 ) {
     val bg = when {
         !enabled    -> CelestiaTheme.colors.surfaceVariant.copy(alpha = 0.3f)
@@ -727,21 +848,24 @@ private fun ToolChip(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .clickable(enabled = enabled) { onClick() }
-                .padding(horizontal = 10.dp, vertical = 5.dp),
+                .padding(horizontal = if (compact) 7.dp else 10.dp, vertical = 5.dp),
         ) {
             Icon(
                 imageVector        = icon,
-                contentDescription = null,
+                // Compact hides the label, so the icon carries it for a11y.
+                contentDescription = if (compact) label else null,
                 tint               = fg,
                 modifier           = Modifier.size(14.dp),
             )
-            Spacer(Modifier.width(5.dp))
-            Text(
-                text       = label,
-                style      = MaterialTheme.typography.labelSmall,
-                color      = fg,
-                fontWeight = if (selected || destructive) FontWeight.SemiBold else FontWeight.Medium,
-            )
+            if (!compact) {
+                Spacer(Modifier.width(5.dp))
+                Text(
+                    text       = label,
+                    style      = MaterialTheme.typography.labelSmall,
+                    color      = fg,
+                    fontWeight = if (selected || destructive) FontWeight.SemiBold else FontWeight.Medium,
+                )
+            }
         }
     }
 }
@@ -785,6 +909,11 @@ private fun humanSurfaceName(surface: SurfaceId, s: AppStrings): String = when (
     "theme.picker"        -> s.editorSurfTheme
     else                  -> surface.value
 }
+
+// Surfaces that expose surface-level settings (a SurfacePropertiesPanel),
+// distinct from per-widget props. Currently only the left nav rail.
+private fun surfaceHasSettings(surface: SurfaceId?): Boolean =
+    surface?.value == "appshell.leftrail"
 
 // ── Vignette ────────────────────────────────────────────────────────────────
 

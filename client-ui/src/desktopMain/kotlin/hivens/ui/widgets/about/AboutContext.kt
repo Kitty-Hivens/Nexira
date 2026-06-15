@@ -5,6 +5,7 @@ import androidx.compose.runtime.ProvidableCompositionLocal
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.staticCompositionLocalOf
 import hivens.core.data.LauncherUpdate
+import hivens.core.jvm.SystemHardware
 
 // Tri-state machine the update widget reads + the surface mutates
 // via the triggerUpdateCheck lambda. Public so the widget files
@@ -32,7 +33,10 @@ class AboutContext(
     val showUpdateManager: MutableState<Boolean>,
     val triggerUpdateCheck: () -> Unit,
     val systemRam: Int,
-    val displayRes: String,
+    val swapMb: Int?,
+    val cpu: SystemHardware.CpuInfo,
+    val displayInfo: String,
+    val renderer: String,
 )
 
 val LocalAboutContext: ProvidableCompositionLocal<AboutContext> =
@@ -46,5 +50,8 @@ internal val STUB_ABOUT: AboutContext = AboutContext(
     showUpdateManager  = mutableStateOf(false),
     triggerUpdateCheck = {},
     systemRam          = 0,
-    displayRes         = "Unknown",
+    swapMb             = null,
+    cpu                = SystemHardware.CpuInfo(null, 0, null, null),
+    displayInfo        = "Unknown",
+    renderer           = "Unknown",
 )

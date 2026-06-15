@@ -99,70 +99,9 @@ class JavaManagerServiceTest {
         assertEquals(8, svc.detectJavaVersion("alpha-1.0.0"))
     }
 
-    // ── getOsName: os.name -> short tag ───────────────────────────────────
-
-    @Test
-    fun `getOsName maps Windows variants to win`() {
-        withSystemProp("os.name", "Windows 10") {
-            assertEquals("win", svc.getOsName())
-        }
-        withSystemProp("os.name", "Windows 11") {
-            assertEquals("win", svc.getOsName())
-        }
-    }
-
-    @Test
-    fun `getOsName maps Linux to linux`() {
-        withSystemProp("os.name", "Linux") {
-            assertEquals("linux", svc.getOsName())
-        }
-    }
-
-    @Test
-    fun `getOsName maps macOS to mac`() {
-        withSystemProp("os.name", "Mac OS X") {
-            assertEquals("mac", svc.getOsName())
-        }
-    }
-
-    @Test
-    fun `getOsName maps unknown OSes to unknown`() {
-        withSystemProp("os.name", "Plan9") {
-            assertEquals("unknown", svc.getOsName())
-        }
-    }
-
-    // ── getArchName: os.arch -> short tag ─────────────────────────────────
-
-    @Test
-    fun `getArchName maps aarch64 and arm64 to arm64`() {
-        withSystemProp("os.arch", "aarch64") {
-            assertEquals("arm64", svc.getArchName())
-        }
-        withSystemProp("os.arch", "arm64") {
-            assertEquals("arm64", svc.getArchName())
-        }
-    }
-
-    @Test
-    fun `getArchName maps amd64 and x86_64 to x64`() {
-        withSystemProp("os.arch", "amd64") {
-            assertEquals("x64", svc.getArchName())
-        }
-        withSystemProp("os.arch", "x86_64") {
-            assertEquals("x64", svc.getArchName())
-        }
-    }
-
-    @Test
-    fun `getArchName maps i386 and i686 to x32`() {
-        withSystemProp("os.arch", "i386") {
-            assertEquals("x32", svc.getArchName())
-        }
-        withSystemProp("os.arch", "i686") {
-            assertEquals("x32", svc.getArchName())
-        }
-    }
+    // os.name/os.arch -> token mapping now lives on Platform/Arch; see
+    // client-core OSTest. The URL-matrix tests below exercise the live
+    // os.name/os.arch path end-to-end through OS.
 
     // ── getDownloadUrl: BellSoft URL matrix ──────────────────────────────
 
@@ -598,7 +537,7 @@ class JavaManagerServiceTest {
         // Linux/i386 + Java 21 is not in the BellSoft URL matrix --
         // getDownloadUrl returns null and downloadAndUnpack throws
         // IOException("no Java build for this system..."). Test pins os.arch
-        // to a value getArchName maps to "x32" so the lookup misses.
+        // to a value Arch.classify maps to "x32" so the lookup misses.
         val runtimesRoot = workDir
         withSystemProp("os.name", "Linux") {
             withSystemProp("os.arch", "i386") {

@@ -78,7 +78,8 @@ object GermanStrings : AppStrings {
     override val settingsThemePicker        = "Design auswählen"
     override val settingsThemePickerSub     = "Farbschema anpassen"
     override val settingsDarkTheme          = "Dunkles Design"
-    override val settingsCloseAfterLaunch   = "Launcher nach Serverstart in Tray minimieren"
+    override val settingsCloseAfterLaunch   = "Launcher nach Spielstart in Tray minimieren"
+    override val settingsCloseAfterLaunchDesc = "Versteckt den Launcher im System-Tray, sobald das Spiel startet."
     override val settingsSaved              = "Einstellungen gespeichert"
     override val settingsLanguage           = "Sprache"
 
@@ -100,6 +101,12 @@ object GermanStrings : AppStrings {
     // News
     override val newsTitle   = "Projektneuigkeiten"
     override val newsEmpty   = "Noch keine Neuigkeiten..."
+    override val newsFilterPlaceholder = "Neuigkeiten filtern"
+    override val newsFilterClear        = "Filter zurücksetzen"
+    override val railCollapse           = "Leiste einklappen"
+    override val railExpand             = "Leiste ausklappen"
+    override val paginationPrev         = "Vorherige Seite"
+    override val paginationNext         = "Nächste Seite"
 
     // Server Detail
     override val serverDetailTitle         = "SERVER-INFORMATIONEN"
@@ -119,6 +126,16 @@ object GermanStrings : AppStrings {
     override val serverSettingsJavaHint        = "Leer lassen für das integrierte Java"
     override val serverSettingsOpenFolder      = "Ordner öffnen"
     override val serverSettingsReset           = "Client zurücksetzen"
+
+    override val serverSettingsResetConfirmTitle = "Client zurücksetzen?"
+    override val serverSettingsResetConfirmBody  = "Alle heruntergeladenen Dateien des Clients dieses Servers werden unwiderruflich gelöscht."
+    override val customizationResetConfirmTitle  = "Anpassungen zurücksetzen?"
+    override val customizationResetConfirmBody   = "Alle Anpassungs-Überschreibungen (Farben, Dichte, Form) kehren auf die Standardwerte zurück."
+    override val backgroundResetConfirmTitle     = "Hintergrund zurücksetzen?"
+    override val backgroundResetConfirmBody      = "Die gesamte Konfiguration des eigenen Hintergrunds kehrt auf die Standardwerte zurück."
+    override val logoutConfirmTitle              = "Abmelden?"
+    override val logoutConfirmBody               = "Deine gespeicherte Anmeldung wird von diesem Gerät entfernt. Zum erneuten Anmelden musst du deine Zugangsdaten wieder eingeben."
+
     override val serverSettingsNoMods          = "Keine optionalen Mods"
     override val serverSettingsPickJava        = "Java auswählen"
 
@@ -206,7 +223,8 @@ object GermanStrings : AppStrings {
     override val settingsReportOnGithub          = "Mit Paket auf GitHub melden"
 
     // File Manager
-    override fun fileDownloading(n: Int) = "Updates werden heruntergeladen ($n Dateien)..."
+    override fun fileDownloading(n: Int) =
+        "Updates werden heruntergeladen ($n ${twoFormPlural(n, "Datei", "Dateien")})..."
 
     // --- Settings: Offline Mode ---
     override val settingsOfflineMode       = "Offlinemodus"
@@ -295,7 +313,9 @@ object GermanStrings : AppStrings {
     // =========================================================================
     override val aboutTitle                = "ÜBER DEN LAUNCHER"
     override fun aboutDescription(branding: String) = "Inoffizieller Launcher für $branding"
+    override val locale = java.util.Locale.GERMAN
     override fun aboutBuildDate(date: String) = "Erstellt: $date"
+    override val aboutRenderer = "Renderer"
     override val aboutSectionCreator       = "Ersteller"
     override val aboutSectionTechnologies  = "Technologien"
     override val aboutSectionLicense       = "Lizenz"
@@ -319,7 +339,7 @@ object GermanStrings : AppStrings {
     override val techComposeDesc = "UI-Framework"
     override val techKtorDesc    = "HTTP-Client"
     override val techKoinDesc    = "Dependency Injection"
-    override val techSkiaDesc    = "Skin-Rendering"
+    override val techSkiaDesc    = "Grafik-Renderer"
     override val techCoilDesc    = "Bildladen"
 
     // --- Spawn Reset ---
@@ -334,6 +354,9 @@ object GermanStrings : AppStrings {
     override val trayShow          = "Launcher anzeigen"
     override val trayServers       = "Server"
     override val trayNoServers     = "Keine Server geladen"
+    override val trayHintTitle     = "Nexira läuft weiter"
+    override val trayHintBody      = "Das Fenster liegt im System-Tray. Klicke auf das Tray-Symbol, um es zurückzuholen."
+    override val trayHintShow      = "Fenster anzeigen"
 
     // --- Settings: Experimental features ---
     override val settingsSectionExperimental    = "Experimentelle Funktionen"
@@ -353,6 +376,9 @@ object GermanStrings : AppStrings {
     override fun dashboardAutoSyncProgress(serverName: String, current: Int, total: Int) =
         "Synchronisiere $serverName ($current/$total)"
     override fun dashboardAutoSyncBytes(readMB: Long, totalMB: Long) = "$readMB / $totalMB MB"
+    override val widgetProgressTitle = "Hintergrundaktivität"
+    override val widgetProgressIdle = "Momentan wird nichts heruntergeladen."
+    override fun widgetTabDefaultLabel(index: Int) = "Tab $index"
 
     // April Fools
     override fun aprilCloseTitle(escapes: Int) = when {
@@ -447,7 +473,7 @@ object GermanStrings : AppStrings {
     override val jvmTabCustom  = "Eigene"
     override val jvmCancel     = "Abbrechen"
     override val jvmApply      = "In jvmArgs übernehmen"
-    override fun jvmPreviewFlagsCount(n: Int) = "Vorschau ($n Flags)"
+    override fun jvmPreviewFlagsCount(n: Int) = "Vorschau ($n ${twoFormPlural(n, "Flag", "Flags")})"
 
     override val jvmGcHeader            = "Garbage Collector"
     override val jvmGcG1Hint            = "Empfohlen für modifiziertes MC, Heap 4-32 GB."
@@ -521,7 +547,8 @@ object GermanStrings : AppStrings {
     override val migrationDescription  = "Nexira heißt jetzt Nexira. Vor dem Start müssen deine vorhandenen Daten an den neuen Ort kopiert werden. Der alte Ordner bleibt als Sicherung unberührt; lösche ihn manuell, sobald alles funktioniert."
     override val migrationFromHeader   = "Von"
     override val migrationToHeader     = "Nach"
-    override fun migrationSize(megabytes: Int, files: Int) = "$megabytes MB, $files Dateien"
+    override fun migrationSize(megabytes: Int, files: Int) =
+        "$megabytes MB, $files ${twoFormPlural(files, "Datei", "Dateien")}"
     override val migrationStart        = "Jetzt migrieren"
     override val migrationInProgress   = "Migration zu Nexira"
     override fun migrationCurrentFile(file: String) = "Kopiere $file"
@@ -549,6 +576,19 @@ object GermanStrings : AppStrings {
     override val settingsUiStyleSub      = "Wechsle Form / Oberfläche / Bewegung unabhängig von der Farbpalette. Celestia ist die aktuelle abgerundete Glasoptik; Brut ist hart und flach."
     override val settingsUiStyleCelestia = "Celestia"
     override val settingsUiStyleBrut     = "Brut"
+
+    // --- Auswahlstil der linken Leiste ---
+    override val navSelectionTitle        = "Stil des aktiven Eintrags"
+    override val navSelectionSub          = "Wie der aktive Eintrag in der linken Leiste hervorgehoben wird"
+    override val navStylePill             = "Kapsel"
+    override val navStyleSquare           = "Quadrat"
+    override val navStyleCircle           = "Kreis"
+    override val navStyleBar              = "Balken"
+    override val navStyleDot              = "Punkt"
+    override val navStyleNone             = "Ohne"
+    override val navSelectionOutlineIcons = "Inaktive Symbole als Umriss"
+    override val navSelectionAccent       = "Hervorhebungsfarbe"
+    override val navHoverHighlight         = "Hervorhebung beim Überfahren"
 
     override val settingsCategoryAppearance   = "Erscheinungsbild"
     override val settingsCategoryNetwork      = "Netzwerk"
@@ -599,7 +639,8 @@ object GermanStrings : AppStrings {
     override val browseDetailInstallButton = "Installieren"
     override val browseDetailTagsTitle     = "Tags"
     override val browseDetailAboutTitle       = "Über dieses Pack"
-    override val browseDetailAboutPlaceholder = "Dieses Pack enthält %d Mods und %d Assets."
+    override fun browseDetailAbout(mods: Int, assets: Int) =
+        "Dieses Pack enthält $mods ${twoFormPlural(mods, "Mod", "Mods")} und $assets ${twoFormPlural(assets, "Asset", "Assets")}."
     override val browseDetailAboutNote        = "Eine ausführliche Beschreibung erscheint hier, sobald der Mirror sie zum Manifest hinzufügt."
     override val browseDetailCompatTitle      = "Kompatibilität"
     override val browseDetailCompatMc         = "Minecraft"
@@ -608,7 +649,8 @@ object GermanStrings : AppStrings {
     override val browseDetailVersionTitle     = "Version"
 
     override val browseDetailInstallRunningTitle  = "Installation läuft..."
-    override val browseDetailInstallProgress      = "%s  (%d / %d)"
+    override fun browseDetailInstallProgress(filename: String, current: Int, total: Int) =
+        "$filename  ($current / $total)"
     override val browseDetailInstallStarting      = "Wird gestartet..."
     override val browseDetailInstallDoneTitle     = "Installiert"
     override val browseDetailInstallDoneHint      = "Zur Library hinzugefügt."
@@ -634,19 +676,23 @@ object GermanStrings : AppStrings {
     override fun contentTabModsSection(count: Int) = "Mods ($count)"
     override fun contentTabAssetsSection(count: Int) = "Assets ($count)"
     override val contentTabResolverIssuesTitle  = "Manifest-Probleme erkannt"
-    override fun contentTabResolverMissing(count: Int) =
-        if (count == 1) "1 Abhängigkeit verweist auf einen Mod, der nicht in diesem Pack ist."
-        else "$count Abhängigkeiten verweisen auf Mods, die nicht in diesem Pack sind."
-    override fun contentTabResolverCycles(count: Int) =
-        if (count == 1) "1 Abhängigkeits-Zyklus gefunden — Pack-Autor sollte den requires-Graph prüfen."
-        else "$count Abhängigkeits-Zyklen gefunden — Pack-Autor sollte den requires-Graph prüfen."
+    override fun contentTabResolverMissing(count: Int) = twoFormPlural(
+        count,
+        "$count Abhängigkeit verweist auf einen Mod, der nicht in diesem Pack ist.",
+        "$count Abhängigkeiten verweisen auf Mods, die nicht in diesem Pack sind.",
+    )
+    override fun contentTabResolverCycles(count: Int) = twoFormPlural(
+        count,
+        "$count Abhängigkeits-Zyklus gefunden — Pack-Autor sollte den requires-Graph prüfen.",
+        "$count Abhängigkeits-Zyklen gefunden — Pack-Autor sollte den requires-Graph prüfen.",
+    )
     override val contentTabRoleRecipeViewer     = "Rezept-Übersicht"
     override val contentTabRoleMinimap          = "Minimap"
     override val contentTabRoleBlockInfo        = "Block-Info"
     override val contentTabRolePerformance      = "Performance"
     override val contentTabRoleInventorySearch  = "Inventar-Suche"
     override fun contentTabRoleAltCount(count: Int) =
-        if (count == 0) "einzige Option" else "$count Alternative${if (count == 1) "" else "n"}"
+        if (count == 0) "einzige Option" else "$count ${twoFormPlural(count, "Alternative", "Alternativen")}"
     override val contentTabRoleAlternativesHeader = "Alternativen in diesem Pack"
     override val contentTabModNoDescription     = "Noch keine Beschreibung im Manifest."
     override fun contentTabModLicensePrefix(license: String) = "Lizenz: $license"
@@ -670,6 +716,8 @@ object GermanStrings : AppStrings {
     override val worldsTabLocalEmpty            = "Noch keine gespeicherten Welten. Starte eine neue Einzelspieler-Welt im Spiel und sie erscheint hier."
     override fun worldsTabServersSection(count: Int) = "Server aus dem Verlauf ($count)"
     override val worldsTabServersEmpty          = "Keine Server im Multiplayer-Verlauf dieser Instanz."
+    override val worldsTabErrorTitle            = "Welten konnten nicht gelesen werden"
+    override val worldsTabErrorMessage          = "Die Spielstände oder die Serverliste dieser Instanz konnten nicht gelesen werden. Die Dateien sind möglicherweise beschädigt oder nicht lesbar."
     override fun worldsTabLastPlayed(rel: String) = "Zuletzt gespielt: $rel"
     override val worldsTabServerHiddenLabel     = "Aus der Spielinternen Liste ausgeblendet"
     override val worldsTabGameSurvival          = "Überleben"
@@ -702,6 +750,11 @@ object GermanStrings : AppStrings {
     override val notificationExpandHistory   = "Benachrichtigungsverlauf einblenden"
     override val notificationCollapseHistory = "Benachrichtigungsverlauf ausblenden"
     override val notificationDismiss         = "Benachrichtigung schliessen"
+    override val notifHistoryEmpty           = "Noch keine Nachrichten"
+    override val notifHistoryClear           = "Leeren"
+    override val notifDoNotDisturb           = "Nicht stören"
+    override fun notifGroupCount(count: Int) = "×$count"
+    override fun notifCountTitle(count: Int) = if (count == 1) "$count Nachricht" else "$count Nachrichten"
     override fun notificationShowMore(count: Int)               = "+$count weitere"
     override fun notificationAbsoluteTime(instant: java.time.Instant): String =
         java.time.format.DateTimeFormatter
@@ -770,6 +823,7 @@ object GermanStrings : AppStrings {
     override val editorCancel  = "Abbrechen"
     override val editorDelete  = "Löschen"
     override val editorReset   = "Zurücksetzen"
+    override val editorUnsupportedWidget = "Nicht unterstütztes Widget"
     override val editorResetAll = "Alles zurücksetzen"
     override val editorToFront = "In den Vordergrund"
     override val editorToBack = "In den Hintergrund"
@@ -780,18 +834,24 @@ object GermanStrings : AppStrings {
         "widget.about.links.card.title" to "Überschrift",
         "widget.about.logo" to "Logo und Version",
         "widget.about.logo.title" to "Überschrift",
+        "widget.about.logo.showVersion" to "Version anzeigen",
+        "widget.about.logo.showBuildDate" to "Build-Datum anzeigen",
+        "widget.about.logo.showTagline" to "Untertitel anzeigen",
         "widget.about.system.card" to "System",
         "widget.about.system.card.title" to "Überschrift",
         "widget.about.update.panel" to "Updates",
         "widget.about.update.panel.title" to "Überschrift",
         "widget.appshell.region.center" to "Hauptbereich",
         "widget.appshell.region.collapsed" to "Eingeklappt",
+        "widget.appshell.region.swipeToCollapse" to "Mit Wischen einklappen",
         "widget.appshell.region.glassAlphaPct" to "Glas, %",
         "widget.appshell.region.left" to "Linke Leiste",
         "widget.appshell.region.right" to "Rechte Leiste",
         "widget.appshell.region.showDivider" to "Trennlinie",
         "widget.appshell.region.widthDp" to "Breite (0 = flexibel)",
         "widget.appshell.rightrail.compactnews" to "Neuigkeiten",
+        "widget.appshell.rightrail.compactnews.maxItems" to "Max. Einträge (0 = alle)",
+        "widget.appshell.rightrail.compactnews.showTitle" to "Titel anzeigen",
         "widget.bg.enable.toggle" to "Hintergrund an/aus",
         "widget.bg.fx.animspeed" to "Animationstempo",
         "widget.bg.fx.blur" to "Unschärfe",
@@ -809,6 +869,11 @@ object GermanStrings : AppStrings {
         "widget.bg.scale.mode" to "Skalierung",
         "widget.bg.tint" to "Tönung",
         "widget.container.group" to "Gruppe",
+        "widget.checklist" to "Checkliste",
+        "widget.checklist.add" to "Punkt hinzufügen...",
+        "widget.checklist.empty" to "Noch nichts",
+        "widget.checklist.hideCompleted" to "Erledigte ausblenden",
+        "widget.checklist.title" to "Titel",
         "widget.container.tabs" to "Tabs",
         "widget.container.tabs.label1" to "Tab 1",
         "widget.container.tabs.label2" to "Tab 2",
@@ -870,6 +935,13 @@ object GermanStrings : AppStrings {
         "widget.library.header.subtitle" to "Untertitel",
         "widget.library.header.title" to "Überschrift",
         "widget.nav.entry" to "Navigationspunkt",
+        "widget.notes.scratch" to "Notizen",
+        "widget.notes.scratch.placeholder" to "Schreib etwas...",
+        "widget.notes.scratch.title" to "Titel",
+        "widget.notifications.history" to "Nachrichtenverlauf",
+        "widget.notifications.history.expandUp" to "Nach oben ausklappen",
+        "widget.notifications.history.clock12h" to "12-Stunden-Format (am/pm)",
+        "widget.notifications.history.verticalTime" to "Zeit gestapelt",
         "widget.profile.account.section" to "Konto",
         "widget.profile.signin" to "Anmelden",
         "widget.profile.nav" to "Profilnavigation",
@@ -900,9 +972,15 @@ object GermanStrings : AppStrings {
     // --- Layout editor: prop panel ---
     override val editorResetToDefault = "Auf Standard zurücksetzen"
     override val editorBackingTitle   = "Hintergrund"
-    override val editorBackingGlass   = "Glas"
+    override val editorSurfaceSettings = "Einstellungen"
+    override val editorBackingGlass   = "Glas-Deckkraft"
     override val editorBackingCorner  = "Ecke"
-    override val editorBackingPadding = "Abstand"
+    override val editorBackingPadding = "Abstand (alle Seiten)"
+    override val editorBackingPaddingTop    = "Abstand oben"
+    override val editorBackingPaddingEnd    = "Abstand rechts"
+    override val editorBackingPaddingBottom = "Abstand unten"
+    override val editorBackingPaddingStart  = "Abstand links"
+    override val editorBackingNoGlassHint   = "Ohne Glas ist keine Unterlage sichtbar. Ecke und Abstand wirken weiterhin auf das Widget."
 
     // --- Layout editor: presets ---
     override val editorPresetsTitle          = "Presets"

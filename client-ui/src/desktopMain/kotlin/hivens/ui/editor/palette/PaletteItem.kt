@@ -1,5 +1,6 @@
 package hivens.ui.editor.palette
 
+import hivens.ui.theme.LocalMonoFamily
 import androidx.compose.foundation.background
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -152,7 +153,7 @@ fun PaletteItem(
                 text       = descriptor.kind.value,
                 style      = MaterialTheme.typography.labelSmall,
                 color      = CelestiaTheme.colors.textSecondary,
-                fontFamily = FontFamily.Monospace,
+                fontFamily = LocalMonoFamily.current,
                 maxLines   = 1,
                 overflow   = TextOverflow.Ellipsis,
             )

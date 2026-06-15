@@ -6,7 +6,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -56,9 +55,9 @@ fun ModItemCard(
 
     Column(
         Modifier.fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
+            .clip(MaterialTheme.shapes.medium)
             .background(backgroundColor)
-            .border(1.dp, borderColor, RoundedCornerShape(10.dp))
+            .border(1.dp, borderColor, MaterialTheme.shapes.medium)
             .clickable { onToggle(!isChecked) }
             .padding(12.dp)
             .animateContentSize(animationSpec = tween(300))
@@ -77,7 +76,7 @@ fun ModItemCard(
                     Text(mod.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, color = CelestiaTheme.colors.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
                     if (!mod.category.isNullOrBlank()) {
                         Spacer(Modifier.width(8.dp))
-                        Box(Modifier.clip(RoundedCornerShape(4.dp)).background(CelestiaTheme.colors.primary.copy(alpha = 0.15f)).padding(horizontal = 6.dp, vertical = 2.dp)) {
+                        Box(Modifier.clip(MaterialTheme.shapes.extraSmall).background(CelestiaTheme.colors.primary.copy(alpha = 0.15f)).padding(horizontal = 6.dp, vertical = 2.dp)) {
                             Text(mod.category!!, fontSize = 10.sp, color = CelestiaTheme.colors.primary, fontWeight = FontWeight.Bold)
                         }
                     }
@@ -112,7 +111,7 @@ fun ModItemCard(
                 }
                 if (hasConflicts) {
                     Spacer(Modifier.height(6.dp))
-                    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(6.dp)).background(CelestiaTheme.colors.error.copy(alpha = 0.08f)).padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Row(Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium).background(CelestiaTheme.colors.error.copy(alpha = 0.08f)).padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.Warning, null, tint = CelestiaTheme.colors.error, modifier = Modifier.size(14.dp))
                         Spacer(Modifier.width(6.dp))
                         Text(s.modConflictWarning(conflictingIds.joinToString(", ")), style = MaterialTheme.typography.labelSmall, color = CelestiaTheme.colors.error)

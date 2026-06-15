@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Code
@@ -37,7 +39,13 @@ fun AboutLinksCardWidget(instance: WidgetInstance) {
     val s = LocalStrings.current
 
     GlassCard(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(20.dp)) {
+        // Wheel-scroll the links when the card is height-constrained (narrow
+        // layout, or once the list grows past the space it gets).
+        Column(
+            Modifier
+                .padding(20.dp)
+                .verticalScroll(rememberScrollState()),
+        ) {
             SectionLabel(p.title.ifBlank { s.aboutSectionLinks })
             Spacer(Modifier.height(12.dp))
             LinkButton(s.aboutLinkGithub,    "https://github.com/Kitty-Hivens/Nexira",         Icons.Default.Code)

@@ -42,6 +42,7 @@ import kotlin.time.Duration.Companion.milliseconds
 @Composable
 fun NotificationStack(center: NotificationCenter = koinInject()) {
     val groups by center.groups.collectAsState()
+    val doNotDisturb by center.doNotDisturb.collectAsState()
 
     // Gate the 1Hz ticker on groups.isNotEmpty -- NotificationStack is
     // mounted in AppShell at all times, so a naive `LaunchedEffect(Unit)`
@@ -68,7 +69,10 @@ fun NotificationStack(center: NotificationCenter = koinInject()) {
         }
     }
 
-    if (!hasGroups) return
+    // "Do not disturb" mutes the popups only -- the ticker + auto-dismiss
+    // effects above still run, so the muted backlog ages out and lifting DnD
+    // surfaces only what is still live, not a flood of stale toasts.
+    if (!hasGroups || doNotDisturb) return
 
     val strings = LocalStrings.current
     // Overflow expansion: click "+N more" to show every group instead of

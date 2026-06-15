@@ -4,7 +4,13 @@ import hivens.config.Branding
 import hivens.core.diag.ActionRing
 import hivens.launcher.CrashReporter
 import hivens.launcher.di.appModule
+import hivens.launcher.di.authModule
+import hivens.launcher.di.cacheModule
+import hivens.launcher.di.launchPipelineModule
+import hivens.launcher.di.mirrorModule
 import hivens.launcher.di.networkModule
+import hivens.launcher.di.runtimeModule
+import hivens.launcher.di.updateModule
 import hivens.launcher.network.NetworkState
 import hivens.launcher.platform.DataDirMigration
 import hivens.launcher.platform.DataDirMover
@@ -188,7 +194,20 @@ object LauncherBootstrap {
         // share the same scope -- otherwise a tray-launched process can outlive
         // the JVM shutdown signal because its launching coroutine isn't joined to
         // the canceled scope.
-        startKoin { modules(listOf(networkModule, appModule) + extraModules) }
+        startKoin {
+            modules(
+                listOf(
+                    networkModule,
+                    authModule,
+                    cacheModule,
+                    runtimeModule,
+                    mirrorModule,
+                    launchPipelineModule,
+                    updateModule,
+                    appModule,
+                ) + extraModules,
+            )
+        }
 
         return Result(paths, pendingMigration, crashReporter)
     }

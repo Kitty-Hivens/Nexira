@@ -13,6 +13,11 @@ import hivens.core.data.FileManifest
 import hivens.core.data.PackAuthRequirement
 import hivens.core.data.SessionData
 import hivens.core.data.SettingsData
+import hivens.core.launch.LaunchError
+import hivens.core.launch.LaunchHandle
+import hivens.core.launch.LaunchLogEvent
+import hivens.core.launch.LaunchState
+import hivens.core.launch.SpawnResult
 import hivens.core.security.IKeyringStorage
 import hivens.launcher.CredentialsManager
 import hivens.launcher.ManifestCache
@@ -61,8 +66,8 @@ import kotlin.test.assertTrue
  *
  * `appScope` is the `TestScope` from [runTest] so the launch coroutine
  * runs on the virtual-time dispatcher and `advanceUntilIdle()` deterministically
- * drains it. The mocked `Process.waitFor()` returns synchronously, so the
- * state machine sweeps through `GameRunning` and lands in `Idle` within
+ * drains it. The mocked `LaunchHandle.awaitExit()` returns synchronously, so
+ * the state machine sweeps through `GameRunning` and lands in `Idle` within
  * a single dispatcher tick -- tests assert the **terminal** state plus
  * the events emitted along the way.
  */
@@ -182,12 +187,12 @@ class LauncherControllerTest {
             )
         }
 
-        val process = mockk<Process>()
-        every { process.waitFor() } returns 0
-        every { process.destroy() } just runs
+        val handle = mockk<LaunchHandle>()
+        coEvery { handle.awaitExit() } returns 0
+        every { handle.terminate() } just runs
         coEvery {
             launcherService.launchClientWithLogs(any(), any(), any(), any(), any(), any(), any())
-        } returns process
+        } returns SpawnResult.Started(handle)
 
         val controller = newController(this)
         val collected = mutableListOf<LaunchLogEvent>()
@@ -303,8 +308,8 @@ class LauncherControllerTest {
         every { settingsService.getSettings() } returns SettingsData()
         coEvery { javaManagerService.getJavaPath("1.12.2") } returns Path.of("/opt/jdk8/bin/java")
 
-        val process = mockk<Process>()
-        every { process.waitFor() } returns 0
+        val handle = mockk<LaunchHandle>()
+        coEvery { handle.awaitExit() } returns 0
         coEvery {
             launcherService.launchPackClient(
                 sessionData        = any(),
@@ -317,7 +322,7 @@ class LauncherControllerTest {
                 displayName        = any(),
                 onLog              = any(),
             )
-        } returns process
+        } returns SpawnResult.Started(handle)
 
         // PackInstance with cachedManifest already filled AND no auth
         // requirement -- the pass-through case. SC-bound packs are
@@ -429,8 +434,8 @@ class LauncherControllerTest {
         )
         coEvery { authService.login("tester", "pw", "Industrial") } returns refreshed
 
-        val process = mockk<Process>()
-        every { process.waitFor() } returns 0
+        val handle = mockk<LaunchHandle>()
+        coEvery { handle.awaitExit() } returns 0
         val sessionPassed = slot<SessionData>()
         coEvery {
             launcherService.launchPackClient(
@@ -444,7 +449,7 @@ class LauncherControllerTest {
                 displayName        = any(),
                 onLog              = any(),
             )
-        } returns process
+        } returns SpawnResult.Started(handle)
         coJustRun { packRepository.put(any()) }
 
         val instance = scBoundPackInstance()
@@ -461,7 +466,7 @@ class LauncherControllerTest {
     }
 
     @Test
-    fun `pack blocked by PackPrepBlocked surfaces the carried LaunchError, not Internal`() = runTest {
+    fun `pack spawn failure surfaces the carried LaunchError, not Internal`() = runTest {
         every { settingsService.getSettings() } returns SettingsData()
         coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk8/bin/java")
         credentialsManager.save(
@@ -471,12 +476,12 @@ class LauncherControllerTest {
             SessionData(playerName = "tester", uuid = "u", accessToken = "fresh")
 
         // The SC-binding step inside the service could not source the patched
-        // authlib; it throws PackPrepBlocked carrying the semantic reason.
+        // authlib; it returns SpawnResult.Failed carrying the semantic reason.
         coEvery {
             launcherService.launchPackClient(
                 any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(),
             )
-        } throws PackPrepBlocked(LaunchError.AuthlibUnavailable("1.12.2"))
+        } returns SpawnResult.Failed(LaunchError.AuthlibUnavailable("1.12.2"))
 
         val instance = scBoundPackInstance()
         val controller = newController(this)
@@ -490,7 +495,7 @@ class LauncherControllerTest {
         assertIs<LaunchState.Error>(state)
         assertEquals(
             LaunchError.AuthlibUnavailable("1.12.2"), state.reason,
-            "controller must map PackPrepBlocked.error, not wrap it in Internal",
+            "controller must surface the Failed result's error, not wrap it in Internal",
         )
     }
 
@@ -563,8 +568,8 @@ class LauncherControllerTest {
         coEvery { authService.login("tester", "pw", "Industrial") } returns
             SessionData(playerName = "tester", uuid = "u", accessToken = "fresh")
 
-        val process = mockk<Process>()
-        every { process.waitFor() } returns 0
+        val handle = mockk<LaunchHandle>()
+        coEvery { handle.awaitExit() } returns 0
         val manifestPassed = slot<hivens.core.data.CachedManifestSnapshot>()
         coEvery {
             launcherService.launchPackClient(
@@ -572,7 +577,7 @@ class LauncherControllerTest {
                 clientRootPath = any(), javaPathOverride = any(), allocatedMemoryMB = any(),
                 adaptiveEnabled = any(), displayName = any(), onLog = any(),
             )
-        } returns process
+        } returns SpawnResult.Started(handle)
         coJustRun { packRepository.put(any()) }
 
         val instance = scBoundPackInstance(packId = "Industrial", displayName = "Industrial", authRequirement = null)
@@ -603,8 +608,8 @@ class LauncherControllerTest {
         coEvery { authService.login("tester", "pw", "Industrial") } returns
             SessionData(playerName = "tester", uuid = "u", accessToken = "fresh")
 
-        val process = mockk<Process>()
-        every { process.waitFor() } returns 0
+        val handle = mockk<LaunchHandle>()
+        coEvery { handle.awaitExit() } returns 0
         val agentFlag = slot<Boolean>()
         val swapFlag = slot<Boolean>()
         coEvery {
@@ -614,7 +619,7 @@ class LauncherControllerTest {
                 redirectAuthHost = any(), useNetworkAgent = capture(agentFlag),
                 useSmartycraftAuthLib = capture(swapFlag), displayName = any(), onLog = any(),
             )
-        } returns process
+        } returns SpawnResult.Started(handle)
         coJustRun { packRepository.put(any()) }
 
         val controller = newController(this)
@@ -675,12 +680,12 @@ class LauncherControllerTest {
             downloadService.processSession(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
         }
 
-        val process = mockk<Process>()
-        every { process.waitFor() } returns 137 // SIGKILL exit code
-        every { process.destroy() } just runs
+        val handle = mockk<LaunchHandle>()
+        coEvery { handle.awaitExit() } returns 137 // SIGKILL exit code
+        every { handle.terminate() } just runs
         coEvery {
             launcherService.launchClientWithLogs(any(), any(), any(), any(), any(), any(), any())
-        } returns process
+        } returns SpawnResult.Started(handle)
 
         val controller = newController(this)
         controller.launch(SessionData(playerName = "tester", cachedPassword = "pw"), server)

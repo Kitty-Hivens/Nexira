@@ -38,7 +38,7 @@ class NotificationCenterTest {
     }
 
     @Test
-    fun `re-push with same sourceKey appends event to existing group`() = runTest {
+    fun `progress coalesces in place but a terminal event still appends`() = runTest {
         val center = newCenter()
         center.push("pack:X", "X", null, Severity.Info, Kind.Progress, "Preparing")
         clock.advance(seconds = 2)
@@ -47,9 +47,34 @@ class NotificationCenterTest {
         center.push("pack:X", "X", null, Severity.Success, Kind.OneShot, "Done")
 
         val g = center.groups.first().single()
-        assertEquals(3, g.count)
+        // The two Progress ticks collapse to one entry; the OneShot terminal appends.
+        assertEquals(2, g.count)
         assertEquals("Done", g.latest.title)
-        assertEquals("Preparing", g.events.last().title, "oldest at tail")
+        assertEquals("Downloading 47%", g.events.last().title, "coalesced progress kept at tail")
+    }
+
+    @Test
+    fun `consecutive progress events coalesce into a single entry`() = runTest {
+        val center = newCenter()
+        repeat(10) { i ->
+            center.push("pack:X", "X", null, Severity.Info, Kind.Progress, "Downloading ${i * 10}%")
+            clock.advance(seconds = 1)
+        }
+
+        val g = center.groups.first().single()
+        assertEquals(1, g.count, "a run of progress ticks stays a single live entry")
+        assertEquals("Downloading 90%", g.latest.title, "latest tick wins")
+    }
+
+    @Test
+    fun `a progress run before a terminal collapses to progress-plus-terminal`() = runTest {
+        val center = newCenter()
+        repeat(5) { center.push("pack:X", "X", null, Severity.Info, Kind.Progress, "tick") }
+        center.push("pack:X", "X", null, Severity.Critical, Kind.Sticky, "failed")
+
+        val g = center.groups.first().single()
+        assertEquals(2, g.count, "the whole progress run is one entry; the terminal is the other")
+        assertEquals("failed", g.latest.title)
     }
 
     @Test
@@ -133,6 +158,61 @@ class NotificationCenterTest {
         assertEquals(4,  Kind.OneShot.autoDismissAfter(Severity.Success)?.inWholeSeconds)
         assertEquals(30, Kind.OneShot.autoDismissAfter(Severity.Warn)?.inWholeSeconds)
         assertEquals(30, Kind.OneShot.autoDismissAfter(Severity.Critical)?.inWholeSeconds)
+    }
+
+    @Test
+    fun `push forwards a serializable projection to the archive hook`() = runTest {
+        val recorded = mutableListOf<PersistedNotification>()
+        val center = NotificationCenter(clock = clock::now, archive = { recorded += it })
+        center.push("pack:X", "Create", "http://i.png", Severity.Warn, Kind.OneShot, "Done", body = "ok")
+
+        assertEquals(1, recorded.size)
+        val p = recorded.single()
+        assertEquals("pack:X", p.sourceKey)
+        assertEquals("Create", p.sender)
+        assertEquals("http://i.png", p.iconUrl)
+        assertEquals(Severity.Warn, p.severity)
+        assertEquals(Kind.OneShot, p.kind)
+        assertEquals("Done", p.title)
+        assertEquals("ok", p.body)
+    }
+
+    @Test
+    fun `push threads the glyph onto the group and the archive projection`() = runTest {
+        val recorded = mutableListOf<PersistedNotification>()
+        val center = NotificationCenter(clock = clock::now, archive = { recorded += it })
+        center.push(
+            sourceKey = "launcher.update",
+            sender    = "Nexira",
+            iconUrl   = null,
+            severity  = Severity.Info,
+            kind      = Kind.ActionRequired,
+            title     = "Update available",
+            glyph     = NotifGlyph.Update,
+        )
+
+        assertEquals(NotifGlyph.Update, center.groups.first().single().glyph, "group carries the glyph for the live card")
+        assertEquals(NotifGlyph.Update, recorded.single().glyph, "history projection carries the glyph too")
+    }
+
+    @Test
+    fun `do not disturb seeds from the initial value`() = runTest {
+        val center = NotificationCenter(clock = clock::now, initialDoNotDisturb = true)
+        assertTrue(center.doNotDisturb.first())
+    }
+
+    @Test
+    fun `set do not disturb flips the flow and persists only real changes`() = runTest {
+        val persisted = mutableListOf<Boolean>()
+        val center = NotificationCenter(clock = clock::now, persistDoNotDisturb = { persisted += it })
+        assertEquals(false, center.doNotDisturb.first())
+
+        center.setDoNotDisturb(true)
+        assertTrue(center.doNotDisturb.first())
+        center.setDoNotDisturb(true)   // no-op: already true
+        center.setDoNotDisturb(false)
+
+        assertEquals(listOf(true, false), persisted, "persist fires once per real change, not on a no-op")
     }
 
     private class FixedClock(start: Instant = Instant.parse("2026-05-26T00:00:00Z")) {

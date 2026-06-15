@@ -9,6 +9,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
@@ -40,6 +41,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -52,31 +54,17 @@ import hivens.ui.easter.LocalAprilFools
 import hivens.ui.effects.neonBorder
 import hivens.ui.effects.shimmerOverlay
 import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.LocalStyle
+import hivens.ui.theme.decorativePair
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 import javax.imageio.ImageIO
-import kotlin.math.abs
 import kotlin.time.Duration.Companion.milliseconds
 
-// ─── Server color palette ─────────────────────────────────────────────────────
-// Each server gets a stable unique gradient derived from its name.
-
-private val SERVER_PALETTES = listOf(
-    Pair(Color(0xFF7C3AED), Color(0xFF4F46E5)), // violet -> indigo
-    Pair(Color(0xFF0EA5E9), Color(0xFF6366F1)), // sky -> violet
-    Pair(Color(0xFF10B981), Color(0xFF0EA5E9)), // emerald -> sky
-    Pair(Color(0xFFF59E0B), Color(0xFFEF4444)), // amber -> red
-    Pair(Color(0xFFEC4899), Color(0xFF8B5CF6)), // pink -> purple
-    Pair(Color(0xFF14B8A6), Color(0xFF3B82F6)), // teal -> blue
-    Pair(Color(0xFFF97316), Color(0xFFEAB308)), // orange -> yellow
-    Pair(Color(0xFF6366F1), Color(0xFFEC4899)), // indigo -> pink
-)
-
-private fun serverPalette(name: String): Pair<Color, Color> =
-    SERVER_PALETTES[abs(name.hashCode()) % SERVER_PALETTES.size]
-
 // ─── Card ─────────────────────────────────────────────────────────────────────
+// The per-server gradient is derived from CelestiaColors.decorativePair, keyed on
+// the server name, so it follows the active theme ramp.
 
 @Composable
 fun SquareServerCard(
@@ -93,6 +81,17 @@ fun SquareServerCard(
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
     val isFocused by interactionSource.collectIsFocusedAsState()
+
+    // A press that ends off the card (press, then drag to another card) leaves
+    // this card focused, so its focus frame lingers. Clear focus when the press
+    // is cancelled so the frame leaves with the pointer. A real click selects
+    // the card and the selection border wins, so keyboard focus is untouched.
+    val focusManager = LocalFocusManager.current
+    LaunchedEffect(interactionSource) {
+        interactionSource.interactions.collect { interaction ->
+            if (interaction is PressInteraction.Cancel) focusManager.clearFocus()
+        }
+    }
 
     var serverIcon by remember { mutableStateOf<ImageBitmap?>(null) }
     val paths: PlatformPaths = koinInject()
@@ -137,7 +136,8 @@ fun SquareServerCard(
 
     val showActions = isHovered || isFocused
     val scale by animateFloatAsState(if (showActions) 1.02f else 1.0f)
-    val (colorA, colorB) = remember(profile.name) { serverPalette(profile.name) }
+    val palette = CelestiaTheme.colors
+    val (colorA, colorB) = remember(profile.name, palette) { palette.decorativePair(profile.name) }
 
     // ── Theme-aware overlay colors ─────────────────────────────────────────
     val bgBase      = CelestiaTheme.colors.background
@@ -180,12 +180,12 @@ fun SquareServerCard(
         modifier = Modifier
             .aspectRatio(1f)
             .scale(scale)
-            .clip(RoundedCornerShape(20.dp))
+            .clip(MaterialTheme.shapes.medium)
             .let { m ->
                 when {
-                    isSelected -> m.neonBorder(CelestiaTheme.colors.primary, cornerRadius = 20.dp, strokeWidth = 2.dp)
-                    isFocused  -> m.border(2.dp, CelestiaTheme.colors.textPrimary, RoundedCornerShape(20.dp))
-                    else       -> m.border(1.dp, CelestiaTheme.colors.outline.copy(alpha = 0.25f), RoundedCornerShape(20.dp))
+                    isSelected -> m.neonBorder(CelestiaTheme.colors.primary, cornerRadius = LocalStyle.current.cardCorner, strokeWidth = 2.dp)
+                    isFocused  -> m.border(2.dp, CelestiaTheme.colors.textPrimary, MaterialTheme.shapes.medium)
+                    else       -> m.border(1.dp, CelestiaTheme.colors.outline.copy(alpha = 0.25f), MaterialTheme.shapes.medium)
                 }
             }
             // Shimmer on hover (not when already glowing with neon)
@@ -290,7 +290,7 @@ fun SquareServerCard(
             // Version badge
             Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(4.dp))
+                    .clip(MaterialTheme.shapes.extraSmall)
                     .background(
                         if (serverIcon != null) surfaceBase.copy(0.55f) else badgeBgFallback
                     )
@@ -327,9 +327,9 @@ fun SquareServerCard(
         ) {
             Row(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(10.dp))
+                    .clip(MaterialTheme.shapes.medium)
                     .background(actionBarColor)
-                    .border(1.dp, CelestiaTheme.colors.outline.copy(alpha = 0.3f), RoundedCornerShape(10.dp))
+                    .border(1.dp, CelestiaTheme.colors.outline.copy(alpha = 0.3f), MaterialTheme.shapes.medium)
                     .padding(4.dp),
                 horizontalArrangement = Arrangement.spacedBy(2.dp)
             ) {
@@ -376,11 +376,12 @@ private fun SyncBadge(state: AutoSyncService.ServerState, modifier: Modifier = M
         exit = fadeOut(),
         modifier = modifier,
     ) {
+        val c = CelestiaTheme.colors
         val (icon, tint) = when (state) {
-            AutoSyncService.ServerState.QUEUED   -> Icons.Default.HourglassEmpty to Color(0xFFEAB308)  // amber
-            AutoSyncService.ServerState.SYNCING  -> Icons.Default.Sync           to Color(0xFF38BDF8)  // sky
-            AutoSyncService.ServerState.SYNCED   -> Icons.Default.Check          to Color(0xFF22C55E)  // green
-            AutoSyncService.ServerState.FAILED   -> Icons.Default.Close          to Color(0xFFEF4444)  // red
+            AutoSyncService.ServerState.QUEUED   -> Icons.Default.HourglassEmpty to c.warnAccent
+            AutoSyncService.ServerState.SYNCING  -> Icons.Default.Sync           to c.progressAccent
+            AutoSyncService.ServerState.SYNCED   -> Icons.Default.Check          to c.success
+            AutoSyncService.ServerState.FAILED   -> Icons.Default.Close          to c.criticalAccent
             AutoSyncService.ServerState.SKIPPED  -> return@AnimatedVisibility
         }
         Box(

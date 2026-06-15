@@ -1,23 +1,19 @@
-package hivens.launcher.launch
+package hivens.core.launch
 
 import hivens.core.data.LauncherLogType
 
 /**
- * One-shot launch-flow events emitted by [LauncherController] for the
- * UI's console pane to consume. Replaces the controller's prior direct
- * calls into `GameConsoleService.append(...)` -- backend produces
- * semantic events, UI translates them to localized text and routes
- * them into the console widget.
+ * One-shot launch-flow events emitted by the launch orchestrator for the UI's
+ * console pane to consume -- backend produces semantic events, UI translates
+ * them to localized text and routes them into the console widget.
  *
- * High-volume [ProcessOutput] events (game stdout / stderr) flow through
- * the same channel; the controller's `SharedFlow` is configured with a
- * bounded buffer and `DROP_OLDEST` so a Forge / NeoForge startup storm
- * cannot back-pressure the launch coroutine. Loss-under-pressure is
- * acceptable -- the in-memory console buffer in `GameConsoleService`
- * is itself capped at 2000 lines.
+ * High-volume [ProcessOutput] events (game stdout / stderr) flow through the
+ * same channel; the orchestrator's `SharedFlow` is configured with a bounded
+ * buffer and `DROP_OLDEST` so a Forge / NeoForge startup storm cannot
+ * back-pressure the launch coroutine. Loss-under-pressure is acceptable -- the
+ * in-memory console buffer is itself capped.
  *
- * Reuses [LauncherLogType] (already in `client-core`) for severity so
- * no new enum is introduced.
+ * Reuses [LauncherLogType] for severity so no new enum is introduced.
  */
 sealed class LaunchLogEvent {
     /**

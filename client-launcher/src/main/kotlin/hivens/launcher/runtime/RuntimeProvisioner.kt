@@ -1,6 +1,7 @@
 package hivens.launcher.runtime
 
 import hivens.core.api.HttpClientProvider
+import hivens.core.platform.Platform
 import hivens.launcher.runtime.loader.DownloadProgress
 import hivens.launcher.runtime.loader.LibrarySpec
 import hivens.launcher.runtime.loader.LoaderRegistry
@@ -59,7 +60,7 @@ class RuntimeProvisioner(
 ) {
     private val log = LoggerFactory.getLogger(RuntimeProvisioner::class.java)
     private val httpClient get() = clientProvider.current
-    private val mojangOs: String = toMojangOs(osName)
+    private val mojangOs: String = Platform.classify(osName).mojang
 
     /**
      * The Mojang native classifiers to keep for THIS host, matched exactly so a
@@ -502,14 +503,5 @@ class RuntimeProvisioner(
 
         /** Pure-vanilla launch entry point (no loader overlay). */
         const val VANILLA_MAIN_CLASS = "net.minecraft.client.main.Main"
-
-        internal fun toMojangOs(osName: String): String {
-            val lower = osName.lowercase()
-            return when {
-                lower.contains("win") -> "windows"
-                lower.contains("mac") || lower.contains("darwin") -> "osx"
-                else -> "linux"
-            }
-        }
     }
 }

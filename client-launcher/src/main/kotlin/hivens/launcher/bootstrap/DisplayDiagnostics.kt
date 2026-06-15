@@ -1,5 +1,6 @@
 package hivens.launcher.bootstrap
 
+import hivens.core.platform.OS
 import org.slf4j.LoggerFactory
 import java.awt.Toolkit
 
@@ -19,7 +20,7 @@ object DisplayDiagnostics {
     private val log = LoggerFactory.getLogger("Main")
 
     fun logEnvironment() {
-        if (!System.getProperty("os.name").lowercase().contains("linux")) return
+        if (!OS.isLinux) return
         val toolkit = runCatching { Toolkit.getDefaultToolkit().javaClass.name }
             .getOrElse { "<unavailable: ${it.javaClass.simpleName}>" }
         fun env(k: String) = System.getenv(k) ?: "<unset>"

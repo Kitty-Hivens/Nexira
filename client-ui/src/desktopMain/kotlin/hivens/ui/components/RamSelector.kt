@@ -6,7 +6,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
@@ -166,11 +165,11 @@ private fun RamChip(selected: Boolean, label: String, modifier: Modifier, onClic
     )
     Box(
         modifier = modifier.height(36.dp)
-            .clip(RoundedCornerShape(8.dp))
+            .clip(MaterialTheme.shapes.small)
             .border(
                 1.dp,
                 if (selected) CelestiaTheme.colors.primary.copy(alpha = 0.7f) else CelestiaTheme.colors.outline.copy(alpha = 0.2f),
-                RoundedCornerShape(8.dp),
+                MaterialTheme.shapes.small,
             )
             .background(bg)
             .clickable(onClick = onClick),

@@ -22,7 +22,6 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Icon
@@ -102,9 +101,9 @@ private fun ThemeCard(
                             CustomTheme.parseHexColor(theme.secondary),
                         ),
                     ) else Brush.linearGradient(listOf(Color.Transparent, Color.Transparent)),
-                    shape = RoundedCornerShape(16.dp),
+                    shape = MaterialTheme.shapes.medium,
                 ),
-            shape           = RoundedCornerShape(16.dp),
+            shape           = MaterialTheme.shapes.medium,
             backgroundColor = scaledAlpha(CustomTheme.parseHexColor(theme.background), 0.8f),
         ) {
             Column(
@@ -125,7 +124,7 @@ private fun ThemeCard(
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
+                                .clip(MaterialTheme.shapes.extraSmall)
                                 .background(CustomTheme.parseHexColor(theme.primary).copy(alpha = 0.2f))
                                 .padding(horizontal = 8.dp, vertical = 4.dp),
                         ) {

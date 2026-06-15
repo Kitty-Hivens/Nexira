@@ -22,9 +22,7 @@ import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.theme.CelestiaTheme
-import kotlinx.coroutines.delay
 import org.koin.compose.koinInject
-import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Settings orchestrator: form state, persistence, the "saved" banner,
@@ -59,7 +57,6 @@ fun SettingsScreen(
 
     val initialSettings = remember { settingsService.getSettings() }
     val form            = remember { SettingsFormState(initialSettings) }
-    var showSavedMessage by remember { mutableStateOf(false) }
     var selectedCategory by remember { mutableStateOf(SettingsCategory.Appearance) }
 
     fun save() {
@@ -74,7 +71,6 @@ fun SettingsScreen(
         // mechanism Protocol.MIMIC_LAUNCHER_VERSION reads is live.
         @OptIn(ExperimentalProtocolOverride::class)
         Protocol.setMimicLauncherVersion(toPersist.mimicVersionOverride)
-        showSavedMessage = true
     }
 
     Column(Modifier.fillMaxSize().padding(16.dp)) {
@@ -146,14 +142,5 @@ fun SettingsScreen(
             }
         }
 
-        if (showSavedMessage) {
-            Spacer(Modifier.height(8.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                Text(s.settingsSaved, color = CelestiaTheme.colors.success, style = MaterialTheme.typography.bodySmall)
-            }
-            LaunchedEffect(showSavedMessage) {
-                if (showSavedMessage) { delay(2000.milliseconds); showSavedMessage = false }
-            }
-        }
     }
 }

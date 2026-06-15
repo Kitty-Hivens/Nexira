@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -22,6 +21,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.ui.customization.glassSurfaceAlpha
+import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
 import hivens.widget.api.SlotRenderer
 import hivens.widget.api.rememberProps
@@ -44,9 +44,11 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class TabContainerProps(
     @PropLabel("widget.container.tabs.tabCount") @PropRange(1.0, 3.0) val tabCount: Int = 2,
-    @PropLabel("widget.container.tabs.label1") val label1: String = "Вкладка 1",
-    @PropLabel("widget.container.tabs.label2") val label2: String = "Вкладка 2",
-    @PropLabel("widget.container.tabs.label3") val label3: String = "Вкладка 3",
+    // Blank labels resolve to the localized "Tab N" at render; a non-blank
+    // value is the user's own tab name (single language, by choice).
+    @PropLabel("widget.container.tabs.label1") val label1: String = "",
+    @PropLabel("widget.container.tabs.label2") val label2: String = "",
+    @PropLabel("widget.container.tabs.label3") val label3: String = "",
 )
 
 @Widget(
@@ -58,7 +60,9 @@ data class TabContainerProps(
 @Composable
 fun TabContainerWidget(instance: WidgetInstance) {
     val p = instance.rememberProps<TabContainerProps>()
+    val s = LocalStrings.current
     val labels = listOf(p.label1, p.label2, p.label3)
+        .mapIndexed { idx, label -> label.ifBlank { s.widgetTabDefaultLabel(idx + 1) } }
     val count = p.tabCount.coerceIn(1, labels.size)
 
     // Keyed on instanceId so two tab containers keep independent selection.
@@ -92,7 +96,7 @@ private fun TabChip(label: String, selected: Boolean, onClick: () -> Unit) {
         color      = if (selected) CelestiaTheme.colors.primary else CelestiaTheme.colors.textSecondary,
         fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
         modifier   = Modifier
-            .clip(RoundedCornerShape(8.dp))
+            .clip(MaterialTheme.shapes.small)
             .background(
                 if (selected) CelestiaTheme.colors.primary.copy(alpha = 0.16f)
                 else glassSurfaceAlpha(0.4f),

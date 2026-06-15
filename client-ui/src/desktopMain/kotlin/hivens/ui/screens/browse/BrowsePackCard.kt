@@ -25,12 +25,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import hivens.core.api.dto.smrt.SmrtPackSummary
+import hivens.core.data.PackOrigin
+import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.origin
+import hivens.ui.theme.originGradient
 
 /**
  * One Browse row. Same shape as Library's PackCard (banner-as-bg +
@@ -54,8 +57,8 @@ fun BrowsePackCard(
         modifier = modifier
             .fillMaxWidth()
             .height(132.dp)
-            .clip(RoundedCornerShape(14.dp))
-            .background(mirrorGradient())
+            .clip(MaterialTheme.shapes.medium)
+            .background(CelestiaTheme.colors.originGradient(PackOrigin.Mirror))
             .clickable(onClick = onClick),
     ) {
         Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.35f)))
@@ -128,7 +131,7 @@ private fun BrowseAvatar(displayName: String) {
         modifier         = Modifier
             .size(64.dp)
             .clip(RoundedCornerShape(12.dp))
-            .background(Color(0xFF2563EB)),
+            .background(CelestiaTheme.colors.origin(PackOrigin.Mirror)),
         contentAlignment = Alignment.Center,
     ) {
         Text(
@@ -145,8 +148,8 @@ private fun SourceBadgeMirror(featured: Boolean) {
     val label = if (featured) "Mirror ★" else "Mirror"
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(6.dp))
-            .background(Color(0xFF3B82F6).copy(alpha = 0.85f))
+            .clip(MaterialTheme.shapes.extraSmall)
+            .background(CelestiaTheme.colors.origin(PackOrigin.Mirror).copy(alpha = 0.85f))
             .padding(horizontal = 8.dp, vertical = 2.dp),
     ) {
         Text(
@@ -163,17 +166,13 @@ private fun MetaChip(text: String, emphasis: Boolean = false) {
     AssistChip(
         onClick = {},
         enabled = false,
-        shape   = RoundedCornerShape(8.dp),
+        shape   = MaterialTheme.shapes.extraSmall,
         label   = { Text(text, style = MaterialTheme.typography.labelSmall, color = Color.White) },
         colors  = AssistChipDefaults.assistChipColors(
-            disabledContainerColor = if (emphasis) Color(0xFF2563EB).copy(alpha = 0.85f)
+            disabledContainerColor = if (emphasis) CelestiaTheme.colors.primary.copy(alpha = 0.85f)
                                      else          Color.Black.copy(alpha = 0.35f),
             disabledLabelColor     = Color.White,
         ),
         border  = null,
     )
 }
-
-private fun mirrorGradient(): Brush = Brush.linearGradient(
-    listOf(Color(0xFF1E3A8A), Color(0xFF1D4ED8)),
-)

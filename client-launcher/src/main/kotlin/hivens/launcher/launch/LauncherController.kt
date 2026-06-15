@@ -8,21 +8,23 @@ import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.dto.smrt.toDomain
 import hivens.core.data.CachedManifestSnapshot
 import hivens.core.data.ContentToggle
+import hivens.core.data.LauncherLogType
 import hivens.core.data.OptionalContentRules
 import hivens.core.data.PackAuthRequirement
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.core.data.SessionData
 import hivens.core.diag.ActionRing
-import hivens.launcher.CredentialsManager
-import hivens.launcher.ManifestCache
-import hivens.launcher.ProfileManager
+import hivens.core.launch.LaunchError
+import hivens.core.launch.LaunchHandle
+import hivens.core.launch.LaunchLogEvent
+import hivens.core.launch.LaunchState
+import hivens.core.launch.PrepareStage
+import hivens.core.launch.SpawnResult
 import hivens.launcher.di.AppCoroutineScopeHook
 import hivens.launcher.smrt.ClientSyncCoordinator
 import hivens.launcher.smrt.OpenSmrtHelperResolver
 import hivens.launcher.smrt.SmartyModPlanner
-import hivens.launcher.smrt.SmrtPackClient
-import hivens.launcher.smrt.SmrtSyncService
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -42,7 +44,7 @@ import kotlinx.coroutines.slf4j.MDCContext
 /**
  * Constructor injection (not `KoinComponent` + `by inject()`) so the
  * controller is testable without bootstrapping Koin. `singleOf(::LauncherController)`
- * in [hivens.launcher.di.appModule] resolves every parameter from the
+ * in [hivens.launcher.di.launchPipelineModule] resolves every parameter from the
  * graph automatically; production wiring stays a one-liner.
  *
  * Note: [appScope] is the shared `single<CoroutineScope>(createdAtStart)`
@@ -54,17 +56,17 @@ import kotlinx.coroutines.slf4j.MDCContext
  */
 class LauncherController(
     private val authService: AuthProvider,
-    private val credentialsManager: CredentialsManager,
+    private val credentialsManager: ICredentialStore,
     private val settingsService: ISettingsService,
     private val downloadService: IFileDownloadService,
     private val javaManagerService: IJavaManager,
     private val launcherService: ILauncherService,
     private val manifestProcessor: IManifestProcessorService,
-    private val manifestCache: ManifestCache,
-    private val profileManager: ProfileManager,
+    private val manifestCache: IManifestStore,
+    private val profileManager: IInstanceProfileStore,
     private val packRepository: IPackRepository,
-    private val smrtPackClient: SmrtPackClient,
-    private val smrtSyncService: SmrtSyncService,
+    private val smrtPackClient: IMirrorPackClient,
+    private val smrtSyncService: IPackSyncService,
     private val smartyPlanner: SmartyModPlanner,
     private val dataDirectory: Path,
     private val appScope: CoroutineScope,
@@ -146,13 +148,13 @@ class LauncherController(
 
     private var launchJob: Job? = null
     /**
-     * Tracked separately from [launchJob] so [abort] can kill the live
-     * Process even after the coroutine completes the spawn step. Cleared
-     * after `process.waitFor()` returns so subsequent abort() calls don't
-     * try to destroy an already-finished process. Volatile so the abort
-     * thread sees the latest write done from the launch coroutine.
+     * Tracked separately from [launchJob] so [abort] can terminate the live
+     * process even after the coroutine completes the spawn step. Cleared after
+     * [LaunchHandle.awaitExit] returns so a later abort() does not try to
+     * terminate an already-finished process. Volatile so the abort thread sees
+     * the latest write done from the launch coroutine.
      */
-    @Volatile private var runningProcess: Process? = null
+    @Volatile private var runningHandle: LaunchHandle? = null
     private val launchLock = Any()
 
     /**
@@ -172,228 +174,122 @@ class LauncherController(
      */
     @Volatile private var currentAbortToken: AtomicBoolean? = null
 
+    /**
+     * SC server-list launch. Delegates the gate/token/MDC/spawn/wait/exit
+     * machinery to [launchInternal]; [prepareServerLaunch] supplies the
+     * SC-specific auth + sync + java steps and the spawn binding.
+     */
     fun launch(
         currentSession: SessionData,
         server: ServerProfile,
-        onSessionRefreshed: ((SessionData) -> Unit)? = null
+        onSessionRefreshed: ((SessionData) -> Unit)? = null,
+    ) = launchInternal(
+        label = server.name,
+        onStart = {
+            emit(LaunchLogEvent.SessionStarted(server.assetDir, server.name))
+            emit(LaunchLogEvent.AppBanner)
+            emit(LaunchLogEvent.TargetServer(server.name, settingsService.getSettings().isOfflineMode))
+        },
+        prepare = { prepareServerLaunch(currentSession, server, onSessionRefreshed) },
+    )
+
+    /**
+     * Outcome of a prepare phase. [Ready] carries the path-specific spawn (and
+     * an optional post-spawn hook); [Bail] means prepare already called [fail]
+     * and the flow must stop WITHOUT overwriting that error state.
+     */
+    private sealed interface Prepared {
+        class Ready(
+            val spawn: suspend (onLog: (String, LauncherLogType) -> Unit) -> SpawnResult,
+            /** Runs once after the process spawns. [launchInternal] guards it, so it never fails the launch. */
+            val onSpawned: (suspend () -> Unit)? = null,
+        ) : Prepared
+
+        data object Bail : Prepared
+    }
+
+    /**
+     * Owns the launch state machine shared by both entry points: the atomic
+     * re-entry gate, the per-launch abort token + MDC tag, the spawn, the
+     * blocking wait, the exit-code verdict, and the cancellation-vs-crash catch
+     * tail. [prepare] runs the path-specific steps and returns a
+     * [Prepared.Ready] to spawn or [Prepared.Bail] to stop.
+     */
+    private fun launchInternal(
+        label: String,
+        onStart: () -> Unit,
+        prepare: suspend CoroutineScope.() -> Prepared,
     ) {
-        // Re-entry guard must be atomic with the launchJob assignment.
-        // Without the lock two parallel callers (UI double-click,
-        // tray-launch racing dashboard-launch) could both observe Idle, both
-        // pass the gate, both assign launchJob, and produce two in-flight
-        // game spawns -- of which only the second is tracked for abort().
-        // Claim the state slot under the lock; the coroutine still runs
-        // outside the lock so the gate isn't held during the long flow.
+        // Re-entry guard must be atomic with the launchJob assignment. Without
+        // the lock two parallel callers (UI double-click, tray-launch racing
+        // dashboard-launch) could both observe Idle, both pass the gate, both
+        // assign launchJob, and produce two in-flight game spawns -- of which
+        // only the second is tracked for abort(). Claim the state slot under
+        // the lock; the coroutine runs outside it so the gate isn't held
+        // during the long flow.
         synchronized(launchLock) {
             if (_state.value !is LaunchState.Idle &&
                 _state.value !is LaunchState.Error) return
             _state.value = LaunchState.Prepare(PrepareStage.INIT, 0.0f)
         }
 
-        // Tag every log line emitted during this launch attempt with a stable
-        // launchId so a user dump can be sliced per-play-click via
-        // `grep launchId=abcd1234 *.log`. MDCContext (from
-        // kotlinx-coroutines-slf4j) propagates the value across every
-        // dispatcher hop the launch flow takes, including the downstream
-        // FileDownloadService coroutines and LauncherService.
+        // Tag every log line for this attempt with a stable launchId so a user
+        // dump can be sliced per-play-click (`grep launchId=abcd1234 *.log`).
+        // MDCContext (from kotlinx-coroutines-slf4j) propagates it across every
+        // dispatcher hop the flow takes, including FileDownloadService and
+        // LauncherService.
         val launchId = UUID.randomUUID().toString().take(8)
         val abortToken = AtomicBoolean(false)
         currentAbortToken = abortToken
 
         launchJob = appScope.launch(MDCContext(mapOf("launchId" to launchId))) {
-            val settings = settingsService.getSettings()
-            val isOffline = settings.isOfflineMode
-
             try {
                 _state.value = LaunchState.Prepare(PrepareStage.INIT, 0.0f)
+                onStart()
+                ActionRing.record("Launching: $label (launchId=$launchId)")
 
-                emit(LaunchLogEvent.SessionStarted(server.assetDir, server.name))
-                emit(LaunchLogEvent.AppBanner)
-                emit(LaunchLogEvent.TargetServer(server.name, isOffline))
-
-                ActionRing.record("Launching: ${server.name} (launchId=$launchId)")
-
-                // 1. Auth -- skip in offline mode
-                setStage(PrepareStage.AUTH, 0.1f)
-                var session = currentSession
-                val targetServerId = server.assetDir
-
-                if (isOffline) {
-                    emit(LaunchLogEvent.OfflineSkipAuth)
-                    // In offline mode, use whatever session we have (or a stub)
-                    if (session.accessToken.isBlank()) {
-                        session = session.copy(accessToken = "offline")
-                    }
-                } else {
-                    try {
-                        val pass = credentialsManager.load()?.cachedPassword ?: session.cachedPassword
-                        if (!pass.isNullOrEmpty()) {
-                            session = authService.login(session.playerName, pass, targetServerId)
-                            onSessionRefreshed?.invoke(session)
-                            emit(LaunchLogEvent.AuthSucceeded(session.uuid))
-                        } else {
-                            emit(LaunchLogEvent.NoPassword)
-                        }
-                    } catch (_: TwoFactorRequiredException) {
-                        // 2FA account -- refusing to prompt the user for a code
-                        // every time they click Play. The cached accessToken
-                        // in `session` is from a previous successful 2FA flow
-                        // and is what the game uses anyway. Augment it with a
-                        // cached manifest (same path the offline branch
-                        // takes) so processSession has something to walk.
-                        val cached = manifestCache.loadManifest(targetServerId)
-                        if (cached != null) {
-                            session = session.copy(fileManifest = cached)
-                            ActionRing.record("Launch: 2FA account, using cached manifest for $targetServerId")
-                        } else {
-                            // No cached manifest and no fresh login --
-                            // bail with the semantic TwoFactorExpired
-                            // reason so the UI renders an actionable
-                            // "re-login from the form" message instead
-                            // of a generic internal-error path.
-                            ActionRing.record("Launch: 2FA + no cached manifest for $targetServerId -- re-login required")
-                            fail(LaunchError.TwoFactorExpired)
-                            return@launch
-                        }
-                    } catch (e: Exception) {
-                        // Non-2FA auth failure: log and continue with the
-                        // existing (possibly stale) session -- graceful
-                        // degradation, the game itself will reject if the
-                        // token has truly expired.
-                        emit(LaunchLogEvent.AuthFailed(e.message))
-                    }
+                val prepared = when (val r = prepare()) {
+                    // prepare() already called fail(); stop without touching _state.
+                    is Prepared.Bail -> return@launch
+                    is Prepared.Ready -> r
                 }
 
-                // 2. Ignored files
-                val ignoredFiles = calculateIgnoredFiles(server)
-
-                // 3. Download -- skip in offline mode if client exists
-                setStage(PrepareStage.SYNC, 0.2f)
-                val clientDir = dataDirectory.resolve("clients").resolve(targetServerId)
-                if (!Files.exists(clientDir)) Files.createDirectories(clientDir)
-
-                if (isOffline) {
-                    // In offline mode, skip file sync but verify client exists.
-                    // .use{} closes the directory stream; without it the OS
-                    // file handle leaks until GC eventually collects the stream.
-                    val hasClient = Files.exists(clientDir) &&
-                        Files.list(clientDir).use { it.count() > 0 }
-                    if (!hasClient) {
-                        fail(LaunchError.OfflineNoClient)
-                        return@launch
-                    }
-                    // Recover the file manifest from the last successful online sync.
-                    // Without it, ClasspathProvider has nothing to walk and builds an
-                    // empty -cp argument -- the JVM then dies with "Could not find or
-                    // load main class net.minecraft.launchwrapper.Launch" because the
-                    // class IS on disk but classpath is "". TTL is intentionally
-                    // ignored here: a stale-but-present manifest is strictly better
-                    // than launching with no classpath. If the user has never logged
-                    // in online, the cache is empty, and we bail with an actionable
-                    // error rather than a cryptic JVM message.
-                    if (session.fileManifest == null) {
-                        val cached = manifestCache.loadManifest(targetServerId)
-                        if (cached != null) {
-                            session = session.copy(fileManifest = cached)
-                        } else {
-                            fail(LaunchError.OfflineNoManifest)
-                            return@launch
-                        }
-                    }
-                    emit(LaunchLogEvent.OfflineSkipSync)
-                } else {
-                    // Smarty swap / strict plan -- computed here (not in the offline
-                    // branch) so an offline launch never makes the resolver's
-                    // doomed network fetch.
-                    val smartyPlan = smartyPlanner.plan(server, session.fileManifest, settings)
-
-                    // Block rather than strip Smarty with no replacement: if the swap
-                    // is on and the manifest ships Smarty but no helper is available
-                    // for this MC version (unsupported version / descriptor down /
-                    // nothing cached), launching would either join with no network
-                    // mod (kick) or, if we kept Smarty, run the surveillance mod.
-                    if (settings.useOpenSmrtHelper && smartyPlan.ignoredAddon.isNotEmpty() &&
-                        !helperPresent(clientDir, server.version, smartyPlan)) {
-                        fail(LaunchError.HelperUnavailable(server.version))
-                        return@launch
-                    }
-
-                    ClientSyncCoordinator.withClientLock(clientDir) {
-                        downloadService.processSession(
-                            session = session,
-                            serverId = targetServerId,
-                            targetDir = clientDir,
-                            extraCheckSum = server.extraCheckSum,
-                            ignoredFiles = ignoredFiles + smartyPlan.ignoredAddon,
-                            messageUI = { /* log */ },
-                            progressUI = { current, total, bytesRead, totalBytes, speed ->
-                                if (!isActive) return@processSession
-                                _state.value = LaunchState.Downloading(
-                                    currentFileIdx   = current,
-                                    totalFiles       = total,
-                                    downloadedBytes  = bytesRead,
-                                    totalBytes       = totalBytes,
-                                    speedBytesPerSec = parseSpeedString(speed),
-                                )
-                            },
-                            // Map integrity-walk progress onto the SYNC stage's 0.2..0.7
-                            // sub-range. The actual download progress takes over from
-                            // 0.7 upward via the Downloading state above. Without
-                            // this, the progress bar froze at 20% during the MD5
-                            // walk on 1000-file modpacks -- 5-30s of perceived hang.
-                            verifyUI = { verified, total ->
-                                if (!isActive) return@processSession
-                                val fraction = if (total > 0) verified.toFloat() / total else 0f
-                                setStage(PrepareStage.SYNC, 0.2f + 0.5f * fraction)
-                            },
-                            injectModJar = smartyPlan.injectJar,
-                            strictModCheck = smartyPlan.strict,
-                            helperKeepGlobs = smartyPlan.helperKeepGlobs,
-                        )
-                    }
-                }
-
-                // 4. Java
-                setStage(PrepareStage.JVM, 0.9f)
-                val javaPath = if (!settings.javaPath.isNullOrEmpty()) {
-                    Path.of(settings.javaPath!!)
-                } else {
-                    javaManagerService.getJavaPath(server.version)
-                }
-
-                // 5. Launch
                 setStage(PrepareStage.LAUNCH, 0.95f)
-                ActionRing.record("Game running: ${server.name}")
+                ActionRing.record("Game running: $label")
                 emit(LaunchLogEvent.Launching)
 
-                val process = launcherService.launchClientWithLogs(
-                    sessionData = session,
-                    serverProfile = server,
-                    clientRootPath = clientDir,
-                    javaExecutablePath = javaPath,
-                    allocatedMemoryMB = settings.memoryMB,
-                    adaptiveEnabled = settings.experimentalFeaturesEnabled && settings.adaptiveMemoryEnabled,
-                ) { text, type ->
-                    emit(LaunchLogEvent.ProcessOutput(text, type))
+                when (val result = prepared.spawn { text, type -> emit(LaunchLogEvent.ProcessOutput(text, type)) }) {
+                    // The service maps its own failures (provisioning, spawn IO,
+                    // SC-binding block) to a semantic LaunchError; surface it.
+                    is SpawnResult.Failed -> fail(result.error)
+                    is SpawnResult.Started -> {
+                        val handle = result.handle
+                        runningHandle = handle
+                        _state.value = LaunchState.GameRunning(handle)
+                        // Post-spawn hook guarded centrally: a throwing hook must
+                        // not flip the running game into an Error state.
+                        prepared.onSpawned?.let { hook ->
+                            runCatching { hook() }.onFailure { logger.warn("Post-spawn hook failed for {}", label, it) }
+                        }
+
+                        // Reads its OWN captured abortToken, never the
+                        // currentAbortToken field -- see that field's KDoc for the
+                        // abort-A-then-launch-B race a shared flag would reopen.
+                        val exitCode = handle.awaitExit()
+                        runningHandle = null
+                        ActionRing.record("Game exited: $label (code $exitCode)")
+
+                        if (exitCode != 0 && !abortToken.get()) {
+                            fail(LaunchError.ExitCode(exitCode))
+                        } else {
+                            _state.value = LaunchState.Idle
+                        }
+                    }
                 }
-
-                runningProcess = process
-                _state.value = LaunchState.GameRunning(process)
-
-                val exitCode = process.waitFor()
-                runningProcess = null
-                ActionRing.record("Game exited: ${server.name} (code $exitCode)")
-
-                if (exitCode != 0 && !abortToken.get()) {
-                    fail(LaunchError.ExitCode(exitCode))
-                } else {
-                    _state.value = LaunchState.Idle
-                }
-
             } catch (e: Exception) {
-                runningProcess = null
+                runningHandle = null
                 if (e !is CancellationException) {
-                    logger.error("Launch flow failed for {}", server.name, e)
+                    logger.error("Launch flow failed for {}", label, e)
                     fail(LaunchError.Internal(e.message ?: ""), e)
                 } else {
                     _state.value = LaunchState.Idle
@@ -403,109 +299,270 @@ class LauncherController(
     }
 
     /**
-     * Pack-centric launch path. Equivalent to [launch] for the
-     * Hivens mirror world: takes a [PackInstance] from the local
-     * Library, skips SC auth + per-launch asset re-sync (mirror
-     * packs are static + already on disk after install), resolves
-     * Java from the manifest's declared MC version, and spawns via
-     * [ILauncherService.launchPackClient].
+     * SC server-list prepare phase: auth (skipped offline), ignored-file
+     * calculation, sync (or offline manifest recovery), and Java resolution.
+     * Bails -- with the semantic [LaunchError] already set on [fail] -- for the
+     * 2FA-no-manifest, offline-no-client/manifest, and helper-unavailable cases.
      *
-     * Re-entry guard, MDC tagging and abort semantics mirror [launch]
-     * exactly so the existing UI surfaces ([LaunchControlPanel],
-     * `GameConsoleService`) plug in unchanged.
-     *
-     * Behaviour notes:
-     * - No SC auth and no SmrtSyncService call: the install flow is
-     *   responsible for materialising the instance, and an explicit
-     *   "Update pack" Library action will run sync separately later.
-     * - When [PackInstance.cachedManifest] is null (instance created
-     *   before the field existed), a one-time mirror fetch fills it
-     *   in and the result is written back via [IPackRepository.put].
-     *   Subsequent Play clicks read from cache.
-     * - [PackInstance.lastPlayedEpochOrZero] is bumped on successful
-     *   spawn so the Library sort-by-recently-played stays accurate.
+     * A [CoroutineScope] extension so `isActive` inside the sync callbacks reads
+     * the launch coroutine's cancellation, matching the pre-extraction body.
+     */
+    private suspend fun CoroutineScope.prepareServerLaunch(
+        currentSession: SessionData,
+        server: ServerProfile,
+        onSessionRefreshed: ((SessionData) -> Unit)?,
+    ): Prepared {
+        val settings = settingsService.getSettings()
+        val isOffline = settings.isOfflineMode
+
+        // 1. Auth -- skip in offline mode
+        setStage(PrepareStage.AUTH, 0.1f)
+        var session = currentSession
+        val targetServerId = server.assetDir
+
+        if (isOffline) {
+            emit(LaunchLogEvent.OfflineSkipAuth)
+            // In offline mode, use whatever session we have (or a stub)
+            if (session.accessToken.isBlank()) {
+                session = session.copy(accessToken = "offline")
+            }
+        } else {
+            try {
+                val pass = credentialsManager.load()?.cachedPassword ?: session.cachedPassword
+                if (!pass.isNullOrEmpty()) {
+                    session = authService.login(session.playerName, pass, targetServerId)
+                    onSessionRefreshed?.invoke(session)
+                    emit(LaunchLogEvent.AuthSucceeded(session.uuid))
+                } else {
+                    emit(LaunchLogEvent.NoPassword)
+                }
+            } catch (_: TwoFactorRequiredException) {
+                // 2FA account -- refusing to prompt the user for a code every
+                // time they click Play. The cached accessToken in `session` is
+                // from a previous successful 2FA flow and is what the game uses
+                // anyway. Augment it with a cached manifest (same path the
+                // offline branch takes) so processSession has something to walk.
+                val cached = manifestCache.loadManifest(targetServerId)
+                if (cached != null) {
+                    session = session.copy(fileManifest = cached)
+                    ActionRing.record("Launch: 2FA account, using cached manifest for $targetServerId")
+                } else {
+                    // No cached manifest and no fresh login -- bail with the
+                    // semantic TwoFactorExpired reason so the UI renders an
+                    // actionable "re-login from the form" message instead of a
+                    // generic internal-error path.
+                    ActionRing.record("Launch: 2FA + no cached manifest for $targetServerId -- re-login required")
+                    fail(LaunchError.TwoFactorExpired)
+                    return Prepared.Bail
+                }
+            } catch (e: Exception) {
+                // Non-2FA auth failure: log and continue with the existing
+                // (possibly stale) session -- graceful degradation, the game
+                // itself will reject if the token has truly expired.
+                emit(LaunchLogEvent.AuthFailed(e.message))
+            }
+        }
+
+        // 2. Ignored files
+        val ignoredFiles = calculateIgnoredFiles(server)
+
+        // 3. Download -- skip in offline mode if client exists
+        setStage(PrepareStage.SYNC, 0.2f)
+        val clientDir = dataDirectory.resolve("clients").resolve(targetServerId)
+        if (!Files.exists(clientDir)) Files.createDirectories(clientDir)
+
+        if (isOffline) {
+            // In offline mode, skip file sync but verify client exists.
+            // .use{} closes the directory stream; without it the OS file handle
+            // leaks until GC eventually collects the stream.
+            val hasClient = Files.exists(clientDir) &&
+                Files.list(clientDir).use { it.count() > 0 }
+            if (!hasClient) {
+                fail(LaunchError.OfflineNoClient)
+                return Prepared.Bail
+            }
+            // Recover the file manifest from the last successful online sync.
+            // Without it, ClasspathProvider has nothing to walk and builds an
+            // empty -cp argument -- the JVM then dies with "Could not find or
+            // load main class net.minecraft.launchwrapper.Launch" because the
+            // class IS on disk but classpath is "". TTL is intentionally ignored
+            // here: a stale-but-present manifest is strictly better than
+            // launching with no classpath. If the user has never logged in
+            // online, the cache is empty, and we bail with an actionable error
+            // rather than a cryptic JVM message.
+            if (session.fileManifest == null) {
+                val cached = manifestCache.loadManifest(targetServerId)
+                if (cached != null) {
+                    session = session.copy(fileManifest = cached)
+                } else {
+                    fail(LaunchError.OfflineNoManifest)
+                    return Prepared.Bail
+                }
+            }
+            emit(LaunchLogEvent.OfflineSkipSync)
+        } else {
+            // Smarty swap / strict plan -- computed here (not in the offline
+            // branch) so an offline launch never makes the resolver's doomed
+            // network fetch.
+            val smartyPlan = smartyPlanner.plan(server, session.fileManifest, settings)
+
+            // Block rather than strip Smarty with no replacement: if the swap is
+            // on and the manifest ships Smarty but no helper is available for
+            // this MC version (unsupported version / descriptor down / nothing
+            // cached), launching would either join with no network mod (kick)
+            // or, if we kept Smarty, run the surveillance mod.
+            if (settings.useOpenSmrtHelper && smartyPlan.ignoredAddon.isNotEmpty() &&
+                !helperPresent(clientDir, server.version, smartyPlan)) {
+                fail(LaunchError.HelperUnavailable(server.version))
+                return Prepared.Bail
+            }
+
+            ClientSyncCoordinator.withClientLock(clientDir) {
+                downloadService.processSession(
+                    session = session,
+                    serverId = targetServerId,
+                    targetDir = clientDir,
+                    extraCheckSum = server.extraCheckSum,
+                    ignoredFiles = ignoredFiles + smartyPlan.ignoredAddon,
+                    messageUI = { /* log */ },
+                    progressUI = { progress ->
+                        if (!isActive) return@processSession
+                        _state.value = LaunchState.Downloading(
+                            currentFileIdx   = progress.currentFileIdx,
+                            totalFiles       = progress.totalFiles,
+                            downloadedBytes  = progress.downloadedBytes,
+                            totalBytes       = progress.totalBytes,
+                            speedBytesPerSec = progress.bytesPerSec,
+                        )
+                    },
+                    // Map integrity-walk progress onto the SYNC stage's 0.2..0.7
+                    // sub-range. The actual download progress takes over from
+                    // 0.7 upward via the Downloading state above. Without this,
+                    // the progress bar froze at 20% during the MD5 walk on
+                    // 1000-file modpacks -- 5-30s of perceived hang.
+                    verifyUI = { verified, total ->
+                        if (!isActive) return@processSession
+                        val fraction = if (total > 0) verified.toFloat() / total else 0f
+                        setStage(PrepareStage.SYNC, 0.2f + 0.5f * fraction)
+                    },
+                    injectModJar = smartyPlan.injectJar,
+                    strictModCheck = smartyPlan.strict,
+                    helperKeepGlobs = smartyPlan.helperKeepGlobs,
+                )
+            }
+        }
+
+        // 4. Java
+        setStage(PrepareStage.JVM, 0.9f)
+        val javaPath = if (!settings.javaPath.isNullOrEmpty()) {
+            Path.of(settings.javaPath!!)
+        } else {
+            javaManagerService.getJavaPath(server.version)
+        }
+
+        // 5. Spawn binding handed back to launchInternal.
+        return Prepared.Ready(
+            spawn = { onLog ->
+                launcherService.launchClientWithLogs(
+                    sessionData = session,
+                    serverProfile = server,
+                    clientRootPath = clientDir,
+                    javaExecutablePath = javaPath,
+                    allocatedMemoryMB = settings.memoryMB,
+                    adaptiveEnabled = settings.experimentalFeaturesEnabled && settings.adaptiveMemoryEnabled,
+                    onLog = onLog,
+                )
+            },
+        )
+    }
+
+    /**
+     * Pack-centric launch path for the Hivens mirror world: a [PackInstance]
+     * from the local Library. Re-entry guard, MDC tagging, and abort semantics
+     * come from [launchInternal]; [preparePackLaunch] supplies the manifest
+     * resolve + pack auth + spawn binding, so the existing UI surfaces
+     * (LaunchControlPanel, GameConsoleService) plug in unchanged.
      */
     fun launchPackInstance(
         currentSession: SessionData,
         packInstance: PackInstance,
-    ) {
-        synchronized(launchLock) {
-            if (_state.value !is LaunchState.Idle &&
-                _state.value !is LaunchState.Error) return
-            _state.value = LaunchState.Prepare(PrepareStage.INIT, 0.0f)
+    ) = launchInternal(
+        label = packInstance.displayName,
+        onStart = {
+            emit(LaunchLogEvent.SessionStarted(packInstance.id, packInstance.displayName))
+            emit(LaunchLogEvent.AppBanner)
+            // Mirror packs are public read; surfacing the offline flag here
+            // would be misleading -- pack-centric Play does not need network at
+            // all when cachedManifest is populated.
+            emit(LaunchLogEvent.TargetServer(packInstance.displayName, offline = false))
+        },
+        prepare = { preparePackLaunch(currentSession, packInstance) },
+    )
+
+    /**
+     * Pack-centric prepare phase. Skips SC auth + per-launch asset re-sync
+     * (mirror packs are static + already on disk after install):
+     * - Resolves the [CachedManifestSnapshot]; when [PackInstance.cachedManifest]
+     *   is null (instance predates the field) a one-time mirror fetch fills it
+     *   and writes it back via [IPackRepository.put].
+     * - Refreshes the SC session right before spawn for SC-bound packs so a cold
+     *   mod-load (server-side SC tokens age out in ~minutes) does not invalidate
+     *   the join. Packs that declare no requirement pass through untouched.
+     * - Resolves Java from the manifest's declared major, not a version heuristic.
+     *
+     * [Prepared.Ready.onSpawned] bumps [PackInstance.lastPlayedEpochOrZero] after
+     * a real spawn (never before -- a failed spawn must not pollute the Library's
+     * recently-played sort).
+     */
+    private suspend fun preparePackLaunch(
+        currentSession: SessionData,
+        packInstance: PackInstance,
+    ): Prepared {
+        val settings = settingsService.getSettings()
+
+        // 1. Resolve the manifest snapshot. Stored on the instance after
+        // install; one-shot fetch + write-back covers instances that predate
+        // the field.
+        setStage(PrepareStage.SYNC, 0.2f)
+        val (manifestSnapshot, refreshedInstance) = resolveOrFetchManifest(packInstance)
+
+        // 2. Local sanity: instance directory must exist before we run a network
+        // auth round. A broken instance would otherwise burn an SC login (and on
+        // 2FA accounts a prompt) only to bail right after with the same error.
+        val clientDir = dataDirectory
+            .resolve("instances")
+            .resolve(refreshedInstance.instanceDirName)
+        if (!Files.exists(clientDir)) {
+            fail(LaunchError.OfflineNoClient)
+            return Prepared.Bail
         }
 
-        val launchId = UUID.randomUUID().toString().take(8)
-        val abortToken = AtomicBoolean(false)
-        currentAbortToken = abortToken
+        // 3. Auth requirement: refresh the session right before spawn. Mirrors
+        // the SC server path's pre-spawn re-auth.
+        val authRequirement = manifestSnapshot.authRequirement
+            ?: fallbackAuthRequirement(refreshedInstance)
+        var session = currentSession
+        if (authRequirement != null) {
+            setStage(PrepareStage.AUTH, 0.4f)
+            session = preparePackAuth(authRequirement, currentSession, refreshedInstance)
+                ?: return Prepared.Bail
+        }
 
-        launchJob = appScope.launch(MDCContext(mapOf("launchId" to launchId))) {
-            val settings = settingsService.getSettings()
+        // 4. Java override. The pack launch path picks the LOADER-declared Java
+        // itself (resolved.javaMajor) from the resolved runtime -- same MC +
+        // different loader can need different Java (Cleanroom-1.12.2 -> 25 vs
+        // legacy-Forge-1.12.2 -> 8), so the version-keyed heuristic moves out of
+        // the controller. We only pass the user's explicit global setting; null
+        // means "let the service provision."
+        setStage(PrepareStage.JVM, 0.7f)
+        val javaOverride: Path? = settings.javaPath
+            ?.takeIf { it.isNotEmpty() }
+            ?.let { Path.of(it) }
 
-            try {
-                _state.value = LaunchState.Prepare(PrepareStage.INIT, 0.0f)
-
-                emit(LaunchLogEvent.SessionStarted(packInstance.id, packInstance.displayName))
-                emit(LaunchLogEvent.AppBanner)
-                // Mirror packs are public read; surfacing the offline
-                // flag here would be misleading -- pack-centric Play
-                // does not need network at all when cachedManifest is
-                // populated.
-                emit(LaunchLogEvent.TargetServer(packInstance.displayName, offline = false))
-
-                ActionRing.record("Launching pack: ${packInstance.displayName} (launchId=$launchId)")
-
-                // 1. Resolve the manifest snapshot. Stored on the
-                // instance after install; one-shot fetch + write-back
-                // covers instances that predate the field.
-                setStage(PrepareStage.SYNC, 0.2f)
-                val (manifestSnapshot, refreshedInstance) =
-                    resolveOrFetchManifest(packInstance)
-
-                // 2. Local sanity: instance directory must exist before
-                // we run a network auth round. A broken instance would
-                // otherwise burn an SC login (and on 2FA accounts a
-                // prompt) only to bail right after with the same error.
-                val clientDir = dataDirectory
-                    .resolve("instances")
-                    .resolve(refreshedInstance.instanceDirName)
-                if (!Files.exists(clientDir)) {
-                    fail(LaunchError.OfflineNoClient)
-                    return@launch
-                }
-
-                // 3. Auth requirement: refresh the session right before
-                // spawn so a cold mod-load (server-side SC tokens age out
-                // in ~minutes) does not invalidate the join. Mirrors the
-                // SC server path's pre-spawn re-auth. Packs that declare
-                // no requirement (vanilla, future offline-only) pass
-                // through untouched.
-                val authRequirement = manifestSnapshot.authRequirement
-                    ?: fallbackAuthRequirement(refreshedInstance)
-                var session = currentSession
-                if (authRequirement != null) {
-                    setStage(PrepareStage.AUTH, 0.4f)
-                    session = preparePackAuth(authRequirement, currentSession, refreshedInstance)
-                        ?: return@launch
-                }
-
-                // 4. Java override. The pack launch path picks the LOADER-declared
-                // Java itself (resolved.javaMajor) from the resolved runtime --
-                // same MC + different loader can need different Java (Cleanroom-
-                // 1.12.2 -> 25 vs legacy-Forge-1.12.2 -> 8), so the version-keyed
-                // heuristic moves out of the controller. We only pass the user's
-                // explicit global setting; null means "let the service provision."
-                setStage(PrepareStage.JVM, 0.7f)
-                val javaOverride: Path? = settings.javaPath
-                    ?.takeIf { it.isNotEmpty() }
-                    ?.let { Path.of(it) }
-
-                // 5. Spawn. clientDir was validated up front (step 2).
-                setStage(PrepareStage.LAUNCH, 0.95f)
-                ActionRing.record("Game running: ${packInstance.displayName}")
-                emit(LaunchLogEvent.Launching)
-
-                val process = launcherService.launchPackClient(
+        // 5. Spawn binding handed back to launchInternal.
+        return Prepared.Ready(
+            spawn = { onLog ->
+                launcherService.launchPackClient(
                     sessionData          = session,
                     // Carry the EFFECTIVE requirement (manifest value or the
                     // name-based fallback) so the service's SC-binding step sees it;
@@ -528,50 +585,15 @@ class LauncherController(
                     useNetworkAgent       = settings.useNetworkAgent,
                     useSmartycraftAuthLib = settings.useSmartycraftAuthLib,
                     displayName          = refreshedInstance.displayName,
-                ) { text, type ->
-                    emit(LaunchLogEvent.ProcessOutput(text, type))
-                }
-
-                runningProcess = process
-                _state.value = LaunchState.GameRunning(process)
-
-                // Bump lastPlayed *after* the process has actually
-                // spawned, not before -- a failed spawn should not
-                // pollute the recent-played sort.
-                runCatching {
-                    packRepository.put(
-                        refreshedInstance.copy(
-                            lastPlayedEpochOrZero = Instant.now().epochSecond,
-                        ),
-                    )
-                }.onFailure { logger.warn("Failed to bump lastPlayed for ${refreshedInstance.id}", it) }
-
-                val exitCode = process.waitFor()
-                runningProcess = null
-                ActionRing.record("Game exited: ${refreshedInstance.displayName} (code $exitCode)")
-
-                if (exitCode != 0 && !abortToken.get()) {
-                    fail(LaunchError.ExitCode(exitCode))
-                } else {
-                    _state.value = LaunchState.Idle
-                }
-
-            } catch (e: PackPrepBlocked) {
-                // SC-binding step could not complete (patched authlib / open-smrt
-                // helper unavailable). Surface the semantic reason, not Internal.
-                runningProcess = null
-                logger.warn("Pack launch blocked for {}: {}", packInstance.displayName, e.error)
-                fail(e.error)
-            } catch (e: Exception) {
-                runningProcess = null
-                if (e !is CancellationException) {
-                    logger.error("Pack launch flow failed for {}", packInstance.displayName, e)
-                    fail(LaunchError.Internal(e.message ?: ""), e)
-                } else {
-                    _state.value = LaunchState.Idle
-                }
-            }
-        }
+                    onLog                = onLog,
+                )
+            },
+            onSpawned = {
+                packRepository.put(
+                    refreshedInstance.copy(lastPlayedEpochOrZero = Instant.now().epochSecond),
+                )
+            },
+        )
     }
 
     /**
@@ -695,17 +717,16 @@ class LauncherController(
     }
 
     /**
-     * Stops the in-flight launch. If the game process has already
-     * spawned, sends SIGTERM via [Process.destroy] before resetting
-     * state -- canceling the coroutine alone would orphan the
-     * spawned Process and the next [launch] click would happily
-     * spawn a second game.
+     * Stops the in-flight launch. If the game process has already spawned,
+     * terminates it via [LaunchHandle.terminate] before resetting state --
+     * canceling the coroutine alone would orphan the spawned process and the
+     * next [launch] click would happily spawn a second game.
      */
     fun abort() {
         currentAbortToken?.set(true)
-        val proc = runningProcess
-        runningProcess = null
-        runCatching { proc?.destroy() }
+        val handle = runningHandle
+        runningHandle = null
+        runCatching { handle?.terminate() }
         launchJob?.cancel()
         _state.value = LaunchState.Idle
     }
@@ -728,26 +749,4 @@ class LauncherController(
         plan.injectJar != null ||
             Files.isRegularFile(clientDir.resolve("mods").resolve(OpenSmrtHelperResolver.helperFileName(mcVersion)))
 
-    /**
-     * Best-effort parse of FileDownloadService's pre-formatted speed string
-     * (`"2.5 MB/s"`, `"812 KB/s"`, etc.) into bytes/second. The UI side
-     * formats freshly from this number so locale conventions stay correct;
-     * the raw string from FileDownloadService is in the launcher's locale
-     * which may not match the user's UI locale.
-     *
-     * Returns 0 on unparseable input -- the UI just shows no speed in that
-     * case rather than displaying a nonsensical figure.
-     */
-    private fun parseSpeedString(speed: String): Long {
-        val trimmed = speed.trim()
-        val match = Regex("""([\d.,]+)\s*([KMG]?)B?/s""", RegexOption.IGNORE_CASE).find(trimmed) ?: return 0L
-        val value = match.groupValues[1].replace(',', '.').toDoubleOrNull() ?: return 0L
-        val multiplier = when (match.groupValues[2].uppercase()) {
-            "K" -> 1_024L
-            "M" -> 1_048_576L
-            "G" -> 1_073_741_824L
-            else -> 1L
-        }
-        return (value * multiplier).toLong()
-    }
 }

@@ -14,7 +14,6 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -23,18 +22,22 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.launcher.AutoSyncService
 import hivens.ui.customization.glassSurfaceAlpha
+import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
+import hivens.ui.widgets.Sources
 import hivens.widget.api.rememberProps
+import hivens.widget.api.rememberSource
 import hivens.widget.model.PropLabel
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 import kotlinx.serialization.Serializable
-import org.koin.compose.koinInject
 
 @Serializable
 data class ProgressProps(
-    @PropLabel("widget.home.new.progress.title") val title: String = "Фоновая активность",
-    @PropLabel("widget.home.new.progress.idleText") val idleText: String = "Сейчас ничего не качается.",
+    // Blank defaults resolve to the localized text at render; a non-blank
+    // value is the user's own override (single language, by choice).
+    @PropLabel("widget.home.new.progress.title") val title: String = "",
+    @PropLabel("widget.home.new.progress.idleText") val idleText: String = "",
 )
 
 // Compact background-activity card. Shows AutoSyncService state when
@@ -45,29 +48,31 @@ data class ProgressProps(
 @Composable
 fun ProgressWidget(instance: WidgetInstance) {
     val p = instance.rememberProps<ProgressProps>()
-    val autoSyncService: AutoSyncService = koinInject()
-    val snapshot by autoSyncService.snapshot.collectAsState()
+    val s = LocalStrings.current
+    // Bound declaratively to the autosync source -- the widget no longer knows
+    // which service backs it (the SourceKey is wired in Sources + Main DI).
+    val snapshot by rememberSource(Sources.AutoSync)
     val overall  = snapshot.overall
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = 12.dp)
-            .clip(RoundedCornerShape(14.dp))
+            .clip(MaterialTheme.shapes.medium)
             .background(glassSurfaceAlpha(0.40f))
             .padding(horizontal = 16.dp, vertical = 14.dp),
     ) {
         Text(
-            text       = p.title,
+            text       = p.title.ifBlank { s.widgetProgressTitle },
             style      = MaterialTheme.typography.labelLarge,
             color      = CelestiaTheme.colors.textSecondary,
             fontWeight = FontWeight.Medium,
         )
         Spacer(Modifier.height(8.dp))
 
-        when (val s = overall) {
-            is AutoSyncService.OverallState.InProgress -> InProgressBody(s)
-            else                                       -> IdleBody(p.idleText)
+        when (val state = overall) {
+            is AutoSyncService.OverallState.InProgress -> InProgressBody(state)
+            else                                       -> IdleBody(p.idleText.ifBlank { s.widgetProgressIdle })
         }
     }
 }

@@ -20,13 +20,13 @@ import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -47,12 +47,16 @@ import hivens.launcher.instance.WorldScanner
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.screens.CenteredProgress
+import hivens.ui.screens.RetryStateBlock
 import hivens.ui.theme.CelestiaTheme
 import java.io.File
 import java.nio.file.Path
 import java.time.Duration
 import java.time.Instant
 import java.util.Base64
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Library PackDetail Worlds tab. Two stacked sections:
@@ -70,49 +74,70 @@ import java.util.Base64
 fun WorldsTabPane(instanceDir: Path, modifier: Modifier = Modifier) {
     val s = LocalStrings.current
 
-    var worlds  by remember(instanceDir) { mutableStateOf<List<WorldEntry>?>(null) }
-    var servers by remember(instanceDir) { mutableStateOf<List<MultiplayerServerEntry>?>(null) }
+    var state by remember(instanceDir) { mutableStateOf<WorldsState>(WorldsState.Loading) }
+    var retryTick by remember(instanceDir) { mutableIntStateOf(0) }
 
-    LaunchedEffect(instanceDir) {
-        val scanner = WorldScanner()
-        val reader  = ServersDatReader()
-        worlds = scanner.scan(instanceDir)
-        servers = reader.read(instanceDir)
+    // Off-thread scan: a corrupt servers.dat / malformed NBT / permission error
+    // throws, so a bare assignment would leave the pane on an endless spinner.
+    LaunchedEffect(instanceDir, retryTick) {
+        state = WorldsState.Loading
+        state = runCatching {
+            withContext(Dispatchers.IO) {
+                WorldsState.Loaded(
+                    worlds  = WorldScanner().scan(instanceDir),
+                    servers = ServersDatReader().read(instanceDir),
+                )
+            }
+        }.getOrElse { WorldsState.Error }
     }
 
-    if (worlds == null || servers == null) {
-        Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(
-                color       = CelestiaTheme.colors.primary.copy(alpha = 0.6f),
-                strokeWidth = 2.dp,
-                modifier    = Modifier.size(28.dp),
-            )
-        }
-        return
+    when (val st = state) {
+        WorldsState.Loading -> CenteredProgress(modifier.fillMaxSize())
+        WorldsState.Error -> RetryStateBlock(
+            title      = s.worldsTabErrorTitle,
+            message    = s.worldsTabErrorMessage,
+            retryLabel = s.contentTabRetry,
+            onRetry    = { retryTick++ },
+            modifier   = modifier.fillMaxSize().padding(20.dp),
+        )
+        is WorldsState.Loaded -> WorldsList(worlds = st.worlds, servers = st.servers, modifier = modifier)
     }
+}
 
+private sealed interface WorldsState {
+    data object Loading : WorldsState
+    data object Error : WorldsState
+    data class Loaded(
+        val worlds: List<WorldEntry>,
+        val servers: List<MultiplayerServerEntry>,
+    ) : WorldsState
+}
+
+@Composable
+private fun WorldsList(
+    worlds: List<WorldEntry>,
+    servers: List<MultiplayerServerEntry>,
+    modifier: Modifier,
+) {
+    val s = LocalStrings.current
     LazyColumn(
         modifier            = modifier.fillMaxSize().padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        item {
-            SectionHeader(text = s.worldsTabLocalSection(worlds!!.size))
-        }
-        if (worlds!!.isEmpty()) {
+        item { SectionHeader(text = s.worldsTabLocalSection(worlds.size)) }
+        if (worlds.isEmpty()) {
             item { EmptyHint(text = s.worldsTabLocalEmpty) }
         } else {
-            items(items = worlds!!, key = { it.dirName }) { w -> WorldCard(world = w) }
+            items(items = worlds, key = { it.dirName }) { w -> WorldCard(world = w) }
         }
 
         item { Spacer(Modifier.height(4.dp)) }
 
-        item {
-            SectionHeader(text = s.worldsTabServersSection(servers!!.size))
-        }
-        if (servers!!.isEmpty()) {
+        item { SectionHeader(text = s.worldsTabServersSection(servers.size)) }
+        if (servers.isEmpty()) {
             item { EmptyHint(text = s.worldsTabServersEmpty) }
         } else {
-            items(items = servers!!, key = { it.ip + it.name }) { srv -> ServerCard(entry = srv) }
+            items(items = servers, key = { it.ip + it.name }) { srv -> ServerCard(entry = srv) }
         }
 
         item { Spacer(Modifier.height(8.dp)) }
@@ -134,7 +159,7 @@ private fun EmptyHint(text: String) {
     Box(
         modifier         = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
+            .clip(MaterialTheme.shapes.medium)
             .background(glassSurfaceAlpha(0.4f))
             .padding(20.dp),
         contentAlignment = Alignment.Center,
@@ -153,7 +178,7 @@ private fun WorldCard(world: WorldEntry) {
     Row(
         modifier              = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(MaterialTheme.shapes.medium)
             .background(glassSurfaceAlpha(0.5f))
             .padding(12.dp),
         verticalAlignment     = Alignment.CenterVertically,
@@ -190,7 +215,7 @@ private fun WorldThumb(iconPath: String?) {
         modifier         = Modifier
             .size(56.dp)
             .clip(RoundedCornerShape(8.dp))
-            .background(Color(0xFF1F2937)),
+            .background(CelestiaTheme.colors.surfaceVariant),
         contentAlignment = Alignment.Center,
     ) {
         if (iconPath != null) {
@@ -216,7 +241,7 @@ private fun ServerCard(entry: MultiplayerServerEntry) {
     Row(
         modifier              = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(MaterialTheme.shapes.medium)
             .background(glassSurfaceAlpha(0.45f))
             .padding(12.dp),
         verticalAlignment     = Alignment.CenterVertically,
@@ -262,7 +287,7 @@ private fun ServerThumb(iconBase64: String?) {
         modifier         = Modifier
             .size(48.dp)
             .clip(RoundedCornerShape(8.dp))
-            .background(Color(0xFF1F2937)),
+            .background(CelestiaTheme.colors.surfaceVariant),
         contentAlignment = Alignment.Center,
     ) {
         if (bytes != null) {
@@ -287,7 +312,7 @@ private fun Chip(text: String, accent: Boolean = false) {
     AssistChip(
         onClick = {},
         enabled = false,
-        shape   = RoundedCornerShape(6.dp),
+        shape   = MaterialTheme.shapes.extraSmall,
         label   = {
             Text(
                 text  = text,

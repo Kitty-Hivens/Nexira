@@ -57,9 +57,11 @@ import hivens.widget.model.traverse
 // renders through the decorator directly, exactly as before.
 //
 // Each widget renders through LocalWidgetDecorator. Default decorator is
-// identity -- zero cost when no editor is mounted. Unknown widget kinds
-// render nothing; the slot stays valid and the diagnostic surfaces in
-// the editor's --audit-widgets dev tool.
+// identity -- zero cost when no editor is mounted. A widget whose kind is
+// absent from the registry renders through LocalUnknownWidgetDecorator
+// instead (default nothing in production; the editor paints an "unsupported
+// widget" placeholder so the orphan is visible and removable), and keeps
+// its on-disk props / children intact.
 @Composable
 fun SlotRenderer(
     surface: SurfaceId,
@@ -93,6 +95,7 @@ private fun RenderSlotContent(path: SlotPath, modifier: Modifier, spacing: Dp) {
     val registry = LocalWidgetRegistry.current
     val decorator = LocalWidgetDecorator.current
     val emptyDecorator = LocalEmptySlotDecorator.current
+    val unknownDecorator = LocalUnknownWidgetDecorator.current
     val slotControl = LocalSlotControlDecorator.current
     val slotDivider = LocalSlotDividerDecorator.current
     val motionMs = LocalSlotMotionMs.current
@@ -127,6 +130,8 @@ private fun RenderSlotContent(path: SlotPath, modifier: Modifier, spacing: Dp) {
                         }
                         else -> decorator(address, index, descriptor, instance) { RenderWidget(descriptor, instance) }
                     }
+                } else {
+                    unknownDecorator(address, index, instance)
                 }
                 if (index < content.widgets.lastIndex) slotDivider(path, content, index)
             }
@@ -146,6 +151,8 @@ private fun RenderSlotContent(path: SlotPath, modifier: Modifier, spacing: Dp) {
                         Box(Modifier.weight(1f)) {
                             if (descriptor != null) {
                                 decorator(address, index, descriptor, instance) { RenderWidget(descriptor, instance) }
+                            } else {
+                                unknownDecorator(address, index, instance)
                             }
                         }
                     }
@@ -176,8 +183,14 @@ private fun RenderSlotContent(path: SlotPath, modifier: Modifier, spacing: Dp) {
                     content.widgets.withIndex()
                         .sortedWith(compareBy({ it.value.canvas?.z ?: 0 }, { it.index }))
                         .forEach { (index, instance) ->
-                            val descriptor = registry[instance.kind] ?: return@forEach
                             val cp = instance.canvas
+                            val descriptor = registry[instance.kind]
+                            if (descriptor == null) {
+                                Box(Modifier.offset((cp?.x ?: 0f).dp, (cp?.y ?: 0f).dp)) {
+                                    unknownDecorator(address, index, instance)
+                                }
+                                return@forEach
+                            }
                             val sizeMod = if (cp != null && cp.width > 0f && cp.height > 0f)
                                 Modifier.size(cp.width.dp, cp.height.dp) else Modifier
                             Box(Modifier.offset((cp?.x ?: 0f).dp, (cp?.y ?: 0f).dp).then(sizeMod)) {
@@ -206,6 +219,8 @@ private fun RenderSlotContent(path: SlotPath, modifier: Modifier, spacing: Dp) {
                         }
                         else -> decorator(address, index, descriptor, instance) { RenderWidget(descriptor, instance) }
                     }
+                } else {
+                    unknownDecorator(address, index, instance)
                 }
                 if (index < content.widgets.lastIndex) slotDivider(path, content, index)
             }

@@ -3,6 +3,7 @@ package hivens.launcher.smrt
 import hivens.core.api.dto.smrt.SmrtAssetEntry
 import hivens.core.api.dto.smrt.SmrtModEntry
 import hivens.core.api.dto.smrt.SmrtSource
+import hivens.core.api.interfaces.IPackSyncService
 import hivens.launcher.FileDownloadService
 import hivens.launcher.ProtectedPaths
 import hivens.launcher.util.sha1Of
@@ -32,7 +33,7 @@ import java.util.Comparator
 class SmrtSyncService(
     private val client: SmrtPackClient,
     private val protectedPaths: ProtectedPaths,
-) {
+) : IPackSyncService {
     private val log = LoggerFactory.getLogger(SmrtSyncService::class.java)
 
     /**
@@ -112,7 +113,7 @@ class SmrtSyncService(
      * name (and thus whether Forge loads it) changes. A variant that is missing
      * on disk is left for the next full sync to fetch.
      */
-    fun relabel(clientDir: Path, mods: List<SmrtModEntry>, enabledState: Map<String, Boolean>) {
+    override fun relabel(clientDir: Path, mods: List<SmrtModEntry>, enabledState: Map<String, Boolean>) {
         val modsDir = clientDir.resolve("mods")
         if (!Files.isDirectory(modsDir)) return
         for (mod in mods) {
@@ -263,6 +264,12 @@ class SmrtSyncService(
         source: SmrtSource,
         label: String,
     ) {
+        if (source is SmrtSource.Unknown) {
+            // Forward-compat: a source type this launcher version does not
+            // understand. Skip the entry instead of failing the whole sync.
+            log.warn("smrt sync: skipping {} -- unsupported source type; update the launcher to install it", label)
+            return
+        }
         if (isUpToDate(dest, expectedSha1, expectedSize)) {
             return
         }
@@ -299,6 +306,9 @@ class SmrtSyncService(
             val v = client.resolveModrinthVersion(source.projectId, source.versionId)
             v.primaryFile().url
         }
+        // Unreachable: downloadIfNeeded skips Unknown before resolving a URL.
+        // Kept exhaustive so a new SmrtSource variant forces a decision here.
+        is SmrtSource.Unknown    -> error("resolveUrl called on an unsupported source")
     }
 
     /**

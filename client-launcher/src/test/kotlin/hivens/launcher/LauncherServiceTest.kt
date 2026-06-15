@@ -7,6 +7,7 @@ import hivens.core.data.FileManifest
 import hivens.core.data.InstanceProfile
 import hivens.core.data.LauncherLogType
 import hivens.core.data.SessionData
+import hivens.core.launch.SpawnResult
 import hivens.core.api.model.ServerProfile
 import hivens.launcher.LauncherService.Companion.adaptiveApplies
 import hivens.launcher.LauncherService.Companion.baselineMemory
@@ -36,7 +37,6 @@ import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.CopyOnWriteArrayList
-import java.util.concurrent.TimeUnit
 import kotlin.io.path.createDirectories
 import kotlin.io.path.div
 import kotlin.test.AfterTest
@@ -44,6 +44,7 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 /**
@@ -299,7 +300,7 @@ class LauncherServiceTest {
 
         // ── Spawn ──
         val captured = CopyOnWriteArrayList<Pair<String, LauncherLogType>>()
-        val process = service.launchClientWithLogs(
+        val result = service.launchClientWithLogs(
             sessionData = session,
             serverProfile = serverProfile,
             clientRootPath = clientRoot,
@@ -307,10 +308,10 @@ class LauncherServiceTest {
             allocatedMemoryMB = 4096,
         ) { msg, type -> captured.add(msg to type) }
 
-        // /usr/bin/true exits immediately with 0. A generous 5s deadline
-        // covers slow CI runners; on a fast laptop this returns in <50ms.
-        assertTrue(process.waitFor(5, TimeUnit.SECONDS), "spawned process must exit within 5s")
-        assertEquals(0, process.exitValue(), "/usr/bin/true exits 0; nonzero means ProcessBuilder broke")
+        // /usr/bin/true exits immediately with 0; awaitExit() blocks on the real
+        // process and returns its code (<50ms on a laptop).
+        assertIs<SpawnResult.Started>(result, "spawn must succeed; got $result")
+        assertEquals(0, result.handle.awaitExit(), "/usr/bin/true exits 0; nonzero means ProcessBuilder broke")
 
         // ── Asserts on observable orchestration ──
         // The "Running <server>..." line is the synchronous onLog before spawn.

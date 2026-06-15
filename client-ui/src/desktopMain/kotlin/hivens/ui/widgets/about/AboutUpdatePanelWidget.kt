@@ -1,5 +1,6 @@
 package hivens.ui.widgets.about
 
+import hivens.ui.theme.LocalMonoFamily
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -87,7 +88,7 @@ fun AboutUpdatePanelWidget(instance: WidgetInstance) {
                     color      = accent,
                     fontSize   = 13.sp,
                     fontWeight = FontWeight.Medium,
-                    fontFamily = FontFamily.Monospace,
+                    fontFamily = LocalMonoFamily.current,
                 )
             }
 
@@ -104,7 +105,7 @@ fun AboutUpdatePanelWidget(instance: WidgetInstance) {
                         text       = current.update.version,
                         color      = availAccent,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace,
+                        fontFamily = LocalMonoFamily.current,
                     )
                 }
                 Spacer(Modifier.height(12.dp))
