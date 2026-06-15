@@ -282,7 +282,16 @@ fun EditorSurfaceHost(
                         if (propTarget?.instanceId == instance.instanceId) propTarget = null
                         controller.removeWidget(path, instance.instanceId)
                     },
-                    onEditProps  = { propTarget = PropTarget(path, instance.instanceId); surfaceSettingsOpen = false },
+                    onEditProps  = {
+                        // Toggle: tapping the same widget's tune again closes the
+                        // panel, matching the surface-settings gear below.
+                        if (propTarget?.instanceId == instance.instanceId) {
+                            propTarget = null
+                        } else {
+                            propTarget = PropTarget(path, instance.instanceId)
+                            surfaceSettingsOpen = false
+                        }
+                    },
                     onCommitDrop = { committedPointer ->
                         // Hit-test which slot received the drop. Null =
                         // pointer is off any slot; treat as cancel.
@@ -614,7 +623,7 @@ fun EditorSurfaceHost(
                     selectedSurface       = selectedSurface,
                     onSurfacePicked       = { selectedSurface = it; surfaceSettingsOpen = false },
                     surfaceHasSettings    = surfaceHasSettings(selectedSurface),
-                    onOpenSurfaceSettings = { surfaceSettingsOpen = true; propTarget = null },
+                    onOpenSurfaceSettings = { surfaceSettingsOpen = !surfaceSettingsOpen; if (surfaceSettingsOpen) propTarget = null },
                     paletteOpen           = paletteOpen,
                     onTogglePalette       = { paletteOpen = !paletteOpen },
                     previewing            = previewing,

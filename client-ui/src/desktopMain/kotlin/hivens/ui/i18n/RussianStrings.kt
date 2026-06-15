@@ -586,7 +586,7 @@ object RussianStrings : AppStrings {
     override val navStyleCircle           = "Круг"
     override val navStyleBar              = "Полоса"
     override val navStyleDot              = "Точка"
-    override val navStyleNone             = "Без подложки"
+    override val navStyleNone             = "Нет"
     override val navSelectionOutlineIcons = "Контурные иконки у невыбранных"
     override val navSelectionAccent       = "Цвет выделения"
     override val navHoverHighlight        = "Подсветка при наведении"
