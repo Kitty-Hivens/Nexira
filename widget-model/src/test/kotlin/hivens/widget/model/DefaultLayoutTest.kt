@@ -76,7 +76,7 @@ class DefaultLayoutTest {
         assertEquals(setOf("main"),           slots("home.new"))
         assertEquals(setOf("header", "body"), slots("library"))
         assertEquals(setOf("top", "bottom"),  slots("appshell.leftrail"))
-        assertEquals(setOf("news"),            slots("appshell.rightrail"))
+        assertEquals(setOf("news", "bottom"),  slots("appshell.rightrail"))
     }
 
     @Test

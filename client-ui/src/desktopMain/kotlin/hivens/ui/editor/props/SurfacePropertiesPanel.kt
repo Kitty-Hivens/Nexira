@@ -10,6 +10,7 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,10 +38,17 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.ui.customization.CustomizationSettings
@@ -79,8 +87,12 @@ fun SurfacePropertiesPanel(
         modifier = modifier,
     ) {
         val s = LocalStrings.current
+        // Draggable dock: the header drags this offset (session-scoped), like the
+        // widget palette, so the panel can be pulled off the right edge.
+        var offset by remember { mutableStateOf(Offset.Zero) }
         Column(
             modifier = Modifier
+                .graphicsLayer { translationX = offset.x; translationY = offset.y }
                 .width(320.dp)
                 .fillMaxHeight()
                 .padding(top = 64.dp, bottom = 96.dp, end = 16.dp)
@@ -95,6 +107,12 @@ fun SurfacePropertiesPanel(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 modifier              = Modifier
                     .fillMaxWidth()
+                    .pointerInput(Unit) {
+                        detectDragGestures { change, drag ->
+                            change.consume()
+                            offset += drag
+                        }
+                    }
                     .padding(start = 14.dp, end = 6.dp, top = 12.dp, bottom = 6.dp),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -168,8 +186,8 @@ private fun NavSelectionControl(
         }
 
         FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement   = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement   = Arrangement.spacedBy(6.dp),
         ) {
             NavSelectionStyle.entries.forEach { variant ->
                 val selected = customization.navSelectionStyle == variant
@@ -187,7 +205,7 @@ private fun NavSelectionControl(
                             shape = RoundedCornerShape(style.buttonCorner),
                         )
                         .clickable { onChange(customization.copy(navSelectionStyle = variant)) }
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                        .padding(horizontal = 8.dp, vertical = 6.dp),
                 ) {
                     Text(
                         text       = navSelectionStyleLabel(variant, s),
