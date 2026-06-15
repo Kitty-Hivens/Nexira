@@ -47,13 +47,17 @@ proguard          = "7.8.2"
 # for the native tray icon. Now on Maven Central as dev.hivens:libtray
 # (resolved from mavenCentral; the jitpack repo is no longer needed for it).
 # Pinned to a released semver so upstream changes don't silently land here.
-libtray           = "0.1.0"
+# 0.1.1: backend hardening -- fixes a DBusMessageIter buffer overflow (heap
+# corruption on every iterator call), native-memory leaks, watcher
+# re-registration (#10), and main-queue marshaling (#3).
+libtray           = "0.1.1"
 
 # Pure-Panama desktop notifications (Kitty-Hivens/libnotify) -- freedesktop
 # Notifications over D-Bus on Linux, WinRT toast on Windows, NSUserNotification
 # on macOS. Used for the OS-level "still running in the tray" hint, distinct
 # from the in-app NotificationCenter. Maven Central as dev.hivens:libnotify.
-libnotify         = "0.1.0"
+# 0.1.1: same DBusMessageIter buffer-overflow + arena-leak fixes as libtray.
+libnotify         = "0.1.1"
 
 # ── Test ─────────────────────────────────────────────────────────────────────
 # junit held on the 5.x line: 6.x drops Java 8 and requires JVM runtime 17+,
