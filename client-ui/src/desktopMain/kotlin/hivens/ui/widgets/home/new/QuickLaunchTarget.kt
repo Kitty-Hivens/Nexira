@@ -6,7 +6,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
-import hivens.launcher.launch.LaunchState
+import hivens.core.launch.LaunchState
 import hivens.launcher.launch.LauncherController
 import hivens.ui.AppState
 import hivens.ui.notifications.LaunchTarget

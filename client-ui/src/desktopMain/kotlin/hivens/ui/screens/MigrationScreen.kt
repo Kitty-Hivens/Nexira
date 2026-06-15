@@ -1,5 +1,6 @@
 package hivens.ui.screens
 
+import hivens.ui.theme.LocalMonoFamily
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -123,7 +124,7 @@ private fun ReadyContent(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
+            .clip(MaterialTheme.shapes.medium)
             .background(glassSurfaceAlpha(0.4f))
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -165,7 +166,7 @@ private fun ProgressContent(source: DataDirMigration.Source, state: UiState.InPr
             text = s.migrationCurrentFile(state.currentFile),
             style = MaterialTheme.typography.bodySmall,
             color = CelestiaTheme.colors.textSecondary,
-            fontFamily = FontFamily.Monospace,
+            fontFamily = LocalMonoFamily.current,
             textAlign = TextAlign.Center,
         )
     }
@@ -258,7 +259,7 @@ private fun PathRow(label: String, path: String) {
             text = path,
             style = MaterialTheme.typography.bodySmall,
             color = CelestiaTheme.colors.textPrimary,
-            fontFamily = FontFamily.Monospace,
+            fontFamily = LocalMonoFamily.current,
         )
     }
 }

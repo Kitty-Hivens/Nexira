@@ -38,13 +38,14 @@ import hivens.launcher.ServerListCacheStore
 import hivens.launcher.bootstrap.AutoLoginCoordinator
 import hivens.launcher.bootstrap.LauncherBootstrap
 import hivens.launcher.CredentialsManager
-import hivens.launcher.launch.LaunchState
+import hivens.core.launch.LaunchState
 import hivens.launcher.launch.LauncherController
 import hivens.launcher.network.ServerProtocolConfig
 import hivens.launcher.platform.computeSafeWindowMinSize
 import hivens.launcher.ProfileManager
 import hivens.ui.background.BackgroundManager
 import hivens.ui.background.CustomBackground
+import hivens.ui.components.DestructiveConfirmDialog
 import hivens.ui.components.UpdateManager
 import hivens.ui.customization.CustomizationManager
 import hivens.ui.customization.CustomizationSettings
@@ -53,11 +54,13 @@ import hivens.ui.easter.AprilFools
 import hivens.ui.easter.AprilFoolsLoader
 import hivens.ui.easter.LocalAprilFools
 import hivens.ui.editor.EditModeController
+import hivens.ui.editor.WidgetGraphReconciler
 import hivens.ui.generated.resources.Res
 import hivens.ui.generated.resources.icon
 import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.i18n.LocaleProvider
+import hivens.ui.puppet.PuppetClick
 import hivens.ui.notifications.LaunchTarget
 import hivens.ui.notifications.drivers.LaunchDriver
 import hivens.ui.notifications.render.NotificationStack
@@ -69,6 +72,7 @@ import hivens.ui.theme.applyOverrides
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.CustomTheme
 import hivens.ui.theme.ThemeManager
+import hivens.ui.system.SystemNotifier
 import hivens.ui.tray.TrayManager
 import hivens.ui.utils.ConsoleSettingsManager
 import hivens.ui.utils.GameConsoleService
@@ -79,12 +83,21 @@ import hivens.widget.api.LocalWidgetChromeRenderer
 import hivens.widget.api.WidgetChromeRenderer
 import hivens.ui.customization.glassSurfaceAlpha
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
+import hivens.ui.widgets.state.WidgetStateStore
+import hivens.widget.api.LocalWidgetCommandRegistry
+import hivens.widget.api.LocalWidgetDataRegistry
 import hivens.widget.api.LocalWidgetServiceRegistry
+import hivens.widget.api.LocalWidgetStateHost
+import hivens.widget.api.WidgetCommandRegistry
+import hivens.widget.api.WidgetDataRegistry
 import hivens.widget.api.WidgetServiceRegistry
 import hivens.widget.api.WidgetRegistry
+import hivens.widget.model.DefaultLayout
+import hivens.widget.model.walkInstances
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -109,6 +122,13 @@ import kotlin.time.Duration.Companion.milliseconds
 // AppShell stays a one-liner.
 private const val MIN_WINDOW_WIDTH_DP  = 960
 private const val MIN_WINDOW_HEIGHT_DP = 600
+
+// Windows Application User Model ID for toast routing (libnotify / SystemNotifier).
+// Matches the macOS bundleID for a single cross-platform identity; ignored on
+// Linux. A toast needs this AUMID registered (a Start-menu shortcut carrying
+// it), which a plain install may lack -- the tray hint then no-ops on Windows,
+// by design, while Linux (the primary desktop) shows it.
+private const val NEXIRA_APP_ID = "dev.hivens.nexira"
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
@@ -174,7 +194,10 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
     // Koin out from under the recovery restart loop. It lives in a JVM
     // shutdown hook in Main instead.
     DisposableEffect(Unit) {
-        onDispose { TrayManager.shutdown() }
+        onDispose {
+            TrayManager.shutdown()
+            SystemNotifier.shutdown()
+        }
     }
 
     val windowState      = rememberWindowState(placement = WindowPlacement.Maximized)
@@ -190,6 +213,9 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
     val layoutGraphRepo: LayoutGraphRepository = koinInject()
     val widgetRegistry: WidgetRegistry         = koinInject()
     val widgetServiceRegistry: WidgetServiceRegistry = koinInject()
+    val widgetDataRegistry: WidgetDataRegistry = koinInject()
+    val widgetCommandRegistry: WidgetCommandRegistry = koinInject()
+    val widgetStateStore: WidgetStateStore = koinInject()
     val editModeController: EditModeController  = koinInject()
     // Shared process-lifetime scope (createdAtStart in appModule; canceled
     // by AppCoroutineScopeHook on JVM shutdown). Same instance backs
@@ -230,6 +256,33 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
     LaunchedEffect(styleSpec) {
         AprilFools.styleAnimationMultiplier = styleSpec.animationMultiplier
         AprilFools.useFlatSurface           = styleSpec.cardSurface == hivens.ui.theme.CardSurface.Flat
+    }
+
+    // One-time registry-aware reconcile of the loaded layout graph. The
+    // launcher seeds missing bundled-default surfaces/slots but has no
+    // WidgetRegistry, so descriptor-declared container child slots are seeded
+    // here -- otherwise a container persisted before child-slot seeding (or one
+    // whose descriptor gained a slot) silently refuses nested drops. Idempotent:
+    // a healthy graph reconciles to itself and writes nothing.
+    LaunchedEffect(Unit) {
+        val before = layoutGraphRepo.value()
+        val defaultKinds = DefaultLayout.load().walkInstances().map { it.kind }.toSet()
+        val result = WidgetGraphReconciler.reconcile(
+            graph        = before,
+            registry     = widgetRegistry,
+            defaultKinds = defaultKinds,
+            // Prune removed kinds only when a schema bump actually happened --
+            // a deliberate app update is the safe moment to reap orphans.
+            prune        = layoutGraphRepo.migratedFromSchema != null,
+        )
+        if (result.graph != before) {
+            val reconcileLog = LoggerFactory.getLogger("Main")
+            if (result.seededSlots > 0)
+                reconcileLog.info("Layout reconcile: seeded {} declared container child slot(s)", result.seededSlots)
+            if (result.prunedWidgets > 0)
+                reconcileLog.info("Layout reconcile: pruned {} widget(s) of removed kinds after a schema bump", result.prunedWidgets)
+            layoutGraphRepo.update { result.graph }
+        }
     }
 
     val launchState by controller.state.collectAsState()
@@ -346,6 +399,7 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
                         ),
                         appName    = Branding.TITLE
                     )
+                    SystemNotifier.init(appName = Branding.TITLE, appId = NEXIRA_APP_ID, iconBytes = iconBytes)
                 } catch (_: Exception) {
                     runCatching {
                         val iconBytes = Res.readBytes("drawable/icon.png")
@@ -362,6 +416,7 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
                             ),
                             appName    = Branding.TITLE
                         )
+                        SystemNotifier.init(appName = Branding.TITLE, appId = NEXIRA_APP_ID, iconBytes = iconBytes)
                     }
                 }
             }
@@ -378,6 +433,13 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
 
             // ── Callbacks ─────────────────────────────────────────────
             TrayManager.onShowWindow = {
+                SwingUtilities.invokeLater { isWindowVisible = true }
+            }
+
+            // Same restore behaviour when the user clicks the tray-hint banner
+            // (or its "Show window" action) -- libnotify fires on its own
+            // thread, so hop to the AWT thread before touching window state.
+            SystemNotifier.onShowWindow = {
                 SwingUtilities.invokeLater { isWindowVisible = true }
             }
 
@@ -506,6 +568,27 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
             }
         }
 
+        // First-time-only OS notification when the window hides to the tray:
+        // a desktop banner (visible while the window is gone) so the user
+        // knows the launcher is still running, not closed. isWindowVisible
+        // only ever goes false via a tray-hide path, so the visible -> hidden
+        // transition is the trigger; it fires once ever, then persists the
+        // suppression flag. Posting + the disk save run off the UI thread.
+        LaunchedEffect(isWindowVisible) {
+            if (isWindowVisible || !SystemNotifier.isSupported) return@LaunchedEffect
+            if (settingsService.getSettings().trayHintShown) return@LaunchedEffect
+            val posted = withContext(Dispatchers.IO) {
+                SystemNotifier.notifyTrayHint(
+                    title     = s.trayHintTitle,
+                    body      = s.trayHintBody,
+                    showLabel = s.trayHintShow,
+                )
+            }
+            if (posted) withContext(Dispatchers.IO) {
+                settingsService.saveSettings(settingsService.getSettings().copy(trayHintShown = true))
+            }
+        }
+
         // Console window moved inside the CompositionLocalProvider /
         // CelestiaTheme block below so it inherits the active theme +
         // customization (accent override, role overrides). The window
@@ -539,23 +622,25 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
             resizable = true,
             icon      = windowIcon,
             onPreviewKeyEvent = { ev ->
-                // Ctrl+E toggles widget edit mode. Handled at Window
-                // scope (preview = before focus dispatch) so it fires no
-                // matter which composable holds focus -- the side rails
-                // own focus, so a host Box-level handler misses the chord.
-                // The EditorSurfaceHost observes the controller signal and
-                // gates on whether its surface is editable.
-                if (ev.isCtrlPressed && ev.key == Key.E) {
-                    // Consume both edges so the chord never reaches a
-                    // focused control (e.g. the palette search field); act
-                    // on release only, so holding the key toggles once
-                    // instead of repeating on auto-repeat KeyDowns.
-                    if (ev.type == KeyEventType.KeyUp) {
-                        editModeController.requestEditToggle()
+                // Window-scoped chords (preview = before focus dispatch) so they
+                // fire no matter which composable holds focus -- the side rails
+                // own focus, so a host Box-level handler misses them. Consume
+                // both edges so they never reach a focused control, and act on
+                // release only so holding does not repeat on auto-repeat KeyDowns.
+                when {
+                    // Ctrl+E toggles widget edit mode. EditorSurfaceHost observes
+                    // the controller signal and gates on its surface being editable.
+                    ev.isCtrlPressed && ev.key == Key.E -> {
+                        if (ev.type == KeyEventType.KeyUp) editModeController.requestEditToggle()
+                        true
                     }
-                    true
-                } else {
-                    false
+                    // Ctrl+N collapses / expands the right rail. ShellRightRegion
+                    // observes the signal and flips its collapsed prop.
+                    ev.isCtrlPressed && ev.key == Key.N -> {
+                        if (ev.type == KeyEventType.KeyUp) editModeController.requestRightRailToggle()
+                        true
+                    }
+                    else -> false
                 }
             },
         ) {
@@ -635,13 +720,25 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
                 val glass = glassSurfaceAlpha(chrome.glassAlphaPct / 100f)
                 androidx.compose.foundation.layout.Box(
                     Modifier
+                        // Padding is an OUTER inset, applied before the backing, so
+                        // the rounded glass hugs the widget's own view -- the corner
+                        // radius describes the widget, not the padded footprint.
+                        // Padding the right panel insets it from the edges without
+                        // the rounding detaching onto the padded box.
+                        .padding(
+                            PaddingValues(
+                                start  = chrome.effectiveStart.dp,
+                                top    = chrome.effectiveTop.dp,
+                                end    = chrome.effectiveEnd.dp,
+                                bottom = chrome.effectiveBottom.dp,
+                            ),
+                        )
                         .then(
                             if (chrome.cornerRadiusDp > 0)
                                 Modifier.clip(RoundedCornerShape(chrome.cornerRadiusDp.dp))
                             else Modifier,
                         )
-                        .background(glass)
-                        .padding(chrome.paddingDp.dp),
+                        .background(glass),
                 ) { content() }
             }
             CompositionLocalProvider(
@@ -650,6 +747,9 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
                 LocalLayoutGraph                         provides layoutGraph,
                 LocalWidgetRegistry                      provides widgetRegistry,
                 LocalWidgetServiceRegistry               provides widgetServiceRegistry,
+                LocalWidgetDataRegistry                  provides widgetDataRegistry,
+                LocalWidgetCommandRegistry               provides widgetCommandRegistry,
+                LocalWidgetStateHost                     provides widgetStateStore,
                 LocalWidgetChromeRenderer                provides chromeRenderer,
             ) {
             val effectiveStyle = if (customization.experimentalColorOverridesEnabled) {
@@ -804,6 +904,8 @@ fun AppRoot(
 
     var appState      by remember { mutableStateOf<AppState>(AppState.Loading) }
     var currentScreen by remember { mutableStateOf<Screen>(Screen.Home) }
+    var pendingLogout by remember { mutableStateOf(false) }
+    val doLogout = { credentialsManager.clear(); appState = AppState.Unauthenticated }
 
     // ── Background settings ───────────────────────────────────────────────
     val backgroundManager = remember { BackgroundManager(dataDirectory, json) }
@@ -864,7 +966,7 @@ fun AppRoot(
                 currentScreen = currentScreen,
                 onScreenChange = { currentScreen = it },
                 onLogin = { session -> appState = AppState.Authenticated(session) },
-                onLogout = { credentialsManager.clear(); appState = AppState.Unauthenticated },
+                onLogout = { pendingLogout = true },
                 isDarkTheme = isDarkTheme,
                 onToggleDarkTheme = onToggleDarkTheme,
                 customTheme = customTheme,
@@ -888,6 +990,19 @@ fun AppRoot(
             )
 
             NotificationStack()
+
+            if (pendingLogout) {
+                val s = LocalStrings.current
+                DestructiveConfirmDialog(
+                    title        = s.logoutConfirmTitle,
+                    body         = s.logoutConfirmBody,
+                    confirmLabel = s.navLogout,
+                    onConfirm    = doLogout,
+                    onDismiss    = { pendingLogout = false },
+                )
+            }
+            // Automation bypass for the now two-step logout (request -> confirm).
+            PuppetClick("logout.confirm") { doLogout() }
         }
     }
 }

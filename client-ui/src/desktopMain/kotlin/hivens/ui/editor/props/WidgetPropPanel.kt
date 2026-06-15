@@ -40,7 +40,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.editor.EditModeController
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
@@ -152,7 +151,9 @@ private fun PropPanelBody(
             .padding(top = 64.dp, bottom = 96.dp, end = 16.dp)
             .shadow(elevation = 18.dp, shape = RoundedCornerShape(14.dp))
             .clip(RoundedCornerShape(14.dp))
-            .background(glassSurfaceAlpha(0.86f)),
+            // Solid surface, no glass: a settings panel must stay readable and
+            // not composite with the layers it floats over.
+            .background(CelestiaTheme.colors.surface),
     ) {
         Row(
             verticalAlignment     = Alignment.CenterVertically,
@@ -231,6 +232,16 @@ private fun PropPanelBody(
                 keyStep       = 1f,
                 onValueChange = { controller.updateChrome(path, instanceId, chrome.copy(glassAlphaPct = it.roundToInt())) },
             )
+            // Glass 0 = no visible card, but the renderer applies the corner clip
+            // and padding outside the glass, so both still shape the widget. Say so
+            // rather than letting the corner/padding controls read as inert.
+            if (chrome.glassAlphaPct == 0) {
+                Text(
+                    text  = s.editorBackingNoGlassHint,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.7f),
+                )
+            }
             LabeledSlider(
                 label         = s.editorBackingCorner,
                 value         = chrome.cornerRadiusDp.toFloat(),
@@ -246,6 +257,40 @@ private fun PropPanelBody(
                 format        = "%.0f",
                 keyStep       = 1f,
                 onValueChange = { controller.updateChrome(path, instanceId, chrome.copy(paddingDp = it.roundToInt())) },
+            )
+            // Per-side overrides. Each starts at the uniform value (effective*)
+            // and, once moved, pins that side independently of the uniform one.
+            LabeledSlider(
+                label         = s.editorBackingPaddingTop,
+                value         = chrome.effectiveTop.toFloat(),
+                range         = 0f..40f,
+                format        = "%.0f",
+                keyStep       = 1f,
+                onValueChange = { controller.updateChrome(path, instanceId, chrome.copy(paddingTopDp = it.roundToInt())) },
+            )
+            LabeledSlider(
+                label         = s.editorBackingPaddingEnd,
+                value         = chrome.effectiveEnd.toFloat(),
+                range         = 0f..40f,
+                format        = "%.0f",
+                keyStep       = 1f,
+                onValueChange = { controller.updateChrome(path, instanceId, chrome.copy(paddingEndDp = it.roundToInt())) },
+            )
+            LabeledSlider(
+                label         = s.editorBackingPaddingBottom,
+                value         = chrome.effectiveBottom.toFloat(),
+                range         = 0f..40f,
+                format        = "%.0f",
+                keyStep       = 1f,
+                onValueChange = { controller.updateChrome(path, instanceId, chrome.copy(paddingBottomDp = it.roundToInt())) },
+            )
+            LabeledSlider(
+                label         = s.editorBackingPaddingStart,
+                value         = chrome.effectiveStart.toFloat(),
+                range         = 0f..40f,
+                format        = "%.0f",
+                keyStep       = 1f,
+                onValueChange = { controller.updateChrome(path, instanceId, chrome.copy(paddingStartDp = it.roundToInt())) },
             )
         }
 

@@ -1,5 +1,6 @@
 package hivens.ui.widgets.customization
 
+import hivens.ui.theme.LocalMonoFamily
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -109,7 +110,7 @@ internal fun ColorRoleRow(
             modifier   = Modifier.width(100.dp),
             color      = CelestiaTheme.colors.textSecondary,
             style      = MaterialTheme.typography.bodySmall,
-            fontFamily = FontFamily.Monospace,
+            fontFamily = LocalMonoFamily.current,
         )
         HexField(
             initialHex   = currentHex ?: "",
@@ -120,7 +121,7 @@ internal fun ColorRoleRow(
         if (currentHex != null) {
             OutlinedButton(
                 onClick        = onClear,
-                shape          = RoundedCornerShape(6.dp),
+                shape          = MaterialTheme.shapes.small,
                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
             ) { Text("x", fontSize = 12.sp) }
         }
@@ -133,10 +134,15 @@ internal fun HexField(
     invalidLabel: String,
     onValidHex: (String) -> Unit,
     modifier: Modifier = Modifier,
+    rgbOnly: Boolean = false,
 ) {
     var text by remember(initialHex) { mutableStateOf(initialHex) }
     val parsed = text.toWidgetColorOrNull()
-    val valid  = text.isBlank() || parsed != null
+    // rgbOnly rejects the 8-digit AARRGGBB form, so an RGB-only field stays at
+    // exactly six hex digits; callers that allow alpha leave it false.
+    fun fits(s: String): Boolean =
+        s.trim().removePrefix("#").length.let { if (rgbOnly) it == 6 else it == 6 || it == 8 }
+    val valid  = text.isBlank() || (parsed != null && fits(text))
 
     Row(
         modifier              = modifier,
@@ -147,19 +153,19 @@ internal fun HexField(
             modifier = Modifier
                 .size(28.dp)
                 .clip(RoundedCornerShape(6.dp))
-                .background(parsed ?: CelestiaTheme.colors.surface)
+                .background(parsed?.takeIf { valid } ?: CelestiaTheme.colors.surface)
                 .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(6.dp)),
         )
         Box(
             modifier = Modifier
                 .weight(1f)
                 .height(36.dp)
-                .clip(RoundedCornerShape(6.dp))
+                .clip(MaterialTheme.shapes.small)
                 .background(glassSurfaceAlpha(0.4f))
                 .border(
                     width = 1.dp,
                     color = if (valid) CelestiaTheme.colors.outline.copy(alpha = 0.3f) else CelestiaTheme.colors.error,
-                    shape = RoundedCornerShape(6.dp),
+                    shape = MaterialTheme.shapes.small,
                 )
                 .padding(horizontal = 10.dp),
             contentAlignment = Alignment.CenterStart,
@@ -170,13 +176,13 @@ internal fun HexField(
                     text = t
                     if (t.isNotBlank()) {
                         val normalized = t.trim()
-                        normalized.toWidgetColorOrNull()?.let { onValidHex(normalized) }
+                        if (fits(normalized)) normalized.toWidgetColorOrNull()?.let { onValidHex(normalized) }
                     }
                 },
                 singleLine    = true,
                 textStyle     = TextStyle(
                     color      = CelestiaTheme.colors.textPrimary,
-                    fontFamily = FontFamily.Monospace,
+                    fontFamily = LocalMonoFamily.current,
                     fontSize   = 13.sp,
                 ),
                 cursorBrush   = SolidColor(CelestiaTheme.colors.primary),

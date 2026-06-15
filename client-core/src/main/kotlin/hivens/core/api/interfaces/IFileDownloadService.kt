@@ -1,13 +1,14 @@
 package hivens.core.api.interfaces
 
 import hivens.core.data.SessionData
+import hivens.core.launch.SyncProgress
 import java.nio.file.Path
 
 interface IFileDownloadService {
     /**
      * Parses the manifest, downloads files, unpacks `extra.zip`.
      *
-     * [progressUI]: `(currentFile, totalFiles, downloadedBytes, totalBytes, speed)`.
+     * [progressUI]: per-tick [SyncProgress] (raw counters + bytes/sec rate).
      * [verifyUI]: `(verifiedCount, totalCount)` fired during the MD5
      *   integrity walk *before* downloads. Keeps the UI bar moving while
      *   hashing a 1000-file modpack -- otherwise the user sees the
@@ -28,7 +29,7 @@ interface IFileDownloadService {
         extraCheckSum: String?,
         ignoredFiles: Set<String>?,
         messageUI: ((String) -> Unit)?,
-        progressUI: ((Int, Int, Long, Long, String) -> Unit)?,
+        progressUI: ((SyncProgress) -> Unit)?,
         verifyUI: ((Int, Int) -> Unit)? = null,
         injectModJar: Path? = null,
         strictModCheck: Boolean = false,

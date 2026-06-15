@@ -1,5 +1,7 @@
 package hivens.launcher.update
 
+import hivens.core.platform.OS
+
 /**
  * True when the launcher runs as a Linux AppImage -- the only environment
  * where the update manager can swap the running binary in place. Gates both
@@ -7,5 +9,4 @@ package hivens.launcher.update
  * install ([DesktopIntegration]).
  */
 internal fun runningAsLinuxAppImage(): Boolean =
-    System.getProperty("os.name", "").lowercase().contains("linux") &&
-        !System.getenv("APPIMAGE").isNullOrBlank()
+    OS.isLinux && !System.getenv("APPIMAGE").isNullOrBlank()

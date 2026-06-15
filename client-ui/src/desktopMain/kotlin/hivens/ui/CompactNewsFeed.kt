@@ -7,12 +7,17 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -40,6 +45,8 @@ private val log = LoggerFactory.getLogger("CompactNewsFeed")
 @Composable
 fun CompactNewsFeed(
     sslBypass: Boolean = false,
+    maxItems: Int = 0,
+    showTitle: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     val serverListService: IServerListService = koinInject()
@@ -47,6 +54,7 @@ fun CompactNewsFeed(
 
     var news    by remember { mutableStateOf<List<NewsItem>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
+    var query   by remember { mutableStateOf("") }
     // Bumped by the retry button to re-trigger the fetch effect. The effect
     // re-runs on (a) initial composition, (b) force-proxy toggle change,
     // (c) SSL bypass grant for the host, (d) explicit retry click. Each is
@@ -84,51 +92,135 @@ fun CompactNewsFeed(
         else if (news.isEmpty()) fetch(forceRefresh = false)
     }
 
+    val shown = remember(news, query, maxItems) {
+        news.asSequence()
+            .filter { query.isBlank() || it.title.contains(query, ignoreCase = true) }
+            .let { seq -> if (maxItems > 0) seq.take(maxItems) else seq }
+            .toList()
+    }
+
     Column(modifier = modifier) {
-        // Section header
-        Text(
-            text       = s.newsTitle,
-            style      = MaterialTheme.typography.bodySmall,
-            fontWeight = FontWeight.Bold,
-            color      = CelestiaTheme.colors.textSecondary,
-            modifier   = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
-        )
+        // Section header (optional -- a tight rail may prefer to drop it).
+        if (showTitle) {
+            Text(
+                text       = s.newsTitle,
+                style      = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.Bold,
+                color      = CelestiaTheme.colors.textSecondary,
+                modifier   = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
+            )
+            HorizontalDivider(color = glassSurfaceAlpha(0.6f))
+        }
 
-        HorizontalDivider(color = glassSurfaceAlpha(0.6f))
+        // Filter field -- only once a loaded, non-empty feed gives something to
+        // filter; the search narrows by title.
+        if (!loading && news.isNotEmpty()) {
+            NewsFilterField(query = query, onQueryChange = { query = it })
+            HorizontalDivider(color = glassSurfaceAlpha(0.4f))
+        }
 
-        when {
-            loading -> NewsSkeleton()
+        // Weighted so the list owns the remaining height and scrolls within it,
+        // instead of overflowing the rail and fighting its neighbours.
+        Box(Modifier.weight(1f).fillMaxWidth()) {
+            when {
+                loading -> NewsSkeleton()
 
-            news.isEmpty() -> Box(
-                Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center,
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                news.isEmpty() -> Box(
+                    Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(
+                            text  = s.newsEmpty,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = CelestiaTheme.colors.textSecondary,
+                        )
+                        // Explicit retry covers the "network came back but no
+                        // toggle was touched" path -- the LaunchedEffect above
+                        // only re-runs on toggle / bypass changes.
+                        TextButton(onClick = { retryTick++ }) {
+                            Text(s.updateRetry, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+
+                shown.isEmpty() -> Box(
+                    Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center,
                 ) {
                     Text(
                         text  = s.newsEmpty,
                         style = MaterialTheme.typography.bodySmall,
                         color = CelestiaTheme.colors.textSecondary,
                     )
-                    // Explicit retry covers the "network came back but no
-                    // toggle was touched" path -- the LaunchedEffect above
-                    // only re-runs on toggle / bypass changes.
-                    TextButton(onClick = { retryTick++ }) {
-                        Text(s.updateRetry, style = MaterialTheme.typography.bodySmall)
+                }
+
+                else -> LazyColumn(
+                    modifier       = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(vertical = 4.dp),
+                ) {
+                    items(shown) { item ->
+                        CompactNewsItem(item = item)
+                        HorizontalDivider(
+                            color    = glassSurfaceAlpha(0.4f),
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        )
                     }
                 }
             }
+        }
+    }
+}
 
-            else -> LazyColumn(contentPadding = PaddingValues(vertical = 4.dp)) {
-                items(news) { item ->
-                    CompactNewsItem(item = item)
-                    HorizontalDivider(
-                        color    = glassSurfaceAlpha(0.4f),
-                        modifier = Modifier.padding(horizontal = 16.dp)
-                    )
-                }
+// Compact glass search field. Narrows the feed by title so a long news list
+// stays scannable in the rail.
+@Composable
+private fun NewsFilterField(query: String, onQueryChange: (String) -> Unit) {
+    val s = LocalStrings.current
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 6.dp)
+            .clip(MaterialTheme.shapes.medium)
+            .background(glassSurfaceAlpha(0.4f))
+            .padding(start = 8.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+    ) {
+        Icon(
+            imageVector        = Icons.Default.Search,
+            contentDescription = null,
+            tint               = CelestiaTheme.colors.textSecondary.copy(alpha = 0.7f),
+            modifier           = Modifier.size(14.dp),
+        )
+        Spacer(Modifier.width(6.dp))
+        Box(Modifier.weight(1f)) {
+            BasicTextField(
+                value         = query,
+                onValueChange = onQueryChange,
+                singleLine    = true,
+                textStyle     = MaterialTheme.typography.bodySmall.copy(color = CelestiaTheme.colors.textPrimary),
+                cursorBrush   = SolidColor(CelestiaTheme.colors.primary),
+                modifier      = Modifier.fillMaxWidth(),
+            )
+            if (query.isEmpty()) {
+                Text(
+                    text  = s.newsFilterPlaceholder,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.6f),
+                )
+            }
+        }
+        if (query.isNotEmpty()) {
+            IconButton(onClick = { onQueryChange("") }, modifier = Modifier.size(20.dp)) {
+                Icon(
+                    imageVector        = Icons.Default.Close,
+                    contentDescription = s.newsFilterClear,
+                    tint               = CelestiaTheme.colors.textSecondary,
+                    modifier           = Modifier.size(12.dp),
+                )
             }
         }
     }

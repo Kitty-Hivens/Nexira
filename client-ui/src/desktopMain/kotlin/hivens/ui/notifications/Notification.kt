@@ -31,6 +31,10 @@ data class NotificationGroup(
     // future-extension shape without a real consumer; recover the
     // indirection only when a second source type is needed.
     val iconUrl: String?,
+    // Vector glyph fallback when there is no [iconUrl] (launcher-generated
+    // events like an available update). Null falls through to the neutral
+    // placeholder, same as a source with neither.
+    val glyph: NotifGlyph? = null,
     val events: List<NotificationEvent>,
 ) {
     init {

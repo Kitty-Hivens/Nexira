@@ -2,9 +2,9 @@ package hivens.launcher.runtime.loader
 
 import hivens.core.api.HttpClientProvider
 import hivens.core.api.interfaces.IJavaManager
+import hivens.core.platform.OS
 import hivens.launcher.runtime.MavenCoord
 import hivens.launcher.runtime.MojangLibrary
-import hivens.launcher.runtime.RuntimeProvisioner
 import hivens.launcher.runtime.flattenArguments
 import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.bodyAsChannel
@@ -71,7 +71,7 @@ class ModernInstallerResolver(
                 LoaderVersionJson.serializer(),
                 Files.readString(versionJsonPath),
             )
-            val os = RuntimeProvisioner.toMojangOs(System.getProperty("os.name", ""))
+            val os = OS.platform.mojang
             LoaderProfile(
                 libraries = version.libraries.map { harvest(it, dotMinecraft) },
                 mainClass = version.mainClass,

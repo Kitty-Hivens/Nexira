@@ -5,6 +5,7 @@ import hivens.config.Protocol
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.InstanceProfile
 import hivens.core.data.SessionData
+import hivens.core.platform.OS
 import hivens.launcher.network.ServerProtocolConfig
 import hivens.launcher.runtime.loader.ResolvedRuntime
 import org.slf4j.LoggerFactory
@@ -446,7 +447,7 @@ internal class GameCommandBuilder(
 
     /** -XstartOnFirstThread is mandatory for LWJGL on macOS; no-op on other OSes. */
     private fun addMacOsStartupFlags(args: MutableList<String>) {
-        if (System.getProperty("os.name").lowercase().contains("mac")) {
+        if (OS.isMacOS) {
             args.add("-XstartOnFirstThread")
             args.add("-Djava.awt.headless=false")
         }

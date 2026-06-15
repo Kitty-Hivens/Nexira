@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -40,13 +39,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.dto.smrt.SmrtPackSummary
+import hivens.core.data.PackOrigin
 import hivens.launcher.PackInstaller
 import hivens.launcher.smrt.SmrtPackClient
 import hivens.ui.customization.glassSurfaceAlpha
@@ -54,6 +53,7 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.originGradient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -184,7 +184,7 @@ fun BrowsePackDetailScreen(
 
 @Composable
 private fun Hero(packId: String, summary: SmrtPackSummary?, onBack: () -> Unit) {
-    val gradient = Brush.linearGradient(listOf(Color(0xFF1E3A8A), Color(0xFF1D4ED8)))
+    val gradient = CelestiaTheme.colors.originGradient(PackOrigin.Mirror)
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -270,7 +270,7 @@ private fun InstallBar(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
+            .clip(MaterialTheme.shapes.medium)
             .background(glassSurfaceAlpha(0.6f))
             .padding(20.dp),
     ) {
@@ -306,7 +306,7 @@ private fun InstallIdleRow(onInstall: () -> Unit) {
         }
         Button(
             onClick        = onInstall,
-            shape          = RoundedCornerShape(12.dp),
+            shape          = MaterialTheme.shapes.small,
             contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
             colors         = ButtonDefaults.buttonColors(
                 containerColor = CelestiaTheme.colors.primary,
@@ -339,7 +339,7 @@ private fun InstallRunningRow(state: InstallState.Running) {
                 trackColor = CelestiaTheme.colors.outline.copy(alpha = 0.25f),
             )
             Text(
-                text  = s.browseDetailInstallProgress.format(state.filename, state.current, state.total),
+                text  = s.browseDetailInstallProgress(state.filename, state.current, state.total),
                 style = MaterialTheme.typography.bodySmall,
                 color = CelestiaTheme.colors.textSecondary,
             )
@@ -384,7 +384,7 @@ private fun InstallDoneRow(instanceId: String, onOpenInstalled: (String) -> Unit
         }
         Button(
             onClick        = { onOpenInstalled(instanceId) },
-            shape          = RoundedCornerShape(12.dp),
+            shape          = MaterialTheme.shapes.small,
             contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
             colors         = ButtonDefaults.buttonColors(
                 containerColor = CelestiaTheme.colors.primary,
@@ -417,7 +417,7 @@ private fun InstallFailedRow(message: String, onRetry: () -> Unit) {
         }
         Button(
             onClick        = onRetry,
-            shape          = RoundedCornerShape(12.dp),
+            shape          = MaterialTheme.shapes.small,
             contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp),
             colors         = ButtonDefaults.buttonColors(
                 containerColor = CelestiaTheme.colors.primary,
@@ -432,7 +432,7 @@ private fun DescriptionPlaceholder(modsCount: Int, assetsCount: Int) {
     val s = LocalStrings.current
     Section(title = s.browseDetailAboutTitle) {
         Text(
-            text  = s.browseDetailAboutPlaceholder.format(modsCount, assetsCount),
+            text  = s.browseDetailAbout(modsCount, assetsCount),
             style = MaterialTheme.typography.bodyMedium,
             color = CelestiaTheme.colors.textPrimary.copy(alpha = 0.9f),
         )
@@ -516,7 +516,7 @@ private fun Section(title: String, content: @Composable () -> Unit) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
+                .clip(MaterialTheme.shapes.medium)
                 .background(glassSurfaceAlpha(0.6f))
                 .padding(16.dp),
         ) {
@@ -543,7 +543,7 @@ private fun Chip(text: String) {
     AssistChip(
         onClick = {},
         enabled = false,
-        shape   = RoundedCornerShape(8.dp),
+        shape   = MaterialTheme.shapes.extraSmall,
         label   = { Text(text, style = MaterialTheme.typography.labelSmall, color = CelestiaTheme.colors.textPrimary) },
         colors  = AssistChipDefaults.assistChipColors(
             disabledContainerColor = glassSurfaceAlpha(0.4f),

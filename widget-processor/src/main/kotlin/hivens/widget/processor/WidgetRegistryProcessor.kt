@@ -46,6 +46,7 @@ class WidgetRegistryProcessor(
                 propsClassFqn = extracted.propsClassFqn,
                 functionFqn = if (packageName.isEmpty()) funcName else "$packageName.$funcName",
                 containingFile = symbol.containingFile,
+                symbol = symbol,
             )
         }
 
@@ -53,6 +54,27 @@ class WidgetRegistryProcessor(
             // Some symbols matched but all failed validation; emit nothing
             // so the build fails on diagnostics rather than producing a
             // stub registry that silently drops widgets.
+            return emptyList()
+        }
+
+        // Cross-symbol id uniqueness. The generated registry is a
+        // buildMap { put(WidgetKind(id), ...) }, and buildMap keeps the LAST
+        // put per key -- so two @Widget functions sharing an id would silently
+        // drop one with no diagnostic, against Widget.kt's "id MUST be unique
+        // across the whole runtime". Fail the build instead.
+        val collisions = widgets.groupBy { it.id }.filterValues { it.size > 1 }
+        if (collisions.isNotEmpty()) {
+            collisions.forEach { (id, entries) ->
+                val others = entries.joinToString { it.functionFqn }
+                entries.forEach { entry ->
+                    env.logger.error(
+                        "Duplicate @Widget id '$id' -- declared by $others. " +
+                            "Widget ids MUST be unique across the runtime.",
+                        entry.symbol,
+                    )
+                }
+            }
+            // Emit nothing so the build fails on the diagnostics above.
             return emptyList()
         }
 
@@ -149,6 +171,8 @@ private data class WidgetEntry(
     val propsClassFqn: String?,
     val functionFqn: String,
     val containingFile: com.google.devtools.ksp.symbol.KSFile?,
+    // Carried only so a duplicate-id diagnostic can point at the declaration.
+    val symbol: KSFunctionDeclaration,
 )
 
 class WidgetRegistryProcessorProvider : SymbolProcessorProvider {

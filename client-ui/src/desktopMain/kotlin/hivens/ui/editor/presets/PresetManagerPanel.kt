@@ -1,5 +1,6 @@
 package hivens.ui.editor.presets
 
+import hivens.ui.theme.LocalMonoFamily
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -258,7 +259,7 @@ private fun PresetRow(
                 text       = formatTime(meta.createdAt),
                 style      = MaterialTheme.typography.labelSmall,
                 color      = CelestiaTheme.colors.textSecondary.copy(alpha = 0.75f),
-                fontFamily = FontFamily.Monospace,
+                fontFamily = LocalMonoFamily.current,
             )
         }
         Spacer(Modifier.width(8.dp))

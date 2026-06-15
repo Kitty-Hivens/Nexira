@@ -228,13 +228,13 @@ class AutoSyncService(
                         extraCheckSum = server.extraCheckSum,
                         ignoredFiles = ignoredFiles + smartyPlan.ignoredAddon,
                         messageUI = null,
-                        progressUI = { _, _, bytesRead, totalBytes, _ ->
+                        progressUI = { progress ->
                             setOverall(OverallState.InProgress(
                                 currentServer = server.title ?: server.name,
                                 currentIdx = idx + 1,
                                 total = installed.size,
-                                bytesRead = bytesRead,
-                                totalBytes = totalBytes,
+                                bytesRead = progress.downloadedBytes,
+                                totalBytes = progress.totalBytes,
                             ))
                         },
                         injectModJar = smartyPlan.injectJar,

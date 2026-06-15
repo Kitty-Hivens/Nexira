@@ -108,6 +108,22 @@ class JsonServerListCacheStoreTest {
     }
 
     @Test
+    fun `newer schema_version loads read-only and save does not write back`() = runBlocking {
+        // A future build bumped the cache schema. The older binary reads
+        // best-effort but does not write back -- the only cost is one cold tray
+        // render, and it never downgrades a newer build's file.
+        val newer = """{"schema_version":99,"servers":[]}"""
+        Files.writeString(file, newer)
+        val before = Files.readString(file)
+
+        val store = JsonServerListCacheStore(file, json)
+        store.load()   // sets the read-only flag from the file's schema_version
+        store.save(listOf(sampleServer("a", "Alpha")))
+
+        assertEquals(before, Files.readString(file), "an older build must not overwrite a newer-schema servers cache")
+    }
+
+    @Test
     fun `persisted file is wrapped in versioned envelope`() = runBlocking {
         val store = JsonServerListCacheStore(file, json)
         store.save(listOf(sampleServer("a", "Alpha")))

@@ -18,6 +18,8 @@ interface AppStrings {
     // --- Navigation ---
     val navLogout: String
     val navBack: String
+    /** App locale, for date/number formatting in widgets (not the system default). */
+    val locale: java.util.Locale
 
     // --- Dashboard ---
     fun dashboardWelcome(name: String): String
@@ -76,6 +78,7 @@ interface AppStrings {
     val settingsThemePickerSub: String
     val settingsDarkTheme: String
     val settingsCloseAfterLaunch: String
+    val settingsCloseAfterLaunchDesc: String
     val settingsSaved: String
     val settingsLanguage: String
 
@@ -97,6 +100,16 @@ interface AppStrings {
     // --- News ---
     val newsTitle: String
     val newsEmpty: String
+    val newsFilterPlaceholder: String
+    val newsFilterClear: String
+
+    // --- Right rail ---
+    val railCollapse: String
+    val railExpand: String
+
+    // --- Pagination ---
+    val paginationPrev: String
+    val paginationNext: String
 
     // --- Server Detail ---
     val serverDetailTitle: String
@@ -116,6 +129,17 @@ interface AppStrings {
     val serverSettingsJavaHint: String
     val serverSettingsOpenFolder: String
     val serverSettingsReset: String
+
+    // --- Destructive-action confirm dialogs ---
+    val serverSettingsResetConfirmTitle: String
+    val serverSettingsResetConfirmBody: String
+    val customizationResetConfirmTitle: String
+    val customizationResetConfirmBody: String
+    val backgroundResetConfirmTitle: String
+    val backgroundResetConfirmBody: String
+    val logoutConfirmTitle: String
+    val logoutConfirmBody: String
+
     val serverSettingsNoMods: String
     val serverSettingsPickJava: String
 
@@ -298,6 +322,8 @@ interface AppStrings {
     val aboutTitle: String
     fun aboutDescription(branding: String): String
     fun aboutBuildDate(date: String): String
+    /** System-card row label for the graphics renderer (windowing + Skiko API). */
+    val aboutRenderer: String
     val aboutSectionCreator: String
     val aboutSectionTechnologies: String
     val aboutSectionLicense: String
@@ -338,6 +364,12 @@ interface AppStrings {
     val trayShow: String
     val trayServers: String
     val trayNoServers: String
+    /** Title of the one-time OS notification posted the first time the window hides to the tray. */
+    val trayHintTitle: String
+    /** Body of that hint -- explains the launcher is still running in the tray, not closed. */
+    val trayHintBody: String
+    /** Label on the hint's action button that restores the window. */
+    val trayHintShow: String
 
     // --- Settings: Experimental features ---
     val settingsSectionExperimental: String
@@ -360,6 +392,13 @@ interface AppStrings {
     fun dashboardAutoSyncProgress(serverName: String, current: Int, total: Int): String
     /** Auto-sync byte progress — `123 / 456 MB` */
     fun dashboardAutoSyncBytes(readMB: Long, totalMB: Long): String
+
+    /** Background-activity widget title, shown when the user hasn't set a custom one. */
+    val widgetProgressTitle: String
+    /** Background-activity widget body, shown when no sync is in flight. */
+    val widgetProgressIdle: String
+    /** Tab-container default label for an unnamed tab — receives the 1-based tab number, e.g. `Tab 2`. */
+    fun widgetTabDefaultLabel(index: Int): String
 
     // ─── April Fools close dialog ─────────────────────────────────────────────────
     /** Dialog title — changes tone as the user fails more attempts */
@@ -573,6 +612,24 @@ interface AppStrings {
     val settingsUiStyleCelestia: String
     val settingsUiStyleBrut: String
 
+    // --- Settings: left-rail selection style ---
+    /** Title of the nav-rail selection-style control. */
+    val navSelectionTitle: String
+    /** One-line description under the title. */
+    val navSelectionSub: String
+    val navStylePill: String
+    val navStyleSquare: String
+    val navStyleCircle: String
+    val navStyleBar: String
+    val navStyleDot: String
+    val navStyleNone: String
+    /** Label for the filled<->outlined unselected-icon swap toggle. */
+    val navSelectionOutlineIcons: String
+    /** Label for the selection accent-color field. */
+    val navSelectionAccent: String
+    /** Label for the hover / interaction-highlight toggle. */
+    val navHoverHighlight: String
+
     // --- Settings two-column nav labels ---
     val settingsCategoryAppearance: String
     val settingsCategoryNetwork: String
@@ -628,7 +685,8 @@ interface AppStrings {
     val browseDetailInstallButton: String
     val browseDetailTagsTitle: String
     val browseDetailAboutTitle: String
-    val browseDetailAboutPlaceholder: String
+    /** Placeholder pack blurb shown until the mirror ships a real description. Receives the mod and asset counts. */
+    fun browseDetailAbout(mods: Int, assets: Int): String
     val browseDetailAboutNote: String
     val browseDetailCompatTitle: String
     val browseDetailCompatMc: String
@@ -637,7 +695,8 @@ interface AppStrings {
     val browseDetailVersionTitle: String
 
     val browseDetailInstallRunningTitle: String
-    val browseDetailInstallProgress: String
+    /** Per-file install progress line. Receives the current filename and the file counter. */
+    fun browseDetailInstallProgress(filename: String, current: Int, total: Int): String
     val browseDetailInstallStarting: String
     val browseDetailInstallDoneTitle: String
     val browseDetailInstallDoneHint: String
@@ -697,6 +756,8 @@ interface AppStrings {
     val worldsTabLocalEmpty: String
     fun worldsTabServersSection(count: Int): String
     val worldsTabServersEmpty: String
+    val worldsTabErrorTitle: String
+    val worldsTabErrorMessage: String
     /** Receives a short label like `5h`, `2d`, or `—` when never played. */
     fun worldsTabLastPlayed(rel: String): String
     val worldsTabServerHiddenLabel: String
@@ -734,6 +795,15 @@ interface AppStrings {
     val notificationExpandHistory: String
     val notificationCollapseHistory: String
     val notificationDismiss: String
+    // Notification-history widget.
+    val notifHistoryEmpty: String
+    val notifHistoryClear: String
+    /** "Do not disturb" mute toggle on the history widget (icon-button label). */
+    val notifDoNotDisturb: String
+    /** Count badge on a collapsed group of repeated notifications, e.g. "x3". */
+    fun notifGroupCount(count: Int): String
+    /** Panel title with the message count folded in, e.g. "6 messages". */
+    fun notifCountTitle(count: Int): String
     /** "+N more" footer text + screen-reader label. Receives the overflow count. */
     fun notificationShowMore(count: Int): String
     /** Absolute timestamp shown on hover tooltip over the relative-time label. */
@@ -802,6 +872,8 @@ interface AppStrings {
     val editorResetAll: String
     val editorToFront: String
     val editorToBack: String
+    // Edit-mode placeholder for a widget whose kind is no longer in the registry.
+    val editorUnsupportedWidget: String
 
     // --- Widget palette / prop-editor labels (key-indirection) ---
     // @Widget(displayName) and @PropLabel carry a key; the palette and prop
@@ -828,9 +900,18 @@ interface AppStrings {
     // --- Layout editor: prop panel ---
     val editorResetToDefault: String
     val editorBackingTitle: String
+    /** Pill chip + header for a surface's own settings panel (e.g. the left rail). */
+    val editorSurfaceSettings: String
     val editorBackingGlass: String
     val editorBackingCorner: String
     val editorBackingPadding: String
+    val editorBackingPaddingTop: String
+    val editorBackingPaddingEnd: String
+    val editorBackingPaddingBottom: String
+    val editorBackingPaddingStart: String
+    /** Caption under the backing controls when glass is 0: the card is not drawn,
+     *  but corner still clips the widget and padding still insets it. */
+    val editorBackingNoGlassHint: String
 
     // --- Layout editor: presets ---
     val editorPresetsTitle: String

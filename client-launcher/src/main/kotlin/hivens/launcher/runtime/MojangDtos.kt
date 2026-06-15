@@ -146,7 +146,7 @@ data class MojangAssetObject(
 
 /**
  * Resolves a modern `arguments.jvm` / `arguments.game` list to concrete
- * tokens for [mojangOs] (the value of [RuntimeProvisioner.toMojangOs]).
+ * tokens for [mojangOs] (a [hivens.core.platform.Platform.mojang] value).
  * `${...}` placeholders are PRESERVED -- the command builder substitutes
  * them once the final paths are known. A bare string passes through; a
  * conditional object contributes its value only when its rules allow.

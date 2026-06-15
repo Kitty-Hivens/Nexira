@@ -1,10 +1,10 @@
-package hivens.launcher.launch
+package hivens.core.launch
 
 /**
  * Semantic reasons a launch can terminate with [LaunchState.Error].
  *
- * The UI maps each case to an `AppStrings` key at render time. Backend
- * code stays free of localization concerns and string formatting.
+ * The UI maps each case to a string key at render time. Backend code stays free
+ * of localization concerns and string formatting.
  */
 sealed class LaunchError {
     /** Game process exited with a non-zero status. */
@@ -25,9 +25,6 @@ sealed class LaunchError {
      */
     data object TwoFactorExpired : LaunchError()
 
-    /** Auth call failed for a non-2FA reason (network, server reject, etc.). */
-    data class AuthFail(val cause: String?) : LaunchError()
-
     /**
      * The open-smrt helper swap is enabled and the server ships the
      * proprietary Smarty jar, but no helper is available for [mcVersion]
@@ -47,12 +44,10 @@ sealed class LaunchError {
     data class AuthlibUnavailable(val mcVersion: String) : LaunchError()
 
     /**
-     * Pack declares an auth requirement the user has no live session
-     * for. The UI renders a "sign in with <provider> to play this
-     * pack" hint -- distinct from [AuthFail] (where the user IS
-     * signed in but the call failed) and [TwoFactorExpired] (where
-     * the cached session is unusable). [providerKey] is a stable
-     * identifier the UI maps to a localized provider name.
+     * Pack declares an auth requirement the user has no live session for. The
+     * UI renders a "sign in with <provider> to play this pack" hint -- distinct
+     * from [TwoFactorExpired] (where the cached session is unusable).
+     * [providerKey] is a stable identifier the UI maps to a localized name.
      */
     data class MissingAuthProvider(val providerKey: String) : LaunchError()
 }

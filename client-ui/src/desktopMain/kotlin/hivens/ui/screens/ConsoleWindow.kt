@@ -1,5 +1,6 @@
 package hivens.ui.screens
 
+import hivens.ui.theme.LocalMonoFamily
 import androidx.compose.foundation.HorizontalScrollbar
 import androidx.compose.foundation.ScrollbarStyle
 import androidx.compose.foundation.VerticalScrollbar
@@ -47,6 +48,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -673,7 +675,7 @@ internal fun ConsoleContent(
         Box(Modifier.weight(1f).fillMaxWidth()) {
             val hScroll = rememberScrollState()
             val baseStyle = TextStyle(
-                fontFamily = FontFamily.Monospace,
+                fontFamily = LocalMonoFamily.current,
                 fontSize   = fontSize.sp,
                 color      = themeColors.textPrimary,
             )
@@ -1006,7 +1008,7 @@ private fun Toolbar(
             text       = strings.consoleHeaderCount(filtered, total),
             color      = colors.textPrimary,
             fontWeight = FontWeight.Bold,
-            fontFamily = FontFamily.Monospace,
+            fontFamily = LocalMonoFamily.current,
             fontSize   = 11.sp,
             modifier   = Modifier.padding(start = 4.dp),
         )
@@ -1033,7 +1035,7 @@ private fun Toolbar(
             // presets.
             Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(4.dp))
+                    .clip(MaterialTheme.shapes.small)
                     .clickable {
                         val idx = FONT_SIZES.indexOf(fontSize).takeIf { it >= 0 } ?: 0
                         onFontSize(FONT_SIZES[(idx + 1) % FONT_SIZES.size])
@@ -1059,7 +1061,7 @@ private fun Toolbar(
                     color      = colors.textSecondary,
                     fontSize   = 11.sp,
                     lineHeight = 13.sp,
-                    fontFamily = FontFamily.Monospace,
+                    fontFamily = LocalMonoFamily.current,
                 )
             }
 
@@ -1096,7 +1098,7 @@ private fun Toolbar(
                         text = {
                             Text(
                                 text = if (showGutter) strings.consoleHideGutter else strings.consoleShowGutter,
-                                fontFamily = FontFamily.Monospace,
+                                fontFamily = LocalMonoFamily.current,
                                 fontSize   = 11.sp,
                             )
                         },
@@ -1106,7 +1108,7 @@ private fun Toolbar(
                         text = {
                             Text(
                                 text = if (showTimestamps) strings.consoleHideTimestamps else strings.consoleShowTimestamps,
-                                fontFamily = FontFamily.Monospace,
+                                fontFamily = LocalMonoFamily.current,
                                 fontSize   = 11.sp,
                             )
                         },
@@ -1142,7 +1144,7 @@ private fun SeverityToggle(
     // even top / bottom margin around the actual ink.
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(4.dp))
+            .clip(MaterialTheme.shapes.small)
             .background(bg)
             .clickable { onToggle(!active) }
             .padding(horizontal = 8.dp, vertical = 3.dp),
@@ -1153,7 +1155,7 @@ private fun SeverityToggle(
             color      = if (active) accent else accent.copy(alpha = 0.45f),
             fontSize   = 11.sp,
             lineHeight = 13.sp,
-            fontFamily = FontFamily.Monospace,
+            fontFamily = LocalMonoFamily.current,
             fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
         )
     }
@@ -1186,7 +1188,7 @@ private fun SearchPrompt(
         Text(
             text       = "/",
             color      = colors.textSecondary,
-            fontFamily = FontFamily.Monospace,
+            fontFamily = LocalMonoFamily.current,
             fontWeight = FontWeight.Bold,
             fontSize   = 12.sp,
             modifier   = Modifier.padding(end = 8.dp),
@@ -1198,7 +1200,7 @@ private fun SearchPrompt(
             textStyle     = TextStyle(
                 color      = colors.textPrimary,
                 fontSize   = 12.sp,
-                fontFamily = FontFamily.Monospace,
+                fontFamily = LocalMonoFamily.current,
             ),
             cursorBrush   = SolidColor(colors.textPrimary),
             modifier      = Modifier
@@ -1211,7 +1213,7 @@ private fun SearchPrompt(
                         text       = strings.consoleSearchPlaceholder,
                         color      = colors.textSecondary.copy(alpha = 0.5f),
                         fontSize   = 12.sp,
-                        fontFamily = FontFamily.Monospace,
+                        fontFamily = LocalMonoFamily.current,
                     )
                 }
                 inner()
@@ -1228,7 +1230,7 @@ private fun SearchPrompt(
                 color      = regexTint,
                 fontSize   = 12.sp,
                 lineHeight = 14.sp,
-                fontFamily = FontFamily.Monospace,
+                fontFamily = LocalMonoFamily.current,
                 fontWeight = FontWeight.Bold,
             )
         }
@@ -1243,7 +1245,7 @@ private fun SearchPrompt(
                 color      = if (filterMode) colors.success else colors.textSecondary.copy(alpha = 0.4f),
                 fontSize   = 12.sp,
                 lineHeight = 14.sp,
-                fontFamily = FontFamily.Monospace,
+                fontFamily = LocalMonoFamily.current,
                 fontWeight = FontWeight.Bold,
             )
         }
@@ -1253,7 +1255,7 @@ private fun SearchPrompt(
                 color      = colors.textSecondary,
                 fontSize   = 12.sp,
                 lineHeight = 14.sp,
-                fontFamily = FontFamily.Monospace,
+                fontFamily = LocalMonoFamily.current,
             )
         }
         PromptButton(onClick = onNext) {
@@ -1262,7 +1264,7 @@ private fun SearchPrompt(
                 color      = colors.textSecondary,
                 fontSize   = 12.sp,
                 lineHeight = 14.sp,
-                fontFamily = FontFamily.Monospace,
+                fontFamily = LocalMonoFamily.current,
             )
         }
         PromptButton(onClick = onClose) {
@@ -1289,7 +1291,7 @@ private fun PromptButton(
 ) {
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(4.dp))
+            .clip(MaterialTheme.shapes.small)
             .clickable { onClick() }
             .padding(horizontal = 6.dp, vertical = 3.dp),
         contentAlignment = Alignment.Center,
@@ -1323,7 +1325,7 @@ private fun CommandInputRow(
         Text(
             text       = ">",
             color      = colors.success,
-            fontFamily = FontFamily.Monospace,
+            fontFamily = LocalMonoFamily.current,
             fontWeight = FontWeight.Bold,
             fontSize   = 12.sp,
             modifier   = Modifier.padding(end = 8.dp),
@@ -1335,7 +1337,7 @@ private fun CommandInputRow(
             textStyle     = TextStyle(
                 color      = colors.textPrimary,
                 fontSize   = 12.sp,
-                fontFamily = FontFamily.Monospace,
+                fontFamily = LocalMonoFamily.current,
             ),
             cursorBrush   = SolidColor(colors.textPrimary),
             modifier      = Modifier
@@ -1357,7 +1359,7 @@ private fun CommandInputRow(
                         text       = strings.consoleCommandPlaceholder,
                         color      = colors.textSecondary.copy(alpha = 0.45f),
                         fontSize   = 12.sp,
-                        fontFamily = FontFamily.Monospace,
+                        fontFamily = LocalMonoFamily.current,
                     )
                 }
                 inner()
@@ -1399,14 +1401,14 @@ private fun StatusFooter(
         Text(
             text       = linesText,
             color      = colors.textSecondary,
-            fontFamily = FontFamily.Monospace,
+            fontFamily = LocalMonoFamily.current,
             fontSize   = 10.sp,
         )
         Spacer(Modifier.width(12.dp))
         Text(
             text       = strings.consoleStatusFiltered(warnCount, errorCount),
             color      = colors.textSecondary,
-            fontFamily = FontFamily.Monospace,
+            fontFamily = LocalMonoFamily.current,
             fontSize   = 10.sp,
         )
 
@@ -1416,7 +1418,7 @@ private fun StatusFooter(
             Text(
                 text       = strings.consoleStatusMatch(matchCurrent, matchTotal),
                 color      = colors.textSecondary,
-                fontFamily = FontFamily.Monospace,
+                fontFamily = LocalMonoFamily.current,
                 fontSize   = 10.sp,
             )
             Spacer(Modifier.width(12.dp))
@@ -1432,7 +1434,7 @@ private fun StatusFooter(
             Text(
                 text       = followText,
                 color      = followColor,
-                fontFamily = FontFamily.Monospace,
+                fontFamily = LocalMonoFamily.current,
                 fontWeight = FontWeight.Bold,
                 fontSize   = 10.sp,
             )

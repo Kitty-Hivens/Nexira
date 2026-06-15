@@ -6,8 +6,17 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.LocalIndication
+import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.Build
@@ -18,19 +27,25 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationRailItem
-import androidx.compose.material3.NavigationRailItemDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import hivens.ui.Screen
+import hivens.ui.customization.LocalCustomization
+import hivens.ui.customization.NavSelectionStyle
 import hivens.ui.easter.LocalAprilFools
 import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.LocalStyle
 import hivens.ui.utils.GameConsoleService
+import hivens.ui.widgets.toWidgetColorOrNull
 import hivens.widget.api.rememberProps
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
@@ -65,41 +80,47 @@ fun NavEntry(instance: WidgetInstance) {
 
     when (p.target) {
         NavTarget.Home -> NavSlot(
-            icon    = Icons.Default.Home,
-            phase   = 0.0f,
-            active  = screen is Screen.Home || screen is Screen.ServerSettings || screen is Screen.ServerDetails,
-            onClick = { ctx.onScreenChange(Screen.Home) },
+            icon         = Icons.Default.Home,
+            outlinedIcon = NavOutlinedIcons.home,
+            phase        = 0.0f,
+            active       = screen is Screen.Home || screen is Screen.ServerSettings || screen is Screen.ServerDetails,
+            onClick      = { ctx.onScreenChange(Screen.Home) },
         )
         NavTarget.Library -> NavSlot(
-            icon    = Icons.Default.Star,
-            phase   = 0.55f,
-            active  = screen is Screen.Library || screen is Screen.PackDetail,
-            onClick = { ctx.onScreenChange(Screen.Library) },
+            icon         = Icons.Default.Star,
+            outlinedIcon = NavOutlinedIcons.library,
+            phase        = 0.55f,
+            active       = screen is Screen.Library || screen is Screen.PackDetail,
+            onClick      = { ctx.onScreenChange(Screen.Library) },
         )
         NavTarget.Browse -> NavSlot(
-            icon    = Icons.Default.Search,
-            phase   = 1.65f,
-            active  = screen is Screen.Browse || screen is Screen.BrowsePackDetail,
-            onClick = { ctx.onScreenChange(Screen.Browse) },
+            icon         = Icons.Default.Search,
+            outlinedIcon = NavOutlinedIcons.browse,
+            phase        = 1.65f,
+            active       = screen is Screen.Browse || screen is Screen.BrowsePackDetail,
+            onClick      = { ctx.onScreenChange(Screen.Browse) },
         )
         NavTarget.Profile -> NavSlot(
-            icon    = Icons.Default.Person,
-            phase   = 1.1f,
-            active  = screen is Screen.Profile,
-            onClick = { ctx.onScreenChange(Screen.Profile) },
+            icon         = Icons.Default.Person,
+            outlinedIcon = NavOutlinedIcons.profile,
+            phase        = 1.1f,
+            active       = screen is Screen.Profile,
+            onClick      = { ctx.onScreenChange(Screen.Profile) },
         )
         NavTarget.Settings -> NavSlot(
-            icon    = Icons.Default.Settings,
-            phase   = 2.2f,
-            active  = screen is Screen.Settings || screen is Screen.ThemePicker ||
+            icon         = Icons.Default.Settings,
+            outlinedIcon = NavOutlinedIcons.settings,
+            phase        = 2.2f,
+            active       = screen is Screen.Settings || screen is Screen.ThemePicker ||
                 screen is Screen.BackgroundSettings || screen is Screen.CustomizationExtension,
-            onClick = { ctx.onScreenChange(Screen.Settings) },
+            onClick      = { ctx.onScreenChange(Screen.Settings) },
         )
         NavTarget.About -> NavSlot(
-            icon    = Icons.Default.Info,
-            phase   = 3.3f,
-            active  = screen is Screen.About,
-            onClick = { ctx.onScreenChange(Screen.About) },
+            icon         = Icons.Default.Info,
+            outlinedIcon = NavOutlinedIcons.about,
+            phase        = 3.3f,
+            active       = screen is Screen.About,
+            onClick      = { ctx.onScreenChange(Screen.About) },
         )
         NavTarget.Console -> {
             val gameConsole: GameConsoleService = koinInject()
@@ -134,6 +155,13 @@ fun NavEntry(instance: WidgetInstance) {
 // behaviour -- the 30% click-swallow AND the out-of-phase bounce -- so the
 // console toggle and logout stay stable and always work. [iconTint] overrides
 // the rail tint (logout's destructive red); null keeps the default.
+//
+// The active-item highlight is user-configurable via [NavSelectionStyle]
+// (Pill is the original Material capsule). The decoration is drawn behind /
+// around the icon; the icon and decoration share the selection accent
+// ([CustomizationSettings.navSelectionAccent], else the theme primary).
+// [outlinedIcon] is the idle-state twin used when the user enables the
+// filled<->outlined icon swap; null keeps the filled icon in both states.
 @Composable
 private fun NavSlot(
     icon: ImageVector,
@@ -142,9 +170,12 @@ private fun NavSlot(
     enabled: Boolean = true,
     chaosEligible: Boolean = true,
     iconTint: Color? = null,
+    outlinedIcon: ImageVector? = null,
     onClick: () -> Unit,
 ) {
     val af = LocalAprilFools.current
+    val cz = LocalCustomization.current
+    val style = LocalStyle.current
 
     val bounceAmp = if (chaosEligible && af.isActive()) af.intensity() * 18f else 0f
     // Only run the infinite transition during April Fools. Otherwise a 0-amplitude
@@ -174,27 +205,76 @@ private fun NavSlot(
         if (!chaosEligible || !af.isActive() || Random.nextFloat() > 0.30f) onClick()
     }
 
+    // Selection accent: the user's nav override, else the theme primary -- so
+    // by default it tracks the palette / accent override. Shared by the icon
+    // tint and every decoration.
+    val accent = cz.navSelectionAccent?.toWidgetColorOrNull() ?: CelestiaTheme.colors.primary
+    val iconColor = when {
+        iconTint != null -> iconTint
+        active           -> accent
+        else             -> CelestiaTheme.colors.textSecondary.copy(alpha = if (enabled) 0.70f else 0.20f)
+    }
+    // Filled when selected; outlined twin when the user opted into the swap and
+    // this entry is idle. Service entries pass no twin and stay filled.
+    val shownIcon = if (cz.navSelectionOutlineIcons && !active && outlinedIcon != null) outlinedIcon else icon
+
+    // 13% fill matches the original Material indicator alpha; LeftBar / Dot use
+    // the solid accent since they are thin marks, not a backing.
+    val fill = accent.copy(alpha = 0.13f)
+    val interaction = remember { MutableInteractionSource() }
+
     Box(Modifier.graphicsLayer { translationY = offsetY }) {
-        NavigationRailItem(
-            icon = {
-                Icon(
-                    imageVector        = icon,
-                    contentDescription = null,
-                    modifier           = Modifier.size(24.dp),
-                )
-            },
-            selected        = active,
-            onClick         = gated,
-            enabled         = enabled,
-            label           = null,
-            alwaysShowLabel = false,
-            colors          = NavigationRailItemDefaults.colors(
-                selectedIconColor   = iconTint ?: CelestiaTheme.colors.primary,
-                unselectedIconColor = iconTint ?: CelestiaTheme.colors.textSecondary.copy(
-                    alpha = if (enabled) 0.70f else 0.20f,
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp)
+                .selectable(
+                    selected          = active,
+                    enabled           = enabled,
+                    role              = Role.Tab,
+                    interactionSource = interaction,
+                    // The hover/press state layer is user-toggleable; off leaves
+                    // the active item marked only by its NavSelectionStyle.
+                    indication        = if (cz.navHoverHighlight) LocalIndication.current else null,
+                    onClick           = gated,
                 ),
-                indicatorColor      = CelestiaTheme.colors.primary.copy(alpha = 0.13f),
-            ),
-        )
+            contentAlignment = Alignment.Center,
+        ) {
+            if (active) {
+                when (cz.navSelectionStyle) {
+                    NavSelectionStyle.Pill ->
+                        Box(Modifier.size(width = 44.dp, height = 32.dp).clip(RoundedCornerShape(50)).background(fill))
+                    NavSelectionStyle.Square ->
+                        Box(Modifier.size(width = 40.dp, height = 36.dp).clip(RoundedCornerShape(style.buttonCorner)).background(fill))
+                    NavSelectionStyle.Circle ->
+                        Box(Modifier.size(40.dp).clip(CircleShape).background(fill))
+                    NavSelectionStyle.LeftBar ->
+                        Box(
+                            Modifier
+                                .align(Alignment.CenterStart)
+                                .padding(start = 6.dp)
+                                .size(width = 3.dp, height = 26.dp)
+                                .clip(RoundedCornerShape(2.dp))
+                                .background(accent),
+                        )
+                    NavSelectionStyle.Dot ->
+                        Box(
+                            Modifier
+                                .align(Alignment.BottomCenter)
+                                .padding(bottom = 7.dp)
+                                .size(5.dp)
+                                .clip(CircleShape)
+                                .background(accent),
+                        )
+                    NavSelectionStyle.None -> Unit
+                }
+            }
+            Icon(
+                imageVector        = shownIcon,
+                contentDescription = null,
+                tint               = iconColor,
+                modifier           = Modifier.size(24.dp),
+            )
+        }
     }
 }

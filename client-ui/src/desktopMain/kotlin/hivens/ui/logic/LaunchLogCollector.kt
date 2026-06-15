@@ -4,8 +4,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberUpdatedState
 import hivens.core.data.LauncherLogType
-import hivens.launcher.launch.LaunchError
-import hivens.launcher.launch.LaunchLogEvent
+import hivens.core.launch.LaunchError
+import hivens.core.launch.LaunchLogEvent
 import hivens.launcher.launch.LauncherController
 import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
@@ -101,7 +101,6 @@ private fun localizeError(error: LaunchError, s: AppStrings): String = when (err
     is LaunchError.OfflineNoClient      -> s.stateOfflineNoClient
     is LaunchError.OfflineNoManifest    -> s.stateOfflineNoManifest
     is LaunchError.TwoFactorExpired     -> s.auth2faExpired
-    is LaunchError.AuthFail             -> "${s.stateAuthFail}: ${error.cause ?: ""}"
     is LaunchError.HelperUnavailable    -> s.stateHelperUnavailable(error.mcVersion)
     is LaunchError.AuthlibUnavailable   -> s.stateAuthlibUnavailable(error.mcVersion)
     is LaunchError.MissingAuthProvider  -> s.stateMissingAuthProvider(error.providerKey)

@@ -4,7 +4,6 @@ import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
@@ -14,6 +13,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -47,6 +48,21 @@ fun UpdateDialog(
 
     var downloadState by remember { mutableStateOf<DownloadState>(DownloadState.Idle) }
     var errorMessage  by remember { mutableStateOf<String?>(null) }
+
+    // Focus the primary action so Enter triggers it without a mouse hop -- the
+    // mandatory dialog blocks Esc and offers no other keyboard path. Re-request
+    // on each state change so focus follows the action as the flow advances
+    // (Idle download -> Ready install -> Failed retry); the disabled Downloading
+    // button is skipped since it cannot hold focus. runCatching guards the
+    // node-not-yet-attached race.
+    val primaryFocus = remember { FocusRequester() }
+    LaunchedEffect(downloadState) {
+        when (downloadState) {
+            is DownloadState.Idle, is DownloadState.Ready, is DownloadState.Failed ->
+                runCatching { primaryFocus.requestFocus() }
+            is DownloadState.Downloading -> Unit
+        }
+    }
 
     // Critical and mandatory both block the backdrop dismiss, but a mandatory
     // update goes further: it also replaces the "Later" button with a hard
@@ -163,7 +179,7 @@ fun UpdateDialog(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(CelestiaTheme.colors.error.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+                            .background(CelestiaTheme.colors.error.copy(alpha = 0.1f), MaterialTheme.shapes.medium)
                             .padding(12.dp)
                     ) {
                         val bannerText = when {
@@ -207,7 +223,7 @@ fun UpdateDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(max = bodyMaxHeight)
-                        .background(CelestiaTheme.colors.background.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                        .background(CelestiaTheme.colors.background.copy(alpha = 0.3f), MaterialTheme.shapes.medium)
                         .padding(12.dp)
                 ) {
                     Markdown(
@@ -234,7 +250,7 @@ fun UpdateDialog(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(CelestiaTheme.colors.error.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+                            .background(CelestiaTheme.colors.error.copy(alpha = 0.1f), MaterialTheme.shapes.medium)
                             .padding(12.dp)
                     ) {
                         Column {
@@ -295,6 +311,7 @@ fun UpdateDialog(
                         is DownloadState.Idle -> {
                             Button(
                                 onClick = { launchDownload() },
+                                modifier = Modifier.focusRequester(primaryFocus),
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = if (isBlocking) CelestiaTheme.colors.error else CelestiaTheme.colors.primary
                                 ),
@@ -331,7 +348,8 @@ fun UpdateDialog(
                             val path = (downloadState as DownloadState.Ready).installerPath
                             Button(
                                 onClick = { installUpdate(path) },
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
+                                modifier = Modifier.focusRequester(primaryFocus),
+                                colors = ButtonDefaults.buttonColors(containerColor = CelestiaTheme.colors.success),
                                 shape  = MaterialTheme.shapes.small
                             ) {
                                 Text(s.updateInstall, color = Color.White, fontWeight = FontWeight.Bold)
@@ -341,6 +359,7 @@ fun UpdateDialog(
                         is DownloadState.Failed -> {
                             Button(
                                 onClick = { errorMessage = null; downloadState = DownloadState.Idle },
+                                modifier = Modifier.focusRequester(primaryFocus),
                                 colors  = ButtonDefaults.buttonColors(containerColor = CelestiaTheme.colors.primary),
                                 shape   = MaterialTheme.shapes.small
                             ) {

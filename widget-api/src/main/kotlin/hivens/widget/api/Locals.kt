@@ -64,6 +64,17 @@ typealias EmptySlotDecorator = @Composable (address: SlotAddress) -> Unit
 val LocalEmptySlotDecorator: ProvidableCompositionLocal<EmptySlotDecorator> =
     staticCompositionLocalOf { {} }
 
+// Rendered by SlotRenderer in place of a widget whose kind is absent from the
+// registry (renamed, removed, or a plugin not loaded). Default = nothing --
+// production keeps the slot clean while the instance's props / children stay on
+// disk (non-destructive). The editor swaps in an "unsupported widget" placeholder
+// so the user can see the orphan and remove it; the schema-bump prune reaps the
+// truly-dead ones. Kept editor-agnostic here; the implementation lives in :client-ui.
+typealias UnknownWidgetDecorator = @Composable (address: SlotAddress, index: Int, instance: WidgetInstance) -> Unit
+
+val LocalUnknownWidgetDecorator: ProvidableCompositionLocal<UnknownWidgetDecorator> =
+    staticCompositionLocalOf { { _, _, _ -> } }
+
 // Phase G: rendered by SlotRenderer at the start of a non-empty slot in
 // edit mode. Default = nothing (production: no control). The editor swaps
 // in a small control that changes the slot's orientation (Column/Row/Grid)
@@ -103,6 +114,32 @@ val LocalSlotPath: ProvidableCompositionLocal<SlotPath> =
 val LocalWidgetServiceRegistry: ProvidableCompositionLocal<WidgetServiceRegistry> =
     staticCompositionLocalOf {
         error("LocalWidgetServiceRegistry not provided -- wire WidgetServiceRegistry in Koin and at the composition root")
+    }
+
+// App-provided reactive data sources widgets bind to via rememberSource(key).
+// Provided once at the composition root from the Koin-bound singleton, like the
+// service registry above. Static: the source set is fixed at startup; the
+// reactivity is inside each source's StateFlow, not the registry membership.
+val LocalWidgetDataRegistry: ProvidableCompositionLocal<WidgetDataRegistry> =
+    staticCompositionLocalOf {
+        error("LocalWidgetDataRegistry not provided -- wire WidgetDataRegistry in Koin and at the composition root")
+    }
+
+// App-provided commands widgets fire via rememberCommand(key) / rememberAction(key)
+// -- the write counterpart of LocalWidgetDataRegistry. Provided once at the
+// composition root from the Koin-bound singleton. Static for the same reason: the
+// command set is fixed at startup.
+val LocalWidgetCommandRegistry: ProvidableCompositionLocal<WidgetCommandRegistry> =
+    staticCompositionLocalOf {
+        error("LocalWidgetCommandRegistry not provided -- wire WidgetCommandRegistry in Koin and at the composition root")
+    }
+
+// Backs per-instance widget state (rememberWidgetState). Provided once at the
+// composition root from the Koin-bound store. Static: the host reference is fixed
+// at startup; the per-instance state lives in the store, not in this Local.
+val LocalWidgetStateHost: ProvidableCompositionLocal<WidgetStateHost> =
+    staticCompositionLocalOf {
+        error("LocalWidgetStateHost not provided -- wire WidgetStateStore in Koin and at the composition root")
     }
 
 // Edit-mode slot reflow duration (ms). 0 = no animation (the production

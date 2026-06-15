@@ -31,7 +31,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -41,6 +40,8 @@ import hivens.core.data.PackOrigin
 import hivens.ui.screens.detail.PackDetailScreen
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.origin
+import hivens.ui.theme.originGradient
 import java.time.Duration
 import java.time.Instant
 
@@ -70,13 +71,13 @@ fun PackCard(
     onMore: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val bg = originGradient(instance.packRef.origin)
+    val bg = CelestiaTheme.colors.originGradient(instance.packRef.origin)
     val s = LocalStrings.current
     Box(
         modifier = modifier
             .fillMaxWidth()
             .height(132.dp)
-            .clip(RoundedCornerShape(14.dp))
+            .clip(MaterialTheme.shapes.medium)
             .background(bg)
             .clickable(onClick = onOpenDetail),
     ) {
@@ -131,7 +132,7 @@ fun PackCard(
             ) {
                 Button(
                     onClick        = onPlay,
-                    shape          = RoundedCornerShape(10.dp),
+                    shape          = MaterialTheme.shapes.small,
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                     colors         = ButtonDefaults.buttonColors(
                         containerColor = CelestiaTheme.colors.primary,
@@ -165,7 +166,7 @@ private fun PackAvatar(instance: PackInstance) {
         modifier         = Modifier
             .size(64.dp)
             .clip(RoundedCornerShape(12.dp))
-            .background(originAvatarColor(instance.packRef.origin)),
+            .background(CelestiaTheme.colors.origin(instance.packRef.origin)),
         contentAlignment = Alignment.Center,
     ) {
         Text(
@@ -179,15 +180,17 @@ private fun PackAvatar(instance: PackInstance) {
 
 @Composable
 private fun SourceBadge(origin: PackOrigin) {
-    val (label, color) = when (origin) {
-        PackOrigin.Smartycraft -> "SC"       to Color(0xFF8B5CF6)
-        PackOrigin.Mirror      -> "Mirror"   to Color(0xFF3B82F6)
-        PackOrigin.Modrinth    -> "Modrinth" to Color(0xFF22C55E)
-        PackOrigin.Local       -> "Local"    to Color(0xFF9CA3AF)
+    val label = when (origin) {
+        PackOrigin.Smartycraft -> "SC"
+        PackOrigin.Mirror      -> "Mirror"
+        PackOrigin.Modrinth    -> "Modrinth"
+        PackOrigin.Local       -> "Local"
+        PackOrigin.Unknown     -> "?"
     }
+    val color = CelestiaTheme.colors.origin(origin)
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(6.dp))
+            .clip(MaterialTheme.shapes.extraSmall)
             .background(color.copy(alpha = 0.85f))
             .padding(horizontal = 8.dp, vertical = 2.dp),
     ) {
@@ -200,7 +203,7 @@ private fun MetaChip(text: String, emphasis: Boolean = false) {
     AssistChip(
         onClick   = {},
         enabled   = false,
-        shape     = RoundedCornerShape(8.dp),
+        shape     = MaterialTheme.shapes.extraSmall,
         label     = { Text(text, style = MaterialTheme.typography.labelSmall, color = Color.White) },
         colors    = AssistChipDefaults.assistChipColors(
             disabledContainerColor = if (emphasis) CelestiaTheme.colors.primary.copy(alpha = 0.85f)
@@ -229,23 +232,6 @@ private fun LastPlayedChip(lastPlayedEpoch: Long) {
         else                  -> s.packCardPlayedLongAgo
     }
     MetaChip(label)
-}
-
-private fun originGradient(origin: PackOrigin): Brush {
-    val pair = when (origin) {
-        PackOrigin.Smartycraft -> Color(0xFF4C1D95) to Color(0xFF6D28D9)
-        PackOrigin.Mirror      -> Color(0xFF1E3A8A) to Color(0xFF1D4ED8)
-        PackOrigin.Modrinth    -> Color(0xFF14532D) to Color(0xFF15803D)
-        PackOrigin.Local       -> Color(0xFF374151) to Color(0xFF4B5563)
-    }
-    return Brush.linearGradient(listOf(pair.first, pair.second))
-}
-
-private fun originAvatarColor(origin: PackOrigin): Color = when (origin) {
-    PackOrigin.Smartycraft -> Color(0xFF7C3AED)
-    PackOrigin.Mirror      -> Color(0xFF2563EB)
-    PackOrigin.Modrinth    -> Color(0xFF16A34A)
-    PackOrigin.Local       -> Color(0xFF6B7280)
 }
 
 /**

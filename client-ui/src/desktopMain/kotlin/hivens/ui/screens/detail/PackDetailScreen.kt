@@ -1,5 +1,6 @@
 package hivens.ui.screens.detail
 
+import hivens.ui.theme.LocalMonoFamily
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -14,7 +15,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
@@ -43,7 +43,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -67,6 +66,7 @@ import hivens.ui.notifications.drivers.LaunchDriver
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
+import hivens.ui.screens.CenteredProgress
 import hivens.ui.screens.ConsoleContent
 import hivens.ui.screens.ConsoleSource
 import hivens.ui.screens.library.FileBrowserPane
@@ -74,6 +74,7 @@ import hivens.ui.screens.library.PackMetaChip
 import hivens.ui.screens.library.content.ContentTabPane
 import hivens.ui.screens.library.worlds.WorldsTabPane
 import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.originGradient
 import hivens.ui.utils.ConsoleSettingsManager
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.utils.LogEntry
@@ -119,7 +120,7 @@ fun PackDetailScreen(
     }
 
     if (!resolved) {
-        Box(Modifier.fillMaxSize())
+        CenteredProgress(Modifier.fillMaxSize())
         return
     }
     val pack = instance
@@ -279,8 +280,9 @@ private fun PackLogsTab(packId: String, instanceDir: Path, dataDir: Path) {
             HorizontalDivider(color = CelestiaTheme.colors.outline.copy(alpha = 0.3f))
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 if (source == null) {
-                    // A file is selected but still reading -- brief flash.
-                    Box(Modifier.fillMaxSize())
+                    // A file is selected but still reading -- show the spinner
+                    // rather than a blank pane (a slow disk makes this visible).
+                    CenteredProgress(Modifier.fillMaxSize())
                 } else {
                     ConsoleContent(
                         settings = consoleSettings,
@@ -389,7 +391,7 @@ private fun LogSessionPicker(
     Box(Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
         Row(
             modifier = Modifier
-                .clip(RoundedCornerShape(4.dp))
+                .clip(MaterialTheme.shapes.small)
                 .clickable { open = true }
                 .padding(horizontal = 8.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -398,7 +400,7 @@ private fun LogSessionPicker(
                 text       = s.consoleSessionPickerLabel(currentLabel),
                 color      = colors.textSecondary,
                 fontSize   = 11.sp,
-                fontFamily = FontFamily.Monospace,
+                fontFamily = LocalMonoFamily.current,
             )
             Icon(
                 imageVector        = Icons.Default.ArrowDropDown,
@@ -412,7 +414,7 @@ private fun LogSessionPicker(
                 text    = {
                     Text(
                         s.consoleSessionLive,
-                        fontFamily = FontFamily.Monospace,
+                        fontFamily = LocalMonoFamily.current,
                         fontSize   = 11.sp,
                         color      = if (selectedFile == null) colors.primary else colors.textPrimary,
                     )
@@ -424,7 +426,7 @@ private fun LogSessionPicker(
                     text    = {
                         Text(
                             f.name,
-                            fontFamily = FontFamily.Monospace,
+                            fontFamily = LocalMonoFamily.current,
                             fontSize   = 11.sp,
                             color      = if (f == selectedFile) colors.primary else colors.textPrimary,
                         )
@@ -438,7 +440,7 @@ private fun LogSessionPicker(
 
 @Composable
 private fun Hero(pack: PackInstance, onBack: () -> Unit) {
-    val bg = originGradient(pack.packRef.origin)
+    val bg = CelestiaTheme.colors.originGradient(pack.packRef.origin)
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -498,7 +500,7 @@ private fun PlayBar(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
+            .clip(MaterialTheme.shapes.medium)
             .background(glassSurfaceAlpha(0.7f))
             .padding(16.dp),
     ) {
@@ -523,7 +525,7 @@ private fun PlayBar(
             Button(
                 onClick        = onPlay,
                 enabled        = enabled,
-                shape          = RoundedCornerShape(12.dp),
+                shape          = MaterialTheme.shapes.small,
                 contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
                 colors         = ButtonDefaults.buttonColors(
                     containerColor = CelestiaTheme.colors.primary,
@@ -548,14 +550,4 @@ private fun NotFound(onBack: () -> Unit) {
             Button(onClick = onBack) { Text(s.packDetailNotFoundBack) }
         }
     }
-}
-
-private fun originGradient(origin: PackOrigin): Brush {
-    val pair = when (origin) {
-        PackOrigin.Smartycraft -> Color(0xFF4C1D95) to Color(0xFF6D28D9)
-        PackOrigin.Mirror      -> Color(0xFF1E3A8A) to Color(0xFF1D4ED8)
-        PackOrigin.Modrinth    -> Color(0xFF14532D) to Color(0xFF15803D)
-        PackOrigin.Local       -> Color(0xFF374151) to Color(0xFF4B5563)
-    }
-    return Brush.linearGradient(listOf(pair.first, pair.second))
 }

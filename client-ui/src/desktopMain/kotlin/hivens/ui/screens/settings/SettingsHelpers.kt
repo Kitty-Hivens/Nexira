@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -167,7 +168,13 @@ internal fun HomeViewPicker(
             color = CelestiaTheme.colors.textSecondary,
         )
         Spacer(Modifier.height(12.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        // FlowRow so the pills wrap to a second line on a narrow pane instead
+        // of the longest label ("New (prototype)") shrinking and wrapping per
+        // character.
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement   = Arrangement.spacedBy(8.dp),
+        ) {
             VariantPill(
                 label    = classicLabel,
                 selected = current == HomeView.Classic,
@@ -212,7 +219,10 @@ internal fun UiStylePicker(
         Text(title, color = CelestiaTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
         Text(sub, style = MaterialTheme.typography.bodySmall, color = CelestiaTheme.colors.textSecondary)
         Spacer(Modifier.height(12.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement   = Arrangement.spacedBy(8.dp),
+        ) {
             VariantPill(label = celestia, selected = current == UiStyle.Celestia, onClick = { onChange(UiStyle.Celestia) })
             VariantPill(label = brut,     selected = current == UiStyle.Brut,     onClick = { onChange(UiStyle.Brut) })
         }
@@ -233,6 +243,12 @@ private fun VariantPill(label: String, selected: Boolean, onClick: () -> Unit) {
             .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, color = fg, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal)
+        Text(
+            label,
+            color      = fg,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+            maxLines   = 1,
+            softWrap   = false,
+        )
     }
 }

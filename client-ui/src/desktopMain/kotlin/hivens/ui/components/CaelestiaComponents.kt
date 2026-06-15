@@ -8,7 +8,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.unit.dp
 import hivens.ui.customization.LocalCustomization
 import hivens.ui.effects.pulsatingGlow
@@ -62,11 +61,7 @@ fun GlassCard(
         }
     }
     val resolvedBorderWidth = style.cardBorder.coerceAtLeast(0.dp)
-    val resolvedBorder = when {
-        borderColor != Color.Unspecified -> borderColor
-        MaterialTheme.colorScheme.surface.luminance() < 0.5f -> Color(0xFF2C2C2C)
-        else -> Color(0xFFCCCCCC)
-    }
+    val resolvedBorder = if (borderColor != Color.Unspecified) borderColor else palette.outline
 
     OutlinedCard(
         modifier  = modifier,
@@ -129,7 +124,7 @@ fun CelestiaButton(
                 contentColor = MaterialTheme.colorScheme.onSurface,
                 disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
             ),
-            border = BorderStroke(1.dp, Color(0xFF444444))
+            border = BorderStroke(1.dp, CelestiaTheme.colors.outline)
         ) {
             Text(text)
         }

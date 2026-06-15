@@ -129,6 +129,16 @@
 -keep class dev.hivens.libtray.** { *; }
 -dontwarn dev.hivens.libtray.**
 
+# ── libnotify: same Panama treatment as libtray ───────────────────────────
+# The OS-notification sibling lib uses the identical pattern --
+# MethodHandle.invokeExact(MemorySegment...) downcalls plus upcall stubs for
+# its event dispatch (the D-Bus signal pump on Linux, WinRT toast handlers,
+# Cocoa target-action) -- so it needs the same keep (the FFI methods have no
+# source call sites and would be stripped) and dontwarn (the polymorphic
+# invokeExact descriptors read as unresolved library members).
+-keep class dev.hivens.libnotify.** { *; }
+-dontwarn dev.hivens.libnotify.**
+
 # ── dbus-java: ServiceLoader-resolved transport providers ─────────────────
 # Linux fielded report (file picker silently broken on AppImage): filekit's
 # XdgFilePickerPortal calls `DBusConnectionBuilder.forSessionBus()` which

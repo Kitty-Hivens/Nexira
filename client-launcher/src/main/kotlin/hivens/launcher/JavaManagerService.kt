@@ -2,6 +2,7 @@ package hivens.launcher
 
 import hivens.core.api.HttpClientProvider
 import hivens.core.api.interfaces.IJavaManager
+import hivens.core.platform.OS
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
@@ -30,8 +31,8 @@ class JavaManagerService(
         getJavaPathForMajor(detectJavaVersion(version))
 
     override suspend fun getJavaPathForMajor(javaMajor: Int, onProgress: (String) -> Unit): Path = withContext(Dispatchers.IO) {
-        val os = getOsName()
-        val arch = getArchName()
+        val os = OS.platform.bellsoft
+        val arch = OS.arch.bellsoft
 
         val folderName = "java-$javaMajor-$os-$arch"
         val targetDir = runtimesDir.resolve(folderName)
@@ -66,7 +67,7 @@ class JavaManagerService(
     private suspend fun downloadAndUnpack(version: Int, targetDir: Path, onProgress: (String) -> Unit = {}) {
         val urls = getDownloadUrls(version)
         if (urls.isEmpty()) {
-            throw IOException("There is no Java build for this system (${getOsName()} ${getArchName()})")
+            throw IOException("There is no Java build for this system (${OS.platform.bellsoft} ${OS.arch.bellsoft})")
         }
 
         // Try each mirror in order; first one that returns a usable
@@ -130,31 +131,11 @@ class JavaManagerService(
             }
         }
         throw IOException(
-            "All Java $version download mirrors failed for ${getOsName()} ${getArchName()}. " +
+            "All Java $version download mirrors failed for ${OS.platform.bellsoft} ${OS.arch.bellsoft}. " +
                 "Last error: ${lastError?.message ?: "unknown"}",
             lastError,
         )
     }
-    internal fun getOsName(): String {
-        val os = System.getProperty("os.name").lowercase()
-        return when {
-            os.contains("win") -> "win"
-            os.contains("nux") || os.contains("nix") || os.contains("aix") -> "linux"
-            os.contains("mac") -> "mac"
-            else -> "unknown"
-        }
-    }
-
-    internal fun getArchName(): String {
-        val arch = System.getProperty("os.arch").lowercase()
-        return when {
-            arch.contains("aarch64") || arch.contains("arm64") -> "arm64"
-            arch.contains("64") -> "x64"
-            arch.contains("86") || arch.contains("32") -> "x32"
-            else -> "x64" // Default for strange cases
-        }
-    }
-
     internal fun findJavaExecutable(dir: Path): Path? {
         if (!Files.exists(dir)) return null
 
@@ -340,7 +321,7 @@ class JavaManagerService(
                                 // other execute. Stricter masks miss
                                 // archives that ship group-only-exec
                                 // (`0o010`) entries.
-                                if (getOsName() != "win" && (entry.mode and 0b001_001_001) != 0) {
+                                if (!OS.isWindows && (entry.mode and 0b001_001_001) != 0) {
                                     setExecutablePermissions(resolvedPath)
                                 }
                             }
@@ -370,8 +351,8 @@ class JavaManagerService(
     internal fun getDownloadUrl(version: Int): String? = getBellSoftUrl(version)
 
     internal fun getBellSoftUrl(version: Int): String? {
-        val os = getOsName()
-        val arch = getArchName()
+        val os = OS.platform.bellsoft
+        val arch = OS.arch.bellsoft
         return when (version) {
             8 -> when (os) {
                 "win" if arch == "x64" -> "https://download.bell-sw.com/java/8u472+9/bellsoft-jdk8u472+9-windows-amd64-full.zip"
@@ -420,8 +401,8 @@ class JavaManagerService(
      * convention.
      */
     internal fun getAdoptiumUrl(version: Int): String? {
-        val os = getOsName()
-        val arch = getArchName()
+        val os = OS.platform.bellsoft
+        val arch = OS.arch.bellsoft
         return when (version) {
             8 -> when (os) {
                 "win"   if arch == "x64"   -> adoptium(8, "8u442-b06", "8u442b06", "x64",     "windows", "zip")

@@ -139,6 +139,23 @@ class LayoutGraphRepositoryTest {
     }
 
     @Test
+    fun `newer schema_version loads read-only and is never written back`() = runBlocking {
+        // A future build bumped the layout schema. An older binary that opens
+        // the file must read it best-effort but never overwrite it -- otherwise
+        // it downgrades the envelope and discards layout it can't represent.
+        val newer = """{"schema_version":99,"graph":{"surfaces":{}}}"""
+        Files.writeString(file, newer)
+        val before = Files.readString(file)
+
+        val repo = repo()
+        repo.update { LayoutGraph.EMPTY }   // in-memory mutation still applies
+        repo.flush()
+
+        assertEquals(LayoutGraph.EMPTY, repo.value(), "in-memory state still mutates under read-only")
+        assertEquals(before, Files.readString(file), "an older build must not overwrite a newer-schema file")
+    }
+
+    @Test
     fun `observe re-emits after update`() = runBlocking {
         val repo = repo()
         val flow = repo.observe()
@@ -282,6 +299,24 @@ class LayoutGraphRepositoryTest {
         }
 
         assertEquals(before, repo.value(), "cross-depth dup must be rejected too")
+    }
+
+    @Test
+    fun `a persisted graph with duplicate instance ids falls back to default on load`() = runBlocking {
+        // A hand-edited / corrupted file can carry a duplicate id no update()
+        // ever produced. load() must sweep and serve the bundled default
+        // rather than a tree that breaks every findByInstanceId traversal.
+        val corrupt = LayoutGraph(surfaces = mapOf(
+            SurfaceId("s") to SurfaceLayout(slots = mapOf(
+                SlotId("a") to SlotContent(listOf(WidgetInstance(WidgetKind("a"), "dup"))),
+                SlotId("b") to SlotContent(listOf(WidgetInstance(WidgetKind("b"), "dup"))),
+            )),
+        ))
+        assertEquals(
+            sampleDefault,
+            loadFrom(4, corrupt),
+            "a duplicate-id graph on disk must not load -- fall back to the bundled default",
+        )
     }
 
     // ── Schema v1 -> v2 migration ─────────────────────────────────────
@@ -520,6 +555,26 @@ class LayoutGraphRepositoryTest {
         val loaded = loadFrom(3, v3)
         val ids = loaded.surfaces.values.flatMap { it.slots.values }.flatMap { it.widgets }.map { it.instanceId }
         assertEquals(ids.toSet().size, ids.size, "migration must not produce duplicate ids")
+    }
+
+    @Test
+    fun `v3 -- a migration-minted id colliding with an existing id falls back to default`() {
+        // navbuttons "nb" expands to nb-home / nb-library / ...; a widget already
+        // named "nb-home" on another surface turns the mint into a tree-wide
+        // collision the load sweep must reject in favour of the bundled default.
+        val v3 = LayoutGraph(surfaces = mapOf(
+            SurfaceId("appshell.leftrail") to SurfaceLayout(slots = mapOf(
+                SlotId("top") to SlotContent(listOf(navKind("appshell.leftrail.navbuttons", "nb"))),
+            )),
+            SurfaceId("home.new") to SurfaceLayout(slots = mapOf(
+                SlotId("main") to SlotContent(listOf(navKind("home.new.clock", "nb-home"))),
+            )),
+        ))
+        assertEquals(
+            sampleDefault,
+            loadFrom(3, v3),
+            "a migration that mints a colliding instanceId must fall back to the bundled default",
+        )
     }
 
     @Test

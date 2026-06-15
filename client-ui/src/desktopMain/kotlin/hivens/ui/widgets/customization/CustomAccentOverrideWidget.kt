@@ -4,7 +4,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -34,7 +34,7 @@ fun CustomAccentOverrideWidget(instance: WidgetInstance) {
             Spacer(Modifier.height(4.dp))
             OutlinedButton(
                 onClick  = { ctx.update { copy(accentOverride = null) } },
-                shape    = RoundedCornerShape(8.dp),
+                shape    = MaterialTheme.shapes.small,
                 modifier = Modifier.fillMaxWidth(),
             ) { Text(s.customizationAccentClear) }
         }

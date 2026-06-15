@@ -48,7 +48,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.editor.EditModeController
 import hivens.ui.editor.dnd.DragController
 import hivens.ui.editor.dnd.DropTargetRegistry
@@ -114,9 +113,9 @@ fun WidgetPalettePanel(
                 .padding(top = 64.dp, bottom = 96.dp, end = 16.dp, start = 0.dp)
                 .shadow(elevation = 18.dp, shape = RoundedCornerShape(14.dp))
                 .clip(RoundedCornerShape(14.dp))
-                // Near-opaque so the busy backdrop (art + right rail) does not
-                // bleed through unevenly and read as mismatched glass.
-                .background(glassSurfaceAlpha(0.94f)),
+                // Solid surface, no glass: the panel floats over the right rail,
+                // and stacked translucent layers composited into muddy glass.
+                .background(CelestiaTheme.colors.surface),
         ) {
             // Header
             Row(
@@ -226,7 +225,7 @@ private fun PaletteSearchField(query: String, onQueryChange: (String) -> Unit) {
             .fillMaxWidth()
             .padding(horizontal = 10.dp)
             .clip(RoundedCornerShape(10.dp))
-            .border(1.dp, glassSurfaceAlpha(0.5f), RoundedCornerShape(10.dp))
+            .border(1.dp, CelestiaTheme.colors.outline, RoundedCornerShape(10.dp))
             .padding(start = 10.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
     ) {
         Icon(

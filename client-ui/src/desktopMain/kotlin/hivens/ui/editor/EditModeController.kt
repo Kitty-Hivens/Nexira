@@ -69,6 +69,15 @@ class EditModeController(
         _editToggleSignal.value++
     }
 
+    // Ctrl+N (window-level) bumps this; ShellRightRegion observes it and flips
+    // its own collapsed prop. Same focus-independent bridge as the edit toggle.
+    private val _rightRailToggleSignal = mutableStateOf(0)
+    val rightRailToggleSignal: State<Int> = _rightRailToggleSignal
+
+    fun requestRightRailToggle() {
+        _rightRailToggleSignal.value++
+    }
+
     // `slots` comes from the widget's descriptor and pre-seeds the
     // WidgetInstance.children map with empty SlotContent for every
     // declared slot. Without this, a freshly palette-added container

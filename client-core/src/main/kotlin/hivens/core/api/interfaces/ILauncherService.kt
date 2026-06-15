@@ -5,25 +5,24 @@ import hivens.core.data.CachedManifestSnapshot
 import hivens.core.data.InstanceRuntime
 import hivens.core.data.LauncherLogType
 import hivens.core.data.SessionData
-import java.io.IOException
+import hivens.core.launch.SpawnResult
 import java.nio.file.Path
 
 interface ILauncherService {
     /**
-     * Assembles and spawns the Minecraft launch process; returns the
-     * running [Process] for monitoring.
+     * Assembles and spawns the Minecraft launch process; returns a
+     * [SpawnResult] -- [SpawnResult.Started] with the process handle, or
+     * [SpawnResult.Failed] carrying the semantic launch error.
      */
-    @Throws(IOException::class)
     suspend fun launchClient(
         sessionData: SessionData,
         serverProfile: ServerProfile,
         clientRootPath: Path,
         javaExecutablePath: Path,
         allocatedMemoryMB: Int,
-    ): Process
+    ): SpawnResult
 
     /** Same as [launchClient], plus streams stdout / stderr through [onLog]. */
-    @Throws(IOException::class)
     suspend fun launchClientWithLogs(
         sessionData: SessionData,
         serverProfile: ServerProfile,
@@ -32,7 +31,7 @@ interface ILauncherService {
         allocatedMemoryMB: Int,
         adaptiveEnabled: Boolean = false,
         onLog: (String, LauncherLogType) -> Unit,
-    ): Process
+    ): SpawnResult
 
     /**
      * Pack-centric launch path. Spawns the JVM against a Hivens
@@ -74,7 +73,6 @@ interface ILauncherService {
      * @param displayName      Human label for log lines.
      * @param onLog            Stdout / stderr line callback.
      */
-    @Throws(IOException::class)
     suspend fun launchPackClient(
         sessionData: SessionData,
         manifest: CachedManifestSnapshot,
@@ -95,5 +93,5 @@ interface ILauncherService {
         useSmartycraftAuthLib: Boolean = false,
         displayName: String,
         onLog: (String, LauncherLogType) -> Unit,
-    ): Process
+    ): SpawnResult
 }

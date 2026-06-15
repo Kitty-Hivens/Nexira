@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Inventory2
@@ -109,7 +108,7 @@ private fun PackTile(pack: PackInstance, onClick: () -> Unit) {
     Column(
         modifier = Modifier
             .width(180.dp)
-            .clip(RoundedCornerShape(10.dp))
+            .clip(MaterialTheme.shapes.medium)
             .background(glassSurfaceAlpha(0.40f))
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 10.dp),
@@ -118,7 +117,7 @@ private fun PackTile(pack: PackInstance, onClick: () -> Unit) {
         Box(
             modifier = Modifier
                 .size(36.dp)
-                .clip(RoundedCornerShape(6.dp))
+                .clip(MaterialTheme.shapes.extraSmall)
                 .background(CelestiaTheme.colors.textSecondary.copy(alpha = 0.15f)),
             contentAlignment = Alignment.Center,
         ) {
@@ -154,7 +153,7 @@ private fun EmptyPacksCta(onBrowse: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = 12.dp)
-            .clip(RoundedCornerShape(14.dp))
+            .clip(MaterialTheme.shapes.medium)
             .background(glassSurfaceAlpha(0.40f))
             .padding(horizontal = 18.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -173,7 +172,7 @@ private fun EmptyPacksCta(onBrowse: () -> Unit) {
         Spacer(Modifier.height(2.dp))
         OutlinedButton(
             onClick = onBrowse,
-            shape   = RoundedCornerShape(10.dp),
+            shape   = MaterialTheme.shapes.small,
             colors  = ButtonDefaults.outlinedButtonColors(
                 contentColor = CelestiaTheme.colors.primary,
             ),

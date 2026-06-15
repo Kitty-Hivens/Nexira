@@ -3,7 +3,6 @@ package hivens.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
@@ -236,13 +235,13 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(
-                        color = Color(0xFFF59E0B).copy(alpha = 0.12f),
-                        shape = RoundedCornerShape(8.dp)
+                        color = CelestiaTheme.colors.warnAccent.copy(alpha = 0.12f),
+                        shape = MaterialTheme.shapes.medium
                     )
                     .border(
                         width = 1.dp,
-                        color = Color(0xFFF59E0B).copy(alpha = 0.5f),
-                        shape = RoundedCornerShape(8.dp)
+                        color = CelestiaTheme.colors.warnAccent.copy(alpha = 0.5f),
+                        shape = MaterialTheme.shapes.medium
                     )
                     .padding(12.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -251,7 +250,7 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
                     text       = "⚠ ${s.sslWarningTitle}",
                     style      = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
-                    color      = Color(0xFFF59E0B)
+                    color      = CelestiaTheme.colors.warnAccent
                 )
                 Text(
                     text  = s.sslWarningBody,
@@ -266,7 +265,7 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
                 OutlinedButton(
                     onClick  = { sslWarning = false },
                     modifier = Modifier.fillMaxWidth(),
-                    shape    = RoundedCornerShape(6.dp)
+                    shape    = MaterialTheme.shapes.small
                 ) {
                     Text(s.sslWarningCancel, color = CelestiaTheme.colors.textSecondary)
                 }
@@ -275,7 +274,7 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
                     style = MaterialTheme.typography.bodySmall,
                     color = CelestiaTheme.colors.textSecondary,
                 )
-                val acceptColors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF59E0B))
+                val acceptColors = ButtonDefaults.buttonColors(containerColor = CelestiaTheme.colors.warnAccent)
                 fun acceptFor(unit: java.time.temporal.ChronoUnit, amount: Long, label: String) {
                     // 100-year future for "always" -- long enough that no user
                     // will outlive it, short enough to not overflow ISO-8601
@@ -294,19 +293,19 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
                     Button(
                         onClick  = { acceptFor(java.time.temporal.ChronoUnit.HOURS, 1, "1 hour") },
                         modifier = Modifier.weight(1f),
-                        shape    = RoundedCornerShape(6.dp),
+                        shape    = MaterialTheme.shapes.small,
                         colors   = acceptColors,
                     ) { Text(s.sslWarningTrustHour, color = Color.Black) }
                     Button(
                         onClick  = { acceptFor(java.time.temporal.ChronoUnit.DAYS, 30, "30 days") },
                         modifier = Modifier.weight(1f),
-                        shape    = RoundedCornerShape(6.dp),
+                        shape    = MaterialTheme.shapes.small,
                         colors   = acceptColors,
                     ) { Text(s.sslWarningTrust30Days, color = Color.Black) }
                     Button(
                         onClick  = { acceptFor(java.time.temporal.ChronoUnit.DAYS, 36500, "always (100y)") },
                         modifier = Modifier.weight(1f),
-                        shape    = RoundedCornerShape(6.dp),
+                        shape    = MaterialTheme.shapes.small,
                         colors   = acceptColors,
                     ) { Text(s.sslWarningTrustAlways, color = Color.Black) }
                 }
@@ -319,13 +318,13 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(
-                        color = Color(0xFFF59E0B).copy(alpha = 0.12f),
-                        shape = RoundedCornerShape(8.dp)
+                        color = CelestiaTheme.colors.warnAccent.copy(alpha = 0.12f),
+                        shape = MaterialTheme.shapes.medium
                     )
                     .border(
                         width = 1.dp,
-                        color = Color(0xFFF59E0B).copy(alpha = 0.5f),
-                        shape = RoundedCornerShape(8.dp)
+                        color = CelestiaTheme.colors.warnAccent.copy(alpha = 0.5f),
+                        shape = MaterialTheme.shapes.medium
                     )
                     .padding(12.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -334,7 +333,7 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
                     text       = s.auth2faUnsupportedTitle,
                     style      = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
-                    color      = Color(0xFFF59E0B)
+                    color      = CelestiaTheme.colors.warnAccent
                 )
                 Text(
                     text  = s.auth2faUnsupportedBody,
@@ -344,7 +343,7 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
                 OutlinedButton(
                     onClick  = { twoFactorUnsupported = false },
                     modifier = Modifier.align(Alignment.End),
-                    shape    = RoundedCornerShape(6.dp),
+                    shape    = MaterialTheme.shapes.small,
                 ) {
                     Text(s.auth2faUnsupportedDismiss, color = CelestiaTheme.colors.textSecondary)
                 }
@@ -361,7 +360,7 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
                     .fillMaxWidth()
                     .background(
                         color = CelestiaTheme.colors.error.copy(alpha = 0.08f),
-                        shape = RoundedCornerShape(6.dp)
+                        shape = MaterialTheme.shapes.medium
                     )
                     .padding(8.dp)
             )
@@ -376,7 +375,7 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
             singleLine    = true,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
             keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
-            shape          = RoundedCornerShape(8.dp),
+            shape          = MaterialTheme.shapes.small,
             colors         = fieldColors
         )
         PuppetField("login.username", login) {
@@ -397,7 +396,7 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
                 imeAction    = ImeAction.Done
             ),
             keyboardActions = KeyboardActions(onDone = { doLogin() }),
-            shape   = RoundedCornerShape(8.dp),
+            shape   = MaterialTheme.shapes.small,
             colors  = fieldColors
         )
         PuppetField("login.password", password) {
@@ -429,7 +428,7 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
                 onClick   = {},
                 enabled   = false,
                 modifier  = Modifier.fillMaxWidth().height(42.dp),
-                shape     = RoundedCornerShape(8.dp),
+                shape     = MaterialTheme.shapes.small,
                 colors    = ButtonDefaults.buttonColors(
                     disabledContainerColor = CelestiaTheme.colors.primary.copy(alpha = 0.5f)
                 ),

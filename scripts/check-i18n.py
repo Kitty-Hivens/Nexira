@@ -12,12 +12,14 @@
 # High-precision heuristic: a Cyrillic run inside a string literal in
 # client-ui code is almost always a hardcoded RU UI string. The locale files
 # and build output are excluded by path; comments may carry Cyrillic notes
-# and are skipped; and the deferred @PropLabel / @Widget(displayName)
-# annotation values are skipped -- those are compile-time constants that
-# cannot read LocalStrings and need a separate key-indirection pass (see
-# memory project_i18n_annotation_gap). Drop the annotation skip once that
-# lands. English literals are a lower-precision second layer and are left to
-# a future allowlist-backed rule.
+# and are skipped; and the @PropLabel / @Widget(...) / displayName annotation
+# ARGUMENT is stripped before the scan -- the key it carries is a compile-time
+# constant resolved through LocalStrings elsewhere, not user-facing text. Only
+# the annotation call is removed: the rest of the line is still scanned, so a
+# hardcoded Cyrillic prop default sitting beside the annotation
+# (`@PropLabel("k") val title: String = "<cyrillic>"`) is caught rather than
+# masked by the annotation. English literals are a lower-precision second
+# layer and are left to a future allowlist-backed rule.
 #
 # An "// i18n-allow" marker anywhere on a line exempts that line -- the escape
 # hatch for a genuinely non-localizable Cyrillic literal (none today) and for
@@ -51,9 +53,12 @@ CYRILLIC_LITERAL = re.compile('"[^"]*' + _CYRILLIC_CLASS + '[^"]*"')
 # a developer note, not user-facing text.
 COMMENT_LINE = re.compile(r"^\s*(?://|\*|/\*)")
 
-# Annotation context (category C, deferred): the value is a compile-time
-# constant and cannot be localized without key-indirection.
-ANNOTATION_CTX = re.compile(r"@PropLabel\(|@Widget\(|\bdisplayName\s*=")
+# Annotation argument: the key it carries is a compile-time constant resolved
+# through LocalStrings elsewhere. Stripped (not skipped) so the remainder of
+# the line -- e.g. a prop default value beside the annotation -- is still
+# scanned. The argument list is a simple key / range with no nested ')', so a
+# non-greedy `[^)]*` is enough here.
+ANNOTATION_STRIP = re.compile(r'@\w+\s*\([^)]*\)|\bdisplayName\s*=\s*"[^"]*"')
 
 
 @dataclass
@@ -72,9 +77,8 @@ def scan_file(path: Path) -> list[Hit]:
                     continue
                 if COMMENT_LINE.match(line):
                     continue
-                if ANNOTATION_CTX.search(line):
-                    continue
-                if CYRILLIC_LITERAL.search(line):
+                scanned = ANNOTATION_STRIP.sub("", line)
+                if CYRILLIC_LITERAL.search(scanned):
                     hits.append(Hit(path=path, line_no=line_no, line=line.rstrip()))
     except OSError as e:
         print(f"warn: cannot read {path}: {e}", file=sys.stderr)
