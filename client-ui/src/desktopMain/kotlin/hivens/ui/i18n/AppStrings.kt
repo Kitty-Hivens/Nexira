@@ -612,6 +612,22 @@ interface AppStrings {
     val settingsUiStyleCelestia: String
     val settingsUiStyleBrut: String
 
+    // --- Settings: left-rail selection style ---
+    /** Title of the nav-rail selection-style control. */
+    val navSelectionTitle: String
+    /** One-line description under the title. */
+    val navSelectionSub: String
+    val navStylePill: String
+    val navStyleSquare: String
+    val navStyleCircle: String
+    val navStyleBar: String
+    val navStyleDot: String
+    val navStyleNone: String
+    /** Label for the filled<->outlined unselected-icon swap toggle. */
+    val navSelectionOutlineIcons: String
+    /** Label for the selection accent-color field. */
+    val navSelectionAccent: String
+
     // --- Settings two-column nav labels ---
     val settingsCategoryAppearance: String
     val settingsCategoryNetwork: String

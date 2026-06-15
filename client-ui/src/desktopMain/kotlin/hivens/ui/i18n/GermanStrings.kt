@@ -577,6 +577,18 @@ object GermanStrings : AppStrings {
     override val settingsUiStyleCelestia = "Celestia"
     override val settingsUiStyleBrut     = "Brut"
 
+    // --- Auswahlstil der linken Leiste ---
+    override val navSelectionTitle        = "Stil des aktiven Eintrags"
+    override val navSelectionSub          = "Wie der aktive Eintrag in der linken Leiste hervorgehoben wird"
+    override val navStylePill             = "Kapsel"
+    override val navStyleSquare           = "Quadrat"
+    override val navStyleCircle           = "Kreis"
+    override val navStyleBar              = "Balken"
+    override val navStyleDot              = "Punkt"
+    override val navStyleNone             = "Ohne"
+    override val navSelectionOutlineIcons = "Inaktive Symbole als Umriss"
+    override val navSelectionAccent       = "Hervorhebungsfarbe"
+
     override val settingsCategoryAppearance   = "Erscheinungsbild"
     override val settingsCategoryNetwork      = "Netzwerk"
     override val settingsCategorySmarty       = "Smarty"
