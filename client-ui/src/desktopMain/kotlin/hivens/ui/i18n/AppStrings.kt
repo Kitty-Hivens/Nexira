@@ -627,6 +627,8 @@ interface AppStrings {
     val navSelectionOutlineIcons: String
     /** Label for the selection accent-color field. */
     val navSelectionAccent: String
+    /** Label for the hover / interaction-highlight toggle. */
+    val navHoverHighlight: String
 
     // --- Settings two-column nav labels ---
     val settingsCategoryAppearance: String

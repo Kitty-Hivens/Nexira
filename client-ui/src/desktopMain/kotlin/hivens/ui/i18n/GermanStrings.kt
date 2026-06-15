@@ -588,6 +588,7 @@ object GermanStrings : AppStrings {
     override val navStyleNone             = "Ohne"
     override val navSelectionOutlineIcons = "Inaktive Symbole als Umriss"
     override val navSelectionAccent       = "Hervorhebungsfarbe"
+    override val navHoverHighlight         = "Hervorhebung beim Überfahren"
 
     override val settingsCategoryAppearance   = "Erscheinungsbild"
     override val settingsCategoryNetwork      = "Netzwerk"

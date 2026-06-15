@@ -397,6 +397,15 @@ private fun NavSelectionControl(
             onChange(customization.copy(navSelectionOutlineIcons = it))
         }
 
+        SettingsSwitchRow(
+            title           = s.navHoverHighlight,
+            checked         = customization.navHoverHighlight,
+            onCheckedChange = { onChange(customization.copy(navHoverHighlight = it)) },
+        )
+        PuppetToggle("settings.navSelection.hoverHighlight", customization.navHoverHighlight) {
+            onChange(customization.copy(navHoverHighlight = it))
+        }
+
         Row(
             modifier              = Modifier.fillMaxWidth(),
             verticalAlignment     = Alignment.CenterVertically,
@@ -413,6 +422,7 @@ private fun NavSelectionControl(
                 invalidLabel = s.customizationHexInvalid,
                 onValidHex   = { onChange(customization.copy(navSelectionAccent = it)) },
                 modifier     = Modifier.weight(1f),
+                rgbOnly      = true,
             )
             if (customization.navSelectionAccent != null) {
                 OutlinedButton(

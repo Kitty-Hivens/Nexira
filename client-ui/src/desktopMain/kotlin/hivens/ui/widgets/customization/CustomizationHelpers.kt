@@ -133,10 +133,15 @@ internal fun HexField(
     invalidLabel: String,
     onValidHex: (String) -> Unit,
     modifier: Modifier = Modifier,
+    rgbOnly: Boolean = false,
 ) {
     var text by remember(initialHex) { mutableStateOf(initialHex) }
     val parsed = text.toWidgetColorOrNull()
-    val valid  = text.isBlank() || parsed != null
+    // rgbOnly rejects the 8-digit AARRGGBB form, so an RGB-only field stays at
+    // exactly six hex digits; callers that allow alpha leave it false.
+    fun fits(s: String): Boolean =
+        s.trim().removePrefix("#").length.let { if (rgbOnly) it == 6 else it == 6 || it == 8 }
+    val valid  = text.isBlank() || (parsed != null && fits(text))
 
     Row(
         modifier              = modifier,
@@ -147,7 +152,7 @@ internal fun HexField(
             modifier = Modifier
                 .size(28.dp)
                 .clip(RoundedCornerShape(6.dp))
-                .background(parsed ?: CelestiaTheme.colors.surface)
+                .background(parsed?.takeIf { valid } ?: CelestiaTheme.colors.surface)
                 .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(6.dp)),
         )
         Box(
@@ -170,7 +175,7 @@ internal fun HexField(
                     text = t
                     if (t.isNotBlank()) {
                         val normalized = t.trim()
-                        normalized.toWidgetColorOrNull()?.let { onValidHex(normalized) }
+                        if (fits(normalized)) normalized.toWidgetColorOrNull()?.let { onValidHex(normalized) }
                     }
                 },
                 singleLine    = true,
