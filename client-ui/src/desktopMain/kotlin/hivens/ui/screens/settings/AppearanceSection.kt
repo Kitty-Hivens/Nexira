@@ -8,7 +8,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Language
-import androidx.compose.material.icons.filled.Minimize
+import androidx.compose.material.icons.filled.MoveToInbox
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Wallpaper
@@ -249,7 +249,7 @@ internal fun AppearanceSection(
     SettingsRowWithDescription(
         title           = s.settingsCloseAfterLaunch,
         description     = s.settingsCloseAfterLaunchDesc,
-        icon            = Icons.Default.Minimize,
+        icon            = Icons.Default.MoveToInbox,
         iconTint        = CelestiaTheme.colors.textSecondary,
         checked         = form.closeAfterStart,
         enabled         = true,
