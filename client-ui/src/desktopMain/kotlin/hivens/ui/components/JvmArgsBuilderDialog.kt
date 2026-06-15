@@ -1,5 +1,6 @@
 package hivens.ui.components
 
+import hivens.ui.theme.LocalMonoFamily
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -601,7 +602,7 @@ private fun ArgsPreviewBox(config: JvmConfig) {
             Text(
                 args.joinToString(" "),
                 color = CelestiaTheme.colors.textPrimary,
-                fontFamily = FontFamily.Monospace,
+                fontFamily = LocalMonoFamily.current,
                 fontSize = 11.sp,
             )
         }
@@ -634,7 +635,7 @@ private fun SliderField(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(label, color = CelestiaTheme.colors.textPrimary, fontWeight = FontWeight.Bold,
                 modifier = Modifier.weight(1f))
-            Text(display, color = CelestiaTheme.colors.primary, fontFamily = FontFamily.Monospace)
+            Text(display, color = CelestiaTheme.colors.primary, fontFamily = LocalMonoFamily.current)
         }
         Slider(
             value = value, onValueChange = onChange, valueRange = valueRange, steps = steps,

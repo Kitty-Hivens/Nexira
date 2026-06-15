@@ -1,5 +1,6 @@
 package hivens.ui.screens.detail
 
+import hivens.ui.theme.LocalMonoFamily
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -399,7 +400,7 @@ private fun LogSessionPicker(
                 text       = s.consoleSessionPickerLabel(currentLabel),
                 color      = colors.textSecondary,
                 fontSize   = 11.sp,
-                fontFamily = FontFamily.Monospace,
+                fontFamily = LocalMonoFamily.current,
             )
             Icon(
                 imageVector        = Icons.Default.ArrowDropDown,
@@ -413,7 +414,7 @@ private fun LogSessionPicker(
                 text    = {
                     Text(
                         s.consoleSessionLive,
-                        fontFamily = FontFamily.Monospace,
+                        fontFamily = LocalMonoFamily.current,
                         fontSize   = 11.sp,
                         color      = if (selectedFile == null) colors.primary else colors.textPrimary,
                     )
@@ -425,7 +426,7 @@ private fun LogSessionPicker(
                     text    = {
                         Text(
                             f.name,
-                            fontFamily = FontFamily.Monospace,
+                            fontFamily = LocalMonoFamily.current,
                             fontSize   = 11.sp,
                             color      = if (f == selectedFile) colors.primary else colors.textPrimary,
                         )

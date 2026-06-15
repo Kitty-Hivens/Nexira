@@ -1,5 +1,6 @@
 package hivens.ui.widgets.serverdetails
 
+import hivens.ui.theme.LocalMonoFamily
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Column
@@ -79,7 +80,7 @@ private fun MissingDataWarning(title: String, body: String, path: String) {
                 text       = path,
                 style      = MaterialTheme.typography.bodySmall,
                 color      = CelestiaTheme.colors.textSecondary.copy(alpha = 0.6f),
-                fontFamily = FontFamily.Monospace,
+                fontFamily = LocalMonoFamily.current,
             )
         }
     }

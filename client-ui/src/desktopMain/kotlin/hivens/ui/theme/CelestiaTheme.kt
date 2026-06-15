@@ -258,10 +258,12 @@ fun CelestiaTheme(
     CompositionLocalProvider(
         LocalCelestiaColors provides animatedPalette,
         LocalStyle          provides style,
+        LocalMonoFamily     provides nexiraMonoFamily(),
     ) {
         MaterialTheme(
             colorScheme = colorScheme,
             shapes      = style.toMaterialShapes(),
+            typography  = nexiraTypography(),
             content     = content
         )
     }
