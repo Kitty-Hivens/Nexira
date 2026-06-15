@@ -165,6 +165,8 @@ fun AppLayout(
                             onHomeViewChanged            = onHomeViewChanged,
                             uiStyle                      = uiStyle,
                             onUiStyleChanged             = onUiStyleChanged,
+                            customization                = customization,
+                            onCustomizationChanged       = onCustomizationChanged,
                             onOpenBackgroundSettings     = { onScreenChange(Screen.BackgroundSettings) },
                             onOpenCustomizationExtension = { onScreenChange(Screen.CustomizationExtension) },
                             onOpenAbout                  = { onScreenChange(Screen.About) },

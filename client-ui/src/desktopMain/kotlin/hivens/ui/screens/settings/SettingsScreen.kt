@@ -17,6 +17,7 @@ import hivens.core.data.UiStyle
 import hivens.launcher.network.NetworkState
 import hivens.launcher.platform.PlatformPaths
 import hivens.ui.components.GlassCard
+import hivens.ui.customization.CustomizationSettings
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.LocalStrings
@@ -45,6 +46,8 @@ fun SettingsScreen(
     onHomeViewChanged: (HomeView) -> Unit,
     uiStyle: UiStyle,
     onUiStyleChanged: (UiStyle) -> Unit,
+    customization: CustomizationSettings,
+    onCustomizationChanged: (CustomizationSettings) -> Unit,
     onOpenBackgroundSettings: () -> Unit = {},
     onOpenCustomizationExtension: () -> Unit = {},
     onOpenAbout: () -> Unit = {}
@@ -118,6 +121,8 @@ fun SettingsScreen(
                             onHomeViewChanged            = onHomeViewChanged,
                             uiStyle                      = uiStyle,
                             onUiStyleChanged             = onUiStyleChanged,
+                            customization                = customization,
+                            onCustomizationChanged       = onCustomizationChanged,
                         )
                         SettingsCategory.Network -> NetworkSection(
                             form = form,

@@ -579,6 +579,18 @@ object EnglishStrings : AppStrings {
     override val settingsUiStyleCelestia = "Celestia"
     override val settingsUiStyleBrut     = "Brut"
 
+    // --- Left-rail selection style ---
+    override val navSelectionTitle        = "Selected item style"
+    override val navSelectionSub          = "How the active entry in the left rail is highlighted"
+    override val navStylePill             = "Pill"
+    override val navStyleSquare           = "Square"
+    override val navStyleCircle           = "Circle"
+    override val navStyleBar              = "Bar"
+    override val navStyleDot              = "Dot"
+    override val navStyleNone             = "None"
+    override val navSelectionOutlineIcons = "Outline unselected icons"
+    override val navSelectionAccent       = "Highlight color"
+
     override val settingsCategoryAppearance   = "Appearance"
     override val settingsCategoryNetwork      = "Network"
     override val settingsCategorySmarty       = "Smarty"
