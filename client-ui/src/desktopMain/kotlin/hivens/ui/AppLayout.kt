@@ -24,6 +24,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.HomeView
+import hivens.core.data.PackOrigin
 import hivens.core.data.SessionData
 import hivens.core.data.UiStyle
 import hivens.launcher.network.NetworkState
@@ -216,12 +217,24 @@ fun AppLayout(
                     )
 
                     Screen.Browse  -> BrowseScreen(
-                        onOpenPack = { packId -> onScreenChange(Screen.BrowsePackDetail(packId)) },
+                        onOpenPack = { pack ->
+                            onScreenChange(
+                                if (pack.origin == PackOrigin.Modrinth) Screen.ModrinthPackDetail(pack.id)
+                                else Screen.BrowsePackDetail(pack.id),
+                            )
+                        },
                     )
 
                     is Screen.BrowsePackDetail ->
                         hivens.ui.screens.browse.BrowsePackDetailScreen(
                             packId      = screen.packId,
+                            onBack      = onBack,
+                            onInstalled = { instanceId -> onScreenChange(Screen.PackDetail(instanceId)) },
+                        )
+
+                    is Screen.ModrinthPackDetail ->
+                        hivens.ui.screens.browse.ModrinthPackDetailScreen(
+                            projectId   = screen.projectId,
                             onBack      = onBack,
                             onInstalled = { instanceId -> onScreenChange(Screen.PackDetail(instanceId)) },
                         )

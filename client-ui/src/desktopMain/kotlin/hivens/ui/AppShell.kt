@@ -170,6 +170,14 @@ sealed class Screen {
      * via [hivens.core.api.interfaces.IPackRepository].
      */
     data class BrowsePackDetail(val packId: String) : Screen()
+
+    /**
+     * Modrinth-side detail target. Carries the Modrinth project id; the detail
+     * screen fetches the project page + versions via the Modrinth catalogue and
+     * installs the chosen `.mrpack` version. Distinct from [BrowsePackDetail],
+     * which resolves a mirror pack.
+     */
+    data class ModrinthPackDetail(val projectId: String) : Screen()
 }
 
 // ─── App Shell ───────────────────────────────────────────────────────────────
