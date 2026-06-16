@@ -171,7 +171,9 @@ private fun LoadedBody(
         { filename, enable ->
             val next = OptionalContentRules.applyToggle(manifest.mods, enabledState, filename, enable)
             enabledState = next
-            val toggles = optionalMods.map { ContentToggle(it.filename, next[it.filename] ?: it.defaultEnabled) }
+            // Persist by stableKey (survives a pack-version bump); the runtime
+            // `next` map stays filename-keyed for the sync/install path.
+            val toggles = optionalMods.map { ContentToggle(it.stableKey, next[it.filename] ?: it.defaultEnabled) }
             // Hand the write to the controller's long-lived scope. Doing this on a
             // rememberCoroutineScope() one cancelled mid-flight when the user
             // navigated away from the Content tab, so the toggle silently reverted.
