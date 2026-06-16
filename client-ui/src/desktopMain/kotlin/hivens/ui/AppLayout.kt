@@ -67,6 +67,7 @@ fun AppLayout(
     onCloseApp: () -> Unit,
     currentScreen: Screen,
     onScreenChange: (Screen) -> Unit,
+    onBack: () -> Unit,
     onLogin: (SessionData) -> Unit,
     onLogout: () -> Unit,
     isDarkTheme: Boolean,
@@ -175,38 +176,38 @@ fun AppLayout(
                             currentTheme    = customTheme,
                             onThemeSelected = { newTheme ->
                                 onCustomThemeChanged(newTheme)
-                                onScreenChange(Screen.Settings)
+                                onBack()
                             },
-                            onBack          = { onScreenChange(Screen.Settings) },
+                            onBack          = onBack,
                         )
 
                     Screen.CustomizationExtension ->
                         CustomizationSurface(
                             currentSettings   = customization,
                             onSettingsChanged = onCustomizationChanged,
-                            onBack            = { onScreenChange(Screen.Settings) },
+                            onBack            = onBack,
                         )
 
                     Screen.About ->
-                        AboutSurface(onBack = { onScreenChange(Screen.Settings) })
+                        AboutSurface(onBack = onBack)
 
                     Screen.BackgroundSettings ->
                         BgSettingsSurface(
                             currentSettings   = backgroundSettings,
                             onSettingsChanged = onBackgroundSettingsChanged,
-                            onBack            = { onScreenChange(Screen.Settings) },
+                            onBack            = onBack,
                         )
 
                     is Screen.ServerSettings ->
                         ServerSettingsScreen(
                             server = screen.server,
-                            onBack = { onScreenChange(Screen.Home) }
+                            onBack = onBack
                         )
 
                     is Screen.ServerDetails ->
                         ServerDetailsSurface(
                             server = screen.server,
-                            onBack = { onScreenChange(Screen.Home) },
+                            onBack = onBack,
                         )
 
                     Screen.Library -> LibraryScreen(
@@ -221,7 +222,7 @@ fun AppLayout(
                     is Screen.BrowsePackDetail ->
                         hivens.ui.screens.browse.BrowsePackDetailScreen(
                             packId      = screen.packId,
-                            onBack      = { onScreenChange(Screen.Browse) },
+                            onBack      = onBack,
                             onInstalled = { instanceId -> onScreenChange(Screen.PackDetail(instanceId)) },
                         )
 
@@ -229,7 +230,7 @@ fun AppLayout(
                         PackDetailScreen(
                             instanceId = screen.instanceId,
                             appState   = appState,
-                            onBack     = { onScreenChange(Screen.Library) },
+                            onBack     = onBack,
                         )
                 }
             }
