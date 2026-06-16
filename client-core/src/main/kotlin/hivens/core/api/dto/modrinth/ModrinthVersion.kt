@@ -16,6 +16,11 @@ data class ModrinthVersion(
     @SerialName("project_id") val projectId: String,
     val name: String,
     @SerialName("version_number") val versionNumber: String,
+    /** `release` / `beta` / `alpha` -- the source of update "channels". */
+    @SerialName("version_type") val versionType: String = "release",
+    @SerialName("game_versions") val gameVersions: List<String> = emptyList(),
+    val loaders: List<String> = emptyList(),
+    @SerialName("date_published") val datePublished: String = "",
     val files: List<ModrinthFile>,
 ) {
     /**

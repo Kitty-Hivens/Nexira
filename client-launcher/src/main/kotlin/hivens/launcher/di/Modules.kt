@@ -46,6 +46,9 @@ import hivens.core.time.SystemClock
 import hivens.launcher.cache.CacheFactory
 import hivens.launcher.cache.ModrinthCaches
 import hivens.launcher.cache.SmrtPackCaches
+import hivens.launcher.catalogue.MirrorPackCatalogue
+import hivens.launcher.catalogue.ModrinthPackCatalogue
+import hivens.launcher.catalogue.PackCatalogueRegistry
 import hivens.launcher.modrinth.ModrinthClient
 import hivens.launcher.smrt.OpenSmrtHelperResolver
 import hivens.launcher.smrt.SmartyModPlanner
@@ -402,6 +405,12 @@ val mirrorModule = module {
     single<IMirrorPackClient> { get<SmrtPackClient>() }
     single { ModrinthClient(get(named("direct")), caches = get()) }
     single { SmrtSyncService(get(), get(), get()) }
+
+    // Pack-catalogue read side: one provider per browsable source, indexed by
+    // origin so the Browse UI stays source-agnostic.
+    single { MirrorPackCatalogue(get()) }
+    single { ModrinthPackCatalogue(get()) }
+    single { PackCatalogueRegistry(listOf(get<MirrorPackCatalogue>(), get<ModrinthPackCatalogue>())) }
     single<IPackSyncService> { get<SmrtSyncService>() }
 
     // Smarty -> open-smrt-network swap. Direct channel: GitHub releases +

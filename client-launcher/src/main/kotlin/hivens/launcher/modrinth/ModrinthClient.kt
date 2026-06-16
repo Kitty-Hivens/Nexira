@@ -2,6 +2,7 @@ package hivens.launcher.modrinth
 
 import hivens.core.api.HttpClientProvider
 import hivens.core.api.dto.modrinth.ModrinthProject
+import hivens.core.api.dto.modrinth.ModrinthSearchResponse
 import hivens.core.api.dto.modrinth.ModrinthVersion
 import hivens.launcher.cache.ModrinthCaches
 import io.ktor.client.request.get
@@ -10,6 +11,8 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.http.isSuccess
 import kotlinx.serialization.json.Json
 import java.io.IOException
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 
 /**
  * HTTP client for Modrinth's public, key-less `/v2` API. Split out of
@@ -42,6 +45,21 @@ class ModrinthClient(
         val url = "$API_BASE/v2/project/$projectId/version/$versionId"
         return caches.version.get(url) { getJson(url) }
     }
+
+    /**
+     * Search the catalogue, restricted to modpacks via a project-type facet.
+     * Uncached: a query is dynamic, and the UI searches on submit (not per
+     * keystroke) so API traffic stays modest.
+     */
+    suspend fun searchModpacks(query: String, offset: Int = 0, limit: Int = 40): ModrinthSearchResponse {
+        val q = URLEncoder.encode(query, StandardCharsets.UTF_8)
+        val facets = URLEncoder.encode("""[["project_type:modpack"]]""", StandardCharsets.UTF_8)
+        return getJson("$API_BASE/v2/search?query=$q&facets=$facets&offset=$offset&limit=$limit")
+    }
+
+    /** All versions of a project, newest-first (Modrinth's default order). */
+    suspend fun listVersions(projectId: String): List<ModrinthVersion> =
+        getJson("$API_BASE/v2/project/$projectId/version")
 
     private suspend inline fun <reified T> getJson(url: String): T {
         val resp: HttpResponse = httpProvider.current.get(url) {
