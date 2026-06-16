@@ -1,7 +1,6 @@
 package hivens.launcher
 
 import hivens.core.data.PackInstance
-import hivens.launcher.curseforge.CurseForgeZipInstaller
 import hivens.launcher.mrpack.MrpackInstaller
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -20,7 +19,6 @@ import java.util.zip.ZipFile
  */
 class PackImportService(
     private val mrpackInstaller: MrpackInstaller,
-    private val cfInstaller: CurseForgeZipInstaller,
 ) {
     private val log = LoggerFactory.getLogger(PackImportService::class.java)
 
@@ -32,7 +30,7 @@ class PackImportService(
         log.info("import: {} detected as {}", file.fileName, kind)
         return when (kind) {
             PackArchiveKind.Mrpack -> mrpackInstaller.install(file, source = null, progress = progress)
-            PackArchiveKind.CurseForge -> cfInstaller.install(file, progress)
+            PackArchiveKind.CurseForge -> throw IOException("CurseForge import is not wired yet")
             PackArchiveKind.Unknown -> throw IOException(
                 "Unrecognized pack archive '${file.fileName}': expected a Modrinth .mrpack " +
                     "(modrinth.index.json) or a CurseForge export (manifest.json)",
