@@ -216,7 +216,6 @@ fun AppLayout(
                                 else Screen.BrowsePackDetail(pack.id),
                             )
                         },
-                        onImported = { instanceId -> onScreenChange(Screen.PackDetail(instanceId)) },
                     )
 
                     is Screen.BrowsePackDetail ->
