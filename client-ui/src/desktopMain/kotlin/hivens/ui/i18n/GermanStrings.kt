@@ -625,6 +625,7 @@ object GermanStrings : AppStrings {
     override val themePickerAccentOverride    = "Akzent überschreiben (sofort)"
 
     override val browseTitle        = "Katalog"
+    override val browseImport       = "Datei importieren"
     override val browseSubtitle     = "Auf dem Mirror veröffentlichte Packs"
     override val browseEmptyTitle   = "Katalog ist leer"
     override val browseEmptyMessage = "Der Mirror ist erreichbar, hat aber noch keine Packs veröffentlicht. Schau später wieder vorbei."

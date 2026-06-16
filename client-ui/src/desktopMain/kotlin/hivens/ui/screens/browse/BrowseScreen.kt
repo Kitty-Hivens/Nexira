@@ -52,6 +52,15 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
+import androidx.compose.runtime.rememberCoroutineScope
+import hivens.launcher.PackImportService
+import io.github.vinceglb.filekit.FileKit
+import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
+import io.github.vinceglb.filekit.dialogs.FileKitType
+import io.github.vinceglb.filekit.dialogs.openFilePicker
+import io.github.vinceglb.filekit.path
+import kotlinx.coroutines.launch
+import java.nio.file.Path
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
@@ -62,7 +71,10 @@ import kotlin.time.Duration.Companion.milliseconds
  * Clicking a card opens the source's detail screen.
  */
 @Composable
-fun BrowseScreen(onOpenPack: (CataloguePack) -> Unit) {
+fun BrowseScreen(
+    onOpenPack: (CataloguePack) -> Unit,
+    onImported: (instanceId: String) -> Unit,
+) {
     PuppetScreen("Browse")
 
     val s = LocalStrings.current
@@ -74,6 +86,32 @@ fun BrowseScreen(onOpenPack: (CataloguePack) -> Unit) {
     var submittedQuery by remember { mutableStateOf("") }
     var state by remember { mutableStateOf<BrowseState>(BrowseState.Loading) }
     var retryTick by remember { mutableIntStateOf(0) }
+
+    val importService: PackImportService = koinInject()
+    val scope = rememberCoroutineScope()
+    var importing by remember { mutableStateOf(false) }
+    var importError by remember { mutableStateOf<String?>(null) }
+
+    // Pick a .mrpack/.zip and import it (Modrinth installs fully; CurseForge is
+    // best-effort once F2 lands). The installed instance opens in Library.
+    fun startImport() {
+        scope.launch {
+            val picked = FileKit.openFilePicker(
+                type = FileKitType.File(extensions = listOf("mrpack", "zip")),
+                dialogSettings = FileKitDialogSettings(title = s.browseImport),
+            )
+            val path = picked?.path ?: return@launch
+            importing = true
+            importError = null
+            try {
+                onImported(importService.import(Path.of(path)).id)
+            } catch (e: Exception) {
+                importError = e.message ?: s.browseDetailInstallFailedGeneric
+            } finally {
+                importing = false
+            }
+        }
+    }
 
     PuppetClick("browse.retry") { retryTick++ }
     PuppetField("browse.search", query) { query = it }
@@ -99,12 +137,33 @@ fun BrowseScreen(onOpenPack: (CataloguePack) -> Unit) {
     }
 
     Column(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 20.dp)) {
-        Text(
-            text       = s.browseTitle,
-            style      = MaterialTheme.typography.headlineSmall,
-            color      = CelestiaTheme.colors.textPrimary,
-            fontWeight = FontWeight.Bold,
-        )
+        Row(
+            modifier              = Modifier.fillMaxWidth(),
+            verticalAlignment     = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                text       = s.browseTitle,
+                style      = MaterialTheme.typography.headlineSmall,
+                color      = CelestiaTheme.colors.textPrimary,
+                fontWeight = FontWeight.Bold,
+            )
+            Button(
+                onClick = { startImport() },
+                enabled = !importing,
+                shape   = MaterialTheme.shapes.small,
+                colors  = ButtonDefaults.buttonColors(
+                    containerColor = CelestiaTheme.colors.primary,
+                    contentColor   = Color.White,
+                ),
+            ) {
+                if (importing) {
+                    CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
+                } else {
+                    Text(s.browseImport, fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
         Spacer(Modifier.height(4.dp))
         Text(
             text  = s.browseSubtitle,
@@ -129,9 +188,13 @@ fun BrowseScreen(onOpenPack: (CataloguePack) -> Unit) {
             singleLine    = true,
             modifier      = Modifier.fillMaxWidth(),
             leadingIcon   = { Icon(Icons.Default.Search, contentDescription = null) },
-            label         = { Text(s.browseTitle) },
         )
         Spacer(Modifier.height(16.dp))
+
+        importError?.let { err ->
+            Text(err, style = MaterialTheme.typography.bodySmall, color = CelestiaTheme.colors.error)
+            Spacer(Modifier.height(8.dp))
+        }
 
         when (val st = state) {
             BrowseState.Loading -> BrowseLoading()

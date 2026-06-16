@@ -676,6 +676,8 @@ interface AppStrings {
     val browseErrorTitle: String
     val browseErrorMessage: String
     val browseRetry: String
+    /** Label on the Browse button that imports a pack from a local file. */
+    val browseImport: String
 
     // --- Browse pack detail ---
     val browseDetailErrorTitle: String

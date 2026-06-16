@@ -626,6 +626,7 @@ object RussianStrings : AppStrings {
     override val themePickerAccentOverride    = "Свой акцент (применяется сразу)"
 
     override val browseTitle        = "Каталог"
+    override val browseImport       = "Импорт файла"
     override val browseSubtitle     = "Сборки опубликованные на зеркале"
     override val browseEmptyTitle   = "Каталог пуст"
     override val browseEmptyMessage = "Зеркало доступно, но пока не публикует сборки. Загляни позже."

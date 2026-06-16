@@ -627,6 +627,7 @@ object EnglishStrings : AppStrings {
     override val themePickerAccentOverride    = "Accent override (live)"
 
     override val browseTitle        = "Browse"
+    override val browseImport       = "Import file"
     override val browseSubtitle     = "Packs published on the mirror"
     override val browseEmptyTitle   = "Catalog is empty"
     override val browseEmptyMessage = "The mirror is reachable but has not published any packs yet. Check back later."
