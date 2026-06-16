@@ -22,7 +22,7 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.rememberWindowState
 import coil3.ImageLoader
-import coil3.compose.setSingletonImageLoaderFactory
+import coil3.SingletonImageLoader
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import hivens.config.Branding
 import hivens.auth.AuthProvider
@@ -369,7 +369,26 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
         // `Res.readBytes(...)` so it doesn't need a Painter here.
         val windowIcon = painterResource(Res.drawable.icon)
 
-        // ── Tray init on background thread ────────────────────────────
+        // Localized tray labels, derived from the active locale's strings.
+        // Strings is a data class, so its structural equality lets the
+        // locale-reactive effect below re-fire only when a label actually
+        // changes -- not on every unrelated recomposition.
+        val trayLabels = TrayManager.Strings(
+            statusIdle    = s.trayStatusIdle,
+            statusRunning = s.trayStatusRunning,
+            show          = s.trayShow,
+            console       = s.trayConsole,
+            servers       = s.trayServers,
+            noServers     = s.trayNoServers,
+            exit          = s.trayExit,
+        )
+
+        // ── Tray bring-up + server population (run once) ──────────────
+        // The IO ordering here is load-bearing: seed the tray from the disk
+        // cache BEFORE init() so the first published menu already carries
+        // servers, then init, then overwrite with the live dashboard fetch.
+        // Callback wiring and locale-reactive labels are split into their own
+        // focused effects below.
         LaunchedEffect(Unit) {
             withContext(Dispatchers.IO) {
                 // Stale-while-revalidate: seed [TrayManager] from the disk
@@ -388,15 +407,7 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
                     val iconBytes = Res.readBytes("drawable/favicon.png")
                     TrayManager.init(
                         iconStream = iconBytes.inputStream(),
-                        strings    = TrayManager.Strings(
-                            statusIdle    = s.trayStatusIdle,
-                            statusRunning = s.trayStatusRunning,
-                            show          = s.trayShow,
-                            console       = s.trayConsole,
-                            servers       = s.trayServers,
-                            noServers     = s.trayNoServers,
-                            exit          = s.trayExit
-                        ),
+                        strings    = trayLabels,
                         appName    = Branding.TITLE
                     )
                     SystemNotifier.init(appName = Branding.TITLE, appId = NEXIRA_APP_ID, iconBytes = iconBytes)
@@ -405,15 +416,7 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
                         val iconBytes = Res.readBytes("drawable/icon.png")
                         TrayManager.init(
                             iconStream = iconBytes.inputStream(),
-                            strings    = TrayManager.Strings(
-                                statusIdle    = s.trayStatusIdle,
-                                statusRunning = s.trayStatusRunning,
-                                show          = s.trayShow,
-                                console       = s.trayConsole,
-                                servers       = s.trayServers,
-                                noServers     = s.trayNoServers,
-                                exit          = s.trayExit
-                            ),
+                            strings    = trayLabels,
                             appName    = Branding.TITLE
                         )
                         SystemNotifier.init(appName = Branding.TITLE, appId = NEXIRA_APP_ID, iconBytes = iconBytes)
@@ -429,66 +432,6 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
             // with no UI and the user has to kill it.
             if (!TrayManager.isSupported && !isWindowVisible) {
                 isWindowVisible = true
-            }
-
-            // ── Callbacks ─────────────────────────────────────────────
-            TrayManager.onShowWindow = {
-                SwingUtilities.invokeLater { isWindowVisible = true }
-            }
-
-            // Same restore behaviour when the user clicks the tray-hint banner
-            // (or its "Show window" action) -- libnotify fires on its own
-            // thread, so hop to the AWT thread before touching window state.
-            SystemNotifier.onShowWindow = {
-                SwingUtilities.invokeLater { isWindowVisible = true }
-            }
-
-            TrayManager.onExit = {
-                SwingUtilities.invokeLater {
-                    // Real impl pops the chaos close-dialog (during April Fools
-                    // window); NoOp invokes onActualClose synchronously. The
-                    // visibility flip is unconditional during chaos so the
-                    // dialog isn't hidden behind a minimized window.
-                    if (af.isActive()) isWindowVisible = true
-                    af.requestCloseDialog { exitApplication() }
-                }
-            }
-
-            TrayManager.onShowConsole = {
-                SwingUtilities.invokeLater { gameConsole.show() }
-            }
-
-            TrayManager.onLaunchServer = { server ->
-                applicationScope.launch {
-                    val credentials = credentialsManager.load()
-                    if (credentials?.cachedPassword != null) {
-                        try {
-                            val session = try {
-                                authService.login(
-                                    credentials.playerName,
-                                    credentials.cachedPassword!!,
-                                    server.assetDir,
-                                )
-                            } catch (_: TwoFactorRequiredException) {
-                                // Tray-launched 2FA accounts: same trust-the-cache
-                                // policy as the auto-login path. controller.launch
-                                // augments the session with a cached manifest if
-                                // needed (and reports cleanly when the cache is
-                                // empty, which is its job).
-                                credentials.copy(serverId = server.assetDir)
-                            }
-                            launchDriver.observe(LaunchTarget.Server(server))
-                            controller.launch(session, server)
-                        } catch (e: Exception) {
-                            LoggerFactory.getLogger("Main").warn(
-                                "Tray-launched login failed for ${server.assetDir}", e
-                            )
-                            SwingUtilities.invokeLater { isWindowVisible = true }
-                        }
-                    } else {
-                        SwingUtilities.invokeLater { isWindowVisible = true }
-                    }
-                }
             }
 
             // ── Populate server list ───────────────────────────────────
@@ -566,6 +509,78 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
                     autoSyncService.syncAll(dashboardServers)
                 }
             }
+        }
+
+        // ── Tray / notifier callbacks (run once) ──────────────────────
+        // Every captured reference is a stable singleton or remembered state,
+        // so a Unit key is correct -- the assignments need to happen exactly
+        // once, not on every recomposition.
+        LaunchedEffect(Unit) {
+            TrayManager.onShowWindow = {
+                SwingUtilities.invokeLater { isWindowVisible = true }
+            }
+
+            // libnotify fires on its own thread, so hop to the AWT thread
+            // before touching window state.
+            SystemNotifier.onShowWindow = {
+                SwingUtilities.invokeLater { isWindowVisible = true }
+            }
+
+            TrayManager.onExit = {
+                SwingUtilities.invokeLater {
+                    // Real impl pops the chaos close-dialog (during April Fools
+                    // window); NoOp invokes onActualClose synchronously. The
+                    // visibility flip is unconditional during chaos so the
+                    // dialog isn't hidden behind a minimized window.
+                    if (af.isActive()) isWindowVisible = true
+                    af.requestCloseDialog { exitApplication() }
+                }
+            }
+
+            TrayManager.onShowConsole = {
+                SwingUtilities.invokeLater { gameConsole.show() }
+            }
+
+            TrayManager.onLaunchServer = { server ->
+                applicationScope.launch {
+                    val credentials = credentialsManager.load()
+                    if (credentials?.cachedPassword != null) {
+                        try {
+                            val session = try {
+                                authService.login(
+                                    credentials.playerName,
+                                    credentials.cachedPassword!!,
+                                    server.assetDir,
+                                )
+                            } catch (_: TwoFactorRequiredException) {
+                                // Tray-launched 2FA accounts: same trust-the-cache
+                                // policy as the auto-login path. controller.launch
+                                // augments the session with a cached manifest if
+                                // needed (and reports cleanly when the cache is
+                                // empty, which is its job).
+                                credentials.copy(serverId = server.assetDir)
+                            }
+                            launchDriver.observe(LaunchTarget.Server(server))
+                            controller.launch(session, server)
+                        } catch (e: Exception) {
+                            LoggerFactory.getLogger("Main").warn(
+                                "Tray-launched login failed for ${server.assetDir}", e
+                            )
+                            SwingUtilities.invokeLater { isWindowVisible = true }
+                        }
+                    } else {
+                        SwingUtilities.invokeLater { isWindowVisible = true }
+                    }
+                }
+            }
+        }
+
+        // ── Locale-reactive tray labels ───────────────────────────────
+        // init() captures the first locale's labels and no-ops afterwards;
+        // this republishes them when the user switches language at runtime so
+        // the tray menu + tooltip don't stay stuck in the startup locale.
+        LaunchedEffect(trayLabels) {
+            TrayManager.updateStrings(trayLabels)
         }
 
         // First-time-only OS notification when the window hides to the tray:
@@ -716,30 +731,38 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
             // card (follows the active style via glassSurfaceAlpha), rounded
             // corners, inner padding. Invoked by the kernel only when a widget
             // carries chrome, so default-styled widgets pay nothing.
-            val chromeRenderer: WidgetChromeRenderer = { chrome, content ->
-                val glass = glassSurfaceAlpha(chrome.glassAlphaPct / 100f)
-                androidx.compose.foundation.layout.Box(
-                    Modifier
-                        // Padding is an OUTER inset, applied before the backing, so
-                        // the rounded glass hugs the widget's own view -- the corner
-                        // radius describes the widget, not the padded footprint.
-                        // Padding the right panel insets it from the edges without
-                        // the rounding detaching onto the padded box.
-                        .padding(
-                            PaddingValues(
-                                start  = chrome.effectiveStart.dp,
-                                top    = chrome.effectiveTop.dp,
-                                end    = chrome.effectiveEnd.dp,
-                                bottom = chrome.effectiveBottom.dp,
-                            ),
-                        )
-                        .then(
-                            if (chrome.cornerRadiusDp > 0)
-                                Modifier.clip(RoundedCornerShape(chrome.cornerRadiusDp.dp))
-                            else Modifier,
-                        )
-                        .background(glass),
-                ) { content() }
+            // Remembered so its identity stays stable across AppShell
+            // recomposes. It is provided through the *static*
+            // LocalWidgetChromeRenderer, so a fresh identity each recompose
+            // would invalidate the whole content subtree, not just chrome
+            // consumers. The lambda captures nothing mutable -- glassSurfaceAlpha
+            // reads its CompositionLocals at invoke time, inside composition.
+            val chromeRenderer: WidgetChromeRenderer = remember {
+                { chrome, content ->
+                    val glass = glassSurfaceAlpha(chrome.glassAlphaPct / 100f)
+                    androidx.compose.foundation.layout.Box(
+                        Modifier
+                            // Padding is an OUTER inset, applied before the backing, so
+                            // the rounded glass hugs the widget's own view -- the corner
+                            // radius describes the widget, not the padded footprint.
+                            // Padding the right panel insets it from the edges without
+                            // the rounding detaching onto the padded box.
+                            .padding(
+                                PaddingValues(
+                                    start  = chrome.effectiveStart.dp,
+                                    top    = chrome.effectiveTop.dp,
+                                    end    = chrome.effectiveEnd.dp,
+                                    bottom = chrome.effectiveBottom.dp,
+                                ),
+                            )
+                            .then(
+                                if (chrome.cornerRadiusDp > 0)
+                                    Modifier.clip(RoundedCornerShape(chrome.cornerRadiusDp.dp))
+                                else Modifier,
+                            )
+                            .background(glass),
+                    ) { content() }
+                }
             }
             CompositionLocalProvider(
                 LocalCustomization                       provides customization,
@@ -894,12 +917,20 @@ fun AppRoot(
     val routingCallFactory: Call.Factory       = koinInject()
     val af = LocalAprilFools.current
 
-    setSingletonImageLoaderFactory { context ->
-        ImageLoader.Builder(context)
-            .components {
-                add(OkHttpNetworkFetcherFactory(callFactory = { routingCallFactory }))
-            }
-            .build()
+    // Register the routing-aware Coil loader exactly once. setSafe is
+    // idempotent (it no-ops once a loader exists), but allocating the factory
+    // on every AppRoot recompose is wasted work and brushes against coil's
+    // "called after the first get()" guard, so gate it behind remember. The
+    // calculation runs synchronously in the composition pass -- before any
+    // child image composable triggers a get().
+    remember(routingCallFactory) {
+        SingletonImageLoader.setSafe { context ->
+            ImageLoader.Builder(context)
+                .components {
+                    add(OkHttpNetworkFetcherFactory(callFactory = { routingCallFactory }))
+                }
+                .build()
+        }
     }
 
     var appState      by remember { mutableStateOf<AppState>(AppState.Loading) }
@@ -981,9 +1012,6 @@ fun AppRoot(
                 onBackgroundSettingsChanged = { newSettings ->
                     backgroundSettings = newSettings
                     backgroundManager.save(newSettings)
-                    if (!newSettings.enabled || newSettings.imagePath != backgroundSettings.imagePath) {
-                        System.gc()
-                    }
                 },
                 customization              = customization,
                 onCustomizationChanged     = onCustomizationChanged,

@@ -169,6 +169,25 @@ object TrayManager {
         rebuildMenu()
     }
 
+    /**
+     * Replace the localized menu labels after a runtime locale switch and
+     * republish the menu + tooltip. [init] captures the first locale's strings
+     * (and no-ops on later calls), so without this the tray menu and tooltip
+     * stay stuck in the startup language when the user changes the app locale.
+     * Safe before the tray is up: rebuildMenu / setTooltip both guard on a live
+     * tray, so an early call just stores the labels for the eventual init.
+     */
+    fun updateStrings(newStrings: Strings) {
+        strings = newStrings
+        rebuildMenu()
+        val statusPart = when {
+            gameRunning && gameServerName != null -> gameServerName!!
+            gameRunning -> newStrings.statusRunning
+            else        -> newStrings.statusIdle
+        }
+        tray?.setTooltip("$appName | $statusPart")
+    }
+
     fun setGameStatus(running: Boolean, serverName: String? = null) {
         gameRunning = running
         gameServerName = serverName

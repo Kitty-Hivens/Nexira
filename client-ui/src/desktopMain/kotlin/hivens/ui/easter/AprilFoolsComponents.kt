@@ -62,16 +62,16 @@ fun AprilFoolsWrapper(
 
     val scope = rememberCoroutineScope()
 
-    LaunchedEffect(Unit) {
-        AprilFoolsEngine.run(
-            scope       = scope,
+    // The engine owns its own child scope (cancelled in stop()); start it and
+    // tear it down on dispose from one effect so the lifecycle is explicit and
+    // a re-mount can't leave a second engine running against the global state.
+    DisposableEffect(Unit) {
+        AprilFoolsEngine.start(
+            parent      = scope,
             cursorState = { pixelCursorState.value },
             windowSize  = { windowSize },
         )
-    }
-
-    DisposableEffect(Unit) {
-        onDispose { ChaosState.clean() }
+        onDispose { AprilFoolsEngine.stop() }
     }
 
     CompositionLocalProvider(
