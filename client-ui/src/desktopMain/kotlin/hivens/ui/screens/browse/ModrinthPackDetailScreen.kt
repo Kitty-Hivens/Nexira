@@ -14,6 +14,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -68,7 +69,7 @@ fun ModrinthPackDetailScreen(
 
     var state by remember(projectId) { mutableStateOf<ModrinthDetailState>(ModrinthDetailState.Loading) }
     var retryTick by remember(projectId) { mutableIntStateOf(0) }
-    var installingVersion by remember(projectId) { mutableStateOf<String?>(null) }
+    var installing by remember(projectId) { mutableStateOf<InstallProgress?>(null) }
     var installError by remember(projectId) { mutableStateOf<String?>(null) }
 
     LaunchedEffect(projectId, retryTick) {
@@ -123,12 +124,12 @@ fun ModrinthPackDetailScreen(
                 modifier   = Modifier.fillMaxSize(),
             )
             is ModrinthDetailState.Loaded -> DetailBody(
-                details           = st.details,
-                installingVersion = installingVersion,
-                installError      = installError,
-                onInstall         = { version ->
+                details      = st.details,
+                installing   = installing,
+                installError = installError,
+                onInstall    = { version ->
                     installError = null
-                    installingVersion = version.id
+                    installing = InstallProgress(version.id, 0, 0, "")
                     scope.launch {
                         try {
                             val instance = coordinator.install(
@@ -140,12 +141,15 @@ fun ModrinthPackDetailScreen(
                                     iconUrl = st.details.iconUrl,
                                 ),
                                 version = version,
+                                progress = { current, total, filename ->
+                                    installing = InstallProgress(version.id, current, total, filename)
+                                },
                             )
                             onInstalled(instance.id)
                         } catch (e: Exception) {
                             installError = e.message ?: s.browseDetailInstallFailedGeneric
                         } finally {
-                            installingVersion = null
+                            installing = null
                         }
                     }
                 },
@@ -157,7 +161,7 @@ fun ModrinthPackDetailScreen(
 @Composable
 private fun DetailBody(
     details: CataloguePackDetails,
-    installingVersion: String?,
+    installing: InstallProgress?,
     installError: String?,
     onInstall: (CataloguePackVersion) -> Unit,
 ) {
@@ -191,6 +195,46 @@ private fun DetailBody(
             )
         }
 
+        if (installing != null) {
+            val p = installing
+            Column(
+                modifier            = Modifier
+                    .fillMaxWidth()
+                    .clip(MaterialTheme.shapes.medium)
+                    .background(CelestiaTheme.colors.surface)
+                    .padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text(
+                    text       = s.browseDetailInstallRunningTitle,
+                    style      = MaterialTheme.typography.titleSmall,
+                    color      = CelestiaTheme.colors.textPrimary,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text  = if (p.total > 0) {
+                        s.browseDetailInstallProgress(p.filename, p.current, p.total)
+                    } else {
+                        s.browseDetailInstallStarting
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = CelestiaTheme.colors.textSecondary,
+                )
+                if (p.total > 0) {
+                    LinearProgressIndicator(
+                        progress = { p.current.toFloat() / p.total },
+                        modifier = Modifier.fillMaxWidth(),
+                        color    = CelestiaTheme.colors.primary,
+                    )
+                } else {
+                    LinearProgressIndicator(
+                        modifier = Modifier.fillMaxWidth(),
+                        color    = CelestiaTheme.colors.primary,
+                    )
+                }
+            }
+        }
+
         Text(
             text       = s.browseDetailVersionTitle,
             style      = MaterialTheme.typography.titleMedium,
@@ -200,8 +244,8 @@ private fun DetailBody(
         details.versions.forEach { v ->
             VersionRow(
                 version       = v,
-                installing    = installingVersion == v.id,
-                anyInstalling = installingVersion != null,
+                installing    = installing?.versionId == v.id,
+                anyInstalling = installing != null,
                 onInstall     = { onInstall(v) },
             )
         }
@@ -306,6 +350,8 @@ private fun VersionRow(
         }
     }
 }
+
+private data class InstallProgress(val versionId: String, val current: Int, val total: Int, val filename: String)
 
 private sealed class ModrinthDetailState {
     object Loading : ModrinthDetailState()
