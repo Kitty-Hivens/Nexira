@@ -31,6 +31,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import hivens.core.api.catalogue.CataloguePack
 import hivens.core.data.PackOrigin
+import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.origin
 import hivens.ui.theme.originGradient
@@ -48,6 +49,7 @@ fun BrowsePackCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val s = LocalStrings.current
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -98,7 +100,9 @@ fun BrowsePackCard(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     pack.mcVersion?.let { MetaChip("MC $it") }
-                    pack.tags.take(2).forEach { MetaChip(it) }
+                    pack.tags.take(3).forEach { tag ->
+                        MetaChip(if (pack.origin == PackOrigin.Modrinth) s.modrinthCategory(tag) else tag)
+                    }
                 }
             }
 

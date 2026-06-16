@@ -19,3 +19,20 @@ internal fun russianPlural(n: Int, one: String, few: String, many: String): Stri
 /** One-vs-other selector for languages with a single plural break (en, de). */
 internal fun twoFormPlural(n: Int, one: String, other: String): String =
     if (n == 1) one else other
+
+/**
+ * Casing/brand fallback for a Modrinth category id with no localized label:
+ * loader ids keep their brand casing, everything else is split on -/_ and
+ * title-cased ("kitchen-sink" -> "Kitchen Sink"). The per-locale
+ * [AppStrings.modrinthCategory] impls translate the modpack taxonomy and
+ * delegate brands + unknowns here.
+ */
+internal fun humanizeCategory(raw: String): String = when (raw) {
+    "fabric"   -> "Fabric"
+    "forge"    -> "Forge"
+    "quilt"    -> "Quilt"
+    "neoforge" -> "NeoForge"
+    else -> raw.split('-', '_', ' ')
+        .filter { it.isNotBlank() }
+        .joinToString(" ") { it.replaceFirstChar(Char::uppercaseChar) }
+}

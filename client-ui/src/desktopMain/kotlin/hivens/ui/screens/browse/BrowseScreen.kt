@@ -13,17 +13,19 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -36,6 +38,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -52,15 +55,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
-import androidx.compose.runtime.rememberCoroutineScope
-import hivens.launcher.PackImportService
-import io.github.vinceglb.filekit.FileKit
-import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
-import io.github.vinceglb.filekit.dialogs.FileKitType
-import io.github.vinceglb.filekit.dialogs.openFilePicker
-import io.github.vinceglb.filekit.path
-import kotlinx.coroutines.launch
-import java.nio.file.Path
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
@@ -68,12 +62,12 @@ import kotlin.time.Duration.Companion.milliseconds
  * switcher (Hivens mirror / Modrinth) drives which [hivens.core.api.interfaces.IPackCatalogueService]
  * the search + grid read from; the search box queries the active source
  * (Modrinth searches its catalogue, the mirror filters its listing client-side).
- * Clicking a card opens the source's detail screen.
+ * Clicking a card opens the source's detail screen. Importing a local pack lives
+ * in Library (it adds to the collection), not here.
  */
 @Composable
 fun BrowseScreen(
     onOpenPack: (CataloguePack) -> Unit,
-    onImported: (instanceId: String) -> Unit,
 ) {
     PuppetScreen("Browse")
 
@@ -86,32 +80,6 @@ fun BrowseScreen(
     var submittedQuery by remember { mutableStateOf("") }
     var state by remember { mutableStateOf<BrowseState>(BrowseState.Loading) }
     var retryTick by remember { mutableIntStateOf(0) }
-
-    val importService: PackImportService = koinInject()
-    val scope = rememberCoroutineScope()
-    var importing by remember { mutableStateOf(false) }
-    var importError by remember { mutableStateOf<String?>(null) }
-
-    // Pick a .mrpack/.zip and import it (Modrinth installs fully; CurseForge is
-    // best-effort once F2 lands). The installed instance opens in Library.
-    fun startImport() {
-        scope.launch {
-            val picked = FileKit.openFilePicker(
-                type = FileKitType.File(extensions = listOf("mrpack", "zip")),
-                dialogSettings = FileKitDialogSettings(title = s.browseImport),
-            )
-            val path = picked?.path ?: return@launch
-            importing = true
-            importError = null
-            try {
-                onImported(importService.import(Path.of(path)).id)
-            } catch (e: Exception) {
-                importError = e.message ?: s.browseDetailInstallFailedGeneric
-            } finally {
-                importing = false
-            }
-        }
-    }
 
     PuppetClick("browse.retry") { retryTick++ }
     PuppetField("browse.search", query) { query = it }
@@ -136,71 +104,85 @@ fun BrowseScreen(
         }
     }
 
-    Column(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 20.dp)) {
+    Column(Modifier.fillMaxSize()) {
+        // Slim top bar -- title only, same chrome as the detail screens.
         Row(
-            modifier              = Modifier.fillMaxWidth(),
-            verticalAlignment     = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier          = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
                 text       = s.browseTitle,
-                style      = MaterialTheme.typography.headlineSmall,
+                style      = MaterialTheme.typography.titleLarge,
                 color      = CelestiaTheme.colors.textPrimary,
                 fontWeight = FontWeight.Bold,
             )
-            Button(
-                onClick = { startImport() },
-                enabled = !importing,
-                shape   = MaterialTheme.shapes.small,
-                colors  = ButtonDefaults.buttonColors(
-                    containerColor = CelestiaTheme.colors.primary,
-                    contentColor   = Color.White,
-                ),
-            ) {
-                if (importing) {
-                    CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
-                } else {
-                    Text(s.browseImport, fontWeight = FontWeight.SemiBold)
+        }
+        HorizontalDivider(color = CelestiaTheme.colors.outline.copy(alpha = 0.4f))
+
+        Column(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 16.dp)) {
+            // Source switcher -- one chip per registered catalogue origin.
+            if (origins.size > 1) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    origins.forEach { o ->
+                        SourceTab(label = originLabel(o), selected = o == origin) { origin = o }
+                    }
                 }
+                Spacer(Modifier.height(12.dp))
+            }
+
+            SearchField(
+                value         = query,
+                onValueChange = { query = it },
+                placeholder   = s.browseSearchPlaceholder,
+            )
+            Spacer(Modifier.height(16.dp))
+
+            when (val st = state) {
+                BrowseState.Loading -> BrowseLoading()
+                BrowseState.Empty   -> BrowseEmpty(onRetry = { retryTick++ })
+                is BrowseState.Error -> BrowseError(message = st.message, onRetry = { retryTick++ })
+                is BrowseState.Loaded -> BrowseList(packs = st.packs, onOpenPack = onOpenPack)
             }
         }
-        Spacer(Modifier.height(4.dp))
-        Text(
-            text  = s.browseSubtitle,
-            style = MaterialTheme.typography.bodyMedium,
-            color = CelestiaTheme.colors.textSecondary,
-        )
-        Spacer(Modifier.height(16.dp))
+    }
+}
 
-        // Source switcher -- one chip per registered catalogue origin.
-        if (origins.size > 1) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                origins.forEach { o ->
-                    SourceTab(label = originLabel(o), selected = o == origin) { origin = o }
+/** Compact, rounded, filled search field (a bare OutlinedTextField sat too tall and read as a form input). */
+@Composable
+private fun SearchField(value: String, onValueChange: (String) -> Unit, placeholder: String) {
+    BasicTextField(
+        value         = value,
+        onValueChange = onValueChange,
+        singleLine    = true,
+        textStyle     = MaterialTheme.typography.bodyMedium.copy(color = CelestiaTheme.colors.textPrimary),
+        cursorBrush   = SolidColor(CelestiaTheme.colors.primary),
+        modifier      = Modifier.fillMaxWidth(),
+    ) { inner ->
+        Row(
+            modifier          = Modifier
+                .fillMaxWidth()
+                .clip(MaterialTheme.shapes.large)
+                .background(CelestiaTheme.colors.surface)
+                .padding(horizontal = 14.dp, vertical = 11.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector        = Icons.Default.Search,
+                contentDescription = null,
+                tint               = CelestiaTheme.colors.textSecondary,
+                modifier           = Modifier.size(18.dp),
+            )
+            Spacer(Modifier.width(10.dp))
+            Box(Modifier.weight(1f)) {
+                if (value.isEmpty()) {
+                    Text(
+                        text  = placeholder,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = CelestiaTheme.colors.textSecondary,
+                    )
                 }
+                inner()
             }
-            Spacer(Modifier.height(12.dp))
-        }
-
-        OutlinedTextField(
-            value         = query,
-            onValueChange = { query = it },
-            singleLine    = true,
-            modifier      = Modifier.fillMaxWidth(),
-            leadingIcon   = { Icon(Icons.Default.Search, contentDescription = null) },
-        )
-        Spacer(Modifier.height(16.dp))
-
-        importError?.let { err ->
-            Text(err, style = MaterialTheme.typography.bodySmall, color = CelestiaTheme.colors.error)
-            Spacer(Modifier.height(8.dp))
-        }
-
-        when (val st = state) {
-            BrowseState.Loading -> BrowseLoading()
-            BrowseState.Empty   -> BrowseEmpty(onRetry = { retryTick++ })
-            is BrowseState.Error -> BrowseError(message = st.message, onRetry = { retryTick++ })
-            is BrowseState.Loaded -> BrowseList(packs = st.packs, onOpenPack = onOpenPack)
         }
     }
 }
