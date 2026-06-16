@@ -19,20 +19,29 @@ object OptionalContentRules {
 
     /**
      * Seed toggles for a fresh install: one [ContentToggle] per optional mod at
-     * its manifest `default_enabled`. Required mods are omitted (always on).
+     * its manifest `default_enabled`. Keyed by [SmrtModEntry.stableKey] so the
+     * choice survives a pack-version bump. Required mods are omitted (always on).
      */
     fun defaultToggles(mods: List<SmrtModEntry>): List<ContentToggle> =
-        optionalMods(mods).map { ContentToggle(it.filename, it.defaultEnabled) }
+        optionalMods(mods).map { ContentToggle(it.stableKey, it.defaultEnabled) }
 
     /**
      * Effective `filename -> enabled` for the sync path. Required mods are always
      * enabled; an optional uses the user's [toggles] entry, else its manifest
      * `default_enabled`.
+     *
+     * A toggle is matched by [SmrtModEntry.stableKey] first, then by [filename]
+     * as a fallback so state persisted before stable keys existed (#339) still
+     * applies until it is rewritten on the next toggle.
      */
     fun enabledState(mods: List<SmrtModEntry>, toggles: List<ContentToggle>): Map<String, Boolean> {
         val userState = toggles.associate { it.entryId to it.enabled }
         return mods.associate { mod ->
-            mod.filename to if (mod.required) true else (userState[mod.filename] ?: mod.defaultEnabled)
+            mod.filename to if (mod.required) {
+                true
+            } else {
+                userState[mod.stableKey] ?: userState[mod.filename] ?: mod.defaultEnabled
+            }
         }
     }
 

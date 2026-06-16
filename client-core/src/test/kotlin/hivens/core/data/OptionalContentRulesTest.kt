@@ -19,6 +19,8 @@ class OptionalContentRulesTest {
         requires: List<String> = emptyList(),
         optionalRequires: List<String> = emptyList(),
         role: String? = null,
+        slug: String? = null,
+        projectId: String? = null,
     ): SmrtModEntry {
         val hasDisplay = incompatibleWith.isNotEmpty() || requires.isNotEmpty() ||
             optionalRequires.isNotEmpty() || role != null
@@ -28,7 +30,12 @@ class OptionalContentRulesTest {
             sizeBytes = 1,
             required = required,
             defaultEnabled = defaultEnabled,
-            source = SmrtSource.SmrtStatic("https://example/$filename"),
+            slug = slug,
+            source = if (projectId != null) {
+                SmrtSource.Modrinth(projectId = projectId, versionId = "$projectId-v1")
+            } else {
+                SmrtSource.SmrtStatic("https://example/$filename")
+            },
             display = if (!hasDisplay) null else SmrtDisplay(
                 incompatibleWith = incompatibleWith,
                 role = role,
@@ -133,5 +140,49 @@ class OptionalContentRulesTest {
         val after = OptionalContentRules.applyToggle(cyclic, mapOf("a.jar" to false, "b.jar" to false), "a.jar", true)
         assertEquals(true, after["a.jar"])
         assertEquals(true, after["b.jar"])
+    }
+
+    @Test
+    fun `stableKey prefers slug then modrinth project id then filename`() {
+        assertEquals("recipe-viewer", mod("jei-1.0.jar", slug = "recipe-viewer").stableKey)
+        assertEquals("modrinth:P7dR8mSH", mod("jei-1.0.jar", projectId = "P7dR8mSH").stableKey)
+        assertEquals("jei-1.0.jar", mod("jei-1.0.jar").stableKey)
+        // an explicit slug wins over the Modrinth fallback
+        assertEquals("recipe-viewer", mod("jei-1.0.jar", slug = "recipe-viewer", projectId = "P7dR8mSH").stableKey)
+    }
+
+    @Test
+    fun `defaultToggles key on stableKey not filename`() {
+        val toggles = OptionalContentRules.defaultToggles(
+            listOf(mod("jei-1.0.jar", required = false, defaultEnabled = false, projectId = "P7dR8mSH")),
+        )
+        assertEquals(1, toggles.size)
+        assertEquals("modrinth:P7dR8mSH", toggles.first().entryId)
+    }
+
+    @Test
+    fun `a toggle survives a pack-version bump when the stable key is unchanged`() {
+        // The exact #339 failure: user disables a default-on Modrinth optional,
+        // the pack updates (filename carries the new version), the project id is
+        // unchanged -- the choice must survive instead of reverting to default.
+        val v1 = mod("jei-1.12.2-4.16.1.301.jar", required = false, defaultEnabled = true, projectId = "P7dR8mSH")
+        val saved = listOf(ContentToggle(v1.stableKey, enabled = false))
+
+        val v2 = mod("jei-1.12.2-4.17.0.jar", required = false, defaultEnabled = true, projectId = "P7dR8mSH")
+        val state = OptionalContentRules.enabledState(listOf(v2), saved)
+
+        assertEquals(false, state["jei-1.12.2-4.17.0.jar"], "off-toggle survives the version bump via stableKey")
+    }
+
+    @Test
+    fun `a legacy filename-keyed toggle is still honored`() {
+        // State persisted before #339 keyed by filename for a Modrinth mod; the
+        // fallback lookup must still apply it (until rewritten by the next toggle).
+        val m = mod("jei-1.12.2-4.16.1.301.jar", required = false, defaultEnabled = true, projectId = "P7dR8mSH")
+        val legacy = listOf(ContentToggle("jei-1.12.2-4.16.1.301.jar", enabled = false))
+
+        val state = OptionalContentRules.enabledState(listOf(m), legacy)
+
+        assertEquals(false, state["jei-1.12.2-4.16.1.301.jar"], "legacy filename-keyed toggle still applies")
     }
 }

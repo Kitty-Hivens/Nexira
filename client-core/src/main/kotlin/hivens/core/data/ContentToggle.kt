@@ -17,10 +17,12 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class ContentToggle(
     /**
-     * Origin-defined identifier for the entry: the mod's `filename`,
-     * the asset's `dest`, or whatever the manifest uses as its
-     * primary key. Stable across pack versions so toggle state
-     * survives a pack-version bump.
+     * Version-stable identifier for the entry: a mod's
+     * [hivens.core.api.dto.smrt.SmrtModEntry.stableKey] (curator slug ->
+     * Modrinth project id -> filename), an asset's `dest`, or whatever the
+     * manifest uses as its primary key. Chosen so toggle state survives a
+     * pack-version bump rather than orphaning when a versioned filename
+     * changes. Reads still accept a legacy filename-keyed value (#339).
      */
     val entryId: String,
     val enabled: Boolean,

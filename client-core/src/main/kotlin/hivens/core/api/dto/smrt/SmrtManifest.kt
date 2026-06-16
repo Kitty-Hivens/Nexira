@@ -135,10 +135,31 @@ data class SmrtModEntry(
      * which are always installed.
      */
     @SerialName("default_enabled") val defaultEnabled: Boolean = true,
+    /**
+     * Curator-assigned stable identity for an optional entry. Used as the
+     * [hivens.core.data.ContentToggle] key (via [stableKey]) so a user's
+     * on/off choice survives a pack-version bump -- the [filename] carries the
+     * mod version and changes on every update. Optional and additive: absent
+     * means [stableKey] falls back to the Modrinth project id, then the
+     * filename. The mirror should author this for non-Modrinth optionals.
+     */
+    val slug: String? = null,
     @Serializable(with = SmrtSourceLenientSerializer::class)
     val source: SmrtSource,
     val display: SmrtDisplay? = null,
-)
+) {
+    /**
+     * Version-stable key for persisting optional-content toggles. Prefers the
+     * curator [slug], then a Modrinth `project_id`, then the [filename] as a
+     * last resort (which DOES change across versions -- it keeps pre-slug packs
+     * keyed on something, at the cost of orphaning on a bump). Computed, so it
+     * is not serialized. See issue #339.
+     */
+    val stableKey: String
+        get() = slug
+            ?: (source as? SmrtSource.Modrinth)?.let { "modrinth:${it.projectId}" }
+            ?: filename
+}
 
 @Serializable
 data class SmrtAssetEntry(
