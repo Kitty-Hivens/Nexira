@@ -91,7 +91,7 @@ fun ModRowPanel(
             if (toggle != null) {
                 Checkbox(
                     checked         = toggle.checked,
-                    onCheckedChange = if (toggle.locked) null else toggle.onToggle,
+                    onCheckedChange = if (toggle.locked) null else { enable -> toggle.onToggle(mod.filename, enable) },
                     enabled         = !toggle.locked,
                     modifier        = Modifier.size(24.dp),
                 )
@@ -150,11 +150,15 @@ enum class Emphasis { Primary, Alternative }
  * checked, disabled box; otherwise [checked] is the optional mod's current state
  * and [onToggle] flips it. Null on a [ModRowPanel] means no checkbox (e.g. a
  * role-group alternative, where selection is its own UI).
+ *
+ * [onToggle] takes the mod's filename so a single hoisted callback can serve
+ * every row -- a per-row closure would change ModToggle's identity each
+ * recompose and stop ModRowPanel from skipping.
  */
 data class ModToggle(
     val checked: Boolean,
     val locked: Boolean,
-    val onToggle: (Boolean) -> Unit,
+    val onToggle: (filename: String, enable: Boolean) -> Unit,
 )
 
 @Composable

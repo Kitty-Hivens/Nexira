@@ -152,7 +152,7 @@ private fun LoadedBody(
     val s = LocalStrings.current
     val listState = rememberLazyListState()
 
-    val optionalMods = OptionalContentRules.optionalMods(manifest.mods)
+    val optionalMods = remember(manifest) { OptionalContentRules.optionalMods(manifest.mods) }
     // Key on instance.id, not manifest.packId: two installed instances of the
     // same pack reuse this composable but carry independent optionalContent;
     // keying on the pack id would leak the previous instance's checkbox state
@@ -160,25 +160,36 @@ private fun LoadedBody(
     var enabledState by remember(instance.id) {
         mutableStateOf(OptionalContentRules.enabledState(manifest.mods, instance.optionalContent))
     }
-    val onToggleOptional: (String, Boolean) -> Unit = { filename, enable ->
-        val next = OptionalContentRules.applyToggle(manifest.mods, enabledState, filename, enable)
-        enabledState = next
-        val toggles = optionalMods.map { ContentToggle(it.filename, next[it.filename] ?: it.defaultEnabled) }
-        // Hand the write to the controller's long-lived scope. Doing this on a
-        // rememberCoroutineScope() one cancelled mid-flight when the user
-        // navigated away from the Content tab, so the toggle silently reverted.
-        controller.setOptionalModsAsync(instance, manifest, toggles)
+    // One stable (filename, enable) callback shared by every row. Without
+    // remember, each recompose handed every ModRowPanel a fresh lambda identity,
+    // so a single toggle re-rendered the whole visible list. It reads
+    // enabledState fresh through its delegate at click time; the captured
+    // instance's identity fields (id, dir, name) are immutable and its
+    // optionalContent is overwritten by `toggles` downstream, so freezing the
+    // first instance object is safe.
+    val onToggleOptional: (String, Boolean) -> Unit = remember(manifest, instance.id) {
+        { filename, enable ->
+            val next = OptionalContentRules.applyToggle(manifest.mods, enabledState, filename, enable)
+            enabledState = next
+            val toggles = optionalMods.map { ContentToggle(it.filename, next[it.filename] ?: it.defaultEnabled) }
+            // Hand the write to the controller's long-lived scope. Doing this on a
+            // rememberCoroutineScope() one cancelled mid-flight when the user
+            // navigated away from the Content tab, so the toggle silently reverted.
+            controller.setOptionalModsAsync(instance, manifest, toggles)
+        }
     }
     // Leading checkbox per mod row: required mods are locked-on (checked +
-    // disabled, kept for column alignment), optional mods toggle here.
+    // disabled, kept for column alignment), optional mods toggle via the shared
+    // callback. ModToggle is a data class carrying a stable onToggle reference,
+    // so an unchanged row yields an equal value and ModRowPanel skips.
     fun toggleFor(mod: SmrtModEntry): ModToggle =
         if (mod.required) {
-            ModToggle(checked = true, locked = true, onToggle = {})
+            ModToggle(checked = true, locked = true, onToggle = NO_TOGGLE)
         } else {
             ModToggle(
                 checked = enabledState[mod.filename] ?: mod.defaultEnabled,
                 locked = false,
-                onToggle = { enable -> onToggleOptional(mod.filename, enable) },
+                onToggle = onToggleOptional,
             )
         }
 
@@ -274,6 +285,10 @@ private fun LoadedBody(
         )
     }
 }
+
+// Shared no-op for required-mod rows: a fresh `{}` each call would give every
+// required row a new ModToggle identity and defeat skipping, so reuse one.
+private val NO_TOGGLE: (String, Boolean) -> Unit = { _, _ -> }
 
 private fun SmrtModEntry.libraryLike(): Boolean =
     display?.category?.lowercase()?.let { it == "lib" || it == "library" } == true

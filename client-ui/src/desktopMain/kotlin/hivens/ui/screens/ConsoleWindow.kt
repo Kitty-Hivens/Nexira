@@ -102,7 +102,6 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Window
@@ -142,7 +141,7 @@ private val FONT_SIZES = listOf(11, 12, 14)
 // tokens (the yellow search highlight, the orange pause accent) live as
 // constants -- everything else maps to a CelestiaColors role and follows
 // the user's theme + customization overrides.
-private data class ConsolePalette(
+internal data class ConsolePalette(
     val textPrimary:    Color,
     val textSecondary:  Color,
     val severityInfo:   Color,
@@ -172,7 +171,7 @@ private val CONSOLE_PAUSE_ACCENT   = Color(0xFFFFA726)
 // the per-entry severity spans for the gutter, plus the scalar counts the
 // toolbar / footer show. Everything the UI needs is computed once on
 // Dispatchers.Default and swapped in together, so composition stays O(1).
-private data class ConsoleRender(
+internal data class ConsoleRender(
     val annotated:      AnnotatedString,
     val ranges:         List<IntRange>,
     val lineSeverities: List<LineSeverity>,
@@ -184,11 +183,35 @@ private data class ConsoleRender(
 
 private val EMPTY_RENDER = ConsoleRender(AnnotatedString(""), emptyList(), emptyList(), 0, 0, 0, 0)
 
-private data class LineSeverity(
+internal data class LineSeverity(
     val startOffset: Int,
     val endOffset:   Int,
     val type:        LogType,
 )
+
+// Colour role of one span, resolved to an actual SpanStyle only in the styling
+// pass. Keeping the structural pass palette-free is what lets a theme change
+// skip the expensive filter/regex/annotate rebuild -- see [buildConsoleDoc].
+internal enum class SpanRole { Divider, Info, Warn, Error, Marker, Search }
+
+internal class DocSpan(val start: Int, val end: Int, val role: SpanRole)
+
+// Palette-independent render document: the plain text, the span layout (roles
+// not colours), the F3/n match ranges, the gutter severities, and the scalar
+// counts. Built once per content / filter / search change; [styleDoc] colours
+// it per palette.
+internal data class ConsoleDoc(
+    val text:           String,
+    val spans:          List<DocSpan>,
+    val ranges:         List<IntRange>,
+    val lineSeverities: List<LineSeverity>,
+    val filteredCount:  Int,
+    val totalCount:     Int,
+    val warnCount:      Int,
+    val errorCount:     Int,
+)
+
+private val EMPTY_DOC = ConsoleDoc("", emptyList(), emptyList(), emptyList(), 0, 0, 0, 0)
 
 /**
  * Where [ConsoleContent] reads its entries from.
@@ -363,13 +386,17 @@ internal fun ConsoleContent(
     // Two-stage filter: severity gates first, then optional query-narrowing when
     // search-as-filter is on (the default leaves search a pure highlight + F3
     // aid). Dividers are kept verbatim so session boundaries stay visible.
-    val render by produceState(
-        initialValue = remember { EMPTY_RENDER },
+    // Stage 1 -- structural pass, OFF the UI thread and palette-free. The whole
+    // O(n) cost (severity/query filter, regex, warn/error counts, span layout)
+    // runs only when content, filters, search, or timestamps change. A theme
+    // tick does NOT re-run this: palette is deliberately not a key here.
+    val doc by produceState(
+        initialValue = remember { EMPTY_DOC },
         entries, filterInfo, filterWarn, filterError,
-        searchAsFilter, effectiveQuery, regexMode, searchRegex, palette, showTimestamps,
+        searchAsFilter, effectiveQuery, regexMode, searchRegex, showTimestamps,
     ) {
         value = withContext(Dispatchers.Default) {
-            buildConsoleRender(
+            buildConsoleDoc(
                 all            = entries,
                 filterInfo     = filterInfo,
                 filterWarn     = filterWarn,
@@ -378,10 +405,21 @@ internal fun ConsoleContent(
                 rawQuery       = effectiveQuery,
                 regexMode      = regexMode,
                 regexCompiled  = searchRegex,
-                palette        = palette,
                 showTimestamps = showTimestamps,
             )
         }
+    }
+
+    // Stage 2 -- styling pass: apply palette colours to the precomputed spans.
+    // Keyed on the doc instance (stable across a pure palette tick) plus the
+    // palette, so a theme change re-runs only this cheap span-colour pass, never
+    // the filter/regex above. Still off-thread so a content flood never styles a
+    // 5000-line buffer on Main.
+    val render by produceState(
+        initialValue = remember { EMPTY_RENDER },
+        doc, palette,
+    ) {
+        value = withContext(Dispatchers.Default) { styleDoc(doc, palette) }
     }
 
     // Clamp current match index when the match set shrinks past it.
@@ -1517,13 +1555,15 @@ private fun handleKey(
     }
 }
 
-// ── AnnotatedString builder ─────────────────────────────────────────────────
-// Single pass over `filtered`: emit one line per entry with severity color,
-// apply ERROR_MARKERS regex highlight, apply search highlight + collect each
-// match's absolute offset for F3/n jumping. DIVIDERs render inline as their
-// own dimmed line.
+// ── Render document builder + styling ────────────────────────────────────────
+// buildConsoleDoc is the structural pass: one walk over the entries emitting the
+// plain text, a palette-free span layout (severity base, ERROR_MARKERS overlay,
+// search overlay), the F3/n match ranges, the gutter severities, and the counts.
+// styleDoc then colours those spans for a given palette. Splitting the two keeps
+// a theme change off the expensive filter/regex/annotate path -- only styleDoc
+// re-runs. DIVIDERs render inline as their own dimmed line.
 
-private fun buildConsoleRender(
+internal fun buildConsoleDoc(
     all: List<LogEntry>,
     filterInfo: Boolean,
     filterWarn: Boolean,
@@ -1532,9 +1572,8 @@ private fun buildConsoleRender(
     rawQuery: String,
     regexMode: Boolean,
     regexCompiled: Regex?,
-    palette: ConsolePalette,
     showTimestamps: Boolean,
-): ConsoleRender {
+): ConsoleDoc {
     // One pass for counts (over ALL entries) + the severity/query filter that
     // produces the displayed list. Severity gates first; query-narrowing only
     // when search-as-filter is on. Dividers always pass so session boundaries
@@ -1565,77 +1604,62 @@ private fun buildConsoleRender(
         if (queryOk) entries.add(e)
     }
 
+    val sb = StringBuilder()
+    val spans = ArrayList<DocSpan>()
     val matches = mutableListOf<IntRange>()
     val severities = mutableListOf<LineSeverity>()
 
-    val annotated = buildAnnotatedString {
-        for ((idx, e) in entries.withIndex()) {
-            val lineStart = length
-            val lineText: String
-            val severityColor: Color
+    for ((idx, e) in entries.withIndex()) {
+        val lineStart = sb.length
+        val lineText: String
 
-            if (e.type == LogType.DIVIDER) {
-                lineText = e.text
-                severityColor = palette.divider
-                withStyle(SpanStyle(color = severityColor, fontWeight = FontWeight.Light)) {
-                    append(lineText)
-                }
-            } else {
-                severityColor = when (e.type) {
-                    LogType.WARN  -> palette.severityWarn
-                    LogType.ERROR -> palette.severityError
-                    // DIVIDER is handled in the if-branch above; INFO is the
-                    // remaining reachable case.
-                    else          -> palette.severityInfo
-                }
-                lineText = if (showTimestamps) "[${e.timestamp}] ${e.text}" else e.text
-                withStyle(SpanStyle(color = severityColor)) {
-                    append(lineText)
-                }
-                if (e.type == LogType.ERROR || e.type == LogType.WARN) {
-                    ERROR_MARKERS.findAll(lineText).forEach { m ->
-                        addStyle(
-                            SpanStyle(color = palette.severityError, fontWeight = FontWeight.Bold),
-                            lineStart + m.range.first,
-                            lineStart + m.range.last + 1,
-                        )
-                    }
+        if (e.type == LogType.DIVIDER) {
+            lineText = e.text
+            sb.append(lineText)
+            spans.add(DocSpan(lineStart, sb.length, SpanRole.Divider))
+        } else {
+            val role = when (e.type) {
+                LogType.WARN  -> SpanRole.Warn
+                LogType.ERROR -> SpanRole.Error
+                // DIVIDER is handled in the if-branch above; INFO is the
+                // remaining reachable case.
+                else          -> SpanRole.Info
+            }
+            lineText = if (showTimestamps) "[${e.timestamp}] ${e.text}" else e.text
+            sb.append(lineText)
+            spans.add(DocSpan(lineStart, sb.length, role))
+            if (e.type == LogType.ERROR || e.type == LogType.WARN) {
+                ERROR_MARKERS.findAll(lineText).forEach { m ->
+                    spans.add(DocSpan(lineStart + m.range.first, lineStart + m.range.last + 1, SpanRole.Marker))
                 }
             }
-            severities.add(LineSeverity(lineStart, length, e.type))
-
-            // Search highlight + match-offset collection, scanning the
-            // just-appended line text directly (no builder readback).
-            if (rawQuery.isNotBlank()) {
-                val matchRanges = if (regexMode) {
-                    regexCompiled?.findAll(lineText)?.map { it.range }?.toList().orEmpty()
-                } else {
-                    findAllSubstring(lineText, rawQuery)
-                }
-                matchRanges.forEach { range ->
-                    if (range.isEmpty()) return@forEach
-                    val absStart = lineStart + range.first
-                    val absEnd   = lineStart + range.last + 1
-                    addStyle(
-                        SpanStyle(
-                            color      = palette.searchMatch,
-                            background = palette.searchMatchBg,
-                            fontWeight = FontWeight.Bold,
-                        ),
-                        absStart,
-                        absEnd,
-                    )
-                    // Inclusive end so the IntRange size mirrors the match span.
-                    matches.add(absStart until absEnd)
-                }
-            }
-
-            if (idx != entries.lastIndex) append('\n')
         }
+        severities.add(LineSeverity(lineStart, sb.length, e.type))
+
+        // Search highlight + match-offset collection, scanning the
+        // just-appended line text directly.
+        if (rawQuery.isNotBlank()) {
+            val matchRanges = if (regexMode) {
+                regexCompiled?.findAll(lineText)?.map { it.range }?.toList().orEmpty()
+            } else {
+                findAllSubstring(lineText, rawQuery)
+            }
+            matchRanges.forEach { range ->
+                if (range.isEmpty()) return@forEach
+                val absStart = lineStart + range.first
+                val absEnd   = lineStart + range.last + 1
+                spans.add(DocSpan(absStart, absEnd, SpanRole.Search))
+                // Inclusive end so the IntRange size mirrors the match span.
+                matches.add(absStart until absEnd)
+            }
+        }
+
+        if (idx != entries.lastIndex) sb.append('\n')
     }
 
-    return ConsoleRender(
-        annotated      = annotated,
+    return ConsoleDoc(
+        text           = sb.toString(),
+        spans          = spans,
         ranges         = matches,
         lineSeverities = severities,
         filteredCount  = entries.size,
@@ -1643,6 +1667,37 @@ private fun buildConsoleRender(
         warnCount      = warnCount,
         errorCount     = errorCount,
     )
+}
+
+// Colour the palette-free [doc] for the active [palette]. Base-line spans are
+// added before their marker / search overlays (preserved by [buildConsoleDoc]'s
+// emission order) so the overlay colour + weight win on the sub-range they
+// cover -- a later addStyle merges over an earlier one.
+internal fun styleDoc(doc: ConsoleDoc, palette: ConsolePalette): ConsoleRender {
+    val annotated = buildAnnotatedString {
+        append(doc.text)
+        for (sp in doc.spans) {
+            addStyle(spanStyleFor(sp.role, palette), sp.start, sp.end)
+        }
+    }
+    return ConsoleRender(
+        annotated      = annotated,
+        ranges         = doc.ranges,
+        lineSeverities = doc.lineSeverities,
+        filteredCount  = doc.filteredCount,
+        totalCount     = doc.totalCount,
+        warnCount      = doc.warnCount,
+        errorCount     = doc.errorCount,
+    )
+}
+
+private fun spanStyleFor(role: SpanRole, p: ConsolePalette): SpanStyle = when (role) {
+    SpanRole.Divider -> SpanStyle(color = p.divider, fontWeight = FontWeight.Light)
+    SpanRole.Info    -> SpanStyle(color = p.severityInfo)
+    SpanRole.Warn    -> SpanStyle(color = p.severityWarn)
+    SpanRole.Error   -> SpanStyle(color = p.severityError)
+    SpanRole.Marker  -> SpanStyle(color = p.severityError, fontWeight = FontWeight.Bold)
+    SpanRole.Search  -> SpanStyle(color = p.searchMatch, background = p.searchMatchBg, fontWeight = FontWeight.Bold)
 }
 
 // Replaces the default BasicTextField right-click menu (Cut / Copy /
