@@ -46,7 +46,6 @@ import hivens.core.time.SystemClock
 import hivens.launcher.cache.CacheFactory
 import hivens.launcher.PackImportService
 import hivens.launcher.PackInstallCoordinator
-import hivens.launcher.curseforge.CurseForgeZipInstaller
 import hivens.launcher.cache.ModrinthCaches
 import hivens.launcher.cache.SmrtPackCaches
 import hivens.launcher.catalogue.MirrorPackCatalogue
@@ -418,16 +417,7 @@ val mirrorModule = module {
     // Install write side: dispatches a (pack, version) by origin onto the
     // mirror sync installer or the Modrinth .mrpack installer.
     single { PackInstallCoordinator(mirrorInstaller = get(), mrpackInstaller = get(), mirrorClient = get()) }
-    single {
-        CurseForgeZipInstaller(
-            json = get(),
-            javaManager = get(),
-            runtimeProvisioner = get(),
-            repository = get(),
-            dataDir = get(),
-        )
-    }
-    single { PackImportService(mrpackInstaller = get(), cfInstaller = get()) }
+    single { PackImportService(mrpackInstaller = get()) }
     single<IPackSyncService> { get<SmrtSyncService>() }
 
     // Smarty -> open-smrt-network swap. Direct channel: GitHub releases +

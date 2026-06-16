@@ -670,16 +670,14 @@ interface AppStrings {
 
     // --- Browse screen ---
     val browseTitle: String
-    val browseSearchPlaceholder: String
+    val browseSubtitle: String
     val browseEmptyTitle: String
     val browseEmptyMessage: String
     val browseErrorTitle: String
     val browseErrorMessage: String
     val browseRetry: String
-    /** Label on the Library action that imports a pack from a local file. */
+    /** Label on the Browse button that imports a pack from a local file. */
     val browseImport: String
-    /** Localized label for a Modrinth category id (e.g. `optimization`); brands/unknowns fall back to a humanized form. */
-    fun modrinthCategory(id: String): String
 
     // --- Browse pack detail ---
     val browseDetailErrorTitle: String
