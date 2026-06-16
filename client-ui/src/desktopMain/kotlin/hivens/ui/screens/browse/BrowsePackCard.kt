@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Icon
@@ -30,8 +32,6 @@ import androidx.compose.ui.unit.dp
 import hivens.core.api.catalogue.CataloguePack
 import hivens.core.data.PackOrigin
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.icons.NxIcon
-import hivens.ui.icons.Symbol
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.origin
 import hivens.ui.theme.originGradient
@@ -106,7 +106,8 @@ fun BrowsePackCard(
                 }
             }
 
-            Symbol(icon = NxIcon.ArrowForwardIos,
+            Icon(
+                imageVector        = Icons.AutoMirrored.Filled.ArrowForwardIos,
                 contentDescription = null,
                 tint               = Color.White.copy(alpha = 0.75f),
                 modifier           = Modifier.size(20.dp),
