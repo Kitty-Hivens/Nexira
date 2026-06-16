@@ -275,7 +275,7 @@ internal fun assembleProfile(
     autoConnect: Boolean,
     modStates: Map<String, Boolean>,
 ): InstanceProfile {
-    val updated = base.copy(
+    return base.copy(
         javaPath     = javaPath.ifBlank { null },
         memoryMb     = memoryMb,
         fixedMemory  = !isAutoMode,
@@ -284,11 +284,11 @@ internal fun assembleProfile(
         windowHeight = winHeight.toIntOrNull() ?: 530,
         fullScreen   = fullScreen,
         autoConnect  = autoConnect,
+        // Merge the editor's canonical toggles over whatever the base carried,
+        // as a fresh map -- the immutable field has value semantics, so no two
+        // profiles ever share one backing map.
+        optionalModsState = base.optionalModsState + modStates,
     )
-    // optionalModsState is a MutableMap that copy() shares by reference; write
-    // the editor's canonical entries onto it.
-    modStates.forEach { (id, state) -> updated.optionalModsState[id] = state }
-    return updated
 }
 
 /**
