@@ -159,6 +159,27 @@ class MrpackInstallerTest {
         assertTrue(Files.exists(libs.resolve("net/minecraft/minecraft/1.20.1/minecraft-1.20.1.jar")), "vanilla client provisioned")
     }
 
+    @Test
+    fun `install stamps Modrinth origin, project id and version from the source`() = runTest {
+        val provider = HttpClientProvider { HttpClient(engine()) }
+        val provisioner = RuntimeProvisioner(
+            librariesDir = tempDir("libs"), assetsDir = tempDir("assets"), clientProvider = provider, json = json,
+            loaderRegistry = LoaderRegistry(emptyList()), osName = "Linux",
+            versionManifestUrl = MANIFEST_URL, resourcesBaseUrl = RES_BASE,
+        )
+        val installer = MrpackInstaller(provider, json, fakeJava, provisioner, FakeRepository(), tempDir("data"))
+
+        val instance = installer.install(
+            buildMrpack(),
+            source = MrpackSource(PackOrigin.Modrinth, id = "AABBCCDD", version = "1.5.0"),
+        )
+
+        assertEquals(PackOrigin.Modrinth, instance.packRef.origin, "Modrinth install is tracked, not Local")
+        assertEquals("AABBCCDD", instance.packRef.id, "pack id is the Modrinth project id")
+        assertEquals("1.5.0", instance.packRef.version)
+        assertEquals("1.5.0", instance.pinnedPackVersion, "pinned to the installed Modrinth version")
+    }
+
     private companion object {
         const val MANIFEST_URL = "https://piston-meta.test/manifest.json"
         const val VERSION_URL = "https://piston-meta.test/1.20.1.json"

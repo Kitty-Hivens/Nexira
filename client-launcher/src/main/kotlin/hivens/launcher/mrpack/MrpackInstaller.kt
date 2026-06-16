@@ -56,6 +56,7 @@ class MrpackInstaller(
 
     suspend fun install(
         mrpack: Path,
+        source: MrpackSource? = null,
         progress: (current: Int, total: Int, filename: String) -> Unit = { _, _, _ -> },
     ): PackInstance = withContext(Dispatchers.IO) {
         ZipFile(mrpack.toFile()).use { zip ->
@@ -92,17 +93,21 @@ class MrpackInstaller(
             // 3. Canonical runtime into the shared roots (idempotent).
             runtimeProvisioner.ensureRuntime(mcVersion, loaderName, loaderVersion, progress)
 
+            // Provenance: a Modrinth install stamps origin/id/version from [source]
+            // so the update flow can find newer versions; a plain local import
+            // (source == null) stays Local with an id derived from the pack name.
+            val pinned = (source?.version ?: index.versionId).ifBlank { null }
             val instance = PackInstance(
                 id = instanceId,
                 packRef = PackReference(
-                    origin = PackOrigin.Local,
-                    id = sanitize(displayName).lowercase(),
-                    version = index.versionId.ifBlank { null },
+                    origin = source?.origin ?: PackOrigin.Local,
+                    id = source?.id ?: sanitize(displayName).lowercase(),
+                    version = pinned,
                 ),
                 displayName = displayName,
                 instanceDirName = instanceDirName,
                 createdAtEpoch = Instant.now().epochSecond,
-                pinnedPackVersion = index.versionId.ifBlank { null },
+                pinnedPackVersion = pinned,
                 runtime = InstanceRuntime(),  // heap left to the global adaptive sizer
                 cachedManifest = CachedManifestSnapshot(
                     minecraftVersion = mcVersion,
@@ -114,6 +119,30 @@ class MrpackInstaller(
             repository.put(instance)
             log.info("mrpack: registered instance {}", instanceId)
             instance
+        }
+    }
+
+    /**
+     * Download a `.mrpack` from [url] to a temp file, install it, then delete
+     * the temp. [source] stamps the instance's origin/id/version so the update
+     * flow can find newer versions later -- this is the Modrinth catalogue
+     * install path. The download uses the same streaming + close pattern as the
+     * per-file fetch so a large pack archive never lands wholly in memory.
+     */
+    suspend fun installFromUrl(
+        url: String,
+        source: MrpackSource,
+        progress: (current: Int, total: Int, filename: String) -> Unit = { _, _, _ -> },
+    ): PackInstance = withContext(Dispatchers.IO) {
+        val tmp = Files.createTempFile("nexira-mrpack-", ".mrpack")
+        try {
+            clientProvider.current.prepareGet(url).execute { resp ->
+                if (!resp.status.isSuccess()) throw IOException("GET $url -> HTTP ${resp.status}")
+                FileOutputStream(tmp.toFile()).use { out -> resp.bodyAsChannel().copyTo(out) }
+            }
+            install(tmp, source, progress)
+        } finally {
+            runCatching { Files.deleteIfExists(tmp) }
         }
     }
 
@@ -213,6 +242,18 @@ class MrpackInstaller(
         )
     }
 }
+
+/**
+ * Provenance for an installed `.mrpack`: the [PackOrigin] plus a source-local id
+ * and version stamped onto the resulting instance. Passed for a Modrinth install
+ * (origin Modrinth, id = project id); a plain local import omits it and stays
+ * Local with an id derived from the pack name.
+ */
+data class MrpackSource(
+    val origin: PackOrigin,
+    val id: String,
+    val version: String?,
+)
 
 /** The launch-relevant subset of a `.mrpack` `modrinth.index.json`. */
 @Serializable
