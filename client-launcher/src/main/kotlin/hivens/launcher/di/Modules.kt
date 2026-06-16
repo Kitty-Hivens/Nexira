@@ -44,7 +44,9 @@ import hivens.core.data.DashboardData
 import hivens.core.time.Clock
 import hivens.core.time.SystemClock
 import hivens.launcher.cache.CacheFactory
+import hivens.launcher.cache.ModrinthCaches
 import hivens.launcher.cache.SmrtPackCaches
+import hivens.launcher.modrinth.ModrinthClient
 import hivens.launcher.smrt.OpenSmrtHelperResolver
 import hivens.launcher.smrt.SmartyModPlanner
 import hivens.launcher.smrt.SmrtAuthlibSwapper
@@ -384,6 +386,7 @@ val cacheModule = module {
     single<Clock> { SystemClock }
     single { CacheFactory(rootDir = get<Path>().resolve("cache"), json = get(), scope = get(), clock = get()) }
     single { smrtPackCaches() }
+    single { modrinthCaches() }
 }
 
 /**
@@ -397,7 +400,8 @@ val mirrorModule = module {
     // Always wired so toggling on at runtime requires no graph rebuild.
     single { SmrtPackClient(get(named("direct")), caches = get()) }
     single<IMirrorPackClient> { get<SmrtPackClient>() }
-    single { SmrtSyncService(get(), get()) }
+    single { ModrinthClient(get(named("direct")), caches = get()) }
+    single { SmrtSyncService(get(), get(), get()) }
     single<IPackSyncService> { get<SmrtSyncService>() }
 
     // Smarty -> open-smrt-network swap. Direct channel: GitHub releases +
@@ -422,12 +426,12 @@ val mirrorModule = module {
 
     // Per-mod icon URL resolver for the Library PackDetail Content tab.
     // Direct iconUrl wins; otherwise resolves a Modrinth project's icon
-    // via SmrtPackClient. Results cached per project_id inside the
+    // via ModrinthClient. Results cached per project_id inside the
     // resolver instance.
     single {
-        val client: SmrtPackClient = get()
+        val client: ModrinthClient = get()
         ModIconResolver { projectId ->
-            client.resolveModrinthProject(projectId).iconUrl
+            client.resolveProject(projectId).iconUrl
         }
     }
 }
@@ -691,8 +695,21 @@ private fun Scope.smrtPackCaches(): SmrtPackCaches {
         listing = f.create("pack-listing", SmrtPackListing.serializer(), CacheConfig(ttlMs = 5 * min, staleTtlMs = day)),
         summary = f.create("pack-summary", SmrtPackSummary.serializer(), CacheConfig(ttlMs = 10 * min, staleTtlMs = day)),
         manifest = f.create("pack-manifest", SmrtPackManifest.serializer(), CacheConfig(ttlMs = 10 * min, staleTtlMs = 7 * day)),
-        modrinthProject = f.create("modrinth-project", ModrinthProject.serializer(), CacheConfig(ttlMs = hour, staleTtlMs = 7 * day)),
-        modrinthVersion = f.create("modrinth-version", ModrinthVersion.serializer(), CacheConfig(ttlMs = 7 * day, staleTtlMs = 30 * day)),
+    )
+}
+
+/**
+ * Modrinth metadata caches. A published project version is immutable, so the
+ * version cache keeps a long stale window; project metadata changes rarely.
+ */
+private fun Scope.modrinthCaches(): ModrinthCaches {
+    val f: CacheFactory = get()
+    val min = 60_000L
+    val hour = 60 * min
+    val day = 24 * hour
+    return ModrinthCaches(
+        project = f.create("modrinth-project", ModrinthProject.serializer(), CacheConfig(ttlMs = hour, staleTtlMs = 7 * day)),
+        version = f.create("modrinth-version", ModrinthVersion.serializer(), CacheConfig(ttlMs = 7 * day, staleTtlMs = 30 * day)),
     )
 }
 

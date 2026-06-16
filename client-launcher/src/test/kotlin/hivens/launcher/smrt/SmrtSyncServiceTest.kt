@@ -2,6 +2,7 @@ package hivens.launcher.smrt
 
 import hivens.core.api.HttpClientProvider
 import hivens.launcher.ProtectedPaths
+import hivens.launcher.modrinth.ModrinthClient
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -52,8 +53,10 @@ class SmrtSyncServiceTest {
                 else -> respond("missing ${req.url}", HttpStatusCode.NotFound)
             }
         }
-        val client = SmrtPackClient(HttpClientProvider { HttpClient(engine) }, MIRROR_BASE, json)
-        return SmrtSyncService(client, ProtectedPaths(tempDir("pp").resolve("pp.json"), json))
+        val provider = HttpClientProvider { HttpClient(engine) }
+        val client = SmrtPackClient(provider, MIRROR_BASE, json)
+        val modrinth = ModrinthClient(provider, json)
+        return SmrtSyncService(client, modrinth, ProtectedPaths(tempDir("pp").resolve("pp.json"), json))
     }
 
     @Test
