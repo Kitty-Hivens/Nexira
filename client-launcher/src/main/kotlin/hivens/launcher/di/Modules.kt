@@ -34,8 +34,8 @@ import hivens.launcher.runtime.loader.LoaderRegistry
 import hivens.launcher.runtime.loader.ModernInstallerResolver
 import hivens.launcher.security.KeyringStorageFactory
 import hivens.launcher.smrt.ModIconResolver
-import hivens.core.api.dto.smrt.ModrinthProject
-import hivens.core.api.dto.smrt.ModrinthVersion
+import hivens.core.api.dto.modrinth.ModrinthProject
+import hivens.core.api.dto.modrinth.ModrinthVersion
 import hivens.core.api.dto.smrt.SmrtPackListing
 import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.dto.smrt.SmrtPackSummary
