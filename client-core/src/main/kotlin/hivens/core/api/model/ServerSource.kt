@@ -1,5 +1,8 @@
 package hivens.core.api.model
 
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+
 /**
  * Origin of a [ServerProfile]. Drives downstream choices that
  * depend on which upstream produced the entry -- mainly the
@@ -14,7 +17,12 @@ package hivens.core.api.model
  * land when an additional upstream becomes real, not before --
  * speculative variants do not belong in this enum.
  */
+@Serializable
 enum class ServerSource {
-    Smartycraft,
-    Mirror,
+    // @SerialName pins each wire token to its current spelling, so the on-disk
+    // contract (ServerProfile is cached via ServerListCacheStore) no longer
+    // rides on the Kotlin constant name -- a future rename of a constant cannot
+    // silently invalidate every persisted profile.
+    @SerialName("Smartycraft") Smartycraft,
+    @SerialName("Mirror") Mirror,
 }
