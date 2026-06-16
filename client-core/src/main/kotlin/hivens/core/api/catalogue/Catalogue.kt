@@ -17,6 +17,8 @@ data class CataloguePack(
     val tagline: String,
     val iconUrl: String? = null,
     val tags: List<String> = emptyList(),
+    /** Target MC version when the source exposes one on a card (mirror); null otherwise. */
+    val mcVersion: String? = null,
 )
 
 /** Full pack page: hero + long body + gallery + installable versions. */

@@ -24,7 +24,17 @@ class MirrorPackCatalogue(private val client: SmrtPackClient) : IPackCatalogueSe
                     it.displayName.contains(query, ignoreCase = true) ||
                     it.tagline.contains(query, ignoreCase = true)
             }
-            .map { s -> CataloguePack(origin, s.packId, s.displayName, s.tagline, s.iconUrl, s.tags) }
+            .map { s ->
+                CataloguePack(
+                    origin = origin,
+                    id = s.packId,
+                    title = s.displayName,
+                    tagline = s.tagline,
+                    iconUrl = s.iconUrl,
+                    tags = s.tags,
+                    mcVersion = s.minecraftVersion,
+                )
+            }
 
     override suspend fun details(packId: String): CataloguePackDetails {
         val s = client.fetchSummary(packId)

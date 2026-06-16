@@ -29,27 +29,22 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import hivens.core.api.dto.smrt.SmrtPackSummary
+import hivens.core.api.catalogue.CataloguePack
 import hivens.core.data.PackOrigin
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.origin
 import hivens.ui.theme.originGradient
 
 /**
- * One Browse row. Same shape as Library's PackCard (banner-as-bg +
- * avatar + title + chips + right-side action) so the two surfaces
- * read as one design language. Difference: no Play / Settings /
- * More -- browse is for catalogue inspect, not installed-instance
- * actions, so the right side carries a simple chevron and the whole
- * card is a click target into [BrowsePackDetailScreen].
- *
- * Every catalogue entry is mirror-sourced today; once we add other
- * sources (Modrinth / CurseForge / Local-imported) this card splits
- * its colour pass like PackCard already does.
+ * One Browse row. Same shape as Library's PackCard (banner-as-bg + avatar +
+ * title + chips + chevron) so the surfaces read as one design language. The
+ * whole card is a click target into the source's detail screen. Colour, avatar
+ * and source badge follow [CataloguePack.origin], so the card is source-neutral
+ * across the mirror, Modrinth and future sources.
  */
 @Composable
 fun BrowsePackCard(
-    pack: SmrtPackSummary,
+    pack: CataloguePack,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -58,7 +53,7 @@ fun BrowsePackCard(
             .fillMaxWidth()
             .height(132.dp)
             .clip(MaterialTheme.shapes.medium)
-            .background(CelestiaTheme.colors.originGradient(PackOrigin.Mirror))
+            .background(CelestiaTheme.colors.originGradient(pack.origin))
             .clickable(onClick = onClick),
     ) {
         Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.35f)))
@@ -68,7 +63,7 @@ fun BrowsePackCard(
             verticalAlignment     = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            BrowseAvatar(pack.displayName)
+            BrowseAvatar(pack.title, pack.origin)
 
             Column(
                 modifier            = Modifier.weight(1f),
@@ -79,7 +74,7 @@ fun BrowsePackCard(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Text(
-                        text       = pack.displayName,
+                        text       = pack.title,
                         style      = MaterialTheme.typography.titleMedium,
                         color      = Color.White,
                         fontWeight = FontWeight.SemiBold,
@@ -87,7 +82,7 @@ fun BrowsePackCard(
                         overflow   = TextOverflow.Ellipsis,
                         modifier   = Modifier.weight(1f, fill = false),
                     )
-                    SourceBadgeMirror(featured = pack.featured)
+                    SourceBadge(pack.origin)
                 }
                 if (pack.tagline.isNotBlank()) {
                     Text(
@@ -102,9 +97,8 @@ fun BrowsePackCard(
                     verticalAlignment     = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    MetaChip("MC ${pack.minecraftVersion}")
-                    MetaChip(pack.latestPackVersion)
-                    pack.tags.take(2).forEach { MetaChip(it, emphasis = false) }
+                    pack.mcVersion?.let { MetaChip("MC $it") }
+                    pack.tags.take(2).forEach { MetaChip(it) }
                 }
             }
 
@@ -120,8 +114,8 @@ fun BrowsePackCard(
 }
 
 @Composable
-private fun BrowseAvatar(displayName: String) {
-    val initials = displayName
+private fun BrowseAvatar(title: String, origin: PackOrigin) {
+    val initials = title
         .split(' ', '-', '_')
         .filter { it.isNotBlank() }
         .take(2)
@@ -131,7 +125,7 @@ private fun BrowseAvatar(displayName: String) {
         modifier         = Modifier
             .size(64.dp)
             .clip(RoundedCornerShape(12.dp))
-            .background(CelestiaTheme.colors.origin(PackOrigin.Mirror)),
+            .background(CelestiaTheme.colors.origin(origin)),
         contentAlignment = Alignment.Center,
     ) {
         Text(
@@ -144,16 +138,15 @@ private fun BrowseAvatar(displayName: String) {
 }
 
 @Composable
-private fun SourceBadgeMirror(featured: Boolean) {
-    val label = if (featured) "Mirror ★" else "Mirror"
+private fun SourceBadge(origin: PackOrigin) {
     Box(
         modifier = Modifier
             .clip(MaterialTheme.shapes.extraSmall)
-            .background(CelestiaTheme.colors.origin(PackOrigin.Mirror).copy(alpha = 0.85f))
+            .background(CelestiaTheme.colors.origin(origin).copy(alpha = 0.85f))
             .padding(horizontal = 8.dp, vertical = 2.dp),
     ) {
         Text(
-            text       = label,
+            text       = originLabel(origin),
             style      = MaterialTheme.typography.labelSmall,
             color      = Color.White,
             fontWeight = FontWeight.Bold,
@@ -161,16 +154,23 @@ private fun SourceBadgeMirror(featured: Boolean) {
     }
 }
 
+private fun originLabel(origin: PackOrigin): String = when (origin) {
+    PackOrigin.Mirror -> "Mirror"
+    PackOrigin.Modrinth -> "Modrinth"
+    PackOrigin.Smartycraft -> "SmartyCraft"
+    PackOrigin.Local -> "Local"
+    PackOrigin.Unknown -> "Other"
+}
+
 @Composable
-private fun MetaChip(text: String, emphasis: Boolean = false) {
+private fun MetaChip(text: String) {
     AssistChip(
         onClick = {},
         enabled = false,
         shape   = MaterialTheme.shapes.extraSmall,
         label   = { Text(text, style = MaterialTheme.typography.labelSmall, color = Color.White) },
         colors  = AssistChipDefaults.assistChipColors(
-            disabledContainerColor = if (emphasis) CelestiaTheme.colors.primary.copy(alpha = 0.85f)
-                                     else          Color.Black.copy(alpha = 0.35f),
+            disabledContainerColor = Color.Black.copy(alpha = 0.35f),
             disabledLabelColor     = Color.White,
         ),
         border  = null,
