@@ -1,4 +1,4 @@
-package hivens.core.api.dto.smrt
+package hivens.core.api.dto.modrinth
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
