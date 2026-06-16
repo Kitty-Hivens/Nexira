@@ -934,7 +934,10 @@ fun AppRoot(
     }
 
     var appState      by remember { mutableStateOf<AppState>(AppState.Loading) }
-    var currentScreen by remember { mutableStateOf<Screen>(Screen.Home) }
+    // Navigation history. navigate() pushes detail screens and resets on a
+    // top-level destination; back() pops to the actual previous screen instead
+    // of a per-screen hardcoded return target.
+    val backStack     = remember { NavBackStack(Screen.Home) }
     var pendingLogout by remember { mutableStateOf(false) }
     val doLogout = { credentialsManager.clear(); appState = AppState.Unauthenticated }
 
@@ -994,8 +997,9 @@ fun AppRoot(
             AppLayout(
                 appState = appState,
                 onCloseApp = onCloseApp,
-                currentScreen = currentScreen,
-                onScreenChange = { currentScreen = it },
+                currentScreen = backStack.current,
+                onScreenChange = backStack::navigate,
+                onBack = { backStack.back() },
                 onLogin = { session -> appState = AppState.Authenticated(session) },
                 onLogout = { pendingLogout = true },
                 isDarkTheme = isDarkTheme,
