@@ -13,6 +13,10 @@ dependencies {
     implementation(libs.commons.compress)
     implementation(libs.koin.core)
     implementation(libs.slf4j.api)
+    // Secret storage: OS keyring + encrypted-file fallback. CredentialsManager
+    // delegates to it; the in-tree IKeyringStorage + native impls are retained
+    // one release for the migration shim, then deleted.
+    implementation(libs.libvault)
     // MDCContext for tagging launch-flow coroutines with a stable launchId so
     // a multi-launch log dump can be sliced per Play-click. Was a client-ui
     // slf4j-MDC bridge for kotlinx-coroutines lives with the producer of

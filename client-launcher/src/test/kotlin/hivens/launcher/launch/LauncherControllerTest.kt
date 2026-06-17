@@ -18,7 +18,9 @@ import hivens.core.launch.LaunchHandle
 import hivens.core.launch.LaunchLogEvent
 import hivens.core.launch.LaunchState
 import hivens.core.launch.SpawnResult
-import hivens.core.security.IKeyringStorage
+import dev.hivens.libvault.Vault
+import dev.hivens.libvault.VaultConfig
+import dev.hivens.libvault.VaultTier
 import hivens.launcher.CredentialsManager
 import hivens.launcher.ManifestCache
 import hivens.launcher.ProfileManager
@@ -115,7 +117,15 @@ class LauncherControllerTest {
         // paths expect.
         profileManager     = ProfileManager(sandbox, json)
         manifestCache      = ManifestCache(sandbox.resolve("manifest-cache"), json)
-        credentialsManager = CredentialsManager(sandbox, json, mockk<IKeyringStorage>(relaxed = true))
+        // A real in-memory vault so save() -> load() round-trips (the relaxed
+        // mock returned null from retrieve, breaking the re-auth flow). Memory
+        // tier skips the keyring probe entirely. No legacy file is written, so
+        // the migration provider lambda is never invoked.
+        credentialsManager = CredentialsManager(
+            sandbox,
+            json,
+            Vault.open(VaultConfig(namespace = "nexira-launcher-test", preferredTiers = listOf(VaultTier.Memory))),
+        ) { mockk(relaxed = true) }
         // PackRepository + SmrtPackClient: pack-centric controller
         // dependencies. SC-only tests do not call `launchPackInstance`,
         // so a relaxed mockk on both is enough to satisfy the
