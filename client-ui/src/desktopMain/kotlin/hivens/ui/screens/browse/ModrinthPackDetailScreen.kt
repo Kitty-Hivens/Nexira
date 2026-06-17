@@ -32,7 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
-import com.mikepenz.markdown.m3.Markdown
+import hivens.ui.render.MarkdownHtml
 import hivens.core.api.catalogue.CataloguePack
 import hivens.core.api.catalogue.CataloguePackDetails
 import hivens.core.api.catalogue.CataloguePackVersion
@@ -185,7 +185,7 @@ private fun DetailBody(
             }
         }
 
-        details.bodyMarkdown?.let { Markdown(content = it, modifier = Modifier.fillMaxWidth()) }
+        details.bodyMarkdown?.let { MarkdownHtml(markdown = it, modifier = Modifier.fillMaxWidth()) }
 
         if (installError != null) {
             Text(

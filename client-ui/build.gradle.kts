@@ -79,6 +79,10 @@ kotlin {
                 implementation(libs.libtray)
                 implementation(libs.libnotify)
                 implementation(libs.ktor.client.core)
+                // In-launcher HTML renderer (hivens.ui.render): jsoup parses, the
+                // markdown lib does md->html. The velocipede before the standalone lib.
+                implementation(libs.jsoup)
+                implementation(libs.markdown.core)
             }
         }
 

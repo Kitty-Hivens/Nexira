@@ -32,6 +32,10 @@ coroutines        = "1.11.0"
 composeIcons      = "1.7.3"
 composeMaterial3  = "1.11.0-alpha07"
 markdownRenderer  = "0.40.2"
+# org.jetbrains:markdown -- md->html parser under markdown-m3, used directly by the in-launcher HTML renderer (hivens.ui.render).
+markdown          = "0.7.3"
+# jsoup -- HTML parsing for the in-launcher HTML renderer.
+jsoup             = "1.18.1"
 coil              = "3.4.0"
 filekit           = "0.14.1"
 
@@ -116,6 +120,8 @@ compose-material-icons-extended = { group = "org.jetbrains.compose.material",   
 
 # UI add-ons
 multiplatform-markdown-m3       = { group = "com.mikepenz",        name = "multiplatform-markdown-renderer-m3", version.ref = "markdownRenderer" }
+markdown-core                   = { group = "org.jetbrains",       name = "markdown",            version.ref = "markdown" }
+jsoup                           = { group = "org.jsoup",           name = "jsoup",               version.ref = "jsoup" }
 coil-compose                    = { group = "io.coil-kt.coil3",    name = "coil-compose",        version.ref = "coil" }
 coil-network-okhttp             = { group = "io.coil-kt.coil3",    name = "coil-network-okhttp", version.ref = "coil" }
 filekit-core                    = { group = "io.github.vinceglb", name = "filekit-core",         version.ref = "filekit" }
