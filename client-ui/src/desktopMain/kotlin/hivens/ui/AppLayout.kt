@@ -5,21 +5,11 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ExitToApp
-import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import hivens.core.api.model.ServerProfile
@@ -33,28 +23,31 @@ import hivens.ui.background.BackgroundSettings
 import hivens.ui.customization.CustomizationSettings
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.easter.LocalAprilFools
+import hivens.ui.editor.EditorSurfaceHost
 import hivens.ui.i18n.AppLocale
+import hivens.ui.icons.IconKey
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.screens.*
 import hivens.ui.screens.browse.BrowseScreen
 import hivens.ui.screens.detail.PackDetailScreen
 import hivens.ui.screens.library.LibraryScreen
-import hivens.ui.widgets.profile.ProfileSurface
 import hivens.ui.screens.settings.SettingsScreen
+import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.CustomTheme
+import hivens.ui.theme.LocalStyle
+import hivens.ui.utils.GameConsoleService
 import hivens.ui.widgets.about.AboutSurface
 import hivens.ui.widgets.bgsettings.BgSettingsSurface
 import hivens.ui.widgets.customization.CustomizationSurface
+import hivens.ui.widgets.profile.ProfileSurface
 import hivens.ui.widgets.serverdetails.ServerDetailsSurface
-import hivens.ui.widgets.themepicker.ThemePickerSurface
-import hivens.ui.theme.CelestiaTheme
-import hivens.ui.theme.LocalStyle
-import hivens.ui.theme.CustomTheme
-import hivens.ui.editor.EditorSurfaceHost
-import hivens.ui.utils.GameConsoleService
 import hivens.ui.widgets.shell.LeftRailContext
 import hivens.ui.widgets.shell.LocalLeftRailContext
 import hivens.ui.widgets.shell.LocalShellContext
 import hivens.ui.widgets.shell.ShellContext
+import hivens.ui.widgets.themepicker.ThemePickerSurface
 import hivens.widget.api.SlotRenderer
 import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId
@@ -365,8 +358,7 @@ private fun ContentLoginRequiredPlaceholder() {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Icon(
-                imageVector = Icons.Filled.Person,
+            Symbol(icon = NxIcon.Person,
                 contentDescription = null,
                 tint = CelestiaTheme.colors.primary.copy(alpha = 0.45f),
                 modifier = Modifier.size(48.dp)

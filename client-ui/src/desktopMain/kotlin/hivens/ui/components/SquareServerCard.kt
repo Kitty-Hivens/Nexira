@@ -14,15 +14,6 @@ import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.HourglassEmpty
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -32,9 +23,9 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.toComposeImageBitmap
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
@@ -42,7 +33,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -53,14 +43,17 @@ import hivens.launcher.platform.PlatformPaths
 import hivens.ui.easter.LocalAprilFools
 import hivens.ui.effects.neonBorder
 import hivens.ui.effects.shimmerOverlay
+import hivens.ui.icons.IconKey
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.decorativePair
+import javax.imageio.ImageIO
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
-import javax.imageio.ImageIO
-import kotlin.time.Duration.Companion.milliseconds
 
 // ─── Card ─────────────────────────────────────────────────────────────────────
 // The per-server gradient is derived from CelestiaColors.decorativePair, keyed on
@@ -334,21 +327,22 @@ fun SquareServerCard(
                 horizontalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 CardIconButton(
-                    icon  = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                    icon  = NxIcon.Favorite,
                     color = if (isFavorite) Color(0xFFEF4444) else CelestiaTheme.colors.textSecondary,
+                    fill  = if (isFavorite) 1f else 0f,
                     onClick = onToggleFav
                 )
-                CardIconButton(Icons.Default.Settings, color = CelestiaTheme.colors.textSecondary, onClick = onSettings)
-                CardIconButton(Icons.Default.Info,     color = CelestiaTheme.colors.textSecondary, onClick = onDetails)
+                CardIconButton(NxIcon.Settings, color = CelestiaTheme.colors.textSecondary, onClick = onSettings)
+                CardIconButton(NxIcon.Info,     color = CelestiaTheme.colors.textSecondary, onClick = onDetails)
             }
         }
     }
 }
 
 @Composable
-private fun CardIconButton(icon: ImageVector, color: Color = Color.White.copy(0.8f), onClick: () -> Unit) {
+private fun CardIconButton(icon: IconKey, color: Color = Color.White.copy(0.8f), onClick: () -> Unit, fill: Float = 0f) {
     IconButton(onClick = onClick, modifier = Modifier.size(30.dp)) {
-        Icon(icon, null, tint = color, modifier = Modifier.size(16.dp))
+        Symbol(icon, null, tint = color, fill = fill, modifier = Modifier.size(16.dp))
     }
 }
 
@@ -378,10 +372,10 @@ private fun SyncBadge(state: AutoSyncService.ServerState, modifier: Modifier = M
     ) {
         val c = CelestiaTheme.colors
         val (icon, tint) = when (state) {
-            AutoSyncService.ServerState.QUEUED   -> Icons.Default.HourglassEmpty to c.warnAccent
-            AutoSyncService.ServerState.SYNCING  -> Icons.Default.Sync           to c.progressAccent
-            AutoSyncService.ServerState.SYNCED   -> Icons.Default.Check          to c.success
-            AutoSyncService.ServerState.FAILED   -> Icons.Default.Close          to c.criticalAccent
+            AutoSyncService.ServerState.QUEUED   -> NxIcon.HourglassEmpty to c.warnAccent
+            AutoSyncService.ServerState.SYNCING  -> NxIcon.Sync           to c.progressAccent
+            AutoSyncService.ServerState.SYNCED   -> NxIcon.Check          to c.success
+            AutoSyncService.ServerState.FAILED   -> NxIcon.Close          to c.criticalAccent
             AutoSyncService.ServerState.SKIPPED  -> return@AnimatedVisibility
         }
         Box(
@@ -391,7 +385,7 @@ private fun SyncBadge(state: AutoSyncService.ServerState, modifier: Modifier = M
                 .border(1.dp, tint.copy(alpha = 0.55f), RoundedCornerShape(50))
                 .padding(horizontal = 6.dp, vertical = 4.dp),
         ) {
-            Icon(icon, null, tint = tint, modifier = Modifier.size(14.dp))
+            Symbol(icon, null, tint = tint, modifier = Modifier.size(14.dp))
         }
     }
 }

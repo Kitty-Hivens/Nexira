@@ -15,10 +15,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
@@ -37,8 +33,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
-import hivens.ui.screens.detail.PackDetailScreen
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
+import hivens.ui.screens.detail.PackDetailScreen
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.origin
 import hivens.ui.theme.originGradient
@@ -139,15 +137,15 @@ fun PackCard(
                         contentColor   = Color.White,
                     ),
                 ) {
-                    Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Symbol(NxIcon.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
                     Text(s.packCardPlay, fontWeight = FontWeight.SemiBold)
                 }
                 IconButton(onClick = onSettings) {
-                    Icon(Icons.Default.Settings, contentDescription = s.packCardSettings, tint = Color.White)
+                    Symbol(NxIcon.Settings, contentDescription = s.packCardSettings, tint = Color.White)
                 }
                 IconButton(onClick = onMore) {
-                    Icon(Icons.Default.MoreVert, contentDescription = s.packCardMore, tint = Color.White)
+                    Symbol(NxIcon.MoreVert, contentDescription = s.packCardMore, tint = Color.White)
                 }
             }
         }

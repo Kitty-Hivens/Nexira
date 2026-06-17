@@ -25,13 +25,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.DeleteForever
-import androidx.compose.material.icons.filled.FlipToBack
-import androidx.compose.material.icons.filled.FlipToFront
-import androidx.compose.material.icons.filled.OpenInFull
-import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -53,7 +46,6 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
@@ -70,6 +62,9 @@ import hivens.ui.editor.dnd.DragController
 import hivens.ui.editor.dnd.DragPayload
 import hivens.ui.editor.dnd.DropTargetRegistry
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.IconKey
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.LocalStyle
 import hivens.widget.api.LocalCanvasSlotSizeDp
@@ -296,7 +291,7 @@ fun EditableWidgetChrome(
                         enter   = fadeIn(tween(chromeMotionMs)),
                         exit    = fadeOut(tween(chromeMotionMs)),
                     ) {
-                        AffordanceButton(Icons.Default.FlipToFront, s.editorToFront, CelestiaTheme.colors.primary, instance.instanceId) {
+                        AffordanceButton(NxIcon.FlipToFront, s.editorToFront, CelestiaTheme.colors.primary, instance.instanceId) {
                             val maxZ = graph.traverse(path)?.widgets?.maxOfOrNull { it.canvas?.z ?: 0 } ?: 0
                             editController.setWidgetZ(path, instance.instanceId, maxZ + 1)
                         }
@@ -306,7 +301,7 @@ fun EditableWidgetChrome(
                         enter   = fadeIn(tween(chromeMotionMs)),
                         exit    = fadeOut(tween(chromeMotionMs)),
                     ) {
-                        AffordanceButton(Icons.Default.FlipToBack, s.editorToBack, CelestiaTheme.colors.primary, instance.instanceId) {
+                        AffordanceButton(NxIcon.FlipToBack, s.editorToBack, CelestiaTheme.colors.primary, instance.instanceId) {
                             val minZ = graph.traverse(path)?.widgets?.minOfOrNull { it.canvas?.z ?: 0 } ?: 0
                             editController.setWidgetZ(path, instance.instanceId, minZ - 1)
                         }
@@ -317,21 +312,21 @@ fun EditableWidgetChrome(
                     enter   = fadeIn(tween(chromeMotionMs)),
                     exit    = fadeOut(tween(chromeMotionMs)),
                 ) {
-                    AffordanceButton(Icons.Default.Tune, s.editorConfigure, CelestiaTheme.colors.primary, instance.instanceId, onEditProps)
+                    AffordanceButton(NxIcon.Tune, s.editorConfigure, CelestiaTheme.colors.primary, instance.instanceId, onEditProps)
                 }
                 AnimatedVisibility(
                     visible = isHovered && descriptor.removable,
                     enter   = fadeIn(tween(chromeMotionMs)),
                     exit    = fadeOut(tween(chromeMotionMs)),
                 ) {
-                    AffordanceButton(Icons.Default.Close, s.editorDelete, CelestiaTheme.colors.error, instance.instanceId, onRemove)
+                    AffordanceButton(NxIcon.Close, s.editorDelete, CelestiaTheme.colors.error, instance.instanceId, onRemove)
                 }
                 AnimatedVisibility(
                     visible = isHovered && !descriptor.removable,
                     enter   = fadeIn(tween(chromeMotionMs)),
                     exit    = fadeOut(tween(chromeMotionMs)),
                 ) {
-                    AffordanceButton(Icons.Default.DeleteForever, s.editorForceRemove, CelestiaTheme.colors.warnAccent, instance.instanceId) { forceRemoveOpen = true }
+                    AffordanceButton(NxIcon.DeleteForever, s.editorForceRemove, CelestiaTheme.colors.warnAccent, instance.instanceId) { forceRemoveOpen = true }
                 }
             }
 
@@ -378,8 +373,7 @@ fun EditableWidgetChrome(
                             }
                         },
                 ) {
-                    Icon(
-                        imageVector        = Icons.Default.OpenInFull,
+                    Symbol(icon = NxIcon.OpenInFull,
                         contentDescription = null,
                         tint               = CelestiaTheme.colors.onPrimary,
                         modifier           = Modifier.size(11.dp).padding(0.dp),
@@ -434,7 +428,7 @@ fun EditableWidgetChrome(
 // (which arms on any unconsumed down) also nudging the widget.
 @Composable
 private fun AffordanceButton(
-    icon: ImageVector,
+    icon: IconKey,
     description: String,
     color: Color,
     instanceId: String,
@@ -469,8 +463,7 @@ private fun AffordanceButton(
                 }
             },
     ) {
-        Icon(
-            imageVector        = icon,
+        Symbol(icon = icon,
             contentDescription = description,
             tint               = CelestiaTheme.colors.onPrimary,
             modifier           = Modifier.size(13.dp),

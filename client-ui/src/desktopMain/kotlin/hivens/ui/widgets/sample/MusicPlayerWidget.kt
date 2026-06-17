@@ -25,16 +25,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.VolumeDown
-import androidx.compose.material.icons.automirrored.filled.VolumeMute
-import androidx.compose.material.icons.automirrored.filled.VolumeOff
-import androidx.compose.material.icons.automirrored.filled.VolumeUp
-import androidx.compose.material.icons.filled.FolderOpen
-import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -66,27 +56,30 @@ import hivens.ui.audio.PlaybackState
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.IconKey
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.widgets.services.MusicPlayerService
 import hivens.ui.widgets.services.MusicPlayerServiceImpl
 import hivens.widget.api.provideService
 import hivens.widget.api.rememberProps
-import hivens.widget.model.ProvidesService
 import hivens.widget.model.PropLabel
+import hivens.widget.model.ProvidesService
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
-import kotlinx.serialization.Serializable
 import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
 import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.dialogs.openFilePicker
 import io.github.vinceglb.filekit.path
+import java.nio.file.Paths
+import kotlin.io.path.name
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
-import java.nio.file.Paths
-import kotlin.io.path.name
 
 // Mini music player. Drop a WAV / AU / AIFF file, play it through
 // AudioPlayer. The opening pin in the project_achievements vision --
@@ -204,12 +197,12 @@ fun MusicPlayerWidget(instance: WidgetInstance) {
             modifier              = Modifier.fillMaxWidth(),
         ) {
             ControlButton(
-                icon            = Icons.Default.FolderOpen,
+                icon            = NxIcon.FolderOpen,
                 contentDesc     = s.audioOpenFile,
                 onClick         = { pickFile() },
             )
             ControlButton(
-                icon         = if (state is PlaybackState.Playing) Icons.Default.Pause else Icons.Default.PlayArrow,
+                icon         = if (state is PlaybackState.Playing) NxIcon.Pause else NxIcon.PlayArrow,
                 contentDesc  = if (state is PlaybackState.Playing) s.audioPause else s.audioPlay,
                 enabled      = state !is PlaybackState.Idle && state !is PlaybackState.Error,
                 primary      = true,
@@ -218,7 +211,7 @@ fun MusicPlayerWidget(instance: WidgetInstance) {
                 },
             )
             ControlButton(
-                icon         = Icons.Default.Stop,
+                icon         = NxIcon.Stop,
                 contentDesc  = s.audioStop,
                 enabled      = state is PlaybackState.Playing || state is PlaybackState.Paused,
                 onClick      = { player.stop() },
@@ -242,8 +235,7 @@ fun MusicPlayerWidget(instance: WidgetInstance) {
             verticalAlignment = Alignment.CenterVertically,
             modifier          = Modifier.fillMaxWidth(),
         ) {
-            Icon(
-                imageVector        = volumeIcon(volume),
+            Symbol(icon = volumeIcon(volume),
                 contentDescription = s.audioVolume,
                 tint               = CelestiaTheme.colors.textSecondary,
                 modifier           = Modifier.size(16.dp),
@@ -344,11 +336,11 @@ private fun VolumeBar(
     }
 }
 
-private fun volumeIcon(volume: Float): androidx.compose.ui.graphics.vector.ImageVector = when {
-    volume <= 0.001f -> Icons.AutoMirrored.Filled.VolumeOff
-    volume < 0.34f   -> Icons.AutoMirrored.Filled.VolumeMute
-    volume < 0.67f   -> Icons.AutoMirrored.Filled.VolumeDown
-    else             -> Icons.AutoMirrored.Filled.VolumeUp
+private fun volumeIcon(volume: Float): IconKey = when {
+    volume <= 0.001f -> NxIcon.VolumeOff
+    volume < 0.34f   -> NxIcon.VolumeMute
+    volume < 0.67f   -> NxIcon.VolumeDown
+    else             -> NxIcon.VolumeUp
 }
 
 @Composable
@@ -360,8 +352,7 @@ private fun AlbumArtBlock(state: PlaybackState) {
             .background(CelestiaTheme.colors.primary.copy(alpha = 0.18f)),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(
-            imageVector        = Icons.Default.MusicNote,
+        Symbol(icon = NxIcon.MusicNote,
             contentDescription = null,
             tint               = CelestiaTheme.colors.primary,
             modifier           = Modifier.size(28.dp),
@@ -371,7 +362,7 @@ private fun AlbumArtBlock(state: PlaybackState) {
 
 @Composable
 private fun ControlButton(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: IconKey,
     contentDesc: String,
     enabled: Boolean = true,
     primary: Boolean = false,
@@ -395,8 +386,7 @@ private fun ControlButton(
             .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(
-            imageVector        = icon,
+        Symbol(icon = icon,
             contentDescription = contentDesc,
             tint               = tint,
             modifier           = Modifier.size(if (primary) 20.dp else 16.dp),

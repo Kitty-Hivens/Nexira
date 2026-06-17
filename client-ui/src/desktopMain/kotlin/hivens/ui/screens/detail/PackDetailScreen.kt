@@ -1,6 +1,5 @@
 package hivens.ui.screens.detail
 
-import hivens.ui.theme.LocalMonoFamily
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -15,10 +14,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
@@ -27,9 +22,9 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
-import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -61,9 +56,11 @@ import hivens.launcher.platform.PlatformPaths
 import hivens.ui.AppState
 import hivens.ui.components.RamSelector
 import hivens.ui.customization.glassSurfaceAlpha
+import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
 import hivens.ui.notifications.LaunchTarget
 import hivens.ui.notifications.drivers.LaunchDriver
-import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.screens.CenteredProgress
@@ -74,18 +71,19 @@ import hivens.ui.screens.library.PackMetaChip
 import hivens.ui.screens.library.content.ContentTabPane
 import hivens.ui.screens.library.worlds.WorldsTabPane
 import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.LocalMonoFamily
 import hivens.ui.theme.originGradient
 import hivens.ui.utils.ConsoleSettingsManager
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.utils.LogEntry
+import java.io.File
+import java.nio.file.Path
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import org.koin.compose.koinInject
-import java.io.File
-import java.nio.file.Path
 
 /**
  * Library PackDetail. Hero header + Play bar + tabs (Content / Files /
@@ -402,8 +400,7 @@ private fun LogSessionPicker(
                 fontSize   = 11.sp,
                 fontFamily = LocalMonoFamily.current,
             )
-            Icon(
-                imageVector        = Icons.Default.ArrowDropDown,
+            Symbol(icon = NxIcon.ArrowDropDown,
                 contentDescription = null,
                 tint               = colors.textSecondary,
                 modifier           = Modifier.size(16.dp),
@@ -453,7 +450,7 @@ private fun Hero(pack: PackInstance, onBack: () -> Unit) {
             onClick  = onBack,
             modifier = Modifier.padding(12.dp),
         ) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Color.White)
+            Symbol(NxIcon.ArrowBack, contentDescription = null, tint = Color.White)
         }
 
         Column(
@@ -532,7 +529,7 @@ private fun PlayBar(
                     contentColor   = Color.White,
                 ),
             ) {
-                Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(22.dp))
+                Symbol(NxIcon.PlayArrow, contentDescription = null, modifier = Modifier.size(22.dp))
                 Spacer(Modifier.size(8.dp))
                 Text(s.packDetailPlay, fontWeight = FontWeight.Bold)
             }

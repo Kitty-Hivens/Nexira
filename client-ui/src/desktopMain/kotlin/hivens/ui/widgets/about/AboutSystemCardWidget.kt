@@ -5,18 +5,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Code
-import androidx.compose.material.icons.filled.Computer
-import androidx.compose.material.icons.filled.Layers
-import androidx.compose.material.icons.filled.Memory
-import androidx.compose.material.icons.filled.Storage
-import androidx.compose.material.icons.filled.Tv
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import hivens.ui.components.GlassCard
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.NxIcon
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
 import hivens.widget.model.Widget
@@ -71,12 +65,12 @@ fun AboutSystemCardWidget(instance: WidgetInstance) {
                 ctx.swapMb?.takeIf { it > 0 }?.let { append(" · swap $it MB") }
             }
 
-            InfoRow(Icons.Default.Computer, s.aboutOs, "$osName $osVer ($osArch)")
-            InfoRow(Icons.Default.Memory,   "CPU",     cpuValue)
-            InfoRow(Icons.Default.Storage,  "RAM",     ramValue)
-            InfoRow(Icons.Default.Code,     "Java",    "$javaVer ($javaVendor)")
-            InfoRow(Icons.Default.Tv,       "Display", ctx.displayInfo)
-            InfoRow(Icons.Default.Layers,   s.aboutRenderer, ctx.renderer)
+            InfoRow(NxIcon.Computer, s.aboutOs, "$osName $osVer ($osArch)")
+            InfoRow(NxIcon.Memory,   "CPU",     cpuValue)
+            InfoRow(NxIcon.Storage,  "RAM",     ramValue)
+            InfoRow(NxIcon.Code,     "Java",    "$javaVer ($javaVendor)")
+            InfoRow(NxIcon.Tv,       "Display", ctx.displayInfo)
+            InfoRow(NxIcon.Layers,   s.aboutRenderer, ctx.renderer)
         }
     }
 }

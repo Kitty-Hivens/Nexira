@@ -27,9 +27,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ViewSidebar
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -56,6 +53,8 @@ import hivens.ui.customization.NavSelectionStyle
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetToggle
 import hivens.ui.screens.settings.settingsRowBackground
@@ -116,8 +115,7 @@ fun SurfacePropertiesPanel(
                     .padding(start = 14.dp, end = 6.dp, top = 12.dp, bottom = 6.dp),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector        = Icons.AutoMirrored.Filled.ViewSidebar,
+                    Symbol(icon = NxIcon.ViewSidebar,
                         contentDescription = null,
                         tint               = CelestiaTheme.colors.primary,
                         modifier           = Modifier.size(18.dp),
@@ -131,8 +129,7 @@ fun SurfacePropertiesPanel(
                     )
                 }
                 IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
-                    Icon(
-                        imageVector        = Icons.Default.Close,
+                    Symbol(icon = NxIcon.Close,
                         contentDescription = s.editorClose,
                         tint               = CelestiaTheme.colors.textSecondary,
                         modifier           = Modifier.size(16.dp),
@@ -265,8 +262,7 @@ private fun NavSelectionControl(
                         shape          = MaterialTheme.shapes.small,
                         contentPadding = PaddingValues(8.dp),
                     ) {
-                        Icon(
-                            imageVector        = Icons.Default.Close,
+                        Symbol(icon = NxIcon.Close,
                             contentDescription = s.customizationAccentClear,
                             modifier           = Modifier.size(14.dp),
                         )

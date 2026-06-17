@@ -2,16 +2,11 @@ package hivens.ui.screens.settings
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Rule
-import androidx.compose.material.icons.filled.Lan
-import androidx.compose.material.icons.filled.Rule
-import androidx.compose.material.icons.filled.SwapHoriz
-import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.NxIcon
 import hivens.ui.puppet.PuppetToggle
 import hivens.ui.theme.CelestiaTheme
 
@@ -42,7 +37,7 @@ internal fun SmartySection(
         SettingsRowWithDescription(
             title           = s.settingsOpenSmrtHelperTitle,
             description     = s.settingsOpenSmrtHelperDesc,
-            icon            = Icons.Default.SwapHoriz,
+            icon            = NxIcon.SwapHoriz,
             iconTint        = CelestiaTheme.colors.primary,
             checked         = form.useOpenSmrtHelper,
             enabled         = true,
@@ -55,7 +50,7 @@ internal fun SmartySection(
         SettingsRowWithDescription(
             title           = s.settingsStrictModCheckTitle,
             description     = s.settingsStrictModCheckDesc,
-            icon            = Icons.AutoMirrored.Filled.Rule,
+            icon            = NxIcon.Rule,
             iconTint        = CelestiaTheme.colors.primary,
             checked         = form.strictModVerification,
             enabled         = true,
@@ -68,7 +63,7 @@ internal fun SmartySection(
         SettingsRowWithDescription(
             title           = s.settingsNetworkAgentTitle,
             description     = s.settingsNetworkAgentDesc,
-            icon            = Icons.Default.Lan,
+            icon            = NxIcon.Lan,
             iconTint        = CelestiaTheme.colors.primary,
             checked         = form.useNetworkAgent,
             enabled         = true,
@@ -81,7 +76,7 @@ internal fun SmartySection(
         SettingsRowWithDescription(
             title           = s.settingsSmartyAuthLibTitle,
             description     = s.settingsSmartyAuthLibDesc,
-            icon            = Icons.Default.VpnKey,
+            icon            = NxIcon.VpnKey,
             iconTint        = CelestiaTheme.colors.primary,
             checked         = form.useSmartycraftAuthLib,
             enabled         = true,

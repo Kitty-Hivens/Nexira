@@ -7,9 +7,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -26,20 +23,22 @@ import hivens.config.Branding
 import hivens.launcher.diag.DiagnosticBundle
 import hivens.launcher.diag.IssueReporter
 import hivens.launcher.platform.PlatformPaths
+import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.easter.LocalAprilFools
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
 import hivens.ui.platform.SystemActions
 import hivens.ui.puppet.PuppetClick
-import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.LocalStyle
+import java.awt.Toolkit
+import java.awt.datatransfer.StringSelection
+import java.nio.file.Path
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
-import java.awt.Toolkit
-import java.awt.datatransfer.StringSelection
-import java.nio.file.Path
 
 /**
  * Beacon diagnostic surface + About card.
@@ -254,7 +253,7 @@ internal fun DiagnosticsSection(
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.Info, null, tint = CelestiaTheme.colors.primary, modifier = Modifier.size(24.dp))
+            Symbol(NxIcon.Info, null, tint = CelestiaTheme.colors.primary, modifier = Modifier.size(24.dp))
             Spacer(Modifier.width(16.dp))
             Column {
                 Text(Branding.TITLE, color = CelestiaTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
@@ -265,6 +264,6 @@ internal fun DiagnosticsSection(
                 )
             }
         }
-        Icon(Icons.Default.ChevronRight, null, tint = CelestiaTheme.colors.textSecondary)
+        Symbol(NxIcon.ChevronRight, null, tint = CelestiaTheme.colors.textSecondary)
     }
 }

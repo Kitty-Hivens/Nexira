@@ -12,11 +12,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.OpenInNew
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Checkbox
@@ -41,6 +36,8 @@ import hivens.core.api.dto.smrt.SmrtRequirement
 import hivens.launcher.smrt.DepGraph
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
 import hivens.ui.theme.CelestiaTheme
 import java.awt.Desktop
 import java.net.URI
@@ -127,8 +124,7 @@ fun ModRowPanel(
 
                 SourceBadge(mod.source)
 
-                Icon(
-                    imageVector        = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                Symbol(icon = if (expanded) NxIcon.ExpandLess else NxIcon.ExpandMore,
                     contentDescription = null,
                     tint               = CelestiaTheme.colors.textSecondary,
                     modifier           = Modifier.size(20.dp),
@@ -228,8 +224,7 @@ private fun DependenciesSubsection(mod: SmrtModEntry, graph: DepGraph) {
             color = CelestiaTheme.colors.textPrimary,
         )
         if (!empty) {
-            Icon(
-                imageVector        = if (open) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+            Symbol(icon = if (open) NxIcon.ExpandLess else NxIcon.ExpandMore,
                 contentDescription = null,
                 tint               = CelestiaTheme.colors.textSecondary,
                 modifier           = Modifier.size(16.dp),
@@ -237,7 +232,7 @@ private fun DependenciesSubsection(mod: SmrtModEntry, graph: DepGraph) {
         }
         if (missing.isNotEmpty()) {
             Spacer(Modifier.width(4.dp))
-            Icon(Icons.Default.Warning, contentDescription = null, tint = CelestiaTheme.colors.error, modifier = Modifier.size(14.dp))
+            Symbol(NxIcon.Warning, contentDescription = null, tint = CelestiaTheme.colors.error, modifier = Modifier.size(14.dp))
             Text(
                 text  = s.contentTabModMissingCount(missing.size),
                 style = MaterialTheme.typography.labelSmall,
@@ -325,7 +320,7 @@ private fun LinkChip(text: String, url: String) {
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, tint = CelestiaTheme.colors.primary, modifier = Modifier.size(12.dp))
+        Symbol(NxIcon.OpenInNew, contentDescription = null, tint = CelestiaTheme.colors.primary, modifier = Modifier.size(12.dp))
         Text(
             text  = text,
             style = MaterialTheme.typography.labelSmall,

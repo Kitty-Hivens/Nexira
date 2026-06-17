@@ -16,9 +16,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -39,6 +36,8 @@ import hivens.core.data.SessionData
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.easter.LocalAprilFools
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
 import hivens.ui.platform.SystemActions
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.theme.CelestiaTheme
@@ -88,7 +87,7 @@ fun ProfileAccountSectionWidget(instance: WidgetInstance) {
                         colors = ButtonDefaults.buttonColors(containerColor = CelestiaTheme.colors.primary),
                     )
                     IconButton(onClick = uploader.refresh) {
-                        Icon(Icons.Default.Refresh, s.profileRefresh, tint = CelestiaTheme.colors.textSecondary)
+                        Symbol(NxIcon.Refresh, s.profileRefresh, tint = CelestiaTheme.colors.textSecondary)
                     }
                 }
                 SkinUploadStatusLine(uploader.status)
@@ -175,7 +174,7 @@ private fun BalanceCard(balance: Int, modifier: Modifier = Modifier) {
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.Star, s.profileBalance, tint = Color(0xFFFFD700), modifier = Modifier.size(20.dp))
+            Symbol(NxIcon.Star, s.profileBalance, tint = Color(0xFFFFD700), modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(10.dp))
             Text(s.profileBalance, color = CelestiaTheme.colors.textSecondary)
         }

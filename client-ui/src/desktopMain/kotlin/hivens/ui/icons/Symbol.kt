@@ -1,6 +1,6 @@
 package hivens.ui.icons
 
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Text
@@ -21,52 +21,57 @@ import hivens.ui.generated.resources.Res
 import hivens.ui.generated.resources.material_symbols
 import org.jetbrains.compose.resources.Font
 
-/** A Material Symbols glyph, identified by its codepoint. See [NxIcon] for the catalog. */
+/** A Material Symbols glyph identified by its codepoint. See [NxIcon] for the catalog. */
 @JvmInline
 value class IconKey(val codepoint: Int)
 
 /**
- * Renders a Material Symbols icon as a font glyph -- the whole icon set is one bundled
- * subset font (only the glyphs in tools/icons/icons.txt), so this replaces the multi-MB
- * material-icons-extended dependency. The variable axes are driven per call:
+ * Renders a Material Symbols icon as a font glyph from the bundled subset font, replacing
+ * the multi-MB material-icons-extended dependency. Drop-in for `Icon`: same argument order,
+ * honours `Modifier.size(...)` (defaults to 24.dp like `Icon`). Sizes above 24.dp need the
+ * explicit [size] parameter. The variable axes are driven per call:
  *
- * - [fill] 0f outlined .. 1f filled (animate it for the usual toggle effect)
- * - [weight] 100..700 stroke weight, [size] both the box and the optical size.
+ * - [fill] 0f outlined .. 1f filled (animatable for the usual toggle effect)
+ * - [weight] 100..700 stroke weight.
  */
 @Composable
 fun Symbol(
     icon: IconKey,
+    contentDescription: String? = null,
     modifier: Modifier = Modifier,
-    size: Dp = 24.dp,
     tint: Color = LocalContentColor.current,
     fill: Float = 0f,
     weight: Int = 400,
-    contentDescription: String? = null,
+    size: Dp? = null,
 ) {
-    val pxSize = with(LocalDensity.current) { size.toSp() }
-    val family = FontFamily(
-        Font(
-            Res.font.material_symbols,
-            variationSettings = FontVariation.Settings(
-                FontVariation.Setting("FILL", fill.coerceIn(0f, 1f)),
-                FontVariation.Setting("wght", weight.toFloat()),
-                FontVariation.Setting("opsz", pxSize.value),
-                FontVariation.Setting("GRAD", 0f),
-            ),
-        ),
-    )
-    Box(modifier.size(size), contentAlignment = Alignment.Center) {
+    val base = Modifier.size(size ?: 24.dp).then(modifier)
+    BoxWithConstraints(
+        modifier = if (contentDescription != null) {
+            base.semantics { this.contentDescription = contentDescription }
+        } else {
+            base
+        },
+        contentAlignment = Alignment.Center,
+    ) {
+        val px = with(LocalDensity.current) { maxHeight.toSp() }
         Text(
             text = String(Character.toChars(icon.codepoint)),
             color = tint,
-            fontSize = pxSize,
-            fontFamily = family,
-            style = TextStyle(lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.Both)),
-            modifier = if (contentDescription != null) {
-                Modifier.semantics { this.contentDescription = contentDescription }
-            } else {
-                Modifier
-            },
+            fontSize = px,
+            fontFamily = FontFamily(
+                Font(
+                    Res.font.material_symbols,
+                    variationSettings = FontVariation.Settings(
+                        FontVariation.Setting("FILL", fill.coerceIn(0f, 1f)),
+                        FontVariation.Setting("wght", weight.toFloat()),
+                        FontVariation.Setting("opsz", px.value),
+                        FontVariation.Setting("GRAD", 0f),
+                    ),
+                ),
+            ),
+            style = TextStyle(
+                lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.Both),
+            ),
         )
     }
 }

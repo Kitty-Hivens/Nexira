@@ -1,6 +1,5 @@
 package hivens.ui.widgets.about
 
-import hivens.ui.theme.LocalMonoFamily
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,9 +10,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.NewReleases
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -34,7 +30,10 @@ import hivens.ui.components.channelColor
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.easter.LocalAprilFools
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
 import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.LocalMonoFamily
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
 import hivens.widget.model.Widget
@@ -71,8 +70,7 @@ fun AboutUpdatePanelWidget(instance: WidgetInstance) {
             // Current version. Only the "i" opens the manager -- the tap target
             // is the icon, not the whole row.
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector        = Icons.Default.Info,
+                Symbol(icon = NxIcon.Info,
                     contentDescription = s.updateManagerOpenHint,
                     tint               = CelestiaTheme.colors.primary,
                     modifier           = Modifier
@@ -99,7 +97,7 @@ fun AboutUpdatePanelWidget(instance: WidgetInstance) {
 
                 Spacer(Modifier.height(16.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.NewReleases, null, tint = availAccent, modifier = Modifier.size(18.dp))
+                    Symbol(NxIcon.NewReleases, null, tint = availAccent, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
                     Text(
                         text       = current.update.version,

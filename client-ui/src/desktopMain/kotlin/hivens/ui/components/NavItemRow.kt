@@ -8,9 +8,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import hivens.ui.icons.IconKey
+import hivens.ui.icons.Symbol
 import hivens.ui.theme.CelestiaTheme
 
 /**
@@ -20,9 +21,8 @@ import hivens.ui.theme.CelestiaTheme
  * this is only the shared row body.
  */
 @Composable
-internal fun NavItemRowContent(icon: ImageVector, label: String, isSelected: Boolean) {
-    Icon(
-        imageVector = icon,
+internal fun NavItemRowContent(icon: IconKey, label: String, isSelected: Boolean) {
+    Symbol(icon = icon,
         contentDescription = null,
         tint = if (isSelected) CelestiaTheme.colors.primary
                else CelestiaTheme.colors.textSecondary,

@@ -6,8 +6,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -42,6 +40,8 @@ import hivens.core.data.PackOrigin
 import hivens.launcher.PackInstallCoordinator
 import hivens.launcher.catalogue.PackCatalogueRegistry
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
 import hivens.ui.screens.RetryStateBlock
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.originGradient
@@ -94,7 +94,7 @@ fun ModrinthPackDetailScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, s.navBack, tint = CelestiaTheme.colors.textPrimary)
+                Symbol(NxIcon.ArrowBack, s.navBack, tint = CelestiaTheme.colors.textPrimary)
             }
             Spacer(Modifier.width(4.dp))
             Text(

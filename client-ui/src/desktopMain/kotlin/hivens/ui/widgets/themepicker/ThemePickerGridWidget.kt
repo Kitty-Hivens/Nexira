@@ -22,8 +22,6 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -41,6 +39,8 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.components.GlassCard
 import hivens.ui.customization.scaledAlpha
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
 import hivens.ui.theme.CustomTheme
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
@@ -128,8 +128,7 @@ private fun ThemeCard(
                                 .background(CustomTheme.parseHexColor(theme.primary).copy(alpha = 0.2f))
                                 .padding(horizontal = 8.dp, vertical = 4.dp),
                         ) {
-                            Icon(
-                                imageVector        = Icons.Default.Check,
+                            Symbol(icon = NxIcon.Check,
                                 contentDescription = null,
                                 tint               = CustomTheme.parseHexColor(theme.primary),
                                 modifier           = Modifier.size(14.dp),

@@ -1,6 +1,5 @@
 package hivens.ui.editor.decoration
 
-import hivens.ui.theme.LocalMonoFamily
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -10,9 +9,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -24,7 +20,10 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
 import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.LocalMonoFamily
 import hivens.widget.model.WidgetInstance
 
 // Edit-mode stand-in for a widget whose kind is no longer in the registry
@@ -49,8 +48,7 @@ fun UnsupportedWidgetPlaceholder(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Icon(
-            Icons.Default.Warning,
+        Symbol(NxIcon.Warning,
             contentDescription = null,
             tint = CelestiaTheme.colors.error,
             modifier = Modifier.size(18.dp),
@@ -70,8 +68,7 @@ fun UnsupportedWidgetPlaceholder(
             )
         }
         IconButton(onClick = onRemove, modifier = Modifier.size(24.dp)) {
-            Icon(
-                Icons.Default.Close,
+            Symbol(NxIcon.Close,
                 contentDescription = s.editorDelete,
                 tint = CelestiaTheme.colors.textSecondary,
                 modifier = Modifier.size(16.dp),

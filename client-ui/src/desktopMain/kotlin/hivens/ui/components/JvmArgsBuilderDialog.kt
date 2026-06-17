@@ -1,14 +1,11 @@
 package hivens.ui.components
 
-import hivens.ui.theme.LocalMonoFamily
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -22,7 +19,10 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import hivens.core.jvm.*
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
 import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.LocalMonoFamily
 
 /**
  * Visual builder for the [hivens.core.data.InstanceProfile.jvmArgs] string.
@@ -50,13 +50,13 @@ fun JvmArgsBuilderDialog(
 
     val tabs = remember(s) {
         listOf(
-            s.jvmTabGc to Icons.Default.Memory,
-            s.jvmTabTuning to Icons.Default.Tune,
-            s.jvmTabCds to Icons.Default.Bolt,
-            s.jvmTabJit to Icons.Default.Speed,
-            s.jvmTabPerf to Icons.Default.Whatshot,
-            s.jvmTabJfr to Icons.Default.Insights,
-            s.jvmTabCustom to Icons.Default.Code,
+            s.jvmTabGc to NxIcon.Memory,
+            s.jvmTabTuning to NxIcon.Tune,
+            s.jvmTabCds to NxIcon.Bolt,
+            s.jvmTabJit to NxIcon.Speed,
+            s.jvmTabPerf to NxIcon.Whatshot,
+            s.jvmTabJfr to NxIcon.Insights,
+            s.jvmTabCustom to NxIcon.Code,
         )
     }
 
@@ -77,8 +77,7 @@ fun JvmArgsBuilderDialog(
                         .padding(horizontal = 24.dp, vertical = 16.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(
-                        Icons.Default.Tune,
+                    Symbol(NxIcon.Tune,
                         null,
                         tint = CelestiaTheme.colors.primary,
                         modifier = Modifier.size(28.dp),
@@ -98,7 +97,7 @@ fun JvmArgsBuilderDialog(
                         )
                     }
                     IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, null, tint = CelestiaTheme.colors.textSecondary)
+                        Symbol(NxIcon.Close, null, tint = CelestiaTheme.colors.textSecondary)
                     }
                 }
 
@@ -127,7 +126,7 @@ fun JvmArgsBuilderDialog(
                             selected = selectedTabIdx == idx,
                             onClick = { selectedTabIdx = idx },
                             text = { Text(label, fontSize = 13.sp) },
-                            icon = { Icon(icon, null, modifier = Modifier.size(18.dp)) },
+                            icon = { Symbol(icon, null, modifier = Modifier.size(18.dp)) },
                             selectedContentColor = CelestiaTheme.colors.primary,
                             unselectedContentColor = CelestiaTheme.colors.textSecondary,
                         )
@@ -174,7 +173,7 @@ fun JvmArgsBuilderDialog(
                         ),
                         shape = MaterialTheme.shapes.small,
                     ) {
-                        Icon(Icons.Default.Check, null, modifier = Modifier.size(18.dp))
+                        Symbol(NxIcon.Check, null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
                         Text(s.jvmApply)
                     }
@@ -579,7 +578,7 @@ private fun ArgsPreviewBox(config: JvmConfig) {
             .padding(horizontal = 24.dp, vertical = 8.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.Code, null, tint = CelestiaTheme.colors.primary,
+            Symbol(NxIcon.Code, null, tint = CelestiaTheme.colors.primary,
                 modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(6.dp))
             Text(s.jvmPreviewFlagsCount(args.size),

@@ -1,10 +1,8 @@
 package hivens.ui.widgets.profile
 
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.ui.graphics.vector.ImageVector
 import hivens.ui.i18n.AppStrings
+import hivens.ui.icons.IconKey
+import hivens.ui.icons.NxIcon
 
 // Top-level Profile categories. The nav widget renders one row per
 // entry; the surface composable routes the right pane's slot
@@ -14,9 +12,9 @@ import hivens.ui.i18n.AppStrings
 // identity and the nav hides it while signed out. The skin lives on
 // the Account tab (skin-forward); a dedicated skin screen comes later.
 enum class ProfileCategory(
-    val icon: ImageVector,
+    val icon: IconKey,
     val label: (AppStrings) -> String,
 ) {
-    Account( Icons.Default.AccountCircle, { it.profileCategoryAccount }),
-    SignIn(  Icons.Default.Lock,          { it.profileCategorySignIn }),
+    Account( NxIcon.AccountCircle, { it.profileCategoryAccount }),
+    SignIn(  NxIcon.Lock,          { it.profileCategorySignIn }),
 }

@@ -1,13 +1,6 @@
 package hivens.ui.screens.settings
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Memory
-import androidx.compose.material.icons.filled.Science
-import androidx.compose.material.icons.filled.Sync
-import androidx.compose.material.icons.filled.Tag
-import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.filled.Update
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -17,11 +10,12 @@ import hivens.config.ExperimentalProtocolOverride
 import hivens.config.Protocol
 import hivens.core.data.SettingsData
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.NxIcon
 import hivens.ui.puppet.PuppetField
 import hivens.ui.puppet.PuppetToggle
 import hivens.ui.theme.CelestiaTheme
-import kotlinx.coroutines.delay
 import kotlin.time.Duration.Companion.milliseconds
+import kotlinx.coroutines.delay
 
 /**
  * Opt-in experimental features. Master toggle gates every child so a
@@ -48,7 +42,7 @@ internal fun ExperimentalSection(
     SettingsRowWithDescription(
         title          = s.settingsExperimentalMaster,
         description    = s.settingsExperimentalMasterDesc,
-        icon           = Icons.Default.Science,
+        icon           = NxIcon.Science,
         iconTint       = CelestiaTheme.colors.primary,
         checked        = form.experimentalEnabled,
         enabled        = true,
@@ -61,7 +55,7 @@ internal fun ExperimentalSection(
     SettingsRowWithDescription(
         title          = s.settingsMandatoryUpdates,
         description    = s.settingsMandatoryUpdatesDesc,
-        icon           = Icons.Default.Update,
+        icon           = NxIcon.Update,
         iconTint       = CelestiaTheme.colors.primary,
         checked        = form.experimentalEnabled && form.mandatoryUpdates,
         enabled        = form.experimentalEnabled,
@@ -77,7 +71,7 @@ internal fun ExperimentalSection(
     SettingsRowWithDescription(
         title          = s.settingsAutoSyncAllPacks,
         description    = s.settingsAutoSyncAllPacksDesc,
-        icon           = Icons.Default.Sync,
+        icon           = NxIcon.Sync,
         iconTint       = CelestiaTheme.colors.primary,
         checked        = form.experimentalEnabled && form.autoSyncAllPacks,
         enabled        = form.experimentalEnabled,
@@ -92,7 +86,7 @@ internal fun ExperimentalSection(
     SettingsRowWithDescription(
         title          = s.settingsJvmBuilder,
         description    = s.settingsJvmBuilderDesc,
-        icon           = Icons.Default.Tune,
+        icon           = NxIcon.Tune,
         iconTint       = CelestiaTheme.colors.primary,
         checked        = form.experimentalEnabled && form.jvmBuilderEnabled,
         enabled        = form.experimentalEnabled,
@@ -107,7 +101,7 @@ internal fun ExperimentalSection(
     SettingsRowWithDescription(
         title          = s.settingsAdaptiveMemory,
         description    = s.settingsAdaptiveMemoryDesc,
-        icon           = Icons.Default.Memory,
+        icon           = NxIcon.Memory,
         iconTint       = CelestiaTheme.colors.primary,
         checked        = form.experimentalEnabled && form.adaptiveMemoryEnabled,
         enabled        = form.experimentalEnabled,
@@ -127,7 +121,7 @@ internal fun ExperimentalSection(
     SettingsRowWithDescription(
         title          = s.settingsMimicVersion,
         description    = s.settingsMimicVersionDesc,
-        icon           = Icons.Default.Tag,
+        icon           = NxIcon.Tag,
         iconTint       = CelestiaTheme.colors.primary,
         checked        = form.experimentalEnabled && form.mimicOverrideEnabled,
         enabled        = form.experimentalEnabled,

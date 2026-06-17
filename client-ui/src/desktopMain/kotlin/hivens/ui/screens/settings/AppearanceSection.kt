@@ -4,15 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Language
-import androidx.compose.material.icons.filled.MoveToInbox
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.filled.Wallpaper
-import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -25,6 +16,8 @@ import hivens.core.data.UiStyle
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetToggle
 import hivens.ui.theme.CelestiaTheme
@@ -72,7 +65,7 @@ internal fun AppearanceSection(
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.Language, null, tint = CelestiaTheme.colors.primary, modifier = Modifier.size(24.dp))
+            Symbol(NxIcon.Language, null, tint = CelestiaTheme.colors.primary, modifier = Modifier.size(24.dp))
             Spacer(Modifier.width(16.dp))
             Text(s.settingsLanguage, color = CelestiaTheme.colors.textPrimary)
         }
@@ -85,7 +78,7 @@ internal fun AppearanceSection(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(currentLocale.displayName, color = CelestiaTheme.colors.primary, fontWeight = FontWeight.Bold)
-                Icon(Icons.Default.ArrowDropDown, null, tint = CelestiaTheme.colors.primary)
+                Symbol(NxIcon.ArrowDropDown, null, tint = CelestiaTheme.colors.primary)
             }
 
             DropdownMenu(
@@ -134,14 +127,14 @@ internal fun AppearanceSection(
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.Star, null, tint = CelestiaTheme.colors.primary, modifier = Modifier.size(24.dp))
+            Symbol(NxIcon.Star, null, tint = CelestiaTheme.colors.primary, modifier = Modifier.size(24.dp))
             Spacer(Modifier.width(16.dp))
             Column {
                 Text(s.settingsThemePicker, color = CelestiaTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
                 Text(s.settingsThemePickerSub, style = MaterialTheme.typography.bodySmall, color = CelestiaTheme.colors.textSecondary)
             }
         }
-        Icon(Icons.Default.ArrowDropDown, null, tint = CelestiaTheme.colors.primary)
+        Symbol(NxIcon.ArrowDropDown, null, tint = CelestiaTheme.colors.primary)
     }
 
     Spacer(Modifier.height(4.dp))
@@ -159,14 +152,14 @@ internal fun AppearanceSection(
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.Wallpaper, null, tint = CelestiaTheme.colors.primary, modifier = Modifier.size(24.dp))
+            Symbol(NxIcon.Wallpaper, null, tint = CelestiaTheme.colors.primary, modifier = Modifier.size(24.dp))
             Spacer(Modifier.width(16.dp))
             Column {
                 Text(s.settingsBackground, color = CelestiaTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
                 Text(s.settingsBackgroundSub, style = MaterialTheme.typography.bodySmall, color = CelestiaTheme.colors.textSecondary)
             }
         }
-        Icon(Icons.Default.ChevronRight, null, tint = CelestiaTheme.colors.primary)
+        Symbol(NxIcon.ChevronRight, null, tint = CelestiaTheme.colors.primary)
     }
 
     Spacer(Modifier.height(4.dp))
@@ -184,14 +177,14 @@ internal fun AppearanceSection(
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.Tune, null, tint = CelestiaTheme.colors.primary, modifier = Modifier.size(24.dp))
+            Symbol(NxIcon.Tune, null, tint = CelestiaTheme.colors.primary, modifier = Modifier.size(24.dp))
             Spacer(Modifier.width(16.dp))
             Column {
                 Text(s.settingsCustomizationExt, color = CelestiaTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
                 Text(s.settingsCustomizationExtSub, style = MaterialTheme.typography.bodySmall, color = CelestiaTheme.colors.textSecondary)
             }
         }
-        Icon(Icons.Default.ChevronRight, null, tint = CelestiaTheme.colors.primary)
+        Symbol(NxIcon.ChevronRight, null, tint = CelestiaTheme.colors.primary)
     }
 
     Spacer(Modifier.height(4.dp))
@@ -249,7 +242,7 @@ internal fun AppearanceSection(
     SettingsRowWithDescription(
         title           = s.settingsCloseAfterLaunch,
         description     = s.settingsCloseAfterLaunchDesc,
-        icon            = Icons.Default.MoveToInbox,
+        icon            = NxIcon.MoveToInbox,
         iconTint        = CelestiaTheme.colors.textSecondary,
         checked         = form.closeAfterStart,
         enabled         = true,
@@ -273,8 +266,7 @@ internal fun AppearanceSection(
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-            Icon(
-                Icons.Default.WifiOff,
+            Symbol(NxIcon.WifiOff,
                 null,
                 tint = if (form.isOfflineMode) CelestiaTheme.colors.error else CelestiaTheme.colors.textSecondary,
                 modifier = Modifier.size(24.dp)

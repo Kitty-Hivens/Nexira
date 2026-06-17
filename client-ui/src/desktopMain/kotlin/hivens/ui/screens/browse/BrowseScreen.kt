@@ -18,8 +18,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -46,16 +44,18 @@ import hivens.core.api.catalogue.CataloguePack
 import hivens.core.data.PackOrigin
 import hivens.launcher.catalogue.PackCatalogueRegistry
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetField
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.screens.RetryStateBlock
 import hivens.ui.theme.CelestiaTheme
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
-import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Browse = the catalogue of everything installable, across sources. A source
@@ -166,8 +166,7 @@ private fun SearchField(value: String, onValueChange: (String) -> Unit, placehol
                 .padding(horizontal = 14.dp, vertical = 11.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(
-                imageVector        = Icons.Default.Search,
+            Symbol(icon = NxIcon.Search,
                 contentDescription = null,
                 tint               = CelestiaTheme.colors.textSecondary,
                 modifier           = Modifier.size(18.dp),
