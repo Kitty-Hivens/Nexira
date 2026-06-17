@@ -57,9 +57,8 @@ fun CustomBackground(
     modifier: Modifier = Modifier,
     mousePosProvider: () -> Offset = { Offset(0.5f, 0.5f) }
 ) {
-    if (!settings.enabled || settings.imagePath.isNullOrBlank()) return
-    val file = File(settings.imagePath)
-    if (!file.exists()) return
+    if (!settings.hasUsableImage()) return
+    val file = File(settings.imagePath!!)
 
     Box(modifier = modifier.fillMaxSize()) {
         AnimatedParallaxImage(
