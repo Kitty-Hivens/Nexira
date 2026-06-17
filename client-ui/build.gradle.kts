@@ -37,7 +37,6 @@ kotlin {
                 implementation(libs.compose.material3)
                 implementation(libs.compose.ui)
                 implementation(libs.compose.components.resources)
-                implementation(libs.compose.material.icons.extended)
                 implementation(libs.multiplatform.markdown.m3)
 
                 // Coil pulls `org.jetbrains.skiko` transitively at its own
