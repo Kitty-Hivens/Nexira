@@ -7,14 +7,14 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import hivens.ui.generated.resources.Res
-import hivens.ui.generated.resources.google_sans_flex_bold
-import hivens.ui.generated.resources.google_sans_flex_medium
-import hivens.ui.generated.resources.google_sans_flex_regular
-import hivens.ui.generated.resources.google_sans_flex_semibold
 import hivens.ui.generated.resources.jetbrains_mono_bold
 import hivens.ui.generated.resources.jetbrains_mono_medium
 import hivens.ui.generated.resources.jetbrains_mono_regular
 import hivens.ui.generated.resources.jetbrains_mono_semibold
+import hivens.ui.generated.resources.roboto_flex_bold
+import hivens.ui.generated.resources.roboto_flex_medium
+import hivens.ui.generated.resources.roboto_flex_regular
+import hivens.ui.generated.resources.roboto_flex_semibold
 import org.jetbrains.compose.resources.Font
 
 /**
@@ -23,18 +23,20 @@ import org.jetbrains.compose.resources.Font
  * whatever sans the OS happens to default to (which is also how a non-free
  * system font would otherwise leak into the look).
  *
- * - Google Sans Flex -- all UI text. Its variable source is sliced to four
- *   static weights (400/500/600/700) at tooling time for predictable Skia
- *   rendering.
+ * - Roboto Flex -- all UI text. Covers Latin, Cyrillic and Greek, so Russian
+ *   and German render in the bundled face instead of falling back to a system
+ *   font (Google Sans Flex was Latin-only). Its variable source is sliced to
+ *   four static weights (400/500/600/700), subset to those scripts, at tooling
+ *   time for predictable Skia rendering.
  * - JetBrains Mono -- code / hex / console, read through [LocalMonoFamily] so
  *   call sites swap the platform-generic monospace for the bundled one.
  */
 @Composable
 fun nexiraSansFamily(): FontFamily = FontFamily(
-    Font(Res.font.google_sans_flex_regular,  FontWeight.Normal),
-    Font(Res.font.google_sans_flex_medium,   FontWeight.Medium),
-    Font(Res.font.google_sans_flex_semibold, FontWeight.SemiBold),
-    Font(Res.font.google_sans_flex_bold,     FontWeight.Bold),
+    Font(Res.font.roboto_flex_regular,  FontWeight.Normal),
+    Font(Res.font.roboto_flex_medium,   FontWeight.Medium),
+    Font(Res.font.roboto_flex_semibold, FontWeight.SemiBold),
+    Font(Res.font.roboto_flex_bold,     FontWeight.Bold),
 )
 
 @Composable
