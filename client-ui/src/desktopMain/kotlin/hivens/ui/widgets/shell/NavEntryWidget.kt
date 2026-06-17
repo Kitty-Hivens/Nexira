@@ -220,7 +220,9 @@ private fun NavSlot(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(48.dp)
+                // Taller than the icon so the slots tile flush (rail spacing is 0)
+                // and the breathing room between buttons stays inside the hit area.
+                .height(54.dp)
                 .selectable(
                     selected          = active,
                     enabled           = enabled,

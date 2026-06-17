@@ -20,6 +20,7 @@ import hivens.core.data.UiStyle
 import hivens.launcher.network.NetworkState
 import hivens.launcher.network.ServerProtocolConfig
 import hivens.ui.background.BackgroundSettings
+import hivens.ui.background.hasUsableImage
 import hivens.ui.customization.CustomizationSettings
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.easter.LocalAprilFools
@@ -87,8 +88,9 @@ fun AppLayout(
     }
     var selectedServer by remember { mutableStateOf<ServerProfile?>(null) }
 
-    // When custom background is active, make the row transparent so image shows through
-    val rowBackground = if (backgroundSettings.enabled) Color.Transparent
+    // Go transparent only when the wallpaper can actually be drawn -- a deleted
+    // image left the row transparent over a blank white window.
+    val rowBackground = if (backgroundSettings.hasUsableImage()) Color.Transparent
     else CelestiaTheme.colors.background
 
     val bypassHost = protocolConfig.sslBypassHost
@@ -320,16 +322,15 @@ fun AppSidebar(
             containerColor = glassSurfaceAlpha(0.35f),
             contentColor   = CelestiaTheme.colors.textSecondary
         ) {
-            // Per-item spacing keeps the nav icons from jamming together (the
-            // slot's own Column defaults to 0 spacing). No leading spacer: each
-            // item's own height centers its icon with clickable breathing room,
-            // so the top edge has no dead (non-clickable) gap above the first
-            // entry. Spacers are layout, not content -- surface-owned so the
-            // top/bottom widgets need no ColumnScope for the weighted gap, and
-            // fillMaxWidth keeps the slot's Column at rail width so items center.
-            SlotRenderer(SurfaceId(SIDEBAR_SURFACE), SlotId("top"), Modifier.fillMaxWidth(), spacing = 6.dp)
+            // Items sit flush (spacing 0) so the rail is one contiguous column
+            // of clickable slots with no dead gap between buttons. Each NavSlot
+            // is taller than its icon and centers it, so the breathing room is
+            // the slot's own padding -- and stays clickable. No leading spacer
+            // for the same reason; fillMaxWidth keeps the slot's Column at rail
+            // width so items center.
+            SlotRenderer(SurfaceId(SIDEBAR_SURFACE), SlotId("top"), Modifier.fillMaxWidth(), spacing = 0.dp)
             Spacer(Modifier.weight(1f))
-            SlotRenderer(SurfaceId(SIDEBAR_SURFACE), SlotId("bottom"), Modifier.fillMaxWidth(), spacing = 6.dp)
+            SlotRenderer(SurfaceId(SIDEBAR_SURFACE), SlotId("bottom"), Modifier.fillMaxWidth(), spacing = 0.dp)
             Spacer(Modifier.height(8.dp))
         }
     }
