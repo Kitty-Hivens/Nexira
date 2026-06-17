@@ -15,7 +15,9 @@ import hivens.core.api.PlayerRepository
 import hivens.core.api.ServerRepository
 import hivens.core.api.SkinRepository
 import hivens.core.api.interfaces.*
-import hivens.core.security.IKeyringStorage
+import dev.hivens.libvault.SecretVault
+import dev.hivens.libvault.Vault
+import dev.hivens.libvault.VaultConfig
 import hivens.launcher.*
 import hivens.launcher.component.ClasspathProvider
 import hivens.launcher.component.EnvironmentPreparer
@@ -356,16 +358,24 @@ val networkModule = module {
  * (secure + insecure-bypass variants).
  */
 val authModule = module {
-    // IKeyringStorage picked at startup via KeyringStorageFactory.system()
-    // -- libsecret on Linux, Credential Manager / DPAPI on Windows,
-    // Keychain on macOS, NoOp fallback when no daemon is reachable.
-    // CredentialsManager handles the file-fallback path internally when
-    // keyring.store() returns false, so this single line wires both
-    // the happy and the degraded path.
-    single<IKeyringStorage> {
-        KeyringStorageFactory.system()
+    // Secret storage via libvault: OS keyring (Secret Service / Credential
+    // Manager / Keychain) with an encrypted-file fallback, opened once for the
+    // process. The credentials.vault blob sits next to credentials.json. On a
+    // locked keyring the vault degrades to the file tier rather than prompting
+    // (see CredentialsManager KDoc).
+    single<SecretVault> {
+        Vault.open(
+            VaultConfig(
+                namespace = "io.github.kitty_hivens.Nexira",
+                softwareFilePath = get<Path>().resolve("credentials.vault"),
+            ),
+        )
     }
-    single { CredentialsManager(get(), get(), get()) }
+    // Legacy keyring + AES reader, kept one release for the migration shim. Lazy
+    // single: built -- and the old keyring probed -- only when CredentialsManager
+    // hits a pre-v5 credentials.json and resolves the provider lambda below.
+    single { LegacyCredentialsManager(get(), get(), KeyringStorageFactory.system()) }
+    single { CredentialsManager(get(), get(), get<SecretVault>(), legacyProvider = { get() }) }
     // Interface aliases for the launch-flow seam. LauncherController binds the
     // I* slices; other consumers keep the concrete type. get<Concrete>() reuses
     // the single instance rather than building a second.

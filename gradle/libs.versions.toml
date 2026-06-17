@@ -59,6 +59,12 @@ libtray           = "0.1.1"
 # 0.1.1: same DBusMessageIter buffer-overflow + arena-leak fixes as libtray.
 libnotify         = "0.1.1"
 
+# Pure-Panama secret storage (Kitty-Hivens/libvault) -- OS keyring (Secret
+# Service / Credential Manager / Keychain) with an AES-256-GCM file fallback.
+# Replaces the in-tree IKeyringStorage + 4 native impls + the AES fallback that
+# lived inside CredentialsManager. Same dev.hivens family, mavenCentral.
+libvault          = "0.2.0"
+
 # ── Test ─────────────────────────────────────────────────────────────────────
 # junit held on the 5.x line: 6.x drops Java 8 and requires JVM runtime 17+,
 # which authlib-agent / profiler-agent can't honour -- those modules compile to
@@ -119,6 +125,7 @@ filekit-dialogs-compose         = { group = "io.github.vinceglb", name = "fileki
 commons-compress                = { group = "org.apache.commons", name = "commons-compress", version.ref = "commonsCompress" }
 libtray                          = { group = "dev.hivens", name = "libtray", version.ref = "libtray" }
 libnotify                        = { group = "dev.hivens", name = "libnotify", version.ref = "libnotify" }
+libvault                         = { group = "dev.hivens", name = "libvault", version.ref = "libvault" }
 
 # JNA dropped — was only present for dorkbox/SystemTray. libtray is
 # pure java.lang.foreign (Project Panama) and pulls no JNA transitively.

@@ -1,16 +1,17 @@
 package hivens.launcher
 
+import dev.hivens.libvault.SecretVault
+import dev.hivens.libvault.VaultTier
 import hivens.core.data.SessionData
 import hivens.core.security.IKeyringStorage
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import java.nio.file.Files
 import java.nio.file.Path
-import java.util.Base64
 import kotlin.io.path.div
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
@@ -22,22 +23,30 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * Tests the keyring-primary + file-fallback refactor with two independent
- * sensitive fields (password + accessToken). Uses an in-memory
- * [FakeKeyring] instead of mockk so the tests read like state machines.
+ * Tests the libvault-backed CredentialsManager: secrets in the vault, metadata
+ * on disk, and the one-time migration off the legacy keyring/AES store. Uses an
+ * in-memory [FakeVault] (mirrors libvault's own MemoryVault) and, for the
+ * migration cases, a real [LegacyCredentialsManager] over an in-memory
+ * [FakeKeyring].
  */
 class CredentialsManagerTest {
 
     private val json = Json { ignoreUnknownKeys = true; isLenient = true; encodeDefaults = true }
     private lateinit var workDir: Path
-    private lateinit var keyring: FakeKeyring
+    private lateinit var vault: FakeVault
+    private lateinit var legacyKeyring: FakeKeyring
     private lateinit var manager: CredentialsManager
 
     @BeforeTest
     fun setup() {
-        workDir = Files.createTempDirectory("aura-creds-test-")
-        keyring = FakeKeyring()
-        manager = CredentialsManager(workDir, json, keyring)
+        workDir = Files.createTempDirectory("nexira-creds-test-")
+        vault = FakeVault()
+        legacyKeyring = FakeKeyring()
+        // The provider builds a legacy reader over the same workDir + keyring,
+        // so the migration tests can seed via a real LegacyCredentialsManager.
+        manager = CredentialsManager(workDir, json, vault) {
+            LegacyCredentialsManager(workDir, json, legacyKeyring)
+        }
     }
 
     @AfterTest
@@ -54,77 +63,51 @@ class CredentialsManagerTest {
         status = null,
     )
 
-    private fun fileJson(): JsonObject {
-        val text = Files.readString(workDir / "credentials.json")
-        return json.parseToJsonElement(text).jsonObject
-    }
+    private fun fileJson(): JsonObject =
+        json.parseToJsonElement(Files.readString(workDir / "credentials.json")).jsonObject
 
-    private val passwordKey = "io.github.kitty_hivens.AuraLauncher::password"
-    private val accessTokenKey = "io.github.kitty_hivens.AuraLauncher::accessToken"
-
-    // ── save() ─────────────────────────────────────────────────────────────
+    // ── save() ───────────────────────────────────────────────────────────────
 
     @Test
-    fun `save with keyring available -- both secrets land in keyring, file holds flags`() {
+    fun `save stores secrets in the vault and only metadata on disk`() {
         manager.save(session())
 
-        assertEquals("secret-pw", keyring.entries[passwordKey])
-        assertEquals("fake-game-token", keyring.entries[accessTokenKey])
+        assertEquals("secret-pw", vault.entries["password"]?.decodeToString())
+        assertEquals("fake-game-token", vault.entries["accessToken"]?.decodeToString())
 
         val obj = fileJson()
-        assertEquals(true, obj["keyringHasPassword"]?.jsonPrimitive?.boolean)
-        assertEquals(true, obj["keyringHasAccessToken"]?.jsonPrimitive?.boolean)
-        assertNull(obj["encryptedPassword"]?.jsonPrimitive?.contentOrNull)
-        assertNull(obj["encryptedAccessToken"]?.jsonPrimitive?.contentOrNull)
-        // Legacy plaintext accessToken field is never written in v4+.
-        assertNull(obj["accessToken"]?.jsonPrimitive?.contentOrNull)
-        assertEquals(4, obj["version"]?.jsonPrimitive?.contentOrNull?.toInt())
+        assertEquals("ChaosA", obj["username"]?.jsonPrimitive?.contentOrNull)
+        assertEquals(5, obj["version"]?.jsonPrimitive?.int)
+        // No secret material ever touches the file.
+        assertNull(obj["accessToken"], "accessToken must not be on disk")
+        assertNull(obj["encryptedPassword"], "no ciphertext on disk")
+        assertNull(obj["keyringHasPassword"], "no legacy flags written")
     }
 
     @Test
-    fun `save with keyring failing -- both secrets fall back to AES-GCM file`() {
-        keyring.failStore = true
-        manager.save(session())
-
-        assertTrue(keyring.entries.isEmpty())
-
-        val obj = fileJson()
-        assertEquals(false, obj["keyringHasPassword"]?.jsonPrimitive?.boolean)
-        assertEquals(false, obj["keyringHasAccessToken"]?.jsonPrimitive?.boolean)
-        assertNotNull(obj["encryptedPassword"]?.jsonPrimitive?.contentOrNull)
-        assertNotNull(obj["passwordIv"]?.jsonPrimitive?.contentOrNull)
-        assertNotNull(obj["encryptedAccessToken"]?.jsonPrimitive?.contentOrNull)
-        assertNotNull(obj["accessTokenIv"]?.jsonPrimitive?.contentOrNull)
-    }
-
-    @Test
-    fun `save with blank accessToken -- no-op, no file written`() {
-        val noToken = session(accessToken = "")
-        manager.save(noToken)
-        assertFalse(Files.exists(workDir / "credentials.json"))
-        assertTrue(keyring.entries.isEmpty())
-    }
-
-    @Test
-    fun `save with null cachedPassword -- password not stored, accessToken still goes to keyring`() {
+    fun `save with null password -- accessToken stored, password dropped from the vault`() {
+        vault.entries["password"] = "stale".toByteArray() // pretend a prior password lingered
         manager.save(session(password = null))
 
-        assertNull(keyring.entries[passwordKey], "keyring must not store null password")
-        assertEquals("fake-game-token", keyring.entries[accessTokenKey], "accessToken still gets stored")
-
-        val obj = fileJson()
-        assertEquals(false, obj["keyringHasPassword"]?.jsonPrimitive?.boolean)
-        assertEquals(true, obj["keyringHasAccessToken"]?.jsonPrimitive?.boolean)
-        assertNull(obj["encryptedPassword"]?.jsonPrimitive?.contentOrNull)
+        assertNull(vault.entries["password"], "null password must clear the vault entry")
+        assertEquals("fake-game-token", vault.entries["accessToken"]?.decodeToString())
     }
 
-    // ── load() ─────────────────────────────────────────────────────────────
+    @Test
+    fun `save with blank accessToken -- no-op, no file, empty vault`() {
+        manager.save(session(accessToken = ""))
+        assertFalse(Files.exists(workDir / "credentials.json"))
+        assertTrue(vault.entries.isEmpty())
+    }
+
+    // ── load() ───────────────────────────────────────────────────────────────
 
     @Test
-    fun `load v4 keyring-mode -- both secrets come from keyring`() {
+    fun `load round-trips through the vault`() {
         manager.save(session())
-        val freshManager = CredentialsManager(workDir, json, keyring)
-        val loaded = freshManager.load()
+        val loaded = CredentialsManager(workDir, json, vault) {
+            LegacyCredentialsManager(workDir, json, legacyKeyring)
+        }.load()
 
         assertNotNull(loaded)
         assertEquals("ChaosA", loaded.playerName)
@@ -133,101 +116,20 @@ class CredentialsManagerTest {
     }
 
     @Test
-    fun `load v4 keyring-mode but accessToken entry wiped -- returns null (session gone)`() {
+    fun `load with accessToken missing from the vault -- returns null (session gone)`() {
         manager.save(session())
-        // Wipe only the accessToken keyring entry -- daemon issue, manual
-        // delete in seahorse, etc. Without accessToken the launcher cannot
-        // launch the game; load returns null to trigger re-login.
-        keyring.entries.remove(accessTokenKey)
-        val freshManager = CredentialsManager(workDir, json, keyring)
-        assertNull(freshManager.load(), "no accessToken = unusable session")
+        vault.entries.remove("accessToken")
+        assertNull(manager.load(), "no accessToken = unusable session")
     }
 
     @Test
-    fun `load v4 keyring-mode but password entry wiped -- session loads with null cachedPassword`() {
+    fun `load with password missing -- session with null cachedPassword`() {
         manager.save(session())
-        // Wipe only the password entry. accessToken still works, so the
-        // user can still launch the game; only password-dependent flows
-        // (re-auth) need to prompt.
-        keyring.entries.remove(passwordKey)
-        val freshManager = CredentialsManager(workDir, json, keyring)
-        val loaded = freshManager.load()
-
-        assertNotNull(loaded, "accessToken survived -- session is usable")
-        assertEquals("fake-game-token", loaded.accessToken)
-        assertNull(loaded.cachedPassword, "password is gone -- relogin needed for re-auth")
-    }
-
-    @Test
-    fun `load v4 file-mode -- both secrets come from AES-GCM file`() {
-        keyring.failStore = true
-        manager.save(session())
-        val freshManager = CredentialsManager(workDir, json, keyring)
-        val loaded = freshManager.load()
-
-        assertNotNull(loaded)
-        assertEquals("secret-pw", loaded.cachedPassword)
-        assertEquals("fake-game-token", loaded.accessToken)
-    }
-
-    @Test
-    fun `load v3 legacy file with plaintext accessToken -- migrates on next save`() {
-        // Hand-craft a v3-format file: password in keyring (flag set, no
-        // ciphertext) but accessToken still plaintext on disk. This is
-        // exactly what a launcher upgraded from #139 -> this PR would have
-        // on disk for an already-logged-in user.
-        val legacyFile = workDir / "credentials.json"
-        keyring.entries[passwordKey] = "v3-password" // pretend keyring had it
-        val legacyText = """
-            {
-                "username": "OldUser",
-                "uuid": "00000000000000000000000000000000",
-                "uid": "42",
-                "keyringHasPassword": true,
-                "accessToken": "v3-plaintext-token",
-                "version": 3
-            }
-        """.trimIndent()
-        Files.writeString(legacyFile, legacyText)
-
-        // First load: reads v3 schema, surfaces the legacy plaintext token.
+        vault.entries.remove("password")
         val loaded = manager.load()
         assertNotNull(loaded)
-        assertEquals("v3-plaintext-token", loaded.accessToken)
-        assertEquals("v3-password", loaded.cachedPassword)
-
-        // Save migrates accessToken into the keyring + bumps version.
-        manager.save(loaded)
-        assertEquals("v3-plaintext-token", keyring.entries[accessTokenKey])
-        val obj = fileJson()
-        assertEquals(4, obj["version"]?.jsonPrimitive?.contentOrNull?.toInt())
-        assertEquals(true, obj["keyringHasAccessToken"]?.jsonPrimitive?.boolean)
-        assertNull(obj["accessToken"]?.jsonPrimitive?.contentOrNull, "legacy plaintext field cleared")
-    }
-
-    @Test
-    fun `load v1 legacy Base64 -- migrates password on read, returns valid session`() {
-        // v1 schema also had plaintext accessToken -- same migration path
-        // as v3 for the token; password comes from savedPasswordBase64.
-        val legacyFile = workDir / "credentials.json"
-        val legacyB64 = Base64.getEncoder().encodeToString("legacy-pw".toByteArray())
-        val legacyText = """
-            {
-                "username": "OldUser",
-                "accessToken": "v1-token",
-                "uuid": "00000000000000000000000000000000",
-                "uid": "42",
-                "savedPasswordBase64": "$legacyB64",
-                "version": 1
-            }
-        """.trimIndent()
-        Files.writeString(legacyFile, legacyText)
-
-        val loaded = manager.load()
-        assertNotNull(loaded)
-        assertEquals("OldUser", loaded.playerName)
-        assertEquals("legacy-pw", loaded.cachedPassword)
-        assertEquals("v1-token", loaded.accessToken)
+        assertEquals("fake-game-token", loaded.accessToken)
+        assertNull(loaded.cachedPassword)
     }
 
     @Test
@@ -238,60 +140,106 @@ class CredentialsManagerTest {
     @Test
     fun `load with malformed file -- returns null instead of throwing`() {
         Files.writeString(workDir / "credentials.json", "not valid json {{{")
-        assertNull(manager.load(), "load should swallow parse errors and return null")
+        assertNull(manager.load())
     }
 
-    // ── clear() ────────────────────────────────────────────────────────────
+    // ── clear() ──────────────────────────────────────────────────────────────
 
     @Test
-    fun `clear wipes both keyring entries AND file`() {
+    fun `clear wipes the vault entries and the file`() {
         manager.save(session())
-        assertEquals(2, keyring.entries.size, "save populated password + accessToken")
-
         manager.clear()
-
-        assertFalse(Files.exists(workDir / "credentials.json"), "file must be deleted")
-        assertTrue(keyring.entries.isEmpty(), "both keyring entries must be cleared")
+        assertFalse(Files.exists(workDir / "credentials.json"))
+        assertNull(vault.entries["password"])
+        assertNull(vault.entries["accessToken"])
     }
 
     @Test
-    fun `clear is idempotent -- calling twice does not throw`() {
+    fun `clear is idempotent`() {
         manager.save(session())
         manager.clear()
         manager.clear()
         assertFalse(Files.exists(workDir / "credentials.json"))
     }
 
-    @Test
-    fun `clear when only file path is in use -- still wipes both sides`() {
-        keyring.failStore = true
-        manager.save(session())
-        manager.clear()
+    // ── migration from legacy storage ─────────────────────────────────────────
 
-        assertFalse(Files.exists(workDir / "credentials.json"))
-        assertTrue(keyring.entries.isEmpty())
+    @Test
+    fun `migrates a v4 keyring-mode file into the vault and purges old entries`() {
+        // Seed: a real legacy store puts the secrets in the keyring + a v4 file.
+        LegacyCredentialsManager(workDir, json, legacyKeyring).save(session())
+        assertEquals("secret-pw", legacyKeyring.entries["io.github.kitty_hivens.AuraLauncher::password"])
+        assertEquals(4, fileJson()["version"]?.jsonPrimitive?.int)
+
+        val loaded = manager.load()
+        assertNotNull(loaded)
+        assertEquals("fake-game-token", loaded.accessToken)
+        assertEquals("secret-pw", loaded.cachedPassword)
+
+        // Secrets now in the vault, file stamped v5, legacy keyring purged.
+        assertEquals("fake-game-token", vault.entries["accessToken"]?.decodeToString())
+        assertEquals(5, fileJson()["version"]?.jsonPrimitive?.int)
+        assertTrue(legacyKeyring.entries.isEmpty(), "old keyring entries purged after migration")
+
+        // Second load is pure vault -- no legacy left to read.
+        assertEquals("fake-game-token", manager.load()?.accessToken)
     }
 
-    // ── In-memory keyring fake ────────────────────────────────────────────
+    @Test
+    fun `migrates a v4 file-mode (AES) file into the vault`() {
+        // Keyring refuses writes -> legacy store falls back to its AES file.
+        legacyKeyring.failStore = true
+        LegacyCredentialsManager(workDir, json, legacyKeyring).save(session())
+        assertTrue(legacyKeyring.entries.isEmpty(), "secrets went to the AES file, not the keyring")
+
+        val loaded = manager.load()
+        assertNotNull(loaded)
+        assertEquals("secret-pw", loaded.cachedPassword)
+        assertEquals("fake-game-token", loaded.accessToken)
+
+        assertEquals(5, fileJson()["version"]?.jsonPrimitive?.int)
+        assertEquals("secret-pw", vault.entries["password"]?.decodeToString())
+    }
+
+    @Test
+    fun `legacy file with unrecoverable secrets -- returns null and stamps to v5`() {
+        // A v4 keyring-mode file whose keyring entries are gone (wiped daemon).
+        LegacyCredentialsManager(workDir, json, legacyKeyring).save(session())
+        legacyKeyring.entries.clear() // secrets unrecoverable
+
+        assertNull(manager.load(), "no recoverable secret -> re-login")
+        // File stamped to v5 so the next load doesn't re-probe legacy storage.
+        assertEquals(5, fileJson()["version"]?.jsonPrimitive?.int)
+    }
+
+    // ── Fakes ─────────────────────────────────────────────────────────────────
+
+    /** In-memory [SecretVault], the libvault analogue of the old FakeKeyring. */
+    private class FakeVault : SecretVault {
+        val entries: MutableMap<String, ByteArray> = mutableMapOf()
+        override val tier: VaultTier = VaultTier.Memory
+        override val backend: String = "fake (test)"
+
+        override fun store(key: String, secret: ByteArray): Boolean {
+            entries[key] = secret.copyOf()
+            return true
+        }
+
+        override fun retrieve(key: String): ByteArray? = entries[key]?.copyOf()
+
+        override fun delete(key: String): Boolean {
+            entries.remove(key)
+            return true
+        }
+
+        override fun contains(key: String): Boolean = entries.containsKey(key)
+
+        override fun close() {}
+    }
 
     /**
-     * Simple in-memory [IKeyringStorage] that tracks entries by a
-     * `"service::account"` key. Covers two scenarios CredentialsManager
-     * cares about:
-     *
-     *  - **Happy path**: `store` succeeds, `retrieve` returns what was
-     *    written, `clear` removes (returns true only when something was
-     *    actually removed -- matches libsecret's no-match semantics).
-     *  - **`failStore = true`**: simulates a keyring daemon that's
-     *    reachable (`isAvailable() = true`) but refuses every write.
-     *    Covers the "user revoked permission" / "default collection
-     *    locked" cases that should transparently degrade to the
-     *    AES-GCM file fallback.
-     *
-     * One toggle covers both password and accessToken paths because the
-     * production code calls `store` per-secret -- flipping `failStore`
-     * triggers the file fallback for both, which is what we want to
-     * exercise in the file-mode tests.
+     * In-memory [IKeyringStorage] for seeding the legacy store in migration
+     * tests. `failStore = true` forces the legacy AES-file path.
      */
     private class FakeKeyring : IKeyringStorage {
         val entries: MutableMap<String, String> = mutableMapOf()
@@ -307,10 +255,8 @@ class CredentialsManagerTest {
             return true
         }
 
-        override fun retrieve(service: String, account: String): String? =
-            entries[key(service, account)]
+        override fun retrieve(service: String, account: String): String? = entries[key(service, account)]
 
-        override fun clear(service: String, account: String): Boolean =
-            entries.remove(key(service, account)) != null
+        override fun clear(service: String, account: String): Boolean = entries.remove(key(service, account)) != null
     }
 }
