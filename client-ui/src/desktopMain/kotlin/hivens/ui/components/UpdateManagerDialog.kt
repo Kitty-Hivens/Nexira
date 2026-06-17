@@ -1,6 +1,5 @@
 package hivens.ui.components
 
-import hivens.ui.theme.LocalMonoFamily
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -20,8 +19,6 @@ import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -56,17 +53,20 @@ import hivens.launcher.update.DesktopIntegration
 import hivens.launcher.update.SourceBuildService
 import hivens.launcher.update.UpdateService
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.LocalMonoFamily
 import hivens.ui.theme.LocalStyle
+import kotlin.system.exitProcess
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 import org.slf4j.LoggerFactory
-import kotlin.system.exitProcess
 
 /**
  * Update manager modal: pick a release channel, see the available versions,
@@ -356,7 +356,7 @@ private fun VersionRow(entry: ReleaseEntry, isOlder: Boolean, enabled: Boolean, 
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (entry.isCurrent) {
-            Icon(Icons.Default.CheckCircle, null, tint = CelestiaTheme.colors.success, modifier = Modifier.size(16.dp))
+            Symbol(NxIcon.CheckCircle, null, tint = CelestiaTheme.colors.success, modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(6.dp))
         }
         Text(entry.version, style = MaterialTheme.typography.bodyMedium, color = CelestiaTheme.colors.textPrimary)

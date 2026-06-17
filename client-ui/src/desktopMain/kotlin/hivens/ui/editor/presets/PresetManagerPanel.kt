@@ -1,6 +1,5 @@
 package hivens.ui.editor.presets
 
-import hivens.ui.theme.LocalMonoFamily
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -18,12 +17,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Inventory2
-import androidx.compose.material.icons.filled.Save
-import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -52,7 +45,10 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
 import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.LocalMonoFamily
 import java.text.DateFormat
 import java.util.Date
 import kotlinx.coroutines.Dispatchers
@@ -101,8 +97,7 @@ fun PresetManagerPanel(
                     modifier              = Modifier.fillMaxWidth(),
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector        = Icons.Default.Inventory2,
+                        Symbol(icon = NxIcon.Inventory2,
                             contentDescription = null,
                             tint               = CelestiaTheme.colors.primary,
                             modifier           = Modifier.size(22.dp),
@@ -116,7 +111,7 @@ fun PresetManagerPanel(
                         )
                     }
                     IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, contentDescription = s.editorClose,
+                        Symbol(NxIcon.Close, contentDescription = s.editorClose,
                              tint = CelestiaTheme.colors.textSecondary)
                     }
                 }
@@ -176,7 +171,7 @@ fun PresetManagerPanel(
                             contentColor   = Color.White,
                         ),
                     ) {
-                        Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Symbol(NxIcon.Save, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(6.dp))
                         Text(s.editorSave, fontWeight = FontWeight.Medium)
                     }
@@ -275,16 +270,14 @@ private fun PresetRow(
         }
         Spacer(Modifier.width(4.dp))
         IconButton(onClick = onExport, modifier = Modifier.size(36.dp)) {
-            Icon(
-                imageVector        = Icons.Default.Upload,
+            Symbol(icon = NxIcon.Upload,
                 contentDescription = s.editorExport,
                 tint               = CelestiaTheme.colors.textSecondary,
                 modifier           = Modifier.size(18.dp),
             )
         }
         IconButton(onClick = onDelete, modifier = Modifier.size(36.dp)) {
-            Icon(
-                imageVector        = Icons.Default.Delete,
+            Symbol(icon = NxIcon.Delete,
                 contentDescription = s.editorDelete,
                 tint               = CelestiaTheme.colors.error,
                 modifier           = Modifier.size(18.dp),

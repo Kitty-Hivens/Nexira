@@ -1,14 +1,8 @@
 package hivens.ui.screens.settings
 
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.BugReport
-import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.Palette
-import androidx.compose.material.icons.filled.Science
-import androidx.compose.material.icons.filled.Shield
-import androidx.compose.material.icons.filled.Wifi
-import androidx.compose.ui.graphics.vector.ImageVector
 import hivens.ui.i18n.AppStrings
+import hivens.ui.icons.IconKey
+import hivens.ui.icons.NxIcon
 
 /**
  * Top-level Settings categories used by the two-column layout (left nav
@@ -20,13 +14,13 @@ import hivens.ui.i18n.AppStrings
  * Order here = display order in the nav.
  */
 internal enum class SettingsCategory(
-    val icon: ImageVector,
+    val icon: IconKey,
     val label: (AppStrings) -> String,
 ) {
-    Appearance(   Icons.Default.Palette,   { it.settingsCategoryAppearance }),
-    Network(      Icons.Default.Wifi,      { it.settingsCategoryNetwork }),
-    Smarty(       Icons.Default.Shield,    { it.settingsCategorySmarty }),
-    Experimental( Icons.Default.Science,   { it.settingsCategoryExperimental }),
-    Advanced(     Icons.Default.Folder,    { it.settingsCategoryAdvanced }),
-    Diagnostics(  Icons.Default.BugReport, { it.settingsCategoryDiagnostics }),
+    Appearance(   NxIcon.Palette,   { it.settingsCategoryAppearance }),
+    Network(      NxIcon.Wifi,      { it.settingsCategoryNetwork }),
+    Smarty(       NxIcon.Shield,    { it.settingsCategorySmarty }),
+    Experimental( NxIcon.Science,   { it.settingsCategoryExperimental }),
+    Advanced(     NxIcon.Folder,    { it.settingsCategoryAdvanced }),
+    Diagnostics(  NxIcon.BugReport, { it.settingsCategoryDiagnostics }),
 }

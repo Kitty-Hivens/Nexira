@@ -23,11 +23,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -46,7 +41,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.toComposeImageBitmap
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -61,12 +55,15 @@ import androidx.compose.ui.unit.sp
 import hivens.core.api.model.ServerProfile
 import hivens.launcher.platform.PlatformPaths
 import hivens.ui.customization.glassSurfaceAlpha
+import hivens.ui.icons.IconKey
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.decorativePair
+import javax.imageio.ImageIO
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
-import javax.imageio.ImageIO
 
 /**
  * Compact full-width capsule row for a server -- the narrow-width alternative to
@@ -192,20 +189,21 @@ fun ServerPill(
         AnimatedVisibility(visible = showActions, enter = fadeIn(), exit = fadeOut()) {
             Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                 PillIconButton(
-                    icon  = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                    icon  = NxIcon.Favorite,
                     tint  = if (isFavorite) Color(0xFFEF4444) else CelestiaTheme.colors.textSecondary,
+                    fill  = if (isFavorite) 1f else 0f,
                     onClick = onToggleFav,
                 )
-                PillIconButton(Icons.Default.Settings, tint = CelestiaTheme.colors.textSecondary, onClick = onSettings)
-                PillIconButton(Icons.Default.Info, tint = CelestiaTheme.colors.textSecondary, onClick = onDetails)
+                PillIconButton(NxIcon.Settings, tint = CelestiaTheme.colors.textSecondary, onClick = onSettings)
+                PillIconButton(NxIcon.Info, tint = CelestiaTheme.colors.textSecondary, onClick = onDetails)
             }
         }
     }
 }
 
 @Composable
-private fun PillIconButton(icon: ImageVector, tint: Color, onClick: () -> Unit) {
+private fun PillIconButton(icon: IconKey, tint: Color, onClick: () -> Unit, fill: Float = 0f) {
     IconButton(onClick = onClick, modifier = Modifier.size(28.dp)) {
-        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(15.dp))
+        Symbol(icon, contentDescription = null, tint = tint, fill = fill, modifier = Modifier.size(15.dp))
     }
 }

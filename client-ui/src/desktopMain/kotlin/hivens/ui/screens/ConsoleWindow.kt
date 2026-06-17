@@ -1,9 +1,5 @@
 package hivens.ui.screens
 
-import hivens.ui.theme.LocalMonoFamily
-import androidx.compose.foundation.HorizontalScrollbar
-import androidx.compose.foundation.ScrollbarStyle
-import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ContextMenuArea
@@ -11,16 +7,15 @@ import androidx.compose.foundation.ContextMenuItem
 import androidx.compose.foundation.ContextMenuState
 import androidx.compose.foundation.DefaultContextMenuRepresentation
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.HorizontalScrollbar
 import androidx.compose.foundation.LocalContextMenuRepresentation
-import androidx.compose.foundation.text.TextContextMenu
-import androidx.compose.foundation.text.LocalTextContextMenu
-import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.foundation.ScrollbarStyle
+import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,15 +29,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.rememberScrollbarAdapter
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.LocalTextContextMenu
+import androidx.compose.foundation.text.TextContextMenu
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.WrapText
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Save
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -53,8 +46,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.VerticalDivider
-import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
@@ -78,7 +71,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
@@ -108,14 +100,17 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.rememberWindowState
 import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
 import hivens.ui.puppet.PuppetClick
-import hivens.ui.theme.CelestiaStyle
-import hivens.ui.theme.CelestiaTheme
-import hivens.ui.theme.CustomTheme
-import hivens.ui.theme.StyleSpec
 import hivens.ui.puppet.PuppetField
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.puppet.PuppetToggle
+import hivens.ui.theme.CelestiaStyle
+import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.CustomTheme
+import hivens.ui.theme.LocalMonoFamily
+import hivens.ui.theme.StyleSpec
 import hivens.ui.utils.ConsoleSettings
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.utils.LogEntry
@@ -1104,20 +1099,19 @@ private fun Toolbar(
             }
 
             IconButton(onClick = onToggleWrap, modifier = Modifier.size(32.dp)) {
-                Icon(
-                    Icons.AutoMirrored.Filled.WrapText,
+                Symbol(NxIcon.WrapText,
                     contentDescription = strings.consoleWrap,
                     tint = if (wrapText) colors.success else colors.textSecondary,
                 )
             }
             IconButton(onClick = onSave, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Default.Save, strings.consoleSaveToFile, tint = colors.textSecondary)
+                Symbol(NxIcon.Save, strings.consoleSaveToFile, tint = colors.textSecondary)
             }
             IconButton(onClick = onCopyAll, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Default.ContentCopy, strings.consoleCopyAll, tint = colors.textSecondary)
+                Symbol(NxIcon.ContentCopy, strings.consoleCopyAll, tint = colors.textSecondary)
             }
             IconButton(onClick = onClear, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Default.Delete, strings.consoleClear, tint = colors.textSecondary)
+                Symbol(NxIcon.Delete, strings.consoleClear, tint = colors.textSecondary)
             }
 
             // In-window gear: quick-access menu for the persisted toggles
@@ -1126,7 +1120,7 @@ private fun Toolbar(
             var gearOpen by remember { mutableStateOf(false) }
             Box {
                 IconButton(onClick = { gearOpen = true }, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.Default.Settings, strings.consoleSettingsLabel, tint = colors.textSecondary)
+                    Symbol(NxIcon.Settings, strings.consoleSettingsLabel, tint = colors.textSecondary)
                 }
                 DropdownMenu(
                     expanded         = gearOpen,
@@ -1306,8 +1300,7 @@ private fun SearchPrompt(
             )
         }
         PromptButton(onClick = onClose) {
-            Icon(
-                imageVector        = Icons.Default.Close,
+            Symbol(icon = NxIcon.Close,
                 contentDescription = null,
                 tint               = colors.textSecondary,
                 modifier           = Modifier.size(14.dp),

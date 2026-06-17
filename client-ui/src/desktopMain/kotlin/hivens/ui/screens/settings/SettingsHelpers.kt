@@ -24,12 +24,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.core.data.HomeView
 import hivens.core.data.UiStyle
 import hivens.ui.customization.glassSurfaceAlpha
+import hivens.ui.icons.IconKey
+import hivens.ui.icons.Symbol
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.LocalStyle
 
@@ -70,7 +71,7 @@ internal fun SettingsSectionTitle(text: String) {
 internal fun SettingsRowWithDescription(
     title: String,
     description: String,
-    icon: ImageVector,
+    icon: IconKey,
     iconTint: Color,
     checked: Boolean,
     enabled: Boolean,
@@ -88,7 +89,7 @@ internal fun SettingsRowWithDescription(
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-            Icon(
+            Symbol(
                 icon, null,
                 tint     = iconTint.copy(alpha = alpha),
                 modifier = Modifier.size(24.dp)

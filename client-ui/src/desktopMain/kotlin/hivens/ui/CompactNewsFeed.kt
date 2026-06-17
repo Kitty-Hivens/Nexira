@@ -8,14 +8,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
@@ -28,13 +26,14 @@ import coil3.request.ImageRequest
 import coil3.request.crossfade
 import hivens.core.api.interfaces.IServerListService
 import hivens.core.data.NewsItem
-import hivens.ui.customization.glassSurfaceAlpha
 import hivens.launcher.network.NetworkState
 import hivens.launcher.network.ServerProtocolConfig
+import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
 import hivens.ui.platform.SystemActions
-import androidx.compose.ui.geometry.Offset
+import hivens.ui.theme.CelestiaTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
@@ -189,8 +188,7 @@ private fun NewsFilterField(query: String, onQueryChange: (String) -> Unit) {
             .background(glassSurfaceAlpha(0.4f))
             .padding(start = 8.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
     ) {
-        Icon(
-            imageVector        = Icons.Default.Search,
+        Symbol(icon = NxIcon.Search,
             contentDescription = null,
             tint               = CelestiaTheme.colors.textSecondary.copy(alpha = 0.7f),
             modifier           = Modifier.size(14.dp),
@@ -215,8 +213,7 @@ private fun NewsFilterField(query: String, onQueryChange: (String) -> Unit) {
         }
         if (query.isNotEmpty()) {
             IconButton(onClick = { onQueryChange("") }, modifier = Modifier.size(20.dp)) {
-                Icon(
-                    imageVector        = Icons.Default.Close,
+                Symbol(icon = NxIcon.Close,
                     contentDescription = s.newsFilterClear,
                     tint               = CelestiaTheme.colors.textSecondary,
                     modifier           = Modifier.size(12.dp),

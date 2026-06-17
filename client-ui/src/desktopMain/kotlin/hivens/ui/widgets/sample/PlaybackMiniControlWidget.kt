@@ -24,11 +24,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.VolumeOff
-import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -53,6 +48,9 @@ import hivens.ui.audio.PlaybackState
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.IconKey
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.widgets.services.MusicPlayerService
 import hivens.widget.api.useService
@@ -95,8 +93,7 @@ fun PlaybackMiniControlWidget(instance: WidgetInstance) {
             .background(glassSurfaceAlpha(0.55f))
             .padding(horizontal = 12.dp, vertical = 10.dp),
     ) {
-        Icon(
-            imageVector        = Icons.Default.MusicNote,
+        Symbol(icon = NxIcon.MusicNote,
             contentDescription = null,
             tint               = CelestiaTheme.colors.primary,
             modifier           = Modifier.size(18.dp),
@@ -121,7 +118,7 @@ fun PlaybackMiniControlWidget(instance: WidgetInstance) {
         // can transport it from anywhere on the surface.
         val canTransport = state is PlaybackState.Playing || state is PlaybackState.Paused || state is PlaybackState.Ready
         TransportButton(
-            icon        = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+            icon        = if (isPlaying) NxIcon.Pause else NxIcon.PlayArrow,
             enabled     = canTransport,
             onClick     = { if (isPlaying) service.pause() else service.play() },
             description = if (isPlaying) s.audioPause else s.audioPlay,
@@ -146,8 +143,7 @@ private fun DisabledPlaceholder() {
             .background(CelestiaTheme.colors.surfaceVariant.copy(alpha = 0.4f))
             .padding(horizontal = 12.dp, vertical = 10.dp),
     ) {
-        Icon(
-            imageVector        = Icons.AutoMirrored.Filled.VolumeOff,
+        Symbol(icon = NxIcon.VolumeOff,
             contentDescription = null,
             tint               = CelestiaTheme.colors.textSecondary.copy(alpha = 0.55f),
             modifier           = Modifier.size(18.dp),
@@ -169,7 +165,7 @@ private fun DisabledPlaceholder() {
 
 @Composable
 private fun TransportButton(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: IconKey,
     enabled: Boolean,
     onClick: () -> Unit,
     description: String,
@@ -184,8 +180,7 @@ private fun TransportButton(
             .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(
-            imageVector        = icon,
+        Symbol(icon = icon,
             contentDescription = description,
             tint               = tint,
             modifier           = Modifier.size(16.dp),

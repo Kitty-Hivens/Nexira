@@ -13,9 +13,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -38,15 +35,17 @@ import androidx.compose.ui.unit.dp
 import hivens.core.api.interfaces.IServerListService
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.api.model.ServerProfile
+import hivens.core.launch.LaunchState
 import hivens.launcher.AutoSyncService
 import hivens.launcher.ProfileManager
-import hivens.core.launch.LaunchState
 import hivens.launcher.launch.LauncherController
 import hivens.launcher.network.NetworkState
 import hivens.ui.components.LaunchControlPanel
 import hivens.ui.components.ServerGrid
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
 import hivens.ui.notifications.LaunchTarget
 import hivens.ui.notifications.drivers.LaunchDriver
 import hivens.ui.theme.CelestiaTheme
@@ -168,8 +167,7 @@ fun HomeClassicContent(instance: WidgetInstance) {
                 isLoadingServers -> CircularProgressIndicator(color = CelestiaTheme.colors.primary)
                 servers.isEmpty() -> {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            imageVector        = Icons.Default.WifiOff,
+                        Symbol(icon = NxIcon.WifiOff,
                             contentDescription = null,
                             tint               = CelestiaTheme.colors.textSecondary.copy(alpha = 0.5f),
                             modifier           = Modifier.size(48.dp),
@@ -183,7 +181,7 @@ fun HomeClassicContent(instance: WidgetInstance) {
                                 contentColor = CelestiaTheme.colors.primary,
                             ),
                         ) {
-                            Icon(Icons.Default.Refresh, contentDescription = null)
+                            Symbol(NxIcon.Refresh, contentDescription = null)
                             Spacer(Modifier.width(8.dp))
                             Text(s.updateRetry)
                         }

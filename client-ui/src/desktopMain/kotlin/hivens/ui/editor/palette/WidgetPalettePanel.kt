@@ -25,10 +25,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Widgets
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -52,6 +48,8 @@ import hivens.ui.editor.EditModeController
 import hivens.ui.editor.dnd.DragController
 import hivens.ui.editor.dnd.DropTargetRegistry
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
 import hivens.ui.theme.CelestiaTheme
 import hivens.widget.api.LocalWidgetRegistry
 
@@ -132,8 +130,7 @@ fun WidgetPalettePanel(
                     .padding(start = 14.dp, end = 6.dp, top = 12.dp, bottom = 6.dp),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector        = Icons.Default.Widgets,
+                    Symbol(icon = NxIcon.Widgets,
                         contentDescription = null,
                         tint               = CelestiaTheme.colors.primary,
                         modifier           = Modifier.size(18.dp),
@@ -153,8 +150,7 @@ fun WidgetPalettePanel(
                     )
                 }
                 IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
-                    Icon(
-                        imageVector        = Icons.Default.Close,
+                    Symbol(icon = NxIcon.Close,
                         contentDescription = s.editorPaletteHide,
                         tint               = CelestiaTheme.colors.textSecondary,
                         modifier           = Modifier.size(16.dp),
@@ -228,8 +224,7 @@ private fun PaletteSearchField(query: String, onQueryChange: (String) -> Unit) {
             .border(1.dp, CelestiaTheme.colors.outline, RoundedCornerShape(10.dp))
             .padding(start = 10.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
     ) {
-        Icon(
-            imageVector        = Icons.Default.Search,
+        Symbol(icon = NxIcon.Search,
             contentDescription = null,
             tint               = CelestiaTheme.colors.textSecondary.copy(alpha = 0.7f),
             modifier           = Modifier.size(16.dp),
@@ -254,8 +249,7 @@ private fun PaletteSearchField(query: String, onQueryChange: (String) -> Unit) {
         }
         if (query.isNotEmpty()) {
             IconButton(onClick = { onQueryChange("") }, modifier = Modifier.size(22.dp)) {
-                Icon(
-                    imageVector        = Icons.Default.Close,
+                Symbol(icon = NxIcon.Close,
                     contentDescription = null,
                     tint               = CelestiaTheme.colors.textSecondary,
                     modifier           = Modifier.size(14.dp),

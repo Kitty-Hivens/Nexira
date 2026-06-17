@@ -19,9 +19,6 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollbarAdapter
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -53,6 +50,8 @@ import hivens.launcher.smrt.ModGrouping
 import hivens.launcher.smrt.ModRoleGrouper
 import hivens.launcher.smrt.SmrtPackClient
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
 import hivens.ui.screens.RetryStateBlock
 import hivens.ui.theme.CelestiaTheme
 import kotlinx.coroutines.Dispatchers
@@ -348,8 +347,7 @@ private fun CollapsibleSectionHeader(text: String, isOpen: Boolean, onToggle: ()
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Icon(
-            imageVector        = if (isOpen) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+        Symbol(icon = if (isOpen) NxIcon.ExpandLess else NxIcon.ExpandMore,
             contentDescription = null,
             tint               = CelestiaTheme.colors.primary,
             modifier           = Modifier.size(18.dp),

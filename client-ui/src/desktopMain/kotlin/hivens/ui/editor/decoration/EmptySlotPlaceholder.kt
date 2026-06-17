@@ -12,8 +12,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -30,6 +28,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.ui.editor.dnd.DropTargetRegistry
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
 import hivens.ui.theme.CelestiaTheme
 import hivens.widget.model.SlotPath
 
@@ -90,8 +90,7 @@ fun EmptySlotPlaceholder(
             androidx.compose.foundation.layout.Row(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(
-                    imageVector        = Icons.Default.Add,
+                Symbol(icon = NxIcon.Add,
                     contentDescription = null,
                     tint               = CelestiaTheme.colors.primary.copy(alpha = breath),
                     modifier           = Modifier.padding(end = 6.dp),

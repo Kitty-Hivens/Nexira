@@ -1,6 +1,5 @@
 package hivens.ui.editor.palette
 
-import hivens.ui.theme.LocalMonoFamily
 import androidx.compose.foundation.background
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -14,8 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DragIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -46,7 +43,10 @@ import hivens.ui.editor.dnd.DropTargetRegistry
 import hivens.ui.editor.dnd.dragSource
 import hivens.ui.editor.windowPointToSlotDp
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
 import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.LocalMonoFamily
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.WidgetDescriptor
 import hivens.widget.model.SlotOrientation
@@ -158,8 +158,7 @@ fun PaletteItem(
                 overflow   = TextOverflow.Ellipsis,
             )
         }
-        Icon(
-            imageVector        = Icons.Default.DragIndicator,
+        Symbol(icon = NxIcon.DragIndicator,
             contentDescription = null,
             tint               = CelestiaTheme.colors.textSecondary.copy(alpha = if (isHovered) 0.9f else 0.45f),
             modifier           = Modifier.size(18.dp),

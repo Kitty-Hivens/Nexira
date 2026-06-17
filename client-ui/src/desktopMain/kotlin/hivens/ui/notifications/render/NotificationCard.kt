@@ -1,6 +1,7 @@
 package hivens.ui.notifications.render
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -12,6 +13,8 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.TooltipArea
 import androidx.compose.foundation.TooltipPlacement
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,15 +24,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -41,39 +41,37 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.DpOffset
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
 import hivens.ui.notifications.Kind
 import hivens.ui.notifications.NotifAction
 import hivens.ui.notifications.NotificationEvent
 import hivens.ui.notifications.NotificationGroup
 import hivens.ui.notifications.Severity
+import hivens.ui.theme.CardSurface
 import hivens.ui.theme.CelestiaColors
 import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.LocalStyle
 import java.time.Duration
 import java.time.Instant
-import androidx.compose.animation.core.Animatable
-import androidx.compose.foundation.border
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.layout.offset
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.IntOffset
-import hivens.ui.theme.CardSurface
-import hivens.ui.theme.LocalStyle
-import kotlinx.coroutines.launch
 import kotlin.math.abs
+import kotlinx.coroutines.launch
 
 @Composable
 fun NotificationCard(
@@ -249,8 +247,7 @@ private fun HeaderRow(
                         style = MaterialTheme.typography.labelSmall,
                         color = CelestiaTheme.colors.textSecondary,
                     )
-                    Icon(
-                        imageVector       = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    Symbol(icon = if (expanded) NxIcon.ExpandLess else NxIcon.ExpandMore,
                         contentDescription = if (expanded) strings.notificationCollapseHistory
                                              else strings.notificationExpandHistory,
                         modifier          = Modifier.size(16.dp),
@@ -261,8 +258,7 @@ private fun HeaderRow(
         }
         Spacer(Modifier.width(2.dp))
         IconButton(onClick = onDismiss, modifier = Modifier.size(20.dp)) {
-            Icon(
-                imageVector       = Icons.Default.Close,
+            Symbol(icon = NxIcon.Close,
                 contentDescription = strings.notificationDismiss,
                 modifier          = Modifier.size(14.dp),
                 tint              = CelestiaTheme.colors.textSecondary.copy(alpha = 0.6f),

@@ -1,6 +1,5 @@
 package hivens.ui.widgets.serverdetails
 
-import hivens.ui.theme.LocalMonoFamily
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Column
@@ -12,8 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -26,7 +23,10 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
 import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.LocalMonoFamily
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 
@@ -70,7 +70,7 @@ private fun MissingDataWarning(title: String, body: String, path: String) {
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Icons.Default.Warning, null, tint = CelestiaTheme.colors.warnAccent)
+        Symbol(NxIcon.Warning, null, tint = CelestiaTheme.colors.warnAccent)
         Spacer(Modifier.width(16.dp))
         Column {
             Text(title, style = MaterialTheme.typography.titleSmall, color = CelestiaTheme.colors.warnAccent, fontWeight = FontWeight.Bold)

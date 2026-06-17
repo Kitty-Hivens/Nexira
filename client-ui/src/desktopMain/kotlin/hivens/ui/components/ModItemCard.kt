@@ -6,8 +6,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -19,6 +17,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import hivens.core.data.OptionalMod
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
 import hivens.ui.theme.CelestiaTheme
 
 /**
@@ -88,7 +88,7 @@ fun ModItemCard(
             }
             if (hasDescription || mod.jars.size > 1 || mod.incompatibleIds.isNotEmpty()) {
                 IconButton(onClick = { expanded = !expanded }, modifier = Modifier.size(28.dp)) {
-                    Icon(if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore, null, tint = if (expanded) CelestiaTheme.colors.primary else CelestiaTheme.colors.textSecondary.copy(alpha = 0.45f), modifier = Modifier.size(20.dp))
+                    Symbol(if (expanded) NxIcon.ExpandLess else NxIcon.ExpandMore, null, tint = if (expanded) CelestiaTheme.colors.primary else CelestiaTheme.colors.textSecondary.copy(alpha = 0.45f), modifier = Modifier.size(20.dp))
                 }
             }
         }
@@ -104,7 +104,7 @@ fun ModItemCard(
                 }
                 if (mod.jars.isNotEmpty()) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.FolderOpen, null, tint = CelestiaTheme.colors.textSecondary.copy(alpha = 0.4f), modifier = Modifier.size(14.dp))
+                        Symbol(NxIcon.FolderOpen, null, tint = CelestiaTheme.colors.textSecondary.copy(alpha = 0.4f), modifier = Modifier.size(14.dp))
                         Spacer(Modifier.width(6.dp))
                         Text(mod.jars.joinToString(", "), style = MaterialTheme.typography.labelSmall, color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.5f))
                     }
@@ -112,7 +112,7 @@ fun ModItemCard(
                 if (hasConflicts) {
                     Spacer(Modifier.height(6.dp))
                     Row(Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium).background(CelestiaTheme.colors.error.copy(alpha = 0.08f)).padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Warning, null, tint = CelestiaTheme.colors.error, modifier = Modifier.size(14.dp))
+                        Symbol(NxIcon.Warning, null, tint = CelestiaTheme.colors.error, modifier = Modifier.size(14.dp))
                         Spacer(Modifier.width(6.dp))
                         Text(s.modConflictWarning(conflictingIds.joinToString(", ")), style = MaterialTheme.typography.labelSmall, color = CelestiaTheme.colors.error)
                     }

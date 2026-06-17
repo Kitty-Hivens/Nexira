@@ -5,10 +5,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.OpenInNew
-import androidx.compose.material.icons.filled.CloudDownload
-import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -23,16 +19,18 @@ import hivens.core.api.interfaces.IUpdateApplicator
 import hivens.core.data.LauncherUpdate
 import hivens.launcher.update.UpdateService
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
+import hivens.ui.platform.SystemActions
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.theme.CelestiaTheme
-import hivens.ui.platform.SystemActions
-import kotlinx.coroutines.launch
-import org.koin.compose.koinInject
-import org.slf4j.LoggerFactory
 import java.nio.file.Paths
 import kotlin.math.roundToInt
 import kotlin.system.exitProcess
+import kotlinx.coroutines.launch
+import org.koin.compose.koinInject
+import org.slf4j.LoggerFactory
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -147,8 +145,7 @@ fun UpdateDialog(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier          = Modifier.fillMaxWidth()
                 ) {
-                    Icon(
-                        imageVector        = if (isBlocking) Icons.Default.Warning else Icons.Default.CloudDownload,
+                    Symbol(icon = if (isBlocking) NxIcon.Warning else NxIcon.CloudDownload,
                         contentDescription = null,
                         tint               = if (isBlocking) CelestiaTheme.colors.error else CelestiaTheme.colors.primary,
                         modifier           = Modifier.size(32.dp)
@@ -276,8 +273,7 @@ fun UpdateDialog(
                     // user can't accidentally yank focus mid-progress.
                     if (downloadState !is DownloadState.Downloading) {
                         TextButton(onClick = { SystemActions.openUrl(update.releasePageUrl) }) {
-                            Icon(
-                                imageVector        = Icons.AutoMirrored.Filled.OpenInNew,
+                            Symbol(icon = NxIcon.OpenInNew,
                                 contentDescription = null,
                                 tint               = CelestiaTheme.colors.textSecondary,
                                 modifier           = Modifier.size(16.dp)

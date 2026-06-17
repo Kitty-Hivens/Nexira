@@ -7,9 +7,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Image
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -22,6 +19,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
 import hivens.ui.theme.CelestiaTheme
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
@@ -62,13 +61,13 @@ fun BgImagePickerWidget(instance: WidgetInstance) {
                 shape    = MaterialTheme.shapes.small,
                 modifier = Modifier.weight(1f),
             ) {
-                Icon(Icons.Default.Image, null, modifier = Modifier.size(18.dp))
+                Symbol(NxIcon.Image, null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
                 Text(s.backgroundPickButton)
             }
             if (settings.imagePath != null) {
                 IconButton(onClick = { ctx.update { copy(imagePath = null, enabled = false) } }) {
-                    Icon(Icons.Default.Delete, null, tint = CelestiaTheme.colors.error)
+                    Symbol(NxIcon.Delete, null, tint = CelestiaTheme.colors.error)
                 }
             }
         }
