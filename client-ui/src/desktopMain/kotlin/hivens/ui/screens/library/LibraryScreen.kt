@@ -6,11 +6,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -28,6 +25,8 @@ import hivens.launcher.PackImportService
 import hivens.ui.AppState
 import hivens.ui.Screen
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.widgets.library.LibraryContext
@@ -132,7 +131,7 @@ fun LibraryScreen(
                 if (importing) {
                     CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
                 } else {
-                    Icon(Icons.Default.Add, contentDescription = s.browseImport)
+                    Symbol(NxIcon.Add, contentDescription = s.browseImport)
                 }
             }
         }

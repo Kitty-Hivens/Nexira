@@ -18,13 +18,10 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -46,6 +43,8 @@ import hivens.core.api.catalogue.CataloguePack
 import hivens.core.data.PackOrigin
 import hivens.launcher.catalogue.PackCatalogueRegistry
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetField
 import hivens.ui.puppet.PuppetScreen
@@ -166,8 +165,8 @@ private fun SearchField(value: String, onValueChange: (String) -> Unit, placehol
                 .padding(horizontal = 14.dp, vertical = 11.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(
-                imageVector        = Icons.Default.Search,
+            Symbol(
+                NxIcon.Search,
                 contentDescription = null,
                 tint               = CelestiaTheme.colors.textSecondary,
                 modifier           = Modifier.size(18.dp),
