@@ -7,9 +7,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -30,6 +27,8 @@ import hivens.ui.components.ModItemCard
 import hivens.ui.components.RamSelector
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetField
 import hivens.ui.puppet.PuppetScreen
@@ -90,7 +89,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
         // ── Header ────────────────────────────────────────────────────────────
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = { state.save(); onBack() }) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, s.navBack, tint = CelestiaTheme.colors.textPrimary)
+                Symbol(NxIcon.ArrowBack, s.navBack, tint = CelestiaTheme.colors.textPrimary)
             }
             Spacer(Modifier.width(8.dp))
 
@@ -112,8 +111,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                         contentScale = ContentScale.Crop
                     )
                 } else {
-                    Icon(
-                        Icons.Default.Image,
+                    Symbol(NxIcon.Image,
                         contentDescription = null,
                         tint = CelestiaTheme.colors.textSecondary.copy(alpha = 0.4f),
                         modifier = Modifier.size(24.dp)
@@ -179,7 +177,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                         colors        = settingsFieldColors(),
                         trailingIcon  = {
                             IconButton(onClick = { state.pickJava(s.serverSettingsPickJava) }) {
-                                Icon(Icons.Default.Folder, null, tint = CelestiaTheme.colors.primary)
+                                Symbol(NxIcon.Folder, null, tint = CelestiaTheme.colors.primary)
                             }
                         }
                     )
@@ -202,7 +200,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                         Text(s.serverSettingsJvmArgs, color = CelestiaTheme.colors.textPrimary, style = MaterialTheme.typography.bodyMedium)
                         if (state.jvmBuilderEnabled) {
                             TextButton(onClick = { showJvmBuilder = true }) {
-                                Icon(Icons.Default.Tune, null, modifier = Modifier.size(16.dp))
+                                Symbol(NxIcon.Tune, null, modifier = Modifier.size(16.dp))
                                 Spacer(Modifier.width(4.dp))
                                 Text(s.serverSettingsJvmBuildArgs)
                             }

@@ -1,6 +1,5 @@
 package hivens.ui.screens.library
 
-import hivens.ui.theme.LocalMonoFamily
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -23,14 +22,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.OpenInNew
-import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -55,9 +46,11 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.IconKey
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
 import hivens.ui.theme.CelestiaTheme
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import hivens.ui.theme.LocalMonoFamily
 import java.awt.Desktop
 import java.nio.file.Files
 import java.nio.file.Path
@@ -65,6 +58,8 @@ import kotlin.io.path.fileSize
 import kotlin.io.path.isDirectory
 import kotlin.io.path.isRegularFile
 import kotlin.io.path.name
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Two-pane file browser scoped to a single instance directory. Left
@@ -251,15 +246,13 @@ private fun FileTreeRow(
         when {
             node.isEmpty -> Spacer(Modifier.size(20.dp))
             node.isDir -> {
-                Icon(
-                    imageVector        = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                Symbol(icon = if (isExpanded) NxIcon.ExpandLess else NxIcon.ExpandMore,
                     contentDescription = null,
                     tint               = CelestiaTheme.colors.textSecondary,
                     modifier           = Modifier.size(16.dp),
                 )
                 Spacer(Modifier.width(4.dp))
-                Icon(
-                    imageVector        = Icons.Default.Folder,
+                Symbol(icon = NxIcon.Folder,
                     contentDescription = null,
                     tint               = CelestiaTheme.colors.primary.copy(alpha = 0.85f),
                     modifier           = Modifier.size(16.dp),
@@ -267,8 +260,7 @@ private fun FileTreeRow(
             }
             else -> {
                 Spacer(Modifier.size(20.dp))
-                Icon(
-                    imageVector        = fileIconFor(node.path),
+                Symbol(icon = fileIconFor(node.path),
                     contentDescription = null,
                     tint               = CelestiaTheme.colors.textSecondary,
                     modifier           = Modifier.size(16.dp),
@@ -294,12 +286,12 @@ private fun FileTreeRow(
     }
 }
 
-private fun fileIconFor(path: Path): androidx.compose.ui.graphics.vector.ImageVector {
+private fun fileIconFor(path: Path): IconKey {
     val ext = path.name.substringAfterLast('.', "").lowercase()
     return when (ext) {
-        in TEXT_EXTENSIONS -> Icons.Default.Description
-        in IMAGE_EXTENSIONS -> Icons.Default.Image
-        else -> Icons.AutoMirrored.Filled.InsertDriveFile
+        in TEXT_EXTENSIONS -> NxIcon.Description
+        in IMAGE_EXTENSIONS -> NxIcon.Image
+        else -> NxIcon.InsertDriveFile
     }
 }
 
@@ -423,7 +415,7 @@ private fun BinaryPreview(file: Path) {
                 contentColor   = Color.White,
             ),
         ) {
-            Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
+            Symbol(NxIcon.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
             Text(s.fileBrowserOpenExternally, fontWeight = FontWeight.SemiBold)
         }
@@ -433,7 +425,7 @@ private fun BinaryPreview(file: Path) {
 @Composable
 private fun PreviewHeader(file: Path, sizeLabel: String) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Icon(fileIconFor(file), contentDescription = null, tint = CelestiaTheme.colors.primary, modifier = Modifier.size(18.dp))
+        Symbol(fileIconFor(file), contentDescription = null, tint = CelestiaTheme.colors.primary, modifier = Modifier.size(18.dp))
         Text(
             text       = file.name,
             style      = MaterialTheme.typography.titleSmall,

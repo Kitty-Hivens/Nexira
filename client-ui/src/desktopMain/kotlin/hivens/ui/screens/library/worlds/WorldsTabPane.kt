@@ -14,10 +14,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Computer
-import androidx.compose.material.icons.filled.Public
-import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Icon
@@ -47,6 +43,8 @@ import hivens.launcher.instance.WorldScanner
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
 import hivens.ui.screens.CenteredProgress
 import hivens.ui.screens.RetryStateBlock
 import hivens.ui.theme.CelestiaTheme
@@ -225,8 +223,7 @@ private fun WorldThumb(iconPath: String?) {
                 modifier           = Modifier.size(56.dp),
             )
         } else {
-            Icon(
-                imageVector        = Icons.Default.Public,
+            Symbol(icon = NxIcon.Public,
                 contentDescription = null,
                 tint               = Color.White.copy(alpha = 0.55f),
                 modifier           = Modifier.size(28.dp),
@@ -260,8 +257,7 @@ private fun ServerCard(entry: MultiplayerServerEntry) {
                     overflow   = TextOverflow.Ellipsis,
                 )
                 if (entry.hidden) {
-                    Icon(
-                        imageVector        = Icons.Default.VisibilityOff,
+                    Symbol(icon = NxIcon.VisibilityOff,
                         contentDescription = s.worldsTabServerHiddenLabel,
                         tint               = CelestiaTheme.colors.textSecondary,
                         modifier           = Modifier.size(14.dp),
@@ -297,8 +293,7 @@ private fun ServerThumb(iconBase64: String?) {
                 modifier           = Modifier.size(48.dp),
             )
         } else {
-            Icon(
-                imageVector        = Icons.Default.Computer,
+            Symbol(icon = NxIcon.Computer,
                 contentDescription = null,
                 tint               = Color.White.copy(alpha = 0.55f),
                 modifier           = Modifier.size(24.dp),

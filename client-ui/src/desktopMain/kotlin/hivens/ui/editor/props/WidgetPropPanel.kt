@@ -20,10 +20,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.RestartAlt
-import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -42,6 +38,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.ui.editor.EditModeController
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.widgets.customization.LabeledSlider
 import hivens.widget.api.LocalLayoutGraph
@@ -53,9 +51,9 @@ import hivens.widget.model.SlotPath
 import hivens.widget.model.WidgetChrome
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.traverse
+import kotlin.math.roundToInt
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.JsonObject
-import kotlin.math.roundToInt
 
 // Right-edge prop editor. Opened by a widget's "tune" chrome affordance,
 // which sets the host's prop target (path + instanceId). Resolves the
@@ -163,8 +161,7 @@ private fun PropPanelBody(
                 .padding(start = 14.dp, end = 6.dp, top = 12.dp, bottom = 6.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector        = Icons.Default.Tune,
+                Symbol(icon = NxIcon.Tune,
                     contentDescription = null,
                     tint               = CelestiaTheme.colors.primary,
                     modifier           = Modifier.size(18.dp),
@@ -178,8 +175,7 @@ private fun PropPanelBody(
                 )
             }
             IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
-                Icon(
-                    imageVector        = Icons.Default.Close,
+                Symbol(icon = NxIcon.Close,
                     contentDescription = s.editorClose,
                     tint               = CelestiaTheme.colors.textSecondary,
                     modifier           = Modifier.size(16.dp),
@@ -301,7 +297,7 @@ private fun PropPanelBody(
             },
             modifier = Modifier.padding(start = 8.dp, end = 8.dp, bottom = 8.dp),
         ) {
-            Icon(Icons.Default.RestartAlt, contentDescription = null, modifier = Modifier.size(16.dp))
+            Symbol(NxIcon.RestartAlt, contentDescription = null, modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(6.dp))
             Text(s.editorResetToDefault, style = MaterialTheme.typography.labelMedium)
         }

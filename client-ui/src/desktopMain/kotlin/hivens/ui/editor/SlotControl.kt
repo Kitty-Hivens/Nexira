@@ -8,8 +8,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -27,6 +25,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
 import hivens.ui.theme.CelestiaTheme
 import hivens.widget.model.SlotContent
 import hivens.widget.model.SlotOrientation
@@ -57,8 +57,7 @@ internal fun SlotControl(path: SlotPath, content: SlotContent, controller: EditM
                 color      = CelestiaTheme.colors.textSecondary,
                 fontWeight = FontWeight.SemiBold,
             )
-            Icon(
-                imageVector        = Icons.Default.ArrowDropDown,
+            Symbol(icon = NxIcon.ArrowDropDown,
                 contentDescription = null,
                 tint               = CelestiaTheme.colors.textSecondary,
                 modifier           = Modifier.size(16.dp),

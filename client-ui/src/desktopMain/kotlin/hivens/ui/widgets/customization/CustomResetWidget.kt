@@ -5,8 +5,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -21,6 +19,8 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.components.DestructiveConfirmDialog
 import hivens.ui.customization.CustomizationSettings
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 
@@ -37,7 +37,7 @@ fun CustomResetWidget(instance: WidgetInstance) {
         modifier       = Modifier.fillMaxWidth(),
         contentPadding = PaddingValues(vertical = 12.dp),
     ) {
-        Icon(Icons.Default.RestartAlt, null, modifier = Modifier.size(18.dp))
+        Symbol(NxIcon.RestartAlt, null, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(8.dp))
         Text(s.customizationReset)
     }

@@ -20,18 +20,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ViewQuilt
-import androidx.compose.material.icons.automirrored.filled.ViewSidebar
-import androidx.compose.material.icons.filled.Dashboard
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Inventory2
-import androidx.compose.material.icons.filled.RestartAlt
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material.icons.filled.Widgets
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -45,6 +33,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -76,13 +65,6 @@ import hivens.launcher.LayoutGraphRepository
 import hivens.launcher.LayoutReconcile
 import hivens.ui.Screen
 import hivens.ui.customization.CustomizationSettings
-import hivens.ui.i18n.AppStrings
-import hivens.ui.i18n.LocalStrings
-import hivens.ui.layout.AdaptiveWidth
-import hivens.widget.api.LocalLayoutGraph
-import kotlinx.coroutines.CoroutineScope as KotlinCoroutineScope
-import kotlinx.coroutines.launch
-import androidx.compose.runtime.rememberCoroutineScope
 import hivens.ui.editor.decoration.EditableWidgetChrome
 import hivens.ui.editor.decoration.EmptySlotPlaceholder
 import hivens.ui.editor.decoration.UnsupportedWidgetPlaceholder
@@ -92,39 +74,46 @@ import hivens.ui.editor.dnd.DropTargetRegistry
 import hivens.ui.editor.dnd.LocalDragController
 import hivens.ui.editor.dnd.LocalDropTargetRegistry
 import hivens.ui.editor.palette.WidgetPalettePanel
-import hivens.ui.editor.props.SurfacePropertiesPanel
-import hivens.ui.editor.props.WidgetPropPanel
 import hivens.ui.editor.presets.PresetEnvelope
 import hivens.ui.editor.presets.PresetManagerPanel
 import hivens.ui.editor.presets.PresetMeta
 import hivens.ui.editor.presets.PresetRepository
-import hivens.ui.widgets.home.classic.LocalHomeClassicContext
-import hivens.ui.widgets.home.new.LocalHomeNewContext
-import hivens.ui.widgets.library.LocalLibraryContext
-import hivens.ui.widgets.shell.LocalLeftRailContext
-import hivens.ui.widgets.shell.LocalRightRailContext
+import hivens.ui.editor.props.SurfacePropertiesPanel
+import hivens.ui.editor.props.WidgetPropPanel
+import hivens.ui.i18n.AppStrings
+import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.IconKey
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
+import hivens.ui.layout.AdaptiveWidth
+import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.LocalStyle
 import hivens.ui.widgets.about.LocalAboutContext
 import hivens.ui.widgets.about.STUB_ABOUT
 import hivens.ui.widgets.bgsettings.LocalBgSettingsContext
 import hivens.ui.widgets.bgsettings.STUB_BG_SETTINGS
 import hivens.ui.widgets.customization.LocalCustomizationContext
 import hivens.ui.widgets.customization.STUB_CUSTOMIZATION
+import hivens.ui.widgets.home.classic.LocalHomeClassicContext
+import hivens.ui.widgets.home.new.LocalHomeNewContext
+import hivens.ui.widgets.library.LocalLibraryContext
 import hivens.ui.widgets.profile.LocalProfileContext
 import hivens.ui.widgets.profile.STUB_PROFILE
 import hivens.ui.widgets.serverdetails.LocalServerDetailsContext
 import hivens.ui.widgets.serverdetails.STUB_SERVER_DETAILS
+import hivens.ui.widgets.shell.LocalLeftRailContext
+import hivens.ui.widgets.shell.LocalRightRailContext
 import hivens.ui.widgets.themepicker.LocalThemePickerContext
 import hivens.ui.widgets.themepicker.STUB_THEME_PICKER
 import hivens.widget.api.EmptySlotDecorator
 import hivens.widget.api.LocalEmptySlotDecorator
-import hivens.widget.api.LocalUnknownWidgetDecorator
+import hivens.widget.api.LocalLayoutGraph
+import hivens.widget.api.LocalSlotBoundsReporter
 import hivens.widget.api.LocalSlotControlDecorator
 import hivens.widget.api.LocalSlotDividerDecorator
-import hivens.widget.api.LocalSlotBoundsReporter
 import hivens.widget.api.LocalSlotMotionMs
 import hivens.widget.api.LocalSlotPath
-import hivens.ui.theme.CelestiaTheme
-import hivens.ui.theme.LocalStyle
+import hivens.widget.api.LocalUnknownWidgetDecorator
 import hivens.widget.api.LocalWidgetDecorator
 import hivens.widget.api.SlotControlDecorator
 import hivens.widget.api.SlotDividerDecorator
@@ -136,6 +125,8 @@ import hivens.widget.model.SlotPath
 import hivens.widget.model.SurfaceId
 import hivens.widget.model.traverse
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineScope as KotlinCoroutineScope
+import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import org.slf4j.LoggerFactory
 
@@ -683,8 +674,7 @@ private fun EditModePill(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.padding(start = 12.dp, end = if (compact) 8.dp else 4.dp, top = 6.dp, bottom = 6.dp),
                 ) {
-                    Icon(
-                        imageVector        = Icons.Default.Tune,
+                    Symbol(icon = NxIcon.Tune,
                         contentDescription = null,
                         tint               = CelestiaTheme.colors.primary,
                         modifier           = Modifier.size(16.dp),
@@ -710,7 +700,7 @@ private fun EditModePill(
                     // surfaces that expose surface-level settings.
                     if (surfaceHasSettings) {
                         ToolChip(
-                            icon     = Icons.Default.Settings,
+                            icon     = NxIcon.Settings,
                             label    = s.editorSurfaceSettings,
                             selected = false,
                             onClick  = onOpenSurfaceSettings,
@@ -724,7 +714,7 @@ private fun EditModePill(
                     // mode. Drag becomes impossible during preview (no
                     // handles), which matches user intent.
                     ToolChip(
-                        icon       = if (previewing) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                        icon       = if (previewing) NxIcon.VisibilityOff else NxIcon.Visibility,
                         label      = if (previewing) s.editorPreviewHidden else s.editorPreview,
                         selected   = previewing,
                         onClick    = onTogglePreview,
@@ -734,7 +724,7 @@ private fun EditModePill(
 
                     // Palette toggle.
                     ToolChip(
-                        icon     = Icons.Default.Widgets,
+                        icon     = NxIcon.Widgets,
                         label    = if (paletteOpen) s.editorPaletteToggleHide else s.editorWidgets,
                         selected = paletteOpen,
                         onClick  = onTogglePalette,
@@ -744,7 +734,7 @@ private fun EditModePill(
 
                     // Presets dialog.
                     ToolChip(
-                        icon     = Icons.Default.Inventory2,
+                        icon     = NxIcon.Inventory2,
                         label    = s.editorPresetsTitle,
                         selected = false,
                         onClick  = onOpenPresets,
@@ -759,7 +749,7 @@ private fun EditModePill(
                     // host level. Disabled when no surface is selected so
                     // the chip cannot pretend to be live.
                     ToolChip(
-                        icon        = Icons.Default.RestartAlt,
+                        icon        = NxIcon.RestartAlt,
                         label       = s.editorReset,
                         selected    = false,
                         onClick     = onRequestReset,
@@ -801,8 +791,7 @@ private fun SurfaceChip(surface: SurfaceId, active: Boolean, compact: Boolean, o
                 .clickable { onClick() }
                 .padding(horizontal = if (compact) 7.dp else 10.dp, vertical = 5.dp),
         ) {
-            Icon(
-                imageVector        = surfaceIcon(surface),
+            Symbol(icon = surfaceIcon(surface),
                 // Compact hides the label, so the icon carries the name for a11y.
                 contentDescription = if (compact) name else null,
                 tint               = fg,
@@ -823,7 +812,7 @@ private fun SurfaceChip(surface: SurfaceId, active: Boolean, compact: Boolean, o
 
 @Composable
 private fun ToolChip(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: IconKey,
     label: String,
     selected: Boolean,
     onClick: () -> Unit,
@@ -850,8 +839,7 @@ private fun ToolChip(
                 .clickable(enabled = enabled) { onClick() }
                 .padding(horizontal = if (compact) 7.dp else 10.dp, vertical = 5.dp),
         ) {
-            Icon(
-                imageVector        = icon,
+            Symbol(icon = icon,
                 // Compact hides the label, so the icon carries it for a11y.
                 contentDescription = if (compact) label else null,
                 tint               = fg,
@@ -870,12 +858,12 @@ private fun ToolChip(
     }
 }
 
-private fun surfaceIcon(surface: SurfaceId): androidx.compose.ui.graphics.vector.ImageVector =
+private fun surfaceIcon(surface: SurfaceId): IconKey =
     when (surface.value) {
-        "appshell.root"      -> Icons.Default.Dashboard
-        "appshell.leftrail"  -> Icons.AutoMirrored.Filled.ViewSidebar
-        "appshell.rightrail" -> Icons.AutoMirrored.Filled.ViewQuilt
-        else                 -> Icons.Default.Home
+        "appshell.root"      -> NxIcon.Dashboard
+        "appshell.leftrail"  -> NxIcon.ViewSidebar
+        "appshell.rightrail" -> NxIcon.ViewQuilt
+        else                 -> NxIcon.Home
     }
 
 private fun humanSurfaceShortName(surface: SurfaceId, s: AppStrings): String = when (surface.value) {

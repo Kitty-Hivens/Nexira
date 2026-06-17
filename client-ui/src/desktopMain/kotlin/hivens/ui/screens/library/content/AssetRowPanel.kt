@@ -11,10 +11,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -33,6 +29,8 @@ import com.mikepenz.markdown.m3.Markdown
 import hivens.core.api.dto.smrt.SmrtAssetEntry
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
 import hivens.ui.theme.CelestiaTheme
 
 /**
@@ -60,8 +58,7 @@ fun AssetRowPanel(asset: SmrtAssetEntry, modifier: Modifier = Modifier) {
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             modifier              = Modifier.fillMaxWidth(),
         ) {
-            Icon(
-                imageVector        = Icons.Default.Folder,
+            Symbol(icon = NxIcon.Folder,
                 contentDescription = null,
                 tint               = CelestiaTheme.colors.primary.copy(alpha = 0.8f),
                 modifier           = Modifier.size(20.dp),
@@ -101,8 +98,7 @@ fun AssetRowPanel(asset: SmrtAssetEntry, modifier: Modifier = Modifier) {
 
             SourceBadge(asset.source)
 
-            Icon(
-                imageVector        = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+            Symbol(icon = if (expanded) NxIcon.ExpandLess else NxIcon.ExpandMore,
                 contentDescription = null,
                 tint               = CelestiaTheme.colors.textSecondary,
                 modifier           = Modifier.size(20.dp),

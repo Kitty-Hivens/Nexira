@@ -17,15 +17,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ExitToApp
-import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -35,13 +26,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import hivens.ui.Screen
 import hivens.ui.customization.LocalCustomization
 import hivens.ui.customization.NavSelectionStyle
 import hivens.ui.easter.LocalAprilFools
+import hivens.ui.icons.IconKey
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.LocalStyle
 import hivens.ui.utils.GameConsoleService
@@ -49,10 +42,10 @@ import hivens.ui.widgets.toWidgetColorOrNull
 import hivens.widget.api.rememberProps
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
-import kotlinx.serialization.Serializable
-import org.koin.compose.koinInject
 import kotlin.math.sin
 import kotlin.random.Random
+import kotlinx.serialization.Serializable
+import org.koin.compose.koinInject
 
 // One configurable nav-rail item. `target` selects what the item does --
 // a screen navigation, the console-window toggle, or logout. The whole
@@ -80,35 +73,35 @@ fun NavEntry(instance: WidgetInstance) {
 
     when (p.target) {
         NavTarget.Home -> NavSlot(
-            icon         = Icons.Default.Home,
+            icon         = NxIcon.Home,
             outlinedIcon = NavOutlinedIcons.home,
             phase        = 0.0f,
             active       = screen is Screen.Home || screen is Screen.ServerSettings || screen is Screen.ServerDetails,
             onClick      = { ctx.onScreenChange(Screen.Home) },
         )
         NavTarget.Library -> NavSlot(
-            icon         = Icons.Default.Star,
+            icon         = NxIcon.Star,
             outlinedIcon = NavOutlinedIcons.library,
             phase        = 0.55f,
             active       = screen is Screen.Library || screen is Screen.PackDetail,
             onClick      = { ctx.onScreenChange(Screen.Library) },
         )
         NavTarget.Browse -> NavSlot(
-            icon         = Icons.Default.Search,
+            icon         = NxIcon.Search,
             outlinedIcon = NavOutlinedIcons.browse,
             phase        = 1.65f,
             active       = screen is Screen.Browse || screen is Screen.BrowsePackDetail,
             onClick      = { ctx.onScreenChange(Screen.Browse) },
         )
         NavTarget.Profile -> NavSlot(
-            icon         = Icons.Default.Person,
+            icon         = NxIcon.Person,
             outlinedIcon = NavOutlinedIcons.profile,
             phase        = 1.1f,
             active       = screen is Screen.Profile,
             onClick      = { ctx.onScreenChange(Screen.Profile) },
         )
         NavTarget.Settings -> NavSlot(
-            icon         = Icons.Default.Settings,
+            icon         = NxIcon.Settings,
             outlinedIcon = NavOutlinedIcons.settings,
             phase        = 2.2f,
             active       = screen is Screen.Settings || screen is Screen.ThemePicker ||
@@ -116,7 +109,7 @@ fun NavEntry(instance: WidgetInstance) {
             onClick      = { ctx.onScreenChange(Screen.Settings) },
         )
         NavTarget.About -> NavSlot(
-            icon         = Icons.Default.Info,
+            icon         = NxIcon.Info,
             outlinedIcon = NavOutlinedIcons.about,
             phase        = 3.3f,
             active       = screen is Screen.About,
@@ -125,7 +118,7 @@ fun NavEntry(instance: WidgetInstance) {
         NavTarget.Console -> {
             val gameConsole: GameConsoleService = koinInject()
             NavSlot(
-                icon          = Icons.Default.Build,
+                icon          = NxIcon.Build,
                 phase         = 0.0f,
                 active        = gameConsole.shouldShowConsole,
                 chaosEligible = false,
@@ -138,7 +131,7 @@ fun NavEntry(instance: WidgetInstance) {
             // free of auth-state vocabulary.
             if (!ctx.isAuthenticated) return
             NavSlot(
-                icon          = Icons.AutoMirrored.Filled.ExitToApp,
+                icon          = NxIcon.ExitToApp,
                 phase         = 0.0f,
                 active        = false,
                 chaosEligible = false,
@@ -164,13 +157,13 @@ fun NavEntry(instance: WidgetInstance) {
 // filled<->outlined icon swap; null keeps the filled icon in both states.
 @Composable
 private fun NavSlot(
-    icon: ImageVector,
+    icon: IconKey,
     phase: Float,
     active: Boolean,
     enabled: Boolean = true,
     chaosEligible: Boolean = true,
     iconTint: Color? = null,
-    outlinedIcon: ImageVector? = null,
+    outlinedIcon: IconKey? = null,
     onClick: () -> Unit,
 ) {
     val af = LocalAprilFools.current
@@ -269,8 +262,7 @@ private fun NavSlot(
                     NavSelectionStyle.None -> Unit
                 }
             }
-            Icon(
-                imageVector        = shownIcon,
+            Symbol(icon = shownIcon,
                 contentDescription = null,
                 tint               = iconColor,
                 modifier           = Modifier.size(24.dp),

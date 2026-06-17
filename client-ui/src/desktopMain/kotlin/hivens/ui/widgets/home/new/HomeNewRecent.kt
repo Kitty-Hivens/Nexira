@@ -14,10 +14,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Inventory2
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -38,6 +34,8 @@ import hivens.core.data.PackInstance
 import hivens.ui.Screen
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
 import hivens.ui.theme.CelestiaTheme
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
@@ -121,8 +119,7 @@ private fun PackTile(pack: PackInstance, onClick: () -> Unit) {
                 .background(CelestiaTheme.colors.textSecondary.copy(alpha = 0.15f)),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(
-                imageVector        = if (played) Icons.Default.History else Icons.Default.Inventory2,
+            Symbol(icon = if (played) NxIcon.History else NxIcon.Inventory2,
                 contentDescription = null,
                 tint               = CelestiaTheme.colors.textSecondary.copy(alpha = 0.75f),
                 modifier           = Modifier.size(18.dp),
@@ -177,7 +174,7 @@ private fun EmptyPacksCta(onBrowse: () -> Unit) {
                 contentColor = CelestiaTheme.colors.primary,
             ),
         ) {
-            Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(16.dp))
+            Symbol(NxIcon.Search, contentDescription = null, modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(6.dp))
             Text(s.browseOpen, fontWeight = FontWeight.Medium)
         }

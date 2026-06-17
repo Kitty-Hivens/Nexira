@@ -12,8 +12,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -26,6 +24,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.widgets.home.new.rememberQuickLaunchTarget
 import hivens.widget.api.rememberProps
@@ -83,8 +83,7 @@ fun LaunchButtonWidget(instance: WidgetInstance) {
                     .background(Color.White.copy(alpha = if (ready) 0.18f else 0.06f)),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(
-                    imageVector        = Icons.Default.PlayArrow,
+                Symbol(icon = NxIcon.PlayArrow,
                     contentDescription = null,
                     tint               = if (ready) Color.White else CelestiaTheme.colors.textSecondary,
                     modifier           = Modifier.size(28.dp),

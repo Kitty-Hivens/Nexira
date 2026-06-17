@@ -15,17 +15,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Download
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -50,6 +47,8 @@ import hivens.launcher.PackInstaller
 import hivens.launcher.smrt.SmrtPackClient
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.theme.CelestiaTheme
@@ -197,7 +196,7 @@ private fun Hero(packId: String, summary: SmrtPackSummary?, onBack: () -> Unit) 
             onClick  = onBack,
             modifier = Modifier.padding(12.dp),
         ) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Color.White)
+            Symbol(NxIcon.ArrowBack, contentDescription = null, tint = Color.White)
         }
 
         Column(
@@ -313,7 +312,7 @@ private fun InstallIdleRow(onInstall: () -> Unit) {
                 contentColor   = Color.White,
             ),
         ) {
-            Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(20.dp))
+            Symbol(NxIcon.Download, contentDescription = null, modifier = Modifier.size(20.dp))
             Spacer(Modifier.size(8.dp))
             Text(LocalStrings.current.browseDetailInstallButton, fontWeight = FontWeight.Bold)
         }
