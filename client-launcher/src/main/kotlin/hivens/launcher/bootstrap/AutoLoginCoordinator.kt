@@ -4,6 +4,7 @@ import hivens.config.Protocol
 import hivens.core.api.AuthException
 import hivens.core.api.TwoFactorRequiredException
 import hivens.auth.AuthProvider
+import hivens.auth.RefreshableAuthProvider
 import hivens.core.data.AuthStatus
 import hivens.core.data.OfflineIdentity
 import hivens.core.data.SessionData
@@ -23,6 +24,11 @@ import java.time.temporal.ChronoUnit
  * - **Offline mode is on.** Synthesize an offline-identity session (vanilla
  *   offline UUID, blank token) from the chosen offline name, else the last
  *   signed-in name; null when neither exists. No network call.
+ * - **Microsoft account active.** The session carries a refresh token (SC
+ *   sessions never do). Silent-refresh it for a fresh Minecraft token; on any
+ *   failure (or no configured client id) trust the cached token -- the MC
+ *   token lives ~24h, and a stale one is rejected at launch, the same recovery
+ *   as a stale SC token.
  * - **Cached password present.** Attempt a real login. On
  *   [TwoFactorRequiredException], trust the cached accessToken in `saved`
  *   (2FA accounts already paid the 2FA cost when they got that token --
@@ -53,6 +59,7 @@ object AutoLoginCoordinator {
         authService: AuthProvider,
         insecureAuthService: AuthProvider,
         protocolConfig: ServerProtocolConfig,
+        msaProvider: RefreshableAuthProvider? = null,
     ): SessionData? {
         if (settings.isOfflineMode) {
             // Offline identity: the chosen offline name, else the last signed-in
@@ -72,6 +79,19 @@ object AutoLoginCoordinator {
         }
 
         if (saved == null) return null
+
+        // Microsoft account: silent-refresh the stored token, falling back to the
+        // cached Minecraft token on any failure (or no configured client id).
+        // Only Microsoft sessions carry a refresh token, so this never shadows SC.
+        saved.refreshToken?.let { refreshToken ->
+            val refreshed = runCatching { msaProvider?.refresh(refreshToken) }
+                .getOrElse {
+                    log.warn("MSA silent refresh failed -- trusting the cached Microsoft token", it)
+                    null
+                }
+            return (refreshed ?: saved).copy(serverId = lastServerId)
+        }
+
         val cachedPass = saved.cachedPassword ?: return null
         val server = lastServerId ?: Protocol.DEFAULT_SERVER_ID
 

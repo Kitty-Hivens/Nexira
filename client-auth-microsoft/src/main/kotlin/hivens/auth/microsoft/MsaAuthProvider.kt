@@ -4,6 +4,7 @@ import hivens.auth.AuthCapabilities
 import hivens.auth.AuthProvider
 import hivens.auth.DeviceCodeAuthProvider
 import hivens.auth.DeviceCodeChallenge
+import hivens.auth.RefreshableAuthProvider
 import hivens.core.api.AuthException
 import hivens.core.api.HttpClientProvider
 import hivens.core.data.AuthStatus
@@ -42,7 +43,7 @@ class MsaAuthProvider(
     private val httpProvider: HttpClientProvider,
     private val clientId: String,
     private val json: Json = DEFAULT_JSON,
-) : AuthProvider, DeviceCodeAuthProvider {
+) : AuthProvider, DeviceCodeAuthProvider, RefreshableAuthProvider {
 
     private val http get() = httpProvider.current
 
@@ -105,7 +106,7 @@ class MsaAuthProvider(
     }
 
     /** Silent re-auth from a stored refresh token; re-runs the Xbox/Minecraft exchange. */
-    suspend fun refresh(refreshToken: String): SessionData {
+    override suspend fun refresh(refreshToken: String): SessionData {
         val resp = http.post(TOKEN_URL) {
             contentType(ContentType.Application.FormUrlEncoded)
             setBody(form(

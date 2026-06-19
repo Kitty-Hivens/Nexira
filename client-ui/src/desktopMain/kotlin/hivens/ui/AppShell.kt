@@ -26,11 +26,14 @@ import coil3.SingletonImageLoader
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import hivens.config.Branding
 import hivens.auth.AuthProvider
+import hivens.auth.AuthProviderRegistry
+import hivens.auth.RefreshableAuthProvider
 import hivens.core.api.TwoFactorRequiredException
 import hivens.core.api.interfaces.IServerListService
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.HomeView
+import hivens.core.data.PackAuthRequirement
 import hivens.core.data.SessionData
 import hivens.core.data.UiStyle
 import hivens.launcher.AutoSyncService
@@ -917,6 +920,11 @@ fun AppRoot(
     val json: Json                             = koinInject()
     val insecureAuthService: AuthProvider      = koinInject(named("insecure"))
     val protocolConfig: ServerProtocolConfig   = koinInject()
+    val authRegistry: AuthProviderRegistry     = koinInject()
+    // Present only when a Microsoft client id is configured -- the registry holds
+    // the refreshable provider exactly then, so auto-login is gated by its presence.
+    val msaProvider: RefreshableAuthProvider?  =
+        authRegistry.all.filterIsInstance<RefreshableAuthProvider>().firstOrNull()
     // Smartycraft-routed Call.Factory for Coil's image fetcher. The
     // bypass / forceProxy / direct routing rule lives in Modules.kt
     // alongside the same rule for the Ktor HttpClientProvider; both
@@ -957,15 +965,24 @@ fun AppRoot(
     // Business logic lives in AutoLoginCoordinator; the Composable just
     // calls into it and maps the result into the local AppState machine.
     LaunchedEffect(Unit) {
+        val saved = withContext(Dispatchers.IO) { credentialsManager.load() }
         val session = withContext(Dispatchers.IO) {
             AutoLoginCoordinator.resolveSession(
                 settings            = settingsService.getSettings(),
-                saved               = credentialsManager.load(),
+                saved               = saved,
                 lastServerId        = profileManager.lastServerId,
                 authService         = authService,
                 insecureAuthService = insecureAuthService,
                 protocolConfig      = protocolConfig,
+                msaProvider         = msaProvider,
             )
+        }
+        // A silent MSA refresh rotates the refresh token; persist it so the next
+        // start uses the fresh one instead of re-spending the stored token.
+        if (session?.refreshToken != null && session.refreshToken != saved?.refreshToken) {
+            withContext(Dispatchers.IO) {
+                credentialsManager.saveAccount(session, PackAuthRequirement.Microsoft.PROVIDER_KEY)
+            }
         }
         appState = if (session != null) AppState.Authenticated(session) else AppState.Unauthenticated
     }
