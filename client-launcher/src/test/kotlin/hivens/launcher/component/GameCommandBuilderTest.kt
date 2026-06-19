@@ -2,6 +2,7 @@ package hivens.launcher.component
 
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.InstanceProfile
+import hivens.core.data.OfflineIdentity
 import hivens.core.data.SessionData
 import hivens.launcher.runtime.MavenCoord
 import hivens.launcher.runtime.loader.ResolvedLibrary
@@ -206,6 +207,36 @@ class GameCommandBuilderTest {
         val idx = cmd.indexOf("--accessToken")
         assertTrue(idx >= 0, "Should include --accessToken")
         assertEquals("token_abc123", cmd[idx + 1])
+    }
+
+    @Test
+    fun `build emits userType mojang for an online session`() {
+        val cmd = build("1.7.10")
+        val idx = cmd.indexOf("--userType")
+        assertTrue(idx >= 0, "Should include --userType")
+        assertEquals("mojang", cmd[idx + 1])
+    }
+
+    @Test
+    fun `build emits userType legacy and the offline uuid for an offline session`() {
+        val offline = SessionData(
+            playerName  = "TestPlayer",
+            uuid        = OfflineIdentity.dashlessUuidFor("TestPlayer"),
+            accessToken = "",
+            offline     = true,
+        )
+        val cmd = builder.build(
+            javaExec      = "/usr/bin/java",
+            memoryMB      = 4096,
+            clientRoot    = clientRoot,
+            serverProfile = server(version = "1.7.10"),
+            session       = offline,
+            userProfile   = profile(),
+            classpath     = legacyClasspath,
+        )
+        assertEquals("legacy", cmd[cmd.indexOf("--userType") + 1])
+        assertEquals(OfflineIdentity.dashlessUuidFor("TestPlayer"), cmd[cmd.indexOf("--uuid") + 1])
+        assertEquals("0", cmd[cmd.indexOf("--accessToken") + 1], "blank offline token degrades to 0")
     }
 
     @Test

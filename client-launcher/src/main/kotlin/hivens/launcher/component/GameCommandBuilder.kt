@@ -489,7 +489,10 @@ internal class GameCommandBuilder(
         args.add("--uuid"); args.add(session.uuid.ifBlank { "0" })
         args.add("--accessToken"); args.add(session.accessToken.ifBlank { "0" })
         args.add("--userProperties"); args.add("{}")
-        args.add("--userType"); args.add("mojang")
+        // Offline play has no Mojang/SC session: userType "legacy" tells the client
+        // not to expect one. The uuid is the vanilla OfflinePlayer:<name> value, so
+        // singleplayer world data lines up with other launchers' offline mode.
+        args.add("--userType"); args.add(if (session.offline) "legacy" else "mojang")
     }
 
     private fun getConfig(version: String): VersionConfig {
