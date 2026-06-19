@@ -104,7 +104,7 @@ class CredentialsManager internal constructor(
      * provider is the norm; a future multiple-of-same-provider case would resolve
      * the pick at the call site.
      */
-    fun accountFor(providerId: String): SessionData? {
+    override fun accountFor(providerId: String): SessionData? {
         val account = readAccountsFile()?.accounts?.firstOrNull { it.providerId == providerId } ?: return null
         return loadSession(account.accountId)
     }
