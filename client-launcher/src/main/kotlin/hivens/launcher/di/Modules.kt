@@ -5,6 +5,7 @@ import hivens.config.Storage
 import hivens.auth.AuthProvider
 import hivens.auth.AuthProviderRegistry
 import hivens.auth.OfflineAuthProvider
+import hivens.auth.microsoft.MsaAuthProvider
 import hivens.auth.smartycraft.SmartyCraftAuthProvider
 import hivens.launcher.network.ChannelRouter
 import hivens.launcher.network.NetworkState
@@ -404,11 +405,23 @@ val authModule = module {
         SmartyCraftAuthProvider(get<IServerProtocol>(named("insecure")))
     }
 
-    // Offline-play provider + the registry the content router and launch gate
-    // consult. The registry holds the satisfiable providers (SC + offline today);
-    // when Microsoft joins it in a later phase, its gate activates automatically.
+    // Offline-play provider + the Microsoft provider + the registry the content
+    // router and launch gate consult. Microsoft is always constructible but only
+    // JOINS the registry -- and so surfaces in the login UI and activates its
+    // launch gate -- when a client id is configured. It uses the proxy-free
+    // "direct" HTTP client (login.microsoftonline.com / xboxlive must not go
+    // through the SC SOCKS channel).
     single { OfflineAuthProvider() }
-    single { AuthProviderRegistry(listOf(get<AuthProvider>(), get<OfflineAuthProvider>())) }
+    single { MsaAuthProvider(get<HttpClientProvider>(named("direct")), get<MsaConfig>().clientId) }
+    single {
+        AuthProviderRegistry(
+            buildList {
+                add(get<AuthProvider>())
+                add(get<OfflineAuthProvider>())
+                if (get<MsaConfig>().enabled) add(get<MsaAuthProvider>())
+            },
+        )
+    }
 }
 
 /**
