@@ -789,6 +789,7 @@ object GermanStrings : AppStrings {
     override fun notifPackSessionEnded(packName: String) = "Sitzung $packName beendet"
     override val notifActionShowConsole                 = "Konsole anzeigen"
     override val notifActionStop                        = "Stoppen"
+    override val notifActionPlayOffline                 = "Offline spielen"
     override fun notifReasonExitCode(code: Int)         = "Spiel mit Code $code beendet"
     override val notifReasonInternal                    = "Interner Fehler"
     override fun notifReasonInternalDetail(detail: String) = detail

@@ -827,6 +827,7 @@ interface AppStrings {
     fun notifPackSessionEnded(packName: String): String
     val notifActionShowConsole: String
     val notifActionStop: String
+    val notifActionPlayOffline: String
     fun notifReasonExitCode(code: Int): String
     val notifReasonInternal: String
     fun notifReasonInternalDetail(detail: String): String
