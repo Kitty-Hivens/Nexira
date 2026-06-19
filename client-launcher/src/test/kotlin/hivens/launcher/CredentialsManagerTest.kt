@@ -173,6 +173,15 @@ class CredentialsManagerTest {
     }
 
     @Test
+    fun `accountFor resolves the session for each provider`() {
+        manager.save(session())
+        manager.saveAccount(session(uuid = "msuuid", playerName = "MsGamer", refreshToken = "RT"), "microsoft")
+        assertEquals("ChaosA", manager.accountFor("smartycraft")?.playerName)
+        assertEquals("MsGamer", manager.accountFor("microsoft")?.playerName)
+        assertNull(manager.accountFor("offline"))
+    }
+
+    @Test
     fun `setActive switches which account load returns`() {
         manager.save(session())
         manager.saveAccount(session(uuid = "msuuid", playerName = "MsGamer", refreshToken = "RT"), "microsoft")
