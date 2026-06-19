@@ -1,5 +1,9 @@
 package hivens.ui.notifications.drivers
 
+import hivens.auth.OfflineAuthProvider
+import hivens.core.api.interfaces.ICredentialStore
+import hivens.core.api.interfaces.ISettingsService
+import hivens.core.data.PackInstance
 import hivens.core.launch.LaunchError
 import hivens.core.launch.LaunchState
 import hivens.launcher.launch.LauncherController
@@ -38,6 +42,10 @@ class LaunchDriver(
     private val sessions: SessionRegistry,
     private val gameConsole: GameConsoleService,
     private val appScope: CoroutineScope,
+    // Offer-offline-on-failure: mint the fallback identity + resolve its name.
+    private val offlineProvider: OfflineAuthProvider,
+    private val settingsService: ISettingsService,
+    private val credentialStore: ICredentialStore,
     // Read on each push so a locale change in Settings is picked up
     // mid-launch without restarting the driver.
     private val stringsProvider: () -> AppStrings,
@@ -194,10 +202,42 @@ class LaunchDriver(
             kind      = Kind.Sticky,
             title     = s.notifPackFailed(target.displayName),
             body      = humanReason(reason, s),
-            actions   = listOf(
-                NotifAction("show_console", s.notifActionShowConsole) { gameConsole.show() },
-            ),
+            actions   = buildList {
+                add(NotifAction("show_console", s.notifActionShowConsole) { gameConsole.show() })
+                // Offer offline for a pack whose online auth failed: offline runs
+                // the modpack in singleplayer (an SC-bound pack still can't join
+                // its server offline). Only when an offline identity is resolvable.
+                if (target is LaunchTarget.Pack && reason.isAuthFailure()) {
+                    val instance = target.instance
+                    offlineName()?.let { name ->
+                        add(NotifAction("play_offline", s.notifActionPlayOffline) {
+                            relaunchOffline(instance, name)
+                        })
+                    }
+                }
+            },
         )
+    }
+
+    /** Auth/credential failures where an offline singleplayer launch is a useful fallback. */
+    private fun LaunchError.isAuthFailure(): Boolean = when (this) {
+        is LaunchError.MissingAuthProvider -> true
+        is LaunchError.AuthlibUnavailable -> true
+        LaunchError.TwoFactorExpired -> true
+        else -> false
+    }
+
+    /** The offline name to reuse: the chosen offline identity, else the saved sign-in. */
+    private fun offlineName(): String? =
+        settingsService.getSettings().offlinePlayerName?.takeIf { it.isNotBlank() }
+            ?: credentialStore.load()?.playerName?.takeIf { it.isNotBlank() }
+
+    private fun relaunchOffline(instance: PackInstance, name: String) {
+        appScope.launch {
+            val session = offlineProvider.login(name, "", "")
+            observe(LaunchTarget.Pack(instance))
+            controller.launchPackInstance(session, instance)
+        }
     }
 
     private fun onIdle(target: LaunchTarget) {

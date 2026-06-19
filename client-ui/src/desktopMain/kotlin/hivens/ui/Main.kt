@@ -163,6 +163,9 @@ val uiModule = module {
             sessions        = get(),
             gameConsole     = get(),
             appScope        = get(),
+            offlineProvider = get(),
+            settingsService = settingsService,
+            credentialStore = get(),
             stringsProvider = { stringsFor(AppLocale.fromTag(settingsService.getSettings().locale)) },
         )
     }

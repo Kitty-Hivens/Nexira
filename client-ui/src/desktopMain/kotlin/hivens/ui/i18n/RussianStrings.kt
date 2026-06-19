@@ -803,6 +803,7 @@ object RussianStrings : AppStrings {
     override fun notifPackSessionEnded(packName: String) = "Сессия $packName завершена"
     override val notifActionShowConsole                 = "Открыть консоль"
     override val notifActionStop                        = "Остановить"
+    override val notifActionPlayOffline                 = "Играть офлайн"
     override fun notifReasonExitCode(code: Int)         = "Игра завершилась с кодом $code"
     override val notifReasonInternal                    = "Внутренняя ошибка"
     override fun notifReasonInternalDetail(detail: String) = detail
