@@ -685,7 +685,19 @@ class LauncherController(
                 if (scSatisfiable) prepareScAuth(requirement.serverId, currentSession, instance) else currentSession
             is PackAuthRequirement.Both ->
                 if (scSatisfiable) prepareScAuth(requirement.serverId, currentSession, instance) else currentSession
-            PackAuthRequirement.Microsoft -> currentSession
+            PackAuthRequirement.Microsoft ->
+                if (!authProviderRegistry.contains(PackAuthRequirement.Microsoft.PROVIDER_KEY)) {
+                    currentSession // no Microsoft provider configured -> advisory (Phase A behavior)
+                } else {
+                    credentialsManager.accountFor(PackAuthRequirement.Microsoft.PROVIDER_KEY)
+                        ?: run {
+                            ActionRing.record(
+                                "Pack launch ${instance.displayName}: Microsoft account required, none signed in",
+                            )
+                            fail(LaunchError.MissingAuthProvider(PackAuthRequirement.Microsoft.PROVIDER_KEY))
+                            null
+                        }
+                }
         }
     }
 

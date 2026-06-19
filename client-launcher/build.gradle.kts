@@ -8,6 +8,7 @@ dependencies {
     implementation(project(":client-config"))
     implementation(project(":client-auth"))
     implementation(project(":client-auth-smartycraft"))
+    implementation(project(":client-auth-microsoft"))
     implementation(project(":widget-model"))
 
     implementation(libs.commons.compress)
