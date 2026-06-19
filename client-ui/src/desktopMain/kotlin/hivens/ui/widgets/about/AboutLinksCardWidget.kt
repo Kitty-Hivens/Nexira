@@ -5,8 +5,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -36,13 +34,9 @@ fun AboutLinksCardWidget(instance: WidgetInstance) {
     val s = LocalStrings.current
 
     GlassCard(Modifier.fillMaxWidth()) {
-        // Wheel-scroll the links when the card is height-constrained (narrow
-        // layout, or once the list grows past the space it gets).
-        Column(
-            Modifier
-                .padding(20.dp)
-                .verticalScroll(rememberScrollState()),
-        ) {
+        // No inner scroll: the surface already scrolls the right slot in narrow
+        // layouts, and nesting a second scroll crashes (unbounded height).
+        Column(Modifier.padding(20.dp)) {
             SectionLabel(p.title.ifBlank { s.aboutSectionLinks })
             Spacer(Modifier.height(12.dp))
             LinkButton(s.aboutLinkGithub,    "https://github.com/Kitty-Hivens/Nexira",         NxIcon.Code)
