@@ -160,11 +160,16 @@ object NetworkState {
             val text = Files.readString(file)
             val list = json.decodeFromString<List<SslBypassEntry>>(text)
             val now = Instant.now()
-            // Drop expired on load -- stale grants from prior sessions must
-            // not silently re-arm.
-            list.filter { Instant.parse(it.expiresAt).isAfter(now) }.forEach(bypasses::add)
-            if (list.size != bypasses.size) {
-                log.info("Dropped {} expired SSL bypass entries during load", list.size - bypasses.size)
+            // Drop expired on load -- stale grants from prior sessions must not
+            // silently re-arm. Parse each entry independently so one corrupt
+            // timestamp drops only that entry, not every still-valid grant.
+            var dropped = 0
+            for (entry in list) {
+                val keep = runCatching { Instant.parse(entry.expiresAt).isAfter(now) }.getOrDefault(false)
+                if (keep) bypasses.add(entry) else dropped++
+            }
+            if (dropped > 0) {
+                log.info("Dropped {} expired or malformed SSL bypass entries during load", dropped)
             }
         } catch (e: Exception) {
             log.warn("Failed to read ssl-bypasses.json -- starting with empty bypass set: {}", e.message)
