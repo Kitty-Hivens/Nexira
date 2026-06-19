@@ -57,8 +57,15 @@ data class SettingsData(
     val savedFileManifest: FileManifest? = null,
     /** BCP-47 language tag: "ru", "en", "de". */
     val locale: String = "en",
-    /** Offline mode: skip authentication, use cached session. */
+    /** Offline mode: skip authentication, play with an offline identity. */
     val isOfflineMode: Boolean = false,
+    /**
+     * The offline-play name chosen via "Play offline". Drives the offline UUID
+     * (vanilla OfflinePlayer:<name>) and lets a restart restore the offline
+     * identity without re-typing. Null = none chosen yet; auto-login then falls
+     * back to the last signed-in name.
+     */
+    val offlinePlayerName: String? = null,
 
     // ── Experimental features ────────────────────────────────────────────
     // Master gates both children -- switching off disables the sub-toggles

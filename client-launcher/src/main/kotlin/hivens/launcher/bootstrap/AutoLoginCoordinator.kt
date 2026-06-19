@@ -4,6 +4,8 @@ import hivens.config.Protocol
 import hivens.core.api.AuthException
 import hivens.core.api.TwoFactorRequiredException
 import hivens.auth.AuthProvider
+import hivens.core.data.AuthStatus
+import hivens.core.data.OfflineIdentity
 import hivens.core.data.SessionData
 import hivens.core.data.SettingsData
 import hivens.core.diag.ActionRing
@@ -18,8 +20,9 @@ import java.time.temporal.ChronoUnit
  *
  * Three input cases the coordinator unifies:
  *
- * - **Offline mode is on.** Synthesize a session with `accessToken = "offline"`
- *   from the saved credentials if any; otherwise null. No network call.
+ * - **Offline mode is on.** Synthesize an offline-identity session (vanilla
+ *   offline UUID, blank token) from the chosen offline name, else the last
+ *   signed-in name; null when neither exists. No network call.
  * - **Cached password present.** Attempt a real login. On
  *   [TwoFactorRequiredException], trust the cached accessToken in `saved`
  *   (2FA accounts already paid the 2FA cost when they got that token --
@@ -52,15 +55,19 @@ object AutoLoginCoordinator {
         protocolConfig: ServerProtocolConfig,
     ): SessionData? {
         if (settings.isOfflineMode) {
-            if (saved == null) return null
+            // Offline identity: the chosen offline name, else the last signed-in
+            // name. Real vanilla offline UUID + blank token (so it never persists
+            // as a real session); matches OfflineAuthProvider's output.
+            val name = settings.offlinePlayerName?.takeIf { it.isNotBlank() }
+                ?: saved?.playerName?.takeIf { it.isNotBlank() }
+                ?: return null
             return SessionData(
-                playerName     = saved.playerName,
-                uuid           = saved.uuid.ifBlank { "offline-${saved.playerName}" },
-                uid            = saved.uid,
-                accessToken    = "offline",
-                cachedPassword = saved.cachedPassword,
-                status         = null,
-                serverId       = lastServerId,
+                status      = AuthStatus.OK,
+                playerName  = name,
+                uuid        = OfflineIdentity.dashlessUuidFor(name),
+                accessToken = "",
+                offline     = true,
+                serverId    = lastServerId,
             )
         }
 
