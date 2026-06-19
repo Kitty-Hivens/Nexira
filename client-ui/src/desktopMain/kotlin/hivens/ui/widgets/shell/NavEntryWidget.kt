@@ -74,35 +74,35 @@ fun NavEntry(instance: WidgetInstance) {
     when (p.target) {
         NavTarget.Home -> NavSlot(
             icon         = NxIcon.Home,
-            outlinedIcon = NavOutlinedIcons.home,
+            outlineSwap  = true,
             phase        = 0.0f,
             active       = screen is Screen.Home || screen is Screen.ServerSettings || screen is Screen.ServerDetails,
             onClick      = { ctx.onScreenChange(Screen.Home) },
         )
         NavTarget.Library -> NavSlot(
             icon         = NxIcon.Star,
-            outlinedIcon = NavOutlinedIcons.library,
+            outlineSwap  = true,
             phase        = 0.55f,
             active       = screen is Screen.Library || screen is Screen.PackDetail,
             onClick      = { ctx.onScreenChange(Screen.Library) },
         )
         NavTarget.Browse -> NavSlot(
             icon         = NxIcon.Search,
-            outlinedIcon = NavOutlinedIcons.browse,
+            outlineSwap  = true,
             phase        = 1.65f,
             active       = screen is Screen.Browse || screen is Screen.BrowsePackDetail,
             onClick      = { ctx.onScreenChange(Screen.Browse) },
         )
         NavTarget.Profile -> NavSlot(
             icon         = NxIcon.Person,
-            outlinedIcon = NavOutlinedIcons.profile,
+            outlineSwap  = true,
             phase        = 1.1f,
             active       = screen is Screen.Profile,
             onClick      = { ctx.onScreenChange(Screen.Profile) },
         )
         NavTarget.Settings -> NavSlot(
             icon         = NxIcon.Settings,
-            outlinedIcon = NavOutlinedIcons.settings,
+            outlineSwap  = true,
             phase        = 2.2f,
             active       = screen is Screen.Settings || screen is Screen.ThemePicker ||
                 screen is Screen.BackgroundSettings || screen is Screen.CustomizationExtension,
@@ -110,7 +110,7 @@ fun NavEntry(instance: WidgetInstance) {
         )
         NavTarget.About -> NavSlot(
             icon         = NxIcon.Info,
-            outlinedIcon = NavOutlinedIcons.about,
+            outlineSwap  = true,
             phase        = 3.3f,
             active       = screen is Screen.About,
             onClick      = { ctx.onScreenChange(Screen.About) },
@@ -153,8 +153,9 @@ fun NavEntry(instance: WidgetInstance) {
 // (Pill is the original Material capsule). The decoration is drawn behind /
 // around the icon; the icon and decoration share the selection accent
 // ([CustomizationSettings.navSelectionAccent], else the theme primary).
-// [outlinedIcon] is the idle-state twin used when the user enables the
-// filled<->outlined icon swap; null keeps the filled icon in both states.
+// [outlineSwap] marks a screen-nav entry whose idle icon switches to the
+// outlined FILL-axis form when the user enables the swap; service entries
+// stay filled in both states.
 @Composable
 private fun NavSlot(
     icon: IconKey,
@@ -163,7 +164,7 @@ private fun NavSlot(
     enabled: Boolean = true,
     chaosEligible: Boolean = true,
     iconTint: Color? = null,
-    outlinedIcon: IconKey? = null,
+    outlineSwap: Boolean = false,
     onClick: () -> Unit,
 ) {
     val af = LocalAprilFools.current
@@ -207,9 +208,7 @@ private fun NavSlot(
         active           -> accent
         else             -> CelestiaTheme.colors.textSecondary.copy(alpha = if (enabled) 0.70f else 0.20f)
     }
-    // Filled when selected; outlined twin when the user opted into the swap and
-    // this entry is idle. Service entries pass no twin and stay filled.
-    val shownIcon = if (cz.navSelectionOutlineIcons && !active && outlinedIcon != null) outlinedIcon else icon
+    val iconFill = if (outlineSwap && !active && cz.navSelectionOutlineIcons) 0f else 1f
 
     // 13% fill matches the original Material indicator alpha; LeftBar / Dot use
     // the solid accent since they are thin marks, not a backing.
@@ -264,9 +263,10 @@ private fun NavSlot(
                     NavSelectionStyle.None -> Unit
                 }
             }
-            Symbol(icon = shownIcon,
+            Symbol(icon = icon,
                 contentDescription = null,
                 tint               = iconColor,
+                fill               = iconFill,
                 modifier           = Modifier.size(24.dp),
             )
         }

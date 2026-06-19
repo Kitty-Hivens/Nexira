@@ -44,7 +44,9 @@ fun Symbol(
     weight: Int = 400,
     size: Dp? = null,
 ) {
-    val base = Modifier.size(size ?: 24.dp).then(modifier)
+    // Caller modifier before the default size: the reverse order lets size(24)
+    // clamp a smaller caller size up (size enforces incoming constraints).
+    val base = modifier.then(Modifier.size(size ?: 24.dp))
     BoxWithConstraints(
         modifier = if (contentDescription != null) {
             base.semantics { this.contentDescription = contentDescription }
@@ -64,7 +66,7 @@ fun Symbol(
                     variationSettings = FontVariation.Settings(
                         FontVariation.Setting("FILL", fill.coerceIn(0f, 1f)),
                         FontVariation.Setting("wght", weight.toFloat()),
-                        FontVariation.Setting("opsz", px.value),
+                        FontVariation.Setting("opsz", px.value.coerceIn(24f, 48f)),
                         FontVariation.Setting("GRAD", 0f),
                     ),
                 ),

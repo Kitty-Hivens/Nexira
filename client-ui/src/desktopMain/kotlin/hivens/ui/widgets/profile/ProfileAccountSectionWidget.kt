@@ -174,7 +174,7 @@ private fun BalanceCard(balance: Int, modifier: Modifier = Modifier) {
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Symbol(NxIcon.Star, s.profileBalance, tint = Color(0xFFFFD700), modifier = Modifier.size(20.dp))
+            Symbol(NxIcon.Star, s.profileBalance, tint = Color(0xFFFFD700), fill = 1f, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(10.dp))
             Text(s.profileBalance, color = CelestiaTheme.colors.textSecondary)
         }
