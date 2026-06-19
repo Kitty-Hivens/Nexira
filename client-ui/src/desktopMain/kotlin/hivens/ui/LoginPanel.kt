@@ -20,8 +20,10 @@ import androidx.compose.ui.unit.dp
 import hivens.config.Protocol
 import hivens.core.api.AuthException
 import hivens.core.api.TwoFactorRequiredException
+import hivens.core.api.interfaces.ISettingsService
 import hivens.core.data.AuthStatus
 import hivens.auth.AuthProvider
+import hivens.auth.OfflineAuthProvider
 import hivens.core.data.SessionData
 import hivens.launcher.CredentialsManager
 import hivens.launcher.network.NetworkState
@@ -49,6 +51,8 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
     val credentialsManager: CredentialsManager = koinInject()
     val profileManager: ProfileManager         = koinInject()
     val protocolConfig: ServerProtocolConfig   = koinInject()
+    val offlineProvider: OfflineAuthProvider   = koinInject()
+    val settingsService: ISettingsService      = koinInject()
     val s            = LocalStrings.current
     val af           = LocalAprilFools.current
     val scope        = rememberCoroutineScope()
@@ -150,6 +154,24 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
                 hivens.core.diag.ActionRing.record("Login failed (generic): user=$login msg=${e.message?.take(80)}")
                 errorMessage = e.message ?: s.loginErrorGeneric
             }
+        }
+    }
+
+    fun playOffline() {
+        val name = login.trim()
+        if (name.isEmpty()) { errorMessage = s.loginErrorEmpty; return }
+        focusManager.clearFocus()
+        errorMessage = null
+        scope.launch {
+            val session = withContext(Dispatchers.IO) {
+                val sess = offlineProvider.login(name, "", "")
+                // Remember the offline name so a restart -- or the Settings offline
+                // toggle -- restores this identity without re-typing.
+                settingsService.saveSettings(settingsService.getSettings().copy(offlinePlayerName = name))
+                sess
+            }
+            hivens.core.diag.ActionRing.record("Play offline: name=$name")
+            onLogin(session)
         }
     }
 
@@ -469,6 +491,20 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
         PuppetClick("login.register") {
             SystemActions.openUrl("${protocolConfig.baseUrl}/register")
         }
+
+        // PLAY OFFLINE -- offline identity, no network. Reuses the username field
+        // as the offline name and remembers it for next time.
+        af.ChaosButton(
+            id      = "login_offline_btn",
+            text    = s.loginPlayOffline,
+            onClick = { playOffline() },
+            modifier = Modifier.fillMaxWidth().height(42.dp),
+            colors   = ButtonDefaults.buttonColors(
+                containerColor = Color.Transparent,
+                contentColor   = CelestiaTheme.colors.textSecondary,
+            ),
+        )
+        PuppetClick("login.playOffline") { playOffline() }
     }
 }
 
