@@ -44,7 +44,6 @@ fun AboutSystemCardWidget(instance: WidgetInstance) {
             val osVer      = System.getProperty("os.version")
             val javaVer    = System.getProperty("java.version")
             val javaVendor = System.getProperty("java.vendor")
-            val maxHeap    = Runtime.getRuntime().maxMemory() / (1024 * 1024)
 
             val c        = ctx.cpu
             val physical = c.physicalCores
@@ -61,7 +60,6 @@ fun AboutSystemCardWidget(instance: WidgetInstance) {
             }
             val ramValue = buildString {
                 append(if (ctx.systemRam > 0) "${ctx.systemRam} MB" else "Unknown")
-                append(" (Heap: $maxHeap MB)")
                 ctx.swapMb?.takeIf { it > 0 }?.let { append(" · swap $it MB") }
             }
 

@@ -10,8 +10,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -234,11 +232,9 @@ fun AboutSurface(onBack: () -> Unit) {
                         )
                     }
                 } else {
-                    // Too narrow to split side by side: stack the columns. Each
-                    // half stays height-bounded (weight) so the credits widget's
-                    // own scroll keeps working; the right half has no inner scroll,
-                    // so it gets one to keep its fixed cards reachable. (A single
-                    // outer scroll would collide with the credits' inner scroll.)
+                    // Too narrow for side-by-side: stack the slots, each weight-bounded
+                    // so a self-scrolling widget has a height to scroll within. No
+                    // verticalScroll on a slot -- it would collide with that inner scroll.
                     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         SlotRenderer(
                             SurfaceId(SURFACE),
@@ -249,7 +245,7 @@ fun AboutSurface(onBack: () -> Unit) {
                         SlotRenderer(
                             SurfaceId(SURFACE),
                             SlotId("right"),
-                            modifier = Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),
+                            modifier = Modifier.weight(1f).fillMaxWidth(),
                             spacing  = 16.dp,
                         )
                     }

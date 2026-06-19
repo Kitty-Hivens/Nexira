@@ -21,6 +21,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import hivens.config.Branding
@@ -80,13 +82,17 @@ fun AboutUpdatePanelWidget(instance: WidgetInstance) {
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(s.aboutCurrentVersion, color = CelestiaTheme.colors.textSecondary, fontSize = 13.sp)
-                Spacer(Modifier.weight(1f))
+                Spacer(Modifier.width(12.dp))
                 Text(
                     text       = versionText,
                     color      = accent,
                     fontSize   = 13.sp,
                     fontWeight = FontWeight.Medium,
                     fontFamily = LocalMonoFamily.current,
+                    textAlign  = TextAlign.End,
+                    maxLines   = 1,
+                    overflow   = TextOverflow.Ellipsis,
+                    modifier   = Modifier.weight(1f),
                 )
             }
 

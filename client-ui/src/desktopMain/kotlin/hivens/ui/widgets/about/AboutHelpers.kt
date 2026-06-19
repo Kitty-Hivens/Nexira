@@ -1,25 +1,25 @@
 package hivens.ui.widgets.about
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import hivens.ui.icons.IconKey
+import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.platform.SystemActions
 import hivens.ui.theme.CelestiaTheme
@@ -65,15 +65,16 @@ internal fun InfoRow(icon: IconKey, label: String, value: String) {
 @Composable
 internal fun LinkButton(label: String, url: String, icon: IconKey) {
     OutlinedButton(
-        onClick  = { SystemActions.openUrl(url) },
-        modifier = Modifier.fillMaxWidth(),
-        shape    = MaterialTheme.shapes.small,
-        border   = BorderStroke(1.dp, CelestiaTheme.colors.outline.copy(alpha = 0.2f)),
+        onClick        = { SystemActions.openUrl(url) },
+        modifier       = Modifier.fillMaxWidth(),
+        shape          = MaterialTheme.shapes.small,
+        border         = BorderStroke(1.dp, CelestiaTheme.colors.outline.copy(alpha = 0.2f)),
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
     ) {
         Symbol(icon, null, modifier = Modifier.size(16.dp), tint = CelestiaTheme.colors.primary)
         Spacer(Modifier.width(8.dp))
         Text(label, color = CelestiaTheme.colors.textPrimary)
         Spacer(Modifier.weight(1f))
-        Text("↗", color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.4f))
+        Symbol(NxIcon.OpenInNew, null, tint = CelestiaTheme.colors.textSecondary.copy(alpha = 0.4f), modifier = Modifier.size(14.dp))
     }
 }
