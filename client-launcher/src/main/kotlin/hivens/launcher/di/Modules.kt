@@ -8,6 +8,8 @@ import hivens.auth.OfflineAuthProvider
 import hivens.auth.smartycraft.SmartyCraftAuthProvider
 import hivens.launcher.network.ChannelRouter
 import hivens.launcher.network.NetworkState
+import hivens.launcher.network.MsaConfig
+import hivens.launcher.network.MsaConfigLoader
 import hivens.launcher.network.ServerProtocolConfig
 import hivens.launcher.network.ServerProtocolConfigLoader
 import hivens.launcher.protocol.LauncherHashCache
@@ -321,6 +323,13 @@ val networkModule = module {
     // ExperimentalConduitOverride opt-in inside the loader).
     single<ServerProtocolConfig> {
         ServerProtocolConfigLoader(get()).load(get<Path>())
+    }
+
+    // MsaConfig -- Microsoft OAuth client id, blank by default (sign-in disabled).
+    // Loads from <dataDir>/msa-config.json; nexira.msa.clientId / NEXIRA_MSA_CLIENT_ID
+    // override the client id. Blank keeps the launcher at Phase A behavior.
+    single<MsaConfig> {
+        MsaConfigLoader(get()).load(get<Path>())
     }
 
     single { LauncherHashCache(
