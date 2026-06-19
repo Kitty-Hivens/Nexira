@@ -64,13 +64,11 @@ object Nbt {
 
     // ── Internal: reader ────────────────────────────────────────────────────
 
-    private fun DataInputStream.readUtf(): String {
-        val length = readUnsignedShort()
-        if (length == 0) return ""
-        val bytes = ByteArray(length)
-        readFully(bytes)
-        return String(bytes, Charsets.UTF_8)
-    }
+    // NBT strings are Java modified UTF-8 (2-byte length, CESU-8 surrogate pairs
+    // for supplementary code points, 0xC0 0x80 for NUL) -- exactly the wire format
+    // DataInput.readUTF/writeUTF implement. Plain String(bytes, UTF_8) mis-decodes
+    // both edge cases, so a world/server name with an emoji or NUL would corrupt.
+    private fun DataInputStream.readUtf(): String = readUTF()
 
     private fun DataInputStream.readCompoundPayload(): NbtCompound {
         val entries = linkedMapOf<String, NbtValue>()
@@ -141,11 +139,7 @@ object Nbt {
 
     // ── Internal: writer ────────────────────────────────────────────────────
 
-    private fun DataOutputStream.writeUtf(s: String) {
-        val bytes = s.toByteArray(Charsets.UTF_8)
-        writeShort(bytes.size)
-        write(bytes)
-    }
+    private fun DataOutputStream.writeUtf(s: String) = writeUTF(s)
 
     private fun DataOutputStream.writeCompoundPayload(c: NbtCompound) {
         for ((name, value) in c.entries) {
