@@ -639,62 +639,73 @@ class LauncherController(
     }
 
     /**
-     * Run the pack-side auth refresh, mirroring the SC server-list
-     * path's pre-spawn re-auth (see [launch], around the AUTH stage).
-     * Returns the refreshed [SessionData], a 2FA-fallback session
-     * with the cached manifest attached, or null after [fail] has
-     * already set the error state -- the caller bails on null.
-     *
-     * Precondition: missing player + password for an SC requirement
-     * fails with [LaunchError.MissingAuthProvider] rather than
-     * spawning the game and waiting for the SC join to reject the
-     * stale token; the surface is friendlier and the diagnosis is
-     * unambiguous.
+     * Pack-side pre-spawn auth, dispatched by the pack's [PackAuthRequirement].
+     * SC-bound requirements ([PackAuthRequirement.SmartyCraft], and the SC half of
+     * [PackAuthRequirement.Both]) re-auth via [prepareScAuth]; [PackAuthRequirement.Microsoft]
+     * has no registered provider yet, so it is advisory and the pack launches with the
+     * current session (the satisfiable-provider gate arrives with the Microsoft provider).
      */
     private suspend fun preparePackAuth(
         requirement: PackAuthRequirement,
         currentSession: SessionData,
         instance: PackInstance,
+    ): SessionData? = when (requirement) {
+        is PackAuthRequirement.SmartyCraft -> prepareScAuth(requirement.serverId, currentSession, instance)
+        is PackAuthRequirement.Both -> prepareScAuth(requirement.serverId, currentSession, instance)
+        PackAuthRequirement.Microsoft -> currentSession
+    }
+
+    /**
+     * SmartyCraft pre-spawn re-auth for an SC-bound pack, mirroring the SC
+     * server-list path's pre-spawn re-auth (see [launch], around the AUTH stage).
+     * Returns the refreshed [SessionData], a 2FA-fallback session with the cached
+     * manifest attached, or null after [fail] has already set the error state -- the
+     * caller bails on null.
+     *
+     * Precondition: missing player + password fails with
+     * [LaunchError.MissingAuthProvider] rather than spawning the game and waiting
+     * for the SC join to reject the stale token; the surface is friendlier and the
+     * diagnosis is unambiguous.
+     */
+    private suspend fun prepareScAuth(
+        serverId: String,
+        currentSession: SessionData,
+        instance: PackInstance,
     ): SessionData? {
-        when (requirement) {
-            is PackAuthRequirement.SmartyCraft -> {
-                val saved = credentialsManager.load()
-                val pass = saved?.cachedPassword ?: currentSession.cachedPassword
-                val playerName = currentSession.playerName.ifBlank { saved?.playerName ?: "" }
-                if (playerName.isBlank() || pass.isNullOrEmpty()) {
-                    ActionRing.record(
-                        "Pack launch ${instance.displayName}: missing SC credentials for '${requirement.serverId}'",
-                    )
-                    fail(LaunchError.MissingAuthProvider(PackAuthRequirement.SmartyCraft.PROVIDER_KEY))
-                    return null
-                }
-                return try {
-                    val fresh = authService.login(playerName, pass, requirement.serverId)
-                    emit(LaunchLogEvent.AuthSucceeded(fresh.uuid))
-                    fresh
-                } catch (_: TwoFactorRequiredException) {
-                    val cached = manifestCache.loadManifest(requirement.serverId)
-                    if (cached != null) {
-                        ActionRing.record(
-                            "Pack launch ${instance.displayName}: 2FA account, using cached manifest for '${requirement.serverId}'",
-                        )
-                        currentSession.copy(fileManifest = cached)
-                    } else {
-                        ActionRing.record(
-                            "Pack launch ${instance.displayName}: 2FA + no cached manifest for '${requirement.serverId}' -- re-login required",
-                        )
-                        fail(LaunchError.TwoFactorExpired)
-                        null
-                    }
-                } catch (e: Exception) {
-                    // Non-2FA login failure: log + keep the existing
-                    // session. Same graceful-degradation as the SC
-                    // server path -- a real expired token surfaces as
-                    // a more specific reject from the game itself.
-                    emit(LaunchLogEvent.AuthFailed(e.message))
-                    currentSession
-                }
+        val saved = credentialsManager.load()
+        val pass = saved?.cachedPassword ?: currentSession.cachedPassword
+        val playerName = currentSession.playerName.ifBlank { saved?.playerName ?: "" }
+        if (playerName.isBlank() || pass.isNullOrEmpty()) {
+            ActionRing.record(
+                "Pack launch ${instance.displayName}: missing SC credentials for '$serverId'",
+            )
+            fail(LaunchError.MissingAuthProvider(PackAuthRequirement.SmartyCraft.PROVIDER_KEY))
+            return null
+        }
+        return try {
+            val fresh = authService.login(playerName, pass, serverId)
+            emit(LaunchLogEvent.AuthSucceeded(fresh.uuid))
+            fresh
+        } catch (_: TwoFactorRequiredException) {
+            val cached = manifestCache.loadManifest(serverId)
+            if (cached != null) {
+                ActionRing.record(
+                    "Pack launch ${instance.displayName}: 2FA account, using cached manifest for '$serverId'",
+                )
+                currentSession.copy(fileManifest = cached)
+            } else {
+                ActionRing.record(
+                    "Pack launch ${instance.displayName}: 2FA + no cached manifest for '$serverId' -- re-login required",
+                )
+                fail(LaunchError.TwoFactorExpired)
+                null
             }
+        } catch (e: Exception) {
+            // Non-2FA login failure: log + keep the existing session. Same
+            // graceful-degradation as the SC server path -- a real expired token
+            // surfaces as a more specific reject from the game itself.
+            emit(LaunchLogEvent.AuthFailed(e.message))
+            currentSession
         }
     }
 
