@@ -15,6 +15,12 @@ interface AppStrings {
     val loginErrorGeneric: String
     val loginRegister: String
     val loginPlayOffline: String
+    val loginMicrosoft: String
+    val msaTitle: String
+    val msaInstruction: String
+    val msaCopyCode: String
+    val msaOpenBrowser: String
+    val msaWaiting: String
 
     // --- Navigation ---
     val navLogout: String

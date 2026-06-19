@@ -17,6 +17,12 @@ object RussianStrings : AppStrings {
     override val loginErrorGeneric = "Ошибка входа"
     override val loginRegister     = "Зарегистрироваться"
     override val loginPlayOffline  = "Играть офлайн"
+    override val loginMicrosoft    = "Войти через Microsoft"
+    override val msaTitle          = "Вход через Microsoft"
+    override val msaInstruction    = "Откройте страницу и введите код:"
+    override val msaCopyCode       = "Скопировать код"
+    override val msaOpenBrowser    = "Открыть страницу"
+    override val msaWaiting        = "Ожидание подтверждения..."
 
     // Navigation
     override val navLogout   = "Выйти"

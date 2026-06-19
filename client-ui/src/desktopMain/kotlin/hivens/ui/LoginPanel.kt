@@ -23,6 +23,9 @@ import hivens.core.api.TwoFactorRequiredException
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.data.AuthStatus
 import hivens.auth.AuthProvider
+import hivens.auth.AuthProviderRegistry
+import hivens.auth.DeviceCodeAuthProvider
+import hivens.auth.DeviceCodeChallenge
 import hivens.auth.OfflineAuthProvider
 import hivens.core.data.SessionData
 import hivens.launcher.CredentialsManager
@@ -30,6 +33,7 @@ import hivens.launcher.network.NetworkState
 import hivens.launcher.ProfileManager
 import hivens.launcher.network.ServerProtocolConfig
 import hivens.ui.components.ConfirmCodeDialog
+import hivens.ui.components.DeviceCodeDialog
 import hivens.ui.easter.LocalAprilFools
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
@@ -38,7 +42,9 @@ import hivens.ui.puppet.PuppetScreen
 import hivens.ui.puppet.PuppetToggle
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.platform.SystemActions
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
@@ -53,6 +59,7 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
     val protocolConfig: ServerProtocolConfig   = koinInject()
     val offlineProvider: OfflineAuthProvider   = koinInject()
     val settingsService: ISettingsService      = koinInject()
+    val authRegistry: AuthProviderRegistry     = koinInject()
     val s            = LocalStrings.current
     val af           = LocalAprilFools.current
     val scope        = rememberCoroutineScope()
@@ -82,6 +89,15 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
     var twoFactorError        by remember { mutableStateOf<String?>(null) }
     var twoFactorBusy         by remember { mutableStateOf(false) }
     var twoFactorUnsupported  by remember { mutableStateOf(false) }
+
+    // Microsoft device-code sign-in. The provider is in the registry only when a
+    // client id is configured, so the button + dialog are absent until then.
+    // Resolved by capability, never by id.
+    val msaProvider = remember { authRegistry.all.firstOrNull { it.capabilities.supportsDeviceCode } }
+    val deviceCodeProvider = msaProvider as? DeviceCodeAuthProvider
+    var deviceCodePending by remember { mutableStateOf<DeviceCodeChallenge?>(null) }
+    var deviceCodeError   by remember { mutableStateOf<String?>(null) }
+    var msaJob            by remember { mutableStateOf<Job?>(null) }
 
     val fieldColors = OutlinedTextFieldDefaults.colors(
         focusedTextColor        = CelestiaTheme.colors.textPrimary,
@@ -175,6 +191,28 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
         }
     }
 
+    fun startMicrosoft() {
+        val provider = deviceCodeProvider ?: return
+        val providerId = msaProvider?.id ?: return
+        deviceCodeError = null
+        msaJob = scope.launch {
+            try {
+                val challenge = withContext(Dispatchers.IO) { provider.requestDeviceCode() }
+                deviceCodePending = challenge
+                val session = withContext(Dispatchers.IO) { provider.awaitToken(challenge) }
+                if (rememberMe) credentialsManager.saveAccount(session, providerId)
+                hivens.core.diag.ActionRing.record("Microsoft sign-in OK: ${session.playerName}")
+                deviceCodePending = null
+                onLogin(session)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                hivens.core.diag.ActionRing.record("Microsoft sign-in failed: ${e.message?.take(80)}")
+                deviceCodeError = e.message ?: s.loginErrorGeneric
+            }
+        }
+    }
+
     fun submitTwoFactor(code: String) {
         val pending = twoFactorPending ?: return
         twoFactorBusy = true
@@ -234,6 +272,17 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
             onSubmit = { code -> submitTwoFactor(code) },
             errorMessage = twoFactorError,
             isSubmitting = twoFactorBusy,
+        )
+    }
+
+    deviceCodePending?.let { challenge ->
+        DeviceCodeDialog(
+            userCode = challenge.userCode,
+            verificationUri = challenge.verificationUri,
+            onOpenBrowser = { SystemActions.openUrl(challenge.verificationUri) },
+            onCopyCode = { SystemActions.copyToClipboard(challenge.userCode) },
+            onCancel = { msaJob?.cancel(); deviceCodePending = null; deviceCodeError = null },
+            errorMessage = deviceCodeError,
         )
     }
 
@@ -505,6 +554,22 @@ fun LoginPanel(onLogin: (SessionData) -> Unit) {
             ),
         )
         PuppetClick("login.playOffline") { playOffline() }
+
+        // SIGN IN WITH MICROSOFT -- present only when a client id is configured
+        // (the provider then registers and advertises device-code capability).
+        if (deviceCodeProvider != null) {
+            af.ChaosButton(
+                id      = "login_microsoft_btn",
+                text    = s.loginMicrosoft,
+                onClick = { startMicrosoft() },
+                modifier = Modifier.fillMaxWidth().height(42.dp),
+                colors   = ButtonDefaults.buttonColors(
+                    containerColor = Color.Transparent,
+                    contentColor   = CelestiaTheme.colors.primary,
+                ),
+            )
+            PuppetClick("login.microsoft") { startMicrosoft() }
+        }
     }
 }
 

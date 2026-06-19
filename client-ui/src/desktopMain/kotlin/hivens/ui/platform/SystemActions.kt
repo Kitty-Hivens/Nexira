@@ -1,6 +1,8 @@
 package hivens.ui.platform
 
 import java.awt.Desktop
+import java.awt.Toolkit
+import java.awt.datatransfer.StringSelection
 import java.io.File
 import java.net.URI
 
@@ -61,6 +63,18 @@ internal object SystemActions {
             val desktop = Desktop.getDesktop()
             if (!desktop.isSupported(Desktop.Action.BROWSE)) return@runOnThread
             desktop.browse(URI(url))
+        }
+    }
+
+    /**
+     * Copy [text] to the system clipboard. Best-effort + off-thread like the
+     * open* helpers: the AWT clipboard call can block on a stalled clipboard
+     * manager, and failures (headless, no clipboard) are silent.
+     */
+    fun copyToClipboard(text: String) {
+        runOnThread("aura-copy-clipboard") {
+            val clipboard = Toolkit.getDefaultToolkit()?.systemClipboard ?: return@runOnThread
+            clipboard.setContents(StringSelection(text), null)
         }
     }
 

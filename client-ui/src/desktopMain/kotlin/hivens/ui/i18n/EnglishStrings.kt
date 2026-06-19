@@ -20,6 +20,12 @@ object EnglishStrings : AppStrings {
     override val loginErrorGeneric = "Login error"
     override val loginRegister     = "Create an account"
     override val loginPlayOffline  = "Play offline"
+    override val loginMicrosoft    = "Sign in with Microsoft"
+    override val msaTitle          = "Sign in with Microsoft"
+    override val msaInstruction    = "Open this page and enter the code:"
+    override val msaCopyCode       = "Copy code"
+    override val msaOpenBrowser    = "Open page"
+    override val msaWaiting        = "Waiting for confirmation..."
 
     // Navigation
     override val navLogout   = "Log out"
