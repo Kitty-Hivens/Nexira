@@ -16,6 +16,7 @@ object GermanStrings : AppStrings {
     override val loginErrorEmpty   = "Benutzername und Passwort eingeben"
     override val loginErrorGeneric = "Anmeldefehler"
     override val loginRegister     = "Konto erstellen"
+    override val loginPlayOffline  = "Offline spielen"
 
     // Navigation
     override val navLogout   = "Abmelden"

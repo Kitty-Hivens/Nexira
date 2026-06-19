@@ -14,6 +14,7 @@ interface AppStrings {
     val loginErrorEmpty: String
     val loginErrorGeneric: String
     val loginRegister: String
+    val loginPlayOffline: String
 
     // --- Navigation ---
     val navLogout: String
