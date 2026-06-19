@@ -54,20 +54,25 @@ proguard          = "7.8.2"
 # 0.1.1: backend hardening -- fixes a DBusMessageIter buffer overflow (heap
 # corruption on every iterator call), native-memory leaks, watcher
 # re-registration (#10), and main-queue marshaling (#3).
-libtray           = "0.1.1"
+# 0.1.2: private D-Bus connection (dbus_bus_get_private) so a sibling libdbus
+# user's pump (libnotify, libvault) can't steal the tray host's property queries
+# off the shared bus -- the tray icon now renders on cold start.
+libtray           = "0.1.2"
 
 # Pure-Panama desktop notifications (Kitty-Hivens/libnotify) -- freedesktop
 # Notifications over D-Bus on Linux, WinRT toast on Windows, NSUserNotification
 # on macOS. Used for the OS-level "still running in the tray" hint, distinct
 # from the in-app NotificationCenter. Maven Central as dev.hivens:libnotify.
 # 0.1.1: same DBusMessageIter buffer-overflow + arena-leak fixes as libtray.
-libnotify         = "0.1.1"
+# 0.1.2: private D-Bus connection -- same shared-bus message-theft fix as libtray.
+libnotify         = "0.1.2"
 
 # Pure-Panama secret storage (Kitty-Hivens/libvault) -- OS keyring (Secret
 # Service / Credential Manager / Keychain) with an AES-256-GCM file fallback.
 # Replaces the in-tree IKeyringStorage + 4 native impls + the AES fallback that
 # lived inside CredentialsManager. Same dev.hivens family, mavenCentral.
-libvault          = "0.2.0"
+# 0.2.1: private D-Bus connection -- same shared-bus message-theft fix as libtray.
+libvault          = "0.2.1"
 
 # ── Test ─────────────────────────────────────────────────────────────────────
 # junit held on the 5.x line: 6.x drops Java 8 and requires JVM runtime 17+,
@@ -116,7 +121,6 @@ compose-foundation              = { group = "org.jetbrains.compose.foundation", 
 compose-material3               = { group = "org.jetbrains.compose.material3",  name = "material3",           version.ref = "composeMaterial3" }
 compose-ui                      = { group = "org.jetbrains.compose.ui",         name = "ui",                  version.ref = "compose" }
 compose-components-resources    = { group = "org.jetbrains.compose.components", name = "components-resources", version.ref = "compose" }
-compose-material-icons-extended = { group = "org.jetbrains.compose.material",   name = "material-icons-extended", version.ref = "composeIcons" }
 
 # UI add-ons
 multiplatform-markdown-m3       = { group = "com.mikepenz",        name = "multiplatform-markdown-renderer-m3", version.ref = "markdownRenderer" }
@@ -129,28 +133,28 @@ filekit-dialogs-compose         = { group = "io.github.vinceglb", name = "fileki
 
 # Misc
 commons-compress                = { group = "org.apache.commons", name = "commons-compress", version.ref = "commonsCompress" }
-libtray                          = { group = "dev.hivens", name = "libtray", version.ref = "libtray" }
-libnotify                        = { group = "dev.hivens", name = "libnotify", version.ref = "libnotify" }
-libvault                         = { group = "dev.hivens", name = "libvault", version.ref = "libvault" }
+libtray                         = { group = "dev.hivens", name = "libtray", version.ref = "libtray" }
+libnotify                       = { group = "dev.hivens", name = "libnotify", version.ref = "libnotify" }
+libvault                        = { group = "dev.hivens", name = "libvault", version.ref = "libvault" }
 
 # JNA dropped — was only present for dorkbox/SystemTray. libtray is
 # pure java.lang.foreign (Project Panama) and pulls no JNA transitively.
 
 # Test
-mockk                            = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
-junit-jupiter                    = { group = "org.junit.jupiter",  name = "junit-jupiter",           version.ref = "junit" }
-junit-platform-launcher          = { group = "org.junit.platform", name = "junit-platform-launcher", version.ref = "junitPlatform" }
+mockk                           = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
+junit-jupiter                   = { group = "org.junit.jupiter",  name = "junit-jupiter",           version.ref = "junit" }
+junit-platform-launcher         = { group = "org.junit.platform", name = "junit-platform-launcher", version.ref = "junitPlatform" }
 
 # KSP processor API (used by :widget-processor to scan @Widget composables
 # and emit GeneratedWidgetRegistry at compile time).
-ksp-api                          = { group = "com.google.devtools.ksp", name = "symbol-processing-api", version.ref = "ksp" }
+ksp-api                         = { group = "com.google.devtools.ksp", name = "symbol-processing-api", version.ref = "ksp" }
 
 [plugins]
-kotlin-jvm              = { id = "org.jetbrains.kotlin.jvm",                  version.ref = "kotlin" }
-kotlin-multiplatform    = { id = "org.jetbrains.kotlin.multiplatform",        version.ref = "kotlin" }
-kotlin-serialization    = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
-kotlin-compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose",       version.ref = "kotlin" }
-compose                 = { id = "org.jetbrains.compose",                     version.ref = "compose" }
-buildconfig             = { id = "com.github.gmazzo.buildconfig",             version.ref = "buildconfigPlugin" }
-versions                = { id = "com.github.ben-manes.versions",             version.ref = "versionsPlugin" }
-ksp                     = { id = "com.google.devtools.ksp",                   version.ref = "ksp" }
+kotlin-jvm                      = { id = "org.jetbrains.kotlin.jvm",                  version.ref = "kotlin" }
+kotlin-multiplatform            = { id = "org.jetbrains.kotlin.multiplatform",        version.ref = "kotlin" }
+kotlin-serialization            = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+kotlin-compose-compiler         = { id = "org.jetbrains.kotlin.plugin.compose",       version.ref = "kotlin" }
+compose                         = { id = "org.jetbrains.compose",                     version.ref = "compose" }
+buildconfig                     = { id = "com.github.gmazzo.buildconfig",             version.ref = "buildconfigPlugin" }
+versions                        = { id = "com.github.ben-manes.versions",             version.ref = "versionsPlugin" }
+ksp                             = { id = "com.google.devtools.ksp",                   version.ref = "ksp" }

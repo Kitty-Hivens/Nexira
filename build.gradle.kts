@@ -99,6 +99,18 @@ subprojects {
         }
     }
 
+    // Stable jar file names. project.version is a `git describe` string that
+    // changes almost every commit, so the default `<module>-<version>.jar`
+    // name makes build/libs accumulate a new jar per build and never drop the
+    // old ones. A classpath that then resolves an older jar loads stale
+    // classes: a type added in a later commit reads as NoClassDefFoundError
+    // while its older package-mates load fine. Dropping the version from the
+    // file name overwrites a single <module>.jar each build. The real version
+    // still rides in project.version (Implementation-Version, BuildConfig).
+    tasks.withType<Jar>().configureEach {
+        archiveVersion.set("")
+    }
+
     tasks.withType<Test>().configureEach {
         // CI wants maximum throughput (free runners, ephemeral); local
         // dev wants the laptop to stay usable while tests run. Detect via
