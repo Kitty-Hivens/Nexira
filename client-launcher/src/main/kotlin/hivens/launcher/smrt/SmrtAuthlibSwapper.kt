@@ -89,7 +89,11 @@ class SmrtAuthlibSwapper(
             // mandatory (a miss blocks the launch), so retry transient failures.
             retryWithBackoff(
                 operation = "authlib $fileName",
-                shouldRetry = { it !is CancellationException },
+                // A permanent 4xx (renamed/absent artifact) won't fix itself --
+                // retrying only adds ~13s of backoff before the inevitable miss.
+                // The transient stream drops this retry exists for surface as a
+                // plain IOException and still retry.
+                shouldRetry = { it !is CancellationException && !(it is HttpStatusException && it.statusCode in 400..499) },
             ) {
                 downloadToFile(url, dest)
             }
@@ -141,7 +145,9 @@ class SmrtAuthlibSwapper(
         val tmp = dest.resolveSibling("${dest.fileName}.tmp")
         try {
             client.prepareGet(url).execute { response ->
-                if (response.status.value != 200) throw IOException("HTTP ${response.status} for $url")
+                if (response.status.value != 200) {
+                    throw HttpStatusException(response.status.value, "HTTP ${response.status} for $url")
+                }
                 val channel = response.bodyAsChannel()
                 FileOutputStream(tmp.toFile()).use { out ->
                     val buf = ByteArray(64 * 1024)
@@ -181,3 +187,6 @@ class SmrtAuthlibSwapper(
         private val AUTHLIB_JAR = Regex("^authlib-.*\\.jar$", RegexOption.IGNORE_CASE)
     }
 }
+
+/** A non-2xx HTTP response; carries the status so the retry predicate can skip permanent 4xx. */
+private class HttpStatusException(val statusCode: Int, message: String) : IOException(message)
