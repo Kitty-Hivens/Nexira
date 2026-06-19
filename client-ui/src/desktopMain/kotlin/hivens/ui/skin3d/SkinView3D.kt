@@ -71,6 +71,11 @@ fun SkinView3D(
     }
     val sampling = remember { FilterMipmap(FilterMode.NEAREST, MipmapMode.NONE) }
     val paint = remember { Paint().apply { isAntiAlias = false } }
+    // Paint owns native memory; free it on leave instead of riding the Skia
+    // cleaner, matching the deterministic Image disposal above.
+    DisposableEffect(Unit) {
+        onDispose { paint.close() }
+    }
 
     // Start with a slight three-quarter turn so the face reads as 3D at rest.
     var yaw by remember { mutableFloatStateOf(0.5f) }
