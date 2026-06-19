@@ -638,7 +638,7 @@ object RussianStrings : AppStrings {
         "challenging"  -> "Сложные"
         "combat"       -> "Сражения"
         "kitchen-sink" -> "Всё включено"
-        "lightweight"  -> "Лёгкие"
+        "lightweight"  -> "Минималистичное"
         "magic"        -> "Магия"
         "multiplayer"  -> "Мультиплеер"
         "optimization" -> "Оптимизация"
