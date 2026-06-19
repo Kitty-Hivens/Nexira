@@ -506,10 +506,8 @@ fun EditorSurfaceHost(
                             customization = customization,
                             uiStyle       = uiStyle,
                         )
-                        coroutineScope.launch {
-                            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                                presetRepo.save(envelope)
-                            }
+                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                            presetRepo.save(envelope)
                         }
                     },
                     onLoad = { meta ->
@@ -545,10 +543,8 @@ fun EditorSurfaceHost(
                         }
                     },
                     onDelete = { meta ->
-                        coroutineScope.launch {
-                            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                                presetRepo.delete(meta.name)
-                            }
+                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                            presetRepo.delete(meta.name)
                         }
                     },
                     onExport = { meta ->
