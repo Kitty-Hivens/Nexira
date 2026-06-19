@@ -3,6 +3,8 @@ package hivens.launcher.di
 import hivens.config.Protocol
 import hivens.config.Storage
 import hivens.auth.AuthProvider
+import hivens.auth.AuthProviderRegistry
+import hivens.auth.OfflineAuthProvider
 import hivens.auth.smartycraft.SmartyCraftAuthProvider
 import hivens.launcher.network.ChannelRouter
 import hivens.launcher.network.NetworkState
@@ -391,6 +393,12 @@ val authModule = module {
     single<AuthProvider>(named("insecure")) {
         SmartyCraftAuthProvider(get<IServerProtocol>(named("insecure")))
     }
+
+    // Offline-play provider + the registry the content router and launch gate
+    // consult. The registry holds the satisfiable providers (SC + offline today);
+    // when Microsoft joins it in a later phase, its gate activates automatically.
+    single { OfflineAuthProvider() }
+    single { AuthProviderRegistry(listOf(get<AuthProvider>(), get<OfflineAuthProvider>())) }
 }
 
 /**
