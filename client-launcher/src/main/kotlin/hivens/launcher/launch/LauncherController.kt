@@ -1,6 +1,7 @@
 package hivens.launcher.launch
 
 import hivens.auth.AuthProvider
+import hivens.auth.AuthProviderRegistry
 import hivens.core.api.TwoFactorRequiredException
 import hivens.core.api.interfaces.*
 import hivens.core.api.model.ServerProfile
@@ -56,6 +57,7 @@ import kotlinx.coroutines.slf4j.MDCContext
  */
 class LauncherController(
     private val authService: AuthProvider,
+    private val authProviderRegistry: AuthProviderRegistry,
     private val credentialsManager: ICredentialStore,
     private val settingsService: ISettingsService,
     private val downloadService: IFileDownloadService,
@@ -639,19 +641,26 @@ class LauncherController(
 
     /**
      * Pack-side pre-spawn auth, dispatched by the pack's [PackAuthRequirement].
-     * SC-bound requirements ([PackAuthRequirement.SmartyCraft], and the SC half of
-     * [PackAuthRequirement.Both]) re-auth via [prepareScAuth]; [PackAuthRequirement.Microsoft]
-     * has no registered provider yet, so it is advisory and the pack launches with the
-     * current session (the satisfiable-provider gate arrives with the Microsoft provider).
+     * A requirement is enforced only for a provider the [authProviderRegistry] can
+     * satisfy: SC-bound requirements ([PackAuthRequirement.SmartyCraft], and the SC
+     * half of [PackAuthRequirement.Both]) re-auth via [prepareScAuth] when SC is
+     * registered; [PackAuthRequirement.Microsoft] -- and any SC requirement whose
+     * provider is somehow absent -- is advisory, so the pack launches with the
+     * current session. A newly registered provider activates its gate on its own.
      */
     private suspend fun preparePackAuth(
         requirement: PackAuthRequirement,
         currentSession: SessionData,
         instance: PackInstance,
-    ): SessionData? = when (requirement) {
-        is PackAuthRequirement.SmartyCraft -> prepareScAuth(requirement.serverId, currentSession, instance)
-        is PackAuthRequirement.Both -> prepareScAuth(requirement.serverId, currentSession, instance)
-        PackAuthRequirement.Microsoft -> currentSession
+    ): SessionData? {
+        val scSatisfiable = authProviderRegistry.contains(PackAuthRequirement.SmartyCraft.PROVIDER_KEY)
+        return when (requirement) {
+            is PackAuthRequirement.SmartyCraft ->
+                if (scSatisfiable) prepareScAuth(requirement.serverId, currentSession, instance) else currentSession
+            is PackAuthRequirement.Both ->
+                if (scSatisfiable) prepareScAuth(requirement.serverId, currentSession, instance) else currentSession
+            PackAuthRequirement.Microsoft -> currentSession
+        }
     }
 
     /**

@@ -1,6 +1,7 @@
 package hivens.launcher.launch
 
 import hivens.auth.AuthProvider
+import hivens.auth.AuthProviderRegistry
 import hivens.core.api.TwoFactorRequiredException
 import hivens.core.api.interfaces.IFileDownloadService
 import hivens.core.api.interfaces.IJavaManager
@@ -141,6 +142,9 @@ class LauncherControllerTest {
         // to find Smarty jars to strip; no Smarty in these SC-launch fixtures.
         every { manifestProcessor.flattenManifest(any()) } returns emptyMap()
         coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/usr/bin/java")
+        // The registry only reads provider ids; the controller's SC gate checks
+        // contains("smartycraft").
+        every { authService.id } returns "smartycraft"
     }
 
     @OptIn(kotlin.io.path.ExperimentalPathApi::class)
@@ -150,8 +154,9 @@ class LauncherControllerTest {
     }
 
     private fun newController(scope: TestScope) = LauncherController(
-        authService        = authService,
-        credentialsManager = credentialsManager,
+        authService          = authService,
+        authProviderRegistry = AuthProviderRegistry(listOf(authService)),
+        credentialsManager   = credentialsManager,
         settingsService    = settingsService,
         downloadService    = downloadService,
         javaManagerService = javaManagerService,
@@ -704,6 +709,54 @@ class LauncherControllerTest {
         val state = controller.state.value
         assertIs<LaunchState.Error>(state)
         assertEquals(LaunchError.ExitCode(137), state.reason)
+    }
+
+    @Test
+    fun `Microsoft-routed pack launches without firing the auth gate`() = runTest {
+        // A Modrinth-origin pack with no explicit requirement routes to Microsoft,
+        // which has no registered provider this phase -- so the gate is advisory:
+        // the pack launches with the current session and authService is never hit.
+        every { settingsService.getSettings() } returns SettingsData()
+        coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk17/bin/java")
+
+        val handle = mockk<LaunchHandle>()
+        coEvery { handle.awaitExit() } returns 0
+        coEvery {
+            launcherService.launchPackClient(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+        } returns SpawnResult.Started(handle)
+        coJustRun { packRepository.put(any()) }
+
+        val instance = hivens.core.data.PackInstance(
+            id                    = "i-mr",
+            packRef               = hivens.core.data.PackReference(
+                origin  = hivens.core.data.PackOrigin.Modrinth,
+                id      = "sodium",
+                version = "1",
+            ),
+            displayName           = "Sodium Pack",
+            instanceDirName       = "sodium-i-mr",
+            createdAtEpoch        = 0L,
+            cachedManifest        = hivens.core.data.CachedManifestSnapshot(
+                minecraftVersion = "1.20.1",
+                loaderName       = "fabric",
+                loaderVersion    = "0.15",
+                javaMajor        = 17,
+            ),
+        )
+        Files.createDirectories(sandbox.resolve("instances").resolve(instance.instanceDirName))
+
+        val controller = newController(this)
+        controller.launchPackInstance(
+            currentSession = SessionData(playerName = "tester", uuid = "u", accessToken = "tok"),
+            packInstance   = instance,
+        )
+        advanceUntilIdle()
+
+        assertEquals(LaunchState.Idle, controller.state.value)
+        coVerify(exactly = 0) { authService.login(any(), any(), any()) }
+        coVerify(exactly = 1) {
+            launcherService.launchPackClient(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any())
+        }
     }
 
 }
