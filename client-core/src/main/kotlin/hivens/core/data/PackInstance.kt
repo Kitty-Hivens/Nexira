@@ -34,6 +34,8 @@ data class PackInstance(
     val instanceDirName: String,
     val createdAtEpoch: Long,
     val lastPlayedEpochOrZero: Long = 0L,
+    /** Total seconds spent in-game across all sessions; summed on each game exit. */
+    val playtimeSeconds: Long = 0L,
     /**
      * Pack version this instance is pinned to. Null means "follow
      * whatever [Pack.latestVersion] currently is". Pinning is the
@@ -68,4 +70,15 @@ data class PackInstance(
      * case, then writes the snapshot back.
      */
     val cachedManifest: CachedManifestSnapshot? = null,
+    /**
+     * Square pack icon, captured from the catalogue at install time. Drives the
+     * Library card avatar; null (local imports, pre-field instances) falls back
+     * to title initials.
+     */
+    val iconUrl: String? = null,
+    /**
+     * Wide banner, captured from the catalogue at install time. Backs the
+     * Library card; null falls back to procedural pixel art.
+     */
+    val bannerUrl: String? = null,
 )

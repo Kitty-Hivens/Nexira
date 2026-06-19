@@ -23,4 +23,8 @@ data class ModrinthSearchHit(
     val description: String = "",
     @SerialName("icon_url") val iconUrl: String? = null,
     val categories: List<String> = emptyList(),
+    /** Project's featured screenshot, when one is flagged -- the card banner. */
+    @SerialName("featured_gallery") val featuredGallery: String? = null,
+    /** All gallery screenshots; the first is the banner fallback when none is featured. */
+    val gallery: List<String> = emptyList(),
 )

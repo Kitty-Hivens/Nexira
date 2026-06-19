@@ -23,6 +23,7 @@ class ModrinthPackCatalogue(private val client: ModrinthClient) : IPackCatalogue
                 title = hit.title.ifBlank { hit.slug },
                 tagline = hit.description,
                 iconUrl = hit.iconUrl,
+                bannerUrl = hit.featuredGallery ?: hit.gallery.firstOrNull(),
                 tags = hit.categories,
             )
         }

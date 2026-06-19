@@ -57,6 +57,7 @@ import hivens.launcher.cache.ModrinthCaches
 import hivens.launcher.cache.SmrtPackCaches
 import hivens.launcher.catalogue.MirrorPackCatalogue
 import hivens.launcher.catalogue.ModrinthPackCatalogue
+import hivens.launcher.catalogue.PackArtResolver
 import hivens.launcher.catalogue.PackCatalogueRegistry
 import hivens.launcher.modrinth.ModrinthClient
 import hivens.launcher.smrt.OpenSmrtHelperResolver
@@ -441,6 +442,10 @@ val mirrorModule = module {
     single { MirrorPackCatalogue(get()) }
     single { ModrinthPackCatalogue(get()) }
     single { PackCatalogueRegistry(listOf(get<MirrorPackCatalogue>(), get<ModrinthPackCatalogue>())) }
+    // Resolves an installed instance's native cover from its source when the
+    // install didn't capture one (pre-field instances), so Library cards and the
+    // PackDetail hero show real art instead of the pixel placeholder.
+    single { PackArtResolver(modrinth = get(), mirror = get()) }
 
     // Install write side: dispatches a (pack, version) by origin onto the
     // mirror sync installer or the Modrinth .mrpack installer.

@@ -31,6 +31,7 @@ class MirrorPackCatalogue(private val client: SmrtPackClient) : IPackCatalogueSe
                     title = s.displayName,
                     tagline = s.tagline,
                     iconUrl = s.iconUrl,
+                    bannerUrl = s.bannerUrl,
                     tags = s.tags,
                     mcVersion = s.minecraftVersion,
                 )

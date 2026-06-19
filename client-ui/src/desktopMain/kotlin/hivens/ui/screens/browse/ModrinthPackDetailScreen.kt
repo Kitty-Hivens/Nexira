@@ -2,8 +2,6 @@ package hivens.ui.screens.browse
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -39,6 +37,7 @@ import hivens.core.api.catalogue.CataloguePackVersion
 import hivens.core.data.PackOrigin
 import hivens.launcher.PackInstallCoordinator
 import hivens.launcher.catalogue.PackCatalogueRegistry
+import hivens.ui.components.ImageGallery
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -173,16 +172,7 @@ private fun DetailBody(
         Hero(details)
 
         if (details.galleryUrls.isNotEmpty()) {
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                items(details.galleryUrls) { url ->
-                    AsyncImage(
-                        model              = url,
-                        contentDescription = null,
-                        contentScale       = ContentScale.Crop,
-                        modifier           = Modifier.width(220.dp).height(124.dp).clip(MaterialTheme.shapes.small),
-                    )
-                }
-            }
+            ImageGallery(urls = details.galleryUrls)
         }
 
         details.bodyMarkdown?.let { MarkdownHtml(markdown = it, modifier = Modifier.fillMaxWidth()) }
