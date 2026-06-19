@@ -96,6 +96,19 @@ class CredentialsManager internal constructor(
     /** Active-account shim for [ICredentialStore] writers; infers the provider from the session shape. */
     fun save(session: SessionData) = saveAccount(session, inferProviderId(session))
 
+    /**
+     * The stored session for [providerId]'s account, or null when not signed in
+     * with that provider. The launch flow uses this to pick the account matching
+     * the content's required provider (multi-active: SC + Microsoft + offline are
+     * all live at once). Returns the first account of the provider -- one per
+     * provider is the norm; a future multiple-of-same-provider case would resolve
+     * the pick at the call site.
+     */
+    fun accountFor(providerId: String): SessionData? {
+        val account = readAccountsFile()?.accounts?.firstOrNull { it.providerId == providerId } ?: return null
+        return loadSession(account.accountId)
+    }
+
     fun loadSession(accountId: String): SessionData? {
         val account = readAccountsFile()?.accounts?.firstOrNull { it.accountId == accountId } ?: return null
         val accessToken = secret(account, FIELD_ACCESS_TOKEN)
