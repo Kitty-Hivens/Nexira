@@ -28,19 +28,6 @@ data class MsaConfig(
     val enabled: Boolean get() = clientId.isNotBlank()
 
     companion object {
-        // The "consumers" authority is the personal-Microsoft-account tenant used
-        // for Minecraft/Xbox sign-in. Device-code grant: the launcher shows a code
-        // + URL and polls; no embedded browser or redirect URI is needed.
-        const val DEVICE_CODE_URL = "https://login.microsoftonline.com/consumers/oauth2/v2.0/devicecode"
-        const val TOKEN_URL       = "https://login.microsoftonline.com/consumers/oauth2/v2.0/token"
-        const val XBL_AUTH_URL    = "https://user.auth.xboxlive.com/user/authenticate"
-        const val XSTS_AUTH_URL   = "https://xsts.auth.xboxlive.com/xsts/authorize"
-        const val MC_LOGIN_URL    = "https://api.minecraftservices.com/authentication/login_with_xbox"
-        const val MC_PROFILE_URL  = "https://api.minecraftservices.com/minecraft/profile"
-
-        /** offline_access yields the refresh token used for silent re-auth. */
-        const val SCOPE = "XboxLive.signin offline_access"
-
         const val SYSTEM_PROP_CLIENT_ID = "nexira.msa.clientId"
         const val ENV_CLIENT_ID = "NEXIRA_MSA_CLIENT_ID"
 

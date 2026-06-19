@@ -65,9 +65,11 @@ rootProject.name = "nexira"
 include(":client-config")
 include(":client-core")
 // Auth seam carved out of the launcher god-module: :client-auth holds the
-// provider-agnostic AuthProvider SPI, :client-auth-smartycraft the SmartyCraft impl.
+// provider-agnostic AuthProvider SPI, :client-auth-smartycraft the SmartyCraft impl,
+// :client-auth-microsoft the Microsoft (MSA device-code) impl.
 include(":client-auth")
 include(":client-auth-smartycraft")
+include(":client-auth-microsoft")
 include(":client-launcher")
 include(":client-ui")
 include(":widget-model")
