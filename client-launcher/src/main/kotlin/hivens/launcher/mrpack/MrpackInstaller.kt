@@ -10,6 +10,7 @@ import hivens.core.data.PackOrigin
 import hivens.core.data.PackReference
 import hivens.launcher.runtime.RuntimeProvisioner
 import hivens.launcher.util.sha1Of
+import hivens.launcher.util.sha512Of
 import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.http.isSuccess
@@ -41,8 +42,9 @@ import java.util.zip.ZipFile
  *
  * Security: every `files[].path` and override entry is resolved under the
  * instance dir and rejected if it escapes (zip-slip / traversal). Downloaded
- * bytes are sha1-verified against the index when a sha1 is present, so a
- * tampered mirror can't substitute content the index didn't pin.
+ * bytes are verified against the strongest hash the index pins (sha512 over
+ * sha1); a file entry with downloads but no usable hash is rejected, so a
+ * tampered mirror can't substitute content -- not even by omitting sha1.
  */
 class MrpackInstaller(
     private val clientProvider: HttpClientProvider,
@@ -162,7 +164,15 @@ class MrpackInstaller(
     private suspend fun downloadFile(file: MrpackFile, clientDir: Path) {
         val dest = safeResolve(clientDir, file.path)
         if (file.downloads.isEmpty()) throw IOException("mrpack file ${file.path} has no download URL")
+        // Verify against the strongest hash the index pins. An entry with
+        // downloads but NO usable hash is rejected outright: an unverifiable
+        // download is a content-substitution hole (a hostile index can simply
+        // omit sha1), not a soft "skip the check".
+        val sha512 = file.hashes[HASH_SHA512]
         val sha1 = file.hashes[HASH_SHA1]
+        if (sha512 == null && sha1 == null) {
+            throw IOException("mrpack file ${file.path} pins no sha1/sha512; refusing unverifiable download")
+        }
         Files.createDirectories(dest.parent)
         val tmp = dest.resolveSibling("${dest.fileName}.part")
 
@@ -173,12 +183,7 @@ class MrpackInstaller(
                     if (!resp.status.isSuccess()) throw IOException("GET $url -> HTTP ${resp.status}")
                     FileOutputStream(tmp.toFile()).use { out -> resp.bodyAsChannel().copyTo(out) }
                 }
-                if (sha1 != null) {
-                    val actual = sha1Of(tmp)
-                    if (!actual.equals(sha1, ignoreCase = true)) {
-                        throw IOException("sha1 mismatch for ${file.path}: expected $sha1, got $actual")
-                    }
-                }
+                verifyHash(file.path, tmp, sha512, sha1)
                 moveAtomic(tmp, dest)
                 return
             } catch (e: Exception) {
@@ -188,6 +193,18 @@ class MrpackInstaller(
             }
         }
         throw IOException("all downloads failed for ${file.path}", lastError)
+    }
+
+    /** Verifies [tmp] against the strongest pinned hash (sha512 preferred). */
+    private fun verifyHash(path: String, tmp: Path, sha512: String?, sha1: String?) {
+        val (expected, actual, algo) = when {
+            sha512 != null -> Triple(sha512, sha512Of(tmp), "sha512")
+            sha1 != null -> Triple(sha1, sha1Of(tmp), "sha1")
+            else -> return
+        }
+        if (!actual.equals(expected, ignoreCase = true)) {
+            throw IOException("$algo mismatch for $path: expected $expected, got $actual")
+        }
     }
 
     private fun extractOverrides(zip: ZipFile, prefix: String, clientDir: Path) {
@@ -207,8 +224,9 @@ class MrpackInstaller(
 
     /** Resolves [relative] under [base], rejecting traversal that escapes it. */
     internal fun safeResolve(base: Path, relative: String): Path {
-        val resolved = base.resolve(relative).normalize()
-        if (!resolved.startsWith(base)) {
+        val root = base.normalize()
+        val resolved = root.resolve(relative).normalize()
+        if (!resolved.startsWith(root)) {
             throw SecurityException("mrpack entry escapes the instance dir: $relative")
         }
         return resolved
@@ -232,6 +250,7 @@ class MrpackInstaller(
         const val DEP_MINECRAFT = "minecraft"
         const val ENV_UNSUPPORTED = "unsupported"
         const val HASH_SHA1 = "sha1"
+        const val HASH_SHA512 = "sha512"
 
         /** Modrinth dependency key -> LoaderRegistry id, checked in this order. */
         val LOADER_KEYS = linkedMapOf(

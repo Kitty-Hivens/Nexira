@@ -120,8 +120,9 @@ class CurseForgeZipInstaller(
 
     /** Resolves [relative] under [base], rejecting traversal that escapes it. */
     private fun safeResolve(base: Path, relative: String): Path {
-        val resolved = base.resolve(relative).normalize()
-        if (!resolved.startsWith(base)) {
+        val root = base.normalize()
+        val resolved = root.resolve(relative).normalize()
+        if (!resolved.startsWith(root)) {
             throw SecurityException("CurseForge entry escapes the instance dir: $relative")
         }
         return resolved
