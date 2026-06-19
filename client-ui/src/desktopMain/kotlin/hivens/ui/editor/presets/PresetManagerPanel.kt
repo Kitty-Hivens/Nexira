@@ -29,6 +29,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -52,6 +53,7 @@ import hivens.ui.theme.LocalMonoFamily
 import java.text.DateFormat
 import java.util.Date
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 // Modal preset manager. Reached via the "Presets" chip on the
@@ -61,15 +63,16 @@ import kotlinx.coroutines.withContext
 fun PresetManagerPanel(
     visible: Boolean,
     onDismiss: () -> Unit,
-    onSaveCurrent: (String) -> Unit,
+    onSaveCurrent: suspend (String) -> Unit,
     onLoad: (PresetMeta) -> Unit,
-    onDelete: (PresetMeta) -> Unit,
+    onDelete: suspend (PresetMeta) -> Unit,
     onExport: (PresetMeta) -> Unit,
     listProvider: () -> List<PresetMeta>,
 ) {
     if (!visible) return
 
     val s = LocalStrings.current
+    val scope = rememberCoroutineScope()
     var presets by remember(visible) { mutableStateOf(emptyList<PresetMeta>()) }
     var newName by remember(visible) { mutableStateOf("") }
     // Init empty + load off the UI thread: listProvider() is a directory scan and
@@ -159,9 +162,15 @@ fun PresetManagerPanel(
                         onClick = {
                             val n = newName.trim()
                             if (n.isNotEmpty()) {
-                                onSaveCurrent(n)
-                                newName = ""
-                                presets = listProvider()
+                                scope.launch {
+                                    onSaveCurrent(n)
+                                    newName = ""
+                                    // Reload AFTER the write lands (and off the UI
+                                    // thread): listing before the suspend save
+                                    // completed showed a stale set missing the
+                                    // just-saved preset.
+                                    presets = withContext(Dispatchers.IO) { listProvider() }
+                                }
                             }
                         },
                         shape   = RoundedCornerShape(8.dp),
@@ -212,8 +221,10 @@ fun PresetManagerPanel(
                                 meta     = meta,
                                 onLoad   = { onLoad(meta) },
                                 onDelete = {
-                                    onDelete(meta)
-                                    presets = listProvider()
+                                    scope.launch {
+                                        onDelete(meta)
+                                        presets = withContext(Dispatchers.IO) { listProvider() }
+                                    }
                                 },
                                 onExport = { onExport(meta) },
                             )
