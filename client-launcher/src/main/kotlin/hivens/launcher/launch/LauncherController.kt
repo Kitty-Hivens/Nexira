@@ -346,7 +346,8 @@ class LauncherController(
             )
         } else {
             try {
-                val pass = credentialsManager.load()?.cachedPassword ?: session.cachedPassword
+                val pass = credentialsManager.accountFor(PackAuthRequirement.SmartyCraft.PROVIDER_KEY)?.cachedPassword
+                    ?: session.cachedPassword
                 if (!pass.isNullOrEmpty()) {
                     session = authService.login(session.playerName, pass, targetServerId)
                     onSessionRefreshed?.invoke(session)
@@ -705,7 +706,9 @@ class LauncherController(
         currentSession: SessionData,
         instance: PackInstance,
     ): SessionData? {
-        val saved = credentialsManager.load()
+        // Multi-active: an SC-bound pack always uses the SmartyCraft account,
+        // regardless of which account is the chrome "primary".
+        val saved = credentialsManager.accountFor(PackAuthRequirement.SmartyCraft.PROVIDER_KEY)
         val pass = saved?.cachedPassword ?: currentSession.cachedPassword
         val playerName = currentSession.playerName.ifBlank { saved?.playerName ?: "" }
         if (playerName.isBlank() || pass.isNullOrEmpty()) {
