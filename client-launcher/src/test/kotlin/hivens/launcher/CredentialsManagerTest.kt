@@ -8,6 +8,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.int
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import java.nio.file.Files
@@ -23,10 +24,9 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * Tests the libvault-backed CredentialsManager: secrets in the vault, metadata
- * on disk, and the one-time migration off the legacy keyring/AES store. Uses an
- * in-memory [FakeVault] (mirrors libvault's own MemoryVault) and, for the
- * migration cases, a real [LegacyCredentialsManager] over an in-memory
+ * Tests the v6 provider-keyed multi-account CredentialsManager: composite-keyed
+ * secrets in the vault, an account list on disk, and the migrations off v5
+ * (flat keys) and the v4 legacy keyring/AES store. In-memory [FakeVault] +
  * [FakeKeyring].
  */
 class CredentialsManagerTest {
@@ -42,11 +42,7 @@ class CredentialsManagerTest {
         workDir = Files.createTempDirectory("nexira-creds-test-")
         vault = FakeVault()
         legacyKeyring = FakeKeyring()
-        // The provider builds a legacy reader over the same workDir + keyring,
-        // so the migration tests can seed via a real LegacyCredentialsManager.
-        manager = CredentialsManager(workDir, json, vault) {
-            LegacyCredentialsManager(workDir, json, legacyKeyring)
-        }
+        manager = newManager()
     }
 
     @AfterTest
@@ -54,61 +50,81 @@ class CredentialsManagerTest {
         Files.walk(workDir).sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) }
     }
 
-    private fun session(password: String? = "secret-pw", accessToken: String = "fake-game-token") = SessionData(
-        playerName = "ChaosA",
+    private fun newManager() = CredentialsManager(workDir, json, vault) {
+        LegacyCredentialsManager(workDir, json, legacyKeyring)
+    }
+
+    private val scUuid = "550e8400e29b41d4a716446655440000"
+    private fun scKey(field: String) = "smartycraft:$scUuid:$field"
+
+    private fun session(
+        password: String? = "secret-pw",
+        accessToken: String = "fake-game-token",
+        uuid: String = scUuid,
+        playerName: String = "ChaosA",
+        refreshToken: String? = null,
+    ) = SessionData(
+        playerName = playerName,
         accessToken = accessToken,
-        uuid = "550e8400e29b41d4a716446655440000",
+        uuid = uuid,
         uid = "1",
         cachedPassword = password,
+        refreshToken = refreshToken,
         status = null,
     )
 
     private fun fileJson(): JsonObject =
         json.parseToJsonElement(Files.readString(workDir / "credentials.json")).jsonObject
 
+    private fun firstAccount(): JsonObject = fileJson()["accounts"]!!.jsonArray[0].jsonObject
+
     // ── save() ───────────────────────────────────────────────────────────────
 
     @Test
-    fun `save stores secrets in the vault and only metadata on disk`() {
+    fun `save stores secrets under composite keys and only metadata on disk`() {
         manager.save(session())
 
-        assertEquals("secret-pw", vault.entries["password"]?.decodeToString())
-        assertEquals("fake-game-token", vault.entries["accessToken"]?.decodeToString())
+        assertEquals("secret-pw", vault.entries[scKey("password")]?.decodeToString())
+        assertEquals("fake-game-token", vault.entries[scKey("accessToken")]?.decodeToString())
 
         val obj = fileJson()
-        assertEquals("ChaosA", obj["username"]?.jsonPrimitive?.contentOrNull)
-        assertEquals(5, obj["version"]?.jsonPrimitive?.int)
+        assertEquals(6, obj["version"]?.jsonPrimitive?.int)
+        assertEquals(scUuid, obj["activeAccountId"]?.jsonPrimitive?.contentOrNull)
+        assertEquals("ChaosA", firstAccount()["username"]?.jsonPrimitive?.contentOrNull)
+        assertEquals("smartycraft", firstAccount()["providerId"]?.jsonPrimitive?.contentOrNull)
         // No secret material ever touches the file.
         assertNull(obj["accessToken"], "accessToken must not be on disk")
-        assertNull(obj["encryptedPassword"], "no ciphertext on disk")
-        assertNull(obj["keyringHasPassword"], "no legacy flags written")
     }
 
     @Test
-    fun `save with null password -- accessToken stored, password dropped from the vault`() {
-        vault.entries["password"] = "stale".toByteArray() // pretend a prior password lingered
+    fun `save with null password clears the password key, keeps the token`() {
+        vault.entries[scKey("password")] = "stale".toByteArray()
         manager.save(session(password = null))
 
-        assertNull(vault.entries["password"], "null password must clear the vault entry")
-        assertEquals("fake-game-token", vault.entries["accessToken"]?.decodeToString())
+        assertNull(vault.entries[scKey("password")], "null password must clear the vault entry")
+        assertEquals("fake-game-token", vault.entries[scKey("accessToken")]?.decodeToString())
     }
 
     @Test
-    fun `save with blank accessToken -- no-op, no file, empty vault`() {
+    fun `save with blank accessToken is a no-op`() {
         manager.save(session(accessToken = ""))
         assertFalse(Files.exists(workDir / "credentials.json"))
         assertTrue(vault.entries.isEmpty())
     }
 
+    @Test
+    fun `save of a Microsoft session stores the refresh token`() {
+        manager.saveAccount(session(uuid = "msuuid", refreshToken = "RT", password = null), "microsoft")
+        assertEquals("RT", vault.entries["microsoft:msuuid:refreshToken"]?.decodeToString())
+        assertEquals("fake-game-token", vault.entries["microsoft:msuuid:accessToken"]?.decodeToString())
+    }
+
     // ── load() ───────────────────────────────────────────────────────────────
 
     @Test
-    fun `load round-trips through the vault`() {
+    fun `load round-trips the active account through the vault`() {
         manager.save(session())
-        val loaded = CredentialsManager(workDir, json, vault) {
-            LegacyCredentialsManager(workDir, json, legacyKeyring)
-        }.load()
-
+        val loaded = newManager().load()
         assertNotNull(loaded)
         assertEquals("ChaosA", loaded.playerName)
         assertEquals("secret-pw", loaded.cachedPassword)
@@ -116,16 +132,16 @@ class CredentialsManagerTest {
     }
 
     @Test
-    fun `load with accessToken missing from the vault -- returns null (session gone)`() {
+    fun `load with the access token gone returns null`() {
         manager.save(session())
-        vault.entries.remove("accessToken")
-        assertNull(manager.load(), "no accessToken = unusable session")
+        vault.entries.remove(scKey("accessToken"))
+        assertNull(manager.load())
     }
 
     @Test
-    fun `load with password missing -- session with null cachedPassword`() {
+    fun `load with the password gone yields a null cachedPassword`() {
         manager.save(session())
-        vault.entries.remove("password")
+        vault.entries.remove(scKey("password"))
         val loaded = manager.load()
         assertNotNull(loaded)
         assertEquals("fake-game-token", loaded.accessToken)
@@ -133,25 +149,65 @@ class CredentialsManagerTest {
     }
 
     @Test
-    fun `load with no file -- returns null`() {
+    fun `load with no file returns null`() {
         assertNull(manager.load())
     }
 
     @Test
-    fun `load with malformed file -- returns null instead of throwing`() {
+    fun `load with a malformed file returns null instead of throwing`() {
         Files.writeString(workDir / "credentials.json", "not valid json {{{")
         assertNull(manager.load())
+    }
+
+    // ── multi-account ──────────────────────────────────────────────────────────
+
+    @Test
+    fun `two accounts coexist, last saved is active, both load`() {
+        manager.save(session())                                                  // SC
+        manager.saveAccount(session(uuid = "msuuid", playerName = "MsGamer", refreshToken = "RT", password = null), "microsoft")
+
+        assertEquals(2, manager.listAccounts().size)
+        assertEquals("msuuid", manager.activeAccountId())
+        assertEquals("ChaosA", manager.loadSession(scUuid)?.playerName)
+        assertEquals("MsGamer", manager.loadSession("msuuid")?.playerName)
+    }
+
+    @Test
+    fun `setActive switches which account load returns`() {
+        manager.save(session())
+        manager.saveAccount(session(uuid = "msuuid", playerName = "MsGamer", refreshToken = "RT"), "microsoft")
+        manager.setActive(scUuid)
+        assertEquals("ChaosA", manager.load()?.playerName)
+    }
+
+    @Test
+    fun `re-saving the same identity upserts rather than duplicates`() {
+        manager.save(session())
+        manager.save(session(playerName = "ChaosA"))   // same uuid -> same accountId
+        assertEquals(1, manager.listAccounts().size)
+    }
+
+    @Test
+    fun `removeAccount drops its secrets and reassigns active`() {
+        manager.save(session())
+        manager.saveAccount(session(uuid = "msuuid", playerName = "MsGamer", refreshToken = "RT"), "microsoft")
+        manager.removeAccount("msuuid")
+
+        assertEquals(1, manager.listAccounts().size)
+        assertNull(vault.entries["microsoft:msuuid:accessToken"])
+        assertEquals(scUuid, manager.activeAccountId())
+        assertEquals("ChaosA", manager.load()?.playerName)
     }
 
     // ── clear() ──────────────────────────────────────────────────────────────
 
     @Test
-    fun `clear wipes the vault entries and the file`() {
+    fun `clear wipes every account secret and the file`() {
         manager.save(session())
+        manager.saveAccount(session(uuid = "msuuid", refreshToken = "RT"), "microsoft")
         manager.clear()
         assertFalse(Files.exists(workDir / "credentials.json"))
-        assertNull(vault.entries["password"])
-        assertNull(vault.entries["accessToken"])
+        assertTrue(vault.entries.isEmpty())
     }
 
     @Test
@@ -162,13 +218,53 @@ class CredentialsManagerTest {
         assertFalse(Files.exists(workDir / "credentials.json"))
     }
 
-    // ── migration from legacy storage ─────────────────────────────────────────
+    // ── migration: v5 (flat keys) -> v6 ─────────────────────────────────────────
 
     @Test
-    fun `migrates a v4 keyring-mode file into the vault and purges old entries`() {
-        // Seed: a real legacy store puts the secrets in the keyring + a v4 file.
+    fun `migrates a v5 flat-key file into the composite-keyed v6 store`() {
+        // Seed a v5 file + flat vault secrets, as the old single-account store wrote.
+        Files.writeString(
+            workDir / "credentials.json",
+            """{"username":"ChaosA","uuid":"$scUuid","uid":"1","version":5}""",
+        )
+        vault.entries["accessToken"] = "fake-game-token".toByteArray()
+        vault.entries["password"] = "secret-pw".toByteArray()
+
+        val loaded = manager.load()
+        assertNotNull(loaded)
+        assertEquals("ChaosA", loaded.playerName)
+        assertEquals("fake-game-token", loaded.accessToken)
+        assertEquals("secret-pw", loaded.cachedPassword)
+
+        // Re-keyed to composite, flat keys dropped, file stamped v6.
+        assertEquals("fake-game-token", vault.entries[scKey("accessToken")]?.decodeToString())
+        assertNull(vault.entries["accessToken"], "flat key removed after migration")
+        assertEquals(6, fileJson()["version"]?.jsonPrimitive?.int)
+        // A second load is pure v6 -- no re-migration.
+        assertEquals("ChaosA", newManager().load()?.playerName)
+    }
+
+    @Test
+    fun `v5 migration is idempotent when interrupted after the re-key`() {
+        // Simulate a crash AFTER the composite re-key but BEFORE the file was stamped:
+        // flat keys gone, composite present, file still v5.
+        Files.writeString(
+            workDir / "credentials.json",
+            """{"username":"ChaosA","uuid":"$scUuid","uid":"1","version":5}""",
+        )
+        vault.entries[scKey("accessToken")] = "fake-game-token".toByteArray()
+
+        val loaded = manager.load()
+        assertNotNull(loaded)
+        assertEquals("fake-game-token", loaded.accessToken)
+        assertEquals(6, fileJson()["version"]?.jsonPrimitive?.int)
+    }
+
+    // ── migration: v4 legacy store -> v6 ────────────────────────────────────────
+
+    @Test
+    fun `migrates a v4 keyring-mode file into the v6 store and purges old entries`() {
         LegacyCredentialsManager(workDir, json, legacyKeyring).save(session())
-        assertEquals("secret-pw", legacyKeyring.entries["io.github.kitty_hivens.AuraLauncher::password"])
         assertEquals(4, fileJson()["version"]?.jsonPrimitive?.int)
 
         val loaded = manager.load()
@@ -176,45 +272,23 @@ class CredentialsManagerTest {
         assertEquals("fake-game-token", loaded.accessToken)
         assertEquals("secret-pw", loaded.cachedPassword)
 
-        // Secrets now in the vault, file stamped v5, legacy keyring purged.
-        assertEquals("fake-game-token", vault.entries["accessToken"]?.decodeToString())
-        assertEquals(5, fileJson()["version"]?.jsonPrimitive?.int)
+        assertEquals("fake-game-token", vault.entries[scKey("accessToken")]?.decodeToString())
+        assertEquals(6, fileJson()["version"]?.jsonPrimitive?.int)
         assertTrue(legacyKeyring.entries.isEmpty(), "old keyring entries purged after migration")
-
-        // Second load is pure vault -- no legacy left to read.
-        assertEquals("fake-game-token", manager.load()?.accessToken)
+        assertEquals("fake-game-token", newManager().load()?.accessToken)
     }
 
     @Test
-    fun `migrates a v4 file-mode (AES) file into the vault`() {
-        // Keyring refuses writes -> legacy store falls back to its AES file.
-        legacyKeyring.failStore = true
+    fun `legacy file with unrecoverable secrets returns null and stamps v6`() {
         LegacyCredentialsManager(workDir, json, legacyKeyring).save(session())
-        assertTrue(legacyKeyring.entries.isEmpty(), "secrets went to the AES file, not the keyring")
-
-        val loaded = manager.load()
-        assertNotNull(loaded)
-        assertEquals("secret-pw", loaded.cachedPassword)
-        assertEquals("fake-game-token", loaded.accessToken)
-
-        assertEquals(5, fileJson()["version"]?.jsonPrimitive?.int)
-        assertEquals("secret-pw", vault.entries["password"]?.decodeToString())
-    }
-
-    @Test
-    fun `legacy file with unrecoverable secrets -- returns null and stamps to v5`() {
-        // A v4 keyring-mode file whose keyring entries are gone (wiped daemon).
-        LegacyCredentialsManager(workDir, json, legacyKeyring).save(session())
-        legacyKeyring.entries.clear() // secrets unrecoverable
+        legacyKeyring.entries.clear()
 
         assertNull(manager.load(), "no recoverable secret -> re-login")
-        // File stamped to v5 so the next load doesn't re-probe legacy storage.
-        assertEquals(5, fileJson()["version"]?.jsonPrimitive?.int)
+        assertEquals(6, fileJson()["version"]?.jsonPrimitive?.int)
     }
 
     // ── Fakes ─────────────────────────────────────────────────────────────────
 
-    /** In-memory [SecretVault], the libvault analogue of the old FakeKeyring. */
     private class FakeVault : SecretVault {
         val entries: MutableMap<String, ByteArray> = mutableMapOf()
         override val tier: VaultTier = VaultTier.Memory
@@ -237,10 +311,6 @@ class CredentialsManagerTest {
         override fun close() {}
     }
 
-    /**
-     * In-memory [IKeyringStorage] for seeding the legacy store in migration
-     * tests. `failStore = true` forces the legacy AES-file path.
-     */
     private class FakeKeyring : IKeyringStorage {
         val entries: MutableMap<String, String> = mutableMapOf()
         var failStore: Boolean = false
