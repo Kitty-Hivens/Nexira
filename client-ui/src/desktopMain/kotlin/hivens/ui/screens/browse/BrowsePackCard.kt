@@ -23,24 +23,34 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import coil3.compose.AsyncImage
+import coil3.compose.SubcomposeAsyncImage
 import hivens.core.api.catalogue.CataloguePack
 import hivens.core.data.PackOrigin
+import hivens.ui.effects.pixelArtBackground
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.decorativePair
 import hivens.ui.theme.origin
-import hivens.ui.theme.originGradient
 
 /**
  * One Browse row. Same shape as Library's PackCard (banner-as-bg + avatar +
  * title + chips + chevron) so the surfaces read as one design language. The
- * whole card is a click target into the source's detail screen. Colour, avatar
- * and source badge follow [CataloguePack.origin], so the card is source-neutral
- * across the mirror, Modrinth and future sources.
+ * whole card is a click target into the source's detail screen. The source
+ * badge follows [CataloguePack.origin], so the card stays source-neutral across
+ * the mirror, Modrinth and future sources.
+ *
+ * Background layers, back to front: a deterministic pixel-art fill (so a packless
+ * banner is never a flat green), the real banner image on top when the source
+ * carries one ([CataloguePack.bannerUrl]; transparent while loading or on
+ * failure, so the art shows through), then a dark scrim for text legibility.
+ * The avatar shows the pack icon, falling back to title initials.
  */
 @Composable
 fun BrowsePackCard(
@@ -49,22 +59,32 @@ fun BrowsePackCard(
     modifier: Modifier = Modifier,
 ) {
     val s = LocalStrings.current
+    val (hueA, hueB) = CelestiaTheme.colors.decorativePair(pack.id)
     Box(
         modifier = modifier
             .fillMaxWidth()
             .height(132.dp)
             .clip(MaterialTheme.shapes.medium)
-            .background(CelestiaTheme.colors.originGradient(pack.origin))
             .clickable(onClick = onClick),
     ) {
-        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.35f)))
+        Box(Modifier.fillMaxSize().pixelArtBackground(pack.id, hueA, hueB))
+        if (pack.bannerUrl != null) {
+            AsyncImage(
+                model              = pack.bannerUrl,
+                contentDescription = null,
+                contentScale       = ContentScale.Crop,
+                modifier           = Modifier.fillMaxSize(),
+            )
+        }
+        // Banners can be bright, so they get a heavier wash than the dark art.
+        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = if (pack.bannerUrl != null) 0.45f else 0.32f)))
 
         Row(
             modifier              = Modifier.fillMaxSize().padding(14.dp),
             verticalAlignment     = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            BrowseAvatar(pack.title, pack.origin)
+            BrowseAvatar(pack = pack, hue = hueA)
 
             Column(
                 modifier            = Modifier.weight(1f),
@@ -117,7 +137,21 @@ fun BrowsePackCard(
 }
 
 @Composable
-private fun BrowseAvatar(title: String, origin: PackOrigin) {
+private fun BrowseAvatar(pack: CataloguePack, hue: Color) {
+    SubcomposeAsyncImage(
+        model              = pack.iconUrl,
+        contentDescription = null,
+        contentScale       = ContentScale.Crop,
+        modifier           = Modifier.size(64.dp).clip(RoundedCornerShape(12.dp)),
+        // While the icon resolves, a flat hue avoids a letters-then-icon flash;
+        // a missing or broken icon (incl. a null url) lands in error -> initials.
+        loading            = { Box(Modifier.fillMaxSize().background(hue)) },
+        error              = { InitialsAvatar(pack.title, hue) },
+    )
+}
+
+@Composable
+private fun InitialsAvatar(title: String, hue: Color) {
     val initials = title
         .split(' ', '-', '_')
         .filter { it.isNotBlank() }
@@ -125,10 +159,7 @@ private fun BrowseAvatar(title: String, origin: PackOrigin) {
         .joinToString("") { it.first().uppercaseChar().toString() }
         .ifEmpty { "?" }
     Box(
-        modifier         = Modifier
-            .size(64.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(CelestiaTheme.colors.origin(origin)),
+        modifier         = Modifier.fillMaxSize().background(hue),
         contentAlignment = Alignment.Center,
     ) {
         Text(

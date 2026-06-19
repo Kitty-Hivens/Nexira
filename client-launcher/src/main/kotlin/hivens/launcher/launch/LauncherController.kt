@@ -206,6 +206,8 @@ class LauncherController(
             val spawn: suspend (onLog: (String, LauncherLogType) -> Unit) -> SpawnResult,
             /** Runs once after the process spawns. [launchInternal] guards it, so it never fails the launch. */
             val onSpawned: (suspend () -> Unit)? = null,
+            /** Runs once after the game process exits, with the session length in seconds. Guarded like [onSpawned]. */
+            val onExit: (suspend (sessionSeconds: Long) -> Unit)? = null,
         ) : Prepared
 
         data object Bail : Prepared
@@ -274,6 +276,7 @@ class LauncherController(
                         prepared.onSpawned?.let { hook ->
                             runCatching { hook() }.onFailure { logger.warn("Post-spawn hook failed for {}", label, it) }
                         }
+                        val sessionStart = Instant.now().epochSecond
 
                         // Reads its OWN captured abortToken, never the
                         // currentAbortToken field -- see that field's KDoc for the
@@ -281,6 +284,10 @@ class LauncherController(
                         val exitCode = handle.awaitExit()
                         runningHandle = null
                         ActionRing.record("Game exited: $label (code $exitCode)")
+                        prepared.onExit?.let { hook ->
+                            val secs = (Instant.now().epochSecond - sessionStart).coerceAtLeast(0)
+                            runCatching { hook(secs) }.onFailure { logger.warn("Post-exit hook failed for {}", label, it) }
+                        }
 
                         if (exitCode != 0 && !abortToken.get()) {
                             fail(LaunchError.ExitCode(exitCode))
@@ -602,6 +609,15 @@ class LauncherController(
                 packRepository.put(
                     refreshedInstance.copy(lastPlayedEpochOrZero = Instant.now().epochSecond),
                 )
+            },
+            onExit = { secs ->
+                // Re-read the persisted instance (onSpawned wrote lastPlayed; the
+                // user may have edited it mid-session) and add the session onto
+                // THAT, so neither write clobbers the other. Skip when it's gone --
+                // never resurrect an instance deleted while it ran.
+                packRepository.get(refreshedInstance.id)?.let { current ->
+                    packRepository.put(current.copy(playtimeSeconds = current.playtimeSeconds + secs))
+                }
             },
         )
     }

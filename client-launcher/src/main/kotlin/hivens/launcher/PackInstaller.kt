@@ -88,6 +88,8 @@ class PackInstaller(
                 version = manifest.packVersion,
             ),
             displayName           = summary.displayName,
+            iconUrl               = summary.iconUrl,
+            bannerUrl             = summary.bannerUrl,
             instanceDirName       = instanceDir,
             createdAtEpoch        = Instant.now().epochSecond,
             lastPlayedEpochOrZero = 0L,

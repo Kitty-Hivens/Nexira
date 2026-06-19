@@ -368,8 +368,14 @@ class LauncherControllerTest {
         // pre-creates it.
         Files.createDirectories(sandbox.resolve("instances").resolve(instance.instanceDirName))
 
-        val captured = slot<hivens.core.data.PackInstance>()
-        coJustRun { packRepository.put(capture(captured)) }
+        // Two writes land: onSpawned bumps lastPlayed, then onExit re-reads the
+        // persisted instance (via get) and adds the session's playtime. get()
+        // returns the latest put, so the exit write builds on the lastPlayed bump
+        // instead of clobbering it. No cached-manifest write happens because the
+        // instance arrived pre-populated.
+        val puts = mutableListOf<hivens.core.data.PackInstance>()
+        coJustRun { packRepository.put(capture(puts)) }
+        coEvery { packRepository.get(any()) } answers { puts.lastOrNull() }
 
         val controller = newController(this)
         controller.launchPackInstance(
@@ -379,13 +385,9 @@ class LauncherControllerTest {
         advanceUntilIdle()
 
         assertEquals(LaunchState.Idle, controller.state.value)
-        // packRepository.put fires exactly once -- the lastPlayed bump.
-        // No cached-manifest write happens because the instance arrived
-        // pre-populated; if the fetch path had fired, mockk would not
-        // be able to stub SmrtPackClient under JDK 25 (per the file
-        // header) and the launch coroutine would have thrown.
-        coVerify(exactly = 1) { packRepository.put(any()) }
-        assertTrue(captured.captured.lastPlayedEpochOrZero > 0)
+        coVerify(exactly = 2) { packRepository.put(any()) }
+        assertTrue(puts.first().lastPlayedEpochOrZero > 0, "spawn bumps lastPlayed")
+        assertTrue(puts.last().lastPlayedEpochOrZero > 0, "exit preserves lastPlayed (re-read, not clobbered)")
     }
 
     /**

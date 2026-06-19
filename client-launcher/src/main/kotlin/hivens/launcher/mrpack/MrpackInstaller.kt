@@ -59,6 +59,8 @@ class MrpackInstaller(
     suspend fun install(
         mrpack: Path,
         source: MrpackSource? = null,
+        iconUrl: String? = null,
+        bannerUrl: String? = null,
         progress: (current: Int, total: Int, filename: String) -> Unit = { _, _, _ -> },
     ): PackInstance = withContext(Dispatchers.IO) {
         ZipFile(mrpack.toFile()).use { zip ->
@@ -107,6 +109,8 @@ class MrpackInstaller(
                     version = pinned,
                 ),
                 displayName = displayName,
+                iconUrl = iconUrl,
+                bannerUrl = bannerUrl,
                 instanceDirName = instanceDirName,
                 createdAtEpoch = Instant.now().epochSecond,
                 pinnedPackVersion = pinned,
@@ -134,6 +138,8 @@ class MrpackInstaller(
     suspend fun installFromUrl(
         url: String,
         source: MrpackSource,
+        iconUrl: String? = null,
+        bannerUrl: String? = null,
         progress: (current: Int, total: Int, filename: String) -> Unit = { _, _, _ -> },
     ): PackInstance = withContext(Dispatchers.IO) {
         val tmp = Files.createTempFile("nexira-mrpack-", ".mrpack")
@@ -142,7 +148,7 @@ class MrpackInstaller(
                 if (!resp.status.isSuccess()) throw IOException("GET $url -> HTTP ${resp.status}")
                 FileOutputStream(tmp.toFile()).use { out -> resp.bodyAsChannel().copyTo(out) }
             }
-            install(tmp, source, progress)
+            install(tmp, source, iconUrl, bannerUrl, progress)
         } finally {
             runCatching { Files.deleteIfExists(tmp) }
         }

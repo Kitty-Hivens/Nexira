@@ -28,37 +28,38 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import coil3.compose.AsyncImage
+import coil3.compose.SubcomposeAsyncImage
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
+import hivens.ui.effects.pixelArtBackground
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.screens.detail.PackDetailScreen
 import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.decorativePair
 import hivens.ui.theme.origin
-import hivens.ui.theme.originGradient
 import java.time.Duration
 import java.time.Instant
 
 /**
- * One Library row. Banner-as-background (placeholder gradient until
- * AsyncImage plumbing lands -- bannerUrl will be honored when the
- * catalogue service starts populating it from manifests), avatar +
- * title + metadata chips overlaid on top, quick actions on the
- * right. Whole card click-routes to [PackDetailScreen]; the explicit
- * Play / Settings / Overflow buttons short-circuit common actions
- * without the detail hop.
+ * One Library row. Same three-layer background as the Browse card: a
+ * deterministic pixel-art fill (so an art-less instance is never a flat
+ * gradient), the [PackInstance.bannerUrl] image on top when the install
+ * captured one (transparent while loading / on failure, art shows through),
+ * then a dark scrim. Avatar + title + metadata chips overlay it, quick actions
+ * on the right. Whole card click-routes to [PackDetailScreen]; the explicit
+ * Play / Settings / Overflow buttons short-circuit common actions without the
+ * detail hop.
  *
- * Source-badge is the small chip next to the title; it differentiates
- * cards from the four [PackOrigin] values at a glance per
- * [[project_home_library_ia]]'s unified-entity-with-source-badge
- * rule.
- *
- * Sizes are deliberately defaulted, not pinned to a design spec --
- * Atelier visual rework will revisit; this is the working baseline.
+ * Source-badge is the small chip next to the title; it differentiates cards
+ * from the four [PackOrigin] values at a glance per
+ * [[project_home_library_ia]]'s unified-entity-with-source-badge rule.
  */
 @Composable
 fun PackCard(
@@ -69,28 +70,33 @@ fun PackCard(
     onMore: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val bg = CelestiaTheme.colors.originGradient(instance.packRef.origin)
     val s = LocalStrings.current
+    val (hueA, hueB) = CelestiaTheme.colors.decorativePair(instance.id)
+    val art = rememberPackArt(instance)
     Box(
         modifier = modifier
             .fillMaxWidth()
             .height(132.dp)
             .clip(MaterialTheme.shapes.medium)
-            .background(bg)
             .clickable(onClick = onOpenDetail),
     ) {
-        // Dim overlay so any future banner image stays legible behind
-        // the title / chips. With the placeholder gradient the dim is
-        // visually redundant but keeps the layering consistent when
-        // bannerUrl support lands.
-        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.35f)))
+        Box(Modifier.fillMaxSize().pixelArtBackground(instance.id, hueA, hueB))
+        if (art.bannerUrl != null) {
+            AsyncImage(
+                model              = art.bannerUrl,
+                contentDescription = null,
+                contentScale       = ContentScale.Crop,
+                modifier           = Modifier.fillMaxSize(),
+            )
+        }
+        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = if (art.bannerUrl != null) 0.45f else 0.32f)))
 
         Row(
             modifier              = Modifier.fillMaxSize().padding(14.dp),
             verticalAlignment     = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            PackAvatar(instance)
+            PackAvatar(iconUrl = art.iconUrl, displayName = instance.displayName, hue = hueA)
 
             Column(
                 modifier              = Modifier.weight(1f),
@@ -153,18 +159,27 @@ fun PackCard(
 }
 
 @Composable
-private fun PackAvatar(instance: PackInstance) {
-    val initials = instance.displayName
+private fun PackAvatar(iconUrl: String?, displayName: String, hue: Color) {
+    SubcomposeAsyncImage(
+        model              = iconUrl,
+        contentDescription = null,
+        contentScale       = ContentScale.Crop,
+        modifier           = Modifier.size(64.dp).clip(RoundedCornerShape(12.dp)),
+        loading            = { Box(Modifier.fillMaxSize().background(hue)) },
+        error              = { InitialsAvatar(displayName, hue) },
+    )
+}
+
+@Composable
+private fun InitialsAvatar(name: String, hue: Color) {
+    val initials = name
         .split(' ', '-', '_')
         .filter { it.isNotBlank() }
         .take(2)
         .joinToString("") { it.first().uppercaseChar().toString() }
         .ifEmpty { "?" }
     Box(
-        modifier         = Modifier
-            .size(64.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(CelestiaTheme.colors.origin(instance.packRef.origin)),
+        modifier         = Modifier.fillMaxSize().background(hue),
         contentAlignment = Alignment.Center,
     ) {
         Text(

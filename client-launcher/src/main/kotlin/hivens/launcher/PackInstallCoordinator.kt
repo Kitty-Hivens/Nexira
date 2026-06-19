@@ -38,6 +38,8 @@ class PackInstallCoordinator(
             mrpackInstaller.installFromUrl(
                 url = url,
                 source = MrpackSource(PackOrigin.Modrinth, pack.id, version.versionNumber),
+                iconUrl = pack.iconUrl,
+                bannerUrl = pack.bannerUrl,
                 progress = progress,
             )
         }
