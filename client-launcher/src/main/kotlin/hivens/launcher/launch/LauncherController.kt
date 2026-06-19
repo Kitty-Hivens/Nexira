@@ -539,8 +539,7 @@ class LauncherController(
 
         // 3. Auth requirement: refresh the session right before spawn. Mirrors
         // the SC server path's pre-spawn re-auth.
-        val authRequirement = manifestSnapshot.authRequirement
-            ?: fallbackAuthRequirement(refreshedInstance)
+        val authRequirement = PackAuthRouter.requirementFor(refreshedInstance, manifestSnapshot.authRequirement)
         var session = currentSession
         if (authRequirement != null) {
             setStage(PrepareStage.AUTH, 0.4f)
@@ -565,9 +564,9 @@ class LauncherController(
                 launcherService.launchPackClient(
                     sessionData          = session,
                     // Carry the EFFECTIVE requirement (manifest value or the
-                    // name-based fallback) so the service's SC-binding step sees it;
-                    // the raw snapshot's authRequirement is null for packs whose
-                    // mirror manifest has no auth block yet (e.g. Industrial).
+                    // router's origin-derived one) so the service's SC-binding step
+                    // sees it; the raw snapshot's authRequirement is null for packs
+                    // whose mirror manifest has no auth block yet (e.g. Industrial).
                     manifest             = manifestSnapshot.copy(authRequirement = authRequirement),
                     runtime              = refreshedInstance.runtime,
                     clientRootPath       = clientDir,
@@ -706,24 +705,6 @@ class LauncherController(
             // surfaces as a more specific reject from the game itself.
             emit(LaunchLogEvent.AuthFailed(e.message))
             currentSession
-        }
-    }
-
-    /**
-     * Synthesize an [PackAuthRequirement] for SC-bound packs whose
-     * mirror manifest has not yet been updated with an explicit
-     * `auth` block. Recognises the shipping SC pack identities by
-     * name; new packs added here as they go live until the mirror
-     * authors fill in `auth: { kind: smartycraft, server_id: ... }`
-     * and this map drains naturally.
-     */
-    private fun fallbackAuthRequirement(instance: PackInstance): PackAuthRequirement? {
-        val matchesIndustrial = listOf(instance.displayName, instance.packRef.id)
-            .any { it.equals("Industrial", ignoreCase = true) }
-        return if (matchesIndustrial) {
-            PackAuthRequirement.SmartyCraft("Industrial")
-        } else {
-            null
         }
     }
 
