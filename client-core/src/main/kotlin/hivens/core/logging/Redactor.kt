@@ -30,7 +30,11 @@ object Redactor {
 
     private val rules: List<Pair<Regex, String>> = listOf(
         Regex("""(?i)(accessToken["'\s:=]+)($TOKEN_CHARS{6,}=*)""") to "$1<redacted>",
-        Regex("""(?i)(password["'\s:=]+)([^\s"',&}]+)""") to "$1<redacted>",
+        // Value stops at structural delimiters / line end, NOT whitespace: a
+        // password may contain spaces, and stopping on \s leaked everything after
+        // the first space. Over-redacting prose that reads "password ..." is the
+        // accepted trade (see the conservative-RIGHT note above).
+        Regex("""(?i)(password["'\s:=]+)([^"',&}\r\n]+)""") to "$1<redacted>",
         Regex("""(?i)((?:session|refresh|auth|api)Token["'\s:=]+)($TOKEN_CHARS{6,}=*)""") to "$1<redacted>",
         // Bearer-rule alone covers the Authorization-header leak surface.
         // A generic "Authorization: ..." rule would either eat the "Bearer"
