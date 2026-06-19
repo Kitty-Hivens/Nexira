@@ -10,6 +10,7 @@ import hivens.core.api.dto.smrt.toDomain
 import hivens.core.data.CachedManifestSnapshot
 import hivens.core.data.ContentToggle
 import hivens.core.data.LauncherLogType
+import hivens.core.data.OfflineIdentity
 import hivens.core.data.OptionalContentRules
 import hivens.core.data.PackAuthRequirement
 import hivens.core.data.PackInstance
@@ -324,10 +325,18 @@ class LauncherController(
 
         if (isOffline) {
             emit(LaunchLogEvent.OfflineSkipAuth)
-            // In offline mode, use whatever session we have (or a stub)
-            if (session.accessToken.isBlank()) {
-                session = session.copy(accessToken = "offline")
-            }
+            // Offline: no SC auth, so the bound server cannot be joined -- the
+            // client still launches for singleplayer/LAN. Mint a proper offline
+            // identity (vanilla OfflinePlayer UUID, blank token -> "0" in argv +
+            // userType legacy) rather than carrying a stale/garbage session.
+            ActionRing.record(
+                "Offline launch of '$targetServerId': singleplayer only, the server cannot be joined without auth",
+            )
+            session = session.copy(
+                uuid = if (session.offline) session.uuid else OfflineIdentity.dashlessUuidFor(session.playerName),
+                accessToken = "",
+                offline = true,
+            )
         } else {
             try {
                 val pass = credentialsManager.load()?.cachedPassword ?: session.cachedPassword
