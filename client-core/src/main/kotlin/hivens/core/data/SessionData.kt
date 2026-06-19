@@ -24,4 +24,11 @@ data class SessionData(
      * accessToken, so it is never persisted by `CredentialsManager`.
      */
     val offline: Boolean = false,
+
+    /**
+     * MSA refresh token for silent re-auth (the `offline_access` scope). Transient
+     * secret like [cachedPassword]: persisted to the vault by the credential store,
+     * never written to credentials.json. Null for non-Microsoft sessions.
+     */
+    val refreshToken: String? = null,
 )
