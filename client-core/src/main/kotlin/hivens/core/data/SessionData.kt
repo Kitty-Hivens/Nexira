@@ -15,5 +15,13 @@ data class SessionData(
 
     val serverId: String? = null,
     val cachedPassword: String? = null,
-    val balance: Int = 0
+    val balance: Int = 0,
+
+    /**
+     * True for an offline-play identity (no provider auth). Drives the offline
+     * launch fork in `GameCommandBuilder.addSessionAuthArgs` (real offline UUID +
+     * `--userType legacy`). Runtime-only: an offline session carries a blank
+     * accessToken, so it is never persisted by `CredentialsManager`.
+     */
+    val offline: Boolean = false,
 )

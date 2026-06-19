@@ -9,7 +9,6 @@ import hivens.core.data.HeapProfile
 import hivens.core.data.InstanceProfile
 import hivens.core.data.InstanceRuntime
 import hivens.core.data.LauncherLogType
-import hivens.core.data.PackAuthRequirement
 import hivens.core.data.SessionData
 import hivens.core.jvm.AutomaticHeap
 import hivens.core.jvm.HeapDeriver
@@ -147,7 +146,7 @@ internal class LauncherService(
         onLog: (String, LauncherLogType) -> Unit
     ): SpawnResult = try {
         val mcVersion = manifest.minecraftVersion
-        val scBound = manifest.authRequirement is PackAuthRequirement.SmartyCraft
+        val scBound = manifest.authRequirement?.scServerId != null
 
         // 1. Heap: same tiering as the SC path -- pinned -> explicit value, else the
         // machine-aware Automatic baseline that the adaptive sizer refines from.
@@ -280,8 +279,9 @@ internal class LauncherService(
         swapAuthlib: Boolean,
         onLog: (String, LauncherLogType) -> Unit,
     ): ResolvedRuntime {
-        val requirement = manifest.authRequirement
-        if (requirement !is PackAuthRequirement.SmartyCraft) return runtime
+        // SC binding covers SmartyCraft and the SC half of Both -- both expose a
+        // non-null scServerId; Microsoft-only (null) needs no SC authlib/helper.
+        val scServerId = manifest.authRequirement?.scServerId ?: return runtime
 
         // open-smrt-network helper: always attempted for an SC-bound pack (no toggle --
         // a pack ships no proprietary Smarty, so the server-list useOpenSmrtHelper
@@ -306,9 +306,9 @@ internal class LauncherService(
         if (!swapAuthlib) return runtime
         val authlib = findAuthlibLibrary(runtime)
             ?: throw PackPrepBlocked(LaunchError.AuthlibUnavailable(mcVersion))
-        val patched = authlibSwapper.ensurePatchedAuthlib(requirement.serverId, sessionData.fileManifest)
+        val patched = authlibSwapper.ensurePatchedAuthlib(scServerId, sessionData.fileManifest)
             ?: throw PackPrepBlocked(LaunchError.AuthlibUnavailable(mcVersion))
-        onLog("Using SmartyCraft authlib for ${requirement.serverId}", LauncherLogType.INFO)
+        onLog("Using SmartyCraft authlib for $scServerId", LauncherLogType.INFO)
         return swapAuthlibPath(runtime, authlib, patched)
     }
 
