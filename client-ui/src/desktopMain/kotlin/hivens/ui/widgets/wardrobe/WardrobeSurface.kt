@@ -236,6 +236,13 @@ private fun Wardrobe(session: SessionData) {
                 }
 
                 item(key = "capes-h", span = { GridItemSpan(maxLineSpan) }) { SectionHeader(s.wardrobeCapes) }
+                item(key = "capes-hint", span = { GridItemSpan(maxLineSpan) }) {
+                    Text(
+                        s.wardrobeCapeClanHint,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = CelestiaTheme.colors.textSecondary,
+                    )
+                }
                 item(key = "add-cape") { AddTile(onClick = { importInto(SkinLibrary.Kind.Cape) { selectedCapeId = it } }) }
                 items(capes, key = { it.id }) { entry ->
                     CapeCard(

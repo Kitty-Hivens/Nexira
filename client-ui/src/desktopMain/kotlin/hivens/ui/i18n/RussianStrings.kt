@@ -624,7 +624,8 @@ object RussianStrings : AppStrings {
     override val wardrobeEmpty                = "Библиотека пуста. Загрузите PNG-скин, чтобы начать."
     override val wardrobeSaved               = "Сохранённые"
     override val wardrobeCapes               = "Плащи"
-    override val wardrobeApplyCape           = "Применить плащ (SmartyCraft)"
+    override val wardrobeApplyCape           = "Задать плащ клана"
+    override val wardrobeCapeClanHint        = "Плащ клановый — задаёт только глава клана."
 
     override val backgroundLoopMode      = "Луп"
     override val backgroundLoopUseCodec  = "Из кодека"

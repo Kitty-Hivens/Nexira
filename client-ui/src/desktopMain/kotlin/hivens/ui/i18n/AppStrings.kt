@@ -666,6 +666,7 @@ interface AppStrings {
     val wardrobeSaved: String
     val wardrobeCapes: String
     val wardrobeApplyCape: String
+    val wardrobeCapeClanHint: String
 
     // --- Background loop mode ---
     val backgroundLoopMode: String

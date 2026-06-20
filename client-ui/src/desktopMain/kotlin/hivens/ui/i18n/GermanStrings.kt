@@ -623,7 +623,8 @@ object GermanStrings : AppStrings {
     override val wardrobeEmpty                = "Deine Bibliothek ist leer. Lade ein Skin-PNG hoch, um zu beginnen."
     override val wardrobeSaved               = "Gespeichert"
     override val wardrobeCapes               = "Umhänge"
-    override val wardrobeApplyCape           = "Umhang anwenden (SmartyCraft)"
+    override val wardrobeApplyCape           = "Clan-Umhang setzen"
+    override val wardrobeCapeClanHint        = "Umhänge gelten clanweit -- nur der Clan-Anführer kann einen setzen."
 
     override val backgroundLoopMode      = "Schleife"
     override val backgroundLoopUseCodec  = "Aus Codec"
