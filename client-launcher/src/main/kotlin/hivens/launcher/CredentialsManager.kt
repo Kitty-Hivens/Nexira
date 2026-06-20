@@ -109,6 +109,25 @@ class CredentialsManager internal constructor(
         return loadSession(account.accountId)
     }
 
+    /**
+     * The session that should front the shell -- the "primary face". Resolved by
+     * licence priority (Microsoft, the licensed account, before SmartyCraft;
+     * unknown providers last), not by which account was saved last. Callers
+     * recompute it on add/remove so the face follows the highest-priority
+     * signed-in account. An offline identity is not an account, so it never wins
+     * here -- it is reconstructed separately from `SettingsData.offlinePlayerName`.
+     */
+    fun primarySession(): SessionData? {
+        val accounts = readAccountsFile()?.accounts ?: return null
+        for (account in accounts.sortedBy { facePriorityIndex(it.providerId) }) {
+            loadSession(account.accountId)?.let { return it }
+        }
+        return null
+    }
+
+    private fun facePriorityIndex(providerId: String): Int =
+        FACE_PRIORITY.indexOf(providerId).let { if (it < 0) FACE_PRIORITY.size else it }
+
     fun loadSession(accountId: String): SessionData? {
         val account = readAccountsFile()?.accounts?.firstOrNull { it.accountId == accountId } ?: return null
         val accessToken = secret(account, FIELD_ACCESS_TOKEN)
@@ -289,6 +308,10 @@ class CredentialsManager internal constructor(
         const val CURRENT_VERSION = 6
         const val PROVIDER_SMARTYCRAFT = "smartycraft"
         const val PROVIDER_MICROSOFT = "microsoft"
+
+        // Primary-face precedence: the licensed (Microsoft) account fronts the
+        // shell before a SmartyCraft one. Unknown providers sort after both.
+        val FACE_PRIORITY = listOf(PROVIDER_MICROSOFT, PROVIDER_SMARTYCRAFT)
         const val FIELD_ACCESS_TOKEN = "accessToken"
         const val FIELD_PASSWORD = "password"
         const val FIELD_REFRESH_TOKEN = "refreshToken"

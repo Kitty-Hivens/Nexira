@@ -190,6 +190,26 @@ class CredentialsManagerTest {
     }
 
     @Test
+    fun `primarySession prefers the licensed Microsoft account over SmartyCraft`() {
+        manager.save(session())                                                  // SC saved first
+        manager.saveAccount(session(uuid = "msuuid", playerName = "MsGamer", refreshToken = "RT", password = null), "microsoft")
+        // Even with SC made active, the licensed account fronts the shell.
+        manager.setActive(scUuid)
+        assertEquals("MsGamer", manager.primarySession()?.playerName)
+    }
+
+    @Test
+    fun `primarySession falls back to SmartyCraft when no Microsoft account`() {
+        manager.save(session())
+        assertEquals("ChaosA", manager.primarySession()?.playerName)
+    }
+
+    @Test
+    fun `primarySession is null with no accounts`() {
+        assertNull(manager.primarySession())
+    }
+
+    @Test
     fun `re-saving the same identity upserts rather than duplicates`() {
         manager.save(session())
         manager.save(session(playerName = "ChaosA"))   // same uuid -> same accountId
