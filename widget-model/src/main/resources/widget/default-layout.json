@@ -57,6 +57,7 @@
               { "kind": "nav.entry", "instance_id": "appshell-leftrail-nav-library",  "props": { "target": "Library" } },
               { "kind": "nav.entry", "instance_id": "appshell-leftrail-nav-browse",   "props": { "target": "Browse" } },
               { "kind": "nav.entry", "instance_id": "appshell-leftrail-nav-profile",  "props": { "target": "Profile" } },
+              { "kind": "nav.entry", "instance_id": "appshell-leftrail-nav-wardrobe", "props": { "target": "Wardrobe" } },
               { "kind": "nav.entry", "instance_id": "appshell-leftrail-nav-settings", "props": { "target": "Settings" } },
               { "kind": "nav.entry", "instance_id": "appshell-leftrail-nav-about",    "props": { "target": "About" } }
             ]

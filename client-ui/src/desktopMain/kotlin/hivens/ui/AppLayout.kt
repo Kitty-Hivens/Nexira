@@ -43,6 +43,7 @@ import hivens.ui.widgets.about.AboutSurface
 import hivens.ui.widgets.bgsettings.BgSettingsSurface
 import hivens.ui.widgets.customization.CustomizationSurface
 import hivens.ui.widgets.profile.ProfileSurface
+import hivens.ui.widgets.wardrobe.WardrobeSurface
 import hivens.ui.widgets.serverdetails.ServerDetailsSurface
 import hivens.ui.widgets.shell.LeftRailContext
 import hivens.ui.widgets.shell.LocalLeftRailContext
@@ -150,6 +151,9 @@ fun AppLayout(
                             onLogin       = onLogin,
                             onLogout      = onLogout,
                         )
+
+                    Screen.Wardrobe ->
+                        WardrobeSurface(session = currentSession, onBack = onBack)
 
                     Screen.Settings ->
                         SettingsScreen(

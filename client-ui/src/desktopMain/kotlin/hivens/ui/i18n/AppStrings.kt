@@ -658,6 +658,8 @@ interface AppStrings {
     val profileSignOutSmartycraft: String
     val profileSignOutMicrosoft: String
     val msaNotConfigured: String
+    val wardrobeTitle: String
+    val wardrobeSignedOut: String
 
     // --- Background loop mode ---
     val backgroundLoopMode: String

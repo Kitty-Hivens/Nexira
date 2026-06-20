@@ -87,7 +87,7 @@ class DefaultLayoutTest {
             assertEquals("nav.entry", it.kind.value, "leftrail items must all be nav.entry")
             it.props["target"]?.jsonPrimitive?.content
         }
-        assertEquals(listOf("Home", "Library", "Browse", "Profile", "Settings", "About"), targets("top"))
+        assertEquals(listOf("Home", "Library", "Browse", "Profile", "Wardrobe", "Settings", "About"), targets("top"))
         assertEquals(listOf("Console", "Logout"), targets("bottom"))
     }
 }
