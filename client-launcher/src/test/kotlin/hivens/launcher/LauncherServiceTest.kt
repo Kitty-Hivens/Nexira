@@ -24,7 +24,6 @@ import hivens.launcher.component.GameCommandBuilder
 import hivens.launcher.component.ProcessLogHandler
 import hivens.launcher.network.ServerProtocolConfig
 import hivens.launcher.runtime.RuntimeProvisioner
-import hivens.launcher.smrt.OpenSmrtHelperResolver
 import hivens.launcher.smrt.SmrtAuthlibSwapper
 import hivens.test.buildMockClient
 import io.ktor.client.HttpClient
@@ -272,7 +271,6 @@ class LauncherServiceTest {
             agentExtractor = AgentExtractor(workDir),
             // SC server path never reaches the SC-binding step; dead deps satisfy the ctor.
             authlibSwapper = SmrtAuthlibSwapper(deadHttpClientProvider(), ServerProtocolConfig(), workDir),
-            openSmrtResolver = OpenSmrtHelperResolver(deadHttpClientProvider(), json, workDir),
             sharedAssetsDir = workDir / "assets",
             sharedLibrariesDir = workDir / "libraries",
         )
