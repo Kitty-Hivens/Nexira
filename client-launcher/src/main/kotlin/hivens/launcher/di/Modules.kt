@@ -583,7 +583,6 @@ val launchPipelineModule = module {
             profilerStore      = get(),
             agentExtractor     = get(),
             authlibSwapper     = get(),
-            openSmrtResolver   = get(),
             sharedAssetsDir    = get<PlatformPaths>().assetsDir,
             sharedLibrariesDir = get<PlatformPaths>().librariesDir,
         )
