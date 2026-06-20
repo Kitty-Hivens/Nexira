@@ -91,13 +91,26 @@ private fun AccountRoster(ctx: ProfileContext) {
     var refreshKey by remember { mutableIntStateOf(0) }
     val accounts = remember(refreshKey) { credentials.listAccounts() }
 
-    // After an add or remove, re-resolve the face (honouring the chosen provider,
-    // else licence priority) and push it to the shell (null -> signed out), then
-    // force the roster to re-read.
-    fun syncFace() {
-        val face = credentials.primarySession(settingsService.getSettings().preferredFaceProvider)
-        if (face != null) ctx.onLogin(face) else ctx.onLogout()
+    // After the account set changes (an add, or a removal that left at least one
+    // account), re-resolve the face (the chosen provider, else licence priority)
+    // and refresh the roster.
+    fun resyncFace() {
+        credentials.primarySession(settingsService.getSettings().preferredFaceProvider)
+            ?.let { ctx.onLogin(it) }
         refreshKey++
+    }
+
+    // Removing the last account is a logout: route it through the confirm dialog
+    // (doLogout clears + signs out on confirm) instead of deleting here, so a
+    // dismissed confirm leaves the account intact rather than a face with no
+    // account behind it.
+    fun removeOrLogout(accountId: String) {
+        if (accounts.size <= 1) {
+            ctx.onLogout()
+        } else {
+            credentials.removeAccount(accountId)
+            resyncFace()
+        }
     }
 
     val currentAccountId = ctx.session?.let { it.uuid.ifBlank { it.playerName } }
@@ -119,14 +132,14 @@ private fun AccountRoster(ctx: ProfileContext) {
             title = "SmartyCraft",
             accounts = accounts.filter { it.providerId == scKey },
             currentAccountId = currentAccountId,
-            onRemove = { credentials.removeAccount(it); syncFace() },
+            onRemove = { removeOrLogout(it) },
         ) {
             // SmartyCraft uses the username/password form; reveal it inline, with
             // the offline + Microsoft alternatives suppressed in this context.
             var adding by remember { mutableStateOf(false) }
             if (adding) {
                 LoginPanel(
-                    onLogin = { adding = false; syncFace() },
+                    onLogin = { adding = false; resyncFace() },
                     showOffline = false,
                     showMicrosoft = false,
                 )
@@ -150,29 +163,30 @@ private fun AccountRoster(ctx: ProfileContext) {
                 title = "Microsoft",
                 accounts = accounts.filter { it.providerId == msKey },
                 currentAccountId = currentAccountId,
-                onRemove = { credentials.removeAccount(it); syncFace() },
+                onRemove = { removeOrLogout(it) },
             ) {
                 // Device-code button; renders nothing if no client id is configured.
                 MicrosoftSignInButton(
-                    onSignedIn = { syncFace() },
+                    onSignedIn = { resyncFace() },
                     puppetId = "account.add.microsoft",
                 )
             }
         }
 
-        // Bulk forget: drop every account and sign out, the multi-active analogue
-        // of the per-account remove above.
+        // Bulk forget: sign out of every account. Routed through the logout
+        // confirm -- doLogout does the actual clear only on confirm, so a
+        // dismissed dialog leaves the accounts intact.
         af.ChaosButton(
             id = "profile_forget_credentials_btn",
             text = s.profileForgetSavedSignIn,
-            onClick = { credentials.clear(); ctx.onLogout() },
+            onClick = { ctx.onLogout() },
             modifier = Modifier.fillMaxWidth(),
             colors = ButtonDefaults.buttonColors(
                 containerColor = glassSurfaceAlpha(0.5f),
                 contentColor = CelestiaTheme.colors.textPrimary,
             ),
         )
-        PuppetClick("profile.forgetCredentials") { credentials.clear(); ctx.onLogout() }
+        PuppetClick("profile.forgetCredentials") { ctx.onLogout() }
     }
 }
 
