@@ -43,10 +43,15 @@ private const val SPIN_RATE = 0.00055f
 // Pitch clamp so the model never flips fully upside down on a vertical drag.
 private const val PITCH_LIMIT = 1.2f
 
+/** How much of the figure to frame: the whole body, or a head-and-torso bust. */
+enum class SkinFraming { Full, Bust }
+
 /**
  * @param skin        the raw skin texture (64x64 / 64x32 legacy / HD multiples).
  * @param interactive when true, drag rotates the model and pauses the auto-spin.
  * @param autoSpin    when true, the model slowly turns while not being dragged.
+ * @param framing     [SkinFraming.Bust] zooms to head+torso (grid cards); [Full]
+ *                    keeps the whole standing figure (the big preview).
  *
  * Slim/Classic and legacy 64x32 are detected from the texture itself.
  */
@@ -56,6 +61,7 @@ fun SkinView3D(
     modifier: Modifier = Modifier,
     interactive: Boolean = true,
     autoSpin: Boolean = true,
+    framing: SkinFraming = SkinFraming.Full,
 ) {
     val legacy = remember(skin) { skin.height <= skin.width / 2 }
     val model = remember(skin) {
@@ -120,11 +126,15 @@ fun SkinView3D(
         val w = size.width
         val h = size.height
         if (w <= 0f || h <= 0f) return@Canvas
-        // Figure spans ~33 model units tall and ~18 wide once limbs rotate in;
-        // fit to the smaller axis with margin so it never clips.
-        val scale = minOf(h / 42f, w / 22f)
+        // Full: figure spans ~33 model units tall / ~18 wide once limbs rotate in;
+        // fit to the smaller axis with margin so it never clips. Bust: zoom in and
+        // drop the model origin near the card's bottom so head+torso fill it and
+        // the legs fall off below.
+        val (scale, centerY) = when (framing) {
+            SkinFraming.Full -> minOf(h / 42f, w / 22f) to h / 2f
+            SkinFraming.Bust -> minOf(h / 24f, w / 18f) to h * 0.80f
+        }
         val centerX = w / 2f
-        val centerY = h / 2f
         val faces = projectFaces(figure, yaw, pitch, scale, centerX, centerY)
         val k = image.width / 64f
 

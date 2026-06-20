@@ -27,6 +27,9 @@ class SkinLibrary(private val dir: Path, private val json: Json) {
         val name: String,
         val slim: Boolean = false,
         val addedAt: Long = 0L,
+        // When this skin was last applied to a provider -- the library doubles as
+        // the skin history, so the most-recently-applied entry is the active one.
+        val lastAppliedAt: Long? = null,
     )
 
     @Serializable
@@ -56,6 +59,14 @@ class SkinLibrary(private val dir: Path, private val json: Json) {
     fun rename(id: String, name: String) {
         writeIndex(Index(readIndex().skins.map { if (it.id == id) it.copy(name = name.ifBlank { it.name }) else it }))
     }
+
+    /** Records that [id]'s skin was applied (to a provider) at [now]. */
+    fun markApplied(id: String, now: Long) {
+        writeIndex(Index(readIndex().skins.map { if (it.id == id) it.copy(lastAppliedAt = now) else it }))
+    }
+
+    /** The id of the most-recently-applied skin -- the active one in the history. */
+    fun activeId(): String? = readIndex().skins.filter { it.lastAppliedAt != null }.maxByOrNull { it.lastAppliedAt!! }?.id
 
     fun delete(id: String) {
         runCatching { Files.deleteIfExists(file(id)) }

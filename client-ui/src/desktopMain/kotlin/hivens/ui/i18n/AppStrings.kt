@@ -663,6 +663,7 @@ interface AppStrings {
     val wardrobeUpload: String
     val wardrobeApplySmartycraft: String
     val wardrobeEmpty: String
+    val wardrobeSaved: String
 
     // --- Background loop mode ---
     val backgroundLoopMode: String
@@ -738,6 +739,21 @@ interface AppStrings {
 
     // ── Library / PackDetail / Content tab ──────────────────────────────
     val contentTabUnsupportedOrigin: String
+    val contentDetachTitle: String
+    val contentDetachBody: String
+    /** Tracked mirror packs: optional mods already toggle; detach for the rest. */
+    val contentTrackedOptionalBody: String
+    val contentDetachButton: String
+    val contentAddFiles: String
+    val contentFindProjects: String
+    val contentSearchPlaceholder: String
+    val contentEmpty: String
+    val contentFilterAll: String
+    val contentFilterMods: String
+    val contentFilterResourcePacks: String
+    val contentFilterShaderPacks: String
+    val contentDeleteTitle: String
+    val contentDeleteBody: String
     val contentTabFetchErrorTitle: String
     val contentTabFetchErrorGeneric: String
     val contentTabRetry: String
@@ -1020,6 +1036,8 @@ interface AppStrings {
     val packCardPlay: String
     val packCardSettings: String
     val packCardMore: String
+    val packCardDeleteTitle: String
+    val packCardDeleteBody: String
     val packCardNeverPlayed: String
     val packCardPlayedJustNow: String
     fun packCardPlayedMinutesAgo(n: Long): String
