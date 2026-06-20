@@ -619,6 +619,9 @@ object RussianStrings : AppStrings {
     override val msaNotConfigured            = "Вход через Microsoft не настроен в этой сборке."
     override val wardrobeTitle               = "Гардероб"
     override val wardrobeSignedOut           = "Войдите, чтобы управлять скинами и плащами."
+    override val wardrobeUpload               = "Загрузить"
+    override val wardrobeApplySmartycraft     = "Применить (SmartyCraft)"
+    override val wardrobeEmpty                = "Библиотека пуста. Загрузите PNG-скин, чтобы начать."
 
     override val backgroundLoopMode      = "Луп"
     override val backgroundLoopUseCodec  = "Из кодека"

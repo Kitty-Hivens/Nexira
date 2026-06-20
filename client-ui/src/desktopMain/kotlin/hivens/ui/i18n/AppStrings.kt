@@ -660,6 +660,9 @@ interface AppStrings {
     val msaNotConfigured: String
     val wardrobeTitle: String
     val wardrobeSignedOut: String
+    val wardrobeUpload: String
+    val wardrobeApplySmartycraft: String
+    val wardrobeEmpty: String
 
     // --- Background loop mode ---
     val backgroundLoopMode: String

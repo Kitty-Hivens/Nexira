@@ -618,6 +618,9 @@ object GermanStrings : AppStrings {
     override val msaNotConfigured            = "Die Microsoft-Anmeldung ist in diesem Build nicht konfiguriert."
     override val wardrobeTitle               = "Kleiderschrank"
     override val wardrobeSignedOut           = "Melde dich an, um Skins und Umhänge zu verwalten."
+    override val wardrobeUpload               = "Hochladen"
+    override val wardrobeApplySmartycraft     = "Anwenden (SmartyCraft)"
+    override val wardrobeEmpty                = "Deine Bibliothek ist leer. Lade ein Skin-PNG hoch, um zu beginnen."
 
     override val backgroundLoopMode      = "Schleife"
     override val backgroundLoopUseCodec  = "Aus Codec"
