@@ -1,6 +1,7 @@
 package hivens.ui.widgets.profile
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,7 +33,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import hivens.core.api.interfaces.ISettingsService
+import hivens.core.data.PackAuthRequirement
 import hivens.core.data.SessionData
+import hivens.launcher.CredentialsManager
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.easter.LocalAprilFools
 import hivens.ui.i18n.LocalStrings
@@ -44,6 +48,7 @@ import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.LocalStyle
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
+import org.koin.compose.koinInject
 
 // Account tab, skin-forward (option 7): the account panel (name + status,
 // balance + top-up) sits on top, with the 3D skin and its upload/refresh
@@ -65,6 +70,7 @@ fun ProfileAccountSectionWidget(instance: WidgetInstance) {
 
     Column(Modifier.fillMaxSize().padding(top = 4.dp)) {
         Column(Modifier.widthIn(max = 520.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            FaceSelector()
             AccountPanel(session)
 
             // Skin below the panel, with upload + refresh directly under it.
@@ -96,6 +102,64 @@ fun ProfileAccountSectionWidget(instance: WidgetInstance) {
     }
 
     PuppetClick("account.logout") { ctx.onLogout() }
+}
+
+// Picks which signed-in account fronts the shell. Hidden with a single provider
+// (nothing to choose); "Auto" defers to licence priority. Persists the choice and
+// repoints the shell face in place.
+@Composable
+private fun FaceSelector() {
+    val ctx = LocalProfileContext.current
+    val credentials: CredentialsManager = koinInject()
+    val settingsService: ISettingsService = koinInject()
+    val s = LocalStrings.current
+    var refreshKey by remember { mutableIntStateOf(0) }
+    val providers = remember(refreshKey) { credentials.listAccounts().map { it.providerId }.distinct() }
+    if (providers.size < 2) return
+    val current = remember(refreshKey) { settingsService.getSettings().preferredFaceProvider }
+
+    fun choose(providerId: String?) {
+        settingsService.saveSettings(settingsService.getSettings().copy(preferredFaceProvider = providerId))
+        credentials.primarySession(providerId)?.let { ctx.onLogin(it) }
+        refreshKey++
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(
+            text = s.accountFaceLabel,
+            style = MaterialTheme.typography.bodySmall,
+            color = CelestiaTheme.colors.textSecondary,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FaceChip(s.accountFaceAuto, selected = current == null) { choose(null) }
+            providers.forEach { providerId ->
+                FaceChip(providerLabel(providerId), selected = current == providerId) { choose(providerId) }
+            }
+        }
+    }
+    PuppetClick("account.face.auto") { choose(null) }
+    providers.forEach { providerId -> PuppetClick("account.face.$providerId") { choose(providerId) } }
+}
+
+@Composable
+private fun FaceChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    val style = LocalStyle.current
+    Text(
+        text = label,
+        style = MaterialTheme.typography.bodySmall,
+        color = if (selected) CelestiaTheme.colors.primary else CelestiaTheme.colors.textSecondary,
+        modifier = Modifier
+            .clip(RoundedCornerShape(style.cardCorner))
+            .background(if (selected) CelestiaTheme.colors.primary.copy(alpha = 0.18f) else glassSurfaceAlpha(0.4f))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+    )
+}
+
+private fun providerLabel(providerId: String): String = when (providerId) {
+    PackAuthRequirement.Microsoft.PROVIDER_KEY -> "Microsoft"
+    PackAuthRequirement.SmartyCraft.PROVIDER_KEY -> "SmartyCraft"
+    else -> providerId.replaceFirstChar { it.uppercase() }
 }
 
 @Composable

@@ -110,15 +110,22 @@ class CredentialsManager internal constructor(
     }
 
     /**
-     * The session that should front the shell -- the "primary face". Resolved by
-     * licence priority (Microsoft, the licensed account, before SmartyCraft;
-     * unknown providers last), not by which account was saved last. Callers
-     * recompute it on add/remove so the face follows the highest-priority
-     * signed-in account. An offline identity is not an account, so it never wins
-     * here -- it is reconstructed separately from `SettingsData.offlinePlayerName`.
+     * The session that should front the shell -- the "primary face". When
+     * [preferredProviderId] names a provider with a signed-in account, that
+     * account wins; otherwise it falls back to licence priority (Microsoft, the
+     * licensed account, before SmartyCraft; unknown providers last) rather than
+     * to whichever account was saved last. Callers recompute it on add/remove so
+     * the face follows the choice, or the highest-priority account when the
+     * chosen provider has none. An offline identity is not an account, so it
+     * never wins here -- it is reconstructed separately from
+     * `SettingsData.offlinePlayerName`.
      */
-    fun primarySession(): SessionData? {
+    fun primarySession(preferredProviderId: String? = null): SessionData? {
         val accounts = readAccountsFile()?.accounts ?: return null
+        if (preferredProviderId != null) {
+            accounts.firstOrNull { it.providerId == preferredProviderId }
+                ?.let { account -> loadSession(account.accountId)?.let { return it } }
+        }
         for (account in accounts.sortedBy { facePriorityIndex(it.providerId) }) {
             loadSession(account.accountId)?.let { return it }
         }

@@ -220,4 +220,12 @@ data class SettingsData(
      * subsequent hide. Internal onboarding state -- no Settings UI surfaces it.
      */
     val trayHintShown: Boolean = false,
+
+    /**
+     * Which signed-in account fronts the shell -- the provider id of the chosen
+     * "face", or null for automatic licence-priority (the Microsoft account
+     * before SmartyCraft). With several accounts active at once, this pins whose
+     * name and skin the shell shows; the launch still routes per content.
+     */
+    val preferredFaceProvider: String? = null,
 )

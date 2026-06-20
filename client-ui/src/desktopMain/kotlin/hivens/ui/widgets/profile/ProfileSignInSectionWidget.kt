@@ -28,6 +28,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.auth.AuthProviderRegistry
+import hivens.core.api.interfaces.ISettingsService
 import hivens.core.data.PackAuthRequirement
 import hivens.launcher.CredentialsManager
 import hivens.launcher.CredentialsManager.StoredAccount
@@ -82,6 +83,7 @@ private fun AccountRoster(ctx: ProfileContext) {
     val af = LocalAprilFools.current
     val credentials: CredentialsManager = koinInject()
     val authRegistry: AuthProviderRegistry = koinInject()
+    val settingsService: ISettingsService = koinInject()
     // A Microsoft section makes sense only when the provider is configured (it
     // advertises device-code capability then) or an account is already stored.
     val msaConfigured = remember { authRegistry.all.any { it.capabilities.supportsDeviceCode } }
@@ -89,10 +91,11 @@ private fun AccountRoster(ctx: ProfileContext) {
     var refreshKey by remember { mutableIntStateOf(0) }
     val accounts = remember(refreshKey) { credentials.listAccounts() }
 
-    // After an add or remove, re-resolve the licence-priority face and push it to
-    // the shell (null -> signed out), then force the roster to re-read.
+    // After an add or remove, re-resolve the face (honouring the chosen provider,
+    // else licence priority) and push it to the shell (null -> signed out), then
+    // force the roster to re-read.
     fun syncFace() {
-        val face = credentials.primarySession()
+        val face = credentials.primarySession(settingsService.getSettings().preferredFaceProvider)
         if (face != null) ctx.onLogin(face) else ctx.onLogout()
         refreshKey++
     }

@@ -965,10 +965,13 @@ fun AppRoot(
     // Business logic lives in AutoLoginCoordinator; the Composable just
     // calls into it and maps the result into the local AppState machine.
     LaunchedEffect(Unit) {
-        val saved = withContext(Dispatchers.IO) { credentialsManager.primarySession() }
+        val settings = withContext(Dispatchers.IO) { settingsService.getSettings() }
+        val saved = withContext(Dispatchers.IO) {
+            credentialsManager.primarySession(settings.preferredFaceProvider)
+        }
         val session = withContext(Dispatchers.IO) {
             AutoLoginCoordinator.resolveSession(
-                settings            = settingsService.getSettings(),
+                settings            = settings,
                 saved               = saved,
                 lastServerId        = profileManager.lastServerId,
                 authService         = authService,
