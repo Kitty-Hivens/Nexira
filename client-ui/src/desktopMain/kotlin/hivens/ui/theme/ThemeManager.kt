@@ -136,6 +136,21 @@ object ThemePresets {
         error      = "#E53935"    // alarm-bright red, distinct from primary
     )
 
+    // Lotus Dark -- the IntelliJ "Lotus Dark" theme mapped to our palette:
+    // near-black ground, a soft-pink lead, and a Monokai-Pro-family pastel spread
+    // (purple, cyan, green, rose). Its on-screen identity is the pink/pastel
+    // syntax, not the dark-red accent hex buried in the upstream theme file.
+    val LOTUS_DARK = CustomTheme(
+        name = "Lotus Dark",
+        primary    = "#FFB3D6",   // soft lotus pink (the caret colour leads)
+        secondary  = "#AB9DF2",   // pastel purple
+        background = "#141414",   // near-black
+        surface    = "#1C1C1C",   // panels
+        accent     = "#78DCE8",   // pastel cyan
+        success    = "#A9DC76",   // pastel green
+        error      = "#FF6188"    // rose-red
+    )
+
     fun getAll() = listOf(
         CELESTIA_DARK,
         CYBERPUNK,
@@ -145,6 +160,7 @@ object ThemePresets {
         NEON_PINK,
         ABYSSAL,
         BLOOD_RAIN,
+        LOTUS_DARK,
     )
 }
 
