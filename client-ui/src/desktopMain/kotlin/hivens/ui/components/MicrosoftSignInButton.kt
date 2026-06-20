@@ -112,7 +112,6 @@ fun MicrosoftSignInButton(
             userCode = challenge.userCode,
             verificationUri = challenge.verificationUri,
             onOpenBrowser = { SystemActions.openUrl(challenge.verificationUri) },
-            onCopyCode = { SystemActions.copyToClipboard(challenge.userCode) },
             onCancel = { msaJob?.cancel(); deviceCodePending = null; deviceCodeError = null },
             errorMessage = deviceCodeError,
         )

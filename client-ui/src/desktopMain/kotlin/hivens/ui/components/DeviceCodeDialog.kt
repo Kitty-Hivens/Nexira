@@ -1,6 +1,7 @@
 package hivens.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,7 +13,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -33,8 +33,8 @@ import hivens.ui.theme.LocalMonoFamily
 
 /**
  * Microsoft device-code prompt: shows the verification URL + the user code to
- * enter on another device, with copy / open-browser shortcuts, and a spinner
- * while the launcher polls for confirmation. Pure presentation -- the poll loop
+ * enter on another device (selectable, with an open-browser shortcut), and a
+ * spinner while the launcher polls for confirmation. Pure presentation -- the poll loop
  * and the resulting [hivens.core.data.SessionData] live in the LoginPanel, which
  * cancels the poll when this dialog is dismissed.
  *
@@ -46,7 +46,6 @@ fun DeviceCodeDialog(
     userCode: String,
     verificationUri: String,
     onOpenBrowser: () -> Unit,
-    onCopyCode: () -> Unit,
     onCancel: () -> Unit,
     errorMessage: String? = null,
 ) {
@@ -83,15 +82,19 @@ fun DeviceCodeDialog(
                 )
                 PuppetField("login.msa.verificationUrl", verificationUri, enabled = false) {}
 
-                Text(
-                    userCode,
-                    fontFamily = LocalMonoFamily.current,
-                    fontSize = 26.sp,
-                    letterSpacing = 4.sp,
-                    textAlign = TextAlign.Center,
-                    color = CelestiaTheme.colors.textPrimary,
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                // Selectable so the code can be highlighted + copied by hand, not
+                // only via the copy button.
+                SelectionContainer {
+                    Text(
+                        userCode,
+                        fontFamily = LocalMonoFamily.current,
+                        fontSize = 26.sp,
+                        letterSpacing = 4.sp,
+                        textAlign = TextAlign.Center,
+                        color = CelestiaTheme.colors.textPrimary,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
                 PuppetField("login.msa.userCode", userCode, enabled = false) {}
 
                 if (errorMessage != null) {
@@ -116,6 +119,8 @@ fun DeviceCodeDialog(
                     }
                 }
 
+                // No copy button -- the code above is selectable, and a dedicated
+                // copy went unnoticed anyway. Cancel + open fit one row comfortably.
                 Row(
                     Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End,
@@ -126,17 +131,12 @@ fun DeviceCodeDialog(
                     }
                     PuppetClick("login.msa.cancel") { onCancel() }
                     Spacer(Modifier.width(8.dp))
-                    OutlinedButton(onClick = onCopyCode, shape = MaterialTheme.shapes.small) {
-                        Text(s.msaCopyCode, color = CelestiaTheme.colors.textPrimary)
-                    }
-                    PuppetClick("login.msa.copyCode") { onCopyCode() }
-                    Spacer(Modifier.width(8.dp))
                     Button(
                         onClick = onOpenBrowser,
                         shape = MaterialTheme.shapes.small,
                         colors = ButtonDefaults.buttonColors(containerColor = CelestiaTheme.colors.primary),
                     ) {
-                        Text(s.msaOpenBrowser)
+                        Text(s.msaOpenBrowser, maxLines = 1)
                     }
                     PuppetClick("login.msa.openBrowser") { onOpenBrowser() }
                 }
