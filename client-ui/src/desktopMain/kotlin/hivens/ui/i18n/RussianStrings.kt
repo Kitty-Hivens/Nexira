@@ -614,6 +614,9 @@ object RussianStrings : AppStrings {
     override val accountRemove               = "Удалить"
     override val accountFaceLabel            = "Показывать как"
     override val accountFaceAuto             = "Авто"
+    override val profileSignOutSmartycraft   = "Выйти из SmartyCraft"
+    override val profileSignOutMicrosoft     = "Выйти из Microsoft"
+    override val msaNotConfigured            = "Вход через Microsoft не настроен в этой сборке."
 
     override val backgroundLoopMode      = "Луп"
     override val backgroundLoopUseCodec  = "Из кодека"
@@ -982,8 +985,8 @@ object RussianStrings : AppStrings {
         "widget.notifications.history.expandUp" to "Раскрывать вверх",
         "widget.notifications.history.clock12h" to "12-часовой формат (am/pm)",
         "widget.notifications.history.verticalTime" to "Время в столбик",
-        "widget.profile.account.section" to "Аккаунт",
-        "widget.profile.signin" to "Вход",
+        "widget.profile.account.section" to "SmartyCraft",
+        "widget.profile.signin" to "Microsoft",
         "widget.profile.nav" to "Навигация профиля",
         "widget.profile.skin.section" to "Скин",
         "widget.profile.skin.section.previewHeight" to "Высота превью",

@@ -655,6 +655,9 @@ interface AppStrings {
     val accountRemove: String
     val accountFaceLabel: String
     val accountFaceAuto: String
+    val profileSignOutSmartycraft: String
+    val profileSignOutMicrosoft: String
+    val msaNotConfigured: String
 
     // --- Background loop mode ---
     val backgroundLoopMode: String

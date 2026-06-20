@@ -615,6 +615,9 @@ object EnglishStrings : AppStrings {
     override val accountRemove               = "Remove"
     override val accountFaceLabel            = "Show as"
     override val accountFaceAuto             = "Auto"
+    override val profileSignOutSmartycraft   = "Sign out of SmartyCraft"
+    override val profileSignOutMicrosoft     = "Sign out of Microsoft"
+    override val msaNotConfigured            = "Microsoft sign-in is not configured in this build."
 
     override val backgroundLoopMode      = "Loop"
     override val backgroundLoopUseCodec  = "Use codec"
@@ -967,8 +970,8 @@ object EnglishStrings : AppStrings {
         "widget.notifications.history.expandUp" to "Expand upward",
         "widget.notifications.history.clock12h" to "12-hour clock (am/pm)",
         "widget.notifications.history.verticalTime" to "Stacked time",
-        "widget.profile.account.section" to "Account",
-        "widget.profile.signin" to "Sign in",
+        "widget.profile.account.section" to "SmartyCraft",
+        "widget.profile.signin" to "Microsoft",
         "widget.profile.nav" to "Profile navigation",
         "widget.profile.skin.section" to "Skin",
         "widget.profile.skin.section.previewHeight" to "Preview height",

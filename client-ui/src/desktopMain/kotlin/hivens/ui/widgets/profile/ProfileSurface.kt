@@ -15,7 +15,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -76,17 +75,9 @@ fun ProfileSurface(
 ) {
     val s = LocalStrings.current
     val skinManager: SkinManager = koinInject()
-    val selectedCategory = remember {
-        mutableStateOf(if (session != null) ProfileCategory.Account else ProfileCategory.SignIn)
-    }
-
-    // Keep the category coherent with auth state: signing in lands on Account
-    // in place; signing out forces back to Sign in -- the only category that
-    // renders without a session.
-    LaunchedEffect(session != null) {
-        if (session == null) selectedCategory.value = ProfileCategory.SignIn
-        else if (selectedCategory.value == ProfileCategory.SignIn) selectedCategory.value = ProfileCategory.Account
-    }
+    // Per-provider sections each own their signed-in/out state, so the category
+    // no longer flips with the session; default to the SmartyCraft section.
+    val selectedCategory = remember { mutableStateOf(ProfileCategory.SmartyCraft) }
 
     val ctx = remember(session, selectedCategory) {
         ProfileContext(
@@ -130,15 +121,14 @@ fun ProfileSurface(
                 } else {
                     Row(Modifier.fillMaxSize().padding(16.dp)) {
                         SlotRenderer(SurfaceId(SURFACE), SlotId("nav"), Modifier.width(200.dp).fillMaxHeight())
-                        when {
-                            // Sign-in also covers the frame right after logout where
-                            // Account is still selected but the session is gone (the
-                            // LaunchedEffect above resets the category next
-                            // composition) -- otherwise the right pane goes blank.
-                            selectedCategory.value == ProfileCategory.SignIn || session == null ->
-                                SlotRenderer(SurfaceId(SURFACE), SlotId("signin"), Modifier.weight(1f).fillMaxHeight())
-                            else ->
+                        // The slot ids are historical: "account" hosts the SmartyCraft
+                        // section, "signin" the Microsoft one. Reused as-is so the
+                        // bundled layout + reconcile stay untouched.
+                        when (selectedCategory.value) {
+                            ProfileCategory.SmartyCraft ->
                                 SlotRenderer(SurfaceId(SURFACE), SlotId("account"), Modifier.weight(1f).fillMaxHeight())
+                            ProfileCategory.Microsoft ->
+                                SlotRenderer(SurfaceId(SURFACE), SlotId("signin"), Modifier.weight(1f).fillMaxHeight())
                         }
                     }
                 }
