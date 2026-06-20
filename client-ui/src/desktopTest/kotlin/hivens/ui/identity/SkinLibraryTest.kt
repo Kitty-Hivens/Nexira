@@ -71,6 +71,18 @@ class SkinLibraryTest {
     }
 
     @Test
+    fun `markApplied records the timestamp and activeId tracks the latest`() {
+        val a = lib.add(png, "A", false, now = 1)
+        val b = lib.add(png, "B", false, now = 2)
+        assertNull(lib.activeId())
+        lib.markApplied(a.id, now = 10)
+        assertEquals(a.id, lib.activeId())
+        assertEquals(10L, lib.list().first { it.id == a.id }.lastAppliedAt)
+        lib.markApplied(b.id, now = 20)
+        assertEquals(b.id, lib.activeId(), "newest application wins")
+    }
+
+    @Test
     fun `empty library lists nothing`() {
         assertTrue(lib.list().isEmpty())
     }

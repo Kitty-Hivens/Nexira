@@ -1,6 +1,5 @@
 package hivens.ui.widgets.wardrobe
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -15,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -34,13 +34,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import hivens.core.api.SkinRepository
 import hivens.core.data.PackAuthRequirement
@@ -56,6 +53,7 @@ import hivens.ui.identity.SkinLibrary
 import hivens.ui.identity.SkinManager
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
+import hivens.ui.skin3d.SkinFraming
 import hivens.ui.skin3d.SkinView3D
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.LocalStyle
@@ -123,6 +121,8 @@ private fun Wardrobe(session: SessionData) {
         selectedId?.let { library.bytes(it) }?.let(::decodeSkin)
     }
     val scSession = remember(refreshKey, session) { credentials.accountFor(SC_KEY) }
+    // The library doubles as the history -- the last-applied skin is the active one.
+    val activeId = remember(refreshKey) { library.activeId() }
 
     fun importSkin() {
         scope.launch {
@@ -148,6 +148,7 @@ private fun Wardrobe(session: SessionData) {
             }
             busy = false
             if (result == "OK") {
+                library.markApplied(id, System.currentTimeMillis())
                 skinManager.invalidate(sc.playerName)
                 refreshKey++
             } else {
@@ -168,54 +169,41 @@ private fun Wardrobe(session: SessionData) {
         }
 
         Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            // Apply the picked skin to a signed-in SmartyCraft account.
+            if (scSession != null && selectedId != null) {
                 af.ChaosButton(
-                    id = "wardrobe_upload_btn",
-                    text = s.wardrobeUpload,
-                    onClick = { importSkin() },
+                    id = "wardrobe_apply_sc_btn",
+                    text = s.wardrobeApplySmartycraft,
+                    onClick = { if (!busy) applyToSmartyCraft() },
                     modifier = Modifier,
                     colors = ButtonDefaults.buttonColors(containerColor = CelestiaTheme.colors.primary),
                 )
-                PuppetClick("wardrobe.upload") { importSkin() }
-                if (scSession != null && selectedId != null) {
-                    af.ChaosButton(
-                        id = "wardrobe_apply_sc_btn",
-                        text = s.wardrobeApplySmartycraft,
-                        onClick = { if (!busy) applyToSmartyCraft() },
-                        modifier = Modifier,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = glassSurfaceAlpha(0.55f),
-                            contentColor = CelestiaTheme.colors.textPrimary,
-                        ),
-                    )
-                    PuppetClick("wardrobe.applySmartycraft") { if (!busy) applyToSmartyCraft() }
-                }
+                PuppetClick("wardrobe.applySmartycraft") { if (!busy) applyToSmartyCraft() }
             }
             error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = CelestiaTheme.colors.error) }
 
-            if (skins.isEmpty()) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(s.wardrobeEmpty, style = MaterialTheme.typography.bodyMedium, color = CelestiaTheme.colors.textSecondary)
-                }
-            } else {
-                LazyVerticalGrid(
-                    columns = GridCells.Adaptive(minSize = 84.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    items(skins, key = { it.id }) { entry ->
-                        SkinCard(
-                            bitmap = remember(entry.id, refreshKey) { library.bytes(entry.id)?.let(::decodeSkin) },
-                            name = entry.name,
-                            selected = entry.id == selectedId,
-                            onClick = { selectedId = entry.id },
-                            onDelete = {
-                                library.delete(entry.id)
-                                if (selectedId == entry.id) selectedId = null
-                                refreshKey++
-                            },
-                        )
-                    }
+            Text(s.wardrobeSaved, style = MaterialTheme.typography.titleSmall, color = CelestiaTheme.colors.textSecondary)
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(minSize = 96.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                // The "+" tile leads the grid (Modrinth shape); the library is never
+                // truly empty, so it doubles as the empty-state prompt.
+                item(key = "add") { AddTile(onClick = { importSkin() }) }
+                items(skins, key = { it.id }) { entry ->
+                    SkinCard(
+                        bitmap = remember(entry.id, refreshKey) { library.bytes(entry.id)?.let(::decodeSkin) },
+                        name = entry.name,
+                        selected = entry.id == selectedId,
+                        isActive = entry.id == activeId,
+                        onClick = { selectedId = entry.id },
+                        onDelete = {
+                            library.delete(entry.id)
+                            if (selectedId == entry.id) selectedId = null
+                            refreshKey++
+                        },
+                    )
                 }
             }
         }
@@ -227,6 +215,7 @@ private fun SkinCard(
     bitmap: ImageBitmap?,
     name: String,
     selected: Boolean,
+    isActive: Boolean,
     onClick: () -> Unit,
     onDelete: () -> Unit,
 ) {
@@ -245,8 +234,19 @@ private fun SkinCard(
             .padding(6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Box(Modifier.fillMaxWidth().aspectRatio(1f), contentAlignment = Alignment.Center) {
-            if (bitmap != null) SkinHead(bitmap, Modifier.fillMaxSize().padding(4.dp))
+        Box(Modifier.fillMaxWidth().aspectRatio(1f)) {
+            if (bitmap != null) {
+                SkinView3D(bitmap, Modifier.fillMaxSize(), interactive = false, autoSpin = false, framing = SkinFraming.Bust)
+            }
+            // Active marker -- the most-recently-applied skin (library = history).
+            if (isActive) {
+                Symbol(
+                    NxIcon.CheckCircle, null,
+                    tint = CelestiaTheme.colors.success,
+                    size = 16.dp,
+                    modifier = Modifier.align(Alignment.TopEnd).padding(2.dp),
+                )
+            }
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
@@ -257,22 +257,33 @@ private fun SkinCard(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f, fill = false),
             )
-            IconButton(onClick = onDelete, modifier = Modifier.width(24.dp).height(24.dp)) {
-                Symbol(NxIcon.Delete, s.accountRemove, tint = CelestiaTheme.colors.textSecondary, modifier = Modifier.width(16.dp).height(16.dp))
+            IconButton(onClick = onDelete, modifier = Modifier.size(24.dp)) {
+                Symbol(NxIcon.Delete, s.accountRemove, tint = CelestiaTheme.colors.textSecondary, size = 16.dp)
             }
         }
     }
 }
 
-// 2D head: the 8x8 face at (8,8) plus the hat overlay at (40,8), nearest-neighbour
-// scaled. Works for both 64x64 and legacy 64x32 skins.
+// The "+" tile that opens the PNG import; shaped like a skin card so the grid reads
+// as one strip (Modrinth's "Add a skin").
 @Composable
-private fun SkinHead(skin: ImageBitmap, modifier: Modifier) {
-    Canvas(modifier) {
-        val dst = IntSize(size.width.toInt(), size.height.toInt())
-        drawImage(skin, srcOffset = IntOffset(8, 8), srcSize = IntSize(8, 8), dstSize = dst, filterQuality = FilterQuality.None)
-        drawImage(skin, srcOffset = IntOffset(40, 8), srcSize = IntSize(8, 8), dstSize = dst, filterQuality = FilterQuality.None)
+private fun AddTile(onClick: () -> Unit) {
+    val s = LocalStrings.current
+    val style = LocalStyle.current
+    Column(
+        modifier = Modifier
+            .clip(RoundedCornerShape(style.cardCorner))
+            .background(glassSurfaceAlpha(0.4f))
+            .clickable(onClick = onClick)
+            .padding(6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(Modifier.fillMaxWidth().aspectRatio(1f), contentAlignment = Alignment.Center) {
+            Symbol(NxIcon.Add, s.wardrobeUpload, tint = CelestiaTheme.colors.primary, size = 32.dp)
+        }
+        Text(s.wardrobeUpload, style = MaterialTheme.typography.labelSmall, color = CelestiaTheme.colors.textSecondary, maxLines = 1)
     }
+    PuppetClick("wardrobe.upload") { onClick() }
 }
 
 private fun decodeSkin(bytes: ByteArray): ImageBitmap? =
