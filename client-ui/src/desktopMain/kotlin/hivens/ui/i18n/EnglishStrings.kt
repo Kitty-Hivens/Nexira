@@ -611,6 +611,8 @@ object EnglishStrings : AppStrings {
     override val profileCategorySecurity    = "Security"
     override val profileForgetSavedSignIn   = "Forget saved sign-in"
     override val profileSecurityHint        = "Your sign-in is saved on this device for auto-login."
+    override val accountsTitle               = "Accounts"
+    override val accountRemove               = "Remove"
 
     override val backgroundLoopMode      = "Loop"
     override val backgroundLoopUseCodec  = "Use codec"
