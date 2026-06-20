@@ -6,10 +6,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ButtonDefaults
@@ -19,7 +19,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -28,222 +27,154 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.auth.AuthProviderRegistry
-import hivens.core.api.interfaces.ISettingsService
 import hivens.core.data.PackAuthRequirement
+import hivens.core.data.SessionData
 import hivens.launcher.CredentialsManager
-import hivens.launcher.CredentialsManager.StoredAccount
-import hivens.ui.LoginPanel
 import hivens.ui.components.MicrosoftSignInButton
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.easter.LocalAprilFools
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.platform.SystemActions
 import hivens.ui.puppet.PuppetClick
+import hivens.ui.puppet.PuppetScreen
 import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.LocalMonoFamily
 import hivens.ui.theme.LocalStyle
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 import org.koin.compose.koinInject
 
-// Sign-in / Security slot of the profile surface. Signed out it renders the
-// login form (reused verbatim, with its SSL-bypass + 2FA + remember-me flows);
-// signing in completes in place -- onLogin flips the app to Authenticated and
-// the surface re-renders on the Account tab.
+private val MS_KEY = PackAuthRequirement.Microsoft.PROVIDER_KEY
+
+// Microsoft profile section (slot "signin"). Signed into Microsoft it shows the
+// licensed identity -- Minecraft name, UUID, the live skin -- with a sign-out.
+// Signed out it offers the device-code sign-in when a client id is configured,
+// or explains that this build has none. Resolves the Microsoft account directly,
+// independent of the shell face (which may be a SmartyCraft account).
 //
-// Signed in it is the account roster: one section per credential provider
-// (SmartyCraft, Microsoft) listing the signed-in accounts, with per-account
-// remove and an add affordance in an empty section. The accounts coexist
-// (multi-active) -- a launch routes to the one matching the content's provider.
-// The displayed "face" follows licence priority (the Microsoft account first);
-// add/remove recompute it via primarySession and push it to the shell. Removing
-// the last account signs out. Logout itself lives in the left-rail nav.
-//
-// Both states are capped to a comfortable column width so the form/roster read
-// as controls in a card, not full-pane bars across the wide profile content.
-// removable = false: a user must not be able to editor-delete their own sign-in.
+// Skin and cape management (upload, cape selection via the Mojang API) is the
+// next, deeper pass -- this section is the identity + auth foundation.
 @Widget(id = "profile.signin", displayName = "widget.profile.signin", removable = false)
 @Composable
 fun ProfileSignInSectionWidget(instance: WidgetInstance) {
     val ctx = LocalProfileContext.current
+    val credentials: CredentialsManager = koinInject()
+    val authRegistry: AuthProviderRegistry = koinInject()
+    val s = LocalStrings.current
+
+    // The device-code provider is registered only when a client id is configured.
+    val msaConfigured = remember { authRegistry.all.any { it.capabilities.supportsDeviceCode } }
+    var refreshKey by remember { mutableIntStateOf(0) }
+    val msSession = remember(refreshKey, ctx.session) { credentials.accountFor(MS_KEY) }
+
+    PuppetScreen("Profile_Microsoft")
     Box(Modifier.fillMaxWidth()) {
-        Column(Modifier.widthIn(max = 440.dp)) {
-            if (ctx.session == null) {
-                LoginPanel(onLogin = ctx.onLogin)
-            } else {
-                AccountRoster(ctx)
+        Column(
+            Modifier.widthIn(max = 520.dp).padding(top = 4.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            when {
+                msSession != null -> MicrosoftAccount(msSession) { refreshKey++ }
+
+                msaConfigured -> MicrosoftSignInButton(
+                    onSignedIn = {
+                        credentials.primarySession()?.let { ctx.onLogin(it) }
+                        refreshKey++
+                    },
+                    puppetId = "account.signin.microsoft",
+                )
+
+                else -> Text(
+                    text = s.msaNotConfigured,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = CelestiaTheme.colors.textSecondary,
+                )
             }
         }
     }
 }
 
 @Composable
-private fun AccountRoster(ctx: ProfileContext) {
+private fun MicrosoftAccount(session: SessionData, onChanged: () -> Unit) {
+    val ctx = LocalProfileContext.current
+    val credentials: CredentialsManager = koinInject()
     val s = LocalStrings.current
     val af = LocalAprilFools.current
-    val credentials: CredentialsManager = koinInject()
-    val authRegistry: AuthProviderRegistry = koinInject()
-    val settingsService: ISettingsService = koinInject()
-    // A Microsoft section makes sense only when the provider is configured (it
-    // advertises device-code capability then) or an account is already stored.
-    val msaConfigured = remember { authRegistry.all.any { it.capabilities.supportsDeviceCode } }
 
-    var refreshKey by remember { mutableIntStateOf(0) }
-    val accounts = remember(refreshKey) { credentials.listAccounts() }
-
-    // After the account set changes (an add, or a removal that left at least one
-    // account), re-resolve the face (the chosen provider, else licence priority)
-    // and refresh the roster.
-    fun resyncFace() {
-        credentials.primarySession(settingsService.getSettings().preferredFaceProvider)
-            ?.let { ctx.onLogin(it) }
-        refreshKey++
-    }
-
-    // Removing the last account is a logout: route it through the confirm dialog
-    // (doLogout clears + signs out on confirm) instead of deleting here, so a
-    // dismissed confirm leaves the account intact rather than a face with no
-    // account behind it.
-    fun removeOrLogout(accountId: String) {
-        if (accounts.size <= 1) {
+    // Signing out of Microsoft removes its account; if it was the only one, that
+    // is a full logout -- route it through the confirm so a dismissed dialog
+    // leaves the account intact (see the SmartyCraft section for the same shape).
+    fun signOut() {
+        if (credentials.listAccounts().size <= 1) {
             ctx.onLogout()
-        } else {
-            credentials.removeAccount(accountId)
-            resyncFace()
+            return
         }
+        credentials.listAccounts().firstOrNull { it.providerId == MS_KEY }
+            ?.let { credentials.removeAccount(it.accountId) }
+        credentials.primarySession()?.let { ctx.onLogin(it) } ?: ctx.onLogout()
+        onChanged()
     }
 
-    val currentAccountId = ctx.session?.let { it.uuid.ifBlank { it.playerName } }
-    val scKey = PackAuthRequirement.SmartyCraft.PROVIDER_KEY
-    val msKey = PackAuthRequirement.Microsoft.PROVIDER_KEY
-
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(18.dp),
-    ) {
+    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text(
-            text = s.accountsTitle,
-            style = MaterialTheme.typography.titleMedium,
+            text = session.playerName,
+            style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
             color = CelestiaTheme.colors.textPrimary,
         )
-
-        ProviderSection(
-            title = "SmartyCraft",
-            accounts = accounts.filter { it.providerId == scKey },
-            currentAccountId = currentAccountId,
-            onRemove = { removeOrLogout(it) },
-        ) {
-            // SmartyCraft uses the username/password form; reveal it inline, with
-            // the offline + Microsoft alternatives suppressed in this context.
-            var adding by remember { mutableStateOf(false) }
-            if (adding) {
-                LoginPanel(
-                    onLogin = { adding = false; resyncFace() },
-                    showOffline = false,
-                    showMicrosoft = false,
-                )
-            } else {
-                af.ChaosButton(
-                    id = "account_add_smartycraft_btn",
-                    text = s.loginButton,
-                    onClick = { adding = true },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = glassSurfaceAlpha(0.5f),
-                        contentColor = CelestiaTheme.colors.textPrimary,
-                    ),
-                )
-                PuppetClick("account.add.smartycraft") { adding = true }
-            }
-        }
-
-        if (msaConfigured || accounts.any { it.providerId == msKey }) {
-            ProviderSection(
-                title = "Microsoft",
-                accounts = accounts.filter { it.providerId == msKey },
-                currentAccountId = currentAccountId,
-                onRemove = { removeOrLogout(it) },
-            ) {
-                // Device-code button; renders nothing if no client id is configured.
-                MicrosoftSignInButton(
-                    onSignedIn = { resyncFace() },
-                    puppetId = "account.add.microsoft",
-                )
-            }
-        }
-
-        // Bulk forget: sign out of every account. Routed through the logout
-        // confirm -- doLogout does the actual clear only on confirm, so a
-        // dismissed dialog leaves the accounts intact.
+        UuidCard(session.uuid)
+        // The live skin + cape manager (Mojang-sourced, not the SmartyCraft skin
+        // service this section's identity comes from) is the next pass.
         af.ChaosButton(
-            id = "profile_forget_credentials_btn",
-            text = s.profileForgetSavedSignIn,
-            onClick = { ctx.onLogout() },
-            modifier = Modifier.fillMaxWidth(),
+            id = "profile_ms_signout_btn",
+            text = s.profileSignOutMicrosoft,
+            onClick = { signOut() },
+            modifier = Modifier.widthIn(min = 200.dp),
             colors = ButtonDefaults.buttonColors(
                 containerColor = glassSurfaceAlpha(0.5f),
                 contentColor = CelestiaTheme.colors.textPrimary,
             ),
         )
-        PuppetClick("profile.forgetCredentials") { ctx.onLogout() }
+        PuppetClick("account.signout.microsoft") { signOut() }
     }
 }
 
 @Composable
-private fun ProviderSection(
-    title: String,
-    accounts: List<StoredAccount>,
-    currentAccountId: String?,
-    onRemove: (String) -> Unit,
-    emptyContent: @Composable () -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        // Section header is the provider's own name -- a proper noun, not localized.
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleSmall,
-            color = CelestiaTheme.colors.textSecondary,
-        )
-        if (accounts.isEmpty()) {
-            emptyContent()
-        } else {
-            accounts.forEach { account ->
-                AccountRow(
-                    account = account,
-                    isCurrent = account.accountId == currentAccountId,
-                    onRemove = { onRemove(account.accountId) },
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun AccountRow(account: StoredAccount, isCurrent: Boolean, onRemove: () -> Unit) {
-    val s = LocalStrings.current
+private fun UuidCard(uuid: String) {
     val style = LocalStyle.current
-    val accent = if (isCurrent) CelestiaTheme.colors.primary else CelestiaTheme.colors.textSecondary
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(style.cardCorner))
             .background(CelestiaTheme.colors.background.copy(alpha = 0.4f))
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+            .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Symbol(NxIcon.AccountCircle, null, tint = accent, modifier = Modifier.size(28.dp))
-        Spacer(Modifier.width(10.dp))
-        Text(
-            text = account.displayName.ifBlank { account.username },
-            style = MaterialTheme.typography.bodyLarge,
-            fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Normal,
-            color = if (isCurrent) CelestiaTheme.colors.textPrimary else CelestiaTheme.colors.textPrimary.copy(alpha = 0.85f),
-            modifier = Modifier.weight(1f),
-        )
-        IconButton(onClick = onRemove) {
-            Symbol(NxIcon.Delete, s.accountRemove, tint = CelestiaTheme.colors.textSecondary, modifier = Modifier.size(20.dp))
+        Column {
+            Text("UUID", style = MaterialTheme.typography.labelSmall, color = CelestiaTheme.colors.textSecondary)
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = dashedUuid(uuid),
+                style = MaterialTheme.typography.bodyMedium,
+                fontFamily = LocalMonoFamily.current,
+                color = CelestiaTheme.colors.textPrimary,
+            )
         }
-        PuppetClick("account.remove.${account.accountId}") { onRemove() }
+        IconButton(onClick = { SystemActions.copyToClipboard(uuid) }) {
+            Symbol(NxIcon.ContentCopy, "UUID", tint = CelestiaTheme.colors.textSecondary)
+        }
+        PuppetClick("account.microsoft.copyUuid") { SystemActions.copyToClipboard(uuid) }
     }
 }
+
+// Dashes a 32-char hex UUID into 8-4-4-4-12; passes anything else through.
+private fun dashedUuid(uuid: String): String =
+    if (uuid.length == 32 && uuid.all { it.isLetterOrDigit() }) {
+        "${uuid.substring(0, 8)}-${uuid.substring(8, 12)}-${uuid.substring(12, 16)}-" +
+            "${uuid.substring(16, 20)}-${uuid.substring(20)}"
+    } else {
+        uuid
+    }

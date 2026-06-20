@@ -35,11 +35,9 @@ fun ProfileNavWidget(instance: WidgetInstance) {
     val s = LocalStrings.current
     val style = LocalStyle.current
     val current by ctx.selectedCategory
-    val signedIn = ctx.session != null
 
-    // Signed out, only Sign in is meaningful (Account / Skin need an identity).
-    // Signed in, Sign in re-labels to Security (credential management, no form).
-    val categories = if (signedIn) ProfileCategory.entries else listOf(ProfileCategory.SignIn)
+    // Both provider sections always show; each owns its signed-in/out state.
+    val categories = ProfileCategory.entries
 
     Column(
         modifier = Modifier
@@ -49,8 +47,7 @@ fun ProfileNavWidget(instance: WidgetInstance) {
     ) {
         categories.forEach { category ->
             val isSelected = category == current
-            val label = if (category == ProfileCategory.SignIn && signedIn) s.profileCategorySecurity
-                        else category.label(s)
+            val label = category.label(s)
             PuppetClick("profile.category.${category.name}") {
                 ctx.selectedCategory.value = category
             }

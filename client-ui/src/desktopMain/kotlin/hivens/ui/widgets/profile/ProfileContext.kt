@@ -32,7 +32,7 @@ val LocalProfileContext: ProvidableCompositionLocal<ProfileContext> =
 
 internal val STUB_PROFILE: ProfileContext = ProfileContext(
     session          = SessionData(),
-    selectedCategory = mutableStateOf(ProfileCategory.Account),
+    selectedCategory = mutableStateOf(ProfileCategory.SmartyCraft),
     onLogin          = {},
     onLogout         = {},
 )
