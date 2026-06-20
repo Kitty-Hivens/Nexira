@@ -7,6 +7,7 @@ import hivens.launcher.diag.ShellRecovery
 import hivens.launcher.diag.UiRecoverySignal
 import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.stringsFor
+import hivens.ui.identity.SkinLibrary
 import hivens.ui.identity.SkinManager
 import hivens.ui.notifications.IndicationCenter
 import hivens.ui.notifications.NotificationArchiveStore
@@ -52,6 +53,7 @@ import org.koin.dsl.module
  */
 val uiModule = module {
     single { SkinManager(get(), get()) }
+    single { SkinLibrary(get<Path>().resolve("skins"), get()) }
     single { GameConsoleService(get()) }
 
     // Widget kernel registry. KSP-generated; entries land as @Widget
