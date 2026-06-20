@@ -624,6 +624,8 @@ object EnglishStrings : AppStrings {
     override val wardrobeApplySmartycraft     = "Apply (SmartyCraft)"
     override val wardrobeEmpty                = "Your library is empty. Upload a skin PNG to begin."
     override val wardrobeSaved               = "Saved"
+    override val wardrobeCapes               = "Capes"
+    override val wardrobeApplyCape           = "Apply cape (SmartyCraft)"
 
     override val backgroundLoopMode      = "Loop"
     override val backgroundLoopUseCodec  = "Use codec"

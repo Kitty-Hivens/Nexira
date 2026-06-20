@@ -1,5 +1,6 @@
 package hivens.ui.widgets.wardrobe
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -34,10 +36,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import hivens.core.api.SkinRepository
 import hivens.core.data.PackAuthRequirement
@@ -113,38 +118,45 @@ private fun Wardrobe(session: SessionData) {
 
     var refreshKey by remember { mutableIntStateOf(0) }
     var selectedId by remember { mutableStateOf<String?>(null) }
+    var selectedCapeId by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
-    val skins = remember(refreshKey) { library.list() }
+    val skins = remember(refreshKey) { library.list(SkinLibrary.Kind.Skin) }
+    val capes = remember(refreshKey) { library.list(SkinLibrary.Kind.Cape) }
     val selectedBitmap = remember(selectedId, refreshKey) {
         selectedId?.let { library.bytes(it) }?.let(::decodeSkin)
     }
     val scSession = remember(refreshKey, session) { credentials.accountFor(SC_KEY) }
-    // The library doubles as the history -- the last-applied skin is the active one.
-    val activeId = remember(refreshKey) { library.activeId() }
+    // The library doubles as the history -- the last-applied entry (per kind) is active.
+    val activeSkinId = remember(refreshKey) { library.activeId(SkinLibrary.Kind.Skin) }
+    val activeCapeId = remember(refreshKey) { library.activeId(SkinLibrary.Kind.Cape) }
 
-    fun importSkin() {
+    fun importInto(kind: SkinLibrary.Kind, select: (String) -> Unit) {
         scope.launch {
             val picked = FileKit.openFilePicker(type = FileKitType.File(extensions = listOf("png")))
             val file = picked?.path?.let { File(it) } ?: return@launch
             val bytes = withContext(Dispatchers.IO) { runCatching { file.readBytes() }.getOrNull() } ?: return@launch
-            val entry = withContext(Dispatchers.IO) { library.add(bytes, file.nameWithoutExtension, slim = false, now = System.currentTimeMillis()) }
-            selectedId = entry.id
+            val entry = withContext(Dispatchers.IO) {
+                library.add(bytes, file.nameWithoutExtension, slim = false, now = System.currentTimeMillis(), kind = kind)
+            }
+            select(entry.id)
             refreshKey++
         }
     }
 
-    fun applyToSmartyCraft() {
+    // Applies a stored skin or cape to the signed-in SmartyCraft account -- a cape
+    // goes through uploadCloak (isCloak). Capes can need a premium/HD account; that
+    // rejection surfaces from the protocol as the error string.
+    fun applyToSc(id: String, kind: SkinLibrary.Kind) {
         val sc = scSession ?: return
-        val id = selectedId ?: return
-        val entry = skins.firstOrNull { it.id == id } ?: return
         busy = true
         error = null
         scope.launch {
             val result = withContext(Dispatchers.IO) {
-                runCatching { skinRepository.uploadSkin(library.file(id).toFile(), entry.slim, sc) }
-                    .getOrElse { it.message ?: "error" }
+                runCatching {
+                    skinRepository.uploadSkin(library.file(id).toFile(), isCloak = kind == SkinLibrary.Kind.Cape, session = sc)
+                }.getOrElse { it.message ?: "error" }
             }
             busy = false
             if (result == "OK") {
@@ -169,38 +181,72 @@ private fun Wardrobe(session: SessionData) {
         }
 
         Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            // Apply the picked skin to a signed-in SmartyCraft account.
-            if (scSession != null && selectedId != null) {
-                af.ChaosButton(
-                    id = "wardrobe_apply_sc_btn",
-                    text = s.wardrobeApplySmartycraft,
-                    onClick = { if (!busy) applyToSmartyCraft() },
-                    modifier = Modifier,
-                    colors = ButtonDefaults.buttonColors(containerColor = CelestiaTheme.colors.primary),
-                )
-                PuppetClick("wardrobe.applySmartycraft") { if (!busy) applyToSmartyCraft() }
+            // Apply the picked skin and/or cape to a signed-in SmartyCraft account.
+            if (scSession != null && (selectedId != null || selectedCapeId != null)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    selectedId?.let { id ->
+                        af.ChaosButton(
+                            id = "wardrobe_apply_sc_btn",
+                            text = s.wardrobeApplySmartycraft,
+                            onClick = { if (!busy) applyToSc(id, SkinLibrary.Kind.Skin) },
+                            modifier = Modifier,
+                            colors = ButtonDefaults.buttonColors(containerColor = CelestiaTheme.colors.primary),
+                        )
+                        PuppetClick("wardrobe.applySmartycraft") { if (!busy) applyToSc(id, SkinLibrary.Kind.Skin) }
+                    }
+                    selectedCapeId?.let { id ->
+                        af.ChaosButton(
+                            id = "wardrobe_apply_cape_sc_btn",
+                            text = s.wardrobeApplyCape,
+                            onClick = { if (!busy) applyToSc(id, SkinLibrary.Kind.Cape) },
+                            modifier = Modifier,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = glassSurfaceAlpha(0.55f),
+                                contentColor = CelestiaTheme.colors.textPrimary,
+                            ),
+                        )
+                        PuppetClick("wardrobe.applyCapeSmartycraft") { if (!busy) applyToSc(id, SkinLibrary.Kind.Cape) }
+                    }
+                }
             }
             error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = CelestiaTheme.colors.error) }
 
-            Text(s.wardrobeSaved, style = MaterialTheme.typography.titleSmall, color = CelestiaTheme.colors.textSecondary)
+            // One grid, two sections (Modrinth shape). The "+" tile leads each, so a
+            // section is never truly empty -- it doubles as the import prompt.
             LazyVerticalGrid(
                 columns = GridCells.Adaptive(minSize = 96.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                // The "+" tile leads the grid (Modrinth shape); the library is never
-                // truly empty, so it doubles as the empty-state prompt.
-                item(key = "add") { AddTile(onClick = { importSkin() }) }
+                item(key = "skins-h", span = { GridItemSpan(maxLineSpan) }) { SectionHeader(s.wardrobeSaved) }
+                item(key = "add-skin") { AddTile(onClick = { importInto(SkinLibrary.Kind.Skin) { selectedId = it } }) }
                 items(skins, key = { it.id }) { entry ->
                     SkinCard(
                         bitmap = remember(entry.id, refreshKey) { library.bytes(entry.id)?.let(::decodeSkin) },
                         name = entry.name,
                         selected = entry.id == selectedId,
-                        isActive = entry.id == activeId,
+                        isActive = entry.id == activeSkinId,
                         onClick = { selectedId = entry.id },
                         onDelete = {
                             library.delete(entry.id)
                             if (selectedId == entry.id) selectedId = null
+                            refreshKey++
+                        },
+                    )
+                }
+
+                item(key = "capes-h", span = { GridItemSpan(maxLineSpan) }) { SectionHeader(s.wardrobeCapes) }
+                item(key = "add-cape") { AddTile(onClick = { importInto(SkinLibrary.Kind.Cape) { selectedCapeId = it } }) }
+                items(capes, key = { it.id }) { entry ->
+                    CapeCard(
+                        bitmap = remember(entry.id, refreshKey) { library.bytes(entry.id)?.let(::decodeSkin) },
+                        name = entry.name,
+                        selected = entry.id == selectedCapeId,
+                        isActive = entry.id == activeCapeId,
+                        onClick = { selectedCapeId = entry.id },
+                        onDelete = {
+                            library.delete(entry.id)
+                            if (selectedCapeId == entry.id) selectedCapeId = null
                             refreshKey++
                         },
                     )
@@ -284,6 +330,83 @@ private fun AddTile(onClick: () -> Unit) {
         Text(s.wardrobeUpload, style = MaterialTheme.typography.labelSmall, color = CelestiaTheme.colors.textSecondary, maxLines = 1)
     }
     PuppetClick("wardrobe.upload") { onClick() }
+}
+
+@Composable
+private fun SectionHeader(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.titleSmall,
+        color = CelestiaTheme.colors.textSecondary,
+        modifier = Modifier.padding(top = 4.dp),
+    )
+}
+
+@Composable
+private fun CapeCard(
+    bitmap: ImageBitmap?,
+    name: String,
+    selected: Boolean,
+    isActive: Boolean,
+    onClick: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    val s = LocalStrings.current
+    val style = LocalStyle.current
+    Column(
+        modifier = Modifier
+            .clip(RoundedCornerShape(style.cardCorner))
+            .background(CelestiaTheme.colors.background.copy(alpha = 0.4f))
+            .border(
+                width = if (selected) 2.dp else 0.dp,
+                color = if (selected) CelestiaTheme.colors.primary else CelestiaTheme.colors.primary.copy(alpha = 0f),
+                shape = RoundedCornerShape(style.cardCorner),
+            )
+            .clickable(onClick = onClick)
+            .padding(6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(Modifier.fillMaxWidth().aspectRatio(1f), contentAlignment = Alignment.Center) {
+            if (bitmap != null) CapeThumbnail(bitmap, Modifier.fillMaxHeight().aspectRatio(10f / 16f))
+            if (isActive) {
+                Symbol(
+                    NxIcon.CheckCircle, null,
+                    tint = CelestiaTheme.colors.success,
+                    size = 16.dp,
+                    modifier = Modifier.align(Alignment.TopEnd).padding(2.dp),
+                )
+            }
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = name,
+                style = MaterialTheme.typography.labelSmall,
+                color = CelestiaTheme.colors.textPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
+            )
+            IconButton(onClick = onDelete, modifier = Modifier.size(24.dp)) {
+                Symbol(NxIcon.Delete, s.accountRemove, tint = CelestiaTheme.colors.textSecondary, size = 16.dp)
+            }
+        }
+    }
+}
+
+// The cape's front face -- (1,1) size 10x16 on a 64x32 cape, scaled by the HD
+// multiple, nearest-neighbour. Legacy 22x17 capes share the (1,1) front origin.
+@Composable
+private fun CapeThumbnail(cape: ImageBitmap, modifier: Modifier) {
+    Canvas(modifier) {
+        val k = (cape.width / 64f).coerceAtLeast(1f)
+        drawImage(
+            cape,
+            srcOffset = IntOffset((1 * k).toInt(), (1 * k).toInt()),
+            srcSize = IntSize((10 * k).toInt(), (16 * k).toInt()),
+            dstSize = IntSize(size.width.toInt(), size.height.toInt()),
+            filterQuality = FilterQuality.None,
+        )
+    }
 }
 
 private fun decodeSkin(bytes: ByteArray): ImageBitmap? =

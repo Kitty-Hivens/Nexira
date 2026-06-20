@@ -21,15 +21,20 @@ import java.util.UUID
 class SkinLibrary(private val dir: Path, private val json: Json) {
     private val log = LoggerFactory.getLogger(SkinLibrary::class.java)
 
+    /** A library entry is either a player skin or a cape (cloak). */
+    enum class Kind { Skin, Cape }
+
     @Serializable
     data class Entry(
         val id: String,
         val name: String,
         val slim: Boolean = false,
         val addedAt: Long = 0L,
-        // When this skin was last applied to a provider -- the library doubles as
-        // the skin history, so the most-recently-applied entry is the active one.
+        // When this entry was last applied to a provider -- the library doubles as
+        // the history, so the most-recently-applied entry (per kind) is the active one.
         val lastAppliedAt: Long? = null,
+        // Skin vs cape; pre-existing entries (no field) default to Skin.
+        val kind: Kind = Kind.Skin,
     )
 
     @Serializable
@@ -37,22 +42,24 @@ class SkinLibrary(private val dir: Path, private val json: Json) {
 
     private val indexFile: Path get() = dir.resolve("library.json")
 
-    /** Newest first. */
-    fun list(): List<Entry> = readIndex().skins.sortedByDescending { it.addedAt }
+    /** Newest first; [kind] null lists everything, else just that kind. */
+    fun list(kind: Kind? = null): List<Entry> = readIndex().skins
+        .filter { kind == null || it.kind == kind }
+        .sortedByDescending { it.addedAt }
 
     fun file(id: String): Path = dir.resolve("$id.png")
 
     fun bytes(id: String): ByteArray? =
         file(id).takeIf { Files.exists(it) }?.let { runCatching { Files.readAllBytes(it) }.getOrNull() }
 
-    /** Imports [png] under [name]; returns the new entry. */
-    fun add(png: ByteArray, name: String, slim: Boolean, now: Long): Entry {
+    /** Imports [png] under [name] as a skin or cape; returns the new entry. */
+    fun add(png: ByteArray, name: String, slim: Boolean, now: Long, kind: Kind = Kind.Skin): Entry {
         Files.createDirectories(dir)
         val id = UUID.randomUUID().toString().take(12)
         Files.write(file(id), png)
-        val entry = Entry(id, name.ifBlank { "skin" }, slim, now)
+        val entry = Entry(id, name.ifBlank { kind.name.lowercase() }, slim, now, kind = kind)
         writeIndex(Index(readIndex().skins + entry))
-        log.info("Imported skin {} ({} bytes)", id, png.size)
+        log.info("Imported {} {} ({} bytes)", kind.name.lowercase(), id, png.size)
         return entry
     }
 
@@ -65,8 +72,10 @@ class SkinLibrary(private val dir: Path, private val json: Json) {
         writeIndex(Index(readIndex().skins.map { if (it.id == id) it.copy(lastAppliedAt = now) else it }))
     }
 
-    /** The id of the most-recently-applied skin -- the active one in the history. */
-    fun activeId(): String? = readIndex().skins.filter { it.lastAppliedAt != null }.maxByOrNull { it.lastAppliedAt!! }?.id
+    /** The id of the most-recently-applied entry of [kind] -- the active one. */
+    fun activeId(kind: Kind = Kind.Skin): String? = readIndex().skins
+        .filter { it.kind == kind && it.lastAppliedAt != null }
+        .maxByOrNull { it.lastAppliedAt!! }?.id
 
     fun delete(id: String) {
         runCatching { Files.deleteIfExists(file(id)) }

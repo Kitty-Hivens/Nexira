@@ -83,6 +83,20 @@ class SkinLibraryTest {
     }
 
     @Test
+    fun `kind separates skins from capes and activeId is per-kind`() {
+        val skin = lib.add(png, "S", false, now = 1, kind = SkinLibrary.Kind.Skin)
+        val cape = lib.add(png, "", false, now = 2, kind = SkinLibrary.Kind.Cape)
+        assertEquals("cape", cape.name, "blank cape name falls back to its kind")
+        assertEquals(listOf(skin.id), lib.list(SkinLibrary.Kind.Skin).map { it.id })
+        assertEquals(listOf(cape.id), lib.list(SkinLibrary.Kind.Cape).map { it.id })
+        assertEquals(2, lib.list().size, "no-kind list returns both")
+        lib.markApplied(skin.id, now = 10)
+        lib.markApplied(cape.id, now = 20)
+        assertEquals(skin.id, lib.activeId(SkinLibrary.Kind.Skin))
+        assertEquals(cape.id, lib.activeId(SkinLibrary.Kind.Cape))
+    }
+
+    @Test
     fun `empty library lists nothing`() {
         assertTrue(lib.list().isEmpty())
     }
