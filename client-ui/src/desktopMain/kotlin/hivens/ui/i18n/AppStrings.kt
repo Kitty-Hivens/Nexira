@@ -653,6 +653,8 @@ interface AppStrings {
     val profileSecurityHint: String
     val accountsTitle: String
     val accountRemove: String
+    val accountFaceLabel: String
+    val accountFaceAuto: String
 
     // --- Background loop mode ---
     val backgroundLoopMode: String

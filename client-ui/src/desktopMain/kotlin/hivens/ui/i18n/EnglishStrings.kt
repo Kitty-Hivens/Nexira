@@ -613,6 +613,8 @@ object EnglishStrings : AppStrings {
     override val profileSecurityHint        = "Your sign-in is saved on this device for auto-login."
     override val accountsTitle               = "Accounts"
     override val accountRemove               = "Remove"
+    override val accountFaceLabel            = "Show as"
+    override val accountFaceAuto             = "Auto"
 
     override val backgroundLoopMode      = "Loop"
     override val backgroundLoopUseCodec  = "Use codec"

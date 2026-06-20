@@ -612,6 +612,8 @@ object RussianStrings : AppStrings {
     override val profileSecurityHint        = "Твой вход сохранён на этом устройстве для авто-входа."
     override val accountsTitle               = "Аккаунты"
     override val accountRemove               = "Удалить"
+    override val accountFaceLabel            = "Показывать как"
+    override val accountFaceAuto             = "Авто"
 
     override val backgroundLoopMode      = "Луп"
     override val backgroundLoopUseCodec  = "Из кодека"

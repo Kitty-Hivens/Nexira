@@ -611,6 +611,8 @@ object GermanStrings : AppStrings {
     override val profileSecurityHint        = "Deine Anmeldung ist auf diesem Gerät für die automatische Anmeldung gespeichert."
     override val accountsTitle               = "Konten"
     override val accountRemove               = "Entfernen"
+    override val accountFaceLabel            = "Anzeigen als"
+    override val accountFaceAuto             = "Auto"
 
     override val backgroundLoopMode      = "Schleife"
     override val backgroundLoopUseCodec  = "Aus Codec"
