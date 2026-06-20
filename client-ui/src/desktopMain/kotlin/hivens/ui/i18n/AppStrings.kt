@@ -664,6 +664,8 @@ interface AppStrings {
     val wardrobeApplySmartycraft: String
     val wardrobeEmpty: String
     val wardrobeSaved: String
+    val wardrobeCapes: String
+    val wardrobeApplyCape: String
 
     // --- Background loop mode ---
     val backgroundLoopMode: String
