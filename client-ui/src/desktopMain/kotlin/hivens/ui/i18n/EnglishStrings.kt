@@ -620,6 +620,9 @@ object EnglishStrings : AppStrings {
     override val msaNotConfigured            = "Microsoft sign-in is not configured in this build."
     override val wardrobeTitle               = "Wardrobe"
     override val wardrobeSignedOut           = "Sign in to manage your skins and capes."
+    override val wardrobeUpload               = "Upload"
+    override val wardrobeApplySmartycraft     = "Apply (SmartyCraft)"
+    override val wardrobeEmpty                = "Your library is empty. Upload a skin PNG to begin."
 
     override val backgroundLoopMode      = "Loop"
     override val backgroundLoopUseCodec  = "Use codec"
