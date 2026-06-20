@@ -66,6 +66,33 @@ class SmartyModPlannerTest {
     }
 
     @Test
+    fun `helper on but no Smarty in the manifest stays inert -- mirror pack`() = runTest {
+        // A mirror / Hivens pack already ships open-smrt-network and carries no
+        // proprietary Smarty jar. The swap must stay inert -- injecting the helper
+        // on top of the pack's own copy loads the same coremod twice.
+        val resolved = OpenSmrtHelperResolver.Resolved(helperJar, listOf("Smarty*.jar"))
+        val plan = plannerResolving(resolved).plan(
+            server(),
+            FileManifest(
+                directories = mapOf(
+                    "mods" to FileManifest(
+                        files = mapOf(
+                            "open-smrt-network-1.12.2.jar" to FileData(md5 = "a", size = 1),
+                            "JEI.jar" to FileData(md5 = "b", size = 2),
+                        ),
+                    ),
+                ),
+            ),
+            SettingsData(useOpenSmrtHelper = true, strictModVerification = true),
+        )
+
+        assertTrue(plan.ignoredAddon.isEmpty(), "nothing to strip when there is no Smarty")
+        assertNull(plan.injectJar, "must not inject a second open-smrt helper")
+        assertTrue(plan.helperKeepGlobs.isEmpty(), "no helper protection when the swap is inert")
+        assertTrue(plan.strict, "strict is independent of the swap")
+    }
+
+    @Test
     fun `helper off yields no swap and no helper protection`() = runTest {
         val resolved = OpenSmrtHelperResolver.Resolved(helperJar, listOf("Smarty*.jar"))
         val plan = plannerResolving(resolved).plan(
