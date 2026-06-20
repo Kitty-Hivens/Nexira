@@ -57,7 +57,7 @@ import org.koin.compose.koinInject
 // enum: it reads composition locals + koin and the enum must stay a plain
 // serializable value.
 @Serializable
-enum class NavTarget { Home, Library, Browse, Profile, Settings, About, Console, Logout }
+enum class NavTarget { Home, Library, Browse, Profile, Wardrobe, Settings, About, Console, Logout }
 
 @Serializable
 data class NavEntryProps(
@@ -99,6 +99,13 @@ fun NavEntry(instance: WidgetInstance) {
             phase        = 1.1f,
             active       = screen is Screen.Profile,
             onClick      = { ctx.onScreenChange(Screen.Profile) },
+        )
+        NavTarget.Wardrobe -> NavSlot(
+            icon         = NxIcon.Palette,
+            outlineSwap  = true,
+            phase        = 1.6f,
+            active       = screen is Screen.Wardrobe,
+            onClick      = { ctx.onScreenChange(Screen.Wardrobe) },
         )
         NavTarget.Settings -> NavSlot(
             icon         = NxIcon.Settings,

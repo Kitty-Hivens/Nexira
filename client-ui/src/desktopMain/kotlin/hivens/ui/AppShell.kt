@@ -148,6 +148,7 @@ sealed class Screen {
     object Library            : Screen()
     object Browse             : Screen()
     object Profile            : Screen()
+    object Wardrobe           : Screen()
     object Settings           : Screen()
     object ThemePicker        : Screen()
     object About              : Screen()
