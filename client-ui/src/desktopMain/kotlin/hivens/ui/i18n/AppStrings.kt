@@ -651,6 +651,8 @@ interface AppStrings {
     val profileCategorySecurity: String
     val profileForgetSavedSignIn: String
     val profileSecurityHint: String
+    val accountsTitle: String
+    val accountRemove: String
 
     // --- Background loop mode ---
     val backgroundLoopMode: String
