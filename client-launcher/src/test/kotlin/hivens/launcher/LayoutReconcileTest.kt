@@ -8,6 +8,7 @@ import hivens.widget.model.SurfaceLayout
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -17,6 +18,11 @@ class LayoutReconcileTest {
 
     private fun widget(kind: String, id: String) =
         WidgetInstance(WidgetKind(kind), id, JsonObject(emptyMap()))
+
+    private fun navEntry(id: String, target: String) =
+        WidgetInstance(WidgetKind("nav.entry"), id, JsonObject(mapOf("target" to JsonPrimitive(target))))
+
+    private fun navTargetOf(w: WidgetInstance): String? = (w.props["target"] as? JsonPrimitive)?.content
 
     private fun surface(vararg slots: Pair<String, List<WidgetInstance>>) =
         SurfaceLayout(slots = slots.associate { (s, w) -> SlotId(s) to SlotContent(w) })
@@ -28,7 +34,7 @@ class LayoutReconcileTest {
 
     @Test
     fun `CURRENT_SCHEMA is the schema this build migrates up to`() {
-        assertEquals(4, LayoutReconcile.CURRENT_SCHEMA)
+        assertEquals(5, LayoutReconcile.CURRENT_SCHEMA)
     }
 
     @Test
@@ -40,7 +46,11 @@ class LayoutReconcileTest {
         ))
         val out = ok(LayoutReconcile.reconcile(3, v3, LayoutGraph.EMPTY))
         val top = out.surfaces[SurfaceId("appshell.leftrail")]!!.slots[SlotId("top")]!!.widgets
-        assertEquals(List(6) { "nav.entry" }, top.map { it.kind.value })
+        // v3 navbuttons -> six entries (v3->v4); then v4->v5 inserts Wardrobe after Profile.
+        assertEquals(
+            listOf("Home", "Library", "Browse", "Profile", "Wardrobe", "Settings", "About"),
+            top.map { navTargetOf(it) },
+        )
     }
 
     @Test
@@ -58,7 +68,7 @@ class LayoutReconcileTest {
     @Test
     fun `reconcile leaves a current unique graph untouched when nothing to merge`() {
         val g = LayoutGraph(surfaces = mapOf(SurfaceId("a") to surface("main" to listOf(widget("k", "i1")))))
-        assertEquals(g, ok(LayoutReconcile.reconcile(4, g, LayoutGraph.EMPTY)))
+        assertEquals(g, ok(LayoutReconcile.reconcile(5, g, LayoutGraph.EMPTY)))
     }
 
     @Test
@@ -81,5 +91,31 @@ class LayoutReconcileTest {
         val result = LayoutReconcile.reconcile(4, g, LayoutGraph.EMPTY)
         assertIs<LayoutReconcile.Result.DuplicateId>(result)
         assertEquals("dup", result.id)
+    }
+
+    @Test
+    fun `reconcile v4 to v5 inserts the Wardrobe nav entry after Profile`() {
+        val rail = LayoutGraph(surfaces = mapOf(
+            SurfaceId("appshell.leftrail") to surface("top" to listOf(
+                navEntry("appshell-leftrail-nav-profile", "Profile"),
+                navEntry("appshell-leftrail-nav-settings", "Settings"),
+            )),
+        ))
+        val top = ok(LayoutReconcile.reconcile(4, rail, LayoutGraph.EMPTY))
+            .surfaces[SurfaceId("appshell.leftrail")]!!.slots[SlotId("top")]!!.widgets
+        assertEquals(listOf("Profile", "Wardrobe", "Settings"), top.map { navTargetOf(it) })
+    }
+
+    @Test
+    fun `reconcile v4 to v5 does not double-insert an existing Wardrobe entry`() {
+        val rail = LayoutGraph(surfaces = mapOf(
+            SurfaceId("appshell.leftrail") to surface("top" to listOf(
+                navEntry("p", "Profile"),
+                navEntry("w", "Wardrobe"),
+            )),
+        ))
+        val top = ok(LayoutReconcile.reconcile(4, rail, LayoutGraph.EMPTY))
+            .surfaces[SurfaceId("appshell.leftrail")]!!.slots[SlotId("top")]!!.widgets
+        assertEquals(1, top.count { navTargetOf(it) == "Wardrobe" })
     }
 }

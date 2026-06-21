@@ -447,13 +447,13 @@ class LayoutGraphRepositoryTest {
             top = listOf(navKind("appshell.leftrail.navbuttons", "nb"), navKind("home.new.spacer", "sp")),
         )
         val top = loadFrom(3, v3).leftrailSlot("top")
-        assertEquals(7, top.size, "six nav entries plus the preserved sibling")
-        assertEquals(List(6) { "nav.entry" } + "home.new.spacer", top.map { it.kind.value })
+        assertEquals(8, top.size, "six nav entries, the v5 Wardrobe insert, plus the preserved sibling")
+        assertEquals(List(7) { "nav.entry" } + "home.new.spacer", top.map { it.kind.value })
         assertEquals(
-            listOf("Home", "Library", "Browse", "Profile", "Settings", "About"),
-            top.take(6).map { it.target() },
+            listOf("Home", "Library", "Browse", "Profile", "Wardrobe", "Settings", "About"),
+            top.take(7).map { it.target() },
         )
-        assertEquals("sp", top[6].instanceId)
+        assertEquals("sp", top[7].instanceId)
     }
 
     @Test
@@ -533,9 +533,10 @@ class LayoutGraphRepositoryTest {
             ),
         ))
         val top = loadFrom(3, v3).leftrailSlot("top")
-        assertEquals(6, top.size)
+        assertEquals(7, top.size, "six expanded nav entries plus the v5 Wardrobe insert")
         // The monolith's single block frame cannot map onto six items, so the
-        // expansion intentionally resets these to defaults.
+        // expansion intentionally resets these to defaults; the Wardrobe insert is
+        // likewise a clean entry.
         top.forEach {
             assertEquals(null, it.chrome)
             assertEquals(0f, it.weight)
