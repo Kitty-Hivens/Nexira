@@ -30,6 +30,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -54,6 +55,7 @@ import hivens.ui.easter.LocalAprilFools
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.identity.DefaultSkinProvider
 import hivens.ui.identity.SkinLibrary
 import hivens.ui.identity.SkinManager
 import hivens.ui.puppet.PuppetClick
@@ -73,6 +75,7 @@ import kotlinx.coroutines.withContext
 import org.jetbrains.skia.Image
 import org.koin.compose.koinInject
 import java.io.File
+import java.nio.file.Files
 
 private val SC_KEY = PackAuthRequirement.SmartyCraft.PROVIDER_KEY
 
@@ -114,18 +117,28 @@ private fun Wardrobe(session: SessionData) {
     val skinRepository: SkinRepository = koinInject()
     val skinManager: SkinManager = koinInject()
     val credentials: CredentialsManager = koinInject()
+    val defaultSkinProvider: DefaultSkinProvider = koinInject()
     val scope = rememberCoroutineScope()
 
     var refreshKey by remember { mutableIntStateOf(0) }
     var selectedId by remember { mutableStateOf<String?>(null) }
     var selectedCapeId by remember { mutableStateOf<String?>(null) }
+    var selectedDefault by remember { mutableStateOf<DefaultSkinProvider.DefaultSkin?>(null) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
     val skins = remember(refreshKey) { library.list(SkinLibrary.Kind.Skin) }
     val capes = remember(refreshKey) { library.list(SkinLibrary.Kind.Cape) }
+    // Default skins are extracted from a provisioned client jar on the IO pool; the
+    // grid stays empty until that resolves (or no client jar carries them yet).
+    val defaults by produceState(emptyList<DefaultSkinProvider.DefaultSkin>()) {
+        value = withContext(Dispatchers.IO) { defaultSkinProvider.list() }
+    }
     val selectedBitmap = remember(selectedId, refreshKey) {
         selectedId?.let { library.bytes(it) }?.let(::decodeSkin)
+    }
+    val defaultBitmap = remember(selectedDefault) {
+        selectedDefault?.let { runCatching { Files.readAllBytes(it.file) }.getOrNull()?.let(::decodeSkin) }
     }
     val scSession = remember(refreshKey, session) { credentials.accountFor(SC_KEY) }
     // The library doubles as the history -- the last-applied entry (per kind) is active.
@@ -145,22 +158,21 @@ private fun Wardrobe(session: SessionData) {
         }
     }
 
-    // Applies a stored skin or cape to the signed-in SmartyCraft account -- a cape
-    // goes through uploadCloak (isCloak). Capes can need a premium/HD account; that
-    // rejection surfaces from the protocol as the error string.
-    fun applyToSc(id: String, kind: SkinLibrary.Kind) {
+    // Applies a skin or cape file to the signed-in SmartyCraft account -- a cape goes
+    // through uploadCloak (isCloak), which the server gates to clan leaders. [markId]
+    // stamps the library history when the file is a library entry (null for defaults).
+    fun applyToSc(file: File, isCloak: Boolean, markId: String?) {
         val sc = scSession ?: return
         busy = true
         error = null
         scope.launch {
             val result = withContext(Dispatchers.IO) {
-                runCatching {
-                    skinRepository.uploadSkin(library.file(id).toFile(), isCloak = kind == SkinLibrary.Kind.Cape, session = sc)
-                }.getOrElse { it.message ?: "error" }
+                runCatching { skinRepository.uploadSkin(file, isCloak = isCloak, session = sc) }
+                    .getOrElse { it.message ?: "error" }
             }
             busy = false
             if (result == "OK") {
-                library.markApplied(id, System.currentTimeMillis())
+                markId?.let { library.markApplied(it, System.currentTimeMillis()) }
                 skinManager.invalidate(sc.playerName)
                 refreshKey++
             } else {
@@ -172,7 +184,7 @@ private fun Wardrobe(session: SessionData) {
     Row(Modifier.fillMaxSize().padding(20.dp), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
         // Preview: the picked library skin, else the current applied look.
         Box(Modifier.width(260.dp).fillMaxHeight(), contentAlignment = Alignment.Center) {
-            val bmp = selectedBitmap
+            val bmp = selectedBitmap ?: defaultBitmap
             if (bmp != null) {
                 SkinView3D(bmp, Modifier.fillMaxHeight().width(260.dp), interactive = true, autoSpin = true)
             } else {
@@ -181,31 +193,36 @@ private fun Wardrobe(session: SessionData) {
         }
 
         Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            // Apply the picked skin and/or cape to a signed-in SmartyCraft account.
-            if (scSession != null && (selectedId != null || selectedCapeId != null)) {
+            // Apply the picked skin (library entry or default) and/or cape to a
+            // signed-in SmartyCraft account. A default carries no markId (it is not a
+            // library entry, so it never enters the applied-history).
+            val skinSel: Pair<File, String?>? = selectedId?.let { library.file(it).toFile() to it }
+                ?: selectedDefault?.let { it.file.toFile() to null }
+            if (scSession != null && (skinSel != null || selectedCapeId != null)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    selectedId?.let { id ->
+                    skinSel?.let { (file, markId) ->
                         af.ChaosButton(
                             id = "wardrobe_apply_sc_btn",
                             text = s.wardrobeApplySmartycraft,
-                            onClick = { if (!busy) applyToSc(id, SkinLibrary.Kind.Skin) },
+                            onClick = { if (!busy) applyToSc(file, isCloak = false, markId = markId) },
                             modifier = Modifier,
                             colors = ButtonDefaults.buttonColors(containerColor = CelestiaTheme.colors.primary),
                         )
-                        PuppetClick("wardrobe.applySmartycraft") { if (!busy) applyToSc(id, SkinLibrary.Kind.Skin) }
+                        PuppetClick("wardrobe.applySmartycraft") { if (!busy) applyToSc(file, isCloak = false, markId = markId) }
                     }
                     selectedCapeId?.let { id ->
+                        val capeFile = library.file(id).toFile()
                         af.ChaosButton(
                             id = "wardrobe_apply_cape_sc_btn",
                             text = s.wardrobeApplyCape,
-                            onClick = { if (!busy) applyToSc(id, SkinLibrary.Kind.Cape) },
+                            onClick = { if (!busy) applyToSc(capeFile, isCloak = true, markId = id) },
                             modifier = Modifier,
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = glassSurfaceAlpha(0.55f),
                                 contentColor = CelestiaTheme.colors.textPrimary,
                             ),
                         )
-                        PuppetClick("wardrobe.applyCapeSmartycraft") { if (!busy) applyToSc(id, SkinLibrary.Kind.Cape) }
+                        PuppetClick("wardrobe.applyCapeSmartycraft") { if (!busy) applyToSc(capeFile, isCloak = true, markId = id) }
                     }
                 }
             }
@@ -226,7 +243,7 @@ private fun Wardrobe(session: SessionData) {
                         name = entry.name,
                         selected = entry.id == selectedId,
                         isActive = entry.id == activeSkinId,
-                        onClick = { selectedId = entry.id },
+                        onClick = { selectedId = entry.id; selectedDefault = null },
                         onDelete = {
                             library.delete(entry.id)
                             if (selectedId == entry.id) selectedId = null
@@ -258,6 +275,22 @@ private fun Wardrobe(session: SessionData) {
                         },
                     )
                 }
+
+                // Mojang's default skins, read from a provisioned client jar (never
+                // bundled). Read-only -- pick to preview / apply, no delete.
+                if (defaults.isNotEmpty()) {
+                    item(key = "defaults-h", span = { GridItemSpan(maxLineSpan) }) { SectionHeader(s.wardrobeDefaults) }
+                    items(defaults, key = { it.name }) { def ->
+                        SkinCard(
+                            bitmap = remember(def.file) { runCatching { Files.readAllBytes(def.file) }.getOrNull()?.let(::decodeSkin) },
+                            name = def.name,
+                            selected = def == selectedDefault,
+                            isActive = false,
+                            onClick = { selectedDefault = def; selectedId = null },
+                            onDelete = null,
+                        )
+                    }
+                }
             }
         }
     }
@@ -270,7 +303,7 @@ private fun SkinCard(
     selected: Boolean,
     isActive: Boolean,
     onClick: () -> Unit,
-    onDelete: () -> Unit,
+    onDelete: (() -> Unit)?,
 ) {
     val s = LocalStrings.current
     val style = LocalStyle.current
@@ -310,8 +343,11 @@ private fun SkinCard(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f, fill = false),
             )
-            IconButton(onClick = onDelete, modifier = Modifier.size(24.dp)) {
-                Symbol(NxIcon.Delete, s.accountRemove, tint = CelestiaTheme.colors.textSecondary, size = 16.dp)
+            // Default skins are read-only (not library entries), so no delete.
+            onDelete?.let { del ->
+                IconButton(onClick = del, modifier = Modifier.size(24.dp)) {
+                    Symbol(NxIcon.Delete, s.accountRemove, tint = CelestiaTheme.colors.textSecondary, size = 16.dp)
+                }
             }
         }
     }

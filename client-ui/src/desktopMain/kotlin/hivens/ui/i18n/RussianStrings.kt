@@ -626,6 +626,7 @@ object RussianStrings : AppStrings {
     override val wardrobeCapes               = "Плащи"
     override val wardrobeApplyCape           = "Задать плащ клана"
     override val wardrobeCapeClanHint        = "Плащ клановый — задаёт только глава клана."
+    override val wardrobeDefaults            = "Стандартные скины"
 
     override val backgroundLoopMode      = "Луп"
     override val backgroundLoopUseCodec  = "Из кодека"
