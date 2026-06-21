@@ -6,6 +6,7 @@ import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
 import hivens.widget.model.flatMapInstances
 import hivens.widget.model.resetSurface
+import hivens.widget.model.walkInstances
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -299,6 +300,8 @@ internal object Migrations {
         3 -> Step.IDENTITY
         // v3 -> v4: the nav rail unified onto the single nav.entry kind.
         4 -> Step(::migrateNavToEntries)
+        // v4 -> v5: the Wardrobe (skins) nav entry joined the bundled rail.
+        5 -> Step(::insertWardrobeNavEntry)
         else -> Step.IDENTITY
     }
 
@@ -348,6 +351,34 @@ private fun migrateNavToEntries(graph: LayoutGraph): LayoutGraph =
 // 1:1 conversion -- preserves chrome / weight / canvas, only kind + props change.
 private fun WidgetInstance.toNavEntry(target: String): WidgetInstance =
     copy(kind = NAV_ENTRY, props = navTargetProps(target))
+
+// Schema v4 -> v5: the Wardrobe (skins) nav entry was added to the bundled rail.
+// Existing rails pre-date it, and the reconciler only seeds whole missing slots,
+// not new widgets inside a slot the user already has -- so inject it once, right
+// after the Profile entry (its bundled position). Idempotent: a graph that already
+// carries a Wardrobe entry is left as-is; a rail with no Profile entry (heavily
+// customised) is skipped rather than guessed at.
+private fun insertWardrobeNavEntry(graph: LayoutGraph): LayoutGraph {
+    if (graph.walkInstances().any { it.kind == NAV_ENTRY && navTarget(it) == "Wardrobe" }) return graph
+    var inserted = false
+    return graph.flatMapInstances { w ->
+        if (!inserted && w.kind == NAV_ENTRY && navTarget(w) == "Profile") {
+            inserted = true
+            listOf(
+                w,
+                WidgetInstance(
+                    kind = NAV_ENTRY,
+                    instanceId = "appshell-leftrail-nav-wardrobe",
+                    props = navTargetProps("Wardrobe"),
+                ),
+            )
+        } else {
+            listOf(w)
+        }
+    }
+}
+
+private fun navTarget(w: WidgetInstance): String? = (w.props["target"] as? JsonPrimitive)?.content
 
 // Raw-string props: client-launcher cannot see the NavTarget enum (it lives
 // in client-ui), and a Kotlin enum's default serial name equals its constant
