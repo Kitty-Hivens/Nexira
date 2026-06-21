@@ -77,8 +77,21 @@ fun Box.faces(): List<Face> = listOf(
 // hat/jacket/sleeves/pants sit just outside the skin.
 private const val OVERLAY_INFLATE = 0.5f
 
-private fun Box.inflated(by: Float, u: Float, v: Float, layer: Boolean): Box = Box(
-    x0 - by, y0 - by, z0 - by, x1 + by, y1 + by, z1 + by,
+/**
+ * Inflated copy of the box for the overlay (second) layer. [top]/[bottom] gate
+ * the +y / -y growth: a seam face that abuts the adjacent part (head bottom over
+ * the body top, arm/leg tops at the shoulders/hips) is kept FLUSH rather than
+ * inflated. Otherwise two parts' overlays would overlap in a thin band at the
+ * seam, and the painter's renderer (no depth buffer, centroid-depth sort) would
+ * z-fight those coplanar quads -- visible as flickering garbage at e.g. the neck,
+ * worst on skins that fully use the second layer (the vanilla defaults).
+ */
+private fun Box.inflated(
+    by: Float, u: Float, v: Float, layer: Boolean,
+    top: Boolean = true, bottom: Boolean = true,
+): Box = Box(
+    x0 - by, y0 - (if (bottom) by else 0f), z0 - by,
+    x1 + by, y1 + (if (top) by else 0f), z1 + by,
     u = u, v = v, w = w, h = h, d = d, layer = layer,
 )
 
@@ -114,13 +127,16 @@ fun buildFigure(model: SkinModel = SkinModel.Classic, legacy: Boolean = false): 
     }
 
     // Overlay (second layer). Hat exists on every skin; the rest are 64x64 only.
-    boxes += head.inflated(OVERLAY_INFLATE, u = 32f, v = 0f, layer = true)
+    // Seam faces (where a part abuts another) are kept flush so the overlays do
+    // not overlap and z-fight: head over body (head no bottom), torso between head
+    // and legs (body no top/bottom), arms/legs at the shoulders/hips (no top).
+    boxes += head.inflated(OVERLAY_INFLATE, u = 32f, v = 0f, layer = true, bottom = false)
     if (!legacy) {
-        boxes += body.inflated(OVERLAY_INFLATE,     u = 16f, v = 32f, layer = true)
-        boxes += rightArm.inflated(OVERLAY_INFLATE, u = 40f, v = 32f, layer = true)
-        boxes += leftArm.inflated(OVERLAY_INFLATE,  u = 48f, v = 48f, layer = true)
-        boxes += rightLeg.inflated(OVERLAY_INFLATE, u = 0f,  v = 32f, layer = true)
-        boxes += leftLeg.inflated(OVERLAY_INFLATE,  u = 0f,  v = 48f, layer = true)
+        boxes += body.inflated(OVERLAY_INFLATE,     u = 16f, v = 32f, layer = true, top = false, bottom = false)
+        boxes += rightArm.inflated(OVERLAY_INFLATE, u = 40f, v = 32f, layer = true, top = false)
+        boxes += leftArm.inflated(OVERLAY_INFLATE,  u = 48f, v = 48f, layer = true, top = false)
+        boxes += rightLeg.inflated(OVERLAY_INFLATE, u = 0f,  v = 32f, layer = true, top = false)
+        boxes += leftLeg.inflated(OVERLAY_INFLATE,  u = 0f,  v = 48f, layer = true, top = false)
     }
 
     return boxes.flatMap { it.faces() }
