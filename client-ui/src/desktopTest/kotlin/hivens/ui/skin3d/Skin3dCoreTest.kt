@@ -108,6 +108,37 @@ class Skin3dCoreTest {
         assertNotNull(headFront, "head front UV (8,8,8,8) must exist")
     }
 
+    @Test fun `head base box maps all six faces to the canonical skin regions`() {
+        // Guards the unwrap UVs -- a wrong head face (the reported neck-underside
+        // bug class) samples a random texture region.
+        val base = buildFigure().filterNot { it.layer }
+        fun has(uv: UvRect, where: String) =
+            assertTrue(base.any { it.uv == uv }, "head $where face must map to $uv")
+        has(UvRect(8f, 0f, 8f, 8f), "top")
+        has(UvRect(16f, 0f, 8f, 8f), "bottom (neck underside)")
+        has(UvRect(0f, 8f, 8f, 8f), "right")
+        has(UvRect(8f, 8f, 8f, 8f), "front")
+        has(UvRect(16f, 8f, 8f, 8f), "left")
+        has(UvRect(24f, 8f, 8f, 8f), "back")
+    }
+
+    @Test fun `the head overlay stays flush at the neck -- no z-fighting band into the torso`() {
+        // Hat (head overlay) bottom = UV (48,0,8,8). With the seam fix it sits at
+        // the head's bottom plane y=8, not inflated 0.5 down into the body, so it
+        // cannot overlap and z-fight the jacket overlay at the neck.
+        val hatBottom = buildFigure().single { it.layer && it.uv == UvRect(48f, 0f, 8f, 8f) }
+        assertEquals(8f, hatBottom.p0.y, "hat bottom sits at the neck plane")
+        assertEquals(8f, hatBottom.pu.y)
+        assertEquals(8f, hatBottom.pv.y)
+    }
+
+    @Test fun `the body overlay is flush at the neck seam`() {
+        // Body overlay top = UV (20,32,8,4); flush at y=8 under the head so it does
+        // not bulge up to meet the inflated hat.
+        val bodyTop = buildFigure().single { it.layer && it.uv == UvRect(20f, 32f, 8f, 4f) }
+        assertEquals(8f, bodyTop.p0.y, "body overlay top flush at the neck plane")
+    }
+
     @Test fun `arm width follows the model -- classic 4, slim 3`() {
         // The right-arm front face sits at UV (44,20) with width = arm width.
         fun armFrontWidth(m: SkinModel): Float =
