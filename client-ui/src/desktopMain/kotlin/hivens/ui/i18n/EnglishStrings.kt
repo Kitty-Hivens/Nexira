@@ -627,6 +627,7 @@ object EnglishStrings : AppStrings {
     override val wardrobeCapes               = "Capes"
     override val wardrobeApplyCape           = "Set clan cape"
     override val wardrobeCapeClanHint        = "Capes are clan-wide -- only the clan leader can set one."
+    override val wardrobeDefaults            = "Default skins"
 
     override val backgroundLoopMode      = "Loop"
     override val backgroundLoopUseCodec  = "Use codec"
