@@ -60,6 +60,8 @@ import hivens.launcher.catalogue.MirrorPackCatalogue
 import hivens.launcher.catalogue.ModrinthPackCatalogue
 import hivens.launcher.catalogue.PackArtResolver
 import hivens.launcher.catalogue.PackCatalogueRegistry
+import hivens.launcher.media.VideoCacheService
+import hivens.launcher.media.YtDlpService
 import hivens.launcher.modrinth.ModrinthClient
 import hivens.launcher.smrt.OpenSmrtHelperResolver
 import hivens.launcher.smrt.SmartyModPlanner
@@ -434,6 +436,20 @@ val cacheModule = module {
     single { CacheFactory(rootDir = get<Path>().resolve("cache"), json = get(), scope = get(), clock = get()) }
     single { smrtPackCaches() }
     single { modrinthCaches() }
+    // Resolves remote video URLs (pack gallery / banner) to local files for the
+    // Skinema player, which is local-file-only. "direct" channel: the URLs are
+    // public CDNs, not SC-proxied.
+    single { VideoCacheService(dir = get<Path>().resolve("video-cache"), http = get(named("direct")), scope = get()) }
+    // Plays service-page videos (YouTube etc.) by downloading via yt-dlp into the
+    // same video-cache for the local-only Skinema player.
+    single {
+        YtDlpService(
+            toolsDir      = get<Path>().resolve("tools"),
+            videoCacheDir = get<Path>().resolve("video-cache"),
+            http          = get(named("direct")),
+            scope         = get(),
+        )
+    }
 }
 
 /**
@@ -501,9 +517,10 @@ val mirrorModule = module {
     // resolver instance.
     single {
         val client: ModrinthClient = get()
-        ModIconResolver { projectId ->
-            client.resolveProject(projectId).iconUrl
-        }
+        ModIconResolver(
+            resolveProjectIcon = { projectId -> client.resolveProject(projectId).iconUrl },
+            resolveIconByHash  = { sha1 -> client.versionByHash(sha1)?.let { client.resolveProject(it.projectId).iconUrl } },
+        )
     }
 }
 

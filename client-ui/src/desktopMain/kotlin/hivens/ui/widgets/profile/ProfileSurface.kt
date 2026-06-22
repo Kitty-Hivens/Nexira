@@ -2,7 +2,6 @@ package hivens.ui.widgets.profile
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -11,15 +10,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.core.data.SessionData
 import hivens.ui.components.GlassCard
@@ -97,15 +93,7 @@ fun ProfileSurface(
 
     CompositionLocalProvider(LocalProfileContext provides ctx) {
         Column(Modifier.fillMaxSize().padding(16.dp)) {
-            Text(
-                text       = s.profileTitle,
-                style      = MaterialTheme.typography.headlineSmall,
-                color      = CelestiaTheme.colors.textPrimary,
-                fontWeight = FontWeight.Bold,
-            )
-
-            Spacer(Modifier.height(24.dp))
-
+            // Title lives in the top-bar breadcrumb now -- no in-screen duplicate.
             GlassCard(
                 modifier        = Modifier.weight(1f).fillMaxWidth(),
                 backgroundColor = glassSurfaceAlpha(0.7f),

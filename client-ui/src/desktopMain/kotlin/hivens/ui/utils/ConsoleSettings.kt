@@ -43,6 +43,31 @@ data class ConsoleSettings(
      * context in the live view to be useful.
      */
     val maxInMemoryLines: Int = 5000,
+
+    // --- Appearance overrides (Settings > Console). Null = use the theme. ---
+    /** Override hex for INFO-severity text, e.g. "#EEEEEE". Null keeps the theme. */
+    val infoColor: String? = null,
+    val warnColor: String? = null,
+    val errorColor: String? = null,
+
+    /**
+     * User highlight rules: a line whose text matches [HighlightRule.pattern]
+     * is recoloured. First enabled match wins. Applied on top of severity colour.
+     */
+    val highlightRules: List<HighlightRule> = emptyList(),
+
+    /**
+     * User filter/mute rules: a line matching an enabled [FilterRule] is hidden
+     * from the view entirely (persistent noise mute), separate from the in-window
+     * one-shot search filter.
+     */
+    val filterRules: List<FilterRule> = emptyList(),
+
+    /**
+     * User-supplied empty-console art (ASCII / Braille), managed from the Settings
+     * UI. Joins the built-in shapes + the bundled art file; one is shown at random.
+     */
+    val customArt: List<String> = emptyList(),
 ) {
     companion object {
         const val MIN_FONT_SIZE = 8
@@ -60,6 +85,27 @@ data class ConsoleSettings(
         maxInMemoryLines = maxInMemoryLines.coerceIn(MIN_IN_MEMORY_LINES, MAX_IN_MEMORY_LINES),
     )
 }
+
+/** One highlight rule: a [pattern] (substring, or treated as a regex when [regex])
+ *  that recolours a matching console line to [colorHex], optionally [bold]. Disabled
+ *  rules are skipped; the first enabled match on a line wins. */
+@Serializable
+data class HighlightRule(
+    val pattern: String = "",
+    val regex: Boolean = false,
+    val colorHex: String = "#FFD166",
+    val bold: Boolean = false,
+    val enabled: Boolean = true,
+)
+
+/** One filter/mute rule: a [pattern] (substring, or regex when [regex]) whose matching
+ *  lines are hidden from the console entirely. Disabled rules are skipped. */
+@Serializable
+data class FilterRule(
+    val pattern: String = "",
+    val regex: Boolean = false,
+    val enabled: Boolean = true,
+)
 
 class ConsoleSettingsManager(
     configPath: Path,

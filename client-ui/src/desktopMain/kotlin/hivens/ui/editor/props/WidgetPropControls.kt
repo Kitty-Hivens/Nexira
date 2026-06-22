@@ -14,8 +14,6 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -30,6 +28,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import hivens.ui.customization.glassSurfaceAlpha
+import hivens.ui.components.NxSwitch
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.widgets.customization.HexField
 import hivens.ui.widgets.customization.LabeledSlider
@@ -111,10 +110,9 @@ private fun BoolRow(label: String, value: Boolean, onChange: (Boolean) -> Unit) 
             color    = CelestiaTheme.colors.textSecondary,
             modifier = Modifier.weight(1f),
         )
-        Switch(
+        NxSwitch(
             checked         = value,
             onCheckedChange = onChange,
-            colors          = SwitchDefaults.colors(checkedThumbColor = CelestiaTheme.colors.primary),
         )
     }
 }

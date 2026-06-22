@@ -16,23 +16,31 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.core.data.HomeView
 import hivens.core.data.UiStyle
+import hivens.ui.components.NxSwitch
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.icons.IconKey
+import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.LocalStyle
+import hivens.ui.theme.LocalThemeReveal
 
 /**
  * Glass-tinted panel background for every Settings row / picker /
@@ -108,14 +116,10 @@ internal fun SettingsRowWithDescription(
                 )
             }
         }
-        Switch(
+        NxSwitch(
             checked         = checked,
             enabled         = enabled,
             onCheckedChange = onCheckedChange,
-            colors          = SwitchDefaults.colors(
-                checkedThumbColor = CelestiaTheme.colors.primary,
-                checkedTrackColor = CelestiaTheme.colors.primary.copy(alpha = 0.5f)
-            )
         )
     }
 }
@@ -128,13 +132,109 @@ internal fun SettingsSwitchRow(title: String, checked: Boolean, onCheckedChange:
         verticalAlignment     = Alignment.CenterVertically
     ) {
         Text(title, style = MaterialTheme.typography.bodyLarge, color = CelestiaTheme.colors.textPrimary)
-        Switch(
+        NxSwitch(
             checked         = checked,
             onCheckedChange = onCheckedChange,
-            colors          = SwitchDefaults.colors(
-                checkedThumbColor  = CelestiaTheme.colors.primary,
-                checkedTrackColor  = CelestiaTheme.colors.primary.copy(alpha = 0.5f)
+        )
+    }
+}
+
+/**
+ * Full toggle card -- icon (tinted with [accent] when on) + title + description +
+ * [NxSwitch], with a reactive [accent] wash on the whole row while checked. The rich
+ * toggle treatment (the offline-mode reference), as opposed to the bare
+ * [SettingsSwitchRow]. [accent] drives the active icon / wash / switch track.
+ */
+@Composable
+internal fun SettingsToggleCard(
+    icon: IconKey,
+    title: String,
+    description: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    accent: Color = CelestiaTheme.colors.primary,
+) {
+    val style = LocalStyle.current
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(style.cardCorner))
+            .background(if (checked) accent.copy(alpha = 0.08f) else settingsRowBackground())
+            .padding(16.dp),
+        verticalAlignment     = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+            Symbol(
+                icon, null,
+                tint     = if (checked) accent else CelestiaTheme.colors.textSecondary,
+                modifier = Modifier.size(24.dp),
             )
+            Spacer(Modifier.width(16.dp))
+            Column {
+                Text(title, color = CelestiaTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
+                Text(description, style = MaterialTheme.typography.bodySmall, color = CelestiaTheme.colors.textSecondary)
+            }
+        }
+        NxSwitch(checked = checked, onCheckedChange = onCheckedChange, accent = accent)
+    }
+}
+
+// Static day/night colours -- the sun stays warm-orange and the moon cool-blue
+// regardless of palette, so the dark-theme toggle reads as day/night at a glance.
+// Orange over pale yellow: the sun has to stay legible over a light wallpaper.
+private val SunOrange = Color(0xFFFF8C00)
+private val MoonBlue  = Color(0xFF8AB4F8)
+
+/**
+ * Dark-theme toggle in the [SettingsToggleCard] shape but with a day/night identity:
+ * sun (warm) when light, moon (cool) when dark. The icon, the row wash and the switch
+ * track all take that FIXED colour, not the palette accent.
+ */
+@Composable
+internal fun ThemeToggleCard(
+    checked: Boolean,
+    title: String,
+    description: String,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    val style = LocalStyle.current
+    val tint = if (checked) MoonBlue else SunOrange
+    // Flip the theme through the GNOME-style reveal when a host is present; the circle
+    // grows out of the switch's own position. No host (or motion off) -> plain flip.
+    val reveal = LocalThemeReveal.current
+    val durationMs = style.animationDurationMs(550)
+    var switchOrigin by remember { mutableStateOf(Offset.Zero) }
+    val onToggle: (Boolean) -> Unit = { newValue ->
+        if (reveal != null) reveal.reveal(switchOrigin, durationMs) { onCheckedChange(newValue) }
+        else onCheckedChange(newValue)
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(style.cardCorner))
+            .background(settingsRowBackground())
+            .padding(16.dp),
+        verticalAlignment     = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+            Symbol(
+                if (checked) NxIcon.DarkMode else NxIcon.LightMode, null,
+                tint     = tint,
+                modifier = Modifier.size(24.dp),
+            )
+            Spacer(Modifier.width(16.dp))
+            Column {
+                Text(title, color = CelestiaTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
+                Text(description, style = MaterialTheme.typography.bodySmall, color = CelestiaTheme.colors.textSecondary)
+            }
+        }
+        NxSwitch(
+            checked         = checked,
+            onCheckedChange = onToggle,
+            accent          = tint,
+            modifier        = Modifier.onGloballyPositioned { switchOrigin = it.boundsInWindow().center },
         )
     }
 }

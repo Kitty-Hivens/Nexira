@@ -45,6 +45,10 @@ class WidgetRegistryConsistencyTest {
             "appshell.region.left",
             "appshell.region.center",
             "appshell.region.right",
+            // custom title bar (top region + body wrapper + breadcrumb)
+            "appshell.region.top",
+            "appshell.region.body",
+            "appshell.topbar.breadcrumb",
             // editor-2 sample widgets
             "home.new.clock",
             "home.new.spacer",
@@ -52,6 +56,8 @@ class WidgetRegistryConsistencyTest {
             "home.new.launchbutton",
             // editor-3.7 music
             "home.new.music",
+            // inline video player (URL prop, expand-to-full)
+            "home.new.video",
             // unified configurable nav rail item
             "nav.entry",
             // Phase A.3 container sample
@@ -137,6 +143,8 @@ class WidgetRegistryConsistencyTest {
                 "appshell.region.left",          // shell regions: the frame must stay whole
                 "appshell.region.center",
                 "appshell.region.right",
+                "appshell.region.top",           // title bar: hosts window controls + breadcrumb
+                "appshell.region.body",          // carries the whole app body
             ),
             nonRemovable,
             "non-removable set keeps the shell frame and sign-in panel intact; nav items " +
@@ -158,6 +166,7 @@ class WidgetRegistryConsistencyTest {
             "home.new.welcome",
             "home.new.launchbutton",
             "home.new.music",
+            "home.new.video",
             "home.new.recent",
             "home.new.quicklaunch",
             // About surface (title overrides)
@@ -180,6 +189,8 @@ class WidgetRegistryConsistencyTest {
             "appshell.region.left",
             "appshell.region.center",
             "appshell.region.right",
+            // title bar (height / corner / group / frost / controls props)
+            "appshell.region.top",
             // unified nav rail item (target prop)
             "nav.entry",
             // persistent notification history (expand-direction + clock props)

@@ -21,7 +21,6 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -104,20 +103,7 @@ fun BrowseScreen(
     }
 
     Column(Modifier.fillMaxSize()) {
-        // Slim top bar -- title only, same chrome as the detail screens.
-        Row(
-            modifier          = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text       = s.browseTitle,
-                style      = MaterialTheme.typography.titleLarge,
-                color      = CelestiaTheme.colors.textPrimary,
-                fontWeight = FontWeight.Bold,
-            )
-        }
-        HorizontalDivider(color = CelestiaTheme.colors.outline.copy(alpha = 0.4f))
-
+        // Title lives in the top-bar breadcrumb now -- no in-screen duplicate.
         Column(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 16.dp)) {
             // Source switcher -- one chip per registered catalogue origin.
             if (origins.size > 1) {

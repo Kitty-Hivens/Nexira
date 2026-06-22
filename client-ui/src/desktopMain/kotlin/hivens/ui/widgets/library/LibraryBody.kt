@@ -15,7 +15,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -24,18 +27,23 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.data.PackInstance
-import hivens.launcher.launch.LauncherController
-import hivens.ui.AppState
+import hivens.launcher.platform.PlatformPaths
 import hivens.ui.Screen
+import hivens.ui.components.DestructiveConfirmDialog
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.notifications.LaunchTarget
-import hivens.ui.notifications.drivers.LaunchDriver
+import hivens.ui.platform.SystemActions
 import hivens.ui.screens.library.PackCard
 import hivens.ui.theme.CelestiaTheme
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
+import java.nio.file.Files
+import java.nio.file.Path
+import java.util.Comparator
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
 
@@ -57,10 +65,10 @@ fun LibraryBody(instance: WidgetInstance) {
     val ctx = LocalLibraryContext.current
     val s = LocalStrings.current
     val repo: IPackRepository = koinInject()
-    val controller: LauncherController = koinInject()
-    val launchDriver: LaunchDriver = koinInject()
+    val paths: PlatformPaths = koinInject()
+    val scope = rememberCoroutineScope()
+    var pendingDelete by remember { mutableStateOf<PackInstance?>(null) }
     val instances by remember { repo.observe() }.collectAsState(initial = emptyList())
-    val authedSession = (ctx.appState as? AppState.Authenticated)?.session
 
     if (instances.isEmpty()) {
         LibraryEmpty(
@@ -72,21 +80,35 @@ fun LibraryBody(instance: WidgetInstance) {
         LibraryList(
             instances    = instances,
             onOpenDetail = { ctx.onScreenChange(Screen.PackDetail(it.id)) },
-            onPlay       = { pack ->
-                // Unauthenticated state: defer to the detail screen
-                // which renders an explicit "Sign in to play" prompt
-                // instead of swallowing the click silently.
-                val session = authedSession
-                if (session == null) {
-                    ctx.onScreenChange(Screen.PackDetail(pack.id))
-                } else {
-                    launchDriver.observe(LaunchTarget.Pack(pack))
-                    controller.launchPackInstance(session, pack)
+            onOpenFolder = { SystemActions.openFolder(instanceDirOf(paths, it).toString()) },
+            onDelete     = { pendingDelete = it },
+        )
+    }
+
+    pendingDelete?.let { target ->
+        DestructiveConfirmDialog(
+            title        = s.packCardDeleteTitle,
+            body         = s.packCardDeleteBody,
+            confirmLabel = s.editorDelete,
+            onConfirm    = {
+                scope.launch {
+                    withContext(Dispatchers.IO) { deleteInstanceDir(instanceDirOf(paths, target)) }
+                    repo.delete(target.id)
                 }
             },
-            onSettings = { ctx.onScreenChange(Screen.PackDetail(it.id)) },
-            onMore     = { ctx.onScreenChange(Screen.PackDetail(it.id)) },
+            onDismiss    = { pendingDelete = null },
         )
+    }
+}
+
+private fun instanceDirOf(paths: PlatformPaths, instance: PackInstance): Path =
+    paths.dataDir.resolve("instances").resolve(instance.instanceDirName)
+
+/** Recursive delete, deepest-first so directories are empty before removal; best-effort per entry. */
+private fun deleteInstanceDir(dir: Path) {
+    if (!Files.exists(dir)) return
+    Files.walk(dir).use { stream ->
+        stream.sorted(Comparator.reverseOrder()).forEach { path -> runCatching { Files.delete(path) } }
     }
 }
 
@@ -94,9 +116,8 @@ fun LibraryBody(instance: WidgetInstance) {
 private fun LibraryList(
     instances: List<PackInstance>,
     onOpenDetail: (PackInstance) -> Unit,
-    onPlay: (PackInstance) -> Unit,
-    onSettings: (PackInstance) -> Unit,
-    onMore: (PackInstance) -> Unit,
+    onOpenFolder: (PackInstance) -> Unit,
+    onDelete: (PackInstance) -> Unit,
 ) {
     LazyColumn(
         modifier            = Modifier.fillMaxSize(),
@@ -107,9 +128,8 @@ private fun LibraryList(
             PackCard(
                 instance     = instance,
                 onOpenDetail = { onOpenDetail(instance) },
-                onPlay       = { onPlay(instance) },
-                onSettings   = { onSettings(instance) },
-                onMore       = { onMore(instance) },
+                onOpenFolder = { onOpenFolder(instance) },
+                onDelete     = { onDelete(instance) },
             )
         }
     }

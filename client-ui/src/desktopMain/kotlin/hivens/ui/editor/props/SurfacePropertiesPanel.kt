@@ -31,8 +31,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -58,6 +56,7 @@ import hivens.ui.icons.Symbol
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetToggle
 import hivens.ui.screens.settings.settingsRowBackground
+import hivens.ui.components.NxSwitch
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.LocalStyle
 import hivens.ui.widgets.customization.HexField
@@ -299,13 +298,9 @@ private fun CompactSwitchRow(title: String, checked: Boolean, onCheckedChange: (
             color    = CelestiaTheme.colors.textPrimary,
             modifier = Modifier.weight(1f),
         )
-        Switch(
+        NxSwitch(
             checked         = checked,
             onCheckedChange = onCheckedChange,
-            colors          = SwitchDefaults.colors(
-                checkedThumbColor = CelestiaTheme.colors.primary,
-                checkedTrackColor = CelestiaTheme.colors.primary.copy(alpha = 0.5f),
-            ),
         )
     }
 }

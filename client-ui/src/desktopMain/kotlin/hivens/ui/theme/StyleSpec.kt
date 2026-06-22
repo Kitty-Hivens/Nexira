@@ -33,6 +33,9 @@ data class StyleSpec(
     val animationMultiplier: Float,
     /** Whether decorative effects (pulsating glow, soft shadow) render at all. */
     val softGlowEnabled: Boolean,
+    /** Form of the toggle/switch primitive (NxSwitch). Colours stay on the palette
+     *  axis; this carries only the skinnable geometry. */
+    val switchStyle: SwitchStyleSpec = SwitchStyleSpec.Pill,
 ) {
     /**
      * Build a Material 3 [Shapes] bundle from this style. Driven by
@@ -62,6 +65,27 @@ data class StyleSpec(
 enum class CardSurface { Glass, Flat }
 
 /**
+ * Skinnable geometry of the toggle primitive ([hivens.ui.components.NxSwitch]).
+ * Colours come from the palette (theme primary / outline), so a skin only swaps the
+ * track/thumb dimensions + corners -- pill, square, or anything in between. First
+ * component pulled into the component-style ("skin") layer; more follow.
+ */
+data class SwitchStyleSpec(
+    val trackWidth: Dp,
+    val trackHeight: Dp,
+    val thumbSize: Dp,
+    val trackCorner: Dp,
+    val thumbCorner: Dp,
+) {
+    companion object {
+        /** Rounded iOS/Material-ish pill -- the Celestia look. */
+        val Pill = SwitchStyleSpec(trackWidth = 44.dp, trackHeight = 24.dp, thumbSize = 18.dp, trackCorner = 12.dp, thumbCorner = 9.dp)
+        /** Hard-edged rectangle -- the Brut look. */
+        val Square = SwitchStyleSpec(trackWidth = 42.dp, trackHeight = 22.dp, thumbSize = 16.dp, trackCorner = 3.dp, thumbCorner = 2.dp)
+    }
+}
+
+/**
  * Default style -- matches the current CelestiaTheme aesthetic: rounded
  * corners, glass cards with alpha, soft glow on focus / hover. This is
  * what existing code sees if it switches to LocalStyle.current.
@@ -87,6 +111,7 @@ val BrutStyle = StyleSpec(
     buttonCorner        = 0.dp,
     animationMultiplier = 0.0f,
     softGlowEnabled     = false,
+    switchStyle         = SwitchStyleSpec.Square,
 )
 
 val LocalStyle = staticCompositionLocalOf { CelestiaStyle }

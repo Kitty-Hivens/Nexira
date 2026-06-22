@@ -81,12 +81,11 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
 
-// Mini music player. Drop a WAV / AU / AIFF file, play it through
-// AudioPlayer. The opening pin in the project_achievements vision --
-// the user can compose the launcher into a music-only surface by
-// removing every game widget and keeping this + a clock + the right
-// rail (or nothing). MP3 support arrives with Skinema (FFmpeg
-// via Panama).
+// Mini music player. Drop an audio file, play it through AudioPlayer
+// (Skinema / FFmpeg via Panama -- mp3, flac, ogg, opus, aac, wav). The
+// opening pin in the project_achievements vision -- the user can compose
+// the launcher into a music-only surface by removing every game widget
+// and keeping this + a clock + the right rail (or nothing).
 @Serializable
 data class MusicProps(
     @PropLabel("widget.home.new.music.title") val title: String = "",
@@ -117,7 +116,9 @@ fun MusicPlayerWidget(instance: WidgetInstance) {
         scope.launch {
             val picked = withContext(Dispatchers.IO) {
                 FileKit.openFilePicker(
-                    type           = FileKitType.File(extensions = listOf("wav", "au", "aif", "aiff", "snd")),
+                    type           = FileKitType.File(extensions = listOf(
+                        "mp3", "flac", "ogg", "oga", "opus", "m4a", "aac", "wav", "aiff", "aif", "au",
+                    )),
                     dialogSettings = FileKitDialogSettings(title = s.audioPickTrack),
                 )
             }
@@ -190,7 +191,9 @@ fun MusicPlayerWidget(instance: WidgetInstance) {
             trackColor = CelestiaTheme.colors.outline.copy(alpha = 0.15f),
         )
 
-        // Controls row
+        // Controls row: transport on the left, volume + timecode on the right.
+        // The volume bar is a thin custom track (the Material slider's fat thumb
+        // reads as an out-of-place form control here).
         Row(
             verticalAlignment     = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -217,6 +220,16 @@ fun MusicPlayerWidget(instance: WidgetInstance) {
                 onClick      = { player.stop() },
             )
             Spacer(Modifier.weight(1f))
+            Symbol(icon = volumeIcon(volume),
+                contentDescription = s.audioVolume,
+                tint               = CelestiaTheme.colors.textSecondary,
+                modifier           = Modifier.size(16.dp),
+            )
+            VolumeBar(
+                value         = volume,
+                onValueChange = { player.setVolume(it) },
+                modifier      = Modifier.width(96.dp),
+            )
             val timeline = timelineLabel(state)
             if (timeline.isNotEmpty()) {
                 Text(
@@ -225,27 +238,6 @@ fun MusicPlayerWidget(instance: WidgetInstance) {
                     color = CelestiaTheme.colors.textSecondary,
                 )
             }
-        }
-
-        // Volume row: icon + bar. Bar is a custom thin track with a
-        // dot thumb that only appears on hover/drag -- the default
-        // Material slider's fat thumb reads as an out-of-place form
-        // control here.
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier          = Modifier.fillMaxWidth(),
-        ) {
-            Symbol(icon = volumeIcon(volume),
-                contentDescription = s.audioVolume,
-                tint               = CelestiaTheme.colors.textSecondary,
-                modifier           = Modifier.size(16.dp),
-            )
-            Spacer(Modifier.width(10.dp))
-            VolumeBar(
-                value         = volume,
-                onValueChange = { player.setVolume(it) },
-                modifier      = Modifier.weight(1f),
-            )
         }
     }
 }
@@ -270,8 +262,10 @@ private fun VolumeBar(
         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
         label         = "vol-track-height",
     )
+    // Always faintly visible so the handle is findable without hunting; full
+    // opacity on hover/drag.
     val thumbAlpha by animateFloatAsState(
-        targetValue   = if (active) 1f else 0f,
+        targetValue   = if (active) 1f else 0.65f,
         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
         label         = "vol-thumb-alpha",
     )
@@ -292,14 +286,19 @@ private fun VolumeBar(
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
                     pressing = true
-                    val w = size.width.coerceAtLeast(1).toFloat()
-                    onValueChange((down.position.x / w).coerceIn(0f, 1f))
-                    drag(down.id) { change ->
-                        val newValue = (change.position.x / w).coerceIn(0f, 1f)
-                        onValueChange(newValue)
-                        change.consume()
+                    // finally: a cancelled/interrupted drag must still release
+                    // the pressed state, or the thumb sticks enlarged.
+                    try {
+                        val w = size.width.coerceAtLeast(1).toFloat()
+                        onValueChange((down.position.x / w).coerceIn(0f, 1f))
+                        drag(down.id) { change ->
+                            val newValue = (change.position.x / w).coerceIn(0f, 1f)
+                            onValueChange(newValue)
+                            change.consume()
+                        }
+                    } finally {
+                        pressing = false
                     }
-                    pressing = false
                 }
             },
         contentAlignment = Alignment.CenterStart,

@@ -2,6 +2,7 @@ package hivens.ui.icons
 
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -57,6 +58,10 @@ fun Symbol(
     ) {
         val px = with(LocalDensity.current) { maxHeight.toSp() }
         Text(
+            // Unbounded so a dense glyph (globe, description) whose ink reaches the
+            // em edges isn't clipped by the size-px box -- it overflows by a hair
+            // into the caller's own padding instead of "sinking in".
+            modifier = Modifier.wrapContentSize(unbounded = true),
             text = String(Character.toChars(icon.codepoint)),
             color = tint,
             fontSize = px,

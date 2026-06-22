@@ -7,6 +7,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import hivens.ui.generated.resources.Res
+import hivens.ui.generated.resources.dejavu_sans
 import hivens.ui.generated.resources.jetbrains_mono_bold
 import hivens.ui.generated.resources.jetbrains_mono_medium
 import hivens.ui.generated.resources.jetbrains_mono_regular
@@ -46,6 +47,15 @@ fun nexiraMonoFamily(): FontFamily = FontFamily(
     Font(Res.font.jetbrains_mono_semibold, FontWeight.SemiBold),
     Font(Res.font.jetbrains_mono_bold,     FontWeight.Bold),
 )
+
+/**
+ * DejaVu Sans, bundled solely because it carries the full Braille block (U+2800)
+ * at a uniform cell width -- JetBrains Mono has none, so Braille art would tofu or
+ * fall back to a random system font. Used only for the decorative Braille console
+ * filler; all braille cells share one advance, so picture art stays aligned.
+ */
+@Composable
+fun nexiraBrailleFamily(): FontFamily = FontFamily(Font(Res.font.dejavu_sans))
 
 /**
  * The bundled monospace family, provided by [CelestiaTheme]. Read this instead

@@ -1,20 +1,26 @@
 package hivens.ui.render
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -34,6 +40,9 @@ import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import hivens.ui.components.isPlayableVideoUrl
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
 import hivens.ui.theme.CelestiaTheme
 import org.intellij.markdown.flavours.gfm.GFMFlavourDescriptor
 import org.intellij.markdown.html.HtmlGenerator
@@ -156,10 +165,16 @@ private fun ColumnScope.block(el: Element, ctx: InlineCtx, onLink: (String) -> U
                 style = base.copy(color = ctx.baseColor, textAlign = align, fontWeight = FontWeight.Bold),
             )
         }
-        "p" -> Text(
-            buildInline(el.childNodes(), ctx, onLink),
-            style = TextStyle(color = ctx.baseColor, textAlign = align),
-        )
+        "p" -> {
+            // A paragraph that is only images (badges, a video thumbnail) renders
+            // as clickable images, not their alt text.
+            val imgs = imageRunOf(el)
+            if (imgs != null) ImageRunBlock(imgs, onLink)
+            else Text(
+                buildInline(el.childNodes(), ctx, onLink),
+                style = TextStyle(color = ctx.baseColor, textAlign = align),
+            )
+        }
         "ul", "ol" -> ListBlock(el, ctx, onLink, ordered = el.tagName().equals("ol", true))
         "blockquote" -> Box(
             Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small)
@@ -230,6 +245,73 @@ private fun ImageBlock(el: Element) {
         contentScale = ContentScale.Fit,
         modifier = m,
     )
+}
+
+/** A still image and its optional wrapping link. */
+private data class ImgItem(val src: String, val alt: String, val href: String?)
+
+/**
+ * The images of a paragraph whose only significant content is images (bare or
+ * link-wrapped) -- the badge / video-thumbnail rows markdown emits as
+ * `[![alt](img)](href)`. Returns null when the paragraph carries real text too,
+ * so prose paragraphs keep their normal inline rendering.
+ */
+private fun imageRunOf(p: Element): List<ImgItem>? {
+    val items = ArrayList<ImgItem>()
+    for (n in p.childNodes()) {
+        when (n) {
+            is TextNode -> if (n.text().isNotBlank()) return null
+            is Element -> when (n.tagName().lowercase()) {
+                "img" -> items.add(ImgItem(imgSrc(n), n.attr("alt"), null))
+                "a" -> {
+                    val img = n.children().singleOrNull { it.tagName().equals("img", true) } ?: return null
+                    if (n.text().isNotBlank()) return null
+                    items.add(ImgItem(imgSrc(img), img.attr("alt"), n.attr("href").ifBlank { null }))
+                }
+                "br" -> {}
+                else -> return null
+            }
+            else -> return null
+        }
+    }
+    return items.takeIf { it.isNotEmpty() }
+}
+
+private fun imgSrc(img: Element): String = img.attr("src").ifBlank { img.attr("data-src") }
+
+/**
+ * A row of images (badges, video thumbnails). Each opens its link via [onLink];
+ * a video link gets a play badge and is routed to the in-app player upstream.
+ */
+@Composable
+private fun ImageRunBlock(items: List<ImgItem>, onLink: (String) -> Unit) {
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement   = Arrangement.spacedBy(8.dp),
+    ) {
+        for (item in items) {
+            val href = item.href
+            Box(
+                modifier         = if (href != null) Modifier.clickable { onLink(href) } else Modifier,
+                contentAlignment = Alignment.Center,
+            ) {
+                AsyncImage(
+                    model              = item.src.ifBlank { null },
+                    contentDescription = item.alt.ifBlank { null },
+                    contentScale       = ContentScale.Fit,
+                    modifier           = Modifier.heightIn(max = 180.dp),
+                )
+                if (href != null && isPlayableVideoUrl(href)) {
+                    Box(
+                        modifier         = Modifier.size(48.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.5f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Symbol(NxIcon.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(28.dp))
+                    }
+                }
+            }
+        }
+    }
 }
 
 private fun buildInline(nodes: List<Node>, ctx: InlineCtx, onLink: (String) -> Unit): AnnotatedString =

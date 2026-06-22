@@ -139,6 +139,24 @@
 -keep class dev.hivens.libnotify.** { *; }
 -dontwarn dev.hivens.libnotify.**
 
+# ── libvault: same Panama treatment as libtray + libnotify ────────────────
+# The keyring lib (Secret Service / Credential Manager / Keychain via FFM)
+# reaches the uber jar transitively through client-launcher. Its per-platform
+# bindings call MethodHandle.invokeExact(MemorySegment...) -- signature-
+# polymorphic intrinsics ProGuard reports as unresolved library members and
+# then aborts on. Same keep + dontwarn as the rest of the dev.hivens family.
+-keep class dev.hivens.libvault.** { *; }
+-dontwarn dev.hivens.libvault.**
+
+# ── skinema: same Panama treatment as libtray + libnotify ─────────────────
+# The media engine (FFmpeg/libwebp/libass via FFM) downcalls through
+# MethodHandle.invokeExact(MemorySegment...) and registers upcall stubs the
+# same way -- methods with no source call sites that ProGuard would strip,
+# breaking native init at runtime (a release-only failure). The -skiko bridge
+# and the natives loader live under the same root, so one wildcard covers them.
+-keep class dev.hivens.skinema.** { *; }
+-dontwarn dev.hivens.skinema.**
+
 # ── dbus-java: ServiceLoader-resolved transport providers ─────────────────
 # Linux fielded report (file picker silently broken on AppImage): filekit's
 # XdgFilePickerPortal calls `DBusConnectionBuilder.forSessionBus()` which

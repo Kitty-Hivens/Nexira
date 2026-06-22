@@ -5,8 +5,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,7 +19,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -58,12 +59,17 @@ import hivens.core.jvm.SystemMemory
 import hivens.launcher.ProfilerProfileStore
 import hivens.launcher.launch.LauncherController
 import hivens.launcher.platform.PlatformPaths
+import dev.hivens.skinema.compose.VideoScale
 import hivens.ui.AppState
+import hivens.ui.components.FullscreenVideo
 import hivens.ui.components.RamSelector
+import hivens.ui.components.VideoMedia
+import hivens.ui.components.isVideoUrl
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.IconKey
+import hivens.ui.components.PlayButton
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.notifications.LaunchTarget
@@ -171,7 +177,19 @@ fun PackDetailScreen(
 
         Box(modifier = Modifier.fillMaxSize().padding(top = 4.dp)) {
             when (tabIndex) {
-                0 -> ContentTabPane(instance = pack)
+                0 -> ContentTabPane(
+                    instance = pack,
+                    onDetach = {
+                        // Become a Local instance the user owns; keep where it came
+                        // from in forkedFrom so provenance (and its art) survive.
+                        val detached = pack.copy(
+                            packRef    = pack.packRef.copy(origin = PackOrigin.Local),
+                            forkedFrom = pack.forkedFrom ?: pack.packRef,
+                        )
+                        instance = detached
+                        scope.launch { repo.put(detached) }
+                    },
+                )
                 1 -> FileBrowserPane(rootDir = instanceDir, modifier = Modifier.padding(16.dp))
                 2 -> WorldsTabPane(instanceDir = instanceDir)
                 3 -> PackLogsTab(packId = pack.id, instanceDir = instanceDir, dataDir = paths.dataDir)
@@ -427,71 +445,90 @@ private fun Hero(
 ) {
     val s = LocalStrings.current
     val art = rememberPackArt(pack)
+    val bannerUrl = art.bannerUrl
+    val bannerIsVideo = bannerUrl != null && isVideoUrl(bannerUrl)
+    var bannerFullscreen by remember(bannerUrl) { mutableStateOf(false) }
     val (hueA, hueB) = CelestiaTheme.colors.decorativePair(pack.id)
     Box(Modifier.fillMaxWidth().height(196.dp)) {
         // Pixel-art base -> real banner -> scrim, same layering as the cards.
         Box(Modifier.fillMaxSize().pixelArtBackground(pack.id, hueA, hueB))
-        if (art.bannerUrl != null) {
-            AsyncImage(
-                model              = art.bannerUrl,
-                contentDescription = null,
-                contentScale       = ContentScale.Crop,
-                modifier           = Modifier.fillMaxSize(),
-            )
+        if (bannerUrl != null) {
+            if (bannerIsVideo) {
+                VideoMedia(
+                    url          = bannerUrl,
+                    modifier     = Modifier.fillMaxSize(),
+                    autoPlay     = true,
+                    loop         = true,
+                    audio        = false,
+                    startMuted   = true,
+                    showControls = false,
+                    scale        = VideoScale.Cover,
+                )
+            } else {
+                AsyncImage(
+                    model              = bannerUrl,
+                    contentDescription = null,
+                    contentScale       = ContentScale.Crop,
+                    modifier           = Modifier.fillMaxSize(),
+                )
+            }
         }
-        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = if (art.bannerUrl != null) 0.5f else 0.4f)))
+        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = if (bannerUrl != null) 0.5f else 0.4f)))
 
-        // Top row: back (start), folder + settings (end).
+        // Top row: folder + settings (end). Back lives in the top-bar breadcrumb
+        // now, so the hero no longer draws its own arrow.
         Row(
             modifier              = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.End,
             verticalAlignment     = Alignment.CenterVertically,
         ) {
-            HeroAction(NxIcon.ArrowBack, s.navBack, onBack)
             Row {
+                if (bannerIsVideo) HeroAction(NxIcon.OpenInFull, s.videoFullscreen) { bannerFullscreen = true }
                 HeroAction(NxIcon.FolderOpen, null, onOpenFolder)
                 HeroAction(NxIcon.Settings, s.packCardSettings, onOpenSettings)
             }
         }
 
-        // Bottom row: avatar + name + chips, Play pinned to the end.
-        Row(
-            modifier              = Modifier.fillMaxSize().padding(start = 24.dp, end = 24.dp, top = 52.dp, bottom = 20.dp),
-            verticalAlignment     = Alignment.Bottom,
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            HeroAvatar(iconUrl = art.iconUrl, displayName = pack.displayName, hue = hueA)
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    text       = pack.displayName,
-                    style      = MaterialTheme.typography.headlineMedium,
-                    color      = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    maxLines   = 2,
-                    overflow   = TextOverflow.Ellipsis,
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                    SourceChip(pack.packRef.origin)
-                    pack.cachedManifest?.let { HeroChip(loaderMcLabel(it)) }
-                    if (pack.playtimeSeconds > 0L) HeroChip(playtimeLabel(pack.playtimeSeconds))
-                    HeroChip(lastPlayedShort(pack.lastPlayedEpochOrZero, s))
-                }
-            }
-            Button(
-                onClick        = onPlay,
-                enabled        = playEnabled,
-                shape          = MaterialTheme.shapes.small,
-                contentPadding = PaddingValues(horizontal = 22.dp, vertical = 12.dp),
-                colors         = ButtonDefaults.buttonColors(
-                    containerColor = CelestiaTheme.colors.primary,
-                    contentColor   = Color.White,
-                ),
+        // Bottom row: avatar + name + chips, Play pinned to the end. Sheds the
+        // hours, then the source chip, and collapses Play to an icon as the hero
+        // narrows (right panel open / small window).
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+            val showPlaytime = maxWidth >= 560.dp
+            val showSource   = maxWidth >= 460.dp
+            val playIconOnly = maxWidth < 500.dp
+            Row(
+                modifier              = Modifier.fillMaxSize().padding(start = 24.dp, end = 24.dp, top = 52.dp, bottom = 20.dp),
+                verticalAlignment     = Alignment.Bottom,
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                Symbol(NxIcon.PlayArrow, contentDescription = null, modifier = Modifier.size(20.dp))
-                Spacer(Modifier.size(8.dp))
-                Text(s.packDetailPlay, fontWeight = FontWeight.Bold)
+                HeroAvatar(iconUrl = art.iconUrl, displayName = pack.displayName, hue = hueA)
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text       = pack.displayName,
+                        style      = MaterialTheme.typography.headlineMedium,
+                        color      = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        maxLines   = 2,
+                        overflow   = TextOverflow.Ellipsis,
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        if (showSource) SourceChip(pack.packRef.origin)
+                        pack.cachedManifest?.let { HeroChip(loaderMcLabel(it)) }
+                        if (showPlaytime && pack.playtimeSeconds > 0L) HeroChip(playtimeLabel(pack.playtimeSeconds))
+                        HeroChip(lastPlayedShort(pack.lastPlayedEpochOrZero, s))
+                    }
+                }
+                PlayButton(
+                    label    = s.packDetailPlay,
+                    onClick  = onPlay,
+                    enabled  = playEnabled,
+                    iconOnly = playIconOnly,
+                )
             }
         }
+    }
+    if (bannerFullscreen && bannerUrl != null) {
+        FullscreenVideo(url = bannerUrl, onDismiss = { bannerFullscreen = false })
     }
 }
 
@@ -502,7 +539,13 @@ private fun HeroAction(icon: IconKey, contentDescription: String?, onClick: () -
     }
 }
 
-/** Compact pill tab strip, left-aligned -- Material's PrimaryTabRow read too big and stretched. */
+/**
+ * Compact pill tab strip, left-aligned -- Material's PrimaryTabRow read too big
+ * and stretched. FlowRow (not Row) so a narrow content area (the right panel
+ * eats width) wraps the trailing pills to a second line instead of clipping
+ * Worlds / Logs off the right edge.
+ */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun PackTabBar(selected: Int, onSelect: (Int) -> Unit) {
     val s = LocalStrings.current
@@ -512,9 +555,10 @@ private fun PackTabBar(selected: Int, onSelect: (Int) -> Unit) {
         NxIcon.Public to s.packDetailTabWorlds,
         NxIcon.Description to s.packDetailTabLogs,
     )
-    Row(
+    FlowRow(
         modifier              = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement   = Arrangement.spacedBy(6.dp),
     ) {
         tabs.forEachIndexed { i, (icon, label) ->
             val active = i == selected
@@ -528,11 +572,12 @@ private fun PackTabBar(selected: Int, onSelect: (Int) -> Unit) {
                 verticalAlignment     = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                Symbol(icon, contentDescription = null, tint = tint, modifier = Modifier.size(16.dp))
+                Symbol(icon, contentDescription = null, tint = tint, size = 16.dp)
                 Text(
                     text       = label,
                     style      = MaterialTheme.typography.labelLarge,
                     color      = tint,
+                    maxLines   = 1,
                     fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
                 )
             }

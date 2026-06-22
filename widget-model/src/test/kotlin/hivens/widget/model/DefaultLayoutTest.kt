@@ -14,8 +14,11 @@ class DefaultLayoutTest {
         val surfaceIds = graph.surfaces.keys.map { it.value }.toSet()
         assertEquals(
             setOf(
-                // shell-as-surface root (three region widgets in a Row)
+                // shell-as-surface root (Column of top bar + body) and its nested
+                // body (the three region widgets in a Row) + the title-bar surface
                 "appshell.root",
+                "appshell.body",
+                "appshell.topbar",
                 // kernel-3 originals
                 "home.classic", "home.new", "library",
                 "appshell.leftrail", "appshell.rightrail",

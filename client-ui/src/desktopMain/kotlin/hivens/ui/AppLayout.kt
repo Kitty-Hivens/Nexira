@@ -14,7 +14,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.HomeView
-import hivens.core.data.PackOrigin
 import hivens.core.data.SessionData
 import hivens.core.data.UiStyle
 import hivens.launcher.network.NetworkState
@@ -64,6 +63,11 @@ fun AppLayout(
     currentScreen: Screen,
     onScreenChange: (Screen) -> Unit,
     onBack: () -> Unit,
+    canGoBack: Boolean,
+    canGoForward: Boolean,
+    onForward: () -> Unit,
+    trail: List<Screen>,
+    onPopTo: (Screen) -> Unit,
     onLogin: (SessionData) -> Unit,
     onLogout: () -> Unit,
     isDarkTheme: Boolean,
@@ -217,23 +221,14 @@ fun AppLayout(
 
                     Screen.Browse  -> BrowseScreen(
                         onOpenPack = { pack ->
-                            onScreenChange(
-                                if (pack.origin == PackOrigin.Modrinth) Screen.ModrinthPackDetail(pack.id)
-                                else Screen.BrowsePackDetail(pack.id),
-                            )
+                            onScreenChange(Screen.CataloguePackDetail(pack.origin, pack.id))
                         },
                     )
 
-                    is Screen.BrowsePackDetail ->
-                        hivens.ui.screens.browse.BrowsePackDetailScreen(
+                    is Screen.CataloguePackDetail ->
+                        hivens.ui.screens.browse.CataloguePackDetailScreen(
+                            origin      = screen.origin,
                             packId      = screen.packId,
-                            onBack      = onBack,
-                            onInstalled = { instanceId -> onScreenChange(Screen.PackDetail(instanceId)) },
-                        )
-
-                    is Screen.ModrinthPackDetail ->
-                        hivens.ui.screens.browse.ModrinthPackDetailScreen(
-                            projectId   = screen.projectId,
                             onBack      = onBack,
                             onInstalled = { instanceId -> onScreenChange(Screen.PackDetail(instanceId)) },
                         )
@@ -257,6 +252,12 @@ fun AppLayout(
         onLogin         = onLogin,
         sslBypass       = sslBypass,
         centerBody      = centerBody,
+        trail           = trail,
+        canGoBack       = canGoBack,
+        canGoForward    = canGoForward,
+        onBack          = onBack,
+        onForward       = onForward,
+        onPopTo         = onPopTo,
     )
 
     // The editor host wraps the WHOLE shell (rails included) so its decorators

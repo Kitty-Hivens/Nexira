@@ -4,8 +4,11 @@ import hivens.core.api.dto.smrt.SmrtDisplay
 import hivens.core.api.dto.smrt.SmrtModEntry
 import hivens.core.api.dto.smrt.SmrtSource
 import kotlinx.coroutines.runBlocking
+import java.nio.file.Files
+import java.nio.file.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class ModIconResolverTest {
@@ -97,6 +100,47 @@ class ModIconResolverTest {
             source = SmrtSource.Modrinth(projectId = "abc", versionId = "v"),
         ))
         assertEquals("https://cdn.modrinth/abc/icon.png", url, "blank URL should not be treated as resolved")
+    }
+
+    @Test
+    fun `resolveByFile -- hashes the file and resolves via Modrinth, cached per hash`() = runBlocking {
+        var calls = 0
+        val r = ModIconResolver(
+            resolveProjectIcon = { "unused-by-this-path" },
+            resolveIconByHash  = { sha1 -> calls++; "https://cdn.modrinth/$sha1/icon.png" },
+        )
+        val file = Files.createTempFile("mod", ".jar").also { Files.write(it, byteArrayOf(1, 2, 3, 4)) }
+        try {
+            val first = r.resolveByFile(file)
+            val second = r.resolveByFile(file)
+            assertNotNull(first)
+            assertEquals(first, second)
+            assertEquals(1, calls, "same file hashes to the same key -- one lookup")
+        } finally {
+            Files.deleteIfExists(file)
+        }
+    }
+
+    @Test
+    fun `resolveByFile -- unknown hash returns null and is cached`() = runBlocking {
+        var calls = 0
+        val r = ModIconResolver(resolveProjectIcon = { "unused" }, resolveIconByHash = { calls++; null })
+        val file = Files.createTempFile("mod", ".jar").also { Files.write(it, byteArrayOf(9)) }
+        try {
+            assertNull(r.resolveByFile(file))
+            assertNull(r.resolveByFile(file))
+            assertEquals(1, calls, "an unknown (404) hash is cached so we don't keep hitting Modrinth")
+        } finally {
+            Files.deleteIfExists(file)
+        }
+    }
+
+    @Test
+    fun `resolveByFile -- unreadable file returns null without a lookup`() = runBlocking {
+        var calls = 0
+        val r = ModIconResolver(resolveProjectIcon = { "unused" }, resolveIconByHash = { calls++; "x" })
+        assertNull(r.resolveByFile(Path.of("/no/such/file/here.jar")))
+        assertEquals(0, calls, "a file that can't be hashed should not trigger a network lookup")
     }
 
     private fun modWith(display: SmrtDisplay?, source: SmrtSource) = SmrtModEntry(

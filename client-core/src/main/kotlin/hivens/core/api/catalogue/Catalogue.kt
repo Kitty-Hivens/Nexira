@@ -31,10 +31,23 @@ data class CataloguePackDetails(
     val tagline: String,
     val iconUrl: String? = null,
     val bannerUrl: String? = null,
+    /** Full-resolution gallery image URLs (for the lightbox). */
     val galleryUrls: List<String> = emptyList(),
+    /** Light preview URLs for the strip, index-aligned with [galleryUrls]; empty
+     *  means the source has no separate thumbnails (the strip falls back to full). */
+    val galleryThumbUrls: List<String> = emptyList(),
     /** Long-form CommonMark description; null when the source has none. */
     val bodyMarkdown: String? = null,
     val versions: List<CataloguePackVersion> = emptyList(),
+    /** Source-authored tags/categories for the metadata block; empty when none. */
+    val tags: List<String> = emptyList(),
+    /**
+     * Required runtime label (e.g. "Java 21") when the source declares one -- the
+     * mirror reads it from the manifest. Null when the source has no runtime info
+     * (Modrinth does not expose a per-pack Java requirement). MC + loader come off
+     * the selected [CataloguePackVersion].
+     */
+    val runtimeLabel: String? = null,
 )
 
 /** One installable version of a pack. */

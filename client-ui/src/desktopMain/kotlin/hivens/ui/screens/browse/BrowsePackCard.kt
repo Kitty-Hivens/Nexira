@@ -105,7 +105,8 @@ fun BrowsePackCard(
                     )
                     SourceBadge(pack.origin)
                 }
-                if (pack.tagline.isNotBlank()) {
+                // Mirror summaries sometimes ship tagline == name; don't echo the title.
+                if (pack.tagline.isNotBlank() && !pack.tagline.equals(pack.title, ignoreCase = true)) {
                     Text(
                         text     = pack.tagline,
                         style    = MaterialTheme.typography.bodySmall,

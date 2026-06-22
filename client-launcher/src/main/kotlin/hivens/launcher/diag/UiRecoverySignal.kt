@@ -44,6 +44,38 @@ object UiRecoverySignal {
     /** Latches once the crash-loop guard trips. Read by the entry-point loop. */
     val safeMode: StateFlow<Boolean> = _safeMode.asStateFlow()
 
+    /**
+     * Crash side-channel for the render path. A crash thrown while rendering a
+     * frame runs on the AWT event thread, which catches it and keeps the window
+     * alive -- so it never unwinds `application {}` and the restart loop never
+     * sees it. The window-exception handler (see hivens.ui.Main) stashes it here
+     * and exits the application; the loop reads it after `application {}` returns
+     * and drives the same recovery a thrown crash would. First writer wins: a
+     * broken frame can fire the handler repeatedly before teardown, and the
+     * first throwable is the cause.
+     */
+    @Volatile private var pendingCrash: Throwable? = null
+
+    fun recordPendingCrash(crash: Throwable) {
+        if (pendingCrash == null) pendingCrash = crash
+    }
+
+    /** Read and clear the stashed render-path crash, if any. */
+    fun consumePendingCrash(): Throwable? = pendingCrash.also { pendingCrash = null }
+
+    /**
+     * One-shot "the shell just reloaded after a crash" signal. Set before the
+     * loop re-enters `application {}` on a retry; the fresh shell reads it once
+     * on first composition to surface a notification, so a reload that resets the
+     * current screen is never silent.
+     */
+    @Volatile private var recovered: Boolean = false
+
+    fun markRecovered() { recovered = true }
+
+    /** Read and clear the recovered flag; true only on the composition that follows a crash restart. */
+    fun consumeRecovered(): Boolean = recovered.also { recovered = false }
+
     private val crashTimes = ArrayDeque<Long>()
 
     /**

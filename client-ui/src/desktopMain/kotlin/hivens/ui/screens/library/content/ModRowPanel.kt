@@ -2,6 +2,7 @@ package hivens.ui.screens.library.content
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -97,7 +98,7 @@ fun ModRowPanel(
             Row(
                 modifier              = Modifier
                     .weight(1f)
-                    .clickable { expanded = !expanded },
+                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { expanded = !expanded },
                 verticalAlignment     = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
@@ -213,7 +214,7 @@ private fun DependenciesSubsection(mod: SmrtModEntry, graph: DepGraph) {
         modifier              = Modifier
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.small)
-            .clickable(enabled = !empty) { open = !open }
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, enabled = !empty) { open = !open }
             .padding(vertical = 4.dp),
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),

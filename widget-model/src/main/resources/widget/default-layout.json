@@ -1,10 +1,21 @@
 {
-  "schema_version": 5,
+  "schema_version": 6,
   "graph": {
     "surfaces": {
       "appshell.root": {
         "slots": {
           "regions": {
+            "orientation": "Column",
+            "widgets": [
+              { "kind": "appshell.region.top",  "instance_id": "appshell-region-top-default" },
+              { "kind": "appshell.region.body", "instance_id": "appshell-region-body-default", "weight": 1.0 }
+            ]
+          }
+        }
+      },
+      "appshell.body": {
+        "slots": {
+          "content": {
             "orientation": "Row",
             "widgets": [
               { "kind": "appshell.region.left",   "instance_id": "appshell-region-left-default",   "props": { "widthDp": 65 } },
@@ -12,6 +23,11 @@
               { "kind": "appshell.region.right",  "instance_id": "appshell-region-right-default",  "props": { "widthDp": 265 } }
             ]
           }
+        }
+      },
+      "appshell.topbar": {
+        "slots": {
+          "left": { "orientation": "Row", "widgets": [ { "kind": "appshell.topbar.breadcrumb", "instance_id": "appshell-topbar-breadcrumb-default" } ] }
         }
       },
       "home.classic": {
