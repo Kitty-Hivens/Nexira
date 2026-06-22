@@ -6,16 +6,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import hivens.ui.generated.resources.Res
-import hivens.ui.generated.resources.dejavu_sans
-import hivens.ui.generated.resources.jetbrains_mono_bold
-import hivens.ui.generated.resources.jetbrains_mono_medium
-import hivens.ui.generated.resources.jetbrains_mono_regular
-import hivens.ui.generated.resources.jetbrains_mono_semibold
-import hivens.ui.generated.resources.roboto_flex_bold
-import hivens.ui.generated.resources.roboto_flex_medium
-import hivens.ui.generated.resources.roboto_flex_regular
-import hivens.ui.generated.resources.roboto_flex_semibold
+import hivens.nx.ui.generated.resources.Res
+import hivens.nx.ui.generated.resources.dejavu_sans
+import hivens.nx.ui.generated.resources.jetbrains_mono_bold
+import hivens.nx.ui.generated.resources.jetbrains_mono_medium
+import hivens.nx.ui.generated.resources.jetbrains_mono_regular
+import hivens.nx.ui.generated.resources.jetbrains_mono_semibold
+import hivens.nx.ui.generated.resources.roboto_flex_bold
+import hivens.nx.ui.generated.resources.roboto_flex_medium
+import hivens.nx.ui.generated.resources.roboto_flex_regular
+import hivens.nx.ui.generated.resources.roboto_flex_semibold
 import org.jetbrains.compose.resources.Font
 
 /**
