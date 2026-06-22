@@ -47,7 +47,7 @@ import hivens.core.api.SkinRepository
 import hivens.core.data.PackAuthRequirement
 import hivens.core.data.SessionData
 import hivens.launcher.CredentialsManager
-import hivens.ui.components.GlassCard
+import hivens.ui.nx.GlassCard
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.easter.LocalAprilFools
 import hivens.ui.i18n.LocalStrings

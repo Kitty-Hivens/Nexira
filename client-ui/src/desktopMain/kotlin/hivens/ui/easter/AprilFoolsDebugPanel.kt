@@ -13,7 +13,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import hivens.ui.components.NxSwitch
+import hivens.ui.nx.NxSwitch
 import hivens.ui.theme.NxTheme
 import kotlinx.coroutines.launch
 

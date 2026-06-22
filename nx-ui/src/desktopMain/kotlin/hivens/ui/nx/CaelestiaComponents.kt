@@ -1,4 +1,4 @@
-package hivens.ui.components
+package hivens.ui.nx
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*

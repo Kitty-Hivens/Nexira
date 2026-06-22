@@ -56,7 +56,7 @@ import hivens.ui.icons.Symbol
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetToggle
 import hivens.ui.screens.settings.settingsRowBackground
-import hivens.ui.components.NxSwitch
+import hivens.ui.nx.NxSwitch
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalStyle
 import hivens.ui.widgets.customization.HexField

@@ -66,9 +66,9 @@ import hivens.launcher.instance.InstanceContentScanner
 import hivens.launcher.platform.PlatformPaths
 import hivens.launcher.smrt.ModIconResolver
 import hivens.ui.components.DestructiveConfirmDialog
-import hivens.ui.components.NxButton
-import hivens.ui.components.NxSwitch
-import hivens.ui.components.NxButtonStyle
+import hivens.ui.nx.NxButton
+import hivens.ui.nx.NxSwitch
+import hivens.ui.nx.NxButtonStyle
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon

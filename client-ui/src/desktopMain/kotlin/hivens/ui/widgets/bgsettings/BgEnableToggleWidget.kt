@@ -17,7 +17,7 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.components.NxSwitch
+import hivens.ui.nx.NxSwitch
 import hivens.ui.theme.NxTheme
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance

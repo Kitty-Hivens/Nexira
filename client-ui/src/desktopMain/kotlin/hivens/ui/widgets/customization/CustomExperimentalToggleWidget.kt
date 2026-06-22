@@ -12,7 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.components.NxSwitch
+import hivens.ui.nx.NxSwitch
 import hivens.ui.theme.NxTheme
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance

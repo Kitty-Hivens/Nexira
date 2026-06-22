@@ -33,7 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.core.data.HomeView
 import hivens.core.data.UiStyle
-import hivens.ui.components.NxSwitch
+import hivens.ui.nx.NxSwitch
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon

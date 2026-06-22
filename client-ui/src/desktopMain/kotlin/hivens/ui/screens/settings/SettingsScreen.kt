@@ -13,7 +13,7 @@ import hivens.core.data.HomeView
 import hivens.core.data.UiStyle
 import hivens.launcher.network.NetworkState
 import hivens.launcher.platform.PlatformPaths
-import hivens.ui.components.GlassCard
+import hivens.ui.nx.GlassCard
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.LocalStrings

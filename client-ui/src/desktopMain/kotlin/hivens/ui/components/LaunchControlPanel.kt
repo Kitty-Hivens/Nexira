@@ -1,4 +1,5 @@
 package hivens.ui.components
+import hivens.ui.nx.CelestiaButton
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
