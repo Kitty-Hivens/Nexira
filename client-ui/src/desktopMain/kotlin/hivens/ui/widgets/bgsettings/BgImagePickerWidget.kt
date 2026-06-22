@@ -51,7 +51,10 @@ fun BgImagePickerWidget(instance: WidgetInstance) {
                 onClick  = {
                     scope.launch {
                         FileKit.openFilePicker(
-                            type           = FileKitType.File(extensions = listOf("png", "jpg", "jpeg", "webp", "bmp", "gif", "apng")),
+                            type           = FileKitType.File(extensions = listOf(
+                                "png", "jpg", "jpeg", "webp", "bmp", "gif", "apng",
+                                "mp4", "m4v", "mov", "webm", "mkv", "ogv",
+                            )),
                             dialogSettings = FileKitDialogSettings(title = s.backgroundPickFile),
                         )?.path?.let { path ->
                             ctx.update { copy(imagePath = path, enabled = true) }

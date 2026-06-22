@@ -27,6 +27,7 @@ object GermanStrings : AppStrings {
     // Navigation
     override val navLogout   = "Abmelden"
     override val navBack     = "Zurück"
+    override val navForward  = "Vorwärts"
 
     // Dashboard
     override fun dashboardWelcome(name: String) = "WILLKOMMEN ZURÜCK, $name"
@@ -85,6 +86,7 @@ object GermanStrings : AppStrings {
     override val settingsThemePicker        = "Design auswählen"
     override val settingsThemePickerSub     = "Farbschema anpassen"
     override val settingsDarkTheme          = "Dunkles Design"
+    override val settingsDarkThemeDesc      = "Dunkles Oberflächen-Design"
     override val settingsCloseAfterLaunch   = "Launcher nach Spielstart in Tray minimieren"
     override val settingsCloseAfterLaunchDesc = "Versteckt den Launcher im System-Tray, sobald das Spiel startet."
     override val settingsSaved              = "Einstellungen gespeichert"
@@ -112,6 +114,12 @@ object GermanStrings : AppStrings {
     override val newsFilterClear        = "Filter zurücksetzen"
     override val railCollapse           = "Leiste einklappen"
     override val railExpand             = "Leiste ausklappen"
+    override val windowMinimize         = "Minimieren"
+    override val windowMaximize         = "Maximieren"
+    override val windowRestore          = "Wiederherstellen"
+    override val windowClose            = "Schließen"
+    override val crumbHome              = "Start"
+    override val crumbLoading           = "Wird geladen…"
     override val paginationPrev         = "Vorherige Seite"
     override val paginationNext         = "Nächste Seite"
 
@@ -193,6 +201,7 @@ object GermanStrings : AppStrings {
 
     // Console
     override val consoleTitle = "Debug-Konsole"
+    override val consoleEmptyHint = "Alles ruhig. Starte ein Pack, dann laufen die Logs hier ein."
     override fun consoleHeaderCount(filtered: Int, total: Int) = "Spielausgabe ($filtered/$total)"
     override val consoleCopyAll = "Alles kopieren"
     override val consoleClear   = "Leeren"
@@ -281,8 +290,8 @@ object GermanStrings : AppStrings {
     override val backgroundTitle          = "Benutzerdefinierter Hintergrund"
     override val backgroundSubtitle       = "Launcher-Hintergrund anpassen"
     override val backgroundEnable         = "Aktivieren"
-    override val backgroundSectionImage   = "Bild"
-    override val backgroundPickFile       = "Hintergrundbild auswählen"
+    override val backgroundSectionImage   = "Bild oder Video"
+    override val backgroundPickFile       = "Hintergrundbild oder -video auswählen"
     override val backgroundPickButton     = "Datei auswählen"
     override val backgroundSectionScale   = "Skalierung"
     override val backgroundScaleCover     = "Füllen"
@@ -318,7 +327,7 @@ object GermanStrings : AppStrings {
     // =========================================================================
     // About Screen
     // =========================================================================
-    override val aboutTitle                = "ÜBER DEN LAUNCHER"
+    override val aboutTitle                = "Über den Launcher"
     override fun aboutDescription(branding: String) = "Inoffizieller Launcher für $branding"
     override val locale = java.util.Locale.GERMAN
     override fun aboutBuildDate(date: String) = "Erstellt: $date"
@@ -603,6 +612,30 @@ object GermanStrings : AppStrings {
     override val settingsCategoryExperimental = "Experimentell"
     override val settingsCategoryAdvanced     = "Erweitert"
     override val settingsCategoryDiagnostics  = "Diagnose"
+    override val settingsCategoryConsole      = "Konsole"
+    override val consoleSecDisplay            = "Anzeige"
+    override val consoleSecColors             = "Severity-Farben"
+    override val consoleSecFontSize           = "Schriftgröße"
+    override val consoleSecWrap               = "Zeilenumbruch"
+    override val consoleSecGutter             = "Severity-Leiste"
+    override val consoleSecTimestamps         = "Zeitstempel"
+    override val consoleSecBuffer             = "Zeilenpuffer"
+    override val consoleSecColorInfo          = "Info"
+    override val consoleSecColorWarn          = "Warn"
+    override val consoleSecColorError         = "Error"
+    override val consoleSecColorAuto          = "Auto"
+    override val consoleSecApplyNote          = "Änderungen greifen beim nächsten Öffnen der Konsole."
+    override val consoleSecHighlightRules     = "Hervorhebungsregeln"
+    override val consoleSecFilterRules        = "Filter / Stumm"
+    override val consoleSecAddRule            = "Regel hinzufügen"
+    override val consoleSecRulePattern        = "Muster"
+    override val consoleSecRegex              = "regex"
+    override val consoleSecBold               = "Fett"
+    override val consoleSecRulesEmpty         = "Noch keine Regeln."
+    override val consoleSecArt                 = "Leere-Konsole-Art"
+    override val consoleSecArtAdd              = "Art hinzufügen"
+    override val consoleSecArtPaste            = "ASCII- oder Braille-Art einfügen"
+    override val consoleSecArtEmpty            = "Noch keine eigene Art."
 
     override val profileCategoryAccount = "Konto"
     override val profileCategorySignIn      = "Anmelden"
@@ -683,7 +716,7 @@ object GermanStrings : AppStrings {
     override val browseDetailCompatTitle      = "Kompatibilität"
     override val browseDetailCompatMc         = "Minecraft"
     override val browseDetailCompatLoader     = "Loader"
-    override val browseDetailCompatJava       = "Java"
+    override val browseDetailCompatJava       = "Runtime"
     override val browseDetailVersionTitle     = "Version"
 
     override val browseDetailInstallRunningTitle  = "Installation läuft..."
@@ -897,8 +930,17 @@ object GermanStrings : AppStrings {
         "widget.appshell.region.center" to "Hauptbereich",
         "widget.appshell.region.collapsed" to "Eingeklappt",
         "widget.appshell.region.swipeToCollapse" to "Mit Wischen einklappen",
+        "widget.appshell.region.frostTier" to "Glas",
         "widget.appshell.region.glassAlphaPct" to "Glas, %",
         "widget.appshell.region.left" to "Linke Leiste",
+        "widget.appshell.region.top" to "Titelleiste",
+        "widget.appshell.region.body" to "Hauptbereich",
+        "widget.appshell.topbar.breadcrumb" to "Brotkrümel",
+        "widget.appshell.topbar.heightDp" to "Höhe",
+        "widget.appshell.topbar.cornerStyle" to "Eckenstil",
+        "widget.appshell.topbar.groupStyle" to "Gruppierung",
+        "widget.appshell.topbar.frostTier" to "Glas",
+        "widget.appshell.topbar.controls" to "Fenstertasten",
         "widget.appshell.region.right" to "Rechte Leiste",
         "widget.appshell.region.showDivider" to "Trennlinie",
         "widget.appshell.region.widthDp" to "Breite (0 = flexibel)",
@@ -978,6 +1020,8 @@ object GermanStrings : AppStrings {
         "widget.home.new.recent.title" to "Überschrift",
         "widget.home.new.spacer" to "Abstand",
         "widget.home.new.spacer.height" to "Höhe",
+        "widget.home.new.video" to "Videoplayer",
+        "widget.home.new.video.url" to "Video-URL",
         "widget.home.new.welcome" to "Willkommensbanner",
         "widget.home.new.welcome.customGreeting" to "Eigener Begrüßungstext",
         "widget.home.new.welcome.showSubtitle" to "Untertitel anzeigen",
@@ -987,6 +1031,7 @@ object GermanStrings : AppStrings {
         "widget.library.header" to "Bibliothekskopf",
         "widget.library.header.subtitle" to "Untertitel",
         "widget.library.header.title" to "Überschrift",
+        "widget.library.header.show" to "Kopf anzeigen",
         "widget.nav.entry" to "Navigationspunkt",
         "widget.notes.scratch" to "Notizen",
         "widget.notes.scratch.placeholder" to "Schreib etwas...",
@@ -1011,6 +1056,7 @@ object GermanStrings : AppStrings {
     override val recoverySafeModeTitle = "Oberfläche nicht wiederherstellbar"
     override val recoverySafeModeBody  = "Die Oberfläche ist mehrfach hintereinander abgestürzt. Ein Absturzbericht wurde gespeichert. Starte den Launcher neu."
     override val recoverySafeModeQuit  = "Beenden"
+    override val recoveryReloadedNotice = "Oberfläche nach einem Fehler neu geladen"
     override val editorSave    = "Speichern"
     override val editorApply   = "Anwenden"
     override val editorExport  = "Exportieren"
@@ -1081,6 +1127,8 @@ object GermanStrings : AppStrings {
     override val editorSurfShortServer    = "Server"
     override val editorSurfShortTheme     = "Themes"
     override val editorSurfShortShell     = "Hülle"
+    override val editorSurfShortTopBar    = "Oben"
+    override val editorSurfShortBody      = "Bereich"
 
     // --- Layout editor: surface long names ---
     override val editorSurfHomeClassic = "Start (klassisch)"
@@ -1095,6 +1143,8 @@ object GermanStrings : AppStrings {
     override val editorSurfServer      = "Server-Details"
     override val editorSurfTheme       = "Themenauswahl"
     override val editorSurfShell        = "App-Hülle"
+    override val editorSurfTopBar       = "Obere Leiste"
+    override val editorSurfBody         = "Hauptbereich"
 
     // --- Music player widgets ---
     override val musicPlayerTitle      = "Musik-Player"
@@ -1108,13 +1158,26 @@ object GermanStrings : AppStrings {
     override val audioStatusReady      = "Bereit"
     override val audioStatusPlaying    = "Spielt"
     override val audioStatusPaused     = "Pausiert"
-    override val audioFormatHint       = "WAV / AU / AIFF werden unterstützt. MP3 kommt mit Skinema."
+    override val audioFormatHint       = "MP3, FLAC, OGG, WAV und mehr."
     override val audioNoPlayerHere     = "Kein Player auf diesem Layout"
     override val audioAddMusicPlayer   = "Music player hinzufügen"
-    override val audioErrorUnsupported = "Format nicht unterstützt -- WAV / AU / AIFF nötig."
+    override val audioErrorUnsupported = "Format nicht unterstützt oder Datei beschädigt."
     override val audioErrorOpenFailed  = "Datei konnte nicht geöffnet werden"
     override val audioErrorDeviceBusy  = "Audiogerät ist belegt"
     override val audioErrorPlaybackFailed = "Wiedergabe fehlgeschlagen"
+
+    // --- Video player ---
+    override val videoFullscreen     = "Vollbild"
+    override val videoExitFullscreen = "Vollbild verlassen"
+    override val videoMute           = "Stummschalten"
+    override val videoUnmute         = "Ton ein"
+    override val videoReplay         = "Erneut abspielen"
+    override val videoError          = "Video konnte nicht abgespielt werden"
+    override val videoLoading        = "Video wird geladen…"
+    override val videoOpenInBrowser  = "Im Browser öffnen"
+    override val videoSkipBack        = "10 Sekunden zurück"
+    override val videoSkipForward     = "10 Sekunden vor"
+    override val videoWidgetEmpty     = "Video-URL in den Widget-Einstellungen festlegen"
 
     // --- Library pack card ---
     override val packCardPlay          = "Spielen"

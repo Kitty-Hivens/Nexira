@@ -30,6 +30,7 @@ object EnglishStrings : AppStrings {
     // Navigation
     override val navLogout   = "Log out"
     override val navBack     = "Back"
+    override val navForward  = "Forward"
 
     // Dashboard
     override fun dashboardWelcome(name: String) = "WELCOME BACK, $name"
@@ -88,6 +89,7 @@ object EnglishStrings : AppStrings {
     override val settingsThemePicker        = "Choose theme"
     override val settingsThemePickerSub     = "Customize the color scheme"
     override val settingsDarkTheme          = "Dark theme"
+    override val settingsDarkThemeDesc      = "Dark interface theme"
     override val settingsCloseAfterLaunch   = "Hide launcher to tray after the game starts"
     override val settingsCloseAfterLaunchDesc = "Hides the launcher to the system tray once the game starts."
     override val settingsSaved              = "Settings saved"
@@ -115,6 +117,12 @@ object EnglishStrings : AppStrings {
     override val newsFilterClear        = "Clear filter"
     override val railCollapse           = "Collapse panel"
     override val railExpand             = "Expand panel"
+    override val windowMinimize         = "Minimize"
+    override val windowMaximize         = "Maximize"
+    override val windowRestore          = "Restore"
+    override val windowClose            = "Close"
+    override val crumbHome              = "Home"
+    override val crumbLoading           = "Loading…"
     override val paginationPrev         = "Previous page"
     override val paginationNext         = "Next page"
 
@@ -196,6 +204,7 @@ object EnglishStrings : AppStrings {
 
     // Console
     override val consoleTitle = "Debug Console"
+    override val consoleEmptyHint = "All quiet. Launch a pack and the logs will stream in here."
     override fun consoleHeaderCount(filtered: Int, total: Int) = "Game Output ($filtered/$total)"
     override val consoleCopyAll = "Copy All"
     override val consoleClear   = "Clear"
@@ -283,8 +292,8 @@ object EnglishStrings : AppStrings {
     override val backgroundTitle          = "Custom background"
     override val backgroundSubtitle       = "Customize the launcher wallpaper"
     override val backgroundEnable         = "Enable"
-    override val backgroundSectionImage   = "Image"
-    override val backgroundPickFile       = "Choose a background image"
+    override val backgroundSectionImage   = "Image or video"
+    override val backgroundPickFile       = "Choose a background image or video"
     override val backgroundPickButton     = "Choose file"
     override val backgroundSectionScale   = "Scaling"
     override val backgroundScaleCover     = "Cover"
@@ -605,6 +614,30 @@ object EnglishStrings : AppStrings {
     override val settingsCategoryExperimental = "Experimental"
     override val settingsCategoryAdvanced     = "Advanced"
     override val settingsCategoryDiagnostics  = "Diagnostics"
+    override val settingsCategoryConsole      = "Console"
+    override val consoleSecDisplay            = "Display"
+    override val consoleSecColors             = "Severity colours"
+    override val consoleSecFontSize           = "Font size"
+    override val consoleSecWrap               = "Wrap lines"
+    override val consoleSecGutter             = "Severity strip"
+    override val consoleSecTimestamps         = "Timestamps"
+    override val consoleSecBuffer             = "Line buffer"
+    override val consoleSecColorInfo          = "Info"
+    override val consoleSecColorWarn          = "Warn"
+    override val consoleSecColorError         = "Error"
+    override val consoleSecColorAuto          = "Auto"
+    override val consoleSecApplyNote          = "Changes apply the next time the console is opened."
+    override val consoleSecHighlightRules     = "Highlight rules"
+    override val consoleSecFilterRules        = "Filter / mute"
+    override val consoleSecAddRule            = "Add rule"
+    override val consoleSecRulePattern        = "Pattern"
+    override val consoleSecRegex              = "regex"
+    override val consoleSecBold               = "Bold"
+    override val consoleSecRulesEmpty         = "No rules yet."
+    override val consoleSecArt                 = "Empty-console art"
+    override val consoleSecArtAdd              = "Add art"
+    override val consoleSecArtPaste            = "Paste ASCII or Braille art"
+    override val consoleSecArtEmpty            = "No custom art yet."
 
     override val profileCategoryAccount = "Account"
     override val profileCategorySignIn      = "Sign in"
@@ -685,7 +718,7 @@ object EnglishStrings : AppStrings {
     override val browseDetailCompatTitle      = "Compatibility"
     override val browseDetailCompatMc         = "Minecraft"
     override val browseDetailCompatLoader     = "Loader"
-    override val browseDetailCompatJava       = "Java"
+    override val browseDetailCompatJava       = "Runtime"
     override val browseDetailVersionTitle     = "Version"
 
     override val browseDetailInstallRunningTitle  = "Installing..."
@@ -896,8 +929,17 @@ object EnglishStrings : AppStrings {
         "widget.appshell.region.center" to "Main content",
         "widget.appshell.region.collapsed" to "Collapsed",
         "widget.appshell.region.swipeToCollapse" to "Swipe to collapse",
+        "widget.appshell.region.frostTier" to "Frost",
         "widget.appshell.region.glassAlphaPct" to "Glass, %",
         "widget.appshell.region.left" to "Left rail",
+        "widget.appshell.region.top" to "Title bar",
+        "widget.appshell.region.body" to "Main area",
+        "widget.appshell.topbar.breadcrumb" to "Breadcrumb",
+        "widget.appshell.topbar.heightDp" to "Height",
+        "widget.appshell.topbar.cornerStyle" to "Corner style",
+        "widget.appshell.topbar.groupStyle" to "Grouping",
+        "widget.appshell.topbar.frostTier" to "Frost",
+        "widget.appshell.topbar.controls" to "Window controls",
         "widget.appshell.region.right" to "Right panel",
         "widget.appshell.region.showDivider" to "Divider",
         "widget.appshell.region.widthDp" to "Width (0 = flexible)",
@@ -977,6 +1019,8 @@ object EnglishStrings : AppStrings {
         "widget.home.new.recent.title" to "Heading",
         "widget.home.new.spacer" to "Spacer",
         "widget.home.new.spacer.height" to "Height",
+        "widget.home.new.video" to "Video player",
+        "widget.home.new.video.url" to "Video URL",
         "widget.home.new.welcome" to "Welcome banner",
         "widget.home.new.welcome.customGreeting" to "Custom greeting text",
         "widget.home.new.welcome.showSubtitle" to "Show subtitle",
@@ -986,6 +1030,7 @@ object EnglishStrings : AppStrings {
         "widget.library.header" to "Library header",
         "widget.library.header.subtitle" to "Subtitle",
         "widget.library.header.title" to "Heading",
+        "widget.library.header.show" to "Show header",
         "widget.nav.entry" to "Nav item",
         "widget.notes.scratch" to "Notes",
         "widget.notes.scratch.placeholder" to "Write something...",
@@ -1010,6 +1055,7 @@ object EnglishStrings : AppStrings {
     override val recoverySafeModeTitle = "Can't recover the interface"
     override val recoverySafeModeBody  = "The interface crashed several times in a row. A crash report was saved to disk. Restart the launcher."
     override val recoverySafeModeQuit  = "Quit"
+    override val recoveryReloadedNotice = "Interface reloaded after an error"
     override val editorSave    = "Save"
     override val editorApply   = "Apply"
     override val editorExport  = "Export"
@@ -1080,6 +1126,8 @@ object EnglishStrings : AppStrings {
     override val editorSurfShortServer    = "Server"
     override val editorSurfShortTheme     = "Themes"
     override val editorSurfShortShell     = "Shell"
+    override val editorSurfShortTopBar    = "Top"
+    override val editorSurfShortBody      = "Main"
 
     // --- Layout editor: surface long names ---
     override val editorSurfHomeClassic = "Home (classic)"
@@ -1094,6 +1142,8 @@ object EnglishStrings : AppStrings {
     override val editorSurfServer      = "Server details"
     override val editorSurfTheme       = "Theme picker"
     override val editorSurfShell        = "App shell"
+    override val editorSurfTopBar       = "Top bar"
+    override val editorSurfBody         = "Main area"
 
     // --- Music player widgets ---
     override val musicPlayerTitle      = "Music player"
@@ -1107,13 +1157,26 @@ object EnglishStrings : AppStrings {
     override val audioStatusReady      = "Ready"
     override val audioStatusPlaying    = "Playing"
     override val audioStatusPaused     = "Paused"
-    override val audioFormatHint       = "WAV / AU / AIFF supported. MP3 arrives with Skinema."
+    override val audioFormatHint       = "MP3, FLAC, OGG, WAV and more."
     override val audioNoPlayerHere     = "No player on this layout"
     override val audioAddMusicPlayer   = "Add a Music player"
-    override val audioErrorUnsupported = "Unsupported format -- needs WAV / AU / AIFF."
+    override val audioErrorUnsupported = "Unsupported or unreadable file."
     override val audioErrorOpenFailed  = "Could not open the file"
     override val audioErrorDeviceBusy  = "Audio device is busy"
     override val audioErrorPlaybackFailed = "Playback failed"
+
+    // --- Video player ---
+    override val videoFullscreen     = "Fullscreen"
+    override val videoExitFullscreen = "Exit fullscreen"
+    override val videoMute           = "Mute"
+    override val videoUnmute         = "Unmute"
+    override val videoReplay         = "Replay"
+    override val videoError          = "Could not play this video"
+    override val videoLoading        = "Loading video…"
+    override val videoOpenInBrowser  = "Open in browser"
+    override val videoSkipBack        = "Back 10 seconds"
+    override val videoSkipForward     = "Forward 10 seconds"
+    override val videoWidgetEmpty     = "Set a video URL in widget settings"
 
     // --- Library pack card ---
     override val packCardPlay          = "Play"

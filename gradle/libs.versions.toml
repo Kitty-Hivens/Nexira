@@ -37,6 +37,9 @@ markdown          = "0.7.3"
 # jsoup -- HTML parsing for the in-launcher HTML renderer.
 jsoup             = "1.18.1"
 coil              = "3.4.0"
+# Material You colour science (Monet) -- pure Kotlin port, no Compose dep.
+# Seeds a tonal palette from the wallpaper; mapped onto CelestiaColors.
+materialColorUtils = "4.1.1"
 filekit           = "0.14.1"
 
 # ── Logging ──────────────────────────────────────────────────────────────────
@@ -73,6 +76,13 @@ libnotify         = "0.1.2"
 # lived inside CredentialsManager. Same dev.hivens family, mavenCentral.
 # 0.2.1: private D-Bus connection -- same shared-bus message-theft fix as libtray.
 libvault          = "0.2.1"
+
+# Media decode/playback (Kitty-Hivens/skinema) -- FFmpeg via Panama, frames
+# out as Skia images, fail-closed/drop-late, built for looping backgrounds.
+# Replaces the in-tree Skia-Codec animation path in CustomBackground and adds
+# video wallpapers. dev.hivens family, mavenCentral; decode-only LGPL FFmpeg +
+# libwebp + libass ship in per-platform skinema-natives classifier jars.
+skinema           = "0.5.0"
 
 # ── Test ─────────────────────────────────────────────────────────────────────
 # junit held on the 5.x line: 6.x drops Java 8 and requires JVM runtime 17+,
@@ -128,6 +138,7 @@ markdown-core                   = { group = "org.jetbrains",       name = "markd
 jsoup                           = { group = "org.jsoup",           name = "jsoup",               version.ref = "jsoup" }
 coil-compose                    = { group = "io.coil-kt.coil3",    name = "coil-compose",        version.ref = "coil" }
 coil-network-okhttp             = { group = "io.coil-kt.coil3",    name = "coil-network-okhttp", version.ref = "coil" }
+material-color-utilities        = { group = "com.materialkolor",   name = "material-color-utilities", version.ref = "materialColorUtils" }
 filekit-core                    = { group = "io.github.vinceglb", name = "filekit-core",         version.ref = "filekit" }
 filekit-dialogs-compose         = { group = "io.github.vinceglb", name = "filekit-dialogs-compose", version.ref = "filekit" }
 
@@ -136,6 +147,12 @@ commons-compress                = { group = "org.apache.commons", name = "common
 libtray                         = { group = "dev.hivens", name = "libtray", version.ref = "libtray" }
 libnotify                       = { group = "dev.hivens", name = "libnotify", version.ref = "libnotify" }
 libvault                        = { group = "dev.hivens", name = "libvault", version.ref = "libvault" }
+# skinema-compose pulls -core and -skiko at runtime; -skiko (the Skia frame
+# bridge, VideoFrameImage) is also a compile dep -- the background renders
+# frames through its own Painter rather than VideoSurface. Natives are
+# per-platform runtimeOnly classifiers, declared directly in client-ui.
+skinema-compose                 = { group = "dev.hivens", name = "skinema-compose", version.ref = "skinema" }
+skinema-skiko                   = { group = "dev.hivens", name = "skinema-skiko",   version.ref = "skinema" }
 
 # JNA dropped — was only present for dorkbox/SystemTray. libtray is
 # pure java.lang.foreign (Project Panama) and pulls no JNA transitively.

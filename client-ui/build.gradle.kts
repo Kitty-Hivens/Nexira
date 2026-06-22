@@ -78,11 +78,24 @@ kotlin {
                 implementation(libs.logback.classic)
                 implementation(libs.libtray)
                 implementation(libs.libnotify)
+                // Video / animated-image backgrounds (hivens.ui.background): FFmpeg
+                // via Panama. skinema-compose brings -core + -skiko; the natives are
+                // per-platform classifier jars on the runtime classpath, unpacked to a
+                // per-user cache on first use. Ship one classifier per target tier.
+                implementation(libs.skinema.compose)
+                implementation(libs.skinema.skiko)
+                runtimeOnly("dev.hivens:skinema-natives:${libs.versions.skinema.get()}:linux-x64")
+                runtimeOnly("dev.hivens:skinema-natives:${libs.versions.skinema.get()}:linux-arm64")
+                runtimeOnly("dev.hivens:skinema-natives:${libs.versions.skinema.get()}:windows-x64")
+                runtimeOnly("dev.hivens:skinema-natives:${libs.versions.skinema.get()}:macos-arm64")
+                runtimeOnly("dev.hivens:skinema-natives:${libs.versions.skinema.get()}:macos-x64")
                 implementation(libs.ktor.client.core)
                 // In-launcher HTML renderer (hivens.ui.render): jsoup parses, the
                 // markdown lib does md->html. The velocipede before the standalone lib.
                 implementation(libs.jsoup)
                 implementation(libs.markdown.core)
+                // Material You colour science -- wallpaper-seeded palette engine.
+                implementation(libs.material.color.utilities)
             }
         }
 

@@ -18,6 +18,7 @@ internal enum class SettingsCategory(
     val label: (AppStrings) -> String,
 ) {
     Appearance(   NxIcon.Palette,   { it.settingsCategoryAppearance }),
+    Console(      NxIcon.Code,      { it.settingsCategoryConsole }),
     Network(      NxIcon.Wifi,      { it.settingsCategoryNetwork }),
     Smarty(       NxIcon.Shield,    { it.settingsCategorySmarty }),
     Experimental( NxIcon.Science,   { it.settingsCategoryExperimental }),

@@ -4,8 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,13 +17,15 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -36,6 +38,8 @@ import coil3.compose.AsyncImage
 import coil3.compose.SubcomposeAsyncImage
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
+import hivens.ui.components.NxContextMenu
+import hivens.ui.components.NxMenuItem
 import hivens.ui.effects.pixelArtBackground
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
@@ -65,14 +69,14 @@ import java.time.Instant
 fun PackCard(
     instance: PackInstance,
     onOpenDetail: () -> Unit,
-    onPlay: () -> Unit,
-    onSettings: () -> Unit,
-    onMore: () -> Unit,
+    onOpenFolder: () -> Unit,
+    onDelete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val s = LocalStrings.current
     val (hueA, hueB) = CelestiaTheme.colors.decorativePair(instance.id)
     val art = rememberPackArt(instance)
+    var menuOpen by remember { mutableStateOf(false) }
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -91,67 +95,70 @@ fun PackCard(
         }
         Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = if (art.bannerUrl != null) 0.45f else 0.32f)))
 
-        Row(
-            modifier              = Modifier.fillMaxSize().padding(14.dp),
-            verticalAlignment     = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            PackAvatar(iconUrl = art.iconUrl, displayName = instance.displayName, hue = hueA)
-
-            Column(
-                modifier              = Modifier.weight(1f),
-                verticalArrangement   = Arrangement.spacedBy(6.dp),
-            ) {
-                Row(
-                    verticalAlignment     = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Text(
-                        text       = instance.displayName,
-                        style      = MaterialTheme.typography.titleMedium,
-                        color      = Color.White,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines   = 1,
-                        overflow   = TextOverflow.Ellipsis,
-                        modifier   = Modifier.weight(1f, fill = false),
-                    )
-                    SourceBadge(instance.packRef.origin)
-                }
-
-                Row(
-                    verticalAlignment     = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    MetaChip(instance.packRef.version ?: "—")
-                    instance.forkedFrom?.let {
-                        MetaChip("fork", emphasis = true)
-                    }
-                    LastPlayedChip(instance.lastPlayedEpochOrZero)
-                }
-            }
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+            // Tight card (right panel open + narrow window): drop the source badge
+            // before it eats the title.
+            val showBadge = maxWidth >= 380.dp
 
             Row(
+                modifier              = Modifier.fillMaxSize().padding(14.dp),
                 verticalAlignment     = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                Button(
-                    onClick        = onPlay,
-                    shape          = MaterialTheme.shapes.small,
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                    colors         = ButtonDefaults.buttonColors(
-                        containerColor = CelestiaTheme.colors.primary,
-                        contentColor   = Color.White,
-                    ),
+                PackAvatar(iconUrl = art.iconUrl, displayName = instance.displayName, hue = hueA)
+
+                Column(
+                    modifier              = Modifier.weight(1f),
+                    verticalArrangement   = Arrangement.spacedBy(6.dp),
                 ) {
-                    Symbol(NxIcon.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text(s.packCardPlay, fontWeight = FontWeight.SemiBold)
+                    Row(
+                        verticalAlignment     = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(
+                            text       = instance.displayName,
+                            style      = MaterialTheme.typography.titleMedium,
+                            color      = Color.White,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines   = 1,
+                            overflow   = TextOverflow.Ellipsis,
+                            modifier   = Modifier.weight(1f, fill = false),
+                        )
+                        if (showBadge) SourceBadge(instance.packRef.origin)
+                    }
+
+                    Row(
+                        verticalAlignment     = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        MetaChip(instance.packRef.version ?: "—")
+                        instance.forkedFrom?.let {
+                            MetaChip("fork", emphasis = true)
+                        }
+                        LastPlayedChip(instance.lastPlayedEpochOrZero)
+                    }
                 }
-                IconButton(onClick = onSettings) {
-                    Symbol(NxIcon.Settings, contentDescription = s.packCardSettings, tint = Color.White)
-                }
-                IconButton(onClick = onMore) {
-                    Symbol(NxIcon.MoreVert, contentDescription = s.packCardMore, tint = Color.White)
+
+                // No Play / Settings on the card: the whole card opens the detail,
+                // where launch + every setting live. Card keeps only the overflow
+                // (open folder / delete) as out-of-the-way quick actions.
+                Box {
+                    IconButton(onClick = { menuOpen = true }) {
+                        Symbol(NxIcon.MoreVert, contentDescription = s.packCardMore, tint = Color.White)
+                    }
+                    NxContextMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        NxMenuItem(
+                            label   = s.serverSettingsOpenFolder,
+                            icon    = NxIcon.FolderOpen,
+                            onClick = { menuOpen = false; onOpenFolder() },
+                        )
+                        NxMenuItem(
+                            label       = s.editorDelete,
+                            icon        = NxIcon.Delete,
+                            destructive = true,
+                            onClick     = { menuOpen = false; onDelete() },
+                        )
+                    }
                 }
             }
         }

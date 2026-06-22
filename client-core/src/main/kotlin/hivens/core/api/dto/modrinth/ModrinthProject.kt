@@ -25,7 +25,12 @@ data class ModrinthProject(
 
 @Serializable
 data class ModrinthGalleryImage(
+    /** Resized ~350px preview (`..._350.webp`) -- fine for the strip thumbnail. */
     val url: String,
+    /** Original full-resolution upload. Use this for the hero + lightbox; [url] is
+     *  a thumbnail and upscales to mush at full-window size. Older entries may omit
+     *  it, so callers fall back to [url]. */
+    @SerialName("raw_url") val rawUrl: String? = null,
     val featured: Boolean = false,
     val title: String? = null,
 )

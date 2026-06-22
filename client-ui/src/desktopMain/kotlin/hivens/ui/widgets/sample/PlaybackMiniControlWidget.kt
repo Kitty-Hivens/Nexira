@@ -206,8 +206,9 @@ private fun MiniVolumeBar(
         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
         label         = "mini-vol-track",
     )
+    // Always faintly visible so the handle is findable; full opacity on hover/drag.
     val thumbAlpha by animateFloatAsState(
-        targetValue   = if (active) 1f else 0f,
+        targetValue   = if (active) 1f else 0.65f,
         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
         label         = "mini-vol-thumb-alpha",
     )
@@ -223,14 +224,19 @@ private fun MiniVolumeBar(
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
                     pressing = true
-                    val w = size.width.coerceAtLeast(1).toFloat()
-                    onValueChange((down.position.x / w).coerceIn(0f, 1f))
-                    drag(down.id) { change ->
-                        val newValue = (change.position.x / w).coerceIn(0f, 1f)
-                        onValueChange(newValue)
-                        change.consume()
+                    // finally: a cancelled drag must still release the pressed
+                    // state, or the thumb sticks enlarged.
+                    try {
+                        val w = size.width.coerceAtLeast(1).toFloat()
+                        onValueChange((down.position.x / w).coerceIn(0f, 1f))
+                        drag(down.id) { change ->
+                            val newValue = (change.position.x / w).coerceIn(0f, 1f)
+                            onValueChange(newValue)
+                            change.consume()
+                        }
+                    } finally {
+                        pressing = false
                     }
-                    pressing = false
                 }
             },
         contentAlignment = Alignment.CenterStart,

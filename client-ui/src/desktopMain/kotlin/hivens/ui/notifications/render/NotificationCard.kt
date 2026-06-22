@@ -64,7 +64,6 @@ import hivens.ui.notifications.NotifAction
 import hivens.ui.notifications.NotificationEvent
 import hivens.ui.notifications.NotificationGroup
 import hivens.ui.notifications.Severity
-import hivens.ui.theme.CardSurface
 import hivens.ui.theme.CelestiaColors
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.LocalStyle
@@ -107,10 +106,10 @@ fun NotificationCard(
             // hard border instead -- the shadow has no flat-style mapping.
             .then(if (style.softGlowEnabled) Modifier.shadow(8.dp, cardShape, clip = false) else Modifier)
             .clip(cardShape)
-            .background(
-                if (style.cardSurface == CardSurface.Glass) palette.surface.copy(alpha = 0.97f)
-                else palette.surface,
-            )
+            // Toasts are transient alerts read against the live wallpaper -- even a
+            // few percent of translucency tints them off-colour and reads as a glitch,
+            // so they stay fully opaque regardless of the glass style.
+            .background(palette.surface)
             .then(
                 if (style.cardBorder > 0.dp) Modifier.border(style.cardBorder, palette.outline, cardShape)
                 else Modifier,

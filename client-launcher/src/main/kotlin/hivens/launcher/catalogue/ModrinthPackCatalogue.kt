@@ -36,9 +36,12 @@ class ModrinthPackCatalogue(private val client: ModrinthClient) : IPackCatalogue
             title = p.title,
             tagline = p.description,
             iconUrl = p.iconUrl,
-            // Featured gallery image is the hero; fall back to the first.
-            bannerUrl = p.gallery.firstOrNull { it.featured }?.url ?: p.gallery.firstOrNull()?.url,
-            galleryUrls = p.gallery.map { it.url },
+            // Full-res (raw_url) for the hero + lightbox; `url` is a 350px thumbnail
+            // that upscales to mush at full-window size. Featured image is the hero,
+            // else the first.
+            bannerUrl = (p.gallery.firstOrNull { it.featured } ?: p.gallery.firstOrNull())?.let { it.rawUrl ?: it.url },
+            galleryUrls = p.gallery.map { it.rawUrl ?: it.url },   // full-res, for the lightbox
+            galleryThumbUrls = p.gallery.map { it.url },           // ~350px previews, for the strip
             bodyMarkdown = p.body.ifBlank { null },
             versions = versions(packId),
         )

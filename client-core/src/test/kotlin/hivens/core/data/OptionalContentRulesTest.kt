@@ -69,6 +69,34 @@ class OptionalContentRulesTest {
     }
 
     @Test
+    fun `togglesFrom emits one keyed entry per optional, omitting required`() {
+        val state = mapOf("required.jar" to true, "foamfix.jar" to true, "mixinbooter.jar" to false)
+        val toggles = OptionalContentRules.togglesFrom(mods, state)
+        assertEquals(2, toggles.size)
+        assertFalse(toggles.any { it.entryId == "required.jar" }, "required mods never become toggles")
+        assertEquals(true, toggles.first { it.entryId == "foamfix.jar" }.enabled)
+        assertEquals(false, toggles.first { it.entryId == "mixinbooter.jar" }.enabled)
+    }
+
+    @Test
+    fun `togglesFrom uses stableKey and falls back to default_enabled for absent entries`() {
+        val m = listOf(mod("jei-1.0.jar", required = false, defaultEnabled = true, projectId = "P7dR8mSH"))
+        val toggles = OptionalContentRules.togglesFrom(m, emptyMap())
+        assertEquals(1, toggles.size)
+        assertEquals("modrinth:P7dR8mSH", toggles.first().entryId)
+        assertEquals(true, toggles.first().enabled, "absent from the map -> manifest default_enabled")
+    }
+
+    @Test
+    fun `enabledState then togglesFrom round-trips the optional state`() {
+        val saved = listOf(ContentToggle("foamfix.jar", true), ContentToggle("mixinbooter.jar", false))
+        val state = OptionalContentRules.enabledState(mods, saved)
+        val rebuilt = OptionalContentRules.togglesFrom(mods, state).associate { it.entryId to it.enabled }
+        assertEquals(true, rebuilt["foamfix.jar"])
+        assertEquals(false, rebuilt["mixinbooter.jar"])
+    }
+
+    @Test
     fun `conflicts is mutual even when only one side declares it`() {
         assertTrue(OptionalContentRules.conflicts(mods, "foamfix.jar", "mixinbooter.jar"))
         assertTrue(OptionalContentRules.conflicts(mods, "mixinbooter.jar", "foamfix.jar"))

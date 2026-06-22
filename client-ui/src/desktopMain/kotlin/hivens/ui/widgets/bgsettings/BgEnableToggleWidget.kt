@@ -7,8 +7,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -19,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.components.NxSwitch
 import hivens.ui.theme.CelestiaTheme
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
@@ -40,13 +39,9 @@ fun BgEnableToggleWidget(instance: WidgetInstance) {
             Spacer(Modifier.width(12.dp))
             Text(s.backgroundEnable, fontWeight = FontWeight.Bold, color = CelestiaTheme.colors.textPrimary)
         }
-        Switch(
+        NxSwitch(
             checked         = settings.enabled,
             onCheckedChange = { ctx.update { copy(enabled = it) } },
-            colors          = SwitchDefaults.colors(
-                checkedThumbColor = CelestiaTheme.colors.primary,
-                checkedTrackColor = CelestiaTheme.colors.primary.copy(alpha = 0.5f),
-            ),
         )
     }
 }

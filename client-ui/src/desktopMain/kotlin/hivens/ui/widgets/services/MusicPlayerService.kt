@@ -5,12 +5,12 @@ import hivens.widget.model.WidgetService
 import kotlinx.coroutines.flow.StateFlow
 
 // Cross-widget contract for any widget that wants to read or drive
-// audio playback. Phase D's first concrete service. Currently backed
-// by AudioPlayer (javax.sound.sampled); Skinema will swap the impl to
-// FFmpeg-via-Panama while keeping this interface, so consumers
+// audio playback. Phase D's first concrete service. Backed by
+// AudioPlayer (Skinema / FFmpeg via Panama); the engine swap from
+// javax.sound stayed behind this interface, so consumers
 // (PlaybackMiniControlWidget today, achievement watchers tomorrow,
 // music-ducking-on-launch later) write against the contract once and
-// never touch the engine swap.
+// never touch the engine.
 //
 // Reactive fields are StateFlow so non-Compose consumers (a
 // background coroutine inside a future plugin, telemetry sink) can

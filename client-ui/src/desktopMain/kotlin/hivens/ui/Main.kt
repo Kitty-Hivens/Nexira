@@ -1,5 +1,11 @@
 package hivens.ui
 
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
+import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.window.LocalWindowExceptionHandlerFactory
+import androidx.compose.ui.window.WindowExceptionHandler
+import androidx.compose.ui.window.WindowExceptionHandlerFactory
 import androidx.compose.ui.window.application
 import hivens.core.api.interfaces.ISettingsService
 import hivens.launcher.bootstrap.LauncherBootstrap
@@ -223,6 +229,7 @@ fun main() {
  * -- outside this loop -- so a restart keeps the user's data, session and audio
  * playback; only transient composition state (current screen, scroll) is lost.
  */
+@OptIn(ExperimentalComposeUiApi::class)
 private fun runShellWithRecovery(boot: LauncherBootstrap.Result) {
     val log = LoggerFactory.getLogger("ShellRecovery")
     while (true) {
@@ -233,15 +240,40 @@ private fun runShellWithRecovery(boot: LauncherBootstrap.Result) {
         // makes the safe surface actually reachable.
         val safe = UiRecoverySignal.safeMode.value
         val outcome = runCatching {
-            if (safe) {
-                application { SafeModeWindow(onQuit = { exitApplication() }) }
-            } else {
-                application { AppShell(boot) }
+            application {
+                // Convert a render/recompose crash into a clean restart. The
+                // default WindowExceptionHandler rethrows onto the AWT event
+                // thread, which logs it and keeps the now-dead window alive --
+                // `application {}` then never returns and this loop never fires
+                // (the frozen-window failure). Ours stashes the crash and exits,
+                // so the loop below recovers it exactly like a thrown one. Wraps
+                // safe mode too: a crash there is stashed identically, and
+                // recordShellCrash() already returns FATAL once safe mode is
+                // latched, so we reach the terminal dialog instead of hanging.
+                val handler = remember {
+                    WindowExceptionHandlerFactory {
+                        WindowExceptionHandler { crash ->
+                            UiRecoverySignal.recordPendingCrash(crash)
+                            exitApplication()
+                        }
+                    }
+                }
+                CompositionLocalProvider(LocalWindowExceptionHandlerFactory provides handler) {
+                    if (safe) {
+                        SafeModeWindow(onQuit = { exitApplication() })
+                    } else {
+                        AppShell(boot)
+                    }
+                }
             }
         }
-        if (outcome.isSuccess) return
 
-        val crash = outcome.exceptionOrNull() ?: return
+        // A shell crash surfaces two ways: it unwinds `application {}` (a crash in
+        // initial/main-thread composition), or the render path swallowed it on the
+        // AWT thread and the handler stashed it above. Consume unconditionally so a
+        // stashed crash never leaks into the next iteration.
+        val pending = UiRecoverySignal.consumePendingCrash()
+        val crash = outcome.exceptionOrNull() ?: pending ?: return
         log.error(
             if (safe) "Safe-mode window crashed -- giving up" else "Shell composition crashed -- attempting recovery",
             crash,
@@ -253,7 +285,10 @@ private fun runShellWithRecovery(boot: LauncherBootstrap.Result) {
         }.getOrNull()
 
         when (UiRecoverySignal.recordShellCrash()) {
-            ShellRecovery.RETRY     -> log.warn("Restarting shell with a fresh composition")
+            ShellRecovery.RETRY     -> {
+                log.warn("Restarting shell with a fresh composition")
+                UiRecoverySignal.markRecovered()
+            }
             ShellRecovery.SAFE_MODE -> log.warn("Crash loop detected -- falling back to safe mode")
             ShellRecovery.FATAL     -> {
                 log.error("Safe mode itself crashed -- giving up on the UI")

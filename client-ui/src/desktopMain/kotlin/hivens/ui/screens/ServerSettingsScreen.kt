@@ -24,6 +24,7 @@ import hivens.ui.components.DestructiveConfirmDialog
 import hivens.ui.components.GlassCard
 import hivens.ui.components.JvmArgsBuilderDialog
 import hivens.ui.components.ModItemCard
+import hivens.ui.components.NxSwitch
 import hivens.ui.components.RamSelector
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
@@ -423,13 +424,9 @@ private fun SettingsToggleRow(title: String, checked: Boolean, onCheckedChange: 
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(title, style = MaterialTheme.typography.bodyMedium, color = CelestiaTheme.colors.textPrimary)
-        Switch(
+        NxSwitch(
             checked = checked,
             onCheckedChange = onCheckedChange,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = CelestiaTheme.colors.primary,
-                checkedTrackColor = CelestiaTheme.colors.primary.copy(alpha = 0.5f)
-            )
         )
     }
 }

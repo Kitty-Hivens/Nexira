@@ -25,6 +25,7 @@ interface AppStrings {
     // --- Navigation ---
     val navLogout: String
     val navBack: String
+    val navForward: String
     /** App locale, for date/number formatting in widgets (not the system default). */
     val locale: java.util.Locale
 
@@ -84,6 +85,7 @@ interface AppStrings {
     val settingsThemePicker: String
     val settingsThemePickerSub: String
     val settingsDarkTheme: String
+    val settingsDarkThemeDesc: String
     val settingsCloseAfterLaunch: String
     val settingsCloseAfterLaunchDesc: String
     val settingsSaved: String
@@ -113,6 +115,16 @@ interface AppStrings {
     // --- Right rail ---
     val railCollapse: String
     val railExpand: String
+
+    // --- Window chrome (custom title bar caption buttons) ---
+    val windowMinimize: String
+    val windowMaximize: String
+    val windowRestore: String
+    val windowClose: String
+
+    // --- Top-bar breadcrumb ---
+    val crumbHome: String
+    val crumbLoading: String
 
     // --- Pagination ---
     val paginationPrev: String
@@ -195,6 +207,8 @@ interface AppStrings {
 
     // --- Console ---
     val consoleTitle: String
+    /** Shown over the empty console (no log lines yet). */
+    val consoleEmptyHint: String
     /** Header showing how many entries pass the active filter, e.g. "Game Output (12/847)". */
     fun consoleHeaderCount(filtered: Int, total: Int): String
     val consoleCopyAll: String
@@ -644,6 +658,32 @@ interface AppStrings {
     val settingsCategoryExperimental: String
     val settingsCategoryAdvanced: String
     val settingsCategoryDiagnostics: String
+    val settingsCategoryConsole: String
+
+    // --- Settings > Console section ---
+    val consoleSecDisplay: String
+    val consoleSecColors: String
+    val consoleSecFontSize: String
+    val consoleSecWrap: String
+    val consoleSecGutter: String
+    val consoleSecTimestamps: String
+    val consoleSecBuffer: String
+    val consoleSecColorInfo: String
+    val consoleSecColorWarn: String
+    val consoleSecColorError: String
+    val consoleSecColorAuto: String
+    val consoleSecApplyNote: String
+    val consoleSecHighlightRules: String
+    val consoleSecFilterRules: String
+    val consoleSecAddRule: String
+    val consoleSecRulePattern: String
+    val consoleSecRegex: String
+    val consoleSecBold: String
+    val consoleSecRulesEmpty: String
+    val consoleSecArt: String
+    val consoleSecArtAdd: String
+    val consoleSecArtPaste: String
+    val consoleSecArtEmpty: String
 
     // --- Profile two-column nav labels ---
     val profileCategoryAccount: String
@@ -930,6 +970,9 @@ interface AppStrings {
     val recoverySafeModeTitle: String
     val recoverySafeModeBody: String
     val recoverySafeModeQuit: String
+
+    // Toast shown when the shell reloads itself after a recovered crash.
+    val recoveryReloadedNotice: String
     val editorSave: String
     val editorApply: String
     val editorExport: String
@@ -1001,6 +1044,8 @@ interface AppStrings {
     val editorSurfShortServer: String
     val editorSurfShortTheme: String
     val editorSurfShortShell: String
+    val editorSurfShortTopBar: String
+    val editorSurfShortBody: String
 
     // --- Layout editor: surface long names ---
     val editorSurfHomeClassic: String
@@ -1015,6 +1060,8 @@ interface AppStrings {
     val editorSurfServer: String
     val editorSurfTheme: String
     val editorSurfShell: String
+    val editorSurfTopBar: String
+    val editorSurfBody: String
 
     // --- Music player widgets ---
     val musicPlayerTitle: String
@@ -1035,6 +1082,19 @@ interface AppStrings {
     val audioErrorOpenFailed: String
     val audioErrorDeviceBusy: String
     val audioErrorPlaybackFailed: String
+
+    // --- Video player ---
+    val videoFullscreen: String
+    val videoExitFullscreen: String
+    val videoMute: String
+    val videoUnmute: String
+    val videoReplay: String
+    val videoError: String
+    val videoLoading: String
+    val videoOpenInBrowser: String
+    val videoSkipBack: String
+    val videoSkipForward: String
+    val videoWidgetEmpty: String
 
     // --- Library pack card ---
     val packCardPlay: String

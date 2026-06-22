@@ -3,6 +3,7 @@ package hivens.launcher
 import hivens.widget.model.LayoutGraph
 import hivens.widget.model.SlotContent
 import hivens.widget.model.SlotId
+import hivens.widget.model.SlotOrientation
 import hivens.widget.model.SurfaceId
 import hivens.widget.model.SurfaceLayout
 import hivens.widget.model.WidgetInstance
@@ -34,7 +35,7 @@ class LayoutReconcileTest {
 
     @Test
     fun `CURRENT_SCHEMA is the schema this build migrates up to`() {
-        assertEquals(5, LayoutReconcile.CURRENT_SCHEMA)
+        assertEquals(6, LayoutReconcile.CURRENT_SCHEMA)
     }
 
     @Test
@@ -68,7 +69,50 @@ class LayoutReconcileTest {
     @Test
     fun `reconcile leaves a current unique graph untouched when nothing to merge`() {
         val g = LayoutGraph(surfaces = mapOf(SurfaceId("a") to surface("main" to listOf(widget("k", "i1")))))
-        assertEquals(g, ok(LayoutReconcile.reconcile(5, g, LayoutGraph.EMPTY)))
+        assertEquals(g, ok(LayoutReconcile.reconcile(6, g, LayoutGraph.EMPTY)))
+    }
+
+    @Test
+    fun `reconcile v5 to v6 relocates the shell regions under a top bar`() {
+        // The high-risk migration: the reconciler does not reshape an existing
+        // slot, so without the step every upgrading user keeps the old Row and
+        // never sees the bar. A customized region (widthDp 80) must survive.
+        val left = WidgetInstance(
+            WidgetKind("appshell.region.left"), "L", JsonObject(mapOf("widthDp" to JsonPrimitive(80))),
+        )
+        val v5 = LayoutGraph(surfaces = mapOf(
+            SurfaceId("appshell.root") to SurfaceLayout(slots = mapOf(
+                SlotId("regions") to SlotContent(
+                    widgets = listOf(left, widget("appshell.region.center", "C"), widget("appshell.region.right", "R")),
+                    orientation = SlotOrientation.Row,
+                ),
+            )),
+        ))
+        val out = ok(LayoutReconcile.reconcile(5, v5, LayoutGraph.EMPTY))
+
+        val regions = out.surfaces[SurfaceId("appshell.root")]!!.slots[SlotId("regions")]!!
+        assertEquals(SlotOrientation.Column, regions.orientation)
+        assertEquals(listOf("appshell.region.top", "appshell.region.body"), regions.widgets.map { it.kind.value })
+
+        val body = out.surfaces[SurfaceId("appshell.body")]!!.slots[SlotId("content")]!!
+        assertEquals(SlotOrientation.Row, body.orientation)
+        assertEquals(listOf("L", "C", "R"), body.widgets.map { it.instanceId }, "regions moved, none dropped")
+        assertEquals(JsonPrimitive(80), body.widgets.first().props["widthDp"], "custom props preserved")
+    }
+
+    @Test
+    fun `reconcile v5 to v6 is idempotent when the top region already exists`() {
+        val already = LayoutGraph(surfaces = mapOf(
+            SurfaceId("appshell.root") to SurfaceLayout(slots = mapOf(
+                SlotId("regions") to SlotContent(
+                    widgets = listOf(widget("appshell.region.top", "T"), widget("appshell.region.body", "B")),
+                    orientation = SlotOrientation.Column,
+                ),
+            )),
+        ))
+        // Run the step (from < 6) against an already-migrated graph: the guard
+        // must leave it untouched rather than double-wrap.
+        assertEquals(already, ok(LayoutReconcile.reconcile(5, already, LayoutGraph.EMPTY)))
     }
 
     @Test

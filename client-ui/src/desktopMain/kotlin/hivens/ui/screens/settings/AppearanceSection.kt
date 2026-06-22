@@ -191,10 +191,11 @@ internal fun AppearanceSection(
 
     // Dark theme toggle
     var themeSwitchState by remember(isDarkTheme) { mutableStateOf(isDarkTheme) }
-    SettingsSwitchRow(
-        title           = s.settingsDarkTheme,
+    ThemeToggleCard(
         checked         = themeSwitchState,
-        onCheckedChange = { isChecked -> themeSwitchState = isChecked; onToggleTheme() }
+        title           = s.settingsDarkTheme,
+        description     = s.settingsDarkThemeDesc,
+        onCheckedChange = { isChecked -> themeSwitchState = isChecked; onToggleTheme() },
     )
     PuppetToggle("settings.darkTheme", themeSwitchState) { isChecked ->
         themeSwitchState = isChecked; onToggleTheme()
@@ -252,47 +253,14 @@ internal fun AppearanceSection(
 
     Spacer(Modifier.height(4.dp))
 
-    // Offline Mode
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(style.cardCorner))
-            .background(
-                if (form.isOfflineMode) CelestiaTheme.colors.error.copy(alpha = 0.08f)
-                else settingsRowBackground()
-            )
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-            Symbol(NxIcon.WifiOff,
-                null,
-                tint = if (form.isOfflineMode) CelestiaTheme.colors.error else CelestiaTheme.colors.textSecondary,
-                modifier = Modifier.size(24.dp)
-            )
-            Spacer(Modifier.width(16.dp))
-            Column {
-                Text(
-                    s.settingsOfflineMode,
-                    color = CelestiaTheme.colors.textPrimary,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    s.settingsOfflineModeDesc,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = CelestiaTheme.colors.textSecondary
-                )
-            }
-        }
-        Switch(
-            checked = form.isOfflineMode,
-            onCheckedChange = { form.isOfflineMode = it; save() },
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = CelestiaTheme.colors.error,
-                checkedTrackColor = CelestiaTheme.colors.error.copy(alpha = 0.5f)
-            )
-        )
-        PuppetToggle("settings.offlineMode", form.isOfflineMode) { form.isOfflineMode = it; save() }
-    }
+    // Offline Mode -- the reference rich-toggle card; dark theme above now shares it.
+    SettingsToggleCard(
+        icon            = NxIcon.WifiOff,
+        title           = s.settingsOfflineMode,
+        description     = s.settingsOfflineModeDesc,
+        checked         = form.isOfflineMode,
+        onCheckedChange = { form.isOfflineMode = it; save() },
+        accent          = CelestiaTheme.colors.error,
+    )
+    PuppetToggle("settings.offlineMode", form.isOfflineMode) { form.isOfflineMode = it; save() }
 }

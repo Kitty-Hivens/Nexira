@@ -6,13 +6,21 @@ import hivens.core.api.dto.modrinth.ModrinthSearchResponse
 import hivens.core.api.dto.modrinth.ModrinthVersion
 import hivens.launcher.cache.ModrinthCaches
 import io.ktor.client.request.get
+import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.HttpResponse
+import io.ktor.client.statement.bodyAsChannel
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.isSuccess
+import io.ktor.utils.io.jvm.javaio.copyTo
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import java.io.FileOutputStream
 import java.io.IOException
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
+import java.nio.file.Files
+import java.nio.file.Path
 
 /**
  * HTTP client for Modrinth's public, key-less `/v2` API. Split out of
@@ -47,6 +55,16 @@ class ModrinthClient(
     }
 
     /**
+     * Identify a file by its SHA1 via `/v2/version_file/{hash}`. Returns the
+     * owning version (whose `project_id` leads to the project icon) or null when
+     * the hash is unknown to Modrinth (a local / non-Modrinth artifact -- a 404).
+     * Backs the Content-tab icon fallback for origin-agnostic instances, where
+     * there is no manifest project_id to look up by.
+     */
+    suspend fun versionByHash(sha1: String): ModrinthVersion? =
+        runCatching { getJson<ModrinthVersion>("$API_BASE/v2/version_file/$sha1?algorithm=sha1") }.getOrNull()
+
+    /**
      * Search the catalogue, restricted to modpacks via a project-type facet.
      * Uncached: a query is dynamic, and the UI searches on submit (not per
      * keystroke) so API traffic stays modest.
@@ -60,6 +78,41 @@ class ModrinthClient(
     /** All versions of a project, newest-first (Modrinth's default order). */
     suspend fun listVersions(projectId: String): List<ModrinthVersion> =
         getJson("$API_BASE/v2/project/$projectId/version")
+
+    /**
+     * Search installable MODS compatible with an instance, via project-type +
+     * game-version + loader facets. Blank [mcVersion]/[loader] drop their facet
+     * (broader search). Backs the Content tab's "Find projects" browser.
+     */
+    suspend fun searchMods(query: String, mcVersion: String, loader: String, offset: Int = 0, limit: Int = 40): ModrinthSearchResponse {
+        val q = URLEncoder.encode(query, StandardCharsets.UTF_8)
+        val facetList = buildList {
+            add("""["project_type:mod"]""")
+            if (mcVersion.isNotBlank()) add("""["versions:$mcVersion"]""")
+            if (loader.isNotBlank()) add("""["categories:$loader"]""")
+        }
+        val facets = URLEncoder.encode("[${facetList.joinToString(",")}]", StandardCharsets.UTF_8)
+        return getJson("$API_BASE/v2/search?query=$q&facets=$facets&offset=$offset&limit=$limit")
+    }
+
+    /** Newest version of [projectId] fitting the instance's MC + loader, else the newest overall. */
+    suspend fun bestModVersion(projectId: String, mcVersion: String, loader: String): ModrinthVersion? {
+        val versions = listVersions(projectId)
+        return versions.firstOrNull { v ->
+            (mcVersion.isBlank() || v.gameVersions.contains(mcVersion)) &&
+                (loader.isBlank() || v.loaders.contains(loader))
+        } ?: versions.firstOrNull()
+    }
+
+    /** Stream a mod jar to [target] (parents created); no-op if it already exists. */
+    suspend fun downloadTo(url: String, target: Path): Unit = withContext(Dispatchers.IO) {
+        if (Files.exists(target)) return@withContext
+        target.parent?.let { Files.createDirectories(it) }
+        httpProvider.current.prepareGet(url) { headers.append("User-Agent", USER_AGENT) }.execute { resp ->
+            if (!resp.status.isSuccess()) throw IOException("GET $url -> ${resp.status}")
+            FileOutputStream(target.toFile()).use { out -> resp.bodyAsChannel().copyTo(out) }
+        }
+    }
 
     private suspend inline fun <reified T> getJson(url: String): T {
         val resp: HttpResponse = httpProvider.current.get(url) {

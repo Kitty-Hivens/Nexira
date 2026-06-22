@@ -26,6 +26,16 @@ object OptionalContentRules {
         optionalMods(mods).map { ContentToggle(it.stableKey, it.defaultEnabled) }
 
     /**
+     * Persistable [ContentToggle] list for an effective `filename -> enabled`
+     * view (e.g. the result of [applyToggle]). One entry per OPTIONAL mod, keyed
+     * by [SmrtModEntry.stableKey]; required mods are omitted (always on). The
+     * inverse of [enabledState] over the optional subset -- what the toggle UI
+     * hands to the persistence path after a flip.
+     */
+    fun togglesFrom(mods: List<SmrtModEntry>, enabled: Map<String, Boolean>): List<ContentToggle> =
+        optionalMods(mods).map { ContentToggle(it.stableKey, enabled[it.filename] ?: it.defaultEnabled) }
+
+    /**
      * Effective `filename -> enabled` for the sync path. Required mods are always
      * enabled; an optional uses the user's [toggles] entry, else its manifest
      * `default_enabled`.

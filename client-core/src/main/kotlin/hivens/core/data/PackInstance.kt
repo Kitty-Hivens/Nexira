@@ -81,4 +81,14 @@ data class PackInstance(
      * Library card; null falls back to procedural pixel art.
      */
     val bannerUrl: String? = null,
+    /**
+     * The set of files the pack itself laid down at install / last sync -- the
+     * update BASELINE. Captured by the installers (sha1 + size per file, reused from
+     * the source manifest). Null on instances created before this field existed (and
+     * on Local instances never installed from a remote source). The
+     * [hivens.core.update.UpdateReconciler] diffs a new version's target manifest
+     * against this baseline + the current on-disk state to decide what to add /
+     * update / safely delete, leaving user-added files (which are NOT in here) alone.
+     */
+    val installedManifest: FileManifest? = null,
 )

@@ -3,11 +3,8 @@ package hivens.ui.screens.settings
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.config.ExperimentalProtocolOverride
 import hivens.config.Protocol
@@ -21,7 +18,6 @@ import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetScreen
-import hivens.ui.theme.CelestiaTheme
 import org.koin.compose.koinInject
 
 /**
@@ -74,15 +70,7 @@ fun SettingsScreen(
     }
 
     Column(Modifier.fillMaxSize().padding(16.dp)) {
-        Text(
-            text       = s.settingsTitle,
-            style      = MaterialTheme.typography.headlineSmall,
-            color      = CelestiaTheme.colors.textPrimary,
-            fontWeight = FontWeight.Bold
-        )
-
-        Spacer(Modifier.height(24.dp))
-
+        // Title lives in the top-bar breadcrumb now -- no in-screen duplicate.
         // Explicit backgroundColor opts the Settings frame out of
         // style.cardSurface -- stays glassy under Brut, same as the
         // inner row panels. Routed through glassSurfaceAlpha so the
@@ -119,6 +107,7 @@ fun SettingsScreen(
                             uiStyle                      = uiStyle,
                             onUiStyleChanged             = onUiStyleChanged,
                         )
+                        SettingsCategory.Console -> ConsoleSection(paths = paths)
                         SettingsCategory.Network -> NetworkSection(
                             form = form,
                             save = ::save,

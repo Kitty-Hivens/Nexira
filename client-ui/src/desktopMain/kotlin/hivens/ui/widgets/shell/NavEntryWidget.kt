@@ -90,7 +90,7 @@ fun NavEntry(instance: WidgetInstance) {
             icon         = NxIcon.Search,
             outlineSwap  = true,
             phase        = 1.65f,
-            active       = screen is Screen.Browse || screen is Screen.BrowsePackDetail,
+            active       = screen is Screen.Browse || screen is Screen.CataloguePackDetail,
             onClick      = { ctx.onScreenChange(Screen.Browse) },
         )
         NavTarget.Profile -> NavSlot(

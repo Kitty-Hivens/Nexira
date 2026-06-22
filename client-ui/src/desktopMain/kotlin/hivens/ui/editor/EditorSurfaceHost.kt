@@ -859,6 +859,8 @@ private fun surfaceIcon(surface: SurfaceId): IconKey =
         "appshell.root"      -> NxIcon.Dashboard
         "appshell.leftrail"  -> NxIcon.ViewSidebar
         "appshell.rightrail" -> NxIcon.ViewQuilt
+        "appshell.topbar"    -> NxIcon.Layers
+        "appshell.body"      -> NxIcon.ViewQuilt
         else                 -> NxIcon.Home
     }
 
@@ -869,6 +871,8 @@ private fun humanSurfaceShortName(surface: SurfaceId, s: AppStrings): String = w
     "library"             -> s.editorSurfShortLibrary
     "appshell.leftrail"   -> s.editorSurfShortLeftRail
     "appshell.rightrail"  -> s.editorSurfShortRightRail
+    "appshell.topbar"     -> s.editorSurfShortTopBar
+    "appshell.body"       -> s.editorSurfShortBody
     "about"               -> s.editorSurfShortAbout
     "bg.settings"         -> s.editorSurfShortBg
     "customization"       -> s.editorSurfShortStyle
@@ -885,6 +889,8 @@ private fun humanSurfaceName(surface: SurfaceId, s: AppStrings): String = when (
     "library"             -> s.editorSurfLibrary
     "appshell.leftrail"   -> s.editorSurfLeftRail
     "appshell.rightrail"  -> s.editorSurfRightRail
+    "appshell.topbar"     -> s.editorSurfTopBar
+    "appshell.body"       -> s.editorSurfBody
     "about"               -> s.editorSurfAbout
     "bg.settings"         -> s.editorSurfBg
     "customization"       -> s.editorSurfStyle
@@ -1003,8 +1009,10 @@ private fun availableSurfacesFor(screen: Screen, homeView: HomeView): List<Surfa
     // screen even when the center is not yet a widget surface. The center
     // surface (when there is one) is first, so it stays the default selection.
     return listOfNotNull(main) + listOf(
+        SurfaceId("appshell.topbar"),
         SurfaceId("appshell.leftrail"),
         SurfaceId("appshell.rightrail"),
+        SurfaceId("appshell.body"),
         SurfaceId("appshell.root"),
     )
 }

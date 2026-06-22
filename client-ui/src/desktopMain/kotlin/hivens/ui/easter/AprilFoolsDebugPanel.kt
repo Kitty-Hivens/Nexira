@@ -13,6 +13,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import hivens.ui.components.NxSwitch
 import hivens.ui.theme.CelestiaTheme
 import kotlinx.coroutines.launch
 
@@ -123,7 +124,7 @@ fun AprilFoolsDebugPanel() {
                 style = MaterialTheme.typography.bodySmall,
                 color = CelestiaTheme.colors.textPrimary,
             )
-            Switch(
+            NxSwitch(
                 checked         = isForced,
                 onCheckedChange = { enabled ->
                     AprilFools.debugForceActive = if (enabled) true else null
@@ -138,10 +139,7 @@ fun AprilFoolsDebugPanel() {
                         ChaosState.globalTiltDeg = 0f
                     }
                 },
-                colors = SwitchDefaults.colors(
-                    checkedThumbColor = CelestiaTheme.colors.error,
-                    checkedTrackColor = CelestiaTheme.colors.error.copy(alpha = 0.5f),
-                ),
+                accent = CelestiaTheme.colors.error,
             )
         }
 

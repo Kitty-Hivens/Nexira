@@ -1,7 +1,11 @@
 package hivens.launcher
 
 import hivens.widget.model.LayoutGraph
+import hivens.widget.model.SlotContent
+import hivens.widget.model.SlotId
+import hivens.widget.model.SlotOrientation
 import hivens.widget.model.SurfaceId
+import hivens.widget.model.SurfaceLayout
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
 import hivens.widget.model.flatMapInstances
@@ -302,6 +306,9 @@ internal object Migrations {
         4 -> Step(::migrateNavToEntries)
         // v4 -> v5: the Wardrobe (skins) nav entry joined the bundled rail.
         5 -> Step(::insertWardrobeNavEntry)
+        // v5 -> v6: the shell gained a top bar. Relocate the three regions under
+        // a new appshell.body sub-surface and stack the bar over them.
+        6 -> Step(::migrateShellAddTopBar)
         else -> Step.IDENTITY
     }
 
@@ -398,3 +405,41 @@ private val NAVBUTTONS_TARGETS = listOf(
     "settings" to "Settings",
     "about" to "About",
 )
+
+// Schema v5 -> v6: the shell root gained a top bar. The reconciler only ADDS
+// missing surfaces/slots; it never reshapes an existing slot, so a persisted
+// appshell.root/regions (the old Row of three regions) would keep the old shape
+// and never show the bar. Relocate whatever the user has in regions into the new
+// appshell.body sub-surface (props / weight / chrome preserved -- a heavily
+// customised rail is moved, not dropped), and replace regions with the Column of
+// [top, body]. appshell.body is created HERE so mergeMissingSurfaces won't seed
+// the bundled default body over the moved regions; appshell.topbar is left to the
+// merge to seed from the default (it carries no user data yet).
+private fun migrateShellAddTopBar(graph: LayoutGraph): LayoutGraph {
+    val root = graph.surfaces[SHELL_ROOT_SURFACE] ?: return graph
+    val regions = root.slots[REGIONS_SLOT] ?: return graph
+    // Idempotent: a graph already carrying the top region is left untouched.
+    if (regions.widgets.any { it.kind == REGION_TOP_KIND }) return graph
+
+    val body = SurfaceLayout(
+        slots = mapOf(
+            BODY_CONTENT_SLOT to SlotContent(widgets = regions.widgets, orientation = SlotOrientation.Row),
+        ),
+    )
+    val newRegions = SlotContent(
+        orientation = SlotOrientation.Column,
+        widgets = listOf(
+            WidgetInstance(kind = REGION_TOP_KIND, instanceId = "appshell-region-top-default"),
+            WidgetInstance(kind = REGION_BODY_KIND, instanceId = "appshell-region-body-default", weight = 1f),
+        ),
+    )
+    val newRoot = root.copy(slots = root.slots + (REGIONS_SLOT to newRegions))
+    return graph.copy(surfaces = graph.surfaces + (SHELL_ROOT_SURFACE to newRoot) + (SHELL_BODY_SURFACE to body))
+}
+
+private val SHELL_ROOT_SURFACE = SurfaceId("appshell.root")
+private val SHELL_BODY_SURFACE = SurfaceId("appshell.body")
+private val REGIONS_SLOT       = SlotId("regions")
+private val BODY_CONTENT_SLOT  = SlotId("content")
+private val REGION_TOP_KIND    = WidgetKind("appshell.region.top")
+private val REGION_BODY_KIND   = WidgetKind("appshell.region.body")

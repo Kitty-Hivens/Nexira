@@ -16,6 +16,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.ApplicationScope
 import androidx.compose.ui.window.Window
@@ -34,20 +35,30 @@ import hivens.core.api.interfaces.ISettingsService
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.HomeView
 import hivens.core.data.PackAuthRequirement
+import hivens.core.data.PackOrigin
 import hivens.core.data.SessionData
 import hivens.core.data.UiStyle
 import hivens.launcher.AutoSyncService
 import hivens.launcher.ServerListCacheStore
 import hivens.launcher.bootstrap.AutoLoginCoordinator
 import hivens.launcher.bootstrap.LauncherBootstrap
+import hivens.launcher.diag.UiRecoverySignal
 import hivens.launcher.CredentialsManager
 import hivens.core.launch.LaunchState
 import hivens.launcher.launch.LauncherController
 import hivens.launcher.network.ServerProtocolConfig
 import hivens.launcher.platform.computeSafeWindowMinSize
 import hivens.launcher.ProfileManager
+import hivens.ui.background.BackdropState
 import hivens.ui.background.BackgroundManager
 import hivens.ui.background.CustomBackground
+import hivens.ui.background.LocalBackdrop
+import hivens.ui.chrome.IS_TILING_WM
+import hivens.ui.chrome.LocalChromeClose
+import hivens.ui.chrome.LocalComposeWindow
+import hivens.ui.chrome.LocalUseCustomChrome
+import hivens.ui.chrome.LocalWindowState
+import hivens.ui.chrome.WindowResizeHandles
 import hivens.ui.components.DestructiveConfirmDialog
 import hivens.ui.components.UpdateManager
 import hivens.ui.customization.CustomizationManager
@@ -64,7 +75,10 @@ import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.i18n.LocaleProvider
 import hivens.ui.puppet.PuppetClick
+import hivens.ui.notifications.Kind
 import hivens.ui.notifications.LaunchTarget
+import hivens.ui.notifications.NotificationCenter
+import hivens.ui.notifications.Severity
 import hivens.ui.notifications.drivers.LaunchDriver
 import hivens.ui.notifications.render.NotificationStack
 import hivens.ui.screens.ConsoleWindow
@@ -74,6 +88,8 @@ import hivens.ui.theme.CelestiaStyle
 import hivens.ui.theme.applyOverrides
 import hivens.ui.theme.CelestiaTheme
 import hivens.ui.theme.CustomTheme
+import hivens.ui.theme.ThemeRevealHost
+import hivens.ui.theme.rememberThemeReveal
 import hivens.ui.theme.ThemeManager
 import hivens.ui.system.SystemNotifier
 import hivens.ui.tray.TrayManager
@@ -114,8 +130,11 @@ import org.jetbrains.compose.resources.painterResource
 import org.koin.compose.koinInject
 import org.koin.core.qualifier.named
 import org.slf4j.LoggerFactory
+import java.awt.AWTEvent
 import java.awt.Dimension
 import java.awt.Toolkit
+import java.awt.event.AWTEventListener
+import java.awt.event.MouseEvent
 import javax.swing.SwingUtilities
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -167,21 +186,13 @@ sealed class Screen {
     data class PackDetail    (val instanceId: String) : Screen()
 
     /**
-     * Browse-side detail target. Carries the mirror-side `pack_id`
-     * (e.g. `"Industrial"`); the detail screen fetches manifest +
-     * summary fresh via [hivens.launcher.smrt.SmrtPackClient]. Distinct
-     * from [PackDetail] which resolves an installed [hivens.core.data.PackInstance]
-     * via [hivens.core.api.interfaces.IPackRepository].
+     * Catalogue-side detail target, source-neutral: carries the [origin] + that
+     * source's local pack id. The one [hivens.ui.screens.browse.CataloguePackDetailScreen]
+     * resolves both through [hivens.launcher.catalogue.PackCatalogueRegistry] +
+     * [hivens.launcher.PackInstallCoordinator]. Distinct from [PackDetail], which
+     * resolves an already-installed [hivens.core.data.PackInstance].
      */
-    data class BrowsePackDetail(val packId: String) : Screen()
-
-    /**
-     * Modrinth-side detail target. Carries the Modrinth project id; the detail
-     * screen fetches the project page + versions via the Modrinth catalogue and
-     * installs the chosen `.mrpack` version. Distinct from [BrowsePackDetail],
-     * which resolves a mirror pack.
-     */
-    data class ModrinthPackDetail(val projectId: String) : Screen()
+    data class CataloguePackDetail(val origin: PackOrigin, val packId: String) : Screen()
 }
 
 // ─── App Shell ───────────────────────────────────────────────────────────────
@@ -212,7 +223,14 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
         }
     }
 
-    val windowState      = rememberWindowState(placement = WindowPlacement.Maximized)
+    // On a tiling WM the compositor owns geometry/fullscreen; forcing
+    // MAXIMIZED_BOTH there fights it (Compose re-asserts maximize over the WM's
+    // fullscreen, so super+F / proper fullscreen misbehaves -- worse once
+    // undecorated drops the WM title bar that used to mediate it). Let the WM
+    // place it. Floating elsewhere is unchanged: open maximized on Win/floating-DE.
+    val windowState      = rememberWindowState(
+        placement = if (IS_TILING_WM) WindowPlacement.Floating else WindowPlacement.Maximized,
+    )
     val settingsService: ISettingsService      = koinInject()
     val serverListService: IServerListService  = koinInject()
     val serverListCache: ServerListCacheStore  = koinInject()
@@ -244,6 +262,11 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
     var isWindowVisible by remember { mutableStateOf(true) }
 
     var isDarkTheme   by remember { mutableStateOf(settings.isDarkTheme) }
+    // Material You palette: the wallpaper seed (computed in AppRoot from the backdrop
+    // bitmap) lifts up to here so CelestiaTheme -- which wraps AppRoot -- can derive
+    // the palette from it. Default-on; the seed is null until a bitmap is decoded.
+    val paletteFromWallpaper = settings.paletteFromWallpaper
+    var wallpaperSeed by remember { mutableStateOf<Int?>(null) }
     var currentLocale by remember {
         mutableStateOf(AppLocale.fromTag(settings.locale))
     }
@@ -354,6 +377,23 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
     CompositionLocalProvider(LocalAprilFools provides af) {
     LocaleProvider(locale = currentLocale) {
         val s = LocalStrings.current
+
+        // Came back from a crash restart: surface a one-shot notice so the reload
+        // -- which resets the current screen -- is not silent. consumeRecovered()
+        // is one-shot, so a normal start stays quiet.
+        val notificationCenter: NotificationCenter = koinInject()
+        LaunchedEffect(Unit) {
+            if (UiRecoverySignal.consumeRecovered()) {
+                notificationCenter.push(
+                    sourceKey = "ui-recovery",
+                    sender    = Branding.TITLE,
+                    iconUrl   = null,
+                    severity  = Severity.Warn,
+                    kind      = Kind.OneShot,
+                    title     = s.recoveryReloadedNotice,
+                )
+            }
+        }
 
         val dataDirectory: java.nio.file.Path = koinInject()
         val autoSyncService: AutoSyncService = koinInject()
@@ -623,29 +663,40 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
         // CompositionLocals down through the Window composable.
 
         // ── Main window ────────────────────────────────────────────────
-        Window(
-            onCloseRequest = {
-                // af.requestCloseDialog dispatches: chaos active -> pop the
-                // torturous dialog; chaos inactive -> invoke the close path
-                // we'd have taken anyway (tray-hide if available, else exit).
-                af.requestCloseDialog {
-                    if (TrayManager.canBeReady) {
-                        // canBeReady (not isSupported) so we don't kill
-                        // the launcher mid-init while the tray library
-                        // is still settling D-Bus / SNI handshake. If
-                        // it ultimately fails, the user can quit via
-                        // tray (when it appears) or kill the process --
-                        // strictly better than exiting on a close
-                        // request the user clearly meant as "minimize".
-                        isWindowVisible = false
-                    } else {
-                        exitApplication()
-                    }
+        // af.requestCloseDialog dispatches: chaos active -> pop the torturous
+        // dialog; chaos inactive -> the close path we'd have taken anyway
+        // (tray-hide if available, else exit). Hoisted so the OS close request
+        // AND the custom caption Close button (LocalChromeClose) share it --
+        // undecorated chrome must keep the same tray-hide / chaos behavior.
+        val onCloseChrome: () -> Unit = {
+            af.requestCloseDialog {
+                if (TrayManager.canBeReady) {
+                    // canBeReady (not isSupported) so we don't kill the launcher
+                    // mid-init while the tray library is still settling D-Bus /
+                    // SNI handshake. If it ultimately fails, the user can quit via
+                    // tray (when it appears) or kill the process -- strictly
+                    // better than exiting on a close request the user clearly
+                    // meant as "minimize".
+                    isWindowVisible = false
+                } else {
+                    exitApplication()
                 }
-            },
+            }
+        }
+        Window(
+            onCloseRequest = onCloseChrome,
             state     = windowState,
             visible   = isWindowVisible,
             title     = Branding.TITLE,
+            // Replace the OS title bar with our own -- but ONLY where the OS draws
+            // one. A tiling WM draws no title bar for tiled windows (nothing to
+            // hide), and an undecorated AWT window there ignores the WM's external
+            // fullscreen state (_NET_WM_STATE_FULLSCREEN), so super+F breaks. So go
+            // undecorated only off-tiling; on tiling stay decorated (WM shows no
+            // chrome anyway) and the top bar still renders -- it is layout, not
+            // window decoration. useCustomChrome=false forces OS decorations always.
+            // transparent stays false -- opt-in later for Float corners.
+            undecorated = settings.useCustomChrome && !IS_TILING_WM,
             resizable = true,
             icon      = windowIcon,
             onPreviewKeyEvent = { ev ->
@@ -786,6 +837,10 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
                 LocalWidgetCommandRegistry               provides widgetCommandRegistry,
                 LocalWidgetStateHost                     provides widgetStateStore,
                 LocalWidgetChromeRenderer                provides chromeRenderer,
+                LocalWindowState                         provides windowState,
+                LocalComposeWindow                       provides window,
+                LocalChromeClose                         provides onCloseChrome,
+                LocalUseCustomChrome                     provides settings.useCustomChrome,
             ) {
             val effectiveStyle = if (customization.experimentalColorOverridesEnabled) {
                 styleSpec.applyOverrides(customization.styleOverrides)
@@ -812,11 +867,16 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
                 )
             }
 
+            Box(Modifier.fillMaxSize()) {
+            val themeReveal = rememberThemeReveal()
             CelestiaTheme(
                 useDarkTheme = isDarkTheme,
                 customTheme  = customTheme,
                 style        = effectiveStyle,
+                paletteSeed  = wallpaperSeed,
+                paletteFromWallpaper = paletteFromWallpaper,
             ) {
+                ThemeRevealHost(themeReveal) {
                 val migration = boot.pendingMigration
                 if (migration != null) {
                     // Migration is mandatory: the screen does not return
@@ -846,6 +906,7 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
                                 exitApplication()
                             }
                         },
+                        onWallpaperSeed = { wallpaperSeed = it },
                         onRealExit   = { exitApplication() },
                         onHideToTray = if (TrayManager.canBeReady) {{ isWindowVisible = false }}
                         else null,
@@ -886,7 +947,18 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
                     )
                     UpdateManager()
                 }
+                } // end ThemeRevealHost
             }
+            // Synthetic resize grips -- undecorated drops the native border. Only
+            // with custom chrome (else the OS frame resizes); self-gates to
+            // Floating + non-tiling and is transparent, so it's otherwise harmless.
+            if (settings.useCustomChrome) {
+                WindowResizeHandles(
+                    state   = windowState,
+                    minSize = DpSize(MIN_WINDOW_WIDTH_DP.dp, MIN_WINDOW_HEIGHT_DP.dp),
+                )
+            }
+            } // end Box(window resize overlay)
             } // end CompositionLocalProvider(LocalCustomization + LocalDensity)
         }
     }
@@ -898,6 +970,7 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
 @Composable
 fun AppRoot(
     onCloseApp: () -> Unit,
+    onWallpaperSeed: (Int?) -> Unit,
     isDarkTheme: Boolean,
     onRealExit: () -> Unit,
     onHideToTray: (() -> Unit)?,
@@ -958,6 +1031,27 @@ fun AppRoot(
     var pendingLogout by remember { mutableStateOf(false) }
     val doLogout = { credentialsManager.clear(); appState = AppState.Unauthenticated }
 
+    // Mouse side buttons (back/forward) -> history navigation. Compose's pointer
+    // layer only surfaces primary/secondary/tertiary on this platform, so listen at
+    // the AWT level where the thumb buttons still arrive. The AWT event thread is
+    // the Compose UI thread in Compose Desktop, so mutating the NavBackStack here is
+    // on the right thread.
+    DisposableEffect(Unit) {
+        val toolkit = Toolkit.getDefaultToolkit()
+        val listener = AWTEventListener { ev ->
+            if (ev is MouseEvent && ev.id == MouseEvent.MOUSE_PRESSED) {
+                // AWT numbers the thumb buttons inconsistently across mice / X11
+                // setups (4/5 on some, 6/7 on others); lower of each pair = Back.
+                when (ev.button) {
+                    4, 6 -> backStack.back()
+                    5, 7 -> backStack.forward()
+                }
+            }
+        }
+        toolkit.addAWTEventListener(listener, AWTEvent.MOUSE_EVENT_MASK)
+        onDispose { toolkit.removeAWTEventListener(listener) }
+    }
+
     // ── Background settings ───────────────────────────────────────────────
     val backgroundManager = remember { BackgroundManager(dataDirectory, json) }
     var backgroundSettings by remember { mutableStateOf(backgroundManager.load()) }
@@ -995,6 +1089,13 @@ fun AppRoot(
     val mousePos    = remember { mutableStateOf(Offset(0.5f, 0.5f)) }
     val mousePxPos  = remember { mutableStateOf(Offset.Zero) }
     var windowSize by remember { mutableStateOf(IntSize.Zero) }
+    // Wallpaper recipe published by CustomBackground so frosted surfaces can
+    // redraw a blurred slice of it. EMPTY until an image is set.
+    var backdrop   by remember { mutableStateOf(BackdropState.EMPTY) }
+
+    // Material You: forward the wallpaper palette seed (computed in CustomBackground
+    // from the static bitmap or the first video frame) up to CelestiaTheme.
+    LaunchedEffect(backdrop.seedArgb) { onWallpaperSeed(backdrop.seedArgb) }
 
     Box(
         Modifier
@@ -1015,7 +1116,12 @@ fun AppRoot(
                 }
             }
     ) {
-        CustomBackground(settings = backgroundSettings, mousePosProvider = { mousePos.value })
+      CompositionLocalProvider(LocalBackdrop provides backdrop) {
+        CustomBackground(
+            settings         = backgroundSettings,
+            mousePosProvider = { mousePos.value },
+            onBackdrop       = { backdrop = it },
+        )
 
         af.WrapContent(
             pixelCursorState = mousePxPos,
@@ -1029,6 +1135,11 @@ fun AppRoot(
                 currentScreen = backStack.current,
                 onScreenChange = backStack::navigate,
                 onBack = { backStack.back() },
+                canGoBack = backStack.canGoBack,
+                canGoForward = backStack.canGoForward,
+                onForward = { backStack.forward() },
+                trail = backStack.trail,
+                onPopTo = backStack::popTo,
                 onLogin = { session -> appState = AppState.Authenticated(session) },
                 onLogout = { pendingLogout = true },
                 isDarkTheme = isDarkTheme,
@@ -1065,5 +1176,6 @@ fun AppRoot(
             // Automation bypass for the now two-step logout (request -> confirm).
             PuppetClick("logout.confirm") { doLogout() }
         }
+      } // end CompositionLocalProvider(LocalBackdrop)
     }
 }

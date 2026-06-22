@@ -659,13 +659,7 @@ private fun ToggleField(label: String, hint: String, checked: Boolean, onChange:
             Text(hint, color = CelestiaTheme.colors.textSecondary,
                 style = MaterialTheme.typography.bodySmall)
         }
-        Switch(
-            checked = checked, onCheckedChange = onChange,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = CelestiaTheme.colors.primary,
-                checkedTrackColor = CelestiaTheme.colors.primary.copy(alpha = 0.5f),
-            ),
-        )
+        NxSwitch(checked = checked, onCheckedChange = onChange)
     }
 }
 

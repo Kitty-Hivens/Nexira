@@ -22,6 +22,8 @@ CloudDownload
 Code
 Computer
 ContentCopy
+DarkMode
+LightMode
 Dashboard
 Delete
 DeleteForever
@@ -37,6 +39,7 @@ FlipToBack
 FlipToFront
 Folder
 FolderOpen
+Forward10
 History
 Home
 HourglassEmpty
@@ -66,6 +69,7 @@ Person
 PlayArrow
 Public
 Refresh
+Replay10
 RestartAlt
 Rule
 Save

@@ -48,6 +48,22 @@ data class SettingsData(
     val memoryMB: Int = 6144,
     val isDarkTheme: Boolean = true,
     /**
+     * Derive the colour palette from the wallpaper (Material You / Monet): the
+     * dominant colour of the background seeds tinted tonal surfaces, so planes
+     * differ by colour, not just lightness. On by default. Off -> the fixed
+     * Celestia palette (and manual theme overrides) apply as before.
+     */
+    val paletteFromWallpaper: Boolean = true,
+    /**
+     * Replace the OS title bar with the in-app top bar (undecorated window +
+     * custom caption buttons / drag / resize). On by default. Escape hatch: if a
+     * window manager -- or a future native-Wayland JVM, where client-side window
+     * control differs from today's XWayland path -- misbehaves with the custom
+     * chrome, turning this off restores the OS-decorated window. Applies at the
+     * next launch, since `undecorated` is fixed when the window is created.
+     */
+    val useCustomChrome: Boolean = true,
+    /**
      * Hide launcher window to tray after Play. Off by default -- most
      * users want the launcher visible after launch (switch servers,
      * open console). Opt-in for users who want out-of-sight behavior.

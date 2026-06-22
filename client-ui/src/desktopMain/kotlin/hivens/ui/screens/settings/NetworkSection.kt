@@ -12,6 +12,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.core.diag.ActionRing
 import hivens.launcher.network.NetworkState
+import hivens.ui.components.NxSwitch
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetToggle
@@ -133,7 +134,7 @@ internal fun NetworkSection(
                     color = CelestiaTheme.colors.textSecondary,
                 )
             }
-            Switch(
+            NxSwitch(
                 checked         = form.forceProxyMode,
                 onCheckedChange = { form.forceProxyMode = it; save() },
             )

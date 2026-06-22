@@ -43,7 +43,8 @@ class PackArtResolver(
                 PackOrigin.Modrinth -> modrinth.resolveProject(instance.packRef.id).let { p ->
                     PackArt(
                         iconUrl   = p.iconUrl,
-                        bannerUrl = p.gallery.firstOrNull { it.featured }?.url ?: p.gallery.firstOrNull()?.url,
+                        // Full-res (raw_url) -- the hero banner upscales a 350px `url` thumbnail.
+                        bannerUrl = (p.gallery.firstOrNull { it.featured } ?: p.gallery.firstOrNull())?.let { it.rawUrl ?: it.url },
                     )
                 }
                 PackOrigin.Mirror -> mirror.fetchSummary(instance.packRef.id).let { PackArt(it.iconUrl, it.bannerUrl) }

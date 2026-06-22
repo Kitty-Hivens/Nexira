@@ -27,6 +27,7 @@ object RussianStrings : AppStrings {
     // Navigation
     override val navLogout   = "Выйти"
     override val navBack     = "Назад"
+    override val navForward  = "Вперёд"
 
     // Dashboard
     override fun dashboardWelcome(name: String) = "ДОБРО ПОЖАЛОВАТЬ, $name"
@@ -85,6 +86,7 @@ object RussianStrings : AppStrings {
     override val settingsThemePicker        = "Выбор темы"
     override val settingsThemePickerSub     = "Кастомизируйте цветовую схему"
     override val settingsDarkTheme          = "Тёмная тема"
+    override val settingsDarkThemeDesc      = "Тёмное оформление интерфейса"
     override val settingsCloseAfterLaunch   = "Свернуть лаунчер в трей после запуска игры"
     override val settingsCloseAfterLaunchDesc = "Прячет лаунчер в системный трей, как только запускается игра."
     override val settingsSaved              = "Настройки сохранены"
@@ -112,6 +114,12 @@ object RussianStrings : AppStrings {
     override val newsFilterClear        = "Сбросить фильтр"
     override val railCollapse           = "Свернуть панель"
     override val railExpand             = "Развернуть панель"
+    override val windowMinimize         = "Свернуть"
+    override val windowMaximize         = "Развернуть"
+    override val windowRestore          = "Восстановить"
+    override val windowClose            = "Закрыть"
+    override val crumbHome              = "Главная"
+    override val crumbLoading           = "Загрузка…"
     override val paginationPrev         = "Предыдущая страница"
     override val paginationNext         = "Следующая страница"
 
@@ -193,6 +201,7 @@ object RussianStrings : AppStrings {
 
     // Console
     override val consoleTitle = "Консоль отладки"
+    override val consoleEmptyHint = "Пока тихо. Запусти сборку — и логи польются сюда."
     override fun consoleHeaderCount(filtered: Int, total: Int) = "Вывод игры ($filtered/$total)"
     override val consoleCopyAll = "Копировать всё"
     override val consoleClear   = "Очистить"
@@ -281,8 +290,8 @@ object RussianStrings : AppStrings {
     override val backgroundTitle          = "Пользовательский фон"
     override val backgroundSubtitle       = "Настройте обои лаунчера"
     override val backgroundEnable         = "Включить"
-    override val backgroundSectionImage   = "Изображение"
-    override val backgroundPickFile       = "Выберите изображение для фона"
+    override val backgroundSectionImage   = "Изображение или видео"
+    override val backgroundPickFile       = "Выберите изображение или видео для фона"
     override val backgroundPickButton     = "Выбрать файл"
     override val backgroundSectionScale   = "Масштабирование"
     override val backgroundScaleCover     = "Заполнить"
@@ -318,7 +327,7 @@ object RussianStrings : AppStrings {
     // =========================================================================
     // About Screen
     // =========================================================================
-    override val aboutTitle                = "О ЛАУНЧЕРЕ"
+    override val aboutTitle                = "О лаунчере"
     override fun aboutDescription(branding: String) = "Неофициальный лаунчер для $branding"
     override val locale = java.util.Locale.of("ru", "RU")
     override fun aboutBuildDate(date: String) = "Собрано: $date"
@@ -604,6 +613,30 @@ object RussianStrings : AppStrings {
     override val settingsCategoryExperimental = "Эксперименты"
     override val settingsCategoryAdvanced     = "Расширенные"
     override val settingsCategoryDiagnostics  = "Диагностика"
+    override val settingsCategoryConsole      = "Консоль"
+    override val consoleSecDisplay            = "Отображение"
+    override val consoleSecColors             = "Цвета severity"
+    override val consoleSecFontSize           = "Размер шрифта"
+    override val consoleSecWrap               = "Перенос строк"
+    override val consoleSecGutter             = "Полоса severity"
+    override val consoleSecTimestamps         = "Временные метки"
+    override val consoleSecBuffer             = "Буфер строк"
+    override val consoleSecColorInfo          = "Info"
+    override val consoleSecColorWarn          = "Warn"
+    override val consoleSecColorError         = "Error"
+    override val consoleSecColorAuto          = "Авто"
+    override val consoleSecApplyNote          = "Изменения применяются при следующем открытии консоли."
+    override val consoleSecHighlightRules     = "Правила подсветки"
+    override val consoleSecFilterRules        = "Фильтр / мьют"
+    override val consoleSecAddRule            = "Добавить правило"
+    override val consoleSecRulePattern        = "Паттерн"
+    override val consoleSecRegex              = "regex"
+    override val consoleSecBold               = "Жирный"
+    override val consoleSecRulesEmpty         = "Правил пока нет."
+    override val consoleSecArt                 = "Арты пустой консоли"
+    override val consoleSecArtAdd              = "Добавить арт"
+    override val consoleSecArtPaste            = "Вставь ASCII или брайль-арт"
+    override val consoleSecArtEmpty            = "Своих артов пока нет."
 
     override val profileCategoryAccount = "Аккаунт"
     override val profileCategorySignIn      = "Вход"
@@ -684,7 +717,7 @@ object RussianStrings : AppStrings {
     override val browseDetailCompatTitle      = "Совместимость"
     override val browseDetailCompatMc         = "Minecraft"
     override val browseDetailCompatLoader     = "Лоадер"
-    override val browseDetailCompatJava       = "Java"
+    override val browseDetailCompatJava       = "Runtime"
     override val browseDetailVersionTitle     = "Версия"
 
     override val browseDetailInstallRunningTitle  = "Установка..."
@@ -911,8 +944,17 @@ object RussianStrings : AppStrings {
         "widget.appshell.region.center" to "Центральная область",
         "widget.appshell.region.collapsed" to "Свёрнут",
         "widget.appshell.region.swipeToCollapse" to "Сворачивать свайпом",
+        "widget.appshell.region.frostTier" to "Матовость",
         "widget.appshell.region.glassAlphaPct" to "Стекло, %",
         "widget.appshell.region.left" to "Левая панель",
+        "widget.appshell.region.top" to "Шапка окна",
+        "widget.appshell.region.body" to "Основная область",
+        "widget.appshell.topbar.breadcrumb" to "Хлебные крошки",
+        "widget.appshell.topbar.heightDp" to "Высота",
+        "widget.appshell.topbar.cornerStyle" to "Углы",
+        "widget.appshell.topbar.groupStyle" to "Группировка",
+        "widget.appshell.topbar.frostTier" to "Матовость",
+        "widget.appshell.topbar.controls" to "Кнопки окна",
         "widget.appshell.region.right" to "Правая панель",
         "widget.appshell.region.showDivider" to "Разделитель",
         "widget.appshell.region.widthDp" to "Ширина (0 — гибкая)",
@@ -992,6 +1034,8 @@ object RussianStrings : AppStrings {
         "widget.home.new.recent.title" to "Заголовок",
         "widget.home.new.spacer" to "Отступ",
         "widget.home.new.spacer.height" to "Высота",
+        "widget.home.new.video" to "Видео-плеер",
+        "widget.home.new.video.url" to "Ссылка на видео",
         "widget.home.new.welcome" to "Баннер приветствия",
         "widget.home.new.welcome.customGreeting" to "Свой текст приветствия",
         "widget.home.new.welcome.showSubtitle" to "Показывать подзаголовок",
@@ -1001,6 +1045,7 @@ object RussianStrings : AppStrings {
         "widget.library.header" to "Шапка библиотеки",
         "widget.library.header.subtitle" to "Подзаголовок",
         "widget.library.header.title" to "Заголовок",
+        "widget.library.header.show" to "Показывать шапку",
         "widget.nav.entry" to "Пункт навигации",
         "widget.notes.scratch" to "Заметки",
         "widget.notes.scratch.placeholder" to "Напишите что-нибудь...",
@@ -1025,6 +1070,7 @@ object RussianStrings : AppStrings {
     override val recoverySafeModeTitle = "Интерфейс не удаётся восстановить"
     override val recoverySafeModeBody  = "Интерфейс падал несколько раз подряд. Отчёт о сбое сохранён на диск. Перезапусти лаунчер."
     override val recoverySafeModeQuit  = "Выйти"
+    override val recoveryReloadedNotice = "Интерфейс перезапущен после ошибки"
     override val editorSave    = "Сохранить"
     override val editorApply   = "Применить"
     override val editorExport  = "Экспорт"
@@ -1095,6 +1141,8 @@ object RussianStrings : AppStrings {
     override val editorSurfShortServer    = "Сервер"
     override val editorSurfShortTheme     = "Темы"
     override val editorSurfShortShell     = "Оболочка"
+    override val editorSurfShortTopBar    = "Верх"
+    override val editorSurfShortBody      = "Область"
 
     // --- Layout editor: surface long names ---
     override val editorSurfHomeClassic = "Главная (классика)"
@@ -1109,6 +1157,8 @@ object RussianStrings : AppStrings {
     override val editorSurfServer      = "Детали сервера"
     override val editorSurfTheme       = "Выбор темы"
     override val editorSurfShell        = "Оболочка приложения"
+    override val editorSurfTopBar       = "Верхняя панель"
+    override val editorSurfBody         = "Основная область"
 
     // --- Music player widgets ---
     override val musicPlayerTitle      = "Музыкальный плеер"
@@ -1122,13 +1172,26 @@ object RussianStrings : AppStrings {
     override val audioStatusReady      = "Готов"
     override val audioStatusPlaying    = "Играет"
     override val audioStatusPaused     = "Пауза"
-    override val audioFormatHint       = "WAV / AU / AIFF поддерживаются. MP3 будет в Skinema."
+    override val audioFormatHint       = "MP3, FLAC, OGG, WAV и другие."
     override val audioNoPlayerHere     = "Нет плеера на этой раскладке"
     override val audioAddMusicPlayer   = "Добавь Music player"
-    override val audioErrorUnsupported = "Формат не поддерживается -- нужен WAV / AU / AIFF."
+    override val audioErrorUnsupported = "Формат не поддерживается или файл повреждён."
     override val audioErrorOpenFailed  = "Не удалось открыть файл"
     override val audioErrorDeviceBusy  = "Аудиоустройство занято"
     override val audioErrorPlaybackFailed = "Ошибка воспроизведения"
+
+    // --- Video player ---
+    override val videoFullscreen     = "Во весь экран"
+    override val videoExitFullscreen = "Выйти из полноэкранного"
+    override val videoMute           = "Без звука"
+    override val videoUnmute         = "Включить звук"
+    override val videoReplay         = "Заново"
+    override val videoError          = "Не удалось воспроизвести видео"
+    override val videoLoading        = "Загрузка видео…"
+    override val videoOpenInBrowser  = "Открыть в браузере"
+    override val videoSkipBack        = "Назад 10 секунд"
+    override val videoSkipForward     = "Вперёд 10 секунд"
+    override val videoWidgetEmpty     = "Укажите ссылку на видео в настройках виджета"
 
     // --- Library pack card ---
     override val packCardPlay          = "Играть"
