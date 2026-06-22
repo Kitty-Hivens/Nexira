@@ -29,7 +29,7 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.notifications.SessionRegistry
 import hivens.ui.notifications.SessionRegistry.ActiveSession
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import java.time.Duration
 import org.koin.compose.koinInject
 
@@ -43,7 +43,7 @@ fun ActiveSessionsSection(registry: SessionRegistry = koinInject()) { // TODO: F
         Text(
             text       = s.sessionsActiveTitle,
             style      = MaterialTheme.typography.labelSmall,
-            color      = CelestiaTheme.colors.textSecondary,
+            color      = NxTheme.colors.textSecondary,
             fontWeight = FontWeight.Medium,
         )
         active.values.forEach { session ->
@@ -60,7 +60,7 @@ fun SessionChip(session: ActiveSession) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.medium)
-            .background(CelestiaTheme.colors.surface)
+            .background(NxTheme.colors.surface)
             .clickable { session.showConsole() }
             .padding(horizontal = 10.dp, vertical = 8.dp)
     ) {
@@ -69,32 +69,32 @@ fun SessionChip(session: ActiveSession) {
                 modifier = Modifier
                     .size(8.dp)
                     .clip(RoundedCornerShape(50))
-                    .background(CelestiaTheme.colors.success)
+                    .background(NxTheme.colors.success)
             )
             Spacer(Modifier.width(8.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text       = session.packDisplayName,
                     style      = MaterialTheme.typography.bodyMedium,
-                    color      = CelestiaTheme.colors.textPrimary,
+                    color      = NxTheme.colors.textPrimary,
                     fontWeight = FontWeight.Medium,
                 )
                 Text(
                     text  = formatUptime(uptime),
                     style = MaterialTheme.typography.labelSmall,
-                    color = CelestiaTheme.colors.textSecondary,
+                    color = NxTheme.colors.textSecondary,
                 )
             }
             IconButton(onClick = session.showConsole) {
                 Symbol(icon = NxIcon.MenuOpen,
                     contentDescription = s.notifActionShowConsole,
-                    tint              = CelestiaTheme.colors.textSecondary,
+                    tint              = NxTheme.colors.textSecondary,
                 )
             }
             IconButton(onClick = session.abort) {
                 Symbol(icon = NxIcon.Stop,
                     contentDescription = s.notifActionStop,
-                    tint              = CelestiaTheme.colors.error,
+                    tint              = NxTheme.colors.error,
                 )
             }
         }

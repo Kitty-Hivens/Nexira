@@ -29,7 +29,7 @@ import java.util.Locale
  * Standalone last-resort window shown when the shell crash loop latches safe
  * mode (see hivens.launcher.diag.UiRecoverySignal + Main.runShellWithRecovery).
  *
- * Deliberately self-contained: it does NOT touch Koin, CelestiaTheme, the
+ * Deliberately self-contained: it does NOT touch Koin, NxTheme, the
  * widget kernel, or any surface CompositionLocal. A crash anywhere in that
  * scaffolding is exactly what put us here, so re-running it would just crash
  * again -- this window depends only on raw Material3 + a pure stringsFor()

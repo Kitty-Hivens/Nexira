@@ -30,7 +30,7 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.platform.SystemActions
 import hivens.ui.puppet.PuppetClick
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalStyle
 import java.awt.Toolkit
 import java.awt.datatransfer.StringSelection
@@ -116,7 +116,7 @@ internal fun DiagnosticsSection(
     // Buttons need a visible body at rest; transparent containers
     // turn M3's hover state-layer into the only paint and read as a
     // rect popping out of nowhere.
-    val ghostBg = CelestiaTheme.colors.background.copy(alpha = 0.4f)
+    val ghostBg = NxTheme.colors.background.copy(alpha = 0.4f)
 
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         // Open logs -- chaos target
@@ -127,7 +127,7 @@ internal fun DiagnosticsSection(
             modifier = Modifier.weight(1f),
             colors   = ButtonDefaults.buttonColors(
                 containerColor = ghostBg,
-                contentColor   = CelestiaTheme.colors.textPrimary,
+                contentColor   = NxTheme.colors.textPrimary,
             ),
         )
         PuppetClick("settings.openLogsDir") { SystemActions.openFolder(paths.logsDir.toString()) }
@@ -139,7 +139,7 @@ internal fun DiagnosticsSection(
             modifier = Modifier.weight(1f),
             colors   = ButtonDefaults.buttonColors(
                 containerColor = ghostBg,
-                contentColor   = CelestiaTheme.colors.textPrimary,
+                contentColor   = NxTheme.colors.textPrimary,
             ),
         )
         PuppetClick("settings.openCrashReports") { SystemActions.openFolder(paths.crashDir.toString()) }
@@ -182,7 +182,7 @@ internal fun DiagnosticsSection(
             modifier = Modifier.weight(1f),
             colors   = ButtonDefaults.buttonColors(
                 containerColor = ghostBg,
-                contentColor   = CelestiaTheme.colors.textPrimary.copy(
+                contentColor   = NxTheme.colors.textPrimary.copy(
                     alpha = if (bundleBusy) 0.45f else 1f
                 ),
             ),
@@ -214,7 +214,7 @@ internal fun DiagnosticsSection(
             modifier = Modifier.weight(1f),
             colors   = ButtonDefaults.buttonColors(
                 containerColor = ghostBg,
-                contentColor   = CelestiaTheme.colors.textPrimary.copy(
+                contentColor   = NxTheme.colors.textPrimary.copy(
                     alpha = if (lastBundlePath != null) 1f else 0.35f
                 ),
             ),
@@ -231,7 +231,7 @@ internal fun DiagnosticsSection(
     }
     Text(
         text     = s.settingsDiagnosticBundleHint,
-        color    = CelestiaTheme.colors.textSecondary,
+        color    = NxTheme.colors.textSecondary,
         fontSize = TextUnit(11f, TextUnitType.Sp),
         modifier = Modifier.padding(start = 8.dp, top = 2.dp)
     )
@@ -253,17 +253,17 @@ internal fun DiagnosticsSection(
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Symbol(NxIcon.Info, null, tint = CelestiaTheme.colors.primary, modifier = Modifier.size(24.dp))
+            Symbol(NxIcon.Info, null, tint = NxTheme.colors.primary, modifier = Modifier.size(24.dp))
             Spacer(Modifier.width(16.dp))
             Column {
-                Text(Branding.TITLE, color = CelestiaTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
+                Text(Branding.TITLE, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
                 Text(
                     "v${Branding.VERSION.removePrefix("v")} — GPLv3",
                     style = MaterialTheme.typography.bodySmall,
-                    color = CelestiaTheme.colors.textSecondary
+                    color = NxTheme.colors.textSecondary
                 )
             }
         }
-        Symbol(NxIcon.ChevronRight, null, tint = CelestiaTheme.colors.textSecondary)
+        Symbol(NxIcon.ChevronRight, null, tint = NxTheme.colors.textSecondary)
     }
 }

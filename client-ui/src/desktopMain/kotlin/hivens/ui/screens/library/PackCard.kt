@@ -45,7 +45,7 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.screens.detail.PackDetailScreen
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.decorativePair
 import hivens.ui.theme.origin
 import java.time.Duration
@@ -74,7 +74,7 @@ fun PackCard(
     modifier: Modifier = Modifier,
 ) {
     val s = LocalStrings.current
-    val (hueA, hueB) = CelestiaTheme.colors.decorativePair(instance.id)
+    val (hueA, hueB) = NxTheme.colors.decorativePair(instance.id)
     val art = rememberPackArt(instance)
     var menuOpen by remember { mutableStateOf(false) }
     Box(
@@ -207,7 +207,7 @@ private fun SourceBadge(origin: PackOrigin) {
         PackOrigin.Local       -> "Local"
         PackOrigin.Unknown     -> "?"
     }
-    val color = CelestiaTheme.colors.origin(origin)
+    val color = NxTheme.colors.origin(origin)
     Box(
         modifier = Modifier
             .clip(MaterialTheme.shapes.extraSmall)
@@ -226,7 +226,7 @@ private fun MetaChip(text: String, emphasis: Boolean = false) {
         shape     = MaterialTheme.shapes.extraSmall,
         label     = { Text(text, style = MaterialTheme.typography.labelSmall, color = Color.White) },
         colors    = AssistChipDefaults.assistChipColors(
-            disabledContainerColor = if (emphasis) CelestiaTheme.colors.primary.copy(alpha = 0.85f)
+            disabledContainerColor = if (emphasis) NxTheme.colors.primary.copy(alpha = 0.85f)
                                      else          Color.Black.copy(alpha = 0.35f),
             disabledLabelColor     = Color.White,
         ),

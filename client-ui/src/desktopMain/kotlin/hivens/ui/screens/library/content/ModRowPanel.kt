@@ -39,7 +39,7 @@ import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import java.awt.Desktop
 import java.net.URI
 
@@ -108,7 +108,7 @@ fun ModRowPanel(
                     Text(
                         text           = mod.display?.name ?: mod.filename.removeSuffix(".jar"),
                         style          = MaterialTheme.typography.bodyMedium,
-                        color          = CelestiaTheme.colors.textPrimary.copy(alpha = rowAlpha),
+                        color          = NxTheme.colors.textPrimary.copy(alpha = rowAlpha),
                         fontWeight     = if (emphasis == Emphasis.Primary) FontWeight.SemiBold else FontWeight.Normal,
                         textDecoration = titleDecoration,
                         maxLines       = 1,
@@ -118,7 +118,7 @@ fun ModRowPanel(
                         Text(
                             text  = cat,
                             style = MaterialTheme.typography.labelSmall,
-                            color = CelestiaTheme.colors.textSecondary.copy(alpha = rowAlpha),
+                            color = NxTheme.colors.textSecondary.copy(alpha = rowAlpha),
                         )
                     }
                 }
@@ -127,7 +127,7 @@ fun ModRowPanel(
 
                 Symbol(icon = if (expanded) NxIcon.ExpandLess else NxIcon.ExpandMore,
                     contentDescription = null,
-                    tint               = CelestiaTheme.colors.textSecondary,
+                    tint               = NxTheme.colors.textSecondary,
                     modifier           = Modifier.size(20.dp),
                 )
             }
@@ -170,7 +170,7 @@ private fun ExpandedDetails(mod: SmrtModEntry, graph: DepGraph) {
             Text(
                 text  = s.contentTabModNoDescription,
                 style = MaterialTheme.typography.bodySmall,
-                color = CelestiaTheme.colors.textSecondary,
+                color = NxTheme.colors.textSecondary,
             )
         }
 
@@ -185,7 +185,7 @@ private fun ExpandedDetails(mod: SmrtModEntry, graph: DepGraph) {
             Text(
                 text  = s.contentTabModSizeLabel(mod.sizeBytes / 1024L),
                 style = MaterialTheme.typography.labelSmall,
-                color = CelestiaTheme.colors.textSecondary,
+                color = NxTheme.colors.textSecondary,
             )
         }
 
@@ -222,22 +222,22 @@ private fun DependenciesSubsection(mod: SmrtModEntry, graph: DepGraph) {
         Text(
             text  = s.contentTabModDependencies(depEdges.size + missing.size),
             style = MaterialTheme.typography.labelMedium,
-            color = CelestiaTheme.colors.textPrimary,
+            color = NxTheme.colors.textPrimary,
         )
         if (!empty) {
             Symbol(icon = if (open) NxIcon.ExpandLess else NxIcon.ExpandMore,
                 contentDescription = null,
-                tint               = CelestiaTheme.colors.textSecondary,
+                tint               = NxTheme.colors.textSecondary,
                 modifier           = Modifier.size(16.dp),
             )
         }
         if (missing.isNotEmpty()) {
             Spacer(Modifier.width(4.dp))
-            Symbol(NxIcon.Warning, contentDescription = null, tint = CelestiaTheme.colors.error, modifier = Modifier.size(14.dp))
+            Symbol(NxIcon.Warning, contentDescription = null, tint = NxTheme.colors.error, modifier = Modifier.size(14.dp))
             Text(
                 text  = s.contentTabModMissingCount(missing.size),
                 style = MaterialTheme.typography.labelSmall,
-                color = CelestiaTheme.colors.error,
+                color = NxTheme.colors.error,
             )
         }
     }
@@ -275,12 +275,12 @@ private fun DependencyRow(filename: String, versionRange: String?, optional: Boo
         Box(
             modifier         = Modifier
                 .size(6.dp)
-                .background(if (missing) CelestiaTheme.colors.error else CelestiaTheme.colors.primary.copy(alpha = 0.7f)),
+                .background(if (missing) NxTheme.colors.error else NxTheme.colors.primary.copy(alpha = 0.7f)),
         )
         Text(
             text  = filename,
             style = MaterialTheme.typography.bodySmall,
-            color = if (missing) CelestiaTheme.colors.error else CelestiaTheme.colors.textPrimary,
+            color = if (missing) NxTheme.colors.error else NxTheme.colors.textPrimary,
         )
         if (versionRange != null) MetaChip(text = versionRange)
         if (optional)             MetaChip(text = s.contentTabDepOptional)
@@ -298,13 +298,13 @@ private fun MetaChip(text: String, error: Boolean = false) {
             Text(
                 text  = text,
                 style = MaterialTheme.typography.labelSmall,
-                color = if (error) CelestiaTheme.colors.error else CelestiaTheme.colors.textSecondary,
+                color = if (error) NxTheme.colors.error else NxTheme.colors.textSecondary,
             )
         },
         colors  = AssistChipDefaults.assistChipColors(
-            disabledContainerColor = if (error) CelestiaTheme.colors.error.copy(alpha = 0.15f)
-                                     else CelestiaTheme.colors.outline.copy(alpha = 0.2f),
-            disabledLabelColor     = if (error) CelestiaTheme.colors.error else CelestiaTheme.colors.textSecondary,
+            disabledContainerColor = if (error) NxTheme.colors.error.copy(alpha = 0.15f)
+                                     else NxTheme.colors.outline.copy(alpha = 0.2f),
+            disabledLabelColor     = if (error) NxTheme.colors.error else NxTheme.colors.textSecondary,
         ),
         border  = null,
     )
@@ -315,17 +315,17 @@ private fun LinkChip(text: String, url: String) {
     Row(
         modifier              = Modifier
             .clip(MaterialTheme.shapes.extraSmall)
-            .background(CelestiaTheme.colors.primary.copy(alpha = 0.2f))
+            .background(NxTheme.colors.primary.copy(alpha = 0.2f))
             .clickable { runCatching { Desktop.getDesktop().browse(URI(url)) } }
             .padding(horizontal = 8.dp, vertical = 4.dp),
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Symbol(NxIcon.OpenInNew, contentDescription = null, tint = CelestiaTheme.colors.primary, modifier = Modifier.size(12.dp))
+        Symbol(NxIcon.OpenInNew, contentDescription = null, tint = NxTheme.colors.primary, modifier = Modifier.size(12.dp))
         Text(
             text  = text,
             style = MaterialTheme.typography.labelSmall,
-            color = CelestiaTheme.colors.primary,
+            color = NxTheme.colors.primary,
             fontWeight = FontWeight.SemiBold,
         )
     }

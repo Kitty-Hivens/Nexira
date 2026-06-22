@@ -36,7 +36,7 @@ import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
 import hivens.widget.model.PropRange
@@ -81,7 +81,7 @@ fun HomeNewRecent(instance: WidgetInstance) {
         Text(
             text       = p.title.ifBlank { s.homeRecentTitle },
             style      = MaterialTheme.typography.titleSmall,
-            color      = CelestiaTheme.colors.textPrimary,
+            color      = NxTheme.colors.textPrimary,
             fontWeight = FontWeight.SemiBold,
             modifier   = Modifier.padding(bottom = 8.dp),
         )
@@ -116,19 +116,19 @@ private fun PackTile(pack: PackInstance, onClick: () -> Unit) {
             modifier = Modifier
                 .size(36.dp)
                 .clip(MaterialTheme.shapes.extraSmall)
-                .background(CelestiaTheme.colors.textSecondary.copy(alpha = 0.15f)),
+                .background(NxTheme.colors.textSecondary.copy(alpha = 0.15f)),
             contentAlignment = Alignment.Center,
         ) {
             Symbol(icon = if (played) NxIcon.History else NxIcon.Inventory2,
                 contentDescription = null,
-                tint               = CelestiaTheme.colors.textSecondary.copy(alpha = 0.75f),
+                tint               = NxTheme.colors.textSecondary.copy(alpha = 0.75f),
                 modifier           = Modifier.size(18.dp),
             )
         }
         Text(
             text       = pack.displayName,
             style      = MaterialTheme.typography.bodyMedium,
-            color      = CelestiaTheme.colors.textPrimary,
+            color      = NxTheme.colors.textPrimary,
             fontWeight = FontWeight.SemiBold,
             maxLines   = 1,
             overflow   = TextOverflow.Ellipsis,
@@ -136,7 +136,7 @@ private fun PackTile(pack: PackInstance, onClick: () -> Unit) {
         Text(
             text     = pack.packRef.id,
             style    = MaterialTheme.typography.bodySmall,
-            color    = CelestiaTheme.colors.textSecondary,
+            color    = NxTheme.colors.textSecondary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -158,20 +158,20 @@ private fun EmptyPacksCta(onBrowse: () -> Unit) {
         Text(
             text       = s.homeNoPacksTitle,
             style      = MaterialTheme.typography.titleSmall,
-            color      = CelestiaTheme.colors.textPrimary,
+            color      = NxTheme.colors.textPrimary,
             fontWeight = FontWeight.SemiBold,
         )
         Text(
             text  = s.homeNoPacksBody,
             style = MaterialTheme.typography.bodySmall,
-            color = CelestiaTheme.colors.textSecondary,
+            color = NxTheme.colors.textSecondary,
         )
         Spacer(Modifier.height(2.dp))
         OutlinedButton(
             onClick = onBrowse,
             shape   = MaterialTheme.shapes.small,
             colors  = ButtonDefaults.outlinedButtonColors(
-                contentColor = CelestiaTheme.colors.primary,
+                contentColor = NxTheme.colors.primary,
             ),
         ) {
             Symbol(NxIcon.Search, contentDescription = null, modifier = Modifier.size(16.dp))

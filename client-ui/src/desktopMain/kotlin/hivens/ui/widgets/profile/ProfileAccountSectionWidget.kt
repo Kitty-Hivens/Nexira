@@ -42,7 +42,7 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.platform.SystemActions
 import hivens.ui.puppet.PuppetClick
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalStyle
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
@@ -127,10 +127,10 @@ private fun SmartyCraftAccount(session: SessionData, onChanged: () -> Unit) {
                     text = s.profileUploadSkin,
                     onClick = uploader.pick,
                     modifier = Modifier,
-                    colors = ButtonDefaults.buttonColors(containerColor = CelestiaTheme.colors.primary),
+                    colors = ButtonDefaults.buttonColors(containerColor = NxTheme.colors.primary),
                 )
                 IconButton(onClick = uploader.refresh) {
-                    Symbol(NxIcon.Refresh, s.profileRefresh, tint = CelestiaTheme.colors.textSecondary)
+                    Symbol(NxIcon.Refresh, s.profileRefresh, tint = NxTheme.colors.textSecondary)
                 }
             }
             SkinUploadStatusLine(uploader.status)
@@ -143,7 +143,7 @@ private fun SmartyCraftAccount(session: SessionData, onChanged: () -> Unit) {
             modifier = Modifier.widthIn(min = 200.dp),
             colors = ButtonDefaults.buttonColors(
                 containerColor = glassSurfaceAlpha(0.5f),
-                contentColor = CelestiaTheme.colors.textPrimary,
+                contentColor = NxTheme.colors.textPrimary,
             ),
         )
         PuppetClick("account.signout.smartycraft") { signOut() }
@@ -163,7 +163,7 @@ private fun AccountPanel(session: SessionData) {
                 text = session.playerName,
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
-                color = CelestiaTheme.colors.textPrimary,
+                color = NxTheme.colors.textPrimary,
             )
             Spacer(Modifier.width(12.dp))
             StatusPill(online = session.accessToken.length > 10)
@@ -185,7 +185,7 @@ private fun AccountPanel(session: SessionData) {
                 modifier = Modifier.fillMaxHeight().widthIn(min = 150.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = glassSurfaceAlpha(0.55f),
-                    contentColor = CelestiaTheme.colors.textPrimary,
+                    contentColor = NxTheme.colors.textPrimary,
                 ),
             )
         }
@@ -196,7 +196,7 @@ private fun AccountPanel(session: SessionData) {
 private fun StatusPill(online: Boolean) {
     val s = LocalStrings.current
     val style = LocalStyle.current
-    val accent = if (online) CelestiaTheme.colors.success else CelestiaTheme.colors.error
+    val accent = if (online) NxTheme.colors.success else NxTheme.colors.error
     Row(
         modifier = Modifier
             .clip(RoundedCornerShape(style.cardCorner))
@@ -221,7 +221,7 @@ private fun BalanceCard(balance: Int, modifier: Modifier = Modifier) {
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(style.cardCorner))
-            .background(CelestiaTheme.colors.background.copy(alpha = 0.4f))
+            .background(NxTheme.colors.background.copy(alpha = 0.4f))
             .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -229,13 +229,13 @@ private fun BalanceCard(balance: Int, modifier: Modifier = Modifier) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Symbol(NxIcon.Star, s.profileBalance, tint = Color(0xFFFFD700), fill = 1f, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(10.dp))
-            Text(s.profileBalance, color = CelestiaTheme.colors.textSecondary)
+            Text(s.profileBalance, color = NxTheme.colors.textSecondary)
         }
         Text(
             text = "$balance ⛃",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
-            color = CelestiaTheme.colors.textPrimary,
+            color = NxTheme.colors.textPrimary,
         )
     }
 }

@@ -33,7 +33,7 @@ import hivens.ui.icons.Symbol
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.puppet.PuppetToggle
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.widget.api.SlotRenderer
 import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId
@@ -101,7 +101,7 @@ fun BgSettingsSurface(
                 IconButton(onClick = onBack) {
                     Symbol(icon = NxIcon.ArrowBack,
                         contentDescription = s.navBack,
-                        tint               = CelestiaTheme.colors.textPrimary,
+                        tint               = NxTheme.colors.textPrimary,
                     )
                 }
                 Spacer(Modifier.width(8.dp))
@@ -110,12 +110,12 @@ fun BgSettingsSurface(
                         text       = s.backgroundTitle,
                         style      = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
-                        color      = CelestiaTheme.colors.textPrimary,
+                        color      = NxTheme.colors.textPrimary,
                     )
                     Text(
                         text  = s.backgroundSubtitle,
                         style = MaterialTheme.typography.bodySmall,
-                        color = CelestiaTheme.colors.textSecondary,
+                        color = NxTheme.colors.textSecondary,
                     )
                 }
             }

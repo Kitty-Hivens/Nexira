@@ -34,7 +34,7 @@ import hivens.ui.easter.LocalAprilFools
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalMonoFamily
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
@@ -74,14 +74,14 @@ fun AboutUpdatePanelWidget(instance: WidgetInstance) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Symbol(icon = NxIcon.Info,
                     contentDescription = s.updateManagerOpenHint,
-                    tint               = CelestiaTheme.colors.primary,
+                    tint               = NxTheme.colors.primary,
                     modifier           = Modifier
                         .size(18.dp)
                         .clip(CircleShape)
                         .clickable { ctx.showUpdateManager.value = true },
                 )
                 Spacer(Modifier.width(8.dp))
-                Text(s.aboutCurrentVersion, color = CelestiaTheme.colors.textSecondary, fontSize = 13.sp)
+                Text(s.aboutCurrentVersion, color = NxTheme.colors.textSecondary, fontSize = 13.sp)
                 Spacer(Modifier.width(12.dp))
                 Text(
                     text       = versionText,
@@ -99,7 +99,7 @@ fun AboutUpdatePanelWidget(instance: WidgetInstance) {
             // Only an actual available update renders below; up-to-date stays silent.
             (state as? UpdateCheckState.Available)?.let { current ->
                 val availChannel = ReleaseChannel.classify(current.update.version.removePrefix("v"))
-                val availAccent = if (current.update.isCritical) CelestiaTheme.colors.error else channelColor(availChannel)
+                val availAccent = if (current.update.isCritical) NxTheme.colors.error else channelColor(availChannel)
 
                 Spacer(Modifier.height(16.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -119,8 +119,8 @@ fun AboutUpdatePanelWidget(instance: WidgetInstance) {
                     onClick = { ctx.showUpdateDialog.value = true },
                     modifier = Modifier.fillMaxWidth(),
                     colors   = ButtonDefaults.buttonColors(
-                        containerColor = if (current.update.isCritical) CelestiaTheme.colors.error else glassSurfaceAlpha(0.55f),
-                        contentColor   = CelestiaTheme.colors.textPrimary,
+                        containerColor = if (current.update.isCritical) NxTheme.colors.error else glassSurfaceAlpha(0.55f),
+                        contentColor   = NxTheme.colors.textPrimary,
                     ),
                 )
             }

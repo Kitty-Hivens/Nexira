@@ -20,7 +20,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import hivens.ui.editor.dnd.DropTargetRegistry
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.widget.model.SlotContent
 import hivens.widget.model.SlotOrientation
 import hivens.widget.model.SlotPath
@@ -84,7 +84,7 @@ internal fun SlotDivider(
         )
     }
 
-    val bar = CelestiaTheme.colors.primary.copy(alpha = 0.55f)
+    val bar = NxTheme.colors.primary.copy(alpha = 0.55f)
     if (isRow) {
         Box(
             modifier         = Modifier.fillMaxHeight().width(10.dp).pointerHoverIcon(cursor).then(drag),

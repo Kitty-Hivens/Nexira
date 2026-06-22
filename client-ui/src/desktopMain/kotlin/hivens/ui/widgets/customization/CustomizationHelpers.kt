@@ -37,7 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.customization.sliderKeyboardAdjust
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.ui.widgets.toWidgetColorOrNull
 
 @Composable
@@ -46,7 +46,7 @@ internal fun SectionTitle(text: String) {
         text          = text,
         style         = MaterialTheme.typography.labelSmall,
         fontWeight    = FontWeight.Bold,
-        color         = CelestiaTheme.colors.primary,
+        color         = NxTheme.colors.primary,
         letterSpacing = 1.sp,
     )
 }
@@ -65,7 +65,7 @@ internal fun LabeledSlider(
         Text(
             text     = label,
             style    = MaterialTheme.typography.bodySmall,
-            color    = CelestiaTheme.colors.textSecondary,
+            color    = NxTheme.colors.textSecondary,
             modifier = Modifier.width(150.dp),
         )
         // Box owns hover-focus + arrow keys (fine adjustment); the Slider keeps
@@ -77,16 +77,16 @@ internal fun LabeledSlider(
                 valueRange    = range,
                 modifier      = Modifier.fillMaxWidth(),
                 colors        = SliderDefaults.colors(
-                    thumbColor         = CelestiaTheme.colors.primary,
-                    activeTrackColor   = CelestiaTheme.colors.primary,
-                    inactiveTrackColor = CelestiaTheme.colors.outline.copy(alpha = 0.2f),
+                    thumbColor         = NxTheme.colors.primary,
+                    activeTrackColor   = NxTheme.colors.primary,
+                    inactiveTrackColor = NxTheme.colors.outline.copy(alpha = 0.2f),
                 ),
             )
         }
         Text(
             text     = format.format(value * displayMultiplier),
             style    = MaterialTheme.typography.labelSmall,
-            color    = CelestiaTheme.colors.textSecondary.copy(alpha = 0.6f),
+            color    = NxTheme.colors.textSecondary.copy(alpha = 0.6f),
             modifier = Modifier.width(54.dp),
         )
     }
@@ -108,7 +108,7 @@ internal fun ColorRoleRow(
         Text(
             text       = role.replaceFirstChar { it.uppercase() },
             modifier   = Modifier.width(100.dp),
-            color      = CelestiaTheme.colors.textSecondary,
+            color      = NxTheme.colors.textSecondary,
             style      = MaterialTheme.typography.bodySmall,
             fontFamily = LocalMonoFamily.current,
         )
@@ -153,7 +153,7 @@ internal fun HexField(
             modifier = Modifier
                 .size(28.dp)
                 .clip(RoundedCornerShape(6.dp))
-                .background(parsed?.takeIf { valid } ?: CelestiaTheme.colors.surface)
+                .background(parsed?.takeIf { valid } ?: NxTheme.colors.surface)
                 .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(6.dp)),
         )
         Box(
@@ -164,7 +164,7 @@ internal fun HexField(
                 .background(glassSurfaceAlpha(0.4f))
                 .border(
                     width = 1.dp,
-                    color = if (valid) CelestiaTheme.colors.outline.copy(alpha = 0.3f) else CelestiaTheme.colors.error,
+                    color = if (valid) NxTheme.colors.outline.copy(alpha = 0.3f) else NxTheme.colors.error,
                     shape = MaterialTheme.shapes.small,
                 )
                 .padding(horizontal = 10.dp),
@@ -181,16 +181,16 @@ internal fun HexField(
                 },
                 singleLine    = true,
                 textStyle     = TextStyle(
-                    color      = CelestiaTheme.colors.textPrimary,
+                    color      = NxTheme.colors.textPrimary,
                     fontFamily = LocalMonoFamily.current,
                     fontSize   = 13.sp,
                 ),
-                cursorBrush   = SolidColor(CelestiaTheme.colors.primary),
+                cursorBrush   = SolidColor(NxTheme.colors.primary),
                 modifier      = Modifier.fillMaxWidth(),
             )
         }
         if (!valid) {
-            Text(invalidLabel, color = CelestiaTheme.colors.error, style = MaterialTheme.typography.labelSmall)
+            Text(invalidLabel, color = NxTheme.colors.error, style = MaterialTheme.typography.labelSmall)
         }
     }
 }

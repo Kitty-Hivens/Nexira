@@ -4,7 +4,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.text.font.FontWeight
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 
@@ -18,6 +18,6 @@ fun ServerDetailsTitleWidget(instance: WidgetInstance) {
         text       = ctx.server.title ?: ctx.server.name,
         style      = MaterialTheme.typography.displaySmall,
         fontWeight = FontWeight.Black,
-        color      = CelestiaTheme.colors.textPrimary,
+        color      = NxTheme.colors.textPrimary,
     )
 }

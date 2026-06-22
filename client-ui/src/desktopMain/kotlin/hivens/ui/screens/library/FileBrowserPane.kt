@@ -49,7 +49,7 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalMonoFamily
 import java.awt.Desktop
 import java.nio.file.Files
@@ -86,7 +86,7 @@ fun FileBrowserPane(rootDir: Path, modifier: Modifier = Modifier) {
             Text(
                 text  = s.fileBrowserNoRoot,
                 style = MaterialTheme.typography.bodyMedium,
-                color = CelestiaTheme.colors.textSecondary,
+                color = NxTheme.colors.textSecondary,
             )
         }
         return
@@ -166,7 +166,7 @@ fun FileBrowserPane(rootDir: Path, modifier: Modifier = Modifier) {
                     Text(
                         text  = s.fileBrowserPickAFile,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = CelestiaTheme.colors.textSecondary,
+                        color = NxTheme.colors.textSecondary,
                     )
                 }
             } else {
@@ -225,7 +225,7 @@ private fun FileTreeRow(
     onToggleExpand: () -> Unit,
     onSelect: () -> Unit,
 ) {
-    val rowBg = if (isSelected) CelestiaTheme.colors.primary.copy(alpha = 0.25f)
+    val rowBg = if (isSelected) NxTheme.colors.primary.copy(alpha = 0.25f)
                 else Color.Transparent
 
     val s = LocalStrings.current
@@ -248,13 +248,13 @@ private fun FileTreeRow(
             node.isDir -> {
                 Symbol(icon = if (isExpanded) NxIcon.ExpandLess else NxIcon.ExpandMore,
                     contentDescription = null,
-                    tint               = CelestiaTheme.colors.textSecondary,
+                    tint               = NxTheme.colors.textSecondary,
                     modifier           = Modifier.size(16.dp),
                 )
                 Spacer(Modifier.width(4.dp))
                 Symbol(icon = NxIcon.Folder,
                     contentDescription = null,
-                    tint               = CelestiaTheme.colors.primary.copy(alpha = 0.85f),
+                    tint               = NxTheme.colors.primary.copy(alpha = 0.85f),
                     modifier           = Modifier.size(16.dp),
                 )
             }
@@ -262,7 +262,7 @@ private fun FileTreeRow(
                 Spacer(Modifier.size(20.dp))
                 Symbol(icon = fileIconFor(node.path),
                     contentDescription = null,
-                    tint               = CelestiaTheme.colors.textSecondary,
+                    tint               = NxTheme.colors.textSecondary,
                     modifier           = Modifier.size(16.dp),
                 )
             }
@@ -272,14 +272,14 @@ private fun FileTreeRow(
             Text(
                 text       = s.fileBrowserEmptyFolder,
                 style      = MaterialTheme.typography.bodySmall,
-                color      = CelestiaTheme.colors.textSecondary.copy(alpha = 0.7f),
+                color      = NxTheme.colors.textSecondary.copy(alpha = 0.7f),
                 fontStyle  = FontStyle.Italic,
             )
         } else {
             Text(
                 text       = node.path.name,
                 style      = MaterialTheme.typography.bodySmall,
-                color      = CelestiaTheme.colors.textPrimary,
+                color      = NxTheme.colors.textPrimary,
                 fontWeight = if (node.isDir) FontWeight.SemiBold else FontWeight.Normal,
             )
         }
@@ -340,7 +340,7 @@ private fun TextPreview(file: Path) {
     if (state == null) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             CircularProgressIndicator(
-                color       = CelestiaTheme.colors.primary.copy(alpha = 0.6f),
+                color       = NxTheme.colors.primary.copy(alpha = 0.6f),
                 strokeWidth = 2.dp,
                 modifier    = Modifier.size(24.dp),
             )
@@ -355,7 +355,7 @@ private fun TextPreview(file: Path) {
             Text(
                 text  = s.fileBrowserTextTruncated(TEXT_PREVIEW_MAX_BYTES / 1024),
                 style = MaterialTheme.typography.labelSmall,
-                color = CelestiaTheme.colors.error,
+                color = NxTheme.colors.error,
             )
             Spacer(Modifier.height(6.dp))
         }
@@ -367,7 +367,7 @@ private fun TextPreview(file: Path) {
             Text(
                 text       = state.text,
                 style      = MaterialTheme.typography.bodySmall,
-                color      = CelestiaTheme.colors.textPrimary,
+                color      = NxTheme.colors.textPrimary,
                 fontFamily = LocalMonoFamily.current,
             )
         }
@@ -403,7 +403,7 @@ private fun BinaryPreview(file: Path) {
             Text(
                 text  = s.fileBrowserBinaryHint,
                 style = MaterialTheme.typography.bodySmall,
-                color = CelestiaTheme.colors.textSecondary,
+                color = NxTheme.colors.textSecondary,
             )
         }
         Button(
@@ -411,7 +411,7 @@ private fun BinaryPreview(file: Path) {
             shape          = MaterialTheme.shapes.small,
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
             colors         = ButtonDefaults.buttonColors(
-                containerColor = CelestiaTheme.colors.primary,
+                containerColor = NxTheme.colors.primary,
                 contentColor   = Color.White,
             ),
         ) {
@@ -425,18 +425,18 @@ private fun BinaryPreview(file: Path) {
 @Composable
 private fun PreviewHeader(file: Path, sizeLabel: String) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Symbol(fileIconFor(file), contentDescription = null, tint = CelestiaTheme.colors.primary, modifier = Modifier.size(18.dp))
+        Symbol(fileIconFor(file), contentDescription = null, tint = NxTheme.colors.primary, modifier = Modifier.size(18.dp))
         Text(
             text       = file.name,
             style      = MaterialTheme.typography.titleSmall,
-            color      = CelestiaTheme.colors.textPrimary,
+            color      = NxTheme.colors.textPrimary,
             fontWeight = FontWeight.SemiBold,
         )
         Spacer(Modifier.width(8.dp))
         Text(
             text  = sizeLabel,
             style = MaterialTheme.typography.labelSmall,
-            color = CelestiaTheme.colors.textSecondary,
+            color = NxTheme.colors.textSecondary,
         )
     }
 }

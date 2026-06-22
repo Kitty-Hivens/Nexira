@@ -14,7 +14,7 @@ import hivens.ui.customization.ColorRole
 import hivens.ui.customization.LocalCustomization
 
 // --- COLOR PALETTES ---
-data class CelestiaColors(
+data class NxColors(
     val primary: Color,
     val primaryVariant: Color,
     val secondary: Color,
@@ -68,7 +68,7 @@ data class CelestiaColors(
     val decorativeRamp: List<Color>,
 )
 
-internal val DarkColorPalette = CelestiaColors(
+internal val DarkColorPalette = NxColors(
     primary = Color(0xFFBB86FC), // Soft purple
     primaryVariant = Color(0xFF3700B3),
     secondary = Color(0xFF03DAC6),
@@ -112,7 +112,7 @@ internal val DarkColorPalette = CelestiaColors(
     ),
 )
 
-private val LightColorPalette = CelestiaColors(
+private val LightColorPalette = NxColors(
     primary = Color(0xFF5E68C0),       // Soft indigo (instead of harsh purple)
     primaryVariant = Color(0xFF3F51B5),
     secondary = Color(0xFF26A69A),     // Calm teal
@@ -155,14 +155,14 @@ private val LightColorPalette = CelestiaColors(
     ),
 )
 
-val LocalCelestiaColors = staticCompositionLocalOf<CelestiaColors> {
-    error("No CelestiaColors provided")
+val LocalNxColors = staticCompositionLocalOf<NxColors> {
+    error("No NxColors provided")
 }
 
 // --- THEME WITH ANIMATION AND SUPPORT FOR CUSTOM THEMES ---
 
 @Composable
-fun CelestiaTheme(
+fun NxTheme(
     useDarkTheme: Boolean = true,
     customTheme: CustomTheme? = null,
     style: StyleSpec = CelestiaStyle,
@@ -179,7 +179,7 @@ fun CelestiaTheme(
     // Base palette: fixed Celestia, or wallpaper-seeded (Monet) when enabled.
     val rawBase = if (useDarkTheme) DarkColorPalette else LightColorPalette
     val baseColors = if (paletteFromWallpaper && paletteSeed != null)
-        seededCelestiaColors(rawBase, paletteSeed, useDarkTheme) else rawBase
+        seededNxColors(rawBase, paletteSeed, useDarkTheme) else rawBase
 
     val themedColors = if (customTheme != null) {
         baseColors.copy(
@@ -335,7 +335,7 @@ fun CelestiaTheme(
     // read StyleSpec tokens without a separate CompositionLocalProvider
     // chain at every entry point.
     CompositionLocalProvider(
-        LocalCelestiaColors provides animatedPalette,
+        LocalNxColors provides animatedPalette,
         LocalStyle          provides style,
         LocalMonoFamily     provides nexiraMonoFamily(),
     ) {
@@ -348,11 +348,11 @@ fun CelestiaTheme(
     }
 }
 
-// Easy access via CelestiaTheme.colors
-object CelestiaTheme {
-    val colors: CelestiaColors
+// Easy access via NxTheme.colors
+object NxTheme {
+    val colors: NxColors
         @Composable
-        get() = LocalCelestiaColors.current
+        get() = LocalNxColors.current
 }
 
 private fun parseHexColorOrNull(hex: String): Color? = try {

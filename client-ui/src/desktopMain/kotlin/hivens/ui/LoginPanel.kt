@@ -37,7 +37,7 @@ import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetField
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.puppet.PuppetToggle
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.ui.platform.SystemActions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -89,13 +89,13 @@ fun LoginPanel(
     var twoFactorUnsupported  by remember { mutableStateOf(false) }
 
     val fieldColors = OutlinedTextFieldDefaults.colors(
-        focusedTextColor        = CelestiaTheme.colors.textPrimary,
-        unfocusedTextColor      = CelestiaTheme.colors.textPrimary,
-        focusedBorderColor      = CelestiaTheme.colors.primary,
-        unfocusedBorderColor    = CelestiaTheme.colors.textSecondary.copy(alpha = 0.22f),
-        focusedLabelColor       = CelestiaTheme.colors.primary,
-        unfocusedLabelColor     = CelestiaTheme.colors.textSecondary,
-        cursorColor             = CelestiaTheme.colors.primary,
+        focusedTextColor        = NxTheme.colors.textPrimary,
+        unfocusedTextColor      = NxTheme.colors.textPrimary,
+        focusedBorderColor      = NxTheme.colors.primary,
+        unfocusedBorderColor    = NxTheme.colors.textSecondary.copy(alpha = 0.22f),
+        focusedLabelColor       = NxTheme.colors.primary,
+        unfocusedLabelColor     = NxTheme.colors.textSecondary,
+        cursorColor             = NxTheme.colors.primary,
         focusedContainerColor   = Color.Transparent,
         unfocusedContainerColor = Color.Transparent
     )
@@ -253,7 +253,7 @@ fun LoginPanel(
             text       = s.loginTitle,
             style      = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
-            color      = CelestiaTheme.colors.textPrimary
+            color      = NxTheme.colors.textPrimary
         )
 
         // ── SSL warning banner ────────────────────────────────────────────
@@ -262,12 +262,12 @@ fun LoginPanel(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(
-                        color = CelestiaTheme.colors.warnAccent.copy(alpha = 0.12f),
+                        color = NxTheme.colors.warnAccent.copy(alpha = 0.12f),
                         shape = MaterialTheme.shapes.medium
                     )
                     .border(
                         width = 1.dp,
-                        color = CelestiaTheme.colors.warnAccent.copy(alpha = 0.5f),
+                        color = NxTheme.colors.warnAccent.copy(alpha = 0.5f),
                         shape = MaterialTheme.shapes.medium
                     )
                     .padding(12.dp),
@@ -277,12 +277,12 @@ fun LoginPanel(
                     text       = "⚠ ${s.sslWarningTitle}",
                     style      = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
-                    color      = CelestiaTheme.colors.warnAccent
+                    color      = NxTheme.colors.warnAccent
                 )
                 Text(
                     text  = s.sslWarningBody,
                     style = MaterialTheme.typography.bodySmall,
-                    color = CelestiaTheme.colors.textPrimary.copy(alpha = 0.85f)
+                    color = NxTheme.colors.textPrimary.copy(alpha = 0.85f)
                 )
                 // Trust-duration prompt + 3 grant buttons. Each click both
                 // grants the bypass for that duration AND retries login --
@@ -294,14 +294,14 @@ fun LoginPanel(
                     modifier = Modifier.fillMaxWidth(),
                     shape    = MaterialTheme.shapes.small
                 ) {
-                    Text(s.sslWarningCancel, color = CelestiaTheme.colors.textSecondary)
+                    Text(s.sslWarningCancel, color = NxTheme.colors.textSecondary)
                 }
                 Text(
                     text  = s.sslWarningTrustPrompt,
                     style = MaterialTheme.typography.bodySmall,
-                    color = CelestiaTheme.colors.textSecondary,
+                    color = NxTheme.colors.textSecondary,
                 )
-                val acceptColors = ButtonDefaults.buttonColors(containerColor = CelestiaTheme.colors.warnAccent)
+                val acceptColors = ButtonDefaults.buttonColors(containerColor = NxTheme.colors.warnAccent)
                 fun acceptFor(unit: java.time.temporal.ChronoUnit, amount: Long, label: String) {
                     // 100-year future for "always" -- long enough that no user
                     // will outlive it, short enough to not overflow ISO-8601
@@ -345,12 +345,12 @@ fun LoginPanel(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(
-                        color = CelestiaTheme.colors.warnAccent.copy(alpha = 0.12f),
+                        color = NxTheme.colors.warnAccent.copy(alpha = 0.12f),
                         shape = MaterialTheme.shapes.medium
                     )
                     .border(
                         width = 1.dp,
-                        color = CelestiaTheme.colors.warnAccent.copy(alpha = 0.5f),
+                        color = NxTheme.colors.warnAccent.copy(alpha = 0.5f),
                         shape = MaterialTheme.shapes.medium
                     )
                     .padding(12.dp),
@@ -360,19 +360,19 @@ fun LoginPanel(
                     text       = s.auth2faUnsupportedTitle,
                     style      = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
-                    color      = CelestiaTheme.colors.warnAccent
+                    color      = NxTheme.colors.warnAccent
                 )
                 Text(
                     text  = s.auth2faUnsupportedBody,
                     style = MaterialTheme.typography.bodySmall,
-                    color = CelestiaTheme.colors.textPrimary.copy(alpha = 0.85f)
+                    color = NxTheme.colors.textPrimary.copy(alpha = 0.85f)
                 )
                 OutlinedButton(
                     onClick  = { twoFactorUnsupported = false },
                     modifier = Modifier.align(Alignment.End),
                     shape    = MaterialTheme.shapes.small,
                 ) {
-                    Text(s.auth2faUnsupportedDismiss, color = CelestiaTheme.colors.textSecondary)
+                    Text(s.auth2faUnsupportedDismiss, color = NxTheme.colors.textSecondary)
                 }
             }
         }
@@ -382,11 +382,11 @@ fun LoginPanel(
             Text(
                 text     = errorMessage ?: "",
                 style    = MaterialTheme.typography.bodySmall,
-                color    = CelestiaTheme.colors.error,
+                color    = NxTheme.colors.error,
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(
-                        color = CelestiaTheme.colors.error.copy(alpha = 0.08f),
+                        color = NxTheme.colors.error.copy(alpha = 0.08f),
                         shape = MaterialTheme.shapes.medium
                     )
                     .padding(8.dp)
@@ -437,14 +437,14 @@ fun LoginPanel(
                 checked         = rememberMe,
                 onCheckedChange = { rememberMe = it },
                 colors          = CheckboxDefaults.colors(
-                    checkedColor   = CelestiaTheme.colors.primary,
-                    uncheckedColor = CelestiaTheme.colors.textSecondary.copy(alpha = 0.4f)
+                    checkedColor   = NxTheme.colors.primary,
+                    uncheckedColor = NxTheme.colors.textSecondary.copy(alpha = 0.4f)
                 )
             )
             Text(
                 text  = s.loginRemember,
                 style = MaterialTheme.typography.bodySmall,
-                color = CelestiaTheme.colors.textSecondary
+                color = NxTheme.colors.textSecondary
             )
         }
         PuppetToggle("login.rememberMe", rememberMe) { rememberMe = it }
@@ -457,7 +457,7 @@ fun LoginPanel(
                 modifier  = Modifier.fillMaxWidth().height(42.dp),
                 shape     = MaterialTheme.shapes.small,
                 colors    = ButtonDefaults.buttonColors(
-                    disabledContainerColor = CelestiaTheme.colors.primary.copy(alpha = 0.5f)
+                    disabledContainerColor = NxTheme.colors.primary.copy(alpha = 0.5f)
                 ),
                 elevation = ButtonDefaults.buttonElevation(0.dp)
             ) {
@@ -474,7 +474,7 @@ fun LoginPanel(
                 onClick  = { doLogin() },
                 modifier = Modifier.fillMaxWidth().height(42.dp),
                 colors   = ButtonDefaults.buttonColors(
-                    containerColor = CelestiaTheme.colors.primary,
+                    containerColor = NxTheme.colors.primary,
                 ),
             )
         }
@@ -490,7 +490,7 @@ fun LoginPanel(
             modifier = Modifier.fillMaxWidth().height(42.dp),
             colors   = ButtonDefaults.buttonColors(
                 containerColor = Color.Transparent,
-                contentColor   = CelestiaTheme.colors.primary,
+                contentColor   = NxTheme.colors.primary,
             ),
         )
         PuppetClick("login.register") {
@@ -507,7 +507,7 @@ fun LoginPanel(
                 modifier = Modifier.fillMaxWidth().height(42.dp),
                 colors   = ButtonDefaults.buttonColors(
                     containerColor = Color.Transparent,
-                    contentColor   = CelestiaTheme.colors.textSecondary,
+                    contentColor   = NxTheme.colors.textSecondary,
                 ),
             )
             PuppetClick("login.playOffline") { playOffline() }

@@ -48,7 +48,7 @@ import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetField
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.screens.RetryStateBlock
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -139,22 +139,22 @@ private fun SearchField(value: String, onValueChange: (String) -> Unit, placehol
         value         = value,
         onValueChange = onValueChange,
         singleLine    = true,
-        textStyle     = MaterialTheme.typography.bodyMedium.copy(color = CelestiaTheme.colors.textPrimary),
-        cursorBrush   = SolidColor(CelestiaTheme.colors.primary),
+        textStyle     = MaterialTheme.typography.bodyMedium.copy(color = NxTheme.colors.textPrimary),
+        cursorBrush   = SolidColor(NxTheme.colors.primary),
         modifier      = Modifier.fillMaxWidth(),
     ) { inner ->
         Row(
             modifier          = Modifier
                 .fillMaxWidth()
                 .clip(MaterialTheme.shapes.large)
-                .background(CelestiaTheme.colors.surface)
+                .background(NxTheme.colors.surface)
                 .padding(horizontal = 14.dp, vertical = 11.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Symbol(
                 NxIcon.Search,
                 contentDescription = null,
-                tint               = CelestiaTheme.colors.textSecondary,
+                tint               = NxTheme.colors.textSecondary,
                 modifier           = Modifier.size(18.dp),
             )
             Spacer(Modifier.width(10.dp))
@@ -163,7 +163,7 @@ private fun SearchField(value: String, onValueChange: (String) -> Unit, placehol
                     Text(
                         text  = placeholder,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = CelestiaTheme.colors.textSecondary,
+                        color = NxTheme.colors.textSecondary,
                     )
                 }
                 inner()
@@ -177,14 +177,14 @@ private fun SourceTab(label: String, selected: Boolean, onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .clip(MaterialTheme.shapes.small)
-            .background(if (selected) CelestiaTheme.colors.primary else CelestiaTheme.colors.surface)
+            .background(if (selected) NxTheme.colors.primary else NxTheme.colors.surface)
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 8.dp),
     ) {
         Text(
             text       = label,
             style      = MaterialTheme.typography.labelLarge,
-            color      = if (selected) Color.White else CelestiaTheme.colors.textSecondary,
+            color      = if (selected) Color.White else NxTheme.colors.textSecondary,
             fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
         )
     }
@@ -202,7 +202,7 @@ private fun originLabel(origin: PackOrigin): String = when (origin) {
 private fun BrowseLoading() {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         CircularProgressIndicator(
-            color       = CelestiaTheme.colors.primary.copy(alpha = 0.55f),
+            color       = NxTheme.colors.primary.copy(alpha = 0.55f),
             strokeWidth = 2.dp,
             modifier    = Modifier.size(28.dp),
         )
@@ -220,13 +220,13 @@ private fun BrowseEmpty(onRetry: () -> Unit) {
             Text(
                 text       = s.browseEmptyTitle,
                 style      = MaterialTheme.typography.titleLarge,
-                color      = CelestiaTheme.colors.textPrimary,
+                color      = NxTheme.colors.textPrimary,
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
                 text      = s.browseEmptyMessage,
                 style     = MaterialTheme.typography.bodyMedium,
-                color     = CelestiaTheme.colors.textSecondary,
+                color     = NxTheme.colors.textSecondary,
                 textAlign = TextAlign.Center,
                 modifier  = Modifier.widthIn(max = 420.dp),
             )
@@ -234,7 +234,7 @@ private fun BrowseEmpty(onRetry: () -> Unit) {
                 onClick = onRetry,
                 shape   = MaterialTheme.shapes.small,
                 colors  = ButtonDefaults.buttonColors(
-                    containerColor = CelestiaTheme.colors.primary,
+                    containerColor = NxTheme.colors.primary,
                     contentColor   = Color.White,
                 ),
             ) { Text(s.browseRetry, fontWeight = FontWeight.SemiBold) }

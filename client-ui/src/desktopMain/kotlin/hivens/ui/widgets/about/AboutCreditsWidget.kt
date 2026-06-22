@@ -28,7 +28,7 @@ import hivens.ui.components.GlassCard
 import hivens.ui.easter.GibberishMode
 import hivens.ui.easter.LocalAprilFools
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
 import hivens.widget.model.Widget
@@ -75,7 +75,7 @@ fun AboutCreditsWidget(instance: WidgetInstance) {
                     Text(
                         text       = "Haru (Hivens)",
                         fontWeight = FontWeight.Bold,
-                        color      = CelestiaTheme.colors.textPrimary,
+                        color      = NxTheme.colors.textPrimary,
                     )
                     Text(
                         text  = af.maybeGibberish(
@@ -84,7 +84,7 @@ fun AboutCreditsWidget(instance: WidgetInstance) {
                             mode        = GibberishMode.SCRAMBLED,
                         ),
                         style = MaterialTheme.typography.bodySmall,
-                        color = CelestiaTheme.colors.primary,
+                        color = NxTheme.colors.primary,
                     )
                 }
             }
@@ -104,18 +104,18 @@ fun AboutCreditsWidget(instance: WidgetInstance) {
 
             techs.forEach { (name, desc) ->
                 Row(Modifier.padding(vertical = 3.dp)) {
-                    Text("•", color = CelestiaTheme.colors.primary, fontWeight = FontWeight.Bold)
+                    Text("•", color = NxTheme.colors.primary, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.width(8.dp))
                     Text(
                         text       = af.maybeGibberish(name, probability = 0.20f, mode = GibberishMode.ZALGO),
                         fontWeight = FontWeight.Medium,
-                        color      = CelestiaTheme.colors.textPrimary,
+                        color      = NxTheme.colors.textPrimary,
                         fontSize   = 13.sp,
                     )
                     Spacer(Modifier.width(6.dp))
                     Text(
                         text     = "— ${af.maybeGibberish(desc, probability = 0.40f, mode = GibberishMode.JARGON)}",
-                        color    = CelestiaTheme.colors.textSecondary,
+                        color    = NxTheme.colors.textSecondary,
                         fontSize = 13.sp,
                     )
                 }
@@ -132,7 +132,7 @@ fun AboutCreditsWidget(instance: WidgetInstance) {
                     mode        = GibberishMode.LOREM,
                 ),
                 style = MaterialTheme.typography.bodySmall,
-                color = CelestiaTheme.colors.textSecondary,
+                color = NxTheme.colors.textSecondary,
             )
         }
     }

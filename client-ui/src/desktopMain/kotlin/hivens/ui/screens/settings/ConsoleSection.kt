@@ -44,7 +44,7 @@ import hivens.ui.components.NxSwitch
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.CustomTheme
 import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.nexiraBrailleFamily
@@ -107,7 +107,7 @@ internal fun ConsoleSection(paths: PlatformPaths) {
         Text(
             text  = s.consoleSecApplyNote,
             style = MaterialTheme.typography.bodySmall,
-            color = CelestiaTheme.colors.textSecondary,
+            color = NxTheme.colors.textSecondary,
         )
 
         Spacer(Modifier.height(6.dp))
@@ -185,16 +185,16 @@ private fun SliderRow(
             .padding(16.dp),
     ) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text(title, color = CelestiaTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
-            Text(valueLabel, style = MaterialTheme.typography.bodySmall, color = CelestiaTheme.colors.textSecondary)
+            Text(title, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
+            Text(valueLabel, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.textSecondary)
         }
         Slider(
             value         = value,
             onValueChange = onChange,
             valueRange    = range,
             colors        = SliderDefaults.colors(
-                thumbColor       = CelestiaTheme.colors.primary,
-                activeTrackColor = CelestiaTheme.colors.primary,
+                thumbColor       = NxTheme.colors.primary,
+                activeTrackColor = NxTheme.colors.primary,
             ),
         )
     }
@@ -218,30 +218,30 @@ private fun ColorRow(title: String, hex: String?, autoLabel: String, onChange: (
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(title, color = CelestiaTheme.colors.textPrimary, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+        Text(title, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
         Box(
             Modifier
                 .size(22.dp)
                 .clip(RoundedCornerShape(6.dp))
                 .background(parsed ?: Color.Transparent)
-                .border(1.dp, CelestiaTheme.colors.outline, RoundedCornerShape(6.dp)),
+                .border(1.dp, NxTheme.colors.outline, RoundedCornerShape(6.dp)),
         )
         Box(
             Modifier
                 .width(110.dp)
                 .clip(RoundedCornerShape(8.dp))
-                .background(CelestiaTheme.colors.surface)
+                .background(NxTheme.colors.surface)
                 .padding(horizontal = 10.dp, vertical = 8.dp),
         ) {
             BasicTextField(
                 value         = text,
                 onValueChange = { v -> text = v; onChange(v.ifBlank { null }) },
                 singleLine    = true,
-                textStyle     = MaterialTheme.typography.bodySmall.copy(color = CelestiaTheme.colors.textPrimary),
-                cursorBrush   = SolidColor(CelestiaTheme.colors.primary),
+                textStyle     = MaterialTheme.typography.bodySmall.copy(color = NxTheme.colors.textPrimary),
+                cursorBrush   = SolidColor(NxTheme.colors.primary),
             ) { inner ->
                 if (text.isEmpty()) {
-                    Text("#RRGGBB", style = MaterialTheme.typography.bodySmall, color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.6f))
+                    Text("#RRGGBB", style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.textSecondary.copy(alpha = 0.6f))
                 }
                 inner()
             }
@@ -249,7 +249,7 @@ private fun ColorRow(title: String, hex: String?, autoLabel: String, onChange: (
         Text(
             text     = autoLabel,
             style    = MaterialTheme.typography.bodySmall,
-            color    = CelestiaTheme.colors.primary,
+            color    = NxTheme.colors.primary,
             modifier = Modifier
                 .clip(RoundedCornerShape(8.dp))
                 .clickable { text = ""; onChange(null) }
@@ -314,18 +314,18 @@ private fun LineField(value: String, onChange: (String) -> Unit, placeholder: St
     Box(
         modifier
             .clip(RoundedCornerShape(8.dp))
-            .background(CelestiaTheme.colors.surface)
+            .background(NxTheme.colors.surface)
             .padding(horizontal = 10.dp, vertical = 8.dp),
     ) {
         BasicTextField(
             value         = value,
             onValueChange = onChange,
             singleLine    = true,
-            textStyle     = MaterialTheme.typography.bodySmall.copy(color = CelestiaTheme.colors.textPrimary),
-            cursorBrush   = SolidColor(CelestiaTheme.colors.primary),
+            textStyle     = MaterialTheme.typography.bodySmall.copy(color = NxTheme.colors.textPrimary),
+            cursorBrush   = SolidColor(NxTheme.colors.primary),
         ) { inner ->
             if (value.isEmpty()) {
-                Text(placeholder, style = MaterialTheme.typography.bodySmall, color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.6f))
+                Text(placeholder, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.textSecondary.copy(alpha = 0.6f))
             }
             inner()
         }
@@ -340,7 +340,7 @@ private fun Swatch(hex: String) {
             .size(22.dp)
             .clip(RoundedCornerShape(6.dp))
             .background(color ?: Color.Transparent)
-            .border(1.dp, CelestiaTheme.colors.outline, RoundedCornerShape(6.dp)),
+            .border(1.dp, NxTheme.colors.outline, RoundedCornerShape(6.dp)),
     )
 }
 
@@ -349,11 +349,11 @@ private fun ChipToggle(label: String, on: Boolean, onToggle: () -> Unit) {
     Text(
         text       = label,
         style      = MaterialTheme.typography.labelSmall,
-        color      = if (on) CelestiaTheme.colors.primary else CelestiaTheme.colors.textSecondary,
+        color      = if (on) NxTheme.colors.primary else NxTheme.colors.textSecondary,
         fontWeight = if (on) FontWeight.Bold else FontWeight.Normal,
         modifier   = Modifier
             .clip(RoundedCornerShape(8.dp))
-            .background(if (on) CelestiaTheme.colors.primary.copy(alpha = 0.18f) else CelestiaTheme.colors.surface)
+            .background(if (on) NxTheme.colors.primary.copy(alpha = 0.18f) else NxTheme.colors.surface)
             .clickable(onClick = onToggle)
             .padding(horizontal = 10.dp, vertical = 6.dp),
     )
@@ -362,7 +362,7 @@ private fun ChipToggle(label: String, on: Boolean, onToggle: () -> Unit) {
 @Composable
 private fun DeleteIcon(onDelete: () -> Unit) {
     Box(Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onDelete).padding(6.dp)) {
-        Symbol(NxIcon.Delete, contentDescription = null, tint = CelestiaTheme.colors.error, size = 18.dp)
+        Symbol(NxIcon.Delete, contentDescription = null, tint = NxTheme.colors.error, size = 18.dp)
     }
 }
 
@@ -371,7 +371,7 @@ private fun EmptyRulesHint(text: String) {
     Text(
         text,
         style    = MaterialTheme.typography.bodySmall,
-        color    = CelestiaTheme.colors.textSecondary.copy(alpha = 0.7f),
+        color    = NxTheme.colors.textSecondary.copy(alpha = 0.7f),
         modifier = Modifier.padding(vertical = 4.dp),
     )
 }
@@ -393,7 +393,7 @@ private fun ArtCard(art: String, onDelete: () -> Unit) {
         Text(
             text     = art,
             style    = TextStyle(fontFamily = nexiraBrailleFamily(), fontSize = 11.sp, lineHeight = 12.sp),
-            color    = CelestiaTheme.colors.textSecondary,
+            color    = NxTheme.colors.textSecondary,
             softWrap = false,
             maxLines = 10,
             overflow = TextOverflow.Ellipsis,
@@ -425,19 +425,19 @@ private fun ArtAdder(
                 .fillMaxWidth()
                 .heightIn(min = 72.dp)
                 .clip(RoundedCornerShape(8.dp))
-                .background(CelestiaTheme.colors.surface)
+                .background(NxTheme.colors.surface)
                 .padding(10.dp),
         ) {
             BasicTextField(
                 value         = draft,
                 onValueChange = onDraft,
                 singleLine    = false,
-                textStyle     = TextStyle(fontFamily = nexiraBrailleFamily(), fontSize = 12.sp, color = CelestiaTheme.colors.textPrimary),
-                cursorBrush   = SolidColor(CelestiaTheme.colors.primary),
+                textStyle     = TextStyle(fontFamily = nexiraBrailleFamily(), fontSize = 12.sp, color = NxTheme.colors.textPrimary),
+                cursorBrush   = SolidColor(NxTheme.colors.primary),
                 modifier      = Modifier.fillMaxWidth(),
             ) { inner ->
                 if (draft.isEmpty()) {
-                    Text(placeholder, style = MaterialTheme.typography.bodySmall, color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.6f))
+                    Text(placeholder, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.textSecondary.copy(alpha = 0.6f))
                 }
                 inner()
             }

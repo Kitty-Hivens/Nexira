@@ -64,8 +64,8 @@ import hivens.ui.notifications.NotifAction
 import hivens.ui.notifications.NotificationEvent
 import hivens.ui.notifications.NotificationGroup
 import hivens.ui.notifications.Severity
-import hivens.ui.theme.CelestiaColors
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxColors
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalStyle
 import java.time.Duration
 import java.time.Instant
@@ -83,7 +83,7 @@ fun NotificationCard(
     // pushed Critical inherits the user's prior expanded=true and
     // appears already opened into stale history.
     var expanded by remember(group.sourceKey, group.count) { mutableStateOf(false) }
-    val palette = CelestiaTheme.colors
+    val palette = NxTheme.colors
     val style = LocalStyle.current
     val accentColor = severityAccent(group.severity, group.kind, palette)
     // Critical pulses only when the active style allows motion; Brut stays static.
@@ -200,7 +200,7 @@ private fun HeaderRow(
         Text(
             text       = group.sender,
             style      = MaterialTheme.typography.labelLarge,
-            color      = CelestiaTheme.colors.textSecondary,
+            color      = NxTheme.colors.textSecondary,
             fontWeight = FontWeight.Medium,
             modifier   = Modifier.weight(1f),
         )
@@ -210,13 +210,13 @@ private fun HeaderRow(
         TooltipArea(
             tooltip = {
                 Surface(
-                    color = CelestiaTheme.colors.surface,
+                    color = NxTheme.colors.surface,
                     shape = RoundedCornerShape(4.dp),
                 ) {
                     Text(
                         text     = strings.notificationAbsoluteTime(group.latest.createdAt),
                         style    = MaterialTheme.typography.labelSmall,
-                        color    = CelestiaTheme.colors.textPrimary,
+                        color    = NxTheme.colors.textPrimary,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                     )
                 }
@@ -227,7 +227,7 @@ private fun HeaderRow(
             Text(
                 text  = relativeTime(group.latest.createdAt, now, strings),
                 style = MaterialTheme.typography.labelSmall,
-                color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.6f),
+                color = NxTheme.colors.textSecondary.copy(alpha = 0.6f),
             )
         }
         // Chevron is conditional on count; close is unconditional. Sticky
@@ -244,13 +244,13 @@ private fun HeaderRow(
                     Text(
                         text  = group.count.toString(),
                         style = MaterialTheme.typography.labelSmall,
-                        color = CelestiaTheme.colors.textSecondary,
+                        color = NxTheme.colors.textSecondary,
                     )
                     Symbol(icon = if (expanded) NxIcon.ExpandLess else NxIcon.ExpandMore,
                         contentDescription = if (expanded) strings.notificationCollapseHistory
                                              else strings.notificationExpandHistory,
                         modifier          = Modifier.size(16.dp),
-                        tint              = CelestiaTheme.colors.textSecondary,
+                        tint              = NxTheme.colors.textSecondary,
                     )
                 }
             }
@@ -260,7 +260,7 @@ private fun HeaderRow(
             Symbol(icon = NxIcon.Close,
                 contentDescription = strings.notificationDismiss,
                 modifier          = Modifier.size(14.dp),
-                tint              = CelestiaTheme.colors.textSecondary.copy(alpha = 0.6f),
+                tint              = NxTheme.colors.textSecondary.copy(alpha = 0.6f),
             )
         }
     }
@@ -271,7 +271,7 @@ private fun EventBody(event: NotificationEvent, accentColor: Color) {
     Text(
         text       = event.title,
         style      = MaterialTheme.typography.bodyMedium,
-        color      = CelestiaTheme.colors.textPrimary,
+        color      = NxTheme.colors.textPrimary,
         fontWeight = FontWeight.SemiBold,
     )
     val body = event.body
@@ -280,7 +280,7 @@ private fun EventBody(event: NotificationEvent, accentColor: Color) {
         Text(
             text  = body,
             style = MaterialTheme.typography.bodySmall,
-            color = CelestiaTheme.colors.textSecondary,
+            color = NxTheme.colors.textSecondary,
         )
     }
     val progress = event.progress
@@ -292,14 +292,14 @@ private fun EventBody(event: NotificationEvent, accentColor: Color) {
             LinearProgressIndicator(
                 modifier   = Modifier.fillMaxWidth().height(3.dp).clip(RoundedCornerShape(2.dp)),
                 color      = accentColor,
-                trackColor = CelestiaTheme.colors.surfaceVariant,
+                trackColor = NxTheme.colors.surfaceVariant,
             )
         } else {
             LinearProgressIndicator(
                 progress   = { progress.coerceIn(0f, 1f) },
                 modifier   = Modifier.fillMaxWidth().height(3.dp).clip(RoundedCornerShape(2.dp)),
                 color      = accentColor,
-                trackColor = CelestiaTheme.colors.surfaceVariant,
+                trackColor = NxTheme.colors.surfaceVariant,
             )
         }
     }
@@ -319,7 +319,7 @@ private fun ActionsRow(actions: List<NotifAction>, onDismiss: () -> Unit) {
                 Text(
                     text  = action.label,
                     style = MaterialTheme.typography.labelMedium,
-                    color = CelestiaTheme.colors.primary,
+                    color = NxTheme.colors.primary,
                 )
             }
         }
@@ -336,14 +336,14 @@ private fun HistoryRow(event: NotificationEvent, now: Instant) {
         Text(
             text     = event.title,
             style    = MaterialTheme.typography.labelMedium,
-            color    = CelestiaTheme.colors.textSecondary,
+            color    = NxTheme.colors.textSecondary,
             modifier = Modifier.weight(1f),
         )
         Spacer(Modifier.width(6.dp))
         Text(
             text  = relativeTime(event.createdAt, now, strings),
             style = MaterialTheme.typography.labelSmall,
-            color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.55f),
+            color = NxTheme.colors.textSecondary.copy(alpha = 0.55f),
         )
     }
 }
@@ -367,7 +367,7 @@ private fun criticalPulse(): Float {
 // color band; Kind.Progress promotes Info to the progress accent so the
 // card visibly tracks in-flight work. Info+non-Progress has no stripe --
 // caller elides the side-bar -- so Color.Transparent is the safe sentinel.
-private fun severityAccent(severity: Severity, kind: Kind, colors: CelestiaColors): Color = when (severity) {
+private fun severityAccent(severity: Severity, kind: Kind, colors: NxColors): Color = when (severity) {
     Severity.Info     -> if (kind == Kind.Progress) colors.progressAccent else Color.Transparent
     Severity.Success  -> colors.success
     Severity.Warn     -> colors.warnAccent

@@ -35,7 +35,7 @@ import hivens.ui.effects.pixelArtBackground
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.decorativePair
 import hivens.ui.theme.origin
 
@@ -59,7 +59,7 @@ fun BrowsePackCard(
     modifier: Modifier = Modifier,
 ) {
     val s = LocalStrings.current
-    val (hueA, hueB) = CelestiaTheme.colors.decorativePair(pack.id)
+    val (hueA, hueB) = NxTheme.colors.decorativePair(pack.id)
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -177,7 +177,7 @@ private fun SourceBadge(origin: PackOrigin) {
     Box(
         modifier = Modifier
             .clip(MaterialTheme.shapes.extraSmall)
-            .background(CelestiaTheme.colors.origin(origin).copy(alpha = 0.85f))
+            .background(NxTheme.colors.origin(origin).copy(alpha = 0.85f))
             .padding(horizontal = 8.dp, vertical = 2.dp),
     ) {
         Text(

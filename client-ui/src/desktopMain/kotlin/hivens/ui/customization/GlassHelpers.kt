@@ -2,7 +2,7 @@ package hivens.ui.customization
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 
 /**
  * Resolves the active surface tint at [baseAlpha], scaled by the
@@ -12,13 +12,13 @@ import hivens.ui.theme.CelestiaTheme
  * even under Brut.
  *
  * Use this anywhere that currently does
- * `CelestiaTheme.colors.surface.copy(alpha = X)` to make the
+ * `NxTheme.colors.surface.copy(alpha = X)` to make the
  * surface honor [CustomizationSettings.glassIntensity].
  */
 @Composable
 fun glassSurfaceAlpha(baseAlpha: Float): Color {
     val multiplier = LocalCustomization.current.glassIntensity
-    return CelestiaTheme.colors.surface.copy(
+    return NxTheme.colors.surface.copy(
         alpha = (baseAlpha * multiplier).coerceIn(0f, 1f),
     )
 }

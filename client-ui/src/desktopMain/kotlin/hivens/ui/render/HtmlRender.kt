@@ -43,7 +43,7 @@ import coil3.compose.AsyncImage
 import hivens.ui.components.isPlayableVideoUrl
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import org.intellij.markdown.flavours.gfm.GFMFlavourDescriptor
 import org.intellij.markdown.html.HtmlGenerator
 import org.intellij.markdown.parser.MarkdownParser
@@ -97,11 +97,11 @@ fun MarkdownHtml(
 fun HtmlBody(
     html: String,
     modifier: Modifier = Modifier,
-    baseColor: Color = CelestiaTheme.colors.textPrimary,
+    baseColor: Color = NxTheme.colors.textPrimary,
     onLink: (String) -> Unit = ::openInBrowser,
 ) {
     val body = remember(html) { Jsoup.parse(html).body() }
-    val ctx = InlineCtx(linkColor = CelestiaTheme.colors.primary, baseColor = baseColor)
+    val ctx = InlineCtx(linkColor = NxTheme.colors.primary, baseColor = baseColor)
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         blocks(body, ctx, onLink)
     }
@@ -178,7 +178,7 @@ private fun ColumnScope.block(el: Element, ctx: InlineCtx, onLink: (String) -> U
         "ul", "ol" -> ListBlock(el, ctx, onLink, ordered = el.tagName().equals("ol", true))
         "blockquote" -> Box(
             Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small)
-                .background(CelestiaTheme.colors.surface).padding(12.dp),
+                .background(NxTheme.colors.surface).padding(12.dp),
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { blocks(el, ctx, onLink) }
         }
@@ -186,9 +186,9 @@ private fun ColumnScope.block(el: Element, ctx: InlineCtx, onLink: (String) -> U
             el.wholeText().trimEnd(),
             style = TextStyle(color = ctx.baseColor, fontFamily = FontFamily.Monospace),
             modifier = Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small)
-                .background(CelestiaTheme.colors.surface).padding(12.dp),
+                .background(NxTheme.colors.surface).padding(12.dp),
         )
-        "hr" -> HorizontalDivider(color = CelestiaTheme.colors.outline.copy(alpha = 0.4f))
+        "hr" -> HorizontalDivider(color = NxTheme.colors.outline.copy(alpha = 0.4f))
         "img" -> ImageBlock(el)
         "table" -> TableBlock(el, ctx, onLink)
         // div / section / li / summary / details / figure / unknown container -> flow children into this column.

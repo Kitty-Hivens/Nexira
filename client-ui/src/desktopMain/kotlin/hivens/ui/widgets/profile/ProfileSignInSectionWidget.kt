@@ -39,7 +39,7 @@ import hivens.ui.icons.Symbol
 import hivens.ui.platform.SystemActions
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalMonoFamily
 import hivens.ui.theme.LocalStyle
 import hivens.widget.model.Widget
@@ -89,7 +89,7 @@ fun ProfileSignInSectionWidget(instance: WidgetInstance) {
                 else -> Text(
                     text = s.msaNotConfigured,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = CelestiaTheme.colors.textSecondary,
+                    color = NxTheme.colors.textSecondary,
                 )
             }
         }
@@ -122,7 +122,7 @@ private fun MicrosoftAccount(session: SessionData, onChanged: () -> Unit) {
             text = session.playerName,
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
-            color = CelestiaTheme.colors.textPrimary,
+            color = NxTheme.colors.textPrimary,
         )
         UuidCard(session.uuid)
         // The live skin + cape manager (Mojang-sourced, not the SmartyCraft skin
@@ -134,7 +134,7 @@ private fun MicrosoftAccount(session: SessionData, onChanged: () -> Unit) {
             modifier = Modifier.widthIn(min = 200.dp),
             colors = ButtonDefaults.buttonColors(
                 containerColor = glassSurfaceAlpha(0.5f),
-                contentColor = CelestiaTheme.colors.textPrimary,
+                contentColor = NxTheme.colors.textPrimary,
             ),
         )
         PuppetClick("account.signout.microsoft") { signOut() }
@@ -148,23 +148,23 @@ private fun UuidCard(uuid: String) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(style.cardCorner))
-            .background(CelestiaTheme.colors.background.copy(alpha = 0.4f))
+            .background(NxTheme.colors.background.copy(alpha = 0.4f))
             .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Column {
-            Text("UUID", style = MaterialTheme.typography.labelSmall, color = CelestiaTheme.colors.textSecondary)
+            Text("UUID", style = MaterialTheme.typography.labelSmall, color = NxTheme.colors.textSecondary)
             Spacer(Modifier.height(2.dp))
             Text(
                 text = dashedUuid(uuid),
                 style = MaterialTheme.typography.bodyMedium,
                 fontFamily = LocalMonoFamily.current,
-                color = CelestiaTheme.colors.textPrimary,
+                color = NxTheme.colors.textPrimary,
             )
         }
         IconButton(onClick = { SystemActions.copyToClipboard(uuid) }) {
-            Symbol(NxIcon.ContentCopy, "UUID", tint = CelestiaTheme.colors.textSecondary)
+            Symbol(NxIcon.ContentCopy, "UUID", tint = NxTheme.colors.textSecondary)
         }
         PuppetClick("account.microsoft.copyUuid") { SystemActions.copyToClipboard(uuid) }
     }

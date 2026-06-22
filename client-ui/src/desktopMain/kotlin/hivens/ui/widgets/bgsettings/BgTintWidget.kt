@@ -24,7 +24,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 
@@ -60,7 +60,7 @@ fun BgTintWidget(instance: WidgetInstance) {
                         .clip(MaterialTheme.shapes.extraSmall)
                         .border(
                             width = if (selected) 2.dp else 0.dp,
-                            color = if (selected) CelestiaTheme.colors.primary else Color.Transparent,
+                            color = if (selected) NxTheme.colors.primary else Color.Transparent,
                             shape = MaterialTheme.shapes.extraSmall,
                         )
                         .clickable {
@@ -82,12 +82,12 @@ fun BgTintWidget(instance: WidgetInstance) {
                                 if (hex != null) runCatching {
                                     Color(("FF" + hex.removePrefix("#")).toLong(16))
                                 }.getOrDefault(Color.Gray)
-                                else CelestiaTheme.colors.surface,
+                                else NxTheme.colors.surface,
                             )
                             .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(4.dp)),
                     )
                     Spacer(Modifier.size(4.dp))
-                    Text(label, fontSize = 9.sp, color = CelestiaTheme.colors.textSecondary)
+                    Text(label, fontSize = 9.sp, color = NxTheme.colors.textSecondary)
                 }
             }
         }

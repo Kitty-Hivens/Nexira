@@ -12,7 +12,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.core.api.dto.smrt.SmrtSource
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.source
 
 // Provenance pill on a content row: where the entry came from
@@ -27,7 +27,7 @@ internal fun SourceBadge(source: SmrtSource) {
         is SmrtSource.SmrtStatic -> "Static"
         is SmrtSource.Unknown    -> "Unknown"
     }
-    val color = CelestiaTheme.colors.source(source)
+    val color = NxTheme.colors.source(source)
     Box(
         modifier = Modifier
             .clip(MaterialTheme.shapes.extraSmall)

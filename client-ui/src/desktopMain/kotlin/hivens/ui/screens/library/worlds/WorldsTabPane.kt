@@ -44,7 +44,7 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.screens.CenteredProgress
 import hivens.ui.screens.RetryStateBlock
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import java.io.File
 import java.nio.file.Path
 import java.time.Instant
@@ -146,7 +146,7 @@ private fun SectionHeader(text: String) {
     Text(
         text       = text,
         style      = MaterialTheme.typography.titleSmall,
-        color      = CelestiaTheme.colors.primary,
+        color      = NxTheme.colors.primary,
         fontWeight = FontWeight.Bold,
     )
 }
@@ -164,7 +164,7 @@ private fun EmptyHint(text: String) {
         Text(
             text  = text,
             style = MaterialTheme.typography.bodySmall,
-            color = CelestiaTheme.colors.textSecondary,
+            color = NxTheme.colors.textSecondary,
         )
     }
 }
@@ -190,7 +190,7 @@ private fun WorldCard(world: WorldEntry) {
             Text(
                 text       = world.displayName,
                 style      = MaterialTheme.typography.bodyLarge,
-                color      = CelestiaTheme.colors.textPrimary,
+                color      = NxTheme.colors.textPrimary,
                 fontWeight = FontWeight.SemiBold,
                 maxLines   = 1,
                 overflow   = TextOverflow.Ellipsis,
@@ -198,7 +198,7 @@ private fun WorldCard(world: WorldEntry) {
             Text(
                 text     = worldSubtitle(world),
                 style    = MaterialTheme.typography.labelSmall,
-                color    = CelestiaTheme.colors.textSecondary,
+                color    = NxTheme.colors.textSecondary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -207,7 +207,7 @@ private fun WorldCard(world: WorldEntry) {
                 Text(
                     text     = info,
                     style    = MaterialTheme.typography.labelSmall,
-                    color    = CelestiaTheme.colors.textSecondary,
+                    color    = NxTheme.colors.textSecondary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -222,7 +222,7 @@ private fun WorldThumb(iconPath: String?) {
         modifier         = Modifier
             .size(56.dp)
             .clip(RoundedCornerShape(8.dp))
-            .background(CelestiaTheme.colors.surfaceVariant),
+            .background(NxTheme.colors.surfaceVariant),
         contentAlignment = Alignment.Center,
     ) {
         if (iconPath != null) {
@@ -260,7 +260,7 @@ private fun ServerCard(entry: MultiplayerServerEntry) {
                 Text(
                     text       = entry.name,
                     style      = MaterialTheme.typography.bodyLarge,
-                    color      = CelestiaTheme.colors.textPrimary,
+                    color      = NxTheme.colors.textPrimary,
                     fontWeight = FontWeight.SemiBold,
                     maxLines   = 1,
                     overflow   = TextOverflow.Ellipsis,
@@ -268,7 +268,7 @@ private fun ServerCard(entry: MultiplayerServerEntry) {
                 if (entry.hidden) {
                     Symbol(icon = NxIcon.VisibilityOff,
                         contentDescription = s.worldsTabServerHiddenLabel,
-                        tint               = CelestiaTheme.colors.textSecondary,
+                        tint               = NxTheme.colors.textSecondary,
                         modifier           = Modifier.size(14.dp),
                     )
                 }
@@ -276,7 +276,7 @@ private fun ServerCard(entry: MultiplayerServerEntry) {
             Text(
                 text  = entry.ip,
                 style = MaterialTheme.typography.labelSmall,
-                color = CelestiaTheme.colors.textSecondary,
+                color = NxTheme.colors.textSecondary,
             )
         }
     }
@@ -292,7 +292,7 @@ private fun ServerThumb(iconBase64: String?) {
         modifier         = Modifier
             .size(48.dp)
             .clip(RoundedCornerShape(8.dp))
-            .background(CelestiaTheme.colors.surfaceVariant),
+            .background(NxTheme.colors.surfaceVariant),
         contentAlignment = Alignment.Center,
     ) {
         if (bytes != null) {

@@ -42,7 +42,7 @@ import androidx.compose.ui.window.PopupProperties
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 
 /**
  * Themed context menu, in the app's glass language -- replaces Material's
@@ -82,7 +82,7 @@ fun NxContextMenu(
                     .clip(MaterialTheme.shapes.medium)
                     .background(glassSurfaceAlpha(0.9f))
                     .background(Color.Black.copy(alpha = 0.28f))
-                    .border(1.dp, CelestiaTheme.colors.outline.copy(alpha = 0.25f), MaterialTheme.shapes.medium)
+                    .border(1.dp, NxTheme.colors.outline.copy(alpha = 0.25f), MaterialTheme.shapes.medium)
                     .width(IntrinsicSize.Max)
                     .padding(vertical = 6.dp),
             ) {
@@ -106,8 +106,8 @@ fun NxMenuItem(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
-    val color = if (destructive) CelestiaTheme.colors.error else CelestiaTheme.colors.textPrimary
-    val hoverTint = if (destructive) CelestiaTheme.colors.error else CelestiaTheme.colors.primary
+    val color = if (destructive) NxTheme.colors.error else NxTheme.colors.textPrimary
+    val hoverTint = if (destructive) NxTheme.colors.error else NxTheme.colors.primary
 
     Row(
         modifier = Modifier

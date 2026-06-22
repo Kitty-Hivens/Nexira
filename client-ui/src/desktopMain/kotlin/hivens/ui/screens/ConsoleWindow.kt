@@ -109,7 +109,7 @@ import hivens.ui.puppet.PuppetScreen
 import hivens.ui.puppet.PuppetToggle
 import hivens.ui.generated.resources.Res
 import hivens.ui.theme.CelestiaStyle
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.CustomTheme
 import hivens.ui.theme.LocalMonoFamily
 import hivens.ui.theme.StyleSpec
@@ -142,11 +142,11 @@ private val FONT_SIZES = listOf(11, 12, 14)
 private const val MAX_SEARCH_MATCHES = 5000
 
 // ── Palette ──────────────────────────────────────────────────────────────────
-// Theme-derived colors flow through CelestiaTheme.colors at every composable
+// Theme-derived colors flow through NxTheme.colors at every composable
 // call site; this small record carries the subset that pure helpers (the
 // AnnotatedString builder) consume off the composition. Only console-only
 // tokens (the yellow search highlight, the orange pause accent) live as
-// constants -- everything else maps to a CelestiaColors role and follows
+// constants -- everything else maps to a NxColors role and follows
 // the user's theme + customization overrides.
 internal data class ConsolePalette(
     val textPrimary:    Color,
@@ -159,7 +159,7 @@ internal data class ConsolePalette(
     val searchMatchBg:  Color,
 )
 
-// Console-only accents that have no CelestiaColors counterpart. Yellow
+// Console-only accents that have no NxColors counterpart. Yellow
 // search-match background is universally legible on either light or dark
 // surfaces; pause-accent uses warm orange to read as "intentional halt"
 // rather than failure (criticalAccent would conflate with ERROR severity).
@@ -273,18 +273,18 @@ fun ConsoleWindow(
         alwaysOnTop    = false,
         undecorated    = false,
     ) {
-        // CelestiaTheme handles both the Material colorScheme + the
-        // launcher's CelestiaColors composition local; child composables
-        // read CelestiaTheme.colors directly. Accent / role overrides
+        // NxTheme handles both the Material colorScheme + the
+        // launcher's NxColors composition local; child composables
+        // read NxTheme.colors directly. Accent / role overrides
         // from LocalCustomization propagate in if the caller wrapped the
         // ConsoleWindow site in a CustomizationProvider; otherwise the
         // default settings yield the same palette as the main shell.
-        CelestiaTheme(
+        NxTheme(
             useDarkTheme = isDarkTheme,
             customTheme  = customTheme,
             style        = style,
         ) {
-            Surface(modifier = Modifier.fillMaxSize(), color = CelestiaTheme.colors.background) {
+            Surface(modifier = Modifier.fillMaxSize(), color = NxTheme.colors.background) {
                 ConsoleContent(settings = settings, onSettingsChange = onSettingsChange)
             }
         }
@@ -304,7 +304,7 @@ internal fun ConsoleContent(
     val focusManager = LocalFocusManager.current
     val scope = rememberCoroutineScope()
     val gameConsole: GameConsoleService = koinInject()
-    val themeColors = CelestiaTheme.colors
+    val themeColors = NxTheme.colors
 
     // Pure-function helpers (the AnnotatedString builder) consume a value-
     // type palette off the composition; build it once per theme change so
@@ -795,7 +795,7 @@ internal fun ConsoleContent(
                 )
             }
             // Replace Compose Desktop's native-JPopupMenu representation
-            // with a Compose-rendered one painted from CelestiaTheme.
+            // with a Compose-rendered one painted from NxTheme.
             // Default on Linux pulls a Swing popup (dated, ignores theme,
             // user reported as ugly); the DefaultContextMenuRepresentation
             // constructor draws via Compose primitives and lets us pick
@@ -921,7 +921,7 @@ internal fun ConsoleContent(
                         Text(
                             text     = s.consoleCopied,
                             // White text reads against both light- and dark-
-                            // success surfaces in CelestiaColors as currently
+                            // success surfaces in NxColors as currently
                             // defined; revisit in customization slice if a
                             // contrast pairing becomes necessary under
                             // user-supplied overrides.
@@ -1063,7 +1063,7 @@ private fun Toolbar(
     onSave: () -> Unit,
     onClear: () -> Unit,
 ) {
-    val colors = CelestiaTheme.colors
+    val colors = NxTheme.colors
     Row(
         Modifier
             .fillMaxWidth()            .padding(horizontal = 8.dp, vertical = 4.dp),
@@ -1244,7 +1244,7 @@ private fun SearchPrompt(
     onNext: () -> Unit,
     onPrev: () -> Unit,
 ) {
-    val colors = CelestiaTheme.colors
+    val colors = NxTheme.colors
     Row(
         Modifier
             .fillMaxWidth()            .padding(horizontal = 8.dp, vertical = 4.dp),
@@ -1377,7 +1377,7 @@ private fun CommandInputRow(
     onFocusChanged: (Boolean) -> Unit,
     strings: AppStrings,
 ) {
-    val colors = CelestiaTheme.colors
+    val colors = NxTheme.colors
     Row(
         Modifier
             .fillMaxWidth()            .padding(horizontal = 8.dp, vertical = 4.dp),
@@ -1449,7 +1449,7 @@ private fun StatusFooter(
     searchCapped: Boolean = false,
     onResumeFollow: () -> Unit,
 ) {
-    val colors = CelestiaTheme.colors
+    val colors = NxTheme.colors
     Row(
         Modifier
             .fillMaxWidth()            .padding(horizontal = 8.dp, vertical = 3.dp),
@@ -1622,14 +1622,14 @@ private fun ConsoleEmptyState(extraArts: List<String>) {
             // DejaVu Sans (not the mono UI font) -- it carries Braille at a uniform
             // cell; lineHeight == fontSize so the dot rows stack without gaps.
             style     = TextStyle(fontFamily = nexiraBrailleFamily(), fontSize = 16.sp, lineHeight = 16.sp),
-            color     = CelestiaTheme.colors.textSecondary.copy(alpha = 0.5f),
+            color     = NxTheme.colors.textSecondary.copy(alpha = 0.5f),
             textAlign = TextAlign.Start,
         )
         Spacer(Modifier.height(16.dp))
         Text(
             text      = s.consoleEmptyHint,
             style     = MaterialTheme.typography.bodySmall,
-            color     = CelestiaTheme.colors.textSecondary.copy(alpha = 0.7f),
+            color     = NxTheme.colors.textSecondary.copy(alpha = 0.7f),
             textAlign = TextAlign.Center,
         )
     }

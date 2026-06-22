@@ -15,7 +15,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.core.data.ReleaseChannel
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalStyle
 
 // git sits between alpha-yellow and dev-red on the heat scale.
@@ -25,11 +25,11 @@ private val GIT_ORANGE = Color(0xFFE8743B)
  *  dev monochrome (plain white text). */
 @Composable
 fun channelColor(channel: ReleaseChannel): Color = when (channel) {
-    ReleaseChannel.Release -> CelestiaTheme.colors.success
-    ReleaseChannel.Beta    -> CelestiaTheme.colors.progressAccent
-    ReleaseChannel.Alpha   -> CelestiaTheme.colors.warnAccent
+    ReleaseChannel.Release -> NxTheme.colors.success
+    ReleaseChannel.Beta    -> NxTheme.colors.progressAccent
+    ReleaseChannel.Alpha   -> NxTheme.colors.warnAccent
     ReleaseChannel.Git     -> GIT_ORANGE
-    ReleaseChannel.Dev     -> CelestiaTheme.colors.textPrimary
+    ReleaseChannel.Dev     -> NxTheme.colors.textPrimary
 }
 
 /**
@@ -57,8 +57,8 @@ fun ChannelBadge(channel: ReleaseChannel, modifier: Modifier = Modifier) {
         Modifier.background(
             Brush.linearGradient(
                 listOf(
-                    CelestiaTheme.colors.textPrimary.copy(alpha = 0.24f),
-                    CelestiaTheme.colors.textSecondary.copy(alpha = 0.07f),
+                    NxTheme.colors.textPrimary.copy(alpha = 0.24f),
+                    NxTheme.colors.textSecondary.copy(alpha = 0.07f),
                 ),
             ),
         )

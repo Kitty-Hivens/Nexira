@@ -85,7 +85,7 @@ import hivens.ui.screens.library.FileBrowserPane
 import hivens.ui.screens.library.content.ContentTabPane
 import hivens.ui.screens.library.rememberPackArt
 import hivens.ui.screens.library.worlds.WorldsTabPane
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalMonoFamily
 import hivens.ui.theme.decorativePair
 import hivens.ui.theme.origin
@@ -278,7 +278,7 @@ private fun PackLogsTab(packId: String, instanceDir: Path, dataDir: Path) {
                 onSelectGeneral = { selectedFile = null },
                 onSelectFile    = { selectedFile = it },
             )
-            HorizontalDivider(color = CelestiaTheme.colors.outline.copy(alpha = 0.3f))
+            HorizontalDivider(color = NxTheme.colors.outline.copy(alpha = 0.3f))
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 if (source == null) {
                     // A file is selected but still reading -- show the spinner
@@ -380,7 +380,7 @@ private fun LogSessionPicker(
     onSelectFile: (File) -> Unit,
 ) {
     val s = LocalStrings.current
-    val colors = CelestiaTheme.colors
+    val colors = NxTheme.colors
     var open by remember { mutableStateOf(false) }
 
     val currentLabel = selectedFile?.name ?: s.consoleSessionLive
@@ -448,7 +448,7 @@ private fun Hero(
     val bannerUrl = art.bannerUrl
     val bannerIsVideo = bannerUrl != null && isVideoUrl(bannerUrl)
     var bannerFullscreen by remember(bannerUrl) { mutableStateOf(false) }
-    val (hueA, hueB) = CelestiaTheme.colors.decorativePair(pack.id)
+    val (hueA, hueB) = NxTheme.colors.decorativePair(pack.id)
     Box(Modifier.fillMaxWidth().height(196.dp)) {
         // Pixel-art base -> real banner -> scrim, same layering as the cards.
         Box(Modifier.fillMaxSize().pixelArtBackground(pack.id, hueA, hueB))
@@ -562,11 +562,11 @@ private fun PackTabBar(selected: Int, onSelect: (Int) -> Unit) {
     ) {
         tabs.forEachIndexed { i, (icon, label) ->
             val active = i == selected
-            val tint = if (active) Color.White else CelestiaTheme.colors.textSecondary
+            val tint = if (active) Color.White else NxTheme.colors.textSecondary
             Row(
                 modifier = Modifier
                     .clip(MaterialTheme.shapes.small)
-                    .background(if (active) CelestiaTheme.colors.primary else glassSurfaceAlpha(0.5f))
+                    .background(if (active) NxTheme.colors.primary else glassSurfaceAlpha(0.5f))
                     .clickable { onSelect(i) }
                     .padding(horizontal = 12.dp, vertical = 7.dp),
                 verticalAlignment     = Alignment.CenterVertically,
@@ -597,7 +597,7 @@ private fun SourceChip(origin: PackOrigin) {
     Box(
         modifier = Modifier
             .clip(MaterialTheme.shapes.extraSmall)
-            .background(CelestiaTheme.colors.origin(origin).copy(alpha = 0.9f))
+            .background(NxTheme.colors.origin(origin).copy(alpha = 0.9f))
             .padding(horizontal = 8.dp, vertical = 3.dp),
     ) {
         Text(label, style = MaterialTheme.typography.labelSmall, color = Color.White, fontWeight = FontWeight.Bold)
@@ -664,7 +664,7 @@ private fun PackSettingsModal(
                 .fillMaxWidth(0.7f)
                 .clickable(interactionSource = card, indication = null, onClick = {}),
             shape    = MaterialTheme.shapes.medium,
-            color    = CelestiaTheme.colors.surface,
+            color    = NxTheme.colors.surface,
         ) {
             Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Row(
@@ -672,8 +672,8 @@ private fun PackSettingsModal(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment     = Alignment.CenterVertically,
                 ) {
-                    Text(title, style = MaterialTheme.typography.titleLarge, color = CelestiaTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
-                    IconButton(onClick = onDismiss) { Symbol(NxIcon.Close, contentDescription = null, tint = CelestiaTheme.colors.textSecondary) }
+                    Text(title, style = MaterialTheme.typography.titleLarge, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
+                    IconButton(onClick = onDismiss) { Symbol(NxIcon.Close, contentDescription = null, tint = NxTheme.colors.textSecondary) }
                 }
                 PackSettingsTab(runtime = runtime, instanceDir = instanceDir, onRuntimeChange = onRuntimeChange)
             }
@@ -708,8 +708,8 @@ private fun NotFound(onBack: () -> Unit) {
     val s = LocalStrings.current
     Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(s.packDetailNotFoundTitle, style = MaterialTheme.typography.titleLarge, color = CelestiaTheme.colors.textPrimary)
-            Text(s.packDetailNotFoundHint, style = MaterialTheme.typography.bodyMedium, color = CelestiaTheme.colors.textSecondary)
+            Text(s.packDetailNotFoundTitle, style = MaterialTheme.typography.titleLarge, color = NxTheme.colors.textPrimary)
+            Text(s.packDetailNotFoundHint, style = MaterialTheme.typography.bodyMedium, color = NxTheme.colors.textSecondary)
             Button(onClick = onBack) { Text(s.packDetailNotFoundBack) }
         }
     }

@@ -23,8 +23,8 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
 import hivens.ui.background.FrostBackdrop
 import hivens.ui.customization.LocalCustomization
-import hivens.ui.theme.CelestiaColors
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxColors
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalStyle
 
 /**
@@ -109,7 +109,7 @@ data class StateOverlay(val role: FrostRole = FrostRole.Primary, val hoverAlpha:
  *  fields for rendering, not to a settings file. */
 enum class FrostRole { Surface, SurfaceContainer, SurfaceContainerHigh, Background, Primary, Secondary, Tertiary, Outline }
 
-private fun CelestiaColors.frost(role: FrostRole): Color = when (role) {
+private fun NxColors.frost(role: FrostRole): Color = when (role) {
     FrostRole.Surface              -> surface
     FrostRole.SurfaceContainer     -> surfaceContainer
     FrostRole.SurfaceContainerHigh -> surfaceContainerHigh
@@ -121,7 +121,7 @@ private fun CelestiaColors.frost(role: FrostRole): Color = when (role) {
 }
 
 @Composable
-fun frostColor(role: FrostRole): Color = CelestiaTheme.colors.frost(role)
+fun frostColor(role: FrostRole): Color = NxTheme.colors.frost(role)
 
 /** Named depth presets -- each is just a saved layer list. Serializable so it
  *  can be a widget prop field (renders as a dropdown in the editor). */
@@ -147,7 +147,7 @@ fun FrostSurface(
     interactionSource: InteractionSource? = null,
     content: @Composable BoxScope.() -> Unit,
 ) {
-    val colors = CelestiaTheme.colors
+    val colors = NxTheme.colors
     val glassIntensity = LocalCustomization.current.glassIntensity
     val softGlow = LocalStyle.current.softGlowEnabled
 

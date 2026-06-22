@@ -13,7 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.components.NxSwitch
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 
@@ -38,12 +38,12 @@ fun CustomExperimentalToggleWidget(instance: WidgetInstance) {
             Text(
                 text       = s.customizationExperimentalToggle,
                 fontWeight = FontWeight.Bold,
-                color      = CelestiaTheme.colors.textPrimary,
+                color      = NxTheme.colors.textPrimary,
             )
             Text(
                 text  = s.customizationExperimentalSub,
                 style = MaterialTheme.typography.bodySmall,
-                color = CelestiaTheme.colors.textSecondary,
+                color = NxTheme.colors.textSecondary,
             )
         }
         NxSwitch(

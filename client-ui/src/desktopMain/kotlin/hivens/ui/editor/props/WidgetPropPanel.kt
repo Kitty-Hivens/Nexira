@@ -40,7 +40,7 @@ import hivens.ui.editor.EditModeController
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.ui.widgets.customization.LabeledSlider
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalWidgetRegistry
@@ -151,7 +151,7 @@ private fun PropPanelBody(
             .clip(RoundedCornerShape(14.dp))
             // Solid surface, no glass: a settings panel must stay readable and
             // not composite with the layers it floats over.
-            .background(CelestiaTheme.colors.surface),
+            .background(NxTheme.colors.surface),
     ) {
         Row(
             verticalAlignment     = Alignment.CenterVertically,
@@ -163,21 +163,21 @@ private fun PropPanelBody(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Symbol(icon = NxIcon.Tune,
                     contentDescription = null,
-                    tint               = CelestiaTheme.colors.primary,
+                    tint               = NxTheme.colors.primary,
                     modifier           = Modifier.size(18.dp),
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
                     text       = s.widgetLabel(descriptor.displayName),
                     style      = MaterialTheme.typography.titleSmall,
-                    color      = CelestiaTheme.colors.textPrimary,
+                    color      = NxTheme.colors.textPrimary,
                     fontWeight = FontWeight.SemiBold,
                 )
             }
             IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
                 Symbol(icon = NxIcon.Close,
                     contentDescription = s.editorClose,
-                    tint               = CelestiaTheme.colors.textSecondary,
+                    tint               = NxTheme.colors.textSecondary,
                     modifier           = Modifier.size(16.dp),
                 )
             }
@@ -216,7 +216,7 @@ private fun PropPanelBody(
             Text(
                 text       = s.editorBackingTitle,
                 style      = MaterialTheme.typography.labelMedium,
-                color      = CelestiaTheme.colors.textSecondary,
+                color      = NxTheme.colors.textSecondary,
                 fontWeight = FontWeight.SemiBold,
             )
             val chrome = instance.chrome ?: WidgetChrome()
@@ -235,7 +235,7 @@ private fun PropPanelBody(
                 Text(
                     text  = s.editorBackingNoGlassHint,
                     style = MaterialTheme.typography.bodySmall,
-                    color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.7f),
+                    color = NxTheme.colors.textSecondary.copy(alpha = 0.7f),
                 )
             }
             LabeledSlider(

@@ -15,7 +15,7 @@ import hivens.core.launch.PrepareStage
 import hivens.ui.easter.LocalAprilFools
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import java.text.DecimalFormat
 
 @Composable
@@ -49,13 +49,13 @@ fun LaunchControlPanel(
                 is LaunchState.Idle -> Text(
                     s.launchReady,
                     style = MaterialTheme.typography.bodySmall,
-                    color = CelestiaTheme.colors.textSecondary,
+                    color = NxTheme.colors.textSecondary,
                 )
 
                 is LaunchState.Prepare -> Text(
                     text  = localizeStage(state.stage, s),
                     style = MaterialTheme.typography.bodySmall,
-                    color = CelestiaTheme.colors.textSecondary,
+                    color = NxTheme.colors.textSecondary,
                 )
 
                 is LaunchState.Downloading -> {
@@ -66,12 +66,12 @@ fun LaunchControlPanel(
                         Text(
                             "${s.launchDownloading} ",
                             style = MaterialTheme.typography.bodySmall,
-                            color = CelestiaTheme.colors.textSecondary,
+                            color = NxTheme.colors.textSecondary,
                         )
                         Text(
                             "${fmt.format(dlMb)} / ${fmt.format(totMb)} MB (${formatSpeed(state.speedBytesPerSec, fmt)})",
                             style      = MaterialTheme.typography.bodySmall,
-                            color      = CelestiaTheme.colors.primary,
+                            color      = NxTheme.colors.primary,
                             fontWeight = FontWeight.Bold,
                         )
                     }
@@ -83,13 +83,13 @@ fun LaunchControlPanel(
                 is LaunchState.Error -> Text(
                     s.launchReady,
                     style = MaterialTheme.typography.bodySmall,
-                    color = CelestiaTheme.colors.textSecondary,
+                    color = NxTheme.colors.textSecondary,
                 )
 
                 is LaunchState.GameRunning -> Text(
                     s.launchRunning,
                     style = MaterialTheme.typography.bodySmall,
-                    color = CelestiaTheme.colors.success,
+                    color = NxTheme.colors.success,
                 )
             }
         }
@@ -117,15 +117,15 @@ fun LaunchControlPanel(
             if (progress.isNaN()) {
                 LinearProgressIndicator(
                     modifier        = barModifier,
-                    color           = CelestiaTheme.colors.primary,
-                    trackColor      = CelestiaTheme.colors.surface,
+                    color           = NxTheme.colors.primary,
+                    trackColor      = NxTheme.colors.surface,
                 )
             } else {
                 LinearProgressIndicator(
                     progress        = { progress },
                     modifier        = barModifier,
-                    color           = CelestiaTheme.colors.primary,
-                    trackColor      = CelestiaTheme.colors.surface,
+                    color           = NxTheme.colors.primary,
+                    trackColor      = NxTheme.colors.surface,
                     gapSize         = 0.dp,
                     drawStopIndicator = {},
                 )

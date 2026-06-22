@@ -27,7 +27,7 @@ import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.widget.model.SlotContent
 import hivens.widget.model.SlotOrientation
 import hivens.widget.model.SlotPath
@@ -54,12 +54,12 @@ internal fun SlotControl(path: SlotPath, content: SlotContent, controller: EditM
             Text(
                 text       = path.leafAddress.slot.value,
                 style      = MaterialTheme.typography.labelSmall,
-                color      = CelestiaTheme.colors.textSecondary,
+                color      = NxTheme.colors.textSecondary,
                 fontWeight = FontWeight.SemiBold,
             )
             Symbol(icon = NxIcon.ArrowDropDown,
                 contentDescription = null,
-                tint               = CelestiaTheme.colors.textSecondary,
+                tint               = NxTheme.colors.textSecondary,
                 modifier           = Modifier.size(16.dp),
             )
         }
@@ -87,7 +87,7 @@ internal fun SlotControl(path: SlotPath, content: SlotContent, controller: EditM
                     Text(
                         text  = "${content.gridColumns}",
                         style = MaterialTheme.typography.labelMedium,
-                        color = CelestiaTheme.colors.textPrimary,
+                        color = NxTheme.colors.textPrimary,
                     )
                     StepChip("+") { controller.setGridColumns(path, content.gridColumns + 1) }
                 }
@@ -102,7 +102,7 @@ private fun OrientItem(label: String, active: Boolean, onClick: () -> Unit) {
         text = {
             Text(
                 text       = label,
-                color      = if (active) CelestiaTheme.colors.primary else CelestiaTheme.colors.textPrimary,
+                color      = if (active) NxTheme.colors.primary else NxTheme.colors.textPrimary,
                 fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
             )
         },
@@ -115,7 +115,7 @@ private fun StepChip(label: String, onClick: () -> Unit) {
     Text(
         text     = label,
         style    = MaterialTheme.typography.labelMedium,
-        color    = CelestiaTheme.colors.textPrimary,
+        color    = NxTheme.colors.textPrimary,
         modifier = Modifier
             .clip(RoundedCornerShape(6.dp))
             .background(glassSurfaceAlpha(0.5f))

@@ -15,7 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalStyle
 
 /**
@@ -39,7 +39,7 @@ fun NxSwitch(
     accent: Color? = null,
 ) {
     val st = LocalStyle.current.switchStyle
-    val colors = CelestiaTheme.colors
+    val colors = NxTheme.colors
     val alpha = if (enabled) 1f else 0.4f
     val trackColor by animateColorAsState(
         targetValue = if (checked) (accent ?: colors.primary).copy(alpha = alpha)

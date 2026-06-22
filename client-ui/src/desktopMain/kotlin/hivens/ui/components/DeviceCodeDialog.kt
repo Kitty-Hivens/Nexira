@@ -28,7 +28,7 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetField
 import hivens.ui.puppet.PuppetScreen
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalMonoFamily
 
 /**
@@ -59,7 +59,7 @@ fun DeviceCodeDialog(
         Surface(
             modifier = Modifier.width(420.dp),
             shape = MaterialTheme.shapes.large,
-            color = CelestiaTheme.colors.surface,
+            color = NxTheme.colors.surface,
         ) {
             Column(
                 Modifier.fillMaxWidth().padding(24.dp),
@@ -68,17 +68,17 @@ fun DeviceCodeDialog(
                 Text(
                     s.msaTitle,
                     style = MaterialTheme.typography.titleMedium,
-                    color = CelestiaTheme.colors.textPrimary,
+                    color = NxTheme.colors.textPrimary,
                 )
                 Text(
                     s.msaInstruction,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = CelestiaTheme.colors.textSecondary,
+                    color = NxTheme.colors.textSecondary,
                 )
                 Text(
                     verificationUri,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = CelestiaTheme.colors.primary,
+                    color = NxTheme.colors.primary,
                 )
                 PuppetField("login.msa.verificationUrl", verificationUri, enabled = false) {}
 
@@ -91,7 +91,7 @@ fun DeviceCodeDialog(
                         fontSize = 26.sp,
                         letterSpacing = 4.sp,
                         textAlign = TextAlign.Center,
-                        color = CelestiaTheme.colors.textPrimary,
+                        color = NxTheme.colors.textPrimary,
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
@@ -100,7 +100,7 @@ fun DeviceCodeDialog(
                 if (errorMessage != null) {
                     Text(
                         errorMessage,
-                        color = CelestiaTheme.colors.error,
+                        color = NxTheme.colors.error,
                         style = MaterialTheme.typography.bodySmall,
                     )
                 } else {
@@ -108,13 +108,13 @@ fun DeviceCodeDialog(
                         CircularProgressIndicator(
                             modifier = Modifier.size(16.dp),
                             strokeWidth = 2.dp,
-                            color = CelestiaTheme.colors.primary,
+                            color = NxTheme.colors.primary,
                         )
                         Spacer(Modifier.width(10.dp))
                         Text(
                             s.msaWaiting,
                             style = MaterialTheme.typography.bodySmall,
-                            color = CelestiaTheme.colors.textSecondary,
+                            color = NxTheme.colors.textSecondary,
                         )
                     }
                 }
@@ -127,14 +127,14 @@ fun DeviceCodeDialog(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     TextButton(onClick = onCancel) {
-                        Text(s.auth2faCancel, color = CelestiaTheme.colors.textSecondary)
+                        Text(s.auth2faCancel, color = NxTheme.colors.textSecondary)
                     }
                     PuppetClick("login.msa.cancel") { onCancel() }
                     Spacer(Modifier.width(8.dp))
                     Button(
                         onClick = onOpenBrowser,
                         shape = MaterialTheme.shapes.small,
-                        colors = ButtonDefaults.buttonColors(containerColor = CelestiaTheme.colors.primary),
+                        colors = ButtonDefaults.buttonColors(containerColor = NxTheme.colors.primary),
                     ) {
                         Text(s.msaOpenBrowser, maxLines = 1)
                     }

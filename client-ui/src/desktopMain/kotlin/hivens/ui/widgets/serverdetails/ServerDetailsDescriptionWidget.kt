@@ -25,7 +25,7 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalMonoFamily
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
@@ -46,7 +46,7 @@ fun ServerDetailsDescriptionWidget(instance: WidgetInstance) {
             Text(
                 text       = description!!,
                 style      = MaterialTheme.typography.bodyLarge,
-                color      = CelestiaTheme.colors.textPrimary.copy(alpha = 0.8f),
+                color      = NxTheme.colors.textPrimary.copy(alpha = 0.8f),
                 lineHeight = MaterialTheme.typography.bodyLarge.fontSize * 1.5,
             )
         } else {
@@ -65,21 +65,21 @@ private fun MissingDataWarning(title: String, body: String, path: String) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.medium)
-            .background(CelestiaTheme.colors.warnAccent.copy(alpha = 0.12f))
-            .border(1.dp, CelestiaTheme.colors.warnAccent.copy(alpha = 0.3f), MaterialTheme.shapes.medium)
+            .background(NxTheme.colors.warnAccent.copy(alpha = 0.12f))
+            .border(1.dp, NxTheme.colors.warnAccent.copy(alpha = 0.3f), MaterialTheme.shapes.medium)
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Symbol(NxIcon.Warning, null, tint = CelestiaTheme.colors.warnAccent)
+        Symbol(NxIcon.Warning, null, tint = NxTheme.colors.warnAccent)
         Spacer(Modifier.width(16.dp))
         Column {
-            Text(title, style = MaterialTheme.typography.titleSmall, color = CelestiaTheme.colors.warnAccent, fontWeight = FontWeight.Bold)
+            Text(title, style = MaterialTheme.typography.titleSmall, color = NxTheme.colors.warnAccent, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(4.dp))
-            Text(body, style = MaterialTheme.typography.bodySmall, color = CelestiaTheme.colors.textPrimary.copy(alpha = 0.7f))
+            Text(body, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.textPrimary.copy(alpha = 0.7f))
             Text(
                 text       = path,
                 style      = MaterialTheme.typography.bodySmall,
-                color      = CelestiaTheme.colors.textSecondary.copy(alpha = 0.6f),
+                color      = NxTheme.colors.textSecondary.copy(alpha = 0.6f),
                 fontFamily = LocalMonoFamily.current,
             )
         }

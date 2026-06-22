@@ -57,7 +57,7 @@ import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetToggle
 import hivens.ui.screens.settings.settingsRowBackground
 import hivens.ui.components.NxSwitch
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalStyle
 import hivens.ui.widgets.customization.HexField
 
@@ -98,7 +98,7 @@ fun SurfacePropertiesPanel(
                 .clip(RoundedCornerShape(14.dp))
                 // Solid surface, no glass: a settings panel must stay readable and
                 // not composite with the layers it floats over.
-                .background(CelestiaTheme.colors.surface),
+                .background(NxTheme.colors.surface),
         ) {
             Row(
                 verticalAlignment     = Alignment.CenterVertically,
@@ -116,21 +116,21 @@ fun SurfacePropertiesPanel(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Symbol(icon = NxIcon.ViewSidebar,
                         contentDescription = null,
-                        tint               = CelestiaTheme.colors.primary,
+                        tint               = NxTheme.colors.primary,
                         modifier           = Modifier.size(18.dp),
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(
                         text       = title,
                         style      = MaterialTheme.typography.titleSmall,
-                        color      = CelestiaTheme.colors.textPrimary,
+                        color      = NxTheme.colors.textPrimary,
                         fontWeight = FontWeight.SemiBold,
                     )
                 }
                 IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
                     Symbol(icon = NxIcon.Close,
                         contentDescription = s.editorClose,
-                        tint               = CelestiaTheme.colors.textSecondary,
+                        tint               = NxTheme.colors.textSecondary,
                         modifier           = Modifier.size(16.dp),
                     )
                 }
@@ -173,11 +173,11 @@ private fun NavSelectionControl(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Column {
-            Text(s.navSelectionTitle, color = CelestiaTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
+            Text(s.navSelectionTitle, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
             Text(
                 s.navSelectionSub,
                 style = MaterialTheme.typography.bodySmall,
-                color = CelestiaTheme.colors.textSecondary,
+                color = NxTheme.colors.textSecondary,
             )
         }
 
@@ -191,13 +191,13 @@ private fun NavSelectionControl(
                     modifier = Modifier
                         .clip(RoundedCornerShape(style.buttonCorner))
                         .background(
-                            if (selected) CelestiaTheme.colors.primary.copy(alpha = 0.18f)
+                            if (selected) NxTheme.colors.primary.copy(alpha = 0.18f)
                             else glassSurfaceAlpha(0.4f),
                         )
                         .border(
                             width = 1.dp,
-                            color = if (selected) CelestiaTheme.colors.primary
-                            else CelestiaTheme.colors.outline.copy(alpha = 0.25f),
+                            color = if (selected) NxTheme.colors.primary
+                            else NxTheme.colors.outline.copy(alpha = 0.25f),
                             shape = RoundedCornerShape(style.buttonCorner),
                         )
                         .clickable { onChange(customization.copy(navSelectionStyle = variant)) }
@@ -206,7 +206,7 @@ private fun NavSelectionControl(
                     Text(
                         text       = navSelectionStyleLabel(variant, s),
                         style      = MaterialTheme.typography.bodySmall,
-                        color      = if (selected) CelestiaTheme.colors.primary else CelestiaTheme.colors.textSecondary,
+                        color      = if (selected) NxTheme.colors.primary else NxTheme.colors.textSecondary,
                         fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                     )
                 }
@@ -241,7 +241,7 @@ private fun NavSelectionControl(
             Text(
                 text  = s.navSelectionAccent,
                 style = MaterialTheme.typography.bodySmall,
-                color = CelestiaTheme.colors.textSecondary,
+                color = NxTheme.colors.textSecondary,
             )
             Row(
                 modifier              = Modifier.fillMaxWidth(),
@@ -295,7 +295,7 @@ private fun CompactSwitchRow(title: String, checked: Boolean, onCheckedChange: (
         Text(
             text     = title,
             style    = MaterialTheme.typography.bodySmall,
-            color    = CelestiaTheme.colors.textPrimary,
+            color    = NxTheme.colors.textPrimary,
             modifier = Modifier.weight(1f),
         )
         NxSwitch(

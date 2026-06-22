@@ -23,7 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.WindowState
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 
 /** True on macOS, where caption buttons live at the LEFT (traffic-light side). */
 val HOST_IS_MAC: Boolean = System.getProperty("os.name").orEmpty().lowercase().contains("mac")
@@ -44,9 +44,9 @@ fun WindowControls(
     modifier: Modifier = Modifier,
 ) {
     val s = LocalStrings.current
-    val tint = CelestiaTheme.colors.textSecondary
-    val hover = CelestiaTheme.colors.textPrimary.copy(alpha = 0.12f)
-    val closeHover = CelestiaTheme.colors.error
+    val tint = NxTheme.colors.textSecondary
+    val hover = NxTheme.colors.textPrimary.copy(alpha = 0.12f)
+    val closeHover = NxTheme.colors.error
     val maximized = state.placement == WindowPlacement.Maximized
 
     Row(modifier) {

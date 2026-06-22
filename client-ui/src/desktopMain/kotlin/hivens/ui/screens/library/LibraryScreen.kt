@@ -28,7 +28,7 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.puppet.PuppetScreen
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.ui.widgets.library.LibraryContext
 import hivens.ui.widgets.library.LocalLibraryContext
 import hivens.widget.api.SlotRenderer
@@ -115,7 +115,7 @@ fun LibraryScreen(
                 Text(
                     text     = err,
                     style    = MaterialTheme.typography.bodySmall,
-                    color    = CelestiaTheme.colors.error,
+                    color    = NxTheme.colors.error,
                     modifier = Modifier
                         .align(Alignment.BottomStart)
                         .padding(start = 24.dp, end = 96.dp, bottom = 34.dp),
@@ -124,7 +124,7 @@ fun LibraryScreen(
 
             FloatingActionButton(
                 onClick        = { startImport() },
-                containerColor = CelestiaTheme.colors.primary,
+                containerColor = NxTheme.colors.primary,
                 contentColor   = Color.White,
                 modifier       = Modifier.align(Alignment.BottomEnd).padding(24.dp),
             ) {

@@ -33,7 +33,7 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.identity.SkinManager
 import hivens.ui.skin3d.SkinView3D
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
 import io.github.vinceglb.filekit.dialogs.FileKitType
@@ -76,7 +76,7 @@ fun SkinHero(
             SkinView3D(current, Modifier.fillMaxSize(), interactive = interactive, autoSpin = autoSpin)
         } else {
             CircularProgressIndicator(
-                color = CelestiaTheme.colors.primary,
+                color = NxTheme.colors.primary,
                 strokeWidth = 2.dp,
                 modifier = Modifier.size(28.dp),
             )
@@ -141,7 +141,7 @@ fun SkinControls(session: SessionData, onSkinChanged: () -> Unit, modifier: Modi
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = uploader.pick) { Text(s.profileUploadSkin) }
             IconButton(onClick = uploader.refresh) {
-                Symbol(NxIcon.Refresh, s.profileRefresh, tint = CelestiaTheme.colors.textSecondary)
+                Symbol(NxIcon.Refresh, s.profileRefresh, tint = NxTheme.colors.textSecondary)
             }
         }
     }
@@ -151,8 +151,8 @@ fun SkinControls(session: SessionData, onSkinChanged: () -> Unit, modifier: Modi
 fun SkinUploadStatusLine(status: UploadStatus) {
     val s = LocalStrings.current
     when (status) {
-        is UploadStatus.Error -> StatusLine(status.message, CelestiaTheme.colors.error)
-        UploadStatus.Loading  -> StatusLine(s.profileUploadSkinLoading, CelestiaTheme.colors.textSecondary)
+        is UploadStatus.Error -> StatusLine(status.message, NxTheme.colors.error)
+        UploadStatus.Loading  -> StatusLine(s.profileUploadSkinLoading, NxTheme.colors.textSecondary)
         // Success is silent on purpose -- the changed skin is the feedback.
         is UploadStatus.Success, UploadStatus.None -> Unit
     }

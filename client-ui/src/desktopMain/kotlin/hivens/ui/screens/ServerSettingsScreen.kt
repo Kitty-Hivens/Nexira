@@ -34,7 +34,7 @@ import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetField
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.puppet.PuppetToggle
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -57,7 +57,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
         }
     }
 
-    val borderColor = CelestiaTheme.colors.textSecondary.copy(alpha = 0.2f)
+    val borderColor = NxTheme.colors.textSecondary.copy(alpha = 0.2f)
 
     // Wipes clients/<assetDir> irrecoverably. The visible button gates this on a
     // confirm dialog; the puppet hook runs it directly (automation bypass).
@@ -90,7 +90,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
         // ── Header ────────────────────────────────────────────────────────────
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = { state.save(); onBack() }) {
-                Symbol(NxIcon.ArrowBack, s.navBack, tint = CelestiaTheme.colors.textPrimary)
+                Symbol(NxIcon.ArrowBack, s.navBack, tint = NxTheme.colors.textPrimary)
             }
             Spacer(Modifier.width(8.dp))
 
@@ -99,7 +99,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                 modifier = Modifier
                     .size(48.dp)
                     .clip(MaterialTheme.shapes.medium)
-                    .background(CelestiaTheme.colors.surface)
+                    .background(NxTheme.colors.surface)
                     .clickable { state.pickIcon(s.serverSettingsPickIcon) },
                 contentAlignment = Alignment.Center
             ) {
@@ -114,7 +114,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                 } else {
                     Symbol(NxIcon.Image,
                         contentDescription = null,
-                        tint = CelestiaTheme.colors.textSecondary.copy(alpha = 0.4f),
+                        tint = NxTheme.colors.textSecondary.copy(alpha = 0.4f),
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -123,8 +123,8 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
             Spacer(Modifier.width(12.dp))
 
             Column {
-                Text(server.title ?: "Server", style = MaterialTheme.typography.headlineSmall, color = CelestiaTheme.colors.textPrimary)
-                Text(s.serverSettingsSubtitle, style = MaterialTheme.typography.bodySmall, color = CelestiaTheme.colors.textSecondary)
+                Text(server.title ?: "Server", style = MaterialTheme.typography.headlineSmall, color = NxTheme.colors.textPrimary)
+                Text(s.serverSettingsSubtitle, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.textSecondary)
             }
         }
 
@@ -141,7 +141,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                 Column(Modifier.padding(24.dp).verticalScroll(rememberScrollState())) {
 
                     // ── SYSTEM ────────────────────────────────────────────────
-                    Text(s.serverSettingsSectionSystem, style = MaterialTheme.typography.titleSmall, color = CelestiaTheme.colors.primary)
+                    Text(s.serverSettingsSectionSystem, style = MaterialTheme.typography.titleSmall, color = NxTheme.colors.primary)
                     Spacer(Modifier.height(16.dp))
 
                     // ── RAM -- RamSelector replaces old Slider ─────────────────
@@ -159,7 +159,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                     Spacer(Modifier.height(16.dp))
 
                     // Java path
-                    Text(s.serverSettingsJava, color = CelestiaTheme.colors.textPrimary, style = MaterialTheme.typography.bodyMedium)
+                    Text(s.serverSettingsJava, color = NxTheme.colors.textPrimary, style = MaterialTheme.typography.bodyMedium)
                     Spacer(Modifier.height(8.dp))
 
                     OutlinedTextField(
@@ -171,21 +171,21 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                         placeholder   = {
                             Text(
                                 s.serverSettingsJavaAuto(recommendedJavaLabel),
-                                color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.5f)
+                                color = NxTheme.colors.textSecondary.copy(alpha = 0.5f)
                             )
                         },
                         singleLine    = true,
                         colors        = settingsFieldColors(),
                         trailingIcon  = {
                             IconButton(onClick = { state.pickJava(s.serverSettingsPickJava) }) {
-                                Symbol(NxIcon.Folder, null, tint = CelestiaTheme.colors.primary)
+                                Symbol(NxIcon.Folder, null, tint = NxTheme.colors.primary)
                             }
                         }
                     )
 
                     if (state.javaPath.isEmpty()) {
                         Spacer(Modifier.height(4.dp))
-                        Text(s.serverSettingsJavaHint, style = MaterialTheme.typography.bodySmall, color = CelestiaTheme.colors.textSecondary)
+                        Text(s.serverSettingsJavaHint, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.textSecondary)
                     }
 
                     Spacer(Modifier.height(16.dp))
@@ -198,7 +198,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
-                        Text(s.serverSettingsJvmArgs, color = CelestiaTheme.colors.textPrimary, style = MaterialTheme.typography.bodyMedium)
+                        Text(s.serverSettingsJvmArgs, color = NxTheme.colors.textPrimary, style = MaterialTheme.typography.bodyMedium)
                         if (state.jvmBuilderEnabled) {
                             TextButton(onClick = { showJvmBuilder = true }) {
                                 Symbol(NxIcon.Tune, null, modifier = Modifier.size(16.dp))
@@ -216,7 +216,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                         placeholder = {
                             Text(
                                 s.serverSettingsJvmArgsHint,
-                                color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.5f)
+                                color = NxTheme.colors.textSecondary.copy(alpha = 0.5f)
                             )
                         },
                         singleLine = false,
@@ -230,7 +230,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                     Spacer(Modifier.height(16.dp))
 
                     // ── WINDOW RESOLUTION ─────────────────────────────────────
-                    Text(s.serverSettingsResolution, color = CelestiaTheme.colors.textPrimary, style = MaterialTheme.typography.bodyMedium)
+                    Text(s.serverSettingsResolution, color = NxTheme.colors.textPrimary, style = MaterialTheme.typography.bodyMedium)
                     Spacer(Modifier.height(8.dp))
 
                     Row(
@@ -247,7 +247,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             colors = settingsFieldColors()
                         )
-                        Text("×", color = CelestiaTheme.colors.textSecondary, style = MaterialTheme.typography.titleMedium)
+                        Text("×", color = NxTheme.colors.textSecondary, style = MaterialTheme.typography.titleMedium)
                         OutlinedTextField(
                             value           = state.winHeight,
                             onValueChange   = { state.winHeight = it.filter { c -> c.isDigit() } },
@@ -357,12 +357,12 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                 backgroundColor = glassSurfaceAlpha(0.7f),
             ) {
                 Column(Modifier.padding(24.dp)) {
-                    Text(s.serverSettingsSectionMods, style = MaterialTheme.typography.titleSmall, color = CelestiaTheme.colors.primary)
+                    Text(s.serverSettingsSectionMods, style = MaterialTheme.typography.titleSmall, color = NxTheme.colors.primary)
                     Spacer(Modifier.height(16.dp))
 
                     if (state.mods.isEmpty() && state.modsLoaded) {
                         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text(s.serverSettingsNoMods, color = CelestiaTheme.colors.textSecondary)
+                            Text(s.serverSettingsNoMods, color = NxTheme.colors.textSecondary)
                         }
                     } else {
                         AnimatedVisibility(
@@ -407,11 +407,11 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
 
 @Composable
 private fun settingsFieldColors() = OutlinedTextFieldDefaults.colors(
-    focusedTextColor = CelestiaTheme.colors.textPrimary,
-    unfocusedTextColor = CelestiaTheme.colors.textPrimary,
-    cursorColor = CelestiaTheme.colors.primary,
-    focusedBorderColor = CelestiaTheme.colors.primary,
-    unfocusedBorderColor = CelestiaTheme.colors.textSecondary.copy(alpha = 0.2f),
+    focusedTextColor = NxTheme.colors.textPrimary,
+    unfocusedTextColor = NxTheme.colors.textPrimary,
+    cursorColor = NxTheme.colors.primary,
+    focusedBorderColor = NxTheme.colors.primary,
+    unfocusedBorderColor = NxTheme.colors.textSecondary.copy(alpha = 0.2f),
     focusedContainerColor = Color.Transparent,
     unfocusedContainerColor = Color.Transparent
 )
@@ -423,7 +423,7 @@ private fun SettingsToggleRow(title: String, checked: Boolean, onCheckedChange: 
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(title, style = MaterialTheme.typography.bodyMedium, color = CelestiaTheme.colors.textPrimary)
+        Text(title, style = MaterialTheme.typography.bodyMedium, color = NxTheme.colors.textPrimary)
         NxSwitch(
             checked = checked,
             onCheckedChange = onCheckedChange,

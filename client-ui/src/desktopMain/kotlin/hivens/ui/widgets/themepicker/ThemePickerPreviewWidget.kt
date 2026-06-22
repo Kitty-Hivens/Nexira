@@ -32,7 +32,7 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.components.GlassCard
 import hivens.ui.customization.scaledAlpha
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.CustomTheme
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
@@ -117,7 +117,7 @@ private fun ColorRow(label: String, hexColor: String) {
         Text(
             text  = label,
             style = MaterialTheme.typography.bodyMedium,
-            color = CelestiaTheme.colors.textSecondary,
+            color = NxTheme.colors.textSecondary,
         )
         Row(
             verticalAlignment     = Alignment.CenterVertically,
@@ -133,7 +133,7 @@ private fun ColorRow(label: String, hexColor: String) {
             Text(
                 text       = hexColor,
                 style      = MaterialTheme.typography.bodySmall,
-                color      = CelestiaTheme.colors.textPrimary,
+                color      = NxTheme.colors.textPrimary,
                 fontFamily = LocalMonoFamily.current,
             )
         }

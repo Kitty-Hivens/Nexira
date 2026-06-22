@@ -18,7 +18,7 @@ import hivens.ui.components.CelestiaButton
 import hivens.ui.components.GlassCard
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -58,7 +58,7 @@ fun MigrationScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(CelestiaTheme.colors.background),
+            .background(NxTheme.colors.background),
         contentAlignment = Alignment.Center,
     ) {
         GlassCard(modifier = Modifier.widthIn(min = 480.dp, max = 640.dp)) {
@@ -113,12 +113,12 @@ private fun ReadyContent(
         text = s.migrationWelcome,
         style = MaterialTheme.typography.headlineSmall,
         fontWeight = FontWeight.Bold,
-        color = CelestiaTheme.colors.textPrimary,
+        color = NxTheme.colors.textPrimary,
     )
     Text(
         text = s.migrationDescription,
         style = MaterialTheme.typography.bodyMedium,
-        color = CelestiaTheme.colors.textSecondary,
+        color = NxTheme.colors.textSecondary,
         textAlign = TextAlign.Center,
     )
     Column(
@@ -135,7 +135,7 @@ private fun ReadyContent(
         Text(
             text = s.migrationSize(megabytes = (source.totalBytes / 1_048_576L).toInt(), files = source.fileCount),
             style = MaterialTheme.typography.bodySmall,
-            color = CelestiaTheme.colors.textSecondary,
+            color = NxTheme.colors.textSecondary,
         )
     }
     CelestiaButton(
@@ -159,13 +159,13 @@ private fun ProgressContent(source: DataDirMigration.Source, state: UiState.InPr
         text = s.migrationInProgress,
         style = MaterialTheme.typography.headlineSmall,
         fontWeight = FontWeight.Bold,
-        color = CelestiaTheme.colors.textPrimary,
+        color = NxTheme.colors.textPrimary,
     )
     if (state.currentFile != null) {
         Text(
             text = s.migrationCurrentFile(state.currentFile),
             style = MaterialTheme.typography.bodySmall,
-            color = CelestiaTheme.colors.textSecondary,
+            color = NxTheme.colors.textSecondary,
             fontFamily = LocalMonoFamily.current,
             textAlign = TextAlign.Center,
         )
@@ -176,15 +176,15 @@ private fun ProgressContent(source: DataDirMigration.Source, state: UiState.InPr
             .fillMaxWidth()
             .height(8.dp)
             .clip(RoundedCornerShape(4.dp)),
-        color = CelestiaTheme.colors.primary,
-        trackColor = CelestiaTheme.colors.surface,
+        color = NxTheme.colors.primary,
+        trackColor = NxTheme.colors.surface,
         gapSize = 0.dp,
         drawStopIndicator = {},
     )
     Text(
         text = s.migrationProgressBytes(doneMb = doneMb, totalMb = totalMb),
         style = MaterialTheme.typography.bodySmall,
-        color = CelestiaTheme.colors.textSecondary,
+        color = NxTheme.colors.textSecondary,
         fontWeight = FontWeight.Bold,
     )
 }
@@ -196,12 +196,12 @@ private fun CompletedContent(onQuit: () -> Unit) {
         text = s.migrationCompletedTitle,
         style = MaterialTheme.typography.headlineSmall,
         fontWeight = FontWeight.Bold,
-        color = CelestiaTheme.colors.success,
+        color = NxTheme.colors.success,
     )
     Text(
         text = s.migrationCompletedBody,
         style = MaterialTheme.typography.bodyMedium,
-        color = CelestiaTheme.colors.textSecondary,
+        color = NxTheme.colors.textSecondary,
         textAlign = TextAlign.Center,
     )
     CelestiaButton(
@@ -219,12 +219,12 @@ private fun FailedContent(error: String, onRetry: () -> Unit, onQuit: () -> Unit
         text = s.migrationFailedTitle,
         style = MaterialTheme.typography.headlineSmall,
         fontWeight = FontWeight.Bold,
-        color = CelestiaTheme.colors.error,
+        color = NxTheme.colors.error,
     )
     Text(
         text = s.migrationFailedBody(error),
         style = MaterialTheme.typography.bodyMedium,
-        color = CelestiaTheme.colors.textSecondary,
+        color = NxTheme.colors.textSecondary,
         textAlign = TextAlign.Center,
     )
     Row(
@@ -252,13 +252,13 @@ private fun PathRow(label: String, path: String) {
             text = "$label:",
             style = MaterialTheme.typography.bodySmall,
             fontWeight = FontWeight.Bold,
-            color = CelestiaTheme.colors.textSecondary,
+            color = NxTheme.colors.textSecondary,
             modifier = Modifier.width(64.dp),
         )
         Text(
             text = path,
             style = MaterialTheme.typography.bodySmall,
-            color = CelestiaTheme.colors.textPrimary,
+            color = NxTheme.colors.textPrimary,
             fontFamily = LocalMonoFamily.current,
         )
     }

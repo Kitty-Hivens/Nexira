@@ -34,7 +34,7 @@ import hivens.ui.screens.browse.BrowseScreen
 import hivens.ui.screens.detail.PackDetailScreen
 import hivens.ui.screens.library.LibraryScreen
 import hivens.ui.screens.settings.SettingsScreen
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.CustomTheme
 import hivens.ui.theme.LocalStyle
 import hivens.ui.utils.GameConsoleService
@@ -96,7 +96,7 @@ fun AppLayout(
     // Go transparent only when the wallpaper can actually be drawn -- a deleted
     // image left the row transparent over a blank white window.
     val rowBackground = if (backgroundSettings.hasUsableImage()) Color.Transparent
-    else CelestiaTheme.colors.background
+    else NxTheme.colors.background
 
     val bypassHost = protocolConfig.sslBypassHost
     val bypassesList by NetworkState.bypassesState.collectAsState()
@@ -325,7 +325,7 @@ fun AppSidebar(
         NavigationRail(
             modifier       = modifier,
             containerColor = glassSurfaceAlpha(0.35f),
-            contentColor   = CelestiaTheme.colors.textSecondary
+            contentColor   = NxTheme.colors.textSecondary
         ) {
             // Items sit flush (spacing 0) so the rail is one contiguous column
             // of clickable slots with no dead gap between buttons. Each NavSlot
@@ -349,7 +349,7 @@ private const val SIDEBAR_SURFACE = "appshell.leftrail"
 private fun ContentLoadingPlaceholder() {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         CircularProgressIndicator(
-            color       = CelestiaTheme.colors.primary.copy(alpha = 0.35f),
+            color       = NxTheme.colors.primary.copy(alpha = 0.35f),
             modifier    = Modifier.size(28.dp),
             strokeWidth = 2.dp
         )
@@ -366,18 +366,18 @@ private fun ContentLoginRequiredPlaceholder() {
         ) {
             Symbol(icon = NxIcon.Person,
                 contentDescription = null,
-                tint = CelestiaTheme.colors.primary.copy(alpha = 0.45f),
+                tint = NxTheme.colors.primary.copy(alpha = 0.45f),
                 modifier = Modifier.size(48.dp)
             )
             Text(
                 text = s.dashboardLoginRequiredTitle,
                 style = MaterialTheme.typography.titleMedium,
-                color = CelestiaTheme.colors.textPrimary
+                color = NxTheme.colors.textPrimary
             )
             Text(
                 text = s.dashboardLoginRequiredHint,
                 style = MaterialTheme.typography.bodySmall,
-                color = CelestiaTheme.colors.textSecondary,
+                color = NxTheme.colors.textSecondary,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.widthIn(max = 360.dp)
             )

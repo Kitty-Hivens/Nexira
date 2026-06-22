@@ -21,7 +21,7 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 import io.github.vinceglb.filekit.FileKit
@@ -70,7 +70,7 @@ fun BgImagePickerWidget(instance: WidgetInstance) {
             }
             if (settings.imagePath != null) {
                 IconButton(onClick = { ctx.update { copy(imagePath = null, enabled = false) } }) {
-                    Symbol(NxIcon.Delete, null, tint = CelestiaTheme.colors.error)
+                    Symbol(NxIcon.Delete, null, tint = NxTheme.colors.error)
                 }
             }
         }
@@ -79,7 +79,7 @@ fun BgImagePickerWidget(instance: WidgetInstance) {
             Text(
                 text  = settings.imagePath!!.substringAfterLast("/").substringAfterLast("\\"),
                 style = MaterialTheme.typography.labelSmall,
-                color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.5f),
+                color = NxTheme.colors.textSecondary.copy(alpha = 0.5f),
             )
         }
     }

@@ -27,7 +27,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.zIndex
 import hivens.ui.components.NoOpIndication
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import kotlin.math.*
 import kotlin.random.Random
 
@@ -173,9 +173,9 @@ private fun EscapedButtonRenderer(btn: FloatingButton, isGhost: Boolean) {
                 shape = MaterialTheme.shapes.small,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = if (isGhost)
-                        CelestiaTheme.colors.primary.copy(alpha = 0.38f)
+                        NxTheme.colors.primary.copy(alpha = 0.38f)
                     else
-                        CelestiaTheme.colors.primary,
+                        NxTheme.colors.primary,
                 ),
                 // Flat style drops elevation -- Brut surfaces don't lift,
                 // so a chaos button shouldn't either.
@@ -211,7 +211,7 @@ private fun EscapedButtonRenderer(btn: FloatingButton, isGhost: Boolean) {
  */
 @Composable
 private fun LegsCanvas(widthPx: Float, cycle: Float) {
-    val legColor  = CelestiaTheme.colors.textPrimary.copy(alpha = 0.9f)
+    val legColor  = NxTheme.colors.textPrimary.copy(alpha = 0.9f)
     Canvas(
         modifier = Modifier
             .width(widthPx.dp)
@@ -260,7 +260,7 @@ fun AprilFoolsButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     colors: ButtonColors = ButtonDefaults.buttonColors(
-        containerColor = CelestiaTheme.colors.primary,
+        containerColor = NxTheme.colors.primary,
     ),
 ) {
     // Pass-through when chaos is inactive. Same NoOpIndication +
@@ -410,7 +410,7 @@ fun AprilFoolsCloseDialog(
         Surface(
             modifier       = Modifier.width(440.dp).wrapContentHeight(),
             shape          = MaterialTheme.shapes.large,
-            color          = CelestiaTheme.colors.surface,
+            color          = NxTheme.colors.surface,
             tonalElevation = if (AprilFools.useFlatSurface) 0.dp else 10.dp,
         ) {
             Column(
@@ -424,13 +424,13 @@ fun AprilFoolsCloseDialog(
                     text       = s.aprilCloseTitle(escapes),
                     style      = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
-                    color      = CelestiaTheme.colors.textPrimary,
+                    color      = NxTheme.colors.textPrimary,
                     textAlign  = TextAlign.Center,
                 )
 
                 Text(
                     text  = s.aprilCloseBody(escapes),
-                    color = CelestiaTheme.colors.textSecondary,
+                    color = NxTheme.colors.textSecondary,
                     textAlign = TextAlign.Center,
                     style = MaterialTheme.typography.bodyMedium,
                 )
@@ -468,8 +468,8 @@ fun AprilFoolsCloseDialog(
                             .align(Alignment.CenterEnd)
                             .offset { IntOffset(animCloseX.toInt(), animCloseY.toInt()) },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor         = CelestiaTheme.colors.error,
-                            disabledContainerColor = CelestiaTheme.colors.error.copy(alpha = 0.75f),
+                            containerColor         = NxTheme.colors.error,
+                            disabledContainerColor = NxTheme.colors.error.copy(alpha = 0.75f),
                         ),
                         interactionSource = closeBtnInteraction,
                         shape             = MaterialTheme.shapes.small,
@@ -486,7 +486,7 @@ fun AprilFoolsCloseDialog(
                     Text(
                         text  = s.aprilCloseEscapeCount(escapes, surrenderAfter),
                         style = MaterialTheme.typography.labelSmall,
-                        color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.45f),
+                        color = NxTheme.colors.textSecondary.copy(alpha = 0.45f),
                     )
                 }
             }

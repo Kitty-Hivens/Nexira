@@ -40,7 +40,7 @@ import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalStyle
 import hivens.ui.widgets.AdaptiveWidget
 import hivens.ui.widgets.scaled
@@ -78,7 +78,7 @@ data class ChecklistState(val items: List<ChecklistItem> = emptyList(), val next
 fun ChecklistWidget(instance: WidgetInstance) {
     val p = instance.rememberProps<ChecklistProps>()
     val strings = LocalStrings.current
-    val palette = CelestiaTheme.colors
+    val palette = NxTheme.colors
     var state by instance.rememberWidgetState { ChecklistState() }
 
     fun add(text: String) {
@@ -148,7 +148,7 @@ fun ChecklistWidget(instance: WidgetInstance) {
 
 @Composable
 private fun ChecklistRow(item: ChecklistItem, scale: Float, onToggle: () -> Unit, onDelete: () -> Unit) {
-    val palette = CelestiaTheme.colors
+    val palette = NxTheme.colors
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier          = Modifier.fillMaxWidth().padding(vertical = 3.dp * scale),
@@ -180,7 +180,7 @@ private fun ChecklistRow(item: ChecklistItem, scale: Float, onToggle: () -> Unit
 @Composable
 private fun AddRow(scale: Float, onAdd: (String) -> Unit) {
     val strings = LocalStrings.current
-    val palette = CelestiaTheme.colors
+    val palette = NxTheme.colors
     var draft by remember { mutableStateOf("") }
     fun commit() {
         onAdd(draft)

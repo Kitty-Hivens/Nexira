@@ -23,7 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 
 /**
  * Splits [items] into fixed-size pages and renders one page at a time with a
@@ -70,13 +70,13 @@ fun <T> PagedContent(
             ) {
                 Symbol(NxIcon.ChevronLeft,
                     contentDescription = null,
-                    tint = if (clamped > 0) CelestiaTheme.colors.textPrimary else CelestiaTheme.colors.textSecondary.copy(alpha = 0.4f),
+                    tint = if (clamped > 0) NxTheme.colors.textPrimary else NxTheme.colors.textSecondary.copy(alpha = 0.4f),
                 )
             }
             Text(
                 text     = "${clamped + 1} / $pageCount",
                 style    = MaterialTheme.typography.labelMedium,
-                color    = CelestiaTheme.colors.textSecondary,
+                color    = NxTheme.colors.textSecondary,
                 modifier = Modifier.padding(horizontal = 12.dp),
             )
             IconButton(
@@ -86,7 +86,7 @@ fun <T> PagedContent(
             ) {
                 Symbol(NxIcon.ChevronRight,
                     contentDescription = null,
-                    tint = if (clamped < pageCount - 1) CelestiaTheme.colors.textPrimary else CelestiaTheme.colors.textSecondary.copy(alpha = 0.4f),
+                    tint = if (clamped < pageCount - 1) NxTheme.colors.textPrimary else NxTheme.colors.textSecondary.copy(alpha = 0.4f),
                 )
             }
         }

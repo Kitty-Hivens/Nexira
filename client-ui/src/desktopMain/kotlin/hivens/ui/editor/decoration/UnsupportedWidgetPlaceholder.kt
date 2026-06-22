@@ -22,7 +22,7 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalMonoFamily
 import hivens.widget.model.WidgetInstance
 
@@ -42,27 +42,27 @@ fun UnsupportedWidgetPlaceholder(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .border(1.dp, CelestiaTheme.colors.error.copy(alpha = 0.6f), RoundedCornerShape(8.dp))
-            .background(CelestiaTheme.colors.error.copy(alpha = 0.08f), RoundedCornerShape(8.dp))
+            .border(1.dp, NxTheme.colors.error.copy(alpha = 0.6f), RoundedCornerShape(8.dp))
+            .background(NxTheme.colors.error.copy(alpha = 0.08f), RoundedCornerShape(8.dp))
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Symbol(NxIcon.Warning,
             contentDescription = null,
-            tint = CelestiaTheme.colors.error,
+            tint = NxTheme.colors.error,
             modifier = Modifier.size(18.dp),
         )
         Column(Modifier.weight(1f)) {
             Text(
                 s.editorUnsupportedWidget,
-                color = CelestiaTheme.colors.error,
+                color = NxTheme.colors.error,
                 style = MaterialTheme.typography.bodySmall,
                 fontWeight = FontWeight.Medium,
             )
             Text(
                 instance.kind.value,
-                color = CelestiaTheme.colors.textSecondary,
+                color = NxTheme.colors.textSecondary,
                 style = MaterialTheme.typography.labelSmall,
                 fontFamily = LocalMonoFamily.current,
             )
@@ -70,7 +70,7 @@ fun UnsupportedWidgetPlaceholder(
         IconButton(onClick = onRemove, modifier = Modifier.size(24.dp)) {
             Symbol(NxIcon.Close,
                 contentDescription = s.editorDelete,
-                tint = CelestiaTheme.colors.textSecondary,
+                tint = NxTheme.colors.textSecondary,
                 modifier = Modifier.size(16.dp),
             )
         }

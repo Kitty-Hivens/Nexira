@@ -22,7 +22,7 @@ import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.platform.SystemActions
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalMonoFamily
 
 // Shared composables reused across the about widgets. SectionLabel
@@ -35,7 +35,7 @@ internal fun SectionLabel(text: String) {
         text          = text,
         style         = MaterialTheme.typography.labelSmall,
         fontWeight    = FontWeight.Bold,
-        color         = CelestiaTheme.colors.primary,
+        color         = NxTheme.colors.primary,
         letterSpacing = 1.sp,
     )
 }
@@ -46,13 +46,13 @@ internal fun InfoRow(icon: IconKey, label: String, value: String) {
         modifier          = Modifier.fillMaxWidth().padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Symbol(icon, null, tint = CelestiaTheme.colors.textSecondary.copy(alpha = 0.4f), modifier = Modifier.size(16.dp))
+        Symbol(icon, null, tint = NxTheme.colors.textSecondary.copy(alpha = 0.4f), modifier = Modifier.size(16.dp))
         Spacer(Modifier.width(8.dp))
-        Text(label, color = CelestiaTheme.colors.textSecondary, fontSize = 13.sp)
+        Text(label, color = NxTheme.colors.textSecondary, fontSize = 13.sp)
         Spacer(Modifier.width(12.dp))
         Text(
             text       = value,
-            color      = CelestiaTheme.colors.textPrimary,
+            color      = NxTheme.colors.textPrimary,
             fontSize   = 13.sp,
             fontWeight = FontWeight.Medium,
             fontFamily = LocalMonoFamily.current,
@@ -68,13 +68,13 @@ internal fun LinkButton(label: String, url: String, icon: IconKey) {
         onClick        = { SystemActions.openUrl(url) },
         modifier       = Modifier.fillMaxWidth(),
         shape          = MaterialTheme.shapes.small,
-        border         = BorderStroke(1.dp, CelestiaTheme.colors.outline.copy(alpha = 0.2f)),
+        border         = BorderStroke(1.dp, NxTheme.colors.outline.copy(alpha = 0.2f)),
         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
     ) {
-        Symbol(icon, null, modifier = Modifier.size(16.dp), tint = CelestiaTheme.colors.primary)
+        Symbol(icon, null, modifier = Modifier.size(16.dp), tint = NxTheme.colors.primary)
         Spacer(Modifier.width(8.dp))
-        Text(label, color = CelestiaTheme.colors.textPrimary)
+        Text(label, color = NxTheme.colors.textPrimary)
         Spacer(Modifier.weight(1f))
-        Symbol(NxIcon.OpenInNew, null, tint = CelestiaTheme.colors.textSecondary.copy(alpha = 0.4f), modifier = Modifier.size(14.dp))
+        Symbol(NxIcon.OpenInNew, null, tint = NxTheme.colors.textSecondary.copy(alpha = 0.4f), modifier = Modifier.size(14.dp))
     }
 }

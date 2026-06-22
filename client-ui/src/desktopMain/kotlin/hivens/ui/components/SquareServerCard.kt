@@ -46,7 +46,7 @@ import hivens.ui.effects.shimmerOverlay
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.decorativePair
 import javax.imageio.ImageIO
@@ -56,7 +56,7 @@ import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 
 // ─── Card ─────────────────────────────────────────────────────────────────────
-// The per-server gradient is derived from CelestiaColors.decorativePair, keyed on
+// The per-server gradient is derived from NxColors.decorativePair, keyed on
 // the server name, so it follows the active theme ramp.
 
 @Composable
@@ -129,12 +129,12 @@ fun SquareServerCard(
 
     val showActions = isHovered || isFocused
     val scale by animateFloatAsState(if (showActions) 1.02f else 1.0f)
-    val palette = CelestiaTheme.colors
+    val palette = NxTheme.colors
     val (colorA, colorB) = remember(profile.name, palette) { palette.decorativePair(profile.name) }
 
     // ── Theme-aware overlay colors ─────────────────────────────────────────
-    val bgBase      = CelestiaTheme.colors.background
-    val surfaceBase = CelestiaTheme.colors.surface
+    val bgBase      = NxTheme.colors.background
+    val surfaceBase = NxTheme.colors.surface
     // In dark theme bg is near-black; in light theme it's light gray -- both look correct.
     val cardOverlay     = bgBase.copy(alpha = 0.65f)
     val actionBarColor  = surfaceBase.copy(alpha = 0.92f)
@@ -176,9 +176,9 @@ fun SquareServerCard(
             .clip(MaterialTheme.shapes.medium)
             .let { m ->
                 when {
-                    isSelected -> m.neonBorder(CelestiaTheme.colors.primary, cornerRadius = LocalStyle.current.cardCorner, strokeWidth = 2.dp)
-                    isFocused  -> m.border(2.dp, CelestiaTheme.colors.textPrimary, MaterialTheme.shapes.medium)
-                    else       -> m.border(1.dp, CelestiaTheme.colors.outline.copy(alpha = 0.25f), MaterialTheme.shapes.medium)
+                    isSelected -> m.neonBorder(NxTheme.colors.primary, cornerRadius = LocalStyle.current.cardCorner, strokeWidth = 2.dp)
+                    isFocused  -> m.border(2.dp, NxTheme.colors.textPrimary, MaterialTheme.shapes.medium)
+                    else       -> m.border(1.dp, NxTheme.colors.outline.copy(alpha = 0.25f), MaterialTheme.shapes.medium)
                 }
             }
             // Shimmer on hover (not when already glowing with neon)
@@ -273,7 +273,7 @@ fun SquareServerCard(
                 text       = profile.title ?: profile.name,
                 style      = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color      = CelestiaTheme.colors.textPrimary,
+                color      = NxTheme.colors.textPrimary,
                 textAlign  = TextAlign.Center,
                 maxLines   = 1
             )
@@ -292,7 +292,7 @@ fun SquareServerCard(
                 Text(
                     text       = profile.version,
                     style      = MaterialTheme.typography.labelSmall,
-                    color      = if (serverIcon != null) CelestiaTheme.colors.textSecondary else colorA.copy(0.9f),
+                    color      = if (serverIcon != null) NxTheme.colors.textSecondary else colorA.copy(0.9f),
                     fontWeight = FontWeight.Medium
                 )
             }
@@ -322,18 +322,18 @@ fun SquareServerCard(
                 modifier = Modifier
                     .clip(MaterialTheme.shapes.medium)
                     .background(actionBarColor)
-                    .border(1.dp, CelestiaTheme.colors.outline.copy(alpha = 0.3f), MaterialTheme.shapes.medium)
+                    .border(1.dp, NxTheme.colors.outline.copy(alpha = 0.3f), MaterialTheme.shapes.medium)
                     .padding(4.dp),
                 horizontalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 CardIconButton(
                     icon  = NxIcon.Favorite,
-                    color = if (isFavorite) Color(0xFFEF4444) else CelestiaTheme.colors.textSecondary,
+                    color = if (isFavorite) Color(0xFFEF4444) else NxTheme.colors.textSecondary,
                     fill  = if (isFavorite) 1f else 0f,
                     onClick = onToggleFav
                 )
-                CardIconButton(NxIcon.Settings, color = CelestiaTheme.colors.textSecondary, onClick = onSettings)
-                CardIconButton(NxIcon.Info,     color = CelestiaTheme.colors.textSecondary, onClick = onDetails)
+                CardIconButton(NxIcon.Settings, color = NxTheme.colors.textSecondary, onClick = onSettings)
+                CardIconButton(NxIcon.Info,     color = NxTheme.colors.textSecondary, onClick = onDetails)
             }
         }
     }
@@ -370,7 +370,7 @@ private fun SyncBadge(state: AutoSyncService.ServerState, modifier: Modifier = M
         exit = fadeOut(),
         modifier = modifier,
     ) {
-        val c = CelestiaTheme.colors
+        val c = NxTheme.colors
         val (icon, tint) = when (state) {
             AutoSyncService.ServerState.QUEUED   -> NxIcon.HourglassEmpty to c.warnAccent
             AutoSyncService.ServerState.SYNCING  -> NxIcon.Sync           to c.progressAccent

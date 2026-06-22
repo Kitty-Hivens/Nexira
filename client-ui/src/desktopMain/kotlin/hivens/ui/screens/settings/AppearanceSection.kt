@@ -20,7 +20,7 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetToggle
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalStyle
 
 /**
@@ -65,9 +65,9 @@ internal fun AppearanceSection(
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Symbol(NxIcon.Language, null, tint = CelestiaTheme.colors.primary, modifier = Modifier.size(24.dp))
+            Symbol(NxIcon.Language, null, tint = NxTheme.colors.primary, modifier = Modifier.size(24.dp))
             Spacer(Modifier.width(16.dp))
-            Text(s.settingsLanguage, color = CelestiaTheme.colors.textPrimary)
+            Text(s.settingsLanguage, color = NxTheme.colors.textPrimary)
         }
 
         Box {
@@ -77,22 +77,22 @@ internal fun AppearanceSection(
                     .padding(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(currentLocale.displayName, color = CelestiaTheme.colors.primary, fontWeight = FontWeight.Bold)
-                Symbol(NxIcon.ArrowDropDown, null, tint = CelestiaTheme.colors.primary)
+                Text(currentLocale.displayName, color = NxTheme.colors.primary, fontWeight = FontWeight.Bold)
+                Symbol(NxIcon.ArrowDropDown, null, tint = NxTheme.colors.primary)
             }
 
             DropdownMenu(
                 expanded         = langDropdownExpanded,
                 onDismissRequest = { langDropdownExpanded = false },
-                containerColor   = CelestiaTheme.colors.surface
+                containerColor   = NxTheme.colors.surface
             ) {
                 AppLocale.entries.forEach { locale ->
                     DropdownMenuItem(
                         text = {
                             Text(
                                 locale.displayName,
-                                color      = if (locale == currentLocale) CelestiaTheme.colors.primary
-                                else CelestiaTheme.colors.textPrimary,
+                                color      = if (locale == currentLocale) NxTheme.colors.primary
+                                else NxTheme.colors.textPrimary,
                                 fontWeight = if (locale == currentLocale) FontWeight.Bold
                                 else FontWeight.Normal
                             )
@@ -121,20 +121,20 @@ internal fun AppearanceSection(
             .fillMaxWidth()
             .clip(RoundedCornerShape(style.cardCorner))
             .clickable(onClick = onOpenThemePicker)
-            .background(CelestiaTheme.colors.primary.copy(alpha = 0.1f))
+            .background(NxTheme.colors.primary.copy(alpha = 0.1f))
             .padding(16.dp),
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Symbol(NxIcon.Star, null, tint = CelestiaTheme.colors.primary, modifier = Modifier.size(24.dp))
+            Symbol(NxIcon.Star, null, tint = NxTheme.colors.primary, modifier = Modifier.size(24.dp))
             Spacer(Modifier.width(16.dp))
             Column {
-                Text(s.settingsThemePicker, color = CelestiaTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
-                Text(s.settingsThemePickerSub, style = MaterialTheme.typography.bodySmall, color = CelestiaTheme.colors.textSecondary)
+                Text(s.settingsThemePicker, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
+                Text(s.settingsThemePickerSub, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.textSecondary)
             }
         }
-        Symbol(NxIcon.ArrowDropDown, null, tint = CelestiaTheme.colors.primary)
+        Symbol(NxIcon.ArrowDropDown, null, tint = NxTheme.colors.primary)
     }
 
     Spacer(Modifier.height(4.dp))
@@ -152,14 +152,14 @@ internal fun AppearanceSection(
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Symbol(NxIcon.Wallpaper, null, tint = CelestiaTheme.colors.primary, modifier = Modifier.size(24.dp))
+            Symbol(NxIcon.Wallpaper, null, tint = NxTheme.colors.primary, modifier = Modifier.size(24.dp))
             Spacer(Modifier.width(16.dp))
             Column {
-                Text(s.settingsBackground, color = CelestiaTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
-                Text(s.settingsBackgroundSub, style = MaterialTheme.typography.bodySmall, color = CelestiaTheme.colors.textSecondary)
+                Text(s.settingsBackground, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
+                Text(s.settingsBackgroundSub, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.textSecondary)
             }
         }
-        Symbol(NxIcon.ChevronRight, null, tint = CelestiaTheme.colors.primary)
+        Symbol(NxIcon.ChevronRight, null, tint = NxTheme.colors.primary)
     }
 
     Spacer(Modifier.height(4.dp))
@@ -177,14 +177,14 @@ internal fun AppearanceSection(
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Symbol(NxIcon.Tune, null, tint = CelestiaTheme.colors.primary, modifier = Modifier.size(24.dp))
+            Symbol(NxIcon.Tune, null, tint = NxTheme.colors.primary, modifier = Modifier.size(24.dp))
             Spacer(Modifier.width(16.dp))
             Column {
-                Text(s.settingsCustomizationExt, color = CelestiaTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
-                Text(s.settingsCustomizationExtSub, style = MaterialTheme.typography.bodySmall, color = CelestiaTheme.colors.textSecondary)
+                Text(s.settingsCustomizationExt, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
+                Text(s.settingsCustomizationExtSub, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.textSecondary)
             }
         }
-        Symbol(NxIcon.ChevronRight, null, tint = CelestiaTheme.colors.primary)
+        Symbol(NxIcon.ChevronRight, null, tint = NxTheme.colors.primary)
     }
 
     Spacer(Modifier.height(4.dp))
@@ -244,7 +244,7 @@ internal fun AppearanceSection(
         title           = s.settingsCloseAfterLaunch,
         description     = s.settingsCloseAfterLaunchDesc,
         icon            = NxIcon.MoveToInbox,
-        iconTint        = CelestiaTheme.colors.textSecondary,
+        iconTint        = NxTheme.colors.textSecondary,
         checked         = form.closeAfterStart,
         enabled         = true,
         onCheckedChange = { form.closeAfterStart = it; save() }
@@ -260,7 +260,7 @@ internal fun AppearanceSection(
         description     = s.settingsOfflineModeDesc,
         checked         = form.isOfflineMode,
         onCheckedChange = { form.isOfflineMode = it; save() },
-        accent          = CelestiaTheme.colors.error,
+        accent          = NxTheme.colors.error,
     )
     PuppetToggle("settings.offlineMode", form.isOfflineMode) { form.isOfflineMode = it; save() }
 }

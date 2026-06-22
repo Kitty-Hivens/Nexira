@@ -32,7 +32,7 @@ import hivens.ui.easter.LocalAprilFools
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.platform.SystemActions
 import hivens.ui.puppet.PuppetClick
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -125,7 +125,7 @@ fun MicrosoftSignInButton(
             modifier = Modifier.fillMaxWidth().height(42.dp),
             colors   = ButtonDefaults.buttonColors(
                 containerColor = Color.Transparent,
-                contentColor   = CelestiaTheme.colors.primary,
+                contentColor   = NxTheme.colors.primary,
             ),
         )
         when {
@@ -133,17 +133,17 @@ fun MicrosoftSignInButton(
                 CircularProgressIndicator(
                     modifier = Modifier.size(14.dp),
                     strokeWidth = 2.dp,
-                    color = CelestiaTheme.colors.primary,
+                    color = NxTheme.colors.primary,
                 )
                 Spacer(Modifier.width(8.dp))
-                Text(s.msaWaiting, style = MaterialTheme.typography.bodySmall, color = CelestiaTheme.colors.textSecondary)
+                Text(s.msaWaiting, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.textSecondary)
             }
             // Errors from the request itself (before any dialog) show here; the
             // dialog owns errors from the poll once it is open.
             deviceCodeError != null && deviceCodePending == null -> Text(
                 text = deviceCodeError ?: "",
                 style = MaterialTheme.typography.bodySmall,
-                color = CelestiaTheme.colors.error,
+                color = NxTheme.colors.error,
             )
         }
     }

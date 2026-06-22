@@ -20,7 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalStyle
 
 /**
@@ -46,7 +46,7 @@ fun NxButton(
     enabled: Boolean = true,
     compact: Boolean = false,
 ) {
-    val palette = CelestiaTheme.colors
+    val palette = NxTheme.colors
     val shape = MaterialTheme.shapes.small
 
     val container: Color = when (style) {

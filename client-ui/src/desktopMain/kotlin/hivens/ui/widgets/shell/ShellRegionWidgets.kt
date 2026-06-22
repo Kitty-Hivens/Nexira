@@ -65,7 +65,7 @@ import hivens.ui.surface.Edge
 import hivens.ui.surface.FrostSurface
 import hivens.ui.surface.FrostTier
 import hivens.ui.surface.toLayers
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalStyle
 import hivens.widget.api.LocalSlotPath
 import hivens.widget.api.SlotRenderer
@@ -491,7 +491,7 @@ private fun AppGlyph() {
         icon = NxIcon.DarkMode,
         contentDescription = null,
         modifier = Modifier.padding(start = 10.dp, end = 6.dp),
-        tint = CelestiaTheme.colors.primary,
+        tint = NxTheme.colors.primary,
         size = 20.dp,
     )
 }
@@ -502,7 +502,7 @@ private fun AppGlyph() {
 private fun BarDivider() {
     VerticalDivider(
         modifier = Modifier.height(18.dp).padding(horizontal = 4.dp),
-        color = CelestiaTheme.colors.outline,
+        color = NxTheme.colors.outline,
     )
 }
 
