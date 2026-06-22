@@ -21,7 +21,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
-import hivens.ui.background.FrostBackdrop
 import hivens.ui.customization.LocalCustomization
 import hivens.ui.theme.NxColors
 import hivens.ui.theme.NxTheme
@@ -163,7 +162,7 @@ fun FrostSurface(
     Box(outer.clip(shape)) {
         atoms.forEach { layer ->
             when (layer) {
-                is Backdrop -> FrostBackdrop(extraBlurDp = layer.blurRadiusDp, modifier = Modifier.matchParentSize())
+                is Backdrop -> LocalBackdropPainter.current?.invoke(layer.blurRadiusDp, Modifier.matchParentSize())
 
                 is Fill -> {
                     val c = colors.frost(layer.role).copy(alpha = (layer.alpha * glassIntensity).coerceIn(0f, 1f))

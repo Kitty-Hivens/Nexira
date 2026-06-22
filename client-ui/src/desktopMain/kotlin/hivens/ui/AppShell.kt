@@ -53,6 +53,8 @@ import hivens.ui.background.BackdropState
 import hivens.ui.background.BackgroundManager
 import hivens.ui.background.CustomBackground
 import hivens.ui.background.LocalBackdrop
+import hivens.ui.background.FrostBackdrop
+import hivens.ui.surface.LocalBackdropPainter
 import hivens.ui.chrome.IS_TILING_WM
 import hivens.ui.chrome.LocalChromeClose
 import hivens.ui.chrome.LocalComposeWindow
@@ -1116,7 +1118,10 @@ fun AppRoot(
                 }
             }
     ) {
-      CompositionLocalProvider(LocalBackdrop provides backdrop) {
+      CompositionLocalProvider(
+        LocalBackdrop provides backdrop,
+        LocalBackdropPainter provides { blur, mod -> FrostBackdrop(extraBlurDp = blur, modifier = mod) },
+      ) {
         CustomBackground(
             settings         = backgroundSettings,
             mousePosProvider = { mousePos.value },
