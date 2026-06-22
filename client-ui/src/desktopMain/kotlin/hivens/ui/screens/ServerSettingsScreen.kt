@@ -19,12 +19,12 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import hivens.core.api.model.ServerProfile
-import hivens.ui.components.CelestiaButton
+import hivens.ui.nx.CelestiaButton
 import hivens.ui.components.DestructiveConfirmDialog
-import hivens.ui.components.GlassCard
+import hivens.ui.nx.GlassCard
 import hivens.ui.components.JvmArgsBuilderDialog
 import hivens.ui.components.ModItemCard
-import hivens.ui.components.NxSwitch
+import hivens.ui.nx.NxSwitch
 import hivens.ui.components.RamSelector
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings

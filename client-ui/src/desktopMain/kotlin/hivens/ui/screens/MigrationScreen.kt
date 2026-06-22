@@ -14,8 +14,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import hivens.launcher.platform.DataDirMigration
-import hivens.ui.components.CelestiaButton
-import hivens.ui.components.GlassCard
+import hivens.ui.nx.CelestiaButton
+import hivens.ui.nx.GlassCard
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.NxTheme

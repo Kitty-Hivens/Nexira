@@ -1,4 +1,4 @@
-package hivens.ui.components
+package hivens.ui.nx
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState

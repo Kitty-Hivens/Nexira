@@ -38,8 +38,8 @@ import coil3.compose.AsyncImage
 import coil3.compose.SubcomposeAsyncImage
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
-import hivens.ui.components.NxContextMenu
-import hivens.ui.components.NxMenuItem
+import hivens.ui.nx.NxContextMenu
+import hivens.ui.nx.NxMenuItem
 import hivens.ui.effects.pixelArtBackground
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon

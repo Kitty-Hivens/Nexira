@@ -13,7 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import hivens.ui.components.ShapedStateLayer
+import hivens.ui.nx.ShapedStateLayer
 import hivens.ui.theme.LocalStyle
 
 /**

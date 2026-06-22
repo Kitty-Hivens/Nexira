@@ -1,4 +1,4 @@
-package hivens.ui.components
+package hivens.ui.nx
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border

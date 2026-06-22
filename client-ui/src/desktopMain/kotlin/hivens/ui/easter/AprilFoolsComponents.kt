@@ -25,7 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.zIndex
-import hivens.ui.components.NoOpIndication
+import hivens.ui.nx.NoOpIndication
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.NxTheme
 import kotlin.math.*

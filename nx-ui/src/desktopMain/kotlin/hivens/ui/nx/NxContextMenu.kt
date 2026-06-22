@@ -1,4 +1,4 @@
-package hivens.ui.components
+package hivens.ui.nx
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.MutableTransitionState

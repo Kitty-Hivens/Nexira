@@ -1,4 +1,4 @@
-package hivens.ui.components
+package hivens.ui.nx
 
 import androidx.compose.foundation.IndicationNodeFactory
 import androidx.compose.foundation.interaction.HoverInteraction
@@ -26,7 +26,7 @@ import kotlinx.coroutines.launch
  * doesn't match the button container, so the layer is drawn here as a rounded
  * rect with the host's own corner radius -- it can't mismatch.
  */
-internal object NoOpIndication : IndicationNodeFactory {
+object NoOpIndication : IndicationNodeFactory {
     private class EmptyNode : Modifier.Node()
 
     override fun create(interactionSource: InteractionSource): DelegatableNode = EmptyNode()
@@ -42,7 +42,7 @@ internal object NoOpIndication : IndicationNodeFactory {
  * did. Alphas follow the M3 state-layer scale (hover ~8%, press ~12%) over
  * [color] -- pass the host's content color.
  */
-internal class ShapedStateLayer(
+class ShapedStateLayer(
     private val cornerDp: Dp,
     private val color: Color,
 ) : IndicationNodeFactory {

@@ -28,7 +28,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import hivens.ui.customization.glassSurfaceAlpha
-import hivens.ui.components.NxSwitch
+import hivens.ui.nx.NxSwitch
 import hivens.ui.theme.NxTheme
 import hivens.ui.widgets.customization.HexField
 import hivens.ui.widgets.customization.LabeledSlider

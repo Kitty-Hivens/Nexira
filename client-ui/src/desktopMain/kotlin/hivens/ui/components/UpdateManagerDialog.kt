@@ -1,4 +1,5 @@
 package hivens.ui.components
+import hivens.ui.nx.GlassCard
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border

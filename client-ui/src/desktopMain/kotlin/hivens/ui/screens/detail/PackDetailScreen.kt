@@ -69,7 +69,7 @@ import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.IconKey
-import hivens.ui.components.PlayButton
+import hivens.ui.nx.PlayButton
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.notifications.LaunchTarget
