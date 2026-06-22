@@ -21,7 +21,7 @@ import androidx.compose.ui.unit.Dp
 import coil3.compose.AsyncImage
 import hivens.core.api.dto.smrt.SmrtModEntry
 import hivens.launcher.smrt.ModIconResolver
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.decorativeColor
 import org.koin.compose.koinInject
 
@@ -74,7 +74,7 @@ fun ModIconImage(
             Box(
                 modifier = Modifier
                     .size(size)
-                    .background(CelestiaTheme.colors.decorativeColor(mod.filename)),
+                    .background(NxTheme.colors.decorativeColor(mod.filename)),
             )
         }
     }
@@ -92,7 +92,7 @@ private fun LetterAvatar(name: String, size: Dp) {
     Box(
         modifier         = Modifier
             .size(size)
-            .background(CelestiaTheme.colors.decorativeColor(name)),
+            .background(NxTheme.colors.decorativeColor(name)),
         contentAlignment = Alignment.Center,
     ) {
         Text(

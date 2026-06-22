@@ -38,7 +38,7 @@ markdown          = "0.7.3"
 jsoup             = "1.18.1"
 coil              = "3.4.0"
 # Material You colour science (Monet) -- pure Kotlin port, no Compose dep.
-# Seeds a tonal palette from the wallpaper; mapped onto CelestiaColors.
+# Seeds a tonal palette from the wallpaper; mapped onto NxColors.
 materialColorUtils = "4.1.1"
 filekit           = "0.14.1"
 

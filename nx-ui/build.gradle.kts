@@ -28,6 +28,7 @@ kotlin {
                 implementation(libs.compose.ui)
                 implementation(libs.compose.components.resources)
                 implementation(libs.kotlinx.serialization.json)
+                implementation(libs.material.color.utilities)
                 implementation(libs.slf4j.api)
             }
         }

@@ -15,7 +15,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import hivens.ui.customization.sliderKeyboardAdjust
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 
 @Composable
 internal fun SectionTitle(text: String) {
@@ -23,7 +23,7 @@ internal fun SectionTitle(text: String) {
         text          = text,
         style         = MaterialTheme.typography.labelSmall,
         fontWeight    = FontWeight.Bold,
-        color         = CelestiaTheme.colors.primary,
+        color         = NxTheme.colors.primary,
         letterSpacing = 1.sp,
     )
 }
@@ -42,7 +42,7 @@ internal fun LabeledSlider(
         Text(
             text     = label,
             style    = MaterialTheme.typography.bodySmall,
-            color    = CelestiaTheme.colors.textSecondary,
+            color    = NxTheme.colors.textSecondary,
             modifier = Modifier.width(110.dp),
         )
         Box(Modifier.weight(1f).sliderKeyboardAdjust(value, range, keyStep, onValueChange)) {
@@ -52,16 +52,16 @@ internal fun LabeledSlider(
                 valueRange    = range,
                 modifier      = Modifier.fillMaxWidth(),
                 colors        = SliderDefaults.colors(
-                    thumbColor         = CelestiaTheme.colors.primary,
-                    activeTrackColor   = CelestiaTheme.colors.primary,
-                    inactiveTrackColor = CelestiaTheme.colors.outline.copy(alpha = 0.2f),
+                    thumbColor         = NxTheme.colors.primary,
+                    activeTrackColor   = NxTheme.colors.primary,
+                    inactiveTrackColor = NxTheme.colors.outline.copy(alpha = 0.2f),
                 ),
             )
         }
         Text(
             text     = format.format(value * displayMultiplier),
             style    = MaterialTheme.typography.labelSmall,
-            color    = CelestiaTheme.colors.textSecondary.copy(alpha = 0.6f),
+            color    = NxTheme.colors.textSecondary.copy(alpha = 0.6f),
             modifier = Modifier.width(44.dp),
         )
     }

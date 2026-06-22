@@ -29,7 +29,7 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.background.CustomBackground
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 
@@ -83,16 +83,16 @@ fun BgPreviewWidget(instance: WidgetInstance) {
                         .height(80.dp)
                         .clip(RoundedCornerShape(12.dp))
                         .background(glassSurfaceAlpha(0.6f))
-                        .border(1.dp, CelestiaTheme.colors.outline.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
+                        .border(1.dp, NxTheme.colors.outline.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
                         .padding(16.dp),
                     contentAlignment = Alignment.CenterStart,
                 ) {
                     Column {
-                        Text(s.backgroundPreviewServer, color = CelestiaTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
+                        Text(s.backgroundPreviewServer, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
                         Text(
                             text  = "1.21.1 • 42/100",
                             style = MaterialTheme.typography.bodySmall,
-                            color = CelestiaTheme.colors.textSecondary,
+                            color = NxTheme.colors.textSecondary,
                         )
                     }
                 }
@@ -102,7 +102,7 @@ fun BgPreviewWidget(instance: WidgetInstance) {
                         .fillMaxWidth()
                         .height(44.dp)
                         .clip(RoundedCornerShape(10.dp))
-                        .background(CelestiaTheme.colors.primary),
+                        .background(NxTheme.colors.primary),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(s.launchButton, color = Color.White, fontWeight = FontWeight.Bold)

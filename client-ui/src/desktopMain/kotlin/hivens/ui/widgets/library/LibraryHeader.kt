@@ -12,7 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
 import hivens.widget.model.Widget
@@ -38,14 +38,14 @@ fun LibraryHeader(instance: WidgetInstance) {
         Text(
             text       = p.title.ifBlank { s.libraryHeaderTitle },
             style      = MaterialTheme.typography.headlineSmall,
-            color      = CelestiaTheme.colors.textPrimary,
+            color      = NxTheme.colors.textPrimary,
             fontWeight = FontWeight.Bold,
         )
         Spacer(Modifier.height(4.dp))
         Text(
             text  = p.subtitle.ifBlank { s.libraryHeaderSubtitle },
             style = MaterialTheme.typography.bodyMedium,
-            color = CelestiaTheme.colors.textSecondary,
+            color = NxTheme.colors.textSecondary,
         )
     }
 }

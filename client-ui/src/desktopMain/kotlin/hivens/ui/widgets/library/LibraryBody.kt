@@ -33,7 +33,7 @@ import hivens.ui.components.DestructiveConfirmDialog
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.platform.SystemActions
 import hivens.ui.screens.library.PackCard
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
 import hivens.widget.model.Widget
@@ -146,13 +146,13 @@ private fun LibraryEmpty(title: String, body: String, onBrowse: () -> Unit) {
             Text(
                 text       = title,
                 style      = MaterialTheme.typography.titleLarge,
-                color      = CelestiaTheme.colors.textPrimary,
+                color      = NxTheme.colors.textPrimary,
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
                 text      = body,
                 style     = MaterialTheme.typography.bodyMedium,
-                color     = CelestiaTheme.colors.textSecondary,
+                color     = NxTheme.colors.textSecondary,
                 textAlign = TextAlign.Center,
                 modifier  = Modifier.widthIn(max = 360.dp),
             )
@@ -160,7 +160,7 @@ private fun LibraryEmpty(title: String, body: String, onBrowse: () -> Unit) {
                 onClick = onBrowse,
                 shape   = MaterialTheme.shapes.small,
                 colors  = ButtonDefaults.buttonColors(
-                    containerColor = CelestiaTheme.colors.primary,
+                    containerColor = NxTheme.colors.primary,
                     contentColor   = Color.White,
                 ),
             ) { Text(s.browseOpen, fontWeight = FontWeight.SemiBold) }

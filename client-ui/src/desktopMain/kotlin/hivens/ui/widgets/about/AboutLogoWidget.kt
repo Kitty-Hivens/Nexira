@@ -27,7 +27,7 @@ import hivens.ui.easter.LocalAprilFools
 import hivens.ui.generated.resources.Res
 import hivens.ui.generated.resources.favicon
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
 import hivens.widget.model.Widget
@@ -74,14 +74,14 @@ fun AboutLogoWidget(instance: WidgetInstance) {
                 text       = af.maybeGibberish(p.title.ifBlank { Branding.TITLE }, probability = 0.15f),
                 style      = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Black,
-                color      = CelestiaTheme.colors.textPrimary,
+                color      = NxTheme.colors.textPrimary,
             )
             if (p.showVersion) {
                 Spacer(Modifier.height(8.dp))
                 Box(
                     modifier = Modifier
                         .clip(MaterialTheme.shapes.extraSmall)
-                        .background(CelestiaTheme.colors.primary.copy(alpha = 0.15f))
+                        .background(NxTheme.colors.primary.copy(alpha = 0.15f))
                         .padding(horizontal = 10.dp, vertical = 4.dp),
                 ) {
                     Text(
@@ -91,7 +91,7 @@ fun AboutLogoWidget(instance: WidgetInstance) {
                             mode        = GibberishMode.FAKE_VER,
                         ),
                         style      = MaterialTheme.typography.labelLarge,
-                        color      = CelestiaTheme.colors.primary,
+                        color      = NxTheme.colors.primary,
                         fontWeight = FontWeight.Bold,
                     )
                 }
@@ -111,7 +111,7 @@ fun AboutLogoWidget(instance: WidgetInstance) {
                 Text(
                     text  = af.maybeGibberish(s.aboutBuildDate(buildDate), probability = 0.25f),
                     style = MaterialTheme.typography.bodySmall,
-                    color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.6f),
+                    color = NxTheme.colors.textSecondary.copy(alpha = 0.6f),
                 )
             }
 
@@ -123,7 +123,7 @@ fun AboutLogoWidget(instance: WidgetInstance) {
                         probability = 0.20f,
                     ),
                     style     = MaterialTheme.typography.bodyMedium,
-                    color     = CelestiaTheme.colors.textSecondary,
+                    color     = NxTheme.colors.textSecondary,
                     textAlign = TextAlign.Center,
                 )
             }

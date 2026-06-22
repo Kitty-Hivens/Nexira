@@ -58,7 +58,7 @@ fun nexiraMonoFamily(): FontFamily = FontFamily(
 fun nexiraBrailleFamily(): FontFamily = FontFamily(Font(Res.font.dejavu_sans))
 
 /**
- * The bundled monospace family, provided by [CelestiaTheme]. Read this instead
+ * The bundled monospace family, provided by [NxTheme]. Read this instead
  * of `FontFamily.Monospace` so code / hex / console use JetBrains Mono; the
  * default falls back to the platform monospace if a surface renders outside the
  * theme.

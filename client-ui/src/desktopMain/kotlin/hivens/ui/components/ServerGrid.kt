@@ -15,7 +15,7 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.layout.AdaptiveWidth
 import hivens.ui.layout.WidthClass
 import hivens.ui.puppet.PuppetClick
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 
 /**
  * Adaptive server list. Expanded width: a square-card grid (favorites section
@@ -45,7 +45,7 @@ fun ServerGrid(
 
     if (servers.isEmpty()) {
         Box(modifier.fillMaxSize()) {
-            Text(s.dashboardServersEmpty, color = CelestiaTheme.colors.textSecondary, modifier = Modifier.padding(20.dp))
+            Text(s.dashboardServersEmpty, color = NxTheme.colors.textSecondary, modifier = Modifier.padding(20.dp))
         }
         return
     }
@@ -172,7 +172,7 @@ private fun ServerCardGrid(
             when (val item = items[index]) {
                 is GridItem.Header -> Text(
                     item.title, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold,
-                    color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.5f), letterSpacing = 1.5.sp,
+                    color = NxTheme.colors.textSecondary.copy(alpha = 0.5f), letterSpacing = 1.5.sp,
                     modifier = Modifier.padding(top = if (index > 0) 8.dp else 0.dp, bottom = 4.dp)
                 )
                 is GridItem.Server -> {

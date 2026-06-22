@@ -25,7 +25,7 @@ import hivens.ui.identity.SkinManager
 import hivens.ui.platform.SystemActions
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.widget.api.SlotRenderer
 import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId
@@ -101,7 +101,7 @@ fun ProfileSurface(
                 if (authResolving && session == null) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator(
-                            color       = CelestiaTheme.colors.primary.copy(alpha = 0.35f),
+                            color       = NxTheme.colors.primary.copy(alpha = 0.35f),
                             modifier    = Modifier.size(28.dp),
                             strokeWidth = 2.dp,
                         )

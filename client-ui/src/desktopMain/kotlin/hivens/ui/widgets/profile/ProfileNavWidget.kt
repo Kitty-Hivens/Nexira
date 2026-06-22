@@ -18,7 +18,7 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.components.NavItemRowContent
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalStyle
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
@@ -56,8 +56,8 @@ fun ProfileNavWidget(instance: WidgetInstance) {
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(style.cardCorner))
                     .background(
-                        if (isSelected) CelestiaTheme.colors.primary.copy(alpha = 0.18f)
-                        else CelestiaTheme.colors.background.copy(alpha = 0.0f),
+                        if (isSelected) NxTheme.colors.primary.copy(alpha = 0.18f)
+                        else NxTheme.colors.background.copy(alpha = 0.0f),
                     )
                     .clickable { ctx.selectedCategory.value = category }
                     .padding(horizontal = 12.dp, vertical = 10.dp),

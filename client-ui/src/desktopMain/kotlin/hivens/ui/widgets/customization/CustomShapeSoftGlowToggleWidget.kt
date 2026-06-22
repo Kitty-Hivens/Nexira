@@ -13,7 +13,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.components.NxSwitch
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 
@@ -31,7 +31,7 @@ fun CustomShapeSoftGlowToggleWidget(instance: WidgetInstance) {
     ) {
         Text(
             text       = s.customSoftGlow,
-            color      = CelestiaTheme.colors.textPrimary,
+            color      = NxTheme.colors.textPrimary,
             fontWeight = FontWeight.Medium,
         )
         NxSwitch(

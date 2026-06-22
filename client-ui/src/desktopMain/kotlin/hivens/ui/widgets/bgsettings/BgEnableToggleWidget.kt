@@ -18,7 +18,7 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.components.NxSwitch
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 
@@ -35,9 +35,9 @@ fun BgEnableToggleWidget(instance: WidgetInstance) {
         verticalAlignment     = Alignment.CenterVertically,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Symbol(NxIcon.Wallpaper, null, tint = CelestiaTheme.colors.primary, modifier = Modifier.size(24.dp))
+            Symbol(NxIcon.Wallpaper, null, tint = NxTheme.colors.primary, modifier = Modifier.size(24.dp))
             Spacer(Modifier.width(12.dp))
-            Text(s.backgroundEnable, fontWeight = FontWeight.Bold, color = CelestiaTheme.colors.textPrimary)
+            Text(s.backgroundEnable, fontWeight = FontWeight.Bold, color = NxTheme.colors.textPrimary)
         }
         NxSwitch(
             checked         = settings.enabled,

@@ -36,7 +36,7 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.widget.api.SlotRenderer
 import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId
@@ -114,14 +114,14 @@ fun ServerDetailsSurface(
                 IconButton(onClick = onBack) {
                     Symbol(icon = NxIcon.ArrowBack,
                         contentDescription = s.navBack,
-                        tint               = CelestiaTheme.colors.textPrimary,
+                        tint               = NxTheme.colors.textPrimary,
                     )
                 }
                 Spacer(Modifier.width(8.dp))
                 Text(
                     text       = s.serverDetailTitle,
                     style      = MaterialTheme.typography.titleLarge,
-                    color      = CelestiaTheme.colors.textSecondary,
+                    color      = NxTheme.colors.textSecondary,
                     fontWeight = FontWeight.Bold,
                 )
             }
@@ -132,7 +132,7 @@ fun ServerDetailsSurface(
             ) {
                 if (isLoading) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = CelestiaTheme.colors.primary)
+                        CircularProgressIndicator(color = NxTheme.colors.primary)
                     }
                 } else {
                     Row(Modifier.fillMaxSize()) {

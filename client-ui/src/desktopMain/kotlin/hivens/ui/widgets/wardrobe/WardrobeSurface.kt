@@ -60,7 +60,7 @@ import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.skin3d.SkinFraming
 import hivens.ui.skin3d.SkinView3D
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalStyle
 import hivens.ui.widgets.profile.SkinHero
 import io.github.vinceglb.filekit.FileKit
@@ -91,7 +91,7 @@ fun WardrobeSurface(session: SessionData?, onBack: () -> Unit) {
         GlassCard(modifier = Modifier.weight(1f).fillMaxWidth(), backgroundColor = glassSurfaceAlpha(0.7f)) {
             if (session == null) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(s.wardrobeSignedOut, style = MaterialTheme.typography.bodyMedium, color = CelestiaTheme.colors.textSecondary)
+                    Text(s.wardrobeSignedOut, style = MaterialTheme.typography.bodyMedium, color = NxTheme.colors.textSecondary)
                 }
             } else {
                 Wardrobe(session)
@@ -197,7 +197,7 @@ private fun Wardrobe(session: SessionData) {
                             text = s.wardrobeApplySmartycraft,
                             onClick = { if (!busy) applyToSc(file, isCloak = false, markId = markId) },
                             modifier = Modifier,
-                            colors = ButtonDefaults.buttonColors(containerColor = CelestiaTheme.colors.primary),
+                            colors = ButtonDefaults.buttonColors(containerColor = NxTheme.colors.primary),
                         )
                         PuppetClick("wardrobe.applySmartycraft") { if (!busy) applyToSc(file, isCloak = false, markId = markId) }
                     }
@@ -210,14 +210,14 @@ private fun Wardrobe(session: SessionData) {
                             modifier = Modifier,
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = glassSurfaceAlpha(0.55f),
-                                contentColor = CelestiaTheme.colors.textPrimary,
+                                contentColor = NxTheme.colors.textPrimary,
                             ),
                         )
                         PuppetClick("wardrobe.applyCapeSmartycraft") { if (!busy) applyToSc(capeFile, isCloak = true, markId = id) }
                     }
                 }
             }
-            error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = CelestiaTheme.colors.error) }
+            error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.error) }
 
             // One grid, two sections (Modrinth shape). The "+" tile leads each, so a
             // section is never truly empty -- it doubles as the import prompt.
@@ -248,7 +248,7 @@ private fun Wardrobe(session: SessionData) {
                     Text(
                         s.wardrobeCapeClanHint,
                         style = MaterialTheme.typography.bodySmall,
-                        color = CelestiaTheme.colors.textSecondary,
+                        color = NxTheme.colors.textSecondary,
                     )
                 }
                 item(key = "add-cape") { AddTile(onClick = { importInto(SkinLibrary.Kind.Cape) { selectedCapeId = it } }) }
@@ -301,10 +301,10 @@ private fun SkinCard(
     Column(
         modifier = Modifier
             .clip(RoundedCornerShape(style.cardCorner))
-            .background(CelestiaTheme.colors.background.copy(alpha = 0.4f))
+            .background(NxTheme.colors.background.copy(alpha = 0.4f))
             .border(
                 width = if (selected) 2.dp else 0.dp,
-                color = if (selected) CelestiaTheme.colors.primary else CelestiaTheme.colors.primary.copy(alpha = 0f),
+                color = if (selected) NxTheme.colors.primary else NxTheme.colors.primary.copy(alpha = 0f),
                 shape = RoundedCornerShape(style.cardCorner),
             )
             .clickable(onClick = onClick)
@@ -319,7 +319,7 @@ private fun SkinCard(
             if (isActive) {
                 Symbol(
                     NxIcon.CheckCircle, null,
-                    tint = CelestiaTheme.colors.success,
+                    tint = NxTheme.colors.success,
                     size = 16.dp,
                     modifier = Modifier.align(Alignment.TopEnd).padding(2.dp),
                 )
@@ -329,7 +329,7 @@ private fun SkinCard(
             Text(
                 text = name,
                 style = MaterialTheme.typography.labelSmall,
-                color = CelestiaTheme.colors.textPrimary,
+                color = NxTheme.colors.textPrimary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f, fill = false),
@@ -337,7 +337,7 @@ private fun SkinCard(
             // Default skins are read-only (not library entries), so no delete.
             onDelete?.let { del ->
                 IconButton(onClick = del, modifier = Modifier.size(24.dp)) {
-                    Symbol(NxIcon.Delete, s.accountRemove, tint = CelestiaTheme.colors.textSecondary, size = 16.dp)
+                    Symbol(NxIcon.Delete, s.accountRemove, tint = NxTheme.colors.textSecondary, size = 16.dp)
                 }
             }
         }
@@ -359,9 +359,9 @@ private fun AddTile(onClick: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(Modifier.fillMaxWidth().aspectRatio(1f), contentAlignment = Alignment.Center) {
-            Symbol(NxIcon.Add, s.wardrobeUpload, tint = CelestiaTheme.colors.primary, size = 32.dp)
+            Symbol(NxIcon.Add, s.wardrobeUpload, tint = NxTheme.colors.primary, size = 32.dp)
         }
-        Text(s.wardrobeUpload, style = MaterialTheme.typography.labelSmall, color = CelestiaTheme.colors.textSecondary, maxLines = 1)
+        Text(s.wardrobeUpload, style = MaterialTheme.typography.labelSmall, color = NxTheme.colors.textSecondary, maxLines = 1)
     }
     PuppetClick("wardrobe.upload") { onClick() }
 }
@@ -371,7 +371,7 @@ private fun SectionHeader(text: String) {
     Text(
         text = text,
         style = MaterialTheme.typography.titleSmall,
-        color = CelestiaTheme.colors.textSecondary,
+        color = NxTheme.colors.textSecondary,
         modifier = Modifier.padding(top = 4.dp),
     )
 }
@@ -390,10 +390,10 @@ private fun CapeCard(
     Column(
         modifier = Modifier
             .clip(RoundedCornerShape(style.cardCorner))
-            .background(CelestiaTheme.colors.background.copy(alpha = 0.4f))
+            .background(NxTheme.colors.background.copy(alpha = 0.4f))
             .border(
                 width = if (selected) 2.dp else 0.dp,
-                color = if (selected) CelestiaTheme.colors.primary else CelestiaTheme.colors.primary.copy(alpha = 0f),
+                color = if (selected) NxTheme.colors.primary else NxTheme.colors.primary.copy(alpha = 0f),
                 shape = RoundedCornerShape(style.cardCorner),
             )
             .clickable(onClick = onClick)
@@ -405,7 +405,7 @@ private fun CapeCard(
             if (isActive) {
                 Symbol(
                     NxIcon.CheckCircle, null,
-                    tint = CelestiaTheme.colors.success,
+                    tint = NxTheme.colors.success,
                     size = 16.dp,
                     modifier = Modifier.align(Alignment.TopEnd).padding(2.dp),
                 )
@@ -415,13 +415,13 @@ private fun CapeCard(
             Text(
                 text = name,
                 style = MaterialTheme.typography.labelSmall,
-                color = CelestiaTheme.colors.textPrimary,
+                color = NxTheme.colors.textPrimary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f, fill = false),
             )
             IconButton(onClick = onDelete, modifier = Modifier.size(24.dp)) {
-                Symbol(NxIcon.Delete, s.accountRemove, tint = CelestiaTheme.colors.textSecondary, size = 16.dp)
+                Symbol(NxIcon.Delete, s.accountRemove, tint = NxTheme.colors.textSecondary, size = 16.dp)
             }
         }
     }

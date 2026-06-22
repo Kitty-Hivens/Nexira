@@ -57,7 +57,7 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalMonoFamily
 import hivens.ui.theme.LocalStyle
 import kotlin.system.exitProcess
@@ -182,7 +182,7 @@ fun UpdateManagerDialog(onDismiss: () -> Unit) {
             // this is a fixed near-opaque dark panel, not glassIntensity-scaled
             // (BasicAlertDialog draws no scrim behind it).
             modifier = Modifier.width(560.dp).wrapContentHeight(),
-            backgroundColor = CelestiaTheme.colors.background.copy(alpha = 0.97f),
+            backgroundColor = NxTheme.colors.background.copy(alpha = 0.97f),
         ) {
             Column(Modifier.padding(24.dp)) {
                 // ── Header ───────────────────────────────────────────────────────
@@ -190,16 +190,16 @@ fun UpdateManagerDialog(onDismiss: () -> Unit) {
                     s.updateManagerTitle,
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
-                    color = CelestiaTheme.colors.textPrimary,
+                    color = NxTheme.colors.textPrimary,
                 )
 
                 Spacer(Modifier.height(16.dp))
-                HorizontalDivider(color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.2f))
+                HorizontalDivider(color = NxTheme.colors.textSecondary.copy(alpha = 0.2f))
                 Spacer(Modifier.height(16.dp))
 
                 // ── Channel picker (chips sit to the right of the label) ─────────
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(s.updateManagerChannel, style = MaterialTheme.typography.labelMedium, color = CelestiaTheme.colors.textSecondary)
+                    Text(s.updateManagerChannel, style = MaterialTheme.typography.labelMedium, color = NxTheme.colors.textSecondary)
                     Spacer(Modifier.width(8.dp))
                     FlowRow(
                         modifier = Modifier.weight(1f),
@@ -226,7 +226,7 @@ fun UpdateManagerDialog(onDismiss: () -> Unit) {
                         else -> null
                     }
                     if (hint != null) {
-                        Text(hint, style = MaterialTheme.typography.bodySmall, color = CelestiaTheme.colors.warnAccent)
+                        Text(hint, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.warnAccent)
                     }
                 }
 
@@ -241,7 +241,7 @@ fun UpdateManagerDialog(onDismiss: () -> Unit) {
                         enabled = !busy && experimentalOn && toolchainReady,
                         modifier = Modifier.fillMaxWidth(),
                         shape = MaterialTheme.shapes.small,
-                        colors = ButtonDefaults.buttonColors(containerColor = CelestiaTheme.colors.primary),
+                        colors = ButtonDefaults.buttonColors(containerColor = NxTheme.colors.primary),
                     ) {
                         Text(s.updateManagerBuild, color = Color.White, fontWeight = FontWeight.Bold)
                     }
@@ -250,24 +250,24 @@ fun UpdateManagerDialog(onDismiss: () -> Unit) {
                         Box(
                             Modifier.fillMaxWidth().heightIn(max = 180.dp)
                                 .clip(MaterialTheme.shapes.medium)
-                                .background(CelestiaTheme.colors.background.copy(alpha = 0.4f))
+                                .background(NxTheme.colors.background.copy(alpha = 0.4f))
                                 .padding(8.dp),
                         ) {
                             Column(Modifier.verticalScroll(rememberScrollState())) {
                                 buildLog.takeLast(60).forEach {
-                                    Text(it, style = MaterialTheme.typography.bodySmall, fontFamily = LocalMonoFamily.current, color = CelestiaTheme.colors.textSecondary)
+                                    Text(it, style = MaterialTheme.typography.bodySmall, fontFamily = LocalMonoFamily.current, color = NxTheme.colors.textSecondary)
                                 }
                             }
                         }
                     }
                 } else if (loading) {
                     Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                        CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = CelestiaTheme.colors.primary)
+                        CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = NxTheme.colors.primary)
                         Spacer(Modifier.width(12.dp))
-                        Text(s.aboutChecking, color = CelestiaTheme.colors.textSecondary)
+                        Text(s.aboutChecking, color = NxTheme.colors.textSecondary)
                     }
                 } else if (releases.isEmpty()) {
-                    Text(s.updateManagerEmpty, color = CelestiaTheme.colors.textSecondary)
+                    Text(s.updateManagerEmpty, color = NxTheme.colors.textSecondary)
                 } else {
                     val currentIdx = releases.indexOfFirst { it.isCurrent }
                     // Tighten the gap as the list grows so more versions stay
@@ -290,15 +290,15 @@ fun UpdateManagerDialog(onDismiss: () -> Unit) {
 
                 progressText?.let {
                     Spacer(Modifier.height(12.dp))
-                    Text(it, style = MaterialTheme.typography.bodySmall, color = CelestiaTheme.colors.primary)
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.primary)
                 }
                 error?.let {
                     Spacer(Modifier.height(12.dp))
-                    Text(it, style = MaterialTheme.typography.bodySmall, color = CelestiaTheme.colors.error)
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.error)
                 }
 
                 Spacer(Modifier.height(16.dp))
-                HorizontalDivider(color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.2f))
+                HorizontalDivider(color = NxTheme.colors.textSecondary.copy(alpha = 0.2f))
                 Spacer(Modifier.height(12.dp))
 
                 // ── Footer: install .desktop (Linux) + close ─────────────────────
@@ -307,13 +307,13 @@ fun UpdateManagerDialog(onDismiss: () -> Unit) {
                         TextButton(onClick = { installDesktop() }, enabled = !busy && !desktopDone) {
                             Text(
                                 if (desktopDone) s.updateManagerDesktopDone else s.updateManagerInstallDesktop,
-                                color = CelestiaTheme.colors.textSecondary,
+                                color = NxTheme.colors.textSecondary,
                             )
                         }
                     }
                     Spacer(Modifier.weight(1f))
                     TextButton(onClick = onDismiss, enabled = !busy) {
-                        Text(s.updateLater, color = CelestiaTheme.colors.textSecondary)
+                        Text(s.updateLater, color = NxTheme.colors.textSecondary)
                     }
                 }
             }
@@ -335,7 +335,7 @@ private fun ChannelChip(channel: ReleaseChannel, selected: Boolean, enabled: Boo
     Box(
         Modifier
             .clip(shape)
-            .then(if (selected) Modifier.border(1.dp, CelestiaTheme.colors.primary, shape) else Modifier)
+            .then(if (selected) Modifier.border(1.dp, NxTheme.colors.primary, shape) else Modifier)
             .alpha(alpha)
             .clickable(enabled = enabled) { onClick() }
             .padding(2.dp),
@@ -351,27 +351,27 @@ private fun VersionRow(entry: ReleaseEntry, isOlder: Boolean, enabled: Boolean, 
     Row(
         Modifier.fillMaxWidth()
             .clip(RoundedCornerShape(style.cardCorner))
-            .background(CelestiaTheme.colors.background.copy(alpha = 0.3f))
+            .background(NxTheme.colors.background.copy(alpha = 0.3f))
             .padding(horizontal = 12.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (entry.isCurrent) {
-            Symbol(NxIcon.CheckCircle, null, tint = CelestiaTheme.colors.success, modifier = Modifier.size(16.dp))
+            Symbol(NxIcon.CheckCircle, null, tint = NxTheme.colors.success, modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(6.dp))
         }
-        Text(entry.version, style = MaterialTheme.typography.bodyMedium, color = CelestiaTheme.colors.textPrimary)
+        Text(entry.version, style = MaterialTheme.typography.bodyMedium, color = NxTheme.colors.textPrimary)
         Spacer(Modifier.width(8.dp))
         ChannelBadge(entry.channel)
         if (entry.isCurrent) {
             Spacer(Modifier.width(8.dp))
-            Text("(${s.updateManagerCurrentTag})", style = MaterialTheme.typography.labelSmall, color = CelestiaTheme.colors.textSecondary)
+            Text("(${s.updateManagerCurrentTag})", style = MaterialTheme.typography.labelSmall, color = NxTheme.colors.textSecondary)
         }
         Spacer(Modifier.weight(1f))
         if (!entry.isCurrent) {
             TextButton(onClick = onAction, enabled = enabled) {
                 Text(
                     if (isOlder) s.updateManagerRollback else s.updateManagerInstall,
-                    color = if (isOlder) CelestiaTheme.colors.warnAccent else CelestiaTheme.colors.primary,
+                    color = if (isOlder) NxTheme.colors.warnAccent else NxTheme.colors.primary,
                 )
             }
         }

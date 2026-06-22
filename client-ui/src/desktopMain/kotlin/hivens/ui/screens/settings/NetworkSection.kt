@@ -16,7 +16,7 @@ import hivens.ui.components.NxSwitch
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetToggle
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalStyle
 import kotlinx.coroutines.delay
 import java.time.format.DateTimeFormatter
@@ -62,14 +62,14 @@ internal fun NetworkSection(
     ) {
         Text(
             text       = s.sslBypassListTitle,
-            color      = CelestiaTheme.colors.textPrimary,
+            color      = NxTheme.colors.textPrimary,
             fontWeight = FontWeight.Bold,
         )
         if (bypasses.isEmpty()) {
             Text(
                 text  = s.sslBypassNoEntries,
                 style = MaterialTheme.typography.bodySmall,
-                color = CelestiaTheme.colors.textSecondary,
+                color = NxTheme.colors.textSecondary,
             )
         } else {
             bypasses.forEach { entry ->
@@ -81,7 +81,7 @@ internal fun NetworkSection(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text       = entry.host,
-                            color      = CelestiaTheme.colors.textPrimary,
+                            color      = NxTheme.colors.textPrimary,
                             fontWeight = FontWeight.SemiBold,
                         )
                         Text(
@@ -89,7 +89,7 @@ internal fun NetworkSection(
                                 dateFormatter.format(java.time.Instant.parse(entry.expiresAt)),
                             ),
                             style = MaterialTheme.typography.bodySmall,
-                            color = CelestiaTheme.colors.textSecondary,
+                            color = NxTheme.colors.textSecondary,
                         )
                     }
                     OutlinedButton(
@@ -101,7 +101,7 @@ internal fun NetworkSection(
                         },
                         shape = MaterialTheme.shapes.small,
                     ) {
-                        Text(s.sslBypassRevoke, color = CelestiaTheme.colors.textSecondary)
+                        Text(s.sslBypassRevoke, color = NxTheme.colors.textSecondary)
                     }
                     // Puppet: per-host revoke. Driver picks the host by its
                     // actual hostname string.
@@ -125,13 +125,13 @@ internal fun NetworkSection(
             Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
                 Text(
                     text       = s.settingsForceProxyTitle,
-                    color      = CelestiaTheme.colors.textPrimary,
+                    color      = NxTheme.colors.textPrimary,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
                     text  = s.settingsForceProxyDesc,
                     style = MaterialTheme.typography.bodySmall,
-                    color = CelestiaTheme.colors.textSecondary,
+                    color = NxTheme.colors.textSecondary,
                 )
             }
             NxSwitch(

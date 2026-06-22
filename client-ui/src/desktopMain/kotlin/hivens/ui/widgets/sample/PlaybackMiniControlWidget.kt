@@ -51,7 +51,7 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.ui.widgets.services.MusicPlayerService
 import hivens.widget.api.useService
 import hivens.widget.model.InjectService
@@ -95,14 +95,14 @@ fun PlaybackMiniControlWidget(instance: WidgetInstance) {
     ) {
         Symbol(icon = NxIcon.MusicNote,
             contentDescription = null,
-            tint               = CelestiaTheme.colors.primary,
+            tint               = NxTheme.colors.primary,
             modifier           = Modifier.size(18.dp),
         )
         Spacer(Modifier.width(10.dp))
         Text(
             text       = currentTitleShort(state, s),
             style      = MaterialTheme.typography.bodyMedium,
-            color      = CelestiaTheme.colors.textPrimary,
+            color      = NxTheme.colors.textPrimary,
             fontWeight = FontWeight.Medium,
             maxLines   = 1,
             overflow   = TextOverflow.Ellipsis,
@@ -140,25 +140,25 @@ private fun DisabledPlaceholder() {
         modifier = Modifier
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.medium)
-            .background(CelestiaTheme.colors.surfaceVariant.copy(alpha = 0.4f))
+            .background(NxTheme.colors.surfaceVariant.copy(alpha = 0.4f))
             .padding(horizontal = 12.dp, vertical = 10.dp),
     ) {
         Symbol(icon = NxIcon.VolumeOff,
             contentDescription = null,
-            tint               = CelestiaTheme.colors.textSecondary.copy(alpha = 0.55f),
+            tint               = NxTheme.colors.textSecondary.copy(alpha = 0.55f),
             modifier           = Modifier.size(18.dp),
         )
         Spacer(Modifier.width(10.dp))
         Text(
             text  = s.audioNoPlayerHere,
             style = MaterialTheme.typography.bodySmall,
-            color = CelestiaTheme.colors.textSecondary,
+            color = NxTheme.colors.textSecondary,
         )
         Spacer(Modifier.weight(1f))
         Text(
             text  = s.audioAddMusicPlayer,
             style = MaterialTheme.typography.labelSmall,
-            color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.7f),
+            color = NxTheme.colors.textSecondary.copy(alpha = 0.7f),
         )
     }
 }
@@ -170,8 +170,8 @@ private fun TransportButton(
     onClick: () -> Unit,
     description: String,
 ) {
-    val bg = if (enabled) CelestiaTheme.colors.primary else CelestiaTheme.colors.surfaceVariant.copy(alpha = 0.4f)
-    val tint = if (enabled) CelestiaTheme.colors.onPrimary else CelestiaTheme.colors.textSecondary.copy(alpha = 0.4f)
+    val bg = if (enabled) NxTheme.colors.primary else NxTheme.colors.surfaceVariant.copy(alpha = 0.4f)
+    val tint = if (enabled) NxTheme.colors.onPrimary else NxTheme.colors.textSecondary.copy(alpha = 0.4f)
     Box(
         modifier = Modifier
             .size(30.dp)
@@ -246,14 +246,14 @@ private fun MiniVolumeBar(
                 .fillMaxWidth()
                 .height(trackHeight)
                 .clip(RoundedCornerShape(50))
-                .background(CelestiaTheme.colors.outline.copy(alpha = 0.20f)),
+                .background(NxTheme.colors.outline.copy(alpha = 0.20f)),
         )
         Box(
             modifier = Modifier
                 .fillMaxWidth(value)
                 .height(trackHeight)
                 .clip(RoundedCornerShape(50))
-                .background(CelestiaTheme.colors.primary),
+                .background(NxTheme.colors.primary),
         )
         if (widthPx > 0 && thumbAlpha > 0.01f) {
             val thumbHalfPx = with(LocalDensity.current) { 8.dp.toPx() / 2f }
@@ -264,7 +264,7 @@ private fun MiniVolumeBar(
                     .size(8.dp)
                     .graphicsLayer { alpha = thumbAlpha }
                     .clip(CircleShape)
-                    .background(CelestiaTheme.colors.primary),
+                    .background(NxTheme.colors.primary),
             )
         }
     }

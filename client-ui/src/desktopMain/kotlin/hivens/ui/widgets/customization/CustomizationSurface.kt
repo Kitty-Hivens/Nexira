@@ -33,7 +33,7 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.widget.api.SlotRenderer
 import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId
@@ -106,7 +106,7 @@ fun CustomizationSurface(
                 IconButton(onClick = onBack) {
                     Symbol(icon = NxIcon.ArrowBack,
                         contentDescription = null,
-                        tint               = CelestiaTheme.colors.textPrimary,
+                        tint               = NxTheme.colors.textPrimary,
                     )
                 }
                 Spacer(Modifier.width(8.dp))
@@ -115,12 +115,12 @@ fun CustomizationSurface(
                         text       = s.customizationTitle,
                         style      = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
-                        color      = CelestiaTheme.colors.textPrimary,
+                        color      = NxTheme.colors.textPrimary,
                     )
                     Text(
                         text  = s.customizationSubtitle,
                         style = MaterialTheme.typography.bodySmall,
-                        color = CelestiaTheme.colors.textSecondary,
+                        color = NxTheme.colors.textSecondary,
                     )
                 }
             }
@@ -139,13 +139,13 @@ fun CustomizationSurface(
                     // 16dp intra-slot spacing via `spacing`; the outer
                     // Column spaces the slot blocks + dividers.
                     SlotRenderer(SurfaceId(SURFACE), SlotId("visual"), spacing = 16.dp)
-                    HorizontalDivider(color = CelestiaTheme.colors.outline.copy(alpha = 0.15f))
+                    HorizontalDivider(color = NxTheme.colors.outline.copy(alpha = 0.15f))
 
                     if (settings.value.experimentalColorOverridesEnabled) {
                         SlotRenderer(SurfaceId(SURFACE), SlotId("colors"), spacing = 16.dp)
-                        HorizontalDivider(color = CelestiaTheme.colors.outline.copy(alpha = 0.15f))
+                        HorizontalDivider(color = NxTheme.colors.outline.copy(alpha = 0.15f))
                         SlotRenderer(SurfaceId(SURFACE), SlotId("shape"), spacing = 16.dp)
-                        HorizontalDivider(color = CelestiaTheme.colors.outline.copy(alpha = 0.15f))
+                        HorizontalDivider(color = NxTheme.colors.outline.copy(alpha = 0.15f))
                     }
 
                     SlotRenderer(SurfaceId(SURFACE), SlotId("actions"), spacing = 16.dp)

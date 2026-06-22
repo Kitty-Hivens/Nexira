@@ -26,7 +26,7 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.ui.widgets.home.new.rememberQuickLaunchTarget
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
@@ -55,8 +55,8 @@ fun LaunchButtonWidget(instance: WidgetInstance) {
 
     val gradient = Brush.linearGradient(
         colors = listOf(
-            CelestiaTheme.colors.primary,
-            CelestiaTheme.colors.primary.copy(alpha = 0.78f),
+            NxTheme.colors.primary,
+            NxTheme.colors.primary.copy(alpha = 0.78f),
         ),
     )
 
@@ -66,8 +66,8 @@ fun LaunchButtonWidget(instance: WidgetInstance) {
             .padding(top = 12.dp)
             .clip(MaterialTheme.shapes.small)
             .background(if (ready) gradient else Brush.linearGradient(listOf(
-                CelestiaTheme.colors.surfaceVariant,
-                CelestiaTheme.colors.surfaceVariant,
+                NxTheme.colors.surfaceVariant,
+                NxTheme.colors.surfaceVariant,
             )))
             .clickable(enabled = ready, onClick = qt.launch)
             .padding(horizontal = 20.dp, vertical = 18.dp),
@@ -85,7 +85,7 @@ fun LaunchButtonWidget(instance: WidgetInstance) {
             ) {
                 Symbol(icon = NxIcon.PlayArrow,
                     contentDescription = null,
-                    tint               = if (ready) Color.White else CelestiaTheme.colors.textSecondary,
+                    tint               = if (ready) Color.White else NxTheme.colors.textSecondary,
                     modifier           = Modifier.size(28.dp),
                 )
             }
@@ -94,14 +94,14 @@ fun LaunchButtonWidget(instance: WidgetInstance) {
                 Text(
                     text       = if (ready) p.label.ifBlank { s.launchTileReady } else s.launchTileBlocked,
                     style      = MaterialTheme.typography.titleLarge,
-                    color      = if (ready) Color.White else CelestiaTheme.colors.textSecondary,
+                    color      = if (ready) Color.White else NxTheme.colors.textSecondary,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
                     text  = target.displayName,
                     style = MaterialTheme.typography.bodyMedium,
                     color = if (ready) Color.White.copy(alpha = 0.85f)
-                            else CelestiaTheme.colors.textSecondary.copy(alpha = 0.7f),
+                            else NxTheme.colors.textSecondary.copy(alpha = 0.7f),
                 )
             }
         }

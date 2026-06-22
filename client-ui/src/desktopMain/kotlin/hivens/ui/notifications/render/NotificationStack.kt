@@ -33,7 +33,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.notifications.NotificationCenter
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import kotlinx.coroutines.delay
 import org.koin.compose.koinInject
 import java.time.Instant
@@ -115,7 +115,7 @@ fun NotificationStack(center: NotificationCenter = koinInject()) {
                 Text(
                     text       = label,
                     style      = MaterialTheme.typography.labelSmall,
-                    color      = CelestiaTheme.colors.textSecondary,
+                    color      = NxTheme.colors.textSecondary,
                     fontWeight = FontWeight.Medium,
                     textDecoration = TextDecoration.Underline,
                     modifier   = Modifier

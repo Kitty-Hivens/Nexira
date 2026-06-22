@@ -24,7 +24,7 @@ import androidx.compose.ui.unit.sp
 import hivens.ui.background.BackgroundLoopMode
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 
@@ -51,7 +51,7 @@ fun BgLoopModeWidget(instance: WidgetInstance) {
                         .weight(1f)
                         .height(32.dp)
                         .clip(MaterialTheme.shapes.small)
-                        .background(if (selected) CelestiaTheme.colors.primary else glassSurfaceAlpha(0.4f))
+                        .background(if (selected) NxTheme.colors.primary else glassSurfaceAlpha(0.4f))
                         .clickable { ctx.update { copy(loopMode = mode) } },
                     contentAlignment = Alignment.Center,
                 ) {
@@ -59,7 +59,7 @@ fun BgLoopModeWidget(instance: WidgetInstance) {
                         text       = label,
                         fontSize   = 10.sp,
                         fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                        color      = if (selected) Color.White else CelestiaTheme.colors.textSecondary,
+                        color      = if (selected) Color.White else NxTheme.colors.textSecondary,
                     )
                 }
             }

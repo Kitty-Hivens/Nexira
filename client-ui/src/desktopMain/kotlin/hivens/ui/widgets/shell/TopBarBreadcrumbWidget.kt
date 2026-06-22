@@ -20,7 +20,7 @@ import hivens.ui.chrome.rememberCrumbLabel
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 
@@ -52,7 +52,7 @@ fun TopBarBreadcrumbWidget(instance: WidgetInstance) {
                 Symbol(
                     icon = NxIcon.ChevronRight,
                     contentDescription = null,
-                    tint = CelestiaTheme.colors.textSecondary,
+                    tint = NxTheme.colors.textSecondary,
                     size = 16.dp,
                 )
             }
@@ -81,7 +81,7 @@ private fun NavArrow(
             icon = NxIcon.ArrowBack,
             contentDescription = contentDescription,
             modifier = if (mirrored) Modifier.graphicsLayer { scaleX = -1f } else Modifier,
-            tint = CelestiaTheme.colors.textSecondary.copy(alpha = if (enabled) 1f else 0.3f),
+            tint = NxTheme.colors.textSecondary.copy(alpha = if (enabled) 1f else 0.3f),
             size = 18.dp,
         )
     }
@@ -92,7 +92,7 @@ private fun CrumbSegment(label: String, isLast: Boolean, onClick: () -> Unit) {
     Text(
         text = label,
         style = MaterialTheme.typography.labelLarge,
-        color = if (isLast) CelestiaTheme.colors.textPrimary else CelestiaTheme.colors.textSecondary,
+        color = if (isLast) NxTheme.colors.textPrimary else NxTheme.colors.textSecondary,
         fontWeight = if (isLast) FontWeight.SemiBold else FontWeight.Normal,
         maxLines = 1,
         modifier = (if (isLast) Modifier else Modifier.clickable(onClick = onClick))

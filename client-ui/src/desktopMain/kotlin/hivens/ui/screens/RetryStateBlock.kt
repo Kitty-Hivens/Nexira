@@ -17,7 +17,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 
 /**
  * Centred error placeholder: title + message + a single retry button.
@@ -44,13 +44,13 @@ internal fun RetryStateBlock(
             Text(
                 text       = title,
                 style      = titleStyle,
-                color      = CelestiaTheme.colors.error,
+                color      = NxTheme.colors.error,
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
                 text      = message,
                 style     = MaterialTheme.typography.bodySmall,
-                color     = CelestiaTheme.colors.textSecondary,
+                color     = NxTheme.colors.textSecondary,
                 textAlign = TextAlign.Center,
                 modifier  = Modifier.widthIn(max = 480.dp),
             )
@@ -58,7 +58,7 @@ internal fun RetryStateBlock(
                 onClick = onRetry,
                 shape   = MaterialTheme.shapes.small,
                 colors  = ButtonDefaults.buttonColors(
-                    containerColor = CelestiaTheme.colors.primary,
+                    containerColor = NxTheme.colors.primary,
                     contentColor   = Color.White,
                 ),
             ) { Text(retryLabel, fontWeight = FontWeight.SemiBold) }

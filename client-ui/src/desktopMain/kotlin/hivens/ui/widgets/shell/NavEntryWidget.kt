@@ -35,7 +35,7 @@ import hivens.ui.easter.LocalAprilFools
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalStyle
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.widgets.toWidgetColorOrNull
@@ -142,7 +142,7 @@ fun NavEntry(instance: WidgetInstance) {
                 phase         = 0.0f,
                 active        = false,
                 chaosEligible = false,
-                iconTint      = CelestiaTheme.colors.error.copy(alpha = 0.75f),
+                iconTint      = NxTheme.colors.error.copy(alpha = 0.75f),
                 onClick       = ctx.onLogout,
             )
         }
@@ -209,11 +209,11 @@ private fun NavSlot(
     // Selection accent: the user's nav override, else the theme primary -- so
     // by default it tracks the palette / accent override. Shared by the icon
     // tint and every decoration.
-    val accent = cz.navSelectionAccent?.toWidgetColorOrNull() ?: CelestiaTheme.colors.primary
+    val accent = cz.navSelectionAccent?.toWidgetColorOrNull() ?: NxTheme.colors.primary
     val iconColor = when {
         iconTint != null -> iconTint
         active           -> accent
-        else             -> CelestiaTheme.colors.textSecondary.copy(alpha = if (enabled) 0.70f else 0.20f)
+        else             -> NxTheme.colors.textSecondary.copy(alpha = if (enabled) 0.70f else 0.20f)
     }
     val iconFill = if (outlineSwap && !active && cz.navSelectionOutlineIcons) 0f else 1f
 

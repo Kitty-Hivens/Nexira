@@ -86,7 +86,7 @@ import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.layout.AdaptiveWidth
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalStyle
 import hivens.ui.widgets.about.LocalAboutContext
 import hivens.ui.widgets.about.STUB_ABOUT
@@ -481,11 +481,11 @@ fun EditorSurfaceHost(
                                 TextButton(onClick = {
                                     controller.resetAll()
                                     resetSurfaceConfirm = false
-                                }) { Text(s.editorResetAll, color = CelestiaTheme.colors.error) }
+                                }) { Text(s.editorResetAll, color = NxTheme.colors.error) }
                                 TextButton(onClick = {
                                     controller.resetSurface(surfaceForReset)
                                     resetSurfaceConfirm = false
-                                }) { Text(s.editorReset, color = CelestiaTheme.colors.error) }
+                                }) { Text(s.editorReset, color = NxTheme.colors.error) }
                             }
                         },
                         dismissButton = {
@@ -662,7 +662,7 @@ private fun EditModePill(
             // WidthClass, so it tracks the real chip count.
             val compact = maxWidth < 1100.dp
             Surface(
-                color   = CelestiaTheme.colors.surface.copy(alpha = 0.94f),
+                color   = NxTheme.colors.surface.copy(alpha = 0.94f),
                 shape   = RoundedCornerShape(20.dp),
                 shadowElevation = 6.dp,
             ) {
@@ -672,7 +672,7 @@ private fun EditModePill(
                 ) {
                     Symbol(icon = NxIcon.Tune,
                         contentDescription = null,
-                        tint               = CelestiaTheme.colors.primary,
+                        tint               = NxTheme.colors.primary,
                         modifier           = Modifier.size(16.dp),
                     )
                     Spacer(Modifier.width(8.dp))
@@ -759,7 +759,7 @@ private fun EditModePill(
                         Text(
                             text  = s.editorEscHint,
                             style = MaterialTheme.typography.labelSmall,
-                            color = CelestiaTheme.colors.textSecondary,
+                            color = NxTheme.colors.textSecondary,
                             modifier = Modifier.padding(end = 8.dp),
                         )
                     }
@@ -772,9 +772,9 @@ private fun EditModePill(
 @Composable
 private fun SurfaceChip(surface: SurfaceId, active: Boolean, compact: Boolean, onClick: () -> Unit) {
     val s = LocalStrings.current
-    val bg = if (active) CelestiaTheme.colors.primary.copy(alpha = 0.18f)
+    val bg = if (active) NxTheme.colors.primary.copy(alpha = 0.18f)
              else Color.Transparent
-    val fg = if (active) CelestiaTheme.colors.primary else CelestiaTheme.colors.textSecondary
+    val fg = if (active) NxTheme.colors.primary else NxTheme.colors.textSecondary
     val name = humanSurfaceShortName(surface, s)
     Surface(
         color    = bg,
@@ -817,16 +817,16 @@ private fun ToolChip(
     compact: Boolean = false,
 ) {
     val bg = when {
-        !enabled    -> CelestiaTheme.colors.surfaceVariant.copy(alpha = 0.3f)
-        destructive -> CelestiaTheme.colors.error.copy(alpha = 0.12f)
-        selected    -> CelestiaTheme.colors.primary.copy(alpha = 0.18f)
-        else        -> CelestiaTheme.colors.surfaceVariant.copy(alpha = 0.6f)
+        !enabled    -> NxTheme.colors.surfaceVariant.copy(alpha = 0.3f)
+        destructive -> NxTheme.colors.error.copy(alpha = 0.12f)
+        selected    -> NxTheme.colors.primary.copy(alpha = 0.18f)
+        else        -> NxTheme.colors.surfaceVariant.copy(alpha = 0.6f)
     }
     val fg = when {
-        !enabled    -> CelestiaTheme.colors.textSecondary.copy(alpha = 0.45f)
-        destructive -> CelestiaTheme.colors.error
-        selected    -> CelestiaTheme.colors.primary
-        else        -> CelestiaTheme.colors.textPrimary
+        !enabled    -> NxTheme.colors.textSecondary.copy(alpha = 0.45f)
+        destructive -> NxTheme.colors.error
+        selected    -> NxTheme.colors.primary
+        else        -> NxTheme.colors.textPrimary
     }
     Surface(color = bg, shape = RoundedCornerShape(12.dp)) {
         Row(
@@ -922,7 +922,7 @@ private fun EditModeVignette(active: Boolean) {
             .alpha(alpha)
             .border(
                 width = 1.5.dp,
-                color = CelestiaTheme.colors.primary.copy(alpha = 0.35f),
+                color = NxTheme.colors.primary.copy(alpha = 0.35f),
                 shape = RoundedCornerShape(0.dp),
             ),
     )

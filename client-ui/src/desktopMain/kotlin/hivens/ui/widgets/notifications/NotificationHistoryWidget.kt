@@ -54,8 +54,8 @@ import hivens.ui.notifications.NotificationArchiveStore
 import hivens.ui.notifications.PersistedNotification
 import hivens.ui.notifications.Severity
 import hivens.ui.notifications.render.NotificationAvatar
-import hivens.ui.theme.CelestiaColors
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxColors
+import hivens.ui.theme.NxTheme
 import hivens.ui.widgets.Commands
 import hivens.ui.widgets.Sources
 import hivens.widget.api.rememberAction
@@ -115,7 +115,7 @@ fun NotificationHistoryWidget(instance: WidgetInstance) {
     val doNotDisturb by rememberSource(Sources.DoNotDisturb)
     val setDoNotDisturb = rememberCommand(Commands.SetDoNotDisturb)
     val store: NotificationArchiveStore = koinInject()
-    val palette = CelestiaTheme.colors
+    val palette = NxTheme.colors
     var expanded by remember { mutableStateOf(false) }
     val groups = remember(log) { groupHistory(log) }
     val outline = palette.outline.copy(alpha = 0.4f)
@@ -229,7 +229,7 @@ private fun PillButton(
     active: Boolean = false,
     onClick: () -> Unit,
 ) {
-    val palette = CelestiaTheme.colors
+    val palette = NxTheme.colors
     // Active = the toggle is engaged (mute on): tint + fill shift to the accent so
     // the state reads at a glance without a separate label.
     Box(
@@ -261,7 +261,7 @@ private fun CountPill(text: String, outline: Color, modifier: Modifier = Modifie
         Text(
             text       = text,
             style      = MaterialTheme.typography.labelMedium,
-            color      = CelestiaTheme.colors.textSecondary,
+            color      = NxTheme.colors.textSecondary,
             fontWeight = FontWeight.Medium,
             maxLines   = 1,
         )
@@ -280,7 +280,7 @@ private fun NotificationDrawer(
     fromTop: Boolean,
 ) {
     val strings = LocalStrings.current
-    val palette = CelestiaTheme.colors
+    val palette = NxTheme.colors
     val edge = if (fromTop) Alignment.Top else Alignment.Bottom
     AnimatedVisibility(
         visible = expanded,
@@ -404,7 +404,7 @@ private fun groupHistory(log: List<PersistedNotification>): List<HistoryGroup> {
 @Composable
 private fun HistoryRow(entry: PersistedNotification, count: Int, ampm: Boolean, verticalTime: Boolean) {
     val strings = LocalStrings.current
-    val palette = CelestiaTheme.colors
+    val palette = NxTheme.colors
     Row(
         modifier          = Modifier.fillMaxWidth().padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -482,7 +482,7 @@ private fun TimeStamp(epoch: Long, ampm: Boolean, vertical: Boolean, color: Colo
 
 // Critical / Warn tint the title so failures stand out when scanning the log;
 // Info / Success read as normal primary text.
-private fun severityColor(severity: Severity, colors: CelestiaColors): Color = when (severity) {
+private fun severityColor(severity: Severity, colors: NxColors): Color = when (severity) {
     Severity.Critical -> colors.criticalAccent
     Severity.Warn     -> colors.warnAccent
     else              -> colors.textPrimary

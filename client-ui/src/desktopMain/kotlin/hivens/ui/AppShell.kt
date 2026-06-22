@@ -86,7 +86,7 @@ import hivens.ui.screens.MigrationScreen
 import hivens.ui.theme.BrutStyle
 import hivens.ui.theme.CelestiaStyle
 import hivens.ui.theme.applyOverrides
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.CustomTheme
 import hivens.ui.theme.ThemeRevealHost
 import hivens.ui.theme.rememberThemeReveal
@@ -263,7 +263,7 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
 
     var isDarkTheme   by remember { mutableStateOf(settings.isDarkTheme) }
     // Material You palette: the wallpaper seed (computed in AppRoot from the backdrop
-    // bitmap) lifts up to here so CelestiaTheme -- which wraps AppRoot -- can derive
+    // bitmap) lifts up to here so NxTheme -- which wraps AppRoot -- can derive
     // the palette from it. Default-on; the seed is null until a bitmap is decoded.
     val paletteFromWallpaper = settings.paletteFromWallpaper
     var wallpaperSeed by remember { mutableStateOf<Int?>(null) }
@@ -402,7 +402,7 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
 
         // Customization extension: persisted overrides for accent /
         // density / glass intensity / full color overrides. Provided
-        // via [LocalCustomization] so CelestiaTheme + GlassCard can
+        // via [LocalCustomization] so NxTheme + GlassCard can
         // read without prop-drilling.
         val customizationJson    = remember { Json { ignoreUnknownKeys = true; encodeDefaults = true } }
         val customizationManager = remember { CustomizationManager(dataDirectory, customizationJson) }
@@ -657,7 +657,7 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
         }
 
         // Console window moved inside the CompositionLocalProvider /
-        // CelestiaTheme block below so it inherits the active theme +
+        // NxTheme block below so it inherits the active theme +
         // customization (accent override, role overrides). The window
         // itself is a separate OS surface, but Compose Desktop propagates
         // CompositionLocals down through the Window composable.
@@ -849,8 +849,8 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
             }
 
             // Console runs as its own OS window but is composed from here so
-            // it inherits LocalCustomization + LocalCelestiaColors via the
-            // Compose composition tree. The internal CelestiaTheme wrap is
+            // it inherits LocalCustomization + LocalNxColors via the
+            // Compose composition tree. The internal NxTheme wrap is
             // what actually projects the palette into the window's surface;
             // this site only ensures the composition locals are in scope.
             if (gameConsole.shouldShowConsole) {
@@ -869,7 +869,7 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
 
             Box(Modifier.fillMaxSize()) {
             val themeReveal = rememberThemeReveal()
-            CelestiaTheme(
+            NxTheme(
                 useDarkTheme = isDarkTheme,
                 customTheme  = customTheme,
                 style        = effectiveStyle,
@@ -1094,7 +1094,7 @@ fun AppRoot(
     var backdrop   by remember { mutableStateOf(BackdropState.EMPTY) }
 
     // Material You: forward the wallpaper palette seed (computed in CustomBackground
-    // from the static bitmap or the first video frame) up to CelestiaTheme.
+    // from the static bitmap or the first video frame) up to NxTheme.
     LaunchedEffect(backdrop.seedArgb) { onWallpaperSeed(backdrop.seedArgb) }
 
     Box(

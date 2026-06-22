@@ -31,7 +31,7 @@ import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 
 /**
  * One asset row -- resourcepack / shaderpack / config / generic file
@@ -60,7 +60,7 @@ fun AssetRowPanel(asset: SmrtAssetEntry, modifier: Modifier = Modifier) {
         ) {
             Symbol(icon = NxIcon.Folder,
                 contentDescription = null,
-                tint               = CelestiaTheme.colors.primary.copy(alpha = 0.8f),
+                tint               = NxTheme.colors.primary.copy(alpha = 0.8f),
                 modifier           = Modifier.size(20.dp),
             )
 
@@ -68,7 +68,7 @@ fun AssetRowPanel(asset: SmrtAssetEntry, modifier: Modifier = Modifier) {
                 Text(
                     text       = asset.dest,
                     style      = MaterialTheme.typography.bodyMedium,
-                    color      = CelestiaTheme.colors.textPrimary,
+                    color      = NxTheme.colors.textPrimary,
                     fontWeight = FontWeight.SemiBold,
                     maxLines   = 1,
                     overflow   = TextOverflow.Ellipsis,
@@ -77,20 +77,20 @@ fun AssetRowPanel(asset: SmrtAssetEntry, modifier: Modifier = Modifier) {
                     Text(
                         text  = s.contentTabAssetSizeLabel(asset.sizeBytes / 1024L),
                         style = MaterialTheme.typography.labelSmall,
-                        color = CelestiaTheme.colors.textSecondary,
+                        color = NxTheme.colors.textSecondary,
                     )
                     asset.display?.category?.takeIf { it.isNotBlank() }?.let { cat ->
                         Text(
                             text  = "· $cat",
                             style = MaterialTheme.typography.labelSmall,
-                            color = CelestiaTheme.colors.textSecondary,
+                            color = NxTheme.colors.textSecondary,
                         )
                     }
                     if (!asset.required) {
                         Text(
                             text  = "· ${s.contentTabAssetOptional}",
                             style = MaterialTheme.typography.labelSmall,
-                            color = CelestiaTheme.colors.textSecondary,
+                            color = NxTheme.colors.textSecondary,
                         )
                     }
                 }
@@ -100,7 +100,7 @@ fun AssetRowPanel(asset: SmrtAssetEntry, modifier: Modifier = Modifier) {
 
             Symbol(icon = if (expanded) NxIcon.ExpandLess else NxIcon.ExpandMore,
                 contentDescription = null,
-                tint               = CelestiaTheme.colors.textSecondary,
+                tint               = NxTheme.colors.textSecondary,
                 modifier           = Modifier.size(20.dp),
             )
         }
@@ -114,7 +114,7 @@ fun AssetRowPanel(asset: SmrtAssetEntry, modifier: Modifier = Modifier) {
                 Text(
                     text     = s.contentTabAssetNoDescription,
                     style    = MaterialTheme.typography.bodySmall,
-                    color    = CelestiaTheme.colors.textSecondary,
+                    color    = NxTheme.colors.textSecondary,
                     modifier = Modifier.padding(start = 30.dp),
                 )
             }

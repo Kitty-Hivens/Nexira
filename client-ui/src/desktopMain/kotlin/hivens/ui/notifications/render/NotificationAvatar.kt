@@ -17,7 +17,7 @@ import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.notifications.NotifGlyph
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalStyle
 
 /**
@@ -33,7 +33,7 @@ fun NotificationAvatar(
     modifier: Modifier = Modifier,
     size: Dp = 30.dp,
 ) {
-    val palette = CelestiaTheme.colors
+    val palette = NxTheme.colors
     val style = LocalStyle.current
     val shape = RoundedCornerShape((style.cardCorner / 2).coerceAtMost(8.dp))
     Box(

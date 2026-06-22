@@ -24,7 +24,7 @@ import androidx.compose.ui.unit.sp
 import hivens.core.jvm.SystemMemory
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 
 /**
  * RAM mode selector. Represents a MODE, not just a number:
@@ -69,12 +69,12 @@ fun RamSelector(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(s.serverSettingsRam, style = MaterialTheme.typography.bodyMedium, color = CelestiaTheme.colors.textPrimary)
+            Text(s.serverSettingsRam, style = MaterialTheme.typography.bodyMedium, color = NxTheme.colors.textPrimary)
             Text(
                 formatRam(if (isAuto) resolvedAutoMb else currentMb),
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
-                color = CelestiaTheme.colors.primary
+                color = NxTheme.colors.primary
             )
         }
 
@@ -111,7 +111,7 @@ fun RamSelector(
 
         // Custom input -- typing a value also pins the instance.
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(s.ramCustomInputLabel, style = MaterialTheme.typography.bodySmall, color = CelestiaTheme.colors.textSecondary, modifier = Modifier.width(100.dp))
+            Text(s.ramCustomInputLabel, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.textSecondary, modifier = Modifier.width(100.dp))
             OutlinedTextField(
                 value = if (isCustomMode) customInput else "",
                 onValueChange = { input ->
@@ -125,18 +125,18 @@ fun RamSelector(
                 placeholder = {
                     Text(
                         if (isCustomMode) "" else formatRam(if (isAuto) resolvedAutoMb else currentMb),
-                        color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.4f),
+                        color = NxTheme.colors.textSecondary.copy(alpha = 0.4f),
                         fontSize = 13.sp,
                     )
                 },
-                suffix = { Text("MB", color = CelestiaTheme.colors.textSecondary, fontSize = 12.sp) },
+                suffix = { Text("MB", color = NxTheme.colors.textSecondary, fontSize = 12.sp) },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = CelestiaTheme.colors.textPrimary, unfocusedTextColor = CelestiaTheme.colors.textPrimary,
-                    cursorColor = CelestiaTheme.colors.primary, focusedBorderColor = CelestiaTheme.colors.primary,
-                    unfocusedBorderColor = CelestiaTheme.colors.textSecondary.copy(alpha = 0.2f),
+                    focusedTextColor = NxTheme.colors.textPrimary, unfocusedTextColor = NxTheme.colors.textPrimary,
+                    cursorColor = NxTheme.colors.primary, focusedBorderColor = NxTheme.colors.primary,
+                    unfocusedBorderColor = NxTheme.colors.textSecondary.copy(alpha = 0.2f),
                     focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent
                 ),
                 shape = MaterialTheme.shapes.small
@@ -147,7 +147,7 @@ fun RamSelector(
         Text(
             text = s.ramSystemHint(formatRam(systemRamMb), formatRam((systemRamMb * 0.75).toInt())),
             style = MaterialTheme.typography.labelSmall,
-            color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.5f)
+            color = NxTheme.colors.textSecondary.copy(alpha = 0.5f)
         )
     }
 }
@@ -156,11 +156,11 @@ fun RamSelector(
 @Composable
 private fun RamChip(selected: Boolean, label: String, modifier: Modifier, onClick: () -> Unit) {
     val bg by animateColorAsState(
-        if (selected) CelestiaTheme.colors.primary else glassSurfaceAlpha(0.5f),
+        if (selected) NxTheme.colors.primary else glassSurfaceAlpha(0.5f),
         tween(200),
     )
     val fg by animateColorAsState(
-        if (selected) Color.White else CelestiaTheme.colors.textSecondary,
+        if (selected) Color.White else NxTheme.colors.textSecondary,
         tween(200),
     )
     Box(
@@ -168,7 +168,7 @@ private fun RamChip(selected: Boolean, label: String, modifier: Modifier, onClic
             .clip(MaterialTheme.shapes.small)
             .border(
                 1.dp,
-                if (selected) CelestiaTheme.colors.primary.copy(alpha = 0.7f) else CelestiaTheme.colors.outline.copy(alpha = 0.2f),
+                if (selected) NxTheme.colors.primary.copy(alpha = 0.7f) else NxTheme.colors.outline.copy(alpha = 0.2f),
                 MaterialTheme.shapes.small,
             )
             .background(bg)

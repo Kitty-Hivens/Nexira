@@ -7,7 +7,7 @@ import com.materialkolor.hct.Hct
 import com.materialkolor.scheme.SchemeTonalSpot
 
 /**
- * Material You colour science -> [CelestiaColors] (Monet). Given a seed colour
+ * Material You colour science -> [NxColors] (Monet). Given a seed colour
  * (extracted from the wallpaper), build an M3 tonal scheme and map its roles onto
  * [base], replacing the palette-derived fields -- accents, surfaces, outline,
  * on-colours -- while keeping brand / semantic tokens (origin*, severity accents,
@@ -16,10 +16,10 @@ import com.materialkolor.scheme.SchemeTonalSpot
  * which is the whole point (same-on-same never reads as separate).
  *
  * Pure: no Compose state, no IO -- unit-testable. tertiary + the container fills
- * are intentionally left to [CelestiaTheme]'s existing derivation step, which
+ * are intentionally left to [NxTheme]'s existing derivation step, which
  * recomputes them from the (now seeded) primary/secondary.
  */
-fun seededCelestiaColors(base: CelestiaColors, seedArgb: Int, dark: Boolean): CelestiaColors {
+fun seededNxColors(base: NxColors, seedArgb: Int, dark: Boolean): NxColors {
     val scheme = SchemeTonalSpot(Hct.fromInt(seedArgb), dark, 0.0)
     val m = MaterialDynamicColors()
     fun role(dc: DynamicColor): Color = Color(dc.getArgb(scheme))

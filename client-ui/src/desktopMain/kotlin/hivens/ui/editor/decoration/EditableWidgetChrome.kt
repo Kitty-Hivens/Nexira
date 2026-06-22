@@ -65,7 +65,7 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalStyle
 import hivens.widget.api.LocalCanvasSlotSizeDp
 import hivens.widget.api.LocalLayoutGraph
@@ -187,7 +187,7 @@ fun EditableWidgetChrome(
                 .padding(2.dp)
                 .border(
                     width = 1.dp,
-                    color = CelestiaTheme.colors.primary.copy(alpha = borderAlpha),
+                    color = NxTheme.colors.primary.copy(alpha = borderAlpha),
                     shape = RoundedCornerShape(8.dp),
                 )
                 .onGloballyPositioned { coords: LayoutCoordinates ->
@@ -291,7 +291,7 @@ fun EditableWidgetChrome(
                         enter   = fadeIn(tween(chromeMotionMs)),
                         exit    = fadeOut(tween(chromeMotionMs)),
                     ) {
-                        AffordanceButton(NxIcon.FlipToFront, s.editorToFront, CelestiaTheme.colors.primary, instance.instanceId) {
+                        AffordanceButton(NxIcon.FlipToFront, s.editorToFront, NxTheme.colors.primary, instance.instanceId) {
                             val maxZ = graph.traverse(path)?.widgets?.maxOfOrNull { it.canvas?.z ?: 0 } ?: 0
                             editController.setWidgetZ(path, instance.instanceId, maxZ + 1)
                         }
@@ -301,7 +301,7 @@ fun EditableWidgetChrome(
                         enter   = fadeIn(tween(chromeMotionMs)),
                         exit    = fadeOut(tween(chromeMotionMs)),
                     ) {
-                        AffordanceButton(NxIcon.FlipToBack, s.editorToBack, CelestiaTheme.colors.primary, instance.instanceId) {
+                        AffordanceButton(NxIcon.FlipToBack, s.editorToBack, NxTheme.colors.primary, instance.instanceId) {
                             val minZ = graph.traverse(path)?.widgets?.minOfOrNull { it.canvas?.z ?: 0 } ?: 0
                             editController.setWidgetZ(path, instance.instanceId, minZ - 1)
                         }
@@ -312,21 +312,21 @@ fun EditableWidgetChrome(
                     enter   = fadeIn(tween(chromeMotionMs)),
                     exit    = fadeOut(tween(chromeMotionMs)),
                 ) {
-                    AffordanceButton(NxIcon.Tune, s.editorConfigure, CelestiaTheme.colors.primary, instance.instanceId, onEditProps)
+                    AffordanceButton(NxIcon.Tune, s.editorConfigure, NxTheme.colors.primary, instance.instanceId, onEditProps)
                 }
                 AnimatedVisibility(
                     visible = isHovered && descriptor.removable,
                     enter   = fadeIn(tween(chromeMotionMs)),
                     exit    = fadeOut(tween(chromeMotionMs)),
                 ) {
-                    AffordanceButton(NxIcon.Close, s.editorDelete, CelestiaTheme.colors.error, instance.instanceId, onRemove)
+                    AffordanceButton(NxIcon.Close, s.editorDelete, NxTheme.colors.error, instance.instanceId, onRemove)
                 }
                 AnimatedVisibility(
                     visible = isHovered && !descriptor.removable,
                     enter   = fadeIn(tween(chromeMotionMs)),
                     exit    = fadeOut(tween(chromeMotionMs)),
                 ) {
-                    AffordanceButton(NxIcon.DeleteForever, s.editorForceRemove, CelestiaTheme.colors.warnAccent, instance.instanceId) { forceRemoveOpen = true }
+                    AffordanceButton(NxIcon.DeleteForever, s.editorForceRemove, NxTheme.colors.warnAccent, instance.instanceId) { forceRemoveOpen = true }
                 }
             }
 
@@ -342,7 +342,7 @@ fun EditableWidgetChrome(
                 modifier = Modifier.align(Alignment.BottomEnd).padding(3.dp),
             ) {
                 Surface(
-                    color    = CelestiaTheme.colors.primary.copy(alpha = 0.85f),
+                    color    = NxTheme.colors.primary.copy(alpha = 0.85f),
                     shape    = RoundedCornerShape(5.dp),
                     modifier = Modifier
                         .size(16.dp)
@@ -375,7 +375,7 @@ fun EditableWidgetChrome(
                 ) {
                     Symbol(icon = NxIcon.OpenInFull,
                         contentDescription = null,
-                        tint               = CelestiaTheme.colors.onPrimary,
+                        tint               = NxTheme.colors.onPrimary,
                         modifier           = Modifier.size(11.dp).padding(0.dp),
                     )
                 }
@@ -414,7 +414,7 @@ fun EditableWidgetChrome(
                 TextButton(onClick = {
                     forceRemoveOpen = false
                     onRemove()
-                }) { Text(s.editorDelete, color = CelestiaTheme.colors.error) }
+                }) { Text(s.editorDelete, color = NxTheme.colors.error) }
             },
             dismissButton = {
                 TextButton(onClick = { forceRemoveOpen = false }) { Text(s.editorCancel) }
@@ -465,7 +465,7 @@ private fun AffordanceButton(
     ) {
         Symbol(icon = icon,
             contentDescription = description,
-            tint               = CelestiaTheme.colors.onPrimary,
+            tint               = NxTheme.colors.onPrimary,
             modifier           = Modifier.size(13.dp),
         )
     }
@@ -481,7 +481,7 @@ private fun DropIndicator(isRow: Boolean) {
                 .fillMaxHeight()
                 .width(2.dp)
                 .padding(vertical = 4.dp)
-                .background(CelestiaTheme.colors.primary),
+                .background(NxTheme.colors.primary),
         )
     } else {
         Box(
@@ -489,7 +489,7 @@ private fun DropIndicator(isRow: Boolean) {
                 .fillMaxWidth()
                 .height(2.dp)
                 .padding(horizontal = 4.dp)
-                .background(CelestiaTheme.colors.primary),
+                .background(NxTheme.colors.primary),
         )
     }
 }

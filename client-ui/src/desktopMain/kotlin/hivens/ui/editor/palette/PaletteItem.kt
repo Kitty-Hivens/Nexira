@@ -45,7 +45,7 @@ import hivens.ui.editor.windowPointToSlotDp
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalMonoFamily
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.WidgetDescriptor
@@ -76,7 +76,7 @@ fun PaletteItem(
     val label = s.widgetLabel(descriptor.displayName)
     val density = LocalDensity.current.density
 
-    val background = if (isHovered) CelestiaTheme.colors.primary.copy(alpha = 0.12f)
+    val background = if (isHovered) NxTheme.colors.primary.copy(alpha = 0.12f)
                      else Color.Transparent
 
     Row(
@@ -129,13 +129,13 @@ fun PaletteItem(
             modifier = Modifier
                 .size(32.dp)
                 .clip(RoundedCornerShape(6.dp))
-                .background(CelestiaTheme.colors.primary.copy(alpha = 0.20f)),
+                .background(NxTheme.colors.primary.copy(alpha = 0.20f)),
             contentAlignment = Alignment.Center,
         ) {
             Text(
                 text       = label.firstOrNull()?.uppercase() ?: "?",
                 style      = MaterialTheme.typography.titleMedium,
-                color      = CelestiaTheme.colors.primary,
+                color      = NxTheme.colors.primary,
                 fontWeight = FontWeight.SemiBold,
             )
         }
@@ -144,7 +144,7 @@ fun PaletteItem(
             Text(
                 text       = label,
                 style      = MaterialTheme.typography.bodyMedium,
-                color      = CelestiaTheme.colors.textPrimary,
+                color      = NxTheme.colors.textPrimary,
                 fontWeight = FontWeight.Medium,
                 maxLines   = 1,
                 overflow   = TextOverflow.Ellipsis,
@@ -152,7 +152,7 @@ fun PaletteItem(
             Text(
                 text       = descriptor.kind.value,
                 style      = MaterialTheme.typography.labelSmall,
-                color      = CelestiaTheme.colors.textSecondary,
+                color      = NxTheme.colors.textSecondary,
                 fontFamily = LocalMonoFamily.current,
                 maxLines   = 1,
                 overflow   = TextOverflow.Ellipsis,
@@ -160,7 +160,7 @@ fun PaletteItem(
         }
         Symbol(icon = NxIcon.DragIndicator,
             contentDescription = null,
-            tint               = CelestiaTheme.colors.textSecondary.copy(alpha = if (isHovered) 0.9f else 0.45f),
+            tint               = NxTheme.colors.textSecondary.copy(alpha = if (isHovered) 0.9f else 0.45f),
             modifier           = Modifier.size(18.dp),
         )
     }
@@ -169,7 +169,7 @@ fun PaletteItem(
 @Composable
 private fun PaletteGhost(displayName: String) {
     Surface(
-        color           = CelestiaTheme.colors.primary,
+        color           = NxTheme.colors.primary,
         contentColor    = Color.White,
         shape           = RoundedCornerShape(10.dp),
         shadowElevation = 10.dp,

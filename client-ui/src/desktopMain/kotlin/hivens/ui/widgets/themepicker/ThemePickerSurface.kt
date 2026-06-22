@@ -28,7 +28,7 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.CustomTheme
 import hivens.ui.theme.ThemePresets
 import hivens.widget.api.SlotRenderer
@@ -87,7 +87,7 @@ fun ThemePickerSurface(
                     IconButton(onClick = onBack) {
                         Symbol(icon = NxIcon.ArrowBack,
                             contentDescription = s.navBack,
-                            tint               = CelestiaTheme.colors.primary,
+                            tint               = NxTheme.colors.primary,
                         )
                     }
                     Spacer(Modifier.width(8.dp))
@@ -95,7 +95,7 @@ fun ThemePickerSurface(
                         text       = s.themePickerTitle,
                         style      = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Black,
-                        color      = CelestiaTheme.colors.textPrimary,
+                        color      = NxTheme.colors.textPrimary,
                     )
                 }
                 af.ChaosButton(
@@ -103,7 +103,7 @@ fun ThemePickerSurface(
                     text    = s.themePickerApply,
                     onClick = { onThemeSelected(selectedTheme.value) },
                     colors  = ButtonDefaults.buttonColors(
-                        containerColor = CelestiaTheme.colors.primary,
+                        containerColor = NxTheme.colors.primary,
                     ),
                 )
             }

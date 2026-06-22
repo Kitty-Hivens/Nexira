@@ -58,7 +58,7 @@ import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.decorativePair
 import javax.imageio.ImageIO
 import kotlinx.coroutines.Dispatchers
@@ -88,7 +88,7 @@ fun ServerPill(
     val isHovered by interaction.collectIsHoveredAsState()
     val isFocused by interaction.collectIsFocusedAsState()
     val showActions = isHovered || isFocused
-    val palette = CelestiaTheme.colors
+    val palette = NxTheme.colors
     val (colorA, colorB) = remember(profile.name, palette) { palette.decorativePair(profile.name) }
 
     var serverIcon by remember(profile.assetDir) { mutableStateOf<ImageBitmap?>(null) }
@@ -112,9 +112,9 @@ fun ServerPill(
     }
 
     val borderColor = when {
-        isSelected -> CelestiaTheme.colors.primary
-        isFocused  -> CelestiaTheme.colors.textPrimary
-        else       -> CelestiaTheme.colors.outline.copy(alpha = 0.25f)
+        isSelected -> NxTheme.colors.primary
+        isFocused  -> NxTheme.colors.textPrimary
+        else       -> NxTheme.colors.outline.copy(alpha = 0.25f)
     }
 
     Row(
@@ -173,14 +173,14 @@ fun ServerPill(
                 text       = profile.title ?: profile.name,
                 style      = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.SemiBold,
-                color      = CelestiaTheme.colors.textPrimary,
+                color      = NxTheme.colors.textPrimary,
                 maxLines   = 1,
                 overflow   = TextOverflow.Ellipsis,
             )
             Text(
                 text     = profile.version,
                 style    = MaterialTheme.typography.labelSmall,
-                color    = CelestiaTheme.colors.textSecondary,
+                color    = NxTheme.colors.textSecondary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -190,12 +190,12 @@ fun ServerPill(
             Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                 PillIconButton(
                     icon  = NxIcon.Favorite,
-                    tint  = if (isFavorite) Color(0xFFEF4444) else CelestiaTheme.colors.textSecondary,
+                    tint  = if (isFavorite) Color(0xFFEF4444) else NxTheme.colors.textSecondary,
                     fill  = if (isFavorite) 1f else 0f,
                     onClick = onToggleFav,
                 )
-                PillIconButton(NxIcon.Settings, tint = CelestiaTheme.colors.textSecondary, onClick = onSettings)
-                PillIconButton(NxIcon.Info, tint = CelestiaTheme.colors.textSecondary, onClick = onDetails)
+                PillIconButton(NxIcon.Settings, tint = NxTheme.colors.textSecondary, onClick = onSettings)
+                PillIconButton(NxIcon.Info, tint = NxTheme.colors.textSecondary, onClick = onDetails)
             }
         }
     }

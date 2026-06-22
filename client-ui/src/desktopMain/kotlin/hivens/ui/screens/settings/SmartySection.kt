@@ -8,7 +8,7 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.puppet.PuppetToggle
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 
 /**
  * Smarty server controls. Two switches that govern how a raw SmartyCraft
@@ -38,7 +38,7 @@ internal fun SmartySection(
             title           = s.settingsOpenSmrtHelperTitle,
             description     = s.settingsOpenSmrtHelperDesc,
             icon            = NxIcon.SwapHoriz,
-            iconTint        = CelestiaTheme.colors.primary,
+            iconTint        = NxTheme.colors.primary,
             checked         = form.useOpenSmrtHelper,
             enabled         = true,
             onCheckedChange = { form.useOpenSmrtHelper = it; save() },
@@ -51,7 +51,7 @@ internal fun SmartySection(
             title           = s.settingsStrictModCheckTitle,
             description     = s.settingsStrictModCheckDesc,
             icon            = NxIcon.Rule,
-            iconTint        = CelestiaTheme.colors.primary,
+            iconTint        = NxTheme.colors.primary,
             checked         = form.strictModVerification,
             enabled         = true,
             onCheckedChange = { form.strictModVerification = it; save() },
@@ -64,7 +64,7 @@ internal fun SmartySection(
             title           = s.settingsNetworkAgentTitle,
             description     = s.settingsNetworkAgentDesc,
             icon            = NxIcon.Lan,
-            iconTint        = CelestiaTheme.colors.primary,
+            iconTint        = NxTheme.colors.primary,
             checked         = form.useNetworkAgent,
             enabled         = true,
             onCheckedChange = { form.useNetworkAgent = it; save() },
@@ -77,7 +77,7 @@ internal fun SmartySection(
             title           = s.settingsSmartyAuthLibTitle,
             description     = s.settingsSmartyAuthLibDesc,
             icon            = NxIcon.VpnKey,
-            iconTint        = CelestiaTheme.colors.primary,
+            iconTint        = NxTheme.colors.primary,
             checked         = form.useSmartycraftAuthLib,
             enabled         = true,
             onCheckedChange = { form.useSmartycraftAuthLib = it; save() },

@@ -21,7 +21,7 @@ import hivens.core.jvm.*
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalMonoFamily
 
 /**
@@ -67,7 +67,7 @@ fun JvmArgsBuilderDialog(
         Surface(
             modifier = Modifier.width(820.dp).heightIn(min = 540.dp, max = 720.dp),
             shape = MaterialTheme.shapes.large,
-            color = CelestiaTheme.colors.surface,
+            color = NxTheme.colors.surface,
         ) {
             Column(Modifier.fillMaxSize()) {
                 // ── Header ───────────────────────────────────────────
@@ -79,29 +79,29 @@ fun JvmArgsBuilderDialog(
                 ) {
                     Symbol(NxIcon.Tune,
                         null,
-                        tint = CelestiaTheme.colors.primary,
+                        tint = NxTheme.colors.primary,
                         modifier = Modifier.size(28.dp),
                     )
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(
                             s.jvmTitle,
-                            color = CelestiaTheme.colors.textPrimary,
+                            color = NxTheme.colors.textPrimary,
                             fontWeight = FontWeight.Bold,
                             style = MaterialTheme.typography.titleMedium,
                         )
                         Text(
                             s.jvmSubtitle,
-                            color = CelestiaTheme.colors.textSecondary,
+                            color = NxTheme.colors.textSecondary,
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
                     IconButton(onClick = onDismiss) {
-                        Symbol(NxIcon.Close, null, tint = CelestiaTheme.colors.textSecondary)
+                        Symbol(NxIcon.Close, null, tint = NxTheme.colors.textSecondary)
                     }
                 }
 
-                HorizontalDivider(color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.15f))
+                HorizontalDivider(color = NxTheme.colors.textSecondary.copy(alpha = 0.15f))
 
                 // ── Preset picker ──────────────────────────────────────
                 PresetPickerRow(
@@ -112,14 +112,14 @@ fun JvmArgsBuilderDialog(
                     },
                 )
 
-                HorizontalDivider(color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.15f))
+                HorizontalDivider(color = NxTheme.colors.textSecondary.copy(alpha = 0.15f))
 
                 // ── Tab row ────────────────────────────────────────────
                 PrimaryScrollableTabRow(
                     selectedTabIndex = selectedTabIdx,
                     edgePadding = 16.dp,
-                    containerColor = CelestiaTheme.colors.surface,
-                    contentColor = CelestiaTheme.colors.primary,
+                    containerColor = NxTheme.colors.surface,
+                    contentColor = NxTheme.colors.primary,
                 ) {
                     tabs.forEachIndexed { idx, (label, icon) ->
                         Tab(
@@ -127,8 +127,8 @@ fun JvmArgsBuilderDialog(
                             onClick = { selectedTabIdx = idx },
                             text = { Text(label, fontSize = 13.sp) },
                             icon = { Symbol(icon, null, modifier = Modifier.size(18.dp)) },
-                            selectedContentColor = CelestiaTheme.colors.primary,
-                            unselectedContentColor = CelestiaTheme.colors.textSecondary,
+                            selectedContentColor = NxTheme.colors.primary,
+                            unselectedContentColor = NxTheme.colors.textSecondary,
                         )
                     }
                 }
@@ -163,13 +163,13 @@ fun JvmArgsBuilderDialog(
                     horizontalArrangement = Arrangement.End,
                 ) {
                     TextButton(onClick = onDismiss) {
-                        Text(s.jvmCancel, color = CelestiaTheme.colors.textSecondary)
+                        Text(s.jvmCancel, color = NxTheme.colors.textSecondary)
                     }
                     Spacer(Modifier.width(8.dp))
                     Button(
                         onClick = { onApply(config.toArgString()) },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = CelestiaTheme.colors.primary,
+                            containerColor = NxTheme.colors.primary,
                         ),
                         shape = MaterialTheme.shapes.small,
                     ) {
@@ -198,7 +198,7 @@ private fun PresetPickerRow(
     ) {
         Text(
             s.jvmPresetsHeader,
-            color = CelestiaTheme.colors.textSecondary,
+            color = NxTheme.colors.textSecondary,
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.Bold,
         )
@@ -211,8 +211,8 @@ private fun PresetPickerRow(
                     onClick = { onSelected(preset) },
                     label = { Text(preset.displayName.substringBefore(" ("), fontSize = 12.sp) },
                     colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = CelestiaTheme.colors.primary.copy(alpha = 0.2f),
-                        selectedLabelColor = CelestiaTheme.colors.primary,
+                        selectedContainerColor = NxTheme.colors.primary.copy(alpha = 0.2f),
+                        selectedLabelColor = NxTheme.colors.primary,
                     ),
                 )
             }
@@ -223,7 +223,7 @@ private fun PresetPickerRow(
             Spacer(Modifier.height(8.dp))
             Text(
                 selectedPreset.description,
-                color = CelestiaTheme.colors.textSecondary,
+                color = NxTheme.colors.textSecondary,
                 style = MaterialTheme.typography.bodySmall,
             )
         }
@@ -269,21 +269,21 @@ private fun GcOption(label: String, hint: String, selected: Boolean, onClick: ()
             .clip(MaterialTheme.shapes.medium)
             .clickable(onClick = onClick)
             .background(
-                if (selected) CelestiaTheme.colors.primary.copy(alpha = 0.12f)
-                else CelestiaTheme.colors.background.copy(alpha = 0.4f)
+                if (selected) NxTheme.colors.primary.copy(alpha = 0.12f)
+                else NxTheme.colors.background.copy(alpha = 0.4f)
             )
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         RadioButton(selected = selected, onClick = onClick,
             colors = RadioButtonDefaults.colors(
-                selectedColor = CelestiaTheme.colors.primary,
-                unselectedColor = CelestiaTheme.colors.textSecondary,
+                selectedColor = NxTheme.colors.primary,
+                unselectedColor = NxTheme.colors.textSecondary,
             ))
         Spacer(Modifier.width(8.dp))
         Column(Modifier.weight(1f)) {
-            Text(label, color = CelestiaTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
-            Text(hint, color = CelestiaTheme.colors.textSecondary,
+            Text(label, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
+            Text(hint, color = NxTheme.colors.textSecondary,
                 style = MaterialTheme.typography.bodySmall)
         }
     }
@@ -300,7 +300,7 @@ private fun GcTuningTabContent(config: JvmConfig, onChange: (JvmConfig) -> Unit)
         GcChoice.Shenandoah -> ShenandoahTuningPanel(config.shenandoah) { onChange(config.copy(shenandoah = it)) }
         GcChoice.Parallel, GcChoice.Serial -> Text(
             s.jvmTuningNotApplicable("${config.gc.name}GC"),
-            color = CelestiaTheme.colors.textSecondary,
+            color = NxTheme.colors.textSecondary,
             style = MaterialTheme.typography.bodyMedium,
         )
     }
@@ -390,7 +390,7 @@ private fun CdsTabContent(config: JvmConfig, onChange: (JvmConfig) -> Unit) {
         SectionHeader(s.jvmCdsHeader)
         Text(
             s.jvmCdsIntro,
-            color = CelestiaTheme.colors.textSecondary,
+            color = NxTheme.colors.textSecondary,
             style = MaterialTheme.typography.bodySmall,
         )
         Spacer(Modifier.height(4.dp))
@@ -499,7 +499,7 @@ private fun JfrTabContent(config: JvmConfig, onChange: (JvmConfig) -> Unit) {
         SectionHeader(s.jvmJfrHeader)
         Text(
             s.jvmJfrIntro,
-            color = CelestiaTheme.colors.textSecondary,
+            color = NxTheme.colors.textSecondary,
             style = MaterialTheme.typography.bodySmall,
         )
         Spacer(Modifier.height(4.dp))
@@ -550,7 +550,7 @@ private fun CustomTabContent(config: JvmConfig, onChange: (JvmConfig) -> Unit) {
         SectionHeader(s.jvmCustomHeader)
         Text(
             s.jvmCustomIntro,
-            color = CelestiaTheme.colors.textSecondary,
+            color = NxTheme.colors.textSecondary,
             style = MaterialTheme.typography.bodySmall,
         )
         OutlinedTextField(
@@ -578,11 +578,11 @@ private fun ArgsPreviewBox(config: JvmConfig) {
             .padding(horizontal = 24.dp, vertical = 8.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Symbol(NxIcon.Code, null, tint = CelestiaTheme.colors.primary,
+            Symbol(NxIcon.Code, null, tint = NxTheme.colors.primary,
                 modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(6.dp))
             Text(s.jvmPreviewFlagsCount(args.size),
-                color = CelestiaTheme.colors.textSecondary,
+                color = NxTheme.colors.textSecondary,
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.Bold)
         }
@@ -592,15 +592,15 @@ private fun ArgsPreviewBox(config: JvmConfig) {
                 .fillMaxWidth()
                 .heightIn(min = 60.dp, max = 110.dp)
                 .clip(MaterialTheme.shapes.medium)
-                .background(CelestiaTheme.colors.background.copy(alpha = 0.6f))
-                .border(1.dp, CelestiaTheme.colors.textSecondary.copy(alpha = 0.2f),
+                .background(NxTheme.colors.background.copy(alpha = 0.6f))
+                .border(1.dp, NxTheme.colors.textSecondary.copy(alpha = 0.2f),
                     MaterialTheme.shapes.medium)
                 .verticalScroll(rememberScrollState())
                 .padding(12.dp)
         ) {
             Text(
                 args.joinToString(" "),
-                color = CelestiaTheme.colors.textPrimary,
+                color = NxTheme.colors.textPrimary,
                 fontFamily = LocalMonoFamily.current,
                 fontSize = 11.sp,
             )
@@ -614,7 +614,7 @@ private fun ArgsPreviewBox(config: JvmConfig) {
 private fun SectionHeader(text: String) {
     Text(
         text,
-        color = CelestiaTheme.colors.primary,
+        color = NxTheme.colors.primary,
         fontWeight = FontWeight.Bold,
         style = MaterialTheme.typography.titleSmall,
     )
@@ -632,18 +632,18 @@ private fun SliderField(
 ) {
     Column {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(label, color = CelestiaTheme.colors.textPrimary, fontWeight = FontWeight.Bold,
+            Text(label, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Bold,
                 modifier = Modifier.weight(1f))
-            Text(display, color = CelestiaTheme.colors.primary, fontFamily = LocalMonoFamily.current)
+            Text(display, color = NxTheme.colors.primary, fontFamily = LocalMonoFamily.current)
         }
         Slider(
             value = value, onValueChange = onChange, valueRange = valueRange, steps = steps,
             colors = SliderDefaults.colors(
-                thumbColor = CelestiaTheme.colors.primary,
-                activeTrackColor = CelestiaTheme.colors.primary,
+                thumbColor = NxTheme.colors.primary,
+                activeTrackColor = NxTheme.colors.primary,
             ),
         )
-        Text(hint, color = CelestiaTheme.colors.textSecondary,
+        Text(hint, color = NxTheme.colors.textSecondary,
             style = MaterialTheme.typography.bodySmall)
     }
 }
@@ -655,8 +655,8 @@ private fun ToggleField(label: String, hint: String, checked: Boolean, onChange:
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
-            Text(label, color = CelestiaTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
-            Text(hint, color = CelestiaTheme.colors.textSecondary,
+            Text(label, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
+            Text(hint, color = NxTheme.colors.textSecondary,
                 style = MaterialTheme.typography.bodySmall)
         }
         NxSwitch(checked = checked, onCheckedChange = onChange)
@@ -673,7 +673,7 @@ private fun IntInput(
 ) {
     var text by remember(value) { mutableStateOf(value?.toString() ?: "") }
     Column {
-        Text(label, color = CelestiaTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
+        Text(label, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
         OutlinedTextField(
             value = text,
             onValueChange = {
@@ -684,7 +684,7 @@ private fun IntInput(
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
-        Text(hint, color = CelestiaTheme.colors.textSecondary,
+        Text(hint, color = NxTheme.colors.textSecondary,
             style = MaterialTheme.typography.bodySmall)
     }
 }

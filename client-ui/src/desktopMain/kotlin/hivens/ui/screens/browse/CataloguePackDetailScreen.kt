@@ -52,7 +52,7 @@ import hivens.ui.puppet.PuppetClick
 import hivens.ui.render.MarkdownHtml
 import hivens.ui.render.openInBrowser
 import hivens.ui.screens.RetryStateBlock
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -168,7 +168,7 @@ fun CataloguePackDetailScreen(
                 contentAlignment = Alignment.Center,
             ) {
                 CircularProgressIndicator(
-                    color       = CelestiaTheme.colors.primary.copy(alpha = 0.55f),
+                    color       = NxTheme.colors.primary.copy(alpha = 0.55f),
                     strokeWidth = 2.dp,
                     modifier    = Modifier.size(28.dp),
                 )
@@ -218,7 +218,7 @@ private fun DetailBody(details: CataloguePackDetails, installing: InstallProgres
             }
 
             if (installError != null) {
-                Text(installError, style = MaterialTheme.typography.bodySmall, color = CelestiaTheme.colors.error)
+                Text(installError, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.error)
             }
             if (installing != null) InstallProgressBlock(installing)
         }
@@ -246,24 +246,24 @@ private fun DetailBody(details: CataloguePackDetails, installing: InstallProgres
 private fun InstallProgressBlock(p: InstallProgress) {
     val s = LocalStrings.current
     Column(
-        modifier            = Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium).background(CelestiaTheme.colors.surface).padding(12.dp),
+        modifier            = Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium).background(NxTheme.colors.surface).padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Text(
             text       = s.browseDetailInstallRunningTitle,
             style      = MaterialTheme.typography.titleSmall,
-            color      = CelestiaTheme.colors.textPrimary,
+            color      = NxTheme.colors.textPrimary,
             fontWeight = FontWeight.SemiBold,
         )
         Text(
             text  = if (p.total > 0) s.browseDetailInstallProgress(p.filename, p.current, p.total) else s.browseDetailInstallStarting,
             style = MaterialTheme.typography.bodySmall,
-            color = CelestiaTheme.colors.textSecondary,
+            color = NxTheme.colors.textSecondary,
         )
         if (p.total > 0) {
-            LinearProgressIndicator(progress = { p.current.toFloat() / p.total }, modifier = Modifier.fillMaxWidth(), color = CelestiaTheme.colors.primary)
+            LinearProgressIndicator(progress = { p.current.toFloat() / p.total }, modifier = Modifier.fillMaxWidth(), color = NxTheme.colors.primary)
         } else {
-            LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = CelestiaTheme.colors.primary)
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = NxTheme.colors.primary)
         }
     }
 }
@@ -286,7 +286,7 @@ private fun VersionRow(version: CataloguePackVersion, installing: Boolean, anyIn
             Text(
                 text       = version.name.ifBlank { version.versionNumber },
                 style      = MaterialTheme.typography.bodyMedium,
-                color      = CelestiaTheme.colors.textPrimary,
+                color      = NxTheme.colors.textPrimary,
                 fontWeight = FontWeight.SemiBold,
                 maxLines   = 1,
                 overflow   = TextOverflow.Ellipsis,
@@ -300,7 +300,7 @@ private fun VersionRow(version: CataloguePackVersion, installing: Boolean, anyIn
             modifier = Modifier
                 .size(34.dp)
                 .clip(CircleShape)
-                .background(CelestiaTheme.colors.primary.copy(alpha = if (anyInstalling) 0.3f else if (hovered) 1f else 0.85f)),
+                .background(NxTheme.colors.primary.copy(alpha = if (anyInstalling) 0.3f else if (hovered) 1f else 0.85f)),
             contentAlignment = Alignment.Center,
         ) {
             if (installing) {
@@ -334,8 +334,8 @@ private fun VersionPickerModal(
                     .fillMaxWidth(0.92f)
                     .heightIn(max = 600.dp)
                     .clip(RoundedCornerShape(20.dp))
-                    .background(CelestiaTheme.colors.surface)
-                    .border(1.dp, CelestiaTheme.colors.outline.copy(alpha = 0.5f), RoundedCornerShape(20.dp))
+                    .background(NxTheme.colors.surface)
+                    .border(1.dp, NxTheme.colors.outline.copy(alpha = 0.5f), RoundedCornerShape(20.dp))
                     .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = {}),
             ) {
                 // Header: title + count, close in a hover-able circle, then a hairline rule.
@@ -345,17 +345,17 @@ private fun VersionPickerModal(
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(s.browseDetailVersionTitle, style = MaterialTheme.typography.titleMedium, color = CelestiaTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
-                        Text("${versions.size}", style = MaterialTheme.typography.labelMedium, color = CelestiaTheme.colors.textSecondary)
+                        Text(s.browseDetailVersionTitle, style = MaterialTheme.typography.titleMedium, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
+                        Text("${versions.size}", style = MaterialTheme.typography.labelMedium, color = NxTheme.colors.textSecondary)
                     }
                     Box(
                         modifier         = Modifier.size(32.dp).clip(CircleShape).background(glassSurfaceAlpha(0.5f)).clickable(onClick = onDismiss),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Symbol(NxIcon.Close, contentDescription = null, tint = CelestiaTheme.colors.textSecondary, size = 18.dp)
+                        Symbol(NxIcon.Close, contentDescription = null, tint = NxTheme.colors.textSecondary, size = 18.dp)
                     }
                 }
-                HorizontalDivider(color = CelestiaTheme.colors.outline.copy(alpha = 0.25f))
+                HorizontalDivider(color = NxTheme.colors.outline.copy(alpha = 0.25f))
                 Column(
                     modifier            = Modifier.verticalScroll(rememberScrollState()).padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -377,7 +377,7 @@ private fun VersionPickerModal(
 @Composable
 private fun SidebarBlock(title: String, content: @Composable () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(title, style = MaterialTheme.typography.titleSmall, color = CelestiaTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
+        Text(title, style = MaterialTheme.typography.titleSmall, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
         Box(
             modifier = Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium).background(glassSurfaceAlpha(0.6f)).padding(16.dp),
         ) {
@@ -389,8 +389,8 @@ private fun SidebarBlock(title: String, content: @Composable () -> Unit) {
 @Composable
 private fun MetaRow(label: String, value: String) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-        Text(label, style = MaterialTheme.typography.labelSmall, color = CelestiaTheme.colors.textSecondary)
-        Text(value, style = MaterialTheme.typography.bodySmall, color = CelestiaTheme.colors.textPrimary, fontWeight = FontWeight.SemiBold)
+        Text(label, style = MaterialTheme.typography.labelSmall, color = NxTheme.colors.textSecondary)
+        Text(value, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.SemiBold)
     }
 }
 
@@ -400,10 +400,10 @@ private fun Chip(text: String) {
         onClick = {},
         enabled = false,
         shape   = MaterialTheme.shapes.extraSmall,
-        label   = { Text(text, style = MaterialTheme.typography.labelSmall, color = CelestiaTheme.colors.textPrimary) },
+        label   = { Text(text, style = MaterialTheme.typography.labelSmall, color = NxTheme.colors.textPrimary) },
         colors  = AssistChipDefaults.assistChipColors(
             disabledContainerColor = glassSurfaceAlpha(0.4f),
-            disabledLabelColor     = CelestiaTheme.colors.textPrimary,
+            disabledLabelColor     = NxTheme.colors.textPrimary,
         ),
         border  = null,
     )

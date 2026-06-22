@@ -25,7 +25,7 @@ import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
 import hivens.widget.model.Widget
@@ -63,7 +63,7 @@ fun HomeNewQuickLaunch(instance: WidgetInstance) {
         Text(
             text       = label,
             style      = MaterialTheme.typography.labelLarge,
-            color      = CelestiaTheme.colors.textSecondary,
+            color      = NxTheme.colors.textSecondary,
             fontWeight = FontWeight.Medium,
         )
         Row(
@@ -75,13 +75,13 @@ fun HomeNewQuickLaunch(instance: WidgetInstance) {
                 Text(
                     text       = target.displayName,
                     style      = MaterialTheme.typography.titleMedium,
-                    color      = CelestiaTheme.colors.textPrimary,
+                    color      = NxTheme.colors.textPrimary,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
                     text  = target.packRef.id,
                     style = MaterialTheme.typography.bodySmall,
-                    color = CelestiaTheme.colors.textSecondary,
+                    color = NxTheme.colors.textSecondary,
                 )
             }
             Spacer(Modifier.width(12.dp))
@@ -90,7 +90,7 @@ fun HomeNewQuickLaunch(instance: WidgetInstance) {
                 enabled = qt.canLaunch,
                 shape   = MaterialTheme.shapes.small,
                 colors  = ButtonDefaults.buttonColors(
-                    containerColor = CelestiaTheme.colors.primary,
+                    containerColor = NxTheme.colors.primary,
                     contentColor   = Color.White,
                 ),
             ) {

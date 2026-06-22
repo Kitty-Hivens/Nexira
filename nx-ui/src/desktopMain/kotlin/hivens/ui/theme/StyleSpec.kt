@@ -8,7 +8,7 @@ import androidx.compose.ui.unit.dp
 
 /**
  * Form and motion tokens that change WHEN the user picks a different UI
- * variant. Sits alongside [CelestiaColors] -- colors travel through
+ * variant. Sits alongside [NxColors] -- colors travel through
  * palette presets, while shape / surface / motion travel through style.
  *
  * The split lets a single palette (say Celestia Dark) be rendered with
@@ -86,7 +86,7 @@ data class SwitchStyleSpec(
 }
 
 /**
- * Default style -- matches the current CelestiaTheme aesthetic: rounded
+ * Default style -- matches the current NxTheme aesthetic: rounded
  * corners, glass cards with alpha, soft glow on focus / hover. This is
  * what existing code sees if it switches to LocalStyle.current.
  */

@@ -73,7 +73,7 @@ import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.decorativeColor
 import java.nio.file.Path
 import kotlinx.coroutines.Dispatchers
@@ -257,10 +257,10 @@ fun ContentTabPane(instance: PackInstance, onDetach: () -> Unit, modifier: Modif
 
         when {
             current == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = CelestiaTheme.colors.primary.copy(alpha = 0.6f), strokeWidth = 2.dp, modifier = Modifier.size(26.dp))
+                CircularProgressIndicator(color = NxTheme.colors.primary.copy(alpha = 0.6f), strokeWidth = 2.dp, modifier = Modifier.size(26.dp))
             }
             visible.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(s.contentEmpty, style = MaterialTheme.typography.bodyMedium, color = CelestiaTheme.colors.textSecondary)
+                Text(s.contentEmpty, style = MaterialTheme.typography.bodyMedium, color = NxTheme.colors.textSecondary)
             }
             else -> {
                 val listState = rememberLazyListState()
@@ -337,13 +337,13 @@ private fun DetachBanner(body: String, onDetach: () -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Column(Modifier.weight(1f)) {
-            Text(s.contentDetachTitle, style = MaterialTheme.typography.titleSmall, color = CelestiaTheme.colors.textPrimary, fontWeight = FontWeight.SemiBold)
-            Text(body, style = MaterialTheme.typography.bodySmall, color = CelestiaTheme.colors.textSecondary)
+            Text(s.contentDetachTitle, style = MaterialTheme.typography.titleSmall, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.SemiBold)
+            Text(body, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.textSecondary)
         }
         Button(
             onClick = onDetach,
             shape   = MaterialTheme.shapes.small,
-            colors  = ButtonDefaults.buttonColors(containerColor = CelestiaTheme.colors.primary, contentColor = Color.White),
+            colors  = ButtonDefaults.buttonColors(containerColor = NxTheme.colors.primary, contentColor = Color.White),
         ) { Text(s.contentDetachButton, fontWeight = FontWeight.SemiBold) }
     }
 }
@@ -388,18 +388,18 @@ private fun ContentSearch(query: String, onQuery: (String) -> Unit, placeholder:
         value         = query,
         onValueChange = onQuery,
         singleLine    = true,
-        textStyle     = MaterialTheme.typography.bodyMedium.copy(color = CelestiaTheme.colors.textPrimary),
-        cursorBrush   = SolidColor(CelestiaTheme.colors.primary),
+        textStyle     = MaterialTheme.typography.bodyMedium.copy(color = NxTheme.colors.textPrimary),
+        cursorBrush   = SolidColor(NxTheme.colors.primary),
         modifier      = Modifier.fillMaxWidth(),
     ) { inner ->
         Row(
-            modifier          = Modifier.fillMaxWidth().clip(MaterialTheme.shapes.large).background(CelestiaTheme.colors.surface).padding(horizontal = 14.dp, vertical = 10.dp),
+            modifier          = Modifier.fillMaxWidth().clip(MaterialTheme.shapes.large).background(NxTheme.colors.surface).padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Symbol(NxIcon.Search, contentDescription = null, tint = CelestiaTheme.colors.textSecondary, size = 18.dp)
+            Symbol(NxIcon.Search, contentDescription = null, tint = NxTheme.colors.textSecondary, size = 18.dp)
             Spacer(Modifier.width(10.dp))
             Box(Modifier.weight(1f)) {
-                if (query.isEmpty()) Text(placeholder, style = MaterialTheme.typography.bodyMedium, color = CelestiaTheme.colors.textSecondary)
+                if (query.isEmpty()) Text(placeholder, style = MaterialTheme.typography.bodyMedium, color = NxTheme.colors.textSecondary)
                 inner()
             }
         }
@@ -411,14 +411,14 @@ private fun FilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .clip(MaterialTheme.shapes.small)
-            .background(if (selected) CelestiaTheme.colors.primary else glassSurfaceAlpha(0.5f))
+            .background(if (selected) NxTheme.colors.primary else glassSurfaceAlpha(0.5f))
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 6.dp),
     ) {
         Text(
             text       = label,
             style      = MaterialTheme.typography.labelLarge,
-            color      = if (selected) Color.White else CelestiaTheme.colors.textSecondary,
+            color      = if (selected) Color.White else NxTheme.colors.textSecondary,
             fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
         )
     }
@@ -456,13 +456,13 @@ private fun ContentRow(
             Text(
                 text       = content.displayName,
                 style      = MaterialTheme.typography.bodyMedium,
-                color      = CelestiaTheme.colors.textPrimary.copy(alpha = dim),
+                color      = NxTheme.colors.textPrimary.copy(alpha = dim),
                 fontWeight = FontWeight.SemiBold,
                 maxLines   = 1,
                 overflow   = TextOverflow.Ellipsis,
             )
             content.version?.let { v ->
-                Text(v, style = MaterialTheme.typography.labelSmall, color = CelestiaTheme.colors.textSecondary.copy(alpha = dim), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(v, style = MaterialTheme.typography.labelSmall, color = NxTheme.colors.textSecondary.copy(alpha = dim), maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
         if (showToggle) {
@@ -473,7 +473,7 @@ private fun ContentRow(
         }
         if (onDelete != null) {
             Box(Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onDelete).padding(6.dp)) {
-                Symbol(NxIcon.Delete, contentDescription = null, tint = CelestiaTheme.colors.error, size = 18.dp)
+                Symbol(NxIcon.Delete, contentDescription = null, tint = NxTheme.colors.error, size = 18.dp)
             }
         }
     }
@@ -492,7 +492,7 @@ private fun ContentIcon(state: ContentIconState?, seed: String, displayName: Str
         is ContentIconState.Bytes -> AsyncImage(model = state.data, contentDescription = null, contentScale = ContentScale.Crop, modifier = box)
         is ContentIconState.Url   -> AsyncImage(model = state.url, contentDescription = null, contentScale = ContentScale.Crop, modifier = box)
         ContentIconState.None     -> Box(
-            modifier         = box.background(CelestiaTheme.colors.decorativeColor(seed).copy(alpha = dim)),
+            modifier         = box.background(NxTheme.colors.decorativeColor(seed).copy(alpha = dim)),
             contentAlignment = Alignment.Center,
         ) {
             Text(
@@ -504,7 +504,7 @@ private fun ContentIcon(state: ContentIconState?, seed: String, displayName: Str
             )
         }
         // Still resolving: tinted box, same tint as the letter, so settling doesn't flash.
-        null -> Box(box.background(CelestiaTheme.colors.decorativeColor(seed).copy(alpha = dim)))
+        null -> Box(box.background(NxTheme.colors.decorativeColor(seed).copy(alpha = dim)))
     }
 }
 
@@ -552,19 +552,19 @@ private fun ModBrowser(mcVersion: String, loader: String, modsDir: Path, modifie
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Box(Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onBack).padding(6.dp)) {
-                Symbol(NxIcon.ArrowBack, contentDescription = null, tint = CelestiaTheme.colors.textPrimary, size = 20.dp)
+                Symbol(NxIcon.ArrowBack, contentDescription = null, tint = NxTheme.colors.textPrimary, size = 20.dp)
             }
-            Text(s.contentFindProjects, style = MaterialTheme.typography.titleMedium, color = CelestiaTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
+            Text(s.contentFindProjects, style = MaterialTheme.typography.titleMedium, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
         }
         ContentSearch(query, { query = it }, s.contentSearchPlaceholder)
 
         val r = results
         when {
             r == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = CelestiaTheme.colors.primary.copy(alpha = 0.6f), strokeWidth = 2.dp, modifier = Modifier.size(26.dp))
+                CircularProgressIndicator(color = NxTheme.colors.primary.copy(alpha = 0.6f), strokeWidth = 2.dp, modifier = Modifier.size(26.dp))
             }
             r.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(s.contentEmpty, style = MaterialTheme.typography.bodyMedium, color = CelestiaTheme.colors.textSecondary)
+                Text(s.contentEmpty, style = MaterialTheme.typography.bodyMedium, color = NxTheme.colors.textSecondary)
             }
             else -> {
                 val listState = rememberLazyListState()
@@ -610,23 +610,23 @@ private fun ModResultRow(hit: ModrinthSearchHit, installed: Boolean, working: Bo
         if (hit.iconUrl != null) {
             AsyncImage(model = hit.iconUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(36.dp).clip(shape))
         } else {
-            Box(Modifier.size(36.dp).clip(shape).background(CelestiaTheme.colors.decorativeColor(hit.title)), contentAlignment = Alignment.Center) {
+            Box(Modifier.size(36.dp).clip(shape).background(NxTheme.colors.decorativeColor(hit.title)), contentAlignment = Alignment.Center) {
                 Text(hit.title.firstOrNull()?.uppercase() ?: "?", style = MaterialTheme.typography.labelMedium, color = Color.White, fontWeight = FontWeight.Bold)
             }
         }
         Column(Modifier.weight(1f)) {
-            Text(hit.title, style = MaterialTheme.typography.bodyMedium, color = CelestiaTheme.colors.textPrimary, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(hit.title, style = MaterialTheme.typography.bodyMedium, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (hit.description.isNotBlank()) {
-                Text(hit.description, style = MaterialTheme.typography.labelSmall, color = CelestiaTheme.colors.textSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(hit.description, style = MaterialTheme.typography.labelSmall, color = NxTheme.colors.textSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
         }
         when {
-            installed -> Symbol(NxIcon.Check, contentDescription = null, tint = CelestiaTheme.colors.primary, size = 20.dp)
-            working   -> CircularProgressIndicator(color = CelestiaTheme.colors.primary, strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
+            installed -> Symbol(NxIcon.Check, contentDescription = null, tint = NxTheme.colors.primary, size = 20.dp)
+            working   -> CircularProgressIndicator(color = NxTheme.colors.primary, strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
             else      -> Button(
                 onClick = onInstall,
                 shape   = MaterialTheme.shapes.small,
-                colors  = ButtonDefaults.buttonColors(containerColor = CelestiaTheme.colors.primary, contentColor = Color.White),
+                colors  = ButtonDefaults.buttonColors(containerColor = NxTheme.colors.primary, contentColor = Color.White),
             ) { Text(s.browseDetailInstallButton, fontWeight = FontWeight.SemiBold) }
         }
     }

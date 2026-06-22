@@ -38,7 +38,7 @@ import hivens.ui.components.isVideoUrl
 import hivens.ui.effects.pixelArtBackground
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.decorativePair
 
 /**
@@ -60,7 +60,7 @@ fun CatalogueHero(
     modifier: Modifier = Modifier,
     action: (@Composable () -> Unit)? = null,
 ) {
-    val (hueA, hueB) = CelestiaTheme.colors.decorativePair(seed)
+    val (hueA, hueB) = NxTheme.colors.decorativePair(seed)
     val bannerIsVideo = bannerUrl != null && isVideoUrl(bannerUrl)
     var bannerFullscreen by remember(bannerUrl) { mutableStateOf(false) }
     Box(modifier = modifier.fillMaxWidth().height(200.dp)) {

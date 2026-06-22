@@ -13,7 +13,7 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.puppet.PuppetField
 import hivens.ui.puppet.PuppetToggle
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.delay
 
@@ -43,7 +43,7 @@ internal fun ExperimentalSection(
         title          = s.settingsExperimentalMaster,
         description    = s.settingsExperimentalMasterDesc,
         icon           = NxIcon.Science,
-        iconTint       = CelestiaTheme.colors.primary,
+        iconTint       = NxTheme.colors.primary,
         checked        = form.experimentalEnabled,
         enabled        = true,
         onCheckedChange = { form.experimentalEnabled = it; save() }
@@ -56,7 +56,7 @@ internal fun ExperimentalSection(
         title          = s.settingsMandatoryUpdates,
         description    = s.settingsMandatoryUpdatesDesc,
         icon           = NxIcon.Update,
-        iconTint       = CelestiaTheme.colors.primary,
+        iconTint       = NxTheme.colors.primary,
         checked        = form.experimentalEnabled && form.mandatoryUpdates,
         enabled        = form.experimentalEnabled,
         onCheckedChange = { form.mandatoryUpdates = it; save() }
@@ -72,7 +72,7 @@ internal fun ExperimentalSection(
         title          = s.settingsAutoSyncAllPacks,
         description    = s.settingsAutoSyncAllPacksDesc,
         icon           = NxIcon.Sync,
-        iconTint       = CelestiaTheme.colors.primary,
+        iconTint       = NxTheme.colors.primary,
         checked        = form.experimentalEnabled && form.autoSyncAllPacks,
         enabled        = form.experimentalEnabled,
         onCheckedChange = { form.autoSyncAllPacks = it; save() }
@@ -87,7 +87,7 @@ internal fun ExperimentalSection(
         title          = s.settingsJvmBuilder,
         description    = s.settingsJvmBuilderDesc,
         icon           = NxIcon.Tune,
-        iconTint       = CelestiaTheme.colors.primary,
+        iconTint       = NxTheme.colors.primary,
         checked        = form.experimentalEnabled && form.jvmBuilderEnabled,
         enabled        = form.experimentalEnabled,
         onCheckedChange = { form.jvmBuilderEnabled = it; save() }
@@ -102,7 +102,7 @@ internal fun ExperimentalSection(
         title          = s.settingsAdaptiveMemory,
         description    = s.settingsAdaptiveMemoryDesc,
         icon           = NxIcon.Memory,
-        iconTint       = CelestiaTheme.colors.primary,
+        iconTint       = NxTheme.colors.primary,
         checked        = form.experimentalEnabled && form.adaptiveMemoryEnabled,
         enabled        = form.experimentalEnabled,
         onCheckedChange = { form.adaptiveMemoryEnabled = it; save() }
@@ -122,7 +122,7 @@ internal fun ExperimentalSection(
         title          = s.settingsMimicVersion,
         description    = s.settingsMimicVersionDesc,
         icon           = NxIcon.Tag,
-        iconTint       = CelestiaTheme.colors.primary,
+        iconTint       = NxTheme.colors.primary,
         checked        = form.experimentalEnabled && form.mimicOverrideEnabled,
         enabled        = form.experimentalEnabled,
         onCheckedChange = { form.mimicOverrideEnabled = it; save() }
@@ -164,7 +164,7 @@ internal fun ExperimentalSection(
                     s.settingsMimicVersionPlaceholder(
                         Protocol.DEFAULT_MIMIC_LAUNCHER_VERSION
                     ),
-                    color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.55f),
+                    color = NxTheme.colors.textSecondary.copy(alpha = 0.55f),
                 )
             },
             modifier        = Modifier

@@ -48,7 +48,7 @@ import androidx.compose.ui.window.DialogProperties
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalMonoFamily
 import java.text.DateFormat
 import java.util.Date
@@ -84,7 +84,7 @@ fun PresetManagerPanel(
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
         Surface(
-            color           = CelestiaTheme.colors.surface,
+            color           = NxTheme.colors.surface,
             shape           = RoundedCornerShape(16.dp),
             shadowElevation = 18.dp,
             modifier        = Modifier
@@ -102,27 +102,27 @@ fun PresetManagerPanel(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Symbol(icon = NxIcon.Inventory2,
                             contentDescription = null,
-                            tint               = CelestiaTheme.colors.primary,
+                            tint               = NxTheme.colors.primary,
                             modifier           = Modifier.size(22.dp),
                         )
                         Spacer(Modifier.width(10.dp))
                         Text(
                             text       = s.editorPresetsTitle,
                             style      = MaterialTheme.typography.titleMedium,
-                            color      = CelestiaTheme.colors.textPrimary,
+                            color      = NxTheme.colors.textPrimary,
                             fontWeight = FontWeight.SemiBold,
                         )
                     }
                     IconButton(onClick = onDismiss) {
                         Symbol(NxIcon.Close, contentDescription = s.editorClose,
-                             tint = CelestiaTheme.colors.textSecondary)
+                             tint = NxTheme.colors.textSecondary)
                     }
                 }
                 Spacer(Modifier.height(4.dp))
                 Text(
                     text  = s.editorPresetsIntro,
                     style = MaterialTheme.typography.bodySmall,
-                    color = CelestiaTheme.colors.textSecondary,
+                    color = NxTheme.colors.textSecondary,
                 )
 
                 Spacer(Modifier.height(16.dp))
@@ -133,7 +133,7 @@ fun PresetManagerPanel(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(10.dp))
-                        .background(CelestiaTheme.colors.surfaceVariant.copy(alpha = 0.55f))
+                        .background(NxTheme.colors.surfaceVariant.copy(alpha = 0.55f))
                         .padding(horizontal = 12.dp, vertical = 8.dp),
                 ) {
                     BasicTextField(
@@ -141,16 +141,16 @@ fun PresetManagerPanel(
                         onValueChange = { newName = it },
                         singleLine    = true,
                         textStyle     = TextStyle(
-                            color    = CelestiaTheme.colors.textPrimary,
+                            color    = NxTheme.colors.textPrimary,
                             fontSize = 14.sp,
                         ),
-                        cursorBrush   = SolidColor(CelestiaTheme.colors.primary),
+                        cursorBrush   = SolidColor(NxTheme.colors.primary),
                         modifier      = Modifier.weight(1f),
                         decorationBox = { inner ->
                             if (newName.isEmpty()) {
                                 Text(
                                     text  = s.editorPresetNamePlaceholder,
-                                    color = CelestiaTheme.colors.textSecondary.copy(alpha = 0.55f),
+                                    color = NxTheme.colors.textSecondary.copy(alpha = 0.55f),
                                     style = MaterialTheme.typography.bodyMedium,
                                 )
                             }
@@ -176,7 +176,7 @@ fun PresetManagerPanel(
                         shape   = RoundedCornerShape(8.dp),
                         enabled = newName.isNotBlank(),
                         colors  = ButtonDefaults.buttonColors(
-                            containerColor = CelestiaTheme.colors.primary,
+                            containerColor = NxTheme.colors.primary,
                             contentColor   = Color.White,
                         ),
                     ) {
@@ -191,7 +191,7 @@ fun PresetManagerPanel(
                 Text(
                     text       = s.editorPresetsSaved(presets.size),
                     style      = MaterialTheme.typography.labelMedium,
-                    color      = CelestiaTheme.colors.textSecondary,
+                    color      = NxTheme.colors.textSecondary,
                     fontWeight = FontWeight.Medium,
                 )
                 Spacer(Modifier.height(8.dp))
@@ -202,13 +202,13 @@ fun PresetManagerPanel(
                             .fillMaxWidth()
                             .weight(1f)
                             .clip(RoundedCornerShape(10.dp))
-                            .background(CelestiaTheme.colors.surfaceVariant.copy(alpha = 0.35f)),
+                            .background(NxTheme.colors.surfaceVariant.copy(alpha = 0.35f)),
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(
                             text  = s.editorPresetsEmpty,
                             style = MaterialTheme.typography.bodySmall,
-                            color = CelestiaTheme.colors.textSecondary,
+                            color = NxTheme.colors.textSecondary,
                         )
                     }
                 } else {
@@ -249,14 +249,14 @@ private fun PresetRow(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(10.dp))
-            .background(CelestiaTheme.colors.surfaceVariant.copy(alpha = 0.55f))
+            .background(NxTheme.colors.surfaceVariant.copy(alpha = 0.55f))
             .padding(horizontal = 12.dp, vertical = 10.dp),
     ) {
         Column(Modifier.weight(1f)) {
             Text(
                 text       = meta.name,
                 style      = MaterialTheme.typography.bodyLarge,
-                color      = CelestiaTheme.colors.textPrimary,
+                color      = NxTheme.colors.textPrimary,
                 fontWeight = FontWeight.SemiBold,
                 maxLines   = 1,
                 overflow   = TextOverflow.Ellipsis,
@@ -264,7 +264,7 @@ private fun PresetRow(
             Text(
                 text       = formatTime(meta.createdAt),
                 style      = MaterialTheme.typography.labelSmall,
-                color      = CelestiaTheme.colors.textSecondary.copy(alpha = 0.75f),
+                color      = NxTheme.colors.textSecondary.copy(alpha = 0.75f),
                 fontFamily = LocalMonoFamily.current,
             )
         }
@@ -273,7 +273,7 @@ private fun PresetRow(
             onClick = onLoad,
             shape   = RoundedCornerShape(8.dp),
             colors  = ButtonDefaults.buttonColors(
-                containerColor = CelestiaTheme.colors.primary,
+                containerColor = NxTheme.colors.primary,
                 contentColor   = Color.White,
             ),
         ) {
@@ -283,14 +283,14 @@ private fun PresetRow(
         IconButton(onClick = onExport, modifier = Modifier.size(36.dp)) {
             Symbol(icon = NxIcon.Upload,
                 contentDescription = s.editorExport,
-                tint               = CelestiaTheme.colors.textSecondary,
+                tint               = NxTheme.colors.textSecondary,
                 modifier           = Modifier.size(18.dp),
             )
         }
         IconButton(onClick = onDelete, modifier = Modifier.size(36.dp)) {
             Symbol(icon = NxIcon.Delete,
                 contentDescription = s.editorDelete,
-                tint               = CelestiaTheme.colors.error,
+                tint               = NxTheme.colors.error,
                 modifier           = Modifier.size(18.dp),
             )
         }

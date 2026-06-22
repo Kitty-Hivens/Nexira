@@ -12,7 +12,7 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.customization.LocalCustomization
 import hivens.ui.effects.pulsatingGlow
 import hivens.ui.theme.CardSurface
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalStyle
 
 /**
@@ -38,7 +38,7 @@ fun GlassCard(
     content: @Composable BoxScope.() -> Unit
 ) {
     val style          = LocalStyle.current
-    val palette        = CelestiaTheme.colors
+    val palette        = NxTheme.colors
     val customization  = LocalCustomization.current
     val resolvedShape  = shape ?: RoundedCornerShape(style.cardCorner)
     val resolvedBackground = backgroundColor ?: when (style.cardSurface) {
@@ -105,9 +105,9 @@ fun CelestiaButton(
             enabled = enabled,
             shape = buttonShape,
             colors = ButtonDefaults.buttonColors(
-                containerColor = CelestiaTheme.colors.primary,
+                containerColor = NxTheme.colors.primary,
                 contentColor = Color.White,
-                disabledContainerColor = CelestiaTheme.colors.primary.copy(alpha = 0.5f),
+                disabledContainerColor = NxTheme.colors.primary.copy(alpha = 0.5f),
                 disabledContentColor = Color.White.copy(alpha = 0.6f)
             ),
             elevation = ButtonDefaults.buttonElevation(0.dp, 0.dp, 0.dp)
@@ -124,7 +124,7 @@ fun CelestiaButton(
                 contentColor = MaterialTheme.colorScheme.onSurface,
                 disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
             ),
-            border = BorderStroke(1.dp, CelestiaTheme.colors.outline)
+            border = BorderStroke(1.dp, NxTheme.colors.outline)
         ) {
             Text(text)
         }

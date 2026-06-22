@@ -20,7 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 
 /**
  * The Play call-to-action, shared by the Library card and the pack-detail hero so
@@ -39,7 +39,7 @@ fun PlayButton(
     iconOnly: Boolean = false,
     compact: Boolean = false,
 ) {
-    val accent = CelestiaTheme.colors.primary
+    val accent = NxTheme.colors.primary
     val fill: Brush = if (enabled) {
         Brush.verticalGradient(listOf(lerp(accent, Color.White, 0.18f), lerp(accent, Color.Black, 0.12f)))
     } else {

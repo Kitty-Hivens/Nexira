@@ -59,7 +59,7 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.ui.widgets.services.MusicPlayerService
 import hivens.ui.widgets.services.MusicPlayerServiceImpl
 import hivens.widget.api.provideService
@@ -136,7 +136,7 @@ fun MusicPlayerWidget(instance: WidgetInstance) {
             .background(
                 Brush.linearGradient(
                     colors = listOf(
-                        CelestiaTheme.colors.surface,
+                        NxTheme.colors.surface,
                         glassSurfaceAlpha(0.55f),
                     ),
                 ),
@@ -152,14 +152,14 @@ fun MusicPlayerWidget(instance: WidgetInstance) {
                 Text(
                     text       = p.title.ifBlank { s.musicPlayerTitle },
                     style      = MaterialTheme.typography.labelLarge,
-                    color      = CelestiaTheme.colors.textSecondary,
+                    color      = NxTheme.colors.textSecondary,
                     fontWeight = FontWeight.Medium,
                 )
                 Spacer(Modifier.height(2.dp))
                 Text(
                     text       = currentTitle(state, s),
                     style      = MaterialTheme.typography.titleMedium,
-                    color      = CelestiaTheme.colors.textPrimary,
+                    color      = NxTheme.colors.textPrimary,
                     fontWeight = FontWeight.SemiBold,
                     maxLines   = 1,
                     overflow   = TextOverflow.Ellipsis,
@@ -168,13 +168,13 @@ fun MusicPlayerWidget(instance: WidgetInstance) {
                     Text(
                         text  = audioErrorText((state as PlaybackState.Error).reason, s),
                         style = MaterialTheme.typography.bodySmall,
-                        color = CelestiaTheme.colors.error,
+                        color = NxTheme.colors.error,
                     )
                 } else {
                     Text(
                         text     = subtitle(state, s),
                         style    = MaterialTheme.typography.bodySmall,
-                        color    = CelestiaTheme.colors.textSecondary,
+                        color    = NxTheme.colors.textSecondary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -187,8 +187,8 @@ fun MusicPlayerWidget(instance: WidgetInstance) {
         LinearProgressIndicator(
             progress   = { fraction },
             modifier   = Modifier.fillMaxWidth().height(3.dp).clip(RoundedCornerShape(2.dp)),
-            color      = CelestiaTheme.colors.primary,
-            trackColor = CelestiaTheme.colors.outline.copy(alpha = 0.15f),
+            color      = NxTheme.colors.primary,
+            trackColor = NxTheme.colors.outline.copy(alpha = 0.15f),
         )
 
         // Controls row: transport on the left, volume + timecode on the right.
@@ -222,7 +222,7 @@ fun MusicPlayerWidget(instance: WidgetInstance) {
             Spacer(Modifier.weight(1f))
             Symbol(icon = volumeIcon(volume),
                 contentDescription = s.audioVolume,
-                tint               = CelestiaTheme.colors.textSecondary,
+                tint               = NxTheme.colors.textSecondary,
                 modifier           = Modifier.size(16.dp),
             )
             VolumeBar(
@@ -235,7 +235,7 @@ fun MusicPlayerWidget(instance: WidgetInstance) {
                 Text(
                     text  = timeline,
                     style = MaterialTheme.typography.labelSmall,
-                    color = CelestiaTheme.colors.textSecondary,
+                    color = NxTheme.colors.textSecondary,
                 )
             }
         }
@@ -309,7 +309,7 @@ private fun VolumeBar(
                 .fillMaxWidth()
                 .height(trackHeight)
                 .clip(RoundedCornerShape(50))
-                .background(CelestiaTheme.colors.outline.copy(alpha = 0.20f)),
+                .background(NxTheme.colors.outline.copy(alpha = 0.20f)),
         )
         // Active fill (left edge to current value).
         Box(
@@ -317,7 +317,7 @@ private fun VolumeBar(
                 .fillMaxWidth(value)
                 .height(trackHeight)
                 .clip(RoundedCornerShape(50))
-                .background(CelestiaTheme.colors.primary),
+                .background(NxTheme.colors.primary),
         )
         // Thumb dot at the active edge -- only visible on hover/press.
         if (widthPx > 0 && thumbAlpha > 0.01f) {
@@ -329,7 +329,7 @@ private fun VolumeBar(
                     .size(thumbSizeDp)
                     .graphicsLayer { alpha = thumbAlpha }
                     .clip(CircleShape)
-                    .background(CelestiaTheme.colors.primary),
+                    .background(NxTheme.colors.primary),
             )
         }
     }
@@ -348,12 +348,12 @@ private fun AlbumArtBlock(state: PlaybackState) {
         modifier = Modifier
             .size(52.dp)
             .clip(RoundedCornerShape(10.dp))
-            .background(CelestiaTheme.colors.primary.copy(alpha = 0.18f)),
+            .background(NxTheme.colors.primary.copy(alpha = 0.18f)),
         contentAlignment = Alignment.Center,
     ) {
         Symbol(icon = NxIcon.MusicNote,
             contentDescription = null,
-            tint               = CelestiaTheme.colors.primary,
+            tint               = NxTheme.colors.primary,
             modifier           = Modifier.size(28.dp),
         )
     }
@@ -368,14 +368,14 @@ private fun ControlButton(
     onClick: () -> Unit,
 ) {
     val bg = when {
-        !enabled -> CelestiaTheme.colors.surfaceVariant.copy(alpha = 0.4f)
-        primary  -> CelestiaTheme.colors.primary
-        else     -> CelestiaTheme.colors.surface
+        !enabled -> NxTheme.colors.surfaceVariant.copy(alpha = 0.4f)
+        primary  -> NxTheme.colors.primary
+        else     -> NxTheme.colors.surface
     }
     val tint = when {
-        !enabled -> CelestiaTheme.colors.textSecondary.copy(alpha = 0.4f)
+        !enabled -> NxTheme.colors.textSecondary.copy(alpha = 0.4f)
         primary  -> Color.White
-        else     -> CelestiaTheme.colors.textPrimary
+        else     -> NxTheme.colors.textPrimary
     }
     Box(
         modifier = Modifier

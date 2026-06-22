@@ -38,7 +38,7 @@ import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.LocalThemeReveal
 
@@ -50,7 +50,7 @@ import hivens.ui.theme.LocalThemeReveal
  */
 @Composable
 internal fun settingsRowBackground(): Color =
-    CelestiaTheme.colors.background.copy(alpha = 0.4f)
+    NxTheme.colors.background.copy(alpha = 0.4f)
 
 /**
  * Section header used by every Settings section. Small bold caps title
@@ -62,11 +62,11 @@ internal fun SettingsSectionTitle(text: String) {
     Text(
         text,
         style      = MaterialTheme.typography.bodySmall,
-        color      = CelestiaTheme.colors.primary,
+        color      = NxTheme.colors.primary,
         fontWeight = FontWeight.Bold
     )
     Spacer(Modifier.height(4.dp))
-    HorizontalDivider(color = CelestiaTheme.colors.primary.copy(alpha = 0.3f))
+    HorizontalDivider(color = NxTheme.colors.primary.copy(alpha = 0.3f))
     Spacer(Modifier.height(8.dp))
 }
 
@@ -106,13 +106,13 @@ internal fun SettingsRowWithDescription(
             Column {
                 Text(
                     title,
-                    color      = CelestiaTheme.colors.textPrimary.copy(alpha = alpha),
+                    color      = NxTheme.colors.textPrimary.copy(alpha = alpha),
                     fontWeight = FontWeight.Bold
                 )
                 Text(
                     description,
                     style = MaterialTheme.typography.bodySmall,
-                    color = CelestiaTheme.colors.textSecondary.copy(alpha = alpha)
+                    color = NxTheme.colors.textSecondary.copy(alpha = alpha)
                 )
             }
         }
@@ -131,7 +131,7 @@ internal fun SettingsSwitchRow(title: String, checked: Boolean, onCheckedChange:
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment     = Alignment.CenterVertically
     ) {
-        Text(title, style = MaterialTheme.typography.bodyLarge, color = CelestiaTheme.colors.textPrimary)
+        Text(title, style = MaterialTheme.typography.bodyLarge, color = NxTheme.colors.textPrimary)
         NxSwitch(
             checked         = checked,
             onCheckedChange = onCheckedChange,
@@ -152,7 +152,7 @@ internal fun SettingsToggleCard(
     description: String,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
-    accent: Color = CelestiaTheme.colors.primary,
+    accent: Color = NxTheme.colors.primary,
 ) {
     val style = LocalStyle.current
     Row(
@@ -167,13 +167,13 @@ internal fun SettingsToggleCard(
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
             Symbol(
                 icon, null,
-                tint     = if (checked) accent else CelestiaTheme.colors.textSecondary,
+                tint     = if (checked) accent else NxTheme.colors.textSecondary,
                 modifier = Modifier.size(24.dp),
             )
             Spacer(Modifier.width(16.dp))
             Column {
-                Text(title, color = CelestiaTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
-                Text(description, style = MaterialTheme.typography.bodySmall, color = CelestiaTheme.colors.textSecondary)
+                Text(title, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
+                Text(description, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.textSecondary)
             }
         }
         NxSwitch(checked = checked, onCheckedChange = onCheckedChange, accent = accent)
@@ -226,8 +226,8 @@ internal fun ThemeToggleCard(
             )
             Spacer(Modifier.width(16.dp))
             Column {
-                Text(title, color = CelestiaTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
-                Text(description, style = MaterialTheme.typography.bodySmall, color = CelestiaTheme.colors.textSecondary)
+                Text(title, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
+                Text(description, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.textSecondary)
             }
         }
         NxSwitch(
@@ -262,11 +262,11 @@ internal fun HomeViewPicker(
             .background(settingsRowBackground())
             .padding(16.dp),
     ) {
-        Text(labelTitle, color = CelestiaTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
+        Text(labelTitle, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
         Text(
             labelSub,
             style = MaterialTheme.typography.bodySmall,
-            color = CelestiaTheme.colors.textSecondary,
+            color = NxTheme.colors.textSecondary,
         )
         Spacer(Modifier.height(12.dp))
         // FlowRow so the pills wrap to a second line on a narrow pane instead
@@ -317,8 +317,8 @@ internal fun UiStylePicker(
             .background(settingsRowBackground())
             .padding(16.dp),
     ) {
-        Text(title, color = CelestiaTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
-        Text(sub, style = MaterialTheme.typography.bodySmall, color = CelestiaTheme.colors.textSecondary)
+        Text(title, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
+        Text(sub, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.textSecondary)
         Spacer(Modifier.height(12.dp))
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -332,9 +332,9 @@ internal fun UiStylePicker(
 
 @Composable
 private fun VariantPill(label: String, selected: Boolean, onClick: () -> Unit) {
-    val bg = if (selected) CelestiaTheme.colors.primary.copy(alpha = 0.18f)
+    val bg = if (selected) NxTheme.colors.primary.copy(alpha = 0.18f)
              else glassSurfaceAlpha(0.4f)
-    val fg = if (selected) CelestiaTheme.colors.primary else CelestiaTheme.colors.textSecondary
+    val fg = if (selected) NxTheme.colors.primary else NxTheme.colors.textSecondary
     val style = LocalStyle.current
     Row(
         Modifier

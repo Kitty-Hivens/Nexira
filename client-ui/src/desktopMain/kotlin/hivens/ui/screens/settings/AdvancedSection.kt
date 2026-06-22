@@ -17,7 +17,7 @@ import hivens.core.diag.ActionRing
 import hivens.launcher.platform.DataDirMover
 import hivens.launcher.platform.PlatformPaths
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.theme.CelestiaTheme
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalStyle
 import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.PlatformFile
@@ -66,11 +66,11 @@ internal fun AdvancedSection(paths: PlatformPaths) {
         Text(
             text  = s.settingsDataDirCurrent,
             style = MaterialTheme.typography.bodySmall,
-            color = CelestiaTheme.colors.textSecondary,
+            color = NxTheme.colors.textSecondary,
         )
         Text(
             text       = paths.dataDir.toAbsolutePath().toString(),
-            color      = CelestiaTheme.colors.textPrimary,
+            color      = NxTheme.colors.textPrimary,
             fontWeight = FontWeight.SemiBold,
             style      = MaterialTheme.typography.bodyMedium,
         )
@@ -138,13 +138,13 @@ internal fun AdvancedSection(paths: PlatformPaths) {
             },
             shape = MaterialTheme.shapes.small,
         ) {
-            Text(s.settingsDataDirMove, color = CelestiaTheme.colors.textPrimary)
+            Text(s.settingsDataDirMove, color = NxTheme.colors.textPrimary)
         }
         if (showError != null) {
             Text(
                 text  = showError!!,
                 style = MaterialTheme.typography.bodySmall,
-                color = CelestiaTheme.colors.error,
+                color = NxTheme.colors.error,
             )
         }
     }
@@ -191,7 +191,7 @@ internal fun AdvancedSection(paths: PlatformPaths) {
                     Text(s.sslWarningCancel)
                 }
             },
-            containerColor = CelestiaTheme.colors.surface,
+            containerColor = NxTheme.colors.surface,
         )
     }
 }
