@@ -72,6 +72,9 @@ include(":client-auth-smartycraft")
 include(":client-auth-microsoft")
 include(":client-launcher")
 include(":client-ui")
+// Leaf design-system module (NxUI): tokens, primitives, surfaces, Flexible.
+// client-ui depends on it one-way; it depends on nothing in-tree.
+include(":nx-ui")
 include(":widget-model")
 include(":widget-api")
 include(":widget-processor")

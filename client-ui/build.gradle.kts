@@ -69,6 +69,7 @@ kotlin {
                 implementation(project(":client-auth"))
                 implementation(project(":client-launcher"))
                 implementation(project(":widget-api"))
+                implementation(project(":nx-ui"))
 
                 implementation(libs.filekit.core)
                 implementation(libs.filekit.dialogs.compose)
