@@ -26,6 +26,7 @@ kotlin {
                 implementation(libs.compose.foundation)
                 implementation(libs.compose.material3)
                 implementation(libs.compose.ui)
+                implementation(libs.compose.components.resources)
                 implementation(libs.kotlinx.serialization.json)
                 implementation(libs.slf4j.api)
             }
@@ -38,6 +39,15 @@ kotlin {
             }
         }
     }
+}
+
+// Own composeResources -- the icon + typography fonts live here. The generated
+// Res accessor uses a DIFFERENT package than client-ui's (hivens.ui.generated.resources)
+// so the two Res objects never collide on the classpath.
+compose.resources {
+    publicResClass = true
+    packageOfResClass = "hivens.nx.ui.generated.resources"
+    generateResClass = always
 }
 
 // jvmTarget is also forced project-wide by the root subprojects {} block; set it

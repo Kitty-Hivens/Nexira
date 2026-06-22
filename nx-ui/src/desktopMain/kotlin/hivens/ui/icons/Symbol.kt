@@ -18,8 +18,8 @@ import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import hivens.ui.generated.resources.Res
-import hivens.ui.generated.resources.material_symbols
+import hivens.nx.ui.generated.resources.Res
+import hivens.nx.ui.generated.resources.material_symbols
 import org.jetbrains.compose.resources.Font
 
 /** A Material Symbols glyph identified by its codepoint. See [NxIcon] for the catalog. */
