@@ -1,9 +1,7 @@
 package hivens.ui.easter
 
-import androidx.compose.material3.ButtonColors
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.IntSize
 
@@ -11,8 +9,8 @@ import androidx.compose.ui.unit.IntSize
  * Real [AprilFoolsLifecycle] implementation. Thin facade over the chaos
  * singletons that do the work (`AprilFools` calendar logic,
  * `AprilFoolsProgress` regression, `AprilFoolsText` corruption,
- * `ChaosState` overlay state, plus the top-level `AprilFoolsButton` /
- * `AprilFoolsWrapper` / `AprilFoolsDebugPanel` composables).
+ * `ChaosState` overlay state, plus the top-level `AprilFoolsWrapper` /
+ * `AprilFoolsDebugPanel` composables).
  *
  * Must have a public no-arg constructor so `ServiceLoader` can
  * instantiate it.
@@ -59,25 +57,6 @@ class RealAprilFools : AprilFoolsLifecycle { // TODO: Class "RealAprilFools" is 
         heightPx: Float,
         onClick: () -> Unit,
     ): ChaosCardTracker = RealCardTracker(id, label, widthPx, heightPx, onClick)
-
-    @Composable
-    override fun ChaosButton(
-        id: String,
-        text: String,
-        onClick: () -> Unit,
-        modifier: Modifier,
-        enabled: Boolean,
-        colors: ButtonColors,
-    ) {
-        AprilFoolsButton(
-            id       = id,
-            text     = text,
-            onClick  = onClick,
-            modifier = modifier,
-            enabled  = enabled,
-            colors   = colors,
-        )
-    }
 
     @Composable
     override fun WrapContent(
