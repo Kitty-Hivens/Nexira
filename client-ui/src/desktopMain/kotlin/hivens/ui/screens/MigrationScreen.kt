@@ -14,8 +14,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import hivens.launcher.platform.DataDirMigration
-import hivens.ui.nx.CelestiaButton
 import hivens.ui.nx.GlassCard
+import hivens.ui.nx.NxButton
+import hivens.ui.nx.NxButtonStyle
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.NxTheme
@@ -138,11 +139,11 @@ private fun ReadyContent(
             color = NxTheme.colors.textSecondary,
         )
     }
-    CelestiaButton(
-        text = s.migrationStart,
+    NxButton(
+        label = s.migrationStart,
         onClick = onStart,
-        glowing = true,
         modifier = Modifier.fillMaxWidth(),
+        style = NxButtonStyle.Primary,
     )
 }
 
@@ -204,11 +205,11 @@ private fun CompletedContent(onQuit: () -> Unit) {
         color = NxTheme.colors.textSecondary,
         textAlign = TextAlign.Center,
     )
-    CelestiaButton(
-        text = s.migrationQuit,
+    NxButton(
+        label = s.migrationQuit,
         onClick = onQuit,
-        glowing = true,
         modifier = Modifier.fillMaxWidth(),
+        style = NxButtonStyle.Primary,
     )
 }
 
@@ -231,16 +232,17 @@ private fun FailedContent(error: String, onRetry: () -> Unit, onQuit: () -> Unit
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        CelestiaButton(
-            text = s.migrationRetry,
+        NxButton(
+            label = s.migrationRetry,
             onClick = onRetry,
             modifier = Modifier.weight(1f),
+            style = NxButtonStyle.Primary,
         )
-        CelestiaButton(
-            text = s.migrationQuit,
+        NxButton(
+            label = s.migrationQuit,
             onClick = onQuit,
-            primary = false,
             modifier = Modifier.weight(1f),
+            style = NxButtonStyle.Secondary,
         )
     }
 }

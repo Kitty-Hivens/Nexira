@@ -30,10 +30,13 @@ import hivens.core.data.ReleaseChannel
 import hivens.ui.nx.GlassCard
 import hivens.ui.components.channelColor
 import hivens.ui.customization.glassSurfaceAlpha
-import hivens.ui.easter.LocalAprilFools
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.flexible.Flexible
+import hivens.ui.flexible.FlexibleKind
+import hivens.ui.nx.NxButton
+import hivens.ui.nx.NxButtonStyle
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalMonoFamily
 import hivens.widget.api.rememberProps
@@ -56,7 +59,6 @@ data class AboutUpdateProps(
 fun AboutUpdatePanelWidget(instance: WidgetInstance) {
     val p = instance.rememberProps<AboutUpdateProps>()
     val ctx = LocalAboutContext.current
-    val af = LocalAprilFools.current
     val s = LocalStrings.current
     val state by ctx.updateState
 
@@ -113,16 +115,14 @@ fun AboutUpdatePanelWidget(instance: WidgetInstance) {
                     )
                 }
                 Spacer(Modifier.height(12.dp))
-                af.ChaosButton(
-                    id      = "about_open_update_btn",
-                    text    = if (current.update.isCritical) s.updateDownloadNow else s.updateDownload,
-                    onClick = { ctx.showUpdateDialog.value = true },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors   = ButtonDefaults.buttonColors(
-                        containerColor = if (current.update.isCritical) NxTheme.colors.error else glassSurfaceAlpha(0.55f),
-                        contentColor   = NxTheme.colors.textPrimary,
-                    ),
-                )
+                Flexible("about_open_update_btn", FlexibleKind.Button) {
+                    NxButton(
+                        label = if (current.update.isCritical) s.updateDownloadNow else s.updateDownload,
+                        onClick = { ctx.showUpdateDialog.value = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        style = if (current.update.isCritical) NxButtonStyle.Destructive else NxButtonStyle.Secondary,
+                    )
+                }
             }
         }
     }
