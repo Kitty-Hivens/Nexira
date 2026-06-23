@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -35,8 +34,10 @@ import hivens.core.data.PackAuthRequirement
 import hivens.core.data.SessionData
 import hivens.launcher.CredentialsManager
 import hivens.ui.LoginPanel
-import hivens.ui.customization.glassSurfaceAlpha
-import hivens.ui.easter.LocalAprilFools
+import hivens.ui.flexible.Flexible
+import hivens.ui.flexible.FlexibleKind
+import hivens.ui.nx.NxButton
+import hivens.ui.nx.NxButtonStyle
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -89,7 +90,6 @@ private fun SmartyCraftAccount(session: SessionData, onChanged: () -> Unit) {
     val ctx = LocalProfileContext.current
     val credentials: CredentialsManager = koinInject()
     val s = LocalStrings.current
-    val af = LocalAprilFools.current
 
     // Bumped by the skin uploader so the skin re-loads after upload/refresh.
     var skinKey by remember { mutableIntStateOf(0) }
@@ -122,13 +122,13 @@ private fun SmartyCraftAccount(session: SessionData, onChanged: () -> Unit) {
                 autoSpin = true,
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                af.ChaosButton(
-                    id = "profile_upload_skin_btn",
-                    text = s.profileUploadSkin,
-                    onClick = uploader.pick,
-                    modifier = Modifier,
-                    colors = ButtonDefaults.buttonColors(containerColor = NxTheme.colors.primary),
-                )
+                Flexible("profile_upload_skin_btn", FlexibleKind.Button) {
+                    NxButton(
+                        label = s.profileUploadSkin,
+                        onClick = uploader.pick,
+                        style = NxButtonStyle.Filled,
+                    )
+                }
                 IconButton(onClick = uploader.refresh) {
                     Symbol(NxIcon.Refresh, s.profileRefresh, tint = NxTheme.colors.textSecondary)
                 }
@@ -136,16 +136,14 @@ private fun SmartyCraftAccount(session: SessionData, onChanged: () -> Unit) {
             SkinUploadStatusLine(uploader.status)
         }
 
-        af.ChaosButton(
-            id = "profile_sc_signout_btn",
-            text = s.profileSignOutSmartycraft,
-            onClick = { signOut() },
-            modifier = Modifier.widthIn(min = 200.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = glassSurfaceAlpha(0.5f),
-                contentColor = NxTheme.colors.textPrimary,
-            ),
-        )
+        Flexible("profile_sc_signout_btn", FlexibleKind.Button) {
+            NxButton(
+                label = s.profileSignOutSmartycraft,
+                onClick = { signOut() },
+                modifier = Modifier.widthIn(min = 200.dp),
+                style = NxButtonStyle.Glass,
+            )
+        }
         PuppetClick("account.signout.smartycraft") { signOut() }
         PuppetClick("account.logout") { ctx.onLogout() }
     }
@@ -154,7 +152,6 @@ private fun SmartyCraftAccount(session: SessionData, onChanged: () -> Unit) {
 @Composable
 private fun AccountPanel(session: SessionData) {
     val s = LocalStrings.current
-    val af = LocalAprilFools.current
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         // Name with the status pill on its right.
@@ -178,16 +175,14 @@ private fun AccountPanel(session: SessionData) {
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             BalanceCard(session.balance, Modifier.weight(1f))
-            af.ChaosButton(
-                id = "profile_topup_btn",
-                text = s.profileTopUp,
-                onClick = { SystemActions.openUrl("http://smartycraft.ru/cabinet") },
-                modifier = Modifier.fillMaxHeight().widthIn(min = 150.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = glassSurfaceAlpha(0.55f),
-                    contentColor = NxTheme.colors.textPrimary,
-                ),
-            )
+            Flexible("profile_topup_btn", FlexibleKind.Button) {
+                NxButton(
+                    label = s.profileTopUp,
+                    onClick = { SystemActions.openUrl("http://smartycraft.ru/cabinet") },
+                    modifier = Modifier.fillMaxHeight().widthIn(min = 150.dp),
+                    style = NxButtonStyle.Glass,
+                )
+            }
         }
     }
 }

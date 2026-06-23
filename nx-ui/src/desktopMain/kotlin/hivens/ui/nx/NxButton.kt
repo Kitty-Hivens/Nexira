@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -17,24 +18,31 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import hivens.ui.customization.glassSurfaceAlpha
+import hivens.ui.effects.pulsatingGlow
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.Symbol
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalStyle
 
 /**
- * Button visual variants built on the Material-3 tonal palette, so the UI reads as
- * more than "primary fill or glass":
+ * The one button. A finite set of semantic styles replaces the old free-for-all,
+ * where the de-facto base button took an arbitrary Material `ButtonColors` and
+ * every call site invented its own look. Call sites pick a style, not colours --
+ * the per-widget freedom that used to live here moves up to the Flexible event
+ * layer, where it belongs.
  *
- *  - [Filled]  -- solid primary accent; the standard call-to-action.
- *  - [Tonal]   -- muted `secondaryContainer` fill; a SOLID (not glass) secondary
- *                 action -- the replacement for the ad-hoc `glassSurfaceAlpha`
- *                 buttons that made everything translucent.
- *  - [Ghost]   -- opaque `surfaceContainerHigh` chip; low-emphasis, still solid.
- *  - [Outline] -- bordered, transparent fill; for de-emphasised edges.
+ *  - [Filled]  -- primary accent fill; the standard call-to-action.
+ *  - [Danger]  -- error fill; a destructive or critical action.
+ *  - [Glass]   -- translucent surface; the secondary action over the app's glass.
+ *  - [Tonal]   -- opaque `secondaryContainer`; a solid secondary action.
+ *  - [Outline] -- bordered, transparent; a de-emphasised edge action.
+ *  - [Link]    -- transparent, accent text, no border; an inline link action.
+ *  - [Ghost]   -- transparent, muted text; a tertiary, low-emphasis action.
  */
-enum class NxButtonStyle { Filled, Tonal, Ghost, Outline }
+enum class NxButtonStyle { Filled, Danger, Glass, Tonal, Outline, Link, Ghost }
 
 @Composable
 fun NxButton(
@@ -45,34 +53,48 @@ fun NxButton(
     icon: IconKey? = null,
     enabled: Boolean = true,
     compact: Boolean = false,
+    glowing: Boolean = false,
+    minHeight: Dp? = null,
 ) {
     val palette = NxTheme.colors
+    val styleSpec = LocalStyle.current
     val shape = MaterialTheme.shapes.small
+    // Read unconditionally so the Glass branch reuses it without a conditional
+    // composable call. Honours the user's glass-intensity knob like every surface.
+    val glass = glassSurfaceAlpha(0.52f)
 
     val container: Color = when (style) {
         NxButtonStyle.Filled  -> palette.primary
+        NxButtonStyle.Danger  -> palette.error
+        NxButtonStyle.Glass   -> glass
         NxButtonStyle.Tonal   -> palette.secondaryContainer
-        NxButtonStyle.Ghost   -> palette.surfaceContainerHigh
         NxButtonStyle.Outline -> Color.Transparent
+        NxButtonStyle.Link    -> Color.Transparent
+        NxButtonStyle.Ghost   -> Color.Transparent
     }
     val content: Color = when (style) {
         NxButtonStyle.Filled  -> Color.White
+        NxButtonStyle.Danger  -> Color.White
+        NxButtonStyle.Glass   -> palette.textPrimary
         NxButtonStyle.Tonal   -> palette.onSecondaryContainer
-        NxButtonStyle.Ghost   -> palette.textPrimary
         NxButtonStyle.Outline -> palette.textPrimary
+        NxButtonStyle.Link    -> palette.primary
+        NxButtonStyle.Ghost   -> palette.textSecondary
     }
     val dim = if (enabled) 1f else 0.45f
     val pad = if (compact) PaddingValues(horizontal = 12.dp, vertical = 6.dp)
               else PaddingValues(horizontal = 18.dp, vertical = 10.dp)
+    val showGlow = glowing && styleSpec.softGlowEnabled
 
-    // Hover/press feedback through the shared ShapedStateLayer -- the same
-    // shape-correct state layer the easter-egg button uses, now owned by the
-    // base components. Provided as LocalIndication so the clickable picks it up.
+    // Hover/press feedback through the shared ShapedStateLayer, provided as
+    // LocalIndication so the clickable picks it up.
     CompositionLocalProvider(
-        LocalIndication provides ShapedStateLayer(LocalStyle.current.buttonCorner, content),
+        LocalIndication provides ShapedStateLayer(styleSpec.buttonCorner, content),
     ) {
         Row(
             modifier              = modifier
+                .let { if (minHeight != null) it.heightIn(min = minHeight) else it }
+                .let { if (showGlow) it.pulsatingGlow(palette.primary, cornerRadius = styleSpec.buttonCorner) else it }
                 .clip(shape)
                 .background(container.copy(alpha = container.alpha * dim))
                 .let { if (style == NxButtonStyle.Outline) it.border(1.dp, palette.outline.copy(alpha = dim), shape) else it }

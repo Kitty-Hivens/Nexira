@@ -31,7 +31,10 @@ import hivens.launcher.ProfileManager
 import hivens.launcher.network.ServerProtocolConfig
 import hivens.ui.components.ConfirmCodeDialog
 import hivens.ui.components.MicrosoftSignInButton
-import hivens.ui.easter.LocalAprilFools
+import hivens.ui.flexible.Flexible
+import hivens.ui.flexible.FlexibleKind
+import hivens.ui.nx.NxButton
+import hivens.ui.nx.NxButtonStyle
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetField
@@ -59,7 +62,6 @@ fun LoginPanel(
     val offlineProvider: OfflineAuthProvider   = koinInject()
     val settingsService: ISettingsService      = koinInject()
     val s            = LocalStrings.current
-    val af           = LocalAprilFools.current
     val scope        = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
 
@@ -468,31 +470,28 @@ fun LoginPanel(
                 )
             }
         } else {
-            af.ChaosButton(
-                id       = "login_submit_btn",
-                text     = s.loginButton,
-                onClick  = { doLogin() },
-                modifier = Modifier.fillMaxWidth().height(42.dp),
-                colors   = ButtonDefaults.buttonColors(
-                    containerColor = NxTheme.colors.primary,
-                ),
-            )
+            Flexible("login_submit_btn", FlexibleKind.Button) {
+                NxButton(
+                    label     = s.loginButton,
+                    onClick   = { doLogin() },
+                    modifier  = Modifier.fillMaxWidth(),
+                    style     = NxButtonStyle.Filled,
+                    minHeight = 42.dp,
+                )
+            }
         }
         PuppetClick("login.submit", enabled = !isLoading) { doLogin() }
 
         // REGISTER -- chaos target
-        af.ChaosButton(
-            id      = "login_register_btn",
-            text    = s.loginRegister,
-            onClick = {
-                SystemActions.openUrl("${protocolConfig.baseUrl}/register")
-            },
-            modifier = Modifier.fillMaxWidth().height(42.dp),
-            colors   = ButtonDefaults.buttonColors(
-                containerColor = Color.Transparent,
-                contentColor   = NxTheme.colors.primary,
-            ),
-        )
+        Flexible("login_register_btn", FlexibleKind.Button) {
+            NxButton(
+                label     = s.loginRegister,
+                onClick   = { SystemActions.openUrl("${protocolConfig.baseUrl}/register") },
+                modifier  = Modifier.fillMaxWidth(),
+                style     = NxButtonStyle.Link,
+                minHeight = 42.dp,
+            )
+        }
         PuppetClick("login.register") {
             SystemActions.openUrl("${protocolConfig.baseUrl}/register")
         }
@@ -500,16 +499,15 @@ fun LoginPanel(
         // PLAY OFFLINE -- offline identity, no network. Reuses the username field
         // as the offline name and remembers it for next time.
         if (showOffline) {
-            af.ChaosButton(
-                id      = "login_offline_btn",
-                text    = s.loginPlayOffline,
-                onClick = { playOffline() },
-                modifier = Modifier.fillMaxWidth().height(42.dp),
-                colors   = ButtonDefaults.buttonColors(
-                    containerColor = Color.Transparent,
-                    contentColor   = NxTheme.colors.textSecondary,
-                ),
-            )
+            Flexible("login_offline_btn", FlexibleKind.Button) {
+                NxButton(
+                    label     = s.loginPlayOffline,
+                    onClick   = { playOffline() },
+                    modifier  = Modifier.fillMaxWidth(),
+                    style     = NxButtonStyle.Ghost,
+                    minHeight = 42.dp,
+                )
+            }
             PuppetClick("login.playOffline") { playOffline() }
         }
 
