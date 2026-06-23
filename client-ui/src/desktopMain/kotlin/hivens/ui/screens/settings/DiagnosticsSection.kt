@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -25,7 +24,11 @@ import hivens.launcher.diag.IssueReporter
 import hivens.launcher.platform.PlatformPaths
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.easter.LocalAprilFools
+import hivens.ui.flexible.Flexible
+import hivens.ui.flexible.FlexibleKind
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.nx.NxButton
+import hivens.ui.nx.NxButtonStyle
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.platform.SystemActions
@@ -113,35 +116,28 @@ internal fun DiagnosticsSection(
         SettingsSectionTitle(s.settingsSectionDiagnostics)
     }
 
-    // Buttons need a visible body at rest; transparent containers
-    // turn M3's hover state-layer into the only paint and read as a
-    // rect popping out of nowhere.
-    val ghostBg = NxTheme.colors.background.copy(alpha = 0.4f)
-
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        // Open logs -- chaos target
-        af.ChaosButton(
-            id       = "settings_open_logs_btn",
-            text     = s.settingsOpenLogs,
-            onClick  = { SystemActions.openFolder(paths.logsDir.toString()) },
-            modifier = Modifier.weight(1f),
-            colors   = ButtonDefaults.buttonColors(
-                containerColor = ghostBg,
-                contentColor   = NxTheme.colors.textPrimary,
-            ),
-        )
+        Box(Modifier.weight(1f)) {
+            Flexible("settings_open_logs_btn", FlexibleKind.Button) {
+                NxButton(
+                    label = s.settingsOpenLogs,
+                    onClick = { SystemActions.openFolder(paths.logsDir.toString()) },
+                    modifier = Modifier.fillMaxWidth(),
+                    style = NxButtonStyle.Secondary,
+                )
+            }
+        }
         PuppetClick("settings.openLogsDir") { SystemActions.openFolder(paths.logsDir.toString()) }
-        // Open crash reports -- chaos target
-        af.ChaosButton(
-            id       = "settings_crash_reports_btn",
-            text     = s.settingsOpenCrashReports,
-            onClick  = { SystemActions.openFolder(paths.crashDir.toString()) },
-            modifier = Modifier.weight(1f),
-            colors   = ButtonDefaults.buttonColors(
-                containerColor = ghostBg,
-                contentColor   = NxTheme.colors.textPrimary,
-            ),
-        )
+        Box(Modifier.weight(1f)) {
+            Flexible("settings_crash_reports_btn", FlexibleKind.Button) {
+                NxButton(
+                    label = s.settingsOpenCrashReports,
+                    onClick = { SystemActions.openFolder(paths.crashDir.toString()) },
+                    modifier = Modifier.fillMaxWidth(),
+                    style = NxButtonStyle.Secondary,
+                )
+            }
+        }
         PuppetClick("settings.openCrashReports") { SystemActions.openFolder(paths.crashDir.toString()) }
     }
 
@@ -162,32 +158,30 @@ internal fun DiagnosticsSection(
     val bundleScope    = rememberCoroutineScope()
 
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        af.ChaosButton(
-            id       = "settings_create_diag_bundle_btn",
-            text     = s.settingsCreateDiagnosticBundle,
-            onClick  = {
-                if (bundleBusy) return@ChaosButton
-                bundleBusy = true
-                bundleScope.launch {
-                    val zip = withContext(Dispatchers.IO) {
-                        runCatching { DiagnosticBundle.create(paths) }.getOrNull()
-                    }
-                    if (zip != null) {
-                        lastBundlePath = zip
-                        SystemActions.openFile(zip.parent.toFile())
-                    }
-                    bundleBusy = false
-                }
-            },
-            modifier = Modifier.weight(1f),
-            colors   = ButtonDefaults.buttonColors(
-                containerColor = ghostBg,
-                contentColor   = NxTheme.colors.textPrimary.copy(
-                    alpha = if (bundleBusy) 0.45f else 1f
-                ),
-            ),
-            enabled  = !bundleBusy,
-        )
+        Box(Modifier.weight(1f)) {
+            Flexible("settings_create_diag_bundle_btn", FlexibleKind.Button) {
+                NxButton(
+                    label = s.settingsCreateDiagnosticBundle,
+                    onClick = {
+                        if (bundleBusy) return@NxButton
+                        bundleBusy = true
+                        bundleScope.launch {
+                            val zip = withContext(Dispatchers.IO) {
+                                runCatching { DiagnosticBundle.create(paths) }.getOrNull()
+                            }
+                            if (zip != null) {
+                                lastBundlePath = zip
+                                SystemActions.openFile(zip.parent.toFile())
+                            }
+                            bundleBusy = false
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    style = NxButtonStyle.Secondary,
+                    enabled = !bundleBusy,
+                )
+            }
+        }
         PuppetClick("settings.createDiagBundle", enabled = !bundleBusy) {
             bundleBusy = true
             bundleScope.launch {
@@ -198,28 +192,26 @@ internal fun DiagnosticsSection(
                 bundleBusy = false
             }
         }
-        af.ChaosButton(
-            id       = "settings_report_github_btn",
-            text     = s.settingsReportOnGithub,
-            onClick  = {
-                val zip = lastBundlePath ?: return@ChaosButton
-                runCatching {
-                    // Copy path so the user can drag-attach from the file
-                    // manager OR paste the path into a comment.
-                    Toolkit.getDefaultToolkit().systemClipboard
-                        .setContents(StringSelection(zip.toString()), null)
-                    SystemActions.openUrl(IssueReporter.bundleIssueUrl(zip))
-                }
-            },
-            modifier = Modifier.weight(1f),
-            colors   = ButtonDefaults.buttonColors(
-                containerColor = ghostBg,
-                contentColor   = NxTheme.colors.textPrimary.copy(
-                    alpha = if (lastBundlePath != null) 1f else 0.35f
-                ),
-            ),
-            enabled  = lastBundlePath != null,
-        )
+        Box(Modifier.weight(1f)) {
+            Flexible("settings_report_github_btn", FlexibleKind.Button) {
+                NxButton(
+                    label = s.settingsReportOnGithub,
+                    onClick = {
+                        val zip = lastBundlePath ?: return@NxButton
+                        runCatching {
+                            // Copy path so the user can drag-attach from the file
+                            // manager OR paste the path into a comment.
+                            Toolkit.getDefaultToolkit().systemClipboard
+                                .setContents(StringSelection(zip.toString()), null)
+                            SystemActions.openUrl(IssueReporter.bundleIssueUrl(zip))
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    style = NxButtonStyle.Secondary,
+                    enabled = lastBundlePath != null,
+                )
+            }
+        }
         PuppetClick("settings.reportOnGithub", enabled = lastBundlePath != null) {
             val zip = lastBundlePath ?: return@PuppetClick
             runCatching {
