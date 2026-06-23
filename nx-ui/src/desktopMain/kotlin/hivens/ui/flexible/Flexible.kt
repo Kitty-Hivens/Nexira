@@ -33,6 +33,14 @@ interface FlexibleEvent {
     fun isActive(): Boolean
 
     /**
+     * React to an app signal -- a pack launched, the date rolled over, a config
+     * combo went absurd. The default ignores everything; an event overrides this
+     * to flip its own active state or arm a one-shot. Wired to the
+     * [FlexibleSignalBus] by [FlexibleHostProvider] for the event's lifetime.
+     */
+    fun onSignal(signal: FlexibleSignal) {}
+
+    /**
      * Wrap or replace [content] for [target]. The default renders [content]
      * unchanged, so an event overrides only the kinds it cares about and leaves
      * everything else alone.
