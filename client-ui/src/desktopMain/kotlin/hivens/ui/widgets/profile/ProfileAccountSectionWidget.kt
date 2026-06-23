@@ -126,7 +126,7 @@ private fun SmartyCraftAccount(session: SessionData, onChanged: () -> Unit) {
                     NxButton(
                         label = s.profileUploadSkin,
                         onClick = uploader.pick,
-                        style = NxButtonStyle.Filled,
+                        style = NxButtonStyle.Primary,
                     )
                 }
                 IconButton(onClick = uploader.refresh) {
@@ -141,7 +141,7 @@ private fun SmartyCraftAccount(session: SessionData, onChanged: () -> Unit) {
                 label = s.profileSignOutSmartycraft,
                 onClick = { signOut() },
                 modifier = Modifier.widthIn(min = 200.dp),
-                style = NxButtonStyle.Glass,
+                style = NxButtonStyle.Secondary,
             )
         }
         PuppetClick("account.signout.smartycraft") { signOut() }
@@ -180,7 +180,7 @@ private fun AccountPanel(session: SessionData) {
                     label = s.profileTopUp,
                     onClick = { SystemActions.openUrl("http://smartycraft.ru/cabinet") },
                     modifier = Modifier.fillMaxHeight().widthIn(min = 150.dp),
-                    style = NxButtonStyle.Glass,
+                    style = NxButtonStyle.Secondary,
                 )
             }
         }

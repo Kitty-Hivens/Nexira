@@ -475,7 +475,7 @@ fun LoginPanel(
                     label     = s.loginButton,
                     onClick   = { doLogin() },
                     modifier  = Modifier.fillMaxWidth(),
-                    style     = NxButtonStyle.Filled,
+                    style     = NxButtonStyle.Primary,
                     minHeight = 42.dp,
                 )
             }
@@ -488,7 +488,7 @@ fun LoginPanel(
                 label     = s.loginRegister,
                 onClick   = { SystemActions.openUrl("${protocolConfig.baseUrl}/register") },
                 modifier  = Modifier.fillMaxWidth(),
-                style     = NxButtonStyle.Link,
+                style     = NxButtonStyle.Tertiary,
                 minHeight = 42.dp,
             )
         }
@@ -504,7 +504,7 @@ fun LoginPanel(
                     label     = s.loginPlayOffline,
                     onClick   = { playOffline() },
                     modifier  = Modifier.fillMaxWidth(),
-                    style     = NxButtonStyle.Ghost,
+                    style     = NxButtonStyle.Tertiary,
                     minHeight = 42.dp,
                 )
             }

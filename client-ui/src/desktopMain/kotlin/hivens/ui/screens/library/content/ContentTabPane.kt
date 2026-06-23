@@ -373,10 +373,10 @@ private fun Toolbar(
             FilterChip(s.contentFilterShaderPacks, filter == ContentFilter.ShaderPacks) { onFilter(ContentFilter.ShaderPacks) }
             Spacer(Modifier.weight(1f))
             if (canFindProjects) {
-                NxButton(label = s.contentFindProjects, onClick = onFindProjects, style = NxButtonStyle.Tonal, icon = NxIcon.Search, compact = true)
+                NxButton(label = s.contentFindProjects, onClick = onFindProjects, style = NxButtonStyle.Secondary, icon = NxIcon.Search, compact = true)
             }
             if (canAdd) {
-                NxButton(label = s.contentAddFiles, onClick = onAddFiles, style = NxButtonStyle.Tonal, icon = NxIcon.Add, compact = true)
+                NxButton(label = s.contentAddFiles, onClick = onAddFiles, style = NxButtonStyle.Secondary, icon = NxIcon.Add, compact = true)
             }
         }
     }
