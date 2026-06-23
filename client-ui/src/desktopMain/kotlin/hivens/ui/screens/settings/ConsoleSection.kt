@@ -123,7 +123,7 @@ internal fun ConsoleSection(paths: PlatformPaths) {
         NxButton(
             label   = s.consoleSecAddRule,
             onClick = { update(settings.copy(highlightRules = settings.highlightRules + HighlightRule())) },
-            style   = NxButtonStyle.Tonal,
+            style   = NxButtonStyle.Secondary,
             icon    = NxIcon.Add,
             compact = true,
         )
@@ -141,7 +141,7 @@ internal fun ConsoleSection(paths: PlatformPaths) {
         NxButton(
             label   = s.consoleSecAddRule,
             onClick = { update(settings.copy(filterRules = settings.filterRules + FilterRule())) },
-            style   = NxButtonStyle.Tonal,
+            style   = NxButtonStyle.Secondary,
             icon    = NxIcon.Add,
             compact = true,
         )
@@ -442,6 +442,6 @@ private fun ArtAdder(
                 inner()
             }
         }
-        NxButton(label = addLabel, onClick = onAdd, style = NxButtonStyle.Tonal, icon = NxIcon.Add, compact = true)
+        NxButton(label = addLabel, onClick = onAdd, style = NxButtonStyle.Secondary, icon = NxIcon.Add, compact = true)
     }
 }
