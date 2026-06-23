@@ -32,13 +32,16 @@ import hivens.core.data.SessionData
 import hivens.launcher.CredentialsManager
 import hivens.ui.components.MicrosoftSignInButton
 import hivens.ui.customization.glassSurfaceAlpha
-import hivens.ui.easter.LocalAprilFools
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.platform.SystemActions
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
+import hivens.ui.flexible.Flexible
+import hivens.ui.flexible.FlexibleKind
+import hivens.ui.nx.NxButton
+import hivens.ui.nx.NxButtonStyle
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalMonoFamily
 import hivens.ui.theme.LocalStyle
@@ -101,7 +104,6 @@ private fun MicrosoftAccount(session: SessionData, onChanged: () -> Unit) {
     val ctx = LocalProfileContext.current
     val credentials: CredentialsManager = koinInject()
     val s = LocalStrings.current
-    val af = LocalAprilFools.current
 
     // Signing out of Microsoft removes its account; if it was the only one, that
     // is a full logout -- route it through the confirm so a dismissed dialog
@@ -127,16 +129,14 @@ private fun MicrosoftAccount(session: SessionData, onChanged: () -> Unit) {
         UuidCard(session.uuid)
         // The live skin + cape manager (Mojang-sourced, not the SmartyCraft skin
         // service this section's identity comes from) is the next pass.
-        af.ChaosButton(
-            id = "profile_ms_signout_btn",
-            text = s.profileSignOutMicrosoft,
-            onClick = { signOut() },
-            modifier = Modifier.widthIn(min = 200.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = glassSurfaceAlpha(0.5f),
-                contentColor = NxTheme.colors.textPrimary,
-            ),
-        )
+        Flexible("profile_ms_signout_btn", FlexibleKind.Button) {
+            NxButton(
+                label = s.profileSignOutMicrosoft,
+                onClick = { signOut() },
+                modifier = Modifier.widthIn(min = 200.dp),
+                style = NxButtonStyle.Secondary,
+            )
+        }
         PuppetClick("account.signout.microsoft") { signOut() }
     }
 }

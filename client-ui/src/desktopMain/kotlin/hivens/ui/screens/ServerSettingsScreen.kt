@@ -19,7 +19,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import hivens.core.api.model.ServerProfile
-import hivens.ui.nx.CelestiaButton
+import hivens.ui.nx.NxButton
+import hivens.ui.nx.NxButtonStyle
 import hivens.ui.components.DestructiveConfirmDialog
 import hivens.ui.nx.GlassCard
 import hivens.ui.components.JvmArgsBuilderDialog
@@ -286,21 +287,21 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                     // CelestiaButton-based wrapper that can also host the future
                     // Atelier style variants, we use plain CelestiaButton here and
                     // accept losing this button's April Fools chaos integration.
-                    CelestiaButton(
-                        text     = s.serverSettingsOpenFolder,
+                    NxButton(
+                        label    = s.serverSettingsOpenFolder,
                         onClick  = { state.openClientFolder() },
                         modifier = Modifier.fillMaxWidth(),
-                        primary  = false,
+                        style    = NxButtonStyle.Secondary,
                     )
 
                     Spacer(Modifier.height(12.dp))
 
                     // Reset client -- NOT chaos-wrapped (destructive action)
-                    CelestiaButton(
+                    NxButton(
                         s.serverSettingsReset,
                         onClick  = { pendingReset = true },
                         modifier = Modifier.fillMaxWidth(),
-                        primary  = false,
+                        style    = NxButtonStyle.Destructive,
                     )
 
                     if (pendingReset) {
@@ -322,16 +323,16 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                             // Same rationale as the Open Folder button above -- uses
                             // CelestiaButton until AprilFoolsButton gets a wrapper
                             // that respects the Celestia / Atelier visual systems.
-                            CelestiaButton(
-                                text     = s.spawnResetButton,
+                            NxButton(
+                                label    = s.spawnResetButton,
                                 onClick  = { state.resetSpawn() },
                                 modifier = Modifier.fillMaxWidth(),
-                                primary  = false,
+                                style    = NxButtonStyle.Secondary,
                             )
                         } else {
                             // Loading / Success / Error -- plain reliable button, no chaos
-                            CelestiaButton(
-                                text    = when (state.spawnResetState) {
+                            NxButton(
+                                label    = when (state.spawnResetState) {
                                     SpawnResetState.Loading -> s.spawnResetLoading
                                     SpawnResetState.Success -> s.spawnResetSuccess
                                     SpawnResetState.Error   -> s.spawnResetError
@@ -340,7 +341,7 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
                                 enabled  = state.spawnResetState != SpawnResetState.Loading,
                                 onClick  = {},
                                 modifier = Modifier.fillMaxWidth(),
-                                primary  = false
+                                style    = NxButtonStyle.Secondary,
                             )
                         }
                     }

@@ -47,9 +47,12 @@ import hivens.core.api.SkinRepository
 import hivens.core.data.PackAuthRequirement
 import hivens.core.data.SessionData
 import hivens.launcher.CredentialsManager
+import hivens.ui.flexible.Flexible
+import hivens.ui.flexible.FlexibleKind
 import hivens.ui.nx.GlassCard
+import hivens.ui.nx.NxButton
+import hivens.ui.nx.NxButtonStyle
 import hivens.ui.customization.glassSurfaceAlpha
-import hivens.ui.easter.LocalAprilFools
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -103,7 +106,6 @@ fun WardrobeSurface(session: SessionData?, onBack: () -> Unit) {
 @Composable
 private fun Wardrobe(session: SessionData) {
     val s = LocalStrings.current
-    val af = LocalAprilFools.current
     val library: SkinLibrary = koinInject()
     val skinRepository: SkinRepository = koinInject()
     val skinManager: SkinManager = koinInject()
@@ -192,27 +194,24 @@ private fun Wardrobe(session: SessionData) {
             if (scSession != null && (skinSel != null || selectedCapeId != null)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     skinSel?.let { (file, markId) ->
-                        af.ChaosButton(
-                            id = "wardrobe_apply_sc_btn",
-                            text = s.wardrobeApplySmartycraft,
-                            onClick = { if (!busy) applyToSc(file, isCloak = false, markId = markId) },
-                            modifier = Modifier,
-                            colors = ButtonDefaults.buttonColors(containerColor = NxTheme.colors.primary),
-                        )
+                        Flexible("wardrobe_apply_sc_btn", FlexibleKind.Button) {
+                            NxButton(
+                                label = s.wardrobeApplySmartycraft,
+                                onClick = { if (!busy) applyToSc(file, isCloak = false, markId = markId) },
+                                style = NxButtonStyle.Primary,
+                            )
+                        }
                         PuppetClick("wardrobe.applySmartycraft") { if (!busy) applyToSc(file, isCloak = false, markId = markId) }
                     }
                     selectedCapeId?.let { id ->
                         val capeFile = library.file(id).toFile()
-                        af.ChaosButton(
-                            id = "wardrobe_apply_cape_sc_btn",
-                            text = s.wardrobeApplyCape,
-                            onClick = { if (!busy) applyToSc(capeFile, isCloak = true, markId = id) },
-                            modifier = Modifier,
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = glassSurfaceAlpha(0.55f),
-                                contentColor = NxTheme.colors.textPrimary,
-                            ),
-                        )
+                        Flexible("wardrobe_apply_cape_sc_btn", FlexibleKind.Button) {
+                            NxButton(
+                                label = s.wardrobeApplyCape,
+                                onClick = { if (!busy) applyToSc(capeFile, isCloak = true, markId = id) },
+                                style = NxButtonStyle.Secondary,
+                            )
+                        }
                         PuppetClick("wardrobe.applyCapeSmartycraft") { if (!busy) applyToSc(capeFile, isCloak = true, markId = id) }
                     }
                 }

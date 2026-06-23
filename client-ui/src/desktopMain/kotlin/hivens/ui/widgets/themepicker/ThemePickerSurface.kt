@@ -22,12 +22,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import hivens.ui.easter.LocalAprilFools
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
+import hivens.ui.flexible.Flexible
+import hivens.ui.flexible.FlexibleKind
+import hivens.ui.nx.NxButton
+import hivens.ui.nx.NxButtonStyle
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.CustomTheme
 import hivens.ui.theme.ThemePresets
@@ -51,7 +54,6 @@ fun ThemePickerSurface(
     onBack: () -> Unit,
 ) {
     val s = LocalStrings.current
-    val af = LocalAprilFools.current
     val themes = remember { ThemePresets.getAll() }
     // Keyless remember: the local pending selection survives an
     // external currentTheme change (system theme sync, preset
@@ -98,14 +100,13 @@ fun ThemePickerSurface(
                         color      = NxTheme.colors.textPrimary,
                     )
                 }
-                af.ChaosButton(
-                    id      = "theme_picker_apply_btn",
-                    text    = s.themePickerApply,
-                    onClick = { onThemeSelected(selectedTheme.value) },
-                    colors  = ButtonDefaults.buttonColors(
-                        containerColor = NxTheme.colors.primary,
-                    ),
-                )
+                Flexible("theme_picker_apply_btn", FlexibleKind.Button) {
+                    NxButton(
+                        label = s.themePickerApply,
+                        onClick = { onThemeSelected(selectedTheme.value) },
+                        style = NxButtonStyle.Primary,
+                    )
+                }
             }
             // Body: two side-by-side slots. Grid is the editable
             // panel; preview reads the same selectedTheme via the

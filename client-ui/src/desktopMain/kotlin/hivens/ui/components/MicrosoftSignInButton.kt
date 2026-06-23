@@ -28,10 +28,13 @@ import hivens.auth.DeviceCodeChallenge
 import hivens.core.data.SessionData
 import hivens.core.diag.ActionRing
 import hivens.launcher.CredentialsManager
-import hivens.ui.easter.LocalAprilFools
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.platform.SystemActions
 import hivens.ui.puppet.PuppetClick
+import hivens.ui.flexible.Flexible
+import hivens.ui.flexible.FlexibleKind
+import hivens.ui.nx.NxButton
+import hivens.ui.nx.NxButtonStyle
 import hivens.ui.theme.NxTheme
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -69,7 +72,6 @@ fun MicrosoftSignInButton(
     val authRegistry: AuthProviderRegistry     = koinInject()
     val credentialsManager: CredentialsManager = koinInject()
     val s   = LocalStrings.current
-    val af  = LocalAprilFools.current
     val scope = rememberCoroutineScope()
 
     val provider = remember { authRegistry.all.firstOrNull { it.capabilities.supportsDeviceCode } }
@@ -118,16 +120,15 @@ fun MicrosoftSignInButton(
     }
 
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        af.ChaosButton(
-            id      = "login_microsoft_btn",
-            text    = label ?: s.loginMicrosoft,
-            onClick = { start() },
-            modifier = Modifier.fillMaxWidth().height(42.dp),
-            colors   = ButtonDefaults.buttonColors(
-                containerColor = Color.Transparent,
-                contentColor   = NxTheme.colors.primary,
-            ),
-        )
+        Flexible("login_microsoft_btn", FlexibleKind.Button) {
+            NxButton(
+                label = label ?: s.loginMicrosoft,
+                onClick = { start() },
+                modifier = Modifier.fillMaxWidth(),
+                style = NxButtonStyle.Tertiary,
+                minHeight = 42.dp,
+            )
+        }
         when {
             requesting -> Row(verticalAlignment = Alignment.CenterVertically) {
                 CircularProgressIndicator(
