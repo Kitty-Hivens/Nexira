@@ -1,20 +1,9 @@
 package hivens.ui.easter
 
-import androidx.compose.foundation.LocalIndication
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonColors
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.State
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.unit.dp
-import hivens.ui.nx.ShapedStateLayer
-import hivens.ui.theme.LocalStyle
 
 /**
  * Default no-op implementation of [AprilFoolsLifecycle]. Returned by
@@ -63,42 +52,6 @@ object NoOpAprilFools : AprilFoolsLifecycle {
         heightPx: Float,
         onClick: () -> Unit,
     ): ChaosCardTracker = NoOpCardTracker
-
-    @Composable
-    override fun ChaosButton(
-        id: String,
-        text: String,
-        onClick: () -> Unit,
-        modifier: Modifier,
-        enabled: Boolean,
-        colors: ButtonColors,
-    ) {
-        // M3 1.11-alpha07's default ripple paints its state-layer with a shape
-        // that doesn't match Button.shape. Rather than kill feedback entirely
-        // (dead-feeling buttons), draw the hover/press layer with the button's
-        // OWN shape -- it can't mismatch -- so the button stays responsive.
-        CompositionLocalProvider(LocalIndication provides ShapedStateLayer(LocalStyle.current.buttonCorner, colors.contentColor)) {
-            Button(
-                onClick   = onClick,
-                modifier  = modifier,
-                enabled   = enabled,
-                colors    = colors,
-                shape     = MaterialTheme.shapes.small,
-                // Skiko paints hoveredElevation shadow as a rect-blur
-                // outside the rounded clip; zero every elevation to
-                // suppress.
-                elevation = ButtonDefaults.buttonElevation(
-                    defaultElevation  = 0.dp,
-                    pressedElevation  = 0.dp,
-                    focusedElevation  = 0.dp,
-                    hoveredElevation  = 0.dp,
-                    disabledElevation = 0.dp,
-                ),
-            ) {
-                Text(text)
-            }
-        }
-    }
 
     @Composable
     override fun WrapContent(
