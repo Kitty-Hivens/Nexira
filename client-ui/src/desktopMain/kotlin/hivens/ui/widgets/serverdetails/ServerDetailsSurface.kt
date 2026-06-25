@@ -29,8 +29,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.core.api.model.ServerProfile
 import hivens.launcher.platform.PlatformPaths
-import hivens.ui.nx.GlassCard
-import hivens.ui.customization.glassSurfaceAlpha
+import hivens.ui.surface.NxCard
+import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -126,9 +126,9 @@ fun ServerDetailsSurface(
                 )
             }
 
-            GlassCard(
-                modifier        = Modifier.weight(1f).fillMaxWidth(),
-                backgroundColor = glassSurfaceAlpha(0.7f),
+            NxCard(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                level    = NxSurfaceLevel.Raised,
             ) {
                 if (isLoading) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

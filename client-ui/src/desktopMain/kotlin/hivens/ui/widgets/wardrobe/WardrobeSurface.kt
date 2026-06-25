@@ -49,9 +49,10 @@ import hivens.core.data.SessionData
 import hivens.launcher.CredentialsManager
 import hivens.ui.flexible.Flexible
 import hivens.ui.flexible.FlexibleKind
-import hivens.ui.nx.GlassCard
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
+import hivens.ui.surface.NxCard
+import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
@@ -91,7 +92,7 @@ fun WardrobeSurface(session: SessionData?, onBack: () -> Unit) {
 
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         // Title lives in the top-bar breadcrumb now -- no in-screen duplicate.
-        GlassCard(modifier = Modifier.weight(1f).fillMaxWidth(), backgroundColor = glassSurfaceAlpha(0.7f)) {
+        NxCard(modifier = Modifier.weight(1f).fillMaxWidth(), level = NxSurfaceLevel.Raised) {
             if (session == null) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(s.wardrobeSignedOut, style = MaterialTheme.typography.bodyMedium, color = NxTheme.colors.textSecondary)

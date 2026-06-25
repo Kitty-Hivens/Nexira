@@ -49,6 +49,12 @@ data class Backdrop(val blurRadiusDp: Float = 18f) : SurfaceLayer
  *  user's glass-intensity knob, like [hivens.ui.customization.glassSurfaceAlpha]. */
 data class Fill(val role: FrostRole = FrostRole.Surface, val alpha: Float = 0.6f) : SurfaceLayer
 
+/** The opaque tonal BODY of a surface. Unlike [Fill], its alpha is the floor that
+ *  keeps a plane from collapsing into the background when the glass coat thins
+ *  (light theme / no wallpaper / glassIntensity 0) -- it is INDEPENDENT of the
+ *  glass-intensity knob. Glass is a coat over the body, never instead of it. */
+data class Body(val role: FrostRole = FrostRole.Surface, val floorAlpha: Float = 1f) : SurfaceLayer
+
 /** Optional tint/gradient wash over the fill for mood and depth. */
 data class Wash(
     val role: FrostRole = FrostRole.Primary,
@@ -91,8 +97,14 @@ data class EdgeHighlight(val alpha: Float = 0.16f) : SurfaceLayer
 /** Bottom inner shade -- the slab's lower edge falling into shadow. */
 data class EdgeShadow(val alpha: Float = 0.22f) : SurfaceLayer
 
-/** Hairline border around the surface. */
-data class EdgeBorder(val role: FrostRole = FrostRole.Outline, val widthDp: Float = 1f, val alpha: Float = 0.5f) : SurfaceLayer
+/** Hairline border around the surface. With [explicitColor] set, that color is used
+ *  verbatim (the luminance-derived bevel path); otherwise [role] @ [alpha] resolves. */
+data class EdgeBorder(
+    val role: FrostRole = FrostRole.Outline,
+    val widthDp: Float = 1f,
+    val alpha: Float = 0.5f,
+    val explicitColor: Color? = null,
+) : SurfaceLayer
 
 /** Outer drop shadow / glow -- drawn outside the clip; gated on softGlowEnabled. */
 data class EdgeGlow(val role: FrostRole = FrostRole.Primary, val elevationDp: Float = 12f) : SurfaceLayer
@@ -106,10 +118,11 @@ data class StateOverlay(val role: FrostRole = FrostRole.Primary, val hoverAlpha:
 /** Theme color roles a layer can pull from. Distinct from the persisted
  *  [hivens.ui.customization.ColorRole] string keys -- this maps to live palette
  *  fields for rendering, not to a settings file. */
-enum class FrostRole { Surface, SurfaceContainer, SurfaceContainerHigh, Background, Primary, Secondary, Tertiary, Outline }
+enum class FrostRole { Surface, SurfaceContainerLow, SurfaceContainer, SurfaceContainerHigh, Background, Primary, Secondary, Tertiary, Outline }
 
 private fun NxColors.frost(role: FrostRole): Color = when (role) {
     FrostRole.Surface              -> surface
+    FrostRole.SurfaceContainerLow  -> surfaceContainerLow
     FrostRole.SurfaceContainer     -> surfaceContainer
     FrostRole.SurfaceContainerHigh -> surfaceContainerHigh
     FrostRole.Background           -> background
@@ -132,6 +145,15 @@ fun FrostTier.toLayers(): List<SurfaceLayer> = when (this) {
     FrostTier.Frosted -> listOf(Backdrop(), Fill(alpha = 0.55f), Edge())
     FrostTier.Heavy   -> listOf(Backdrop(blurRadiusDp = 28f), Fill(alpha = 0.45f), Wash(), Edge(border = true), Texture())
 }
+
+/** A [Body]'s alpha is the slider-independent floor (Rule 2): the plane must read
+ *  even when the glass coat is gone. No glassIntensity term -- that is the point. */
+internal fun bodyAlpha(floorAlpha: Float): Float = floorAlpha.coerceIn(0f, 1f)
+
+/** A [Fill]'s alpha is the optional glass coat: it scales with the user's
+ *  glass-intensity knob and thins to nothing at intensity 0. */
+internal fun coatAlpha(baseAlpha: Float, glassIntensity: Float): Float =
+    (baseAlpha * glassIntensity).coerceIn(0f, 1f)
 
 /**
  * Renders [layers] bottom-to-top behind [content]. [Edge] groups expand to their
@@ -165,7 +187,12 @@ fun FrostSurface(
                 is Backdrop -> LocalBackdropPainter.current?.invoke(layer.blurRadiusDp, Modifier.matchParentSize())
 
                 is Fill -> {
-                    val c = colors.frost(layer.role).copy(alpha = (layer.alpha * glassIntensity).coerceIn(0f, 1f))
+                    val c = colors.frost(layer.role).copy(alpha = coatAlpha(layer.alpha, glassIntensity))
+                    Box(Modifier.matchParentSize().drawBehind { drawRect(c) })
+                }
+
+                is Body -> {
+                    val c = colors.frost(layer.role).copy(alpha = bodyAlpha(layer.floorAlpha))
                     Box(Modifier.matchParentSize().drawBehind { drawRect(c) })
                 }
 
@@ -202,7 +229,7 @@ fun FrostSurface(
                 })
 
                 is EdgeBorder -> {
-                    val c = colors.frost(layer.role).copy(alpha = layer.alpha)
+                    val c = layer.explicitColor ?: colors.frost(layer.role).copy(alpha = layer.alpha)
                     Box(Modifier.matchParentSize().border(layer.widthDp.dp, c, shape))
                 }
 
