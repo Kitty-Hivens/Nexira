@@ -1,6 +1,5 @@
 package hivens.ui
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
@@ -8,7 +7,6 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import hivens.core.data.SessionData
-import hivens.ui.theme.NxTheme
 import hivens.ui.widgets.shell.LocalRightRailContext
 import hivens.ui.widgets.shell.RightRailContext
 import hivens.widget.api.SlotRenderer
@@ -38,7 +36,7 @@ fun RightPanel(
         )
     }
     CompositionLocalProvider(LocalRightRailContext provides ctx) {
-        Column(modifier = modifier.background(NxTheme.colors.background)) {
+        Column(modifier = modifier) {
             SlotRenderer(SurfaceId(SURFACE), SlotId("news"), Modifier.weight(1f).fillMaxWidth())
             // Bottom slot: the message-history widget seeds here by default; the
             // news slot takes the weight so this stays pinned to the bottom.
