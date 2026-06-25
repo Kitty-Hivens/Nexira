@@ -61,9 +61,10 @@ import hivens.ui.surface.Fill
 import hivens.ui.surface.FrostRole
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.surface.Edge
 import hivens.ui.surface.FrostSurface
 import hivens.ui.surface.FrostTier
+import hivens.ui.surface.NxSurface
+import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.surface.toLayers
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalStyle
@@ -224,28 +225,10 @@ private val AUTO_COLLAPSE_BELOW = 980.dp   // window narrower than this auto-col
 @Composable
 fun ShellRightRegion(instance: WidgetInstance) {
     val props = instance.rememberProps<ShellRegionProps>()
-    // Style the panel itself. The real separator is TONE: the page background and a
-    // plain surface fill are nearly the same dark, so the panel must sit a step up
-    // the tonal hierarchy (SurfaceContainerHigh) at a readable alpha to read as a
-    // distinct plane -- the border alone can't separate same-on-same. Guarantee an
-    // edge border too, so the boundary is crisp. All via the surface's own layers,
-    // not anything drawn over the content.
-    val layers = remember(props.frostTier) {
-        buildList {
-            props.frostTier.toLayers().forEach { layer ->
-                when (layer) {
-                    // Tonal step up from the page background. The Material-You palette
-                    // engine tints this role per wallpaper, so the panel reads as a
-                    // distinct -- and, once seeded, coloured -- plane. Border keeps a
-                    // crisp boundary regardless.
-                    is Fill -> add(layer.copy(role = FrostRole.SurfaceContainerHigh, alpha = maxOf(layer.alpha, 0.85f)))
-                    is Edge -> add(layer.copy(border = true))
-                    else    -> add(layer)
-                }
-            }
-            if (none { it is Edge }) add(Edge(highlight = false, shadow = false, border = true))
-        }
-    }
+    // The panel is an NxSurface at Floating depth: a SurfaceContainerHigh body (a step
+    // up the tonal ladder from the page) plus a luminance-derived bevel, so it reads
+    // as a distinct plane over any wallpaper and with none. The editable frostTier
+    // prop still drives the glass coat's richness.
     val editing = LocalEditMode.current is EditModeState.On
     val path = LocalSlotPath.current
     val controller: EditModeController = koinInject()
@@ -273,7 +256,7 @@ fun ShellRightRegion(instance: WidgetInstance) {
         if (props.collapsed) { CollapsedRegionStrip(); return }
         val ctx = LocalShellContext.current
         val sized = if (props.widthDp > 0) Modifier.width(props.widthDp.dp) else Modifier.width(265.dp)
-        FrostSurface(layers, sized.fillMaxHeight(), RectangleShape) {
+        NxSurface(NxSurfaceLevel.Floating, sized.fillMaxHeight(), RectangleShape, tier = props.frostTier) {
             RightPanel(ctx.appState, ctx.onLogin, ctx.onLogout, ctx.sslBypass, Modifier.fillMaxSize())
         }
         return
@@ -336,7 +319,7 @@ fun ShellRightRegion(instance: WidgetInstance) {
         // clipped sliver; it wipes in (at full width, requiredWidth -- no reflow)
         // as the rail widens.
         if (widthAnim.value > collapsedPx + 1f) {
-            FrostSurface(layers, Modifier.fillMaxSize(), RectangleShape) {
+            NxSurface(NxSurfaceLevel.Floating, Modifier.fillMaxSize(), RectangleShape, tier = props.frostTier) {
                 Row(modifier = Modifier.requiredWidth(expandedWidth).fillMaxHeight()) {
                     RightPanel(ctx.appState, ctx.onLogin, ctx.onLogout, ctx.sslBypass, Modifier.weight(1f).fillMaxHeight())
                 }

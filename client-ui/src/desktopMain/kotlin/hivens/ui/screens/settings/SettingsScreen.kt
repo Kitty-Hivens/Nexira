@@ -13,8 +13,8 @@ import hivens.core.data.HomeView
 import hivens.core.data.UiStyle
 import hivens.launcher.network.NetworkState
 import hivens.launcher.platform.PlatformPaths
-import hivens.ui.nx.GlassCard
-import hivens.ui.customization.glassSurfaceAlpha
+import hivens.ui.surface.NxCard
+import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetScreen
@@ -71,13 +71,12 @@ fun SettingsScreen(
 
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         // Title lives in the top-bar breadcrumb now -- no in-screen duplicate.
-        // Explicit backgroundColor opts the Settings frame out of
-        // style.cardSurface -- stays glassy under Brut, same as the
-        // inner row panels. Routed through glassSurfaceAlpha so the
-        // customization knob still scales it.
-        GlassCard(
-            modifier        = Modifier.weight(1f).fillMaxWidth(),
-            backgroundColor = glassSurfaceAlpha(0.7f),
+        // The frame is an NxCard: a library-owned tonal body + bevel hairline that
+        // stays a distinct plane under any style and with no wallpaper, instead of
+        // a glass-alpha that collapsed when the coat came off.
+        NxCard(
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            level    = NxSurfaceLevel.Raised,
         ) {
             Row(Modifier.fillMaxSize().padding(16.dp)) {
                 SettingsCategoryNav(

@@ -112,7 +112,7 @@ internal val DarkColorPalette = NxColors(
     ),
 )
 
-private val LightColorPalette = NxColors(
+internal val LightColorPalette = NxColors(
     primary = Color(0xFF5E68C0),       // Soft indigo (instead of harsh purple)
     primaryVariant = Color(0xFF3F51B5),
     secondary = Color(0xFF26A69A),     // Calm teal

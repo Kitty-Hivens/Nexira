@@ -18,8 +18,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import hivens.core.data.SessionData
-import hivens.ui.nx.GlassCard
-import hivens.ui.customization.glassSurfaceAlpha
+import hivens.ui.surface.NxCard
+import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.identity.SkinManager
 import hivens.ui.platform.SystemActions
@@ -94,9 +94,9 @@ fun ProfileSurface(
     CompositionLocalProvider(LocalProfileContext provides ctx) {
         Column(Modifier.fillMaxSize().padding(16.dp)) {
             // Title lives in the top-bar breadcrumb now -- no in-screen duplicate.
-            GlassCard(
-                modifier        = Modifier.weight(1f).fillMaxWidth(),
-                backgroundColor = glassSurfaceAlpha(0.7f),
+            NxCard(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                level    = NxSurfaceLevel.Raised,
             ) {
                 if (authResolving && session == null) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
