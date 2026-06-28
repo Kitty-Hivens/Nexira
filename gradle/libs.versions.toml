@@ -16,14 +16,12 @@ versionsPlugin    = "0.54.0"
 ksp               = "2.3.9"
 
 # ── Core libraries ───────────────────────────────────────────────────────────
-ktor              = "3.5.0"
-koin              = "4.2.1"
+ktor              = "3.5.1"
+koin              = "4.2.2"
 serialization     = "1.11.0"
 coroutines        = "1.11.0"
 
 # ── UI / Compose ecosystem ───────────────────────────────────────────────────
-# coil held at 3.4.0 (next is 3.5.0-beta01, skipped -- beta).
-#
 # composeMaterial3 tracks JetBrains' separately-published material3 artifact,
 # which lags Compose-MP core by ~2 release lines. core 1.11.0 GA shipped but
 # material3 has no 1.10.x / 1.11.x stable; latest stable is 1.9.0 (two lines
@@ -31,20 +29,20 @@ coroutines        = "1.11.0"
 # composeIcons (pinned to its own latest-stable 1.7.3 instead of the core ref).
 composeIcons      = "1.7.3"
 composeMaterial3  = "1.11.0-alpha07"
-markdownRenderer  = "0.40.2"
+markdownRenderer  = "0.43.0"
 # org.jetbrains:markdown -- md->html parser under markdown-m3, used directly by the in-launcher HTML renderer (hivens.ui.render).
-markdown          = "0.7.3"
+markdown          = "0.7.5"
 # jsoup -- HTML parsing for the in-launcher HTML renderer.
-jsoup             = "1.18.1"
-coil              = "3.4.0"
+jsoup             = "1.22.2"
+coil              = "3.5.0"
 # Material You colour science (Monet) -- pure Kotlin port, no Compose dep.
 # Seeds a tonal palette from the wallpaper; mapped onto NxColors.
 materialColorUtils = "4.1.1"
-filekit           = "0.14.1"
+filekit           = "0.14.2"
 
 # ── Logging ──────────────────────────────────────────────────────────────────
 slf4j             = "2.0.18"
-logback           = "1.5.34"
+logback           = "1.5.37"
 
 # ── Misc runtime ─────────────────────────────────────────────────────────────
 commonsCompress   = "1.28.0"
