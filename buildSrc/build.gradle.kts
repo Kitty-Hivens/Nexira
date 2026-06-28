@@ -42,5 +42,12 @@ gradlePlugin {
             id = "nexira.packaging"
             implementationClass = "hivens.packaging.PackagingPlugin"
         }
+        // GraalVM / Liberica-NIK native-image build for the headless CLI
+        // (:client-cli). Same shape as `nexira.packaging`: typed ExecOperations
+        // tasks, config-cache clean, no third-party plugin on the classpath.
+        register("nativeImage") {
+            id = "nexira.native-image"
+            implementationClass = "hivens.nativeimage.NativeImagePlugin"
+        }
     }
 }
