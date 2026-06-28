@@ -38,7 +38,16 @@ import kotlin.system.exitProcess
  * [DataDirMigration.Source] that gates whether the first composition
  * shows MigrationScreen or AppRoot.
  *
- * Called from [hivens.ui.Main.main] before `application { ... }`.
+ * [preBoot] runs the full GUI pipeline (display setup + Swing crash
+ * dialog) and is called from [hivens.ui.Main.main] before
+ * `application { ... }`. [preBootHeadless] runs the same data/logging/Koin
+ * setup WITHOUT any AWT/Swing touch -- the native-image CLI entrypoint
+ * (:client-cli) uses it. The GUI-only paths (XToolkitOverride,
+ * DisplayDiagnostics, CrashReporter.showCrashDialog, SwingUtilities) are
+ * reachable ONLY from [preBoot], so they stay out of the CLI's reachable
+ * graph and AWT never enters the native image -- which is the whole point,
+ * since AWT/Skiko is what blocks native-image of the Compose GUI.
+ *
  * Anything that should run AFTER Koin but before the Compose entry
  * (puppet server startup, UI Koin module registration) is the caller's
  * responsibility -- those have client-ui dependencies and cannot live
@@ -61,12 +70,52 @@ object LauncherBootstrap {
     )
 
     /**
-     * Run the full pre-Compose pipeline. [extraModules] is appended to
-     * the launcher's own Koin modules at [startKoin] time so callers
-     * (the ui module) can register their singletons in the same Koin
+     * Run the full pre-Compose pipeline for the GUI launcher. [extraModules]
+     * is appended to the launcher's own Koin modules at [startKoin] time so
+     * callers (the ui module) can register their singletons in the same Koin
      * context without LauncherBootstrap having to know about them.
      */
     fun preBoot(extraModules: List<Module> = emptyList()): Result {
+        val (paths, crashReporter) = prepareCore()
+
+        System.setProperty("skiko.fps.limit", "60")
+
+        // X11 WM_CLASS override. See XToolkitOverride doc for the
+        // cross-vendor reflection rationale; the JVM must have been
+        // launched with `--add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED`.
+        // Runs after prepareCore() set nexira.logs.dir so the diagnostics
+        // line below lands in the configured launcher.log.
+        XToolkitOverride.applyLinuxAppClassName()
+
+        // One INFO line per launch summarising toolkit + Wayland/X11 env --
+        // gives every user-attached launcher.log enough context for triage.
+        DisplayDiagnostics.logEnvironment()
+
+        installGuiCrashHandler(crashReporter)
+
+        return finishBoot(paths, crashReporter, extraModules, singleInstance = true)
+    }
+
+    /**
+     * Headless variant for the CLI / native-image entrypoint: identical
+     * logging, paths, migration and Koin setup, but touches no AWT/Swing.
+     * It installs a log-and-persist crash handler (no Swing dialog) and
+     * skips the single-instance lock so the CLI can run alongside a GUI
+     * instance instead of silently exiting when the GUI holds the lock.
+     */
+    fun preBootHeadless(extraModules: List<Module> = emptyList()): Result {
+        val (paths, crashReporter) = prepareCore()
+        installHeadlessCrashHandler(crashReporter)
+        return finishBoot(paths, crashReporter, extraModules, singleInstance = false)
+    }
+
+    /**
+     * AWT-free core: log dir + data-dir migration + session tagging +
+     * NetworkState restore + data dir + CrashReporter. Shared verbatim by
+     * both entrypoints; contains zero references to AWT/Swing so the CLI's
+     * reachable graph stays clean.
+     */
+    private fun prepareCore(): Pair<PlatformPaths, CrashReporter> {
         // Resolve logs dir BEFORE any LoggerFactory.getLogger() call so
         // logback.xml (which reads `${nexira.logs.dir}` for its rolling-file
         // appenders) sees the platform-correct path on its very first init.
@@ -138,17 +187,6 @@ object LauncherBootstrap {
         // initialize hadn't run yet.)
         NetworkState.initialize(paths.dataDir.resolve("ssl-bypasses.json"))
 
-        System.setProperty("skiko.fps.limit", "60")
-
-        // X11 WM_CLASS override. See XToolkitOverride doc for the
-        // cross-vendor reflection rationale; the JVM must have been
-        // launched with `--add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED`.
-        XToolkitOverride.applyLinuxAppClassName()
-
-        // One INFO line per launch summarising toolkit + Wayland/X11 env --
-        // gives every user-attached launcher.log enough context for triage.
-        DisplayDiagnostics.logEnvironment()
-
         Files.createDirectories(paths.dataDir)
 
         // Constructed here (pre-Koin) so the uncaught-exception handler below
@@ -158,6 +196,15 @@ object LauncherBootstrap {
         // identical.
         val crashReporter = CrashReporter(paths)
 
+        return paths to crashReporter
+    }
+
+    /**
+     * GUI crash handler: persists the report AND surfaces the Swing dialog.
+     * Reachable only from [preBoot] -- this is the single edge that would
+     * otherwise drag AWT/Swing into the native-image CLI.
+     */
+    private fun installGuiCrashHandler(crashReporter: CrashReporter) {
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
             val handlerLog = LoggerFactory.getLogger("CrashHandler")
             handlerLog.error("Uncaught exception on thread '${thread.name}'", throwable)
@@ -171,13 +218,43 @@ object LauncherBootstrap {
                 SwingUtilities.invokeLater { crashReporter.showCrashDialog(report, reportFile) }
             }
         }
+    }
 
+    /**
+     * Headless crash handler: logs and persists the report to disk, no
+     * Swing dialog. AWT-free -- references only [CrashReporter.generate] /
+     * [CrashReporter.saveToDisk], never showCrashDialog.
+     */
+    private fun installHeadlessCrashHandler(crashReporter: CrashReporter) {
+        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            val handlerLog = LoggerFactory.getLogger("CrashHandler")
+            handlerLog.error("Uncaught exception on thread '${thread.name}'", throwable)
+            runCatching {
+                val report     = crashReporter.generate(throwable, thread)
+                val reportFile = crashReporter.saveToDisk(report)
+                handlerLog.error("Crash report written to {}", reportFile.absolutePath)
+            }
+        }
+    }
+
+    /**
+     * Shared tail: single-instance lock (GUI only), migration detection,
+     * Koin startup. AWT-free.
+     */
+    private fun finishBoot(
+        paths: PlatformPaths,
+        crashReporter: CrashReporter,
+        extraModules: List<Module>,
+        singleInstance: Boolean,
+    ): Result {
         // Single-instance lock acquired BEFORE migration is consulted. Two
         // launchers started close together would otherwise both render the
         // MigrationScreen and race on file copies. DataDirMigration's
         // emptiness check is taught to ignore .lock / .show / .migrated so
-        // its first-run trigger still fires.
-        if (!SingleInstance.acquire(paths.dataDir)) exitProcess(0)
+        // its first-run trigger still fires. Skipped for the headless CLI --
+        // it must coexist with a running GUI instance, not exit when the GUI
+        // already holds the lock.
+        if (singleInstance && !SingleInstance.acquire(paths.dataDir)) exitProcess(0)
 
         // Migration runs INSIDE Compose now, as a mandatory full-screen UI
         // shown before AppRoot. The detection is read here once so the

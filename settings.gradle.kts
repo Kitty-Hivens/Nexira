@@ -71,6 +71,12 @@ include(":client-auth")
 include(":client-auth-smartycraft")
 include(":client-auth-microsoft")
 include(":client-launcher")
+// Headless native-image entrypoint: a Compose-free CLI over the launch
+// pipeline (auth -> resolve -> download -> JRE -> runtime -> launch),
+// buildable to a GraalVM / Liberica-NIK native binary for Linux. The GUI
+// (:client-ui) stays on the JVM -- Skiko/AWT block native-image of Compose.
+// See docs/native-image.md.
+include(":client-cli")
 include(":client-ui")
 // Leaf design-system module (NxUI): tokens, primitives, surfaces, Flexible.
 // client-ui depends on it one-way; it depends on nothing in-tree.
