@@ -99,9 +99,10 @@ class LayoutGraphMutationsTest {
     }
 
     @Test
-    fun `setGridColumns updates and coerces to at least one`() {
+    fun `setGridColumns updates and clamps to the 1 to MAX range`() {
         assertEquals(3, seed(w1).setGridColumns(rootPath, 3).surfaces[home]?.slots?.get(main)?.gridColumns)
         assertEquals(1, seed(w1).setGridColumns(rootPath, 0).surfaces[home]?.slots?.get(main)?.gridColumns)
+        assertEquals(GRID_COLUMNS_MAX, seed(w1).setGridColumns(rootPath, 99).surfaces[home]?.slots?.get(main)?.gridColumns)
     }
 
     @Test

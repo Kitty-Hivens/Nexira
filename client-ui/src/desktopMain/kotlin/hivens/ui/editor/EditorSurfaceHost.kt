@@ -36,12 +36,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.State
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
@@ -107,13 +109,13 @@ import hivens.widget.api.EmptySlotDecorator
 import hivens.widget.api.LocalEmptySlotDecorator
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalSlotBoundsReporter
-import hivens.widget.api.LocalSlotControlDecorator
+import hivens.widget.api.LocalSlotChromeModifier
 import hivens.widget.api.LocalSlotDividerDecorator
 import hivens.widget.api.LocalSlotMotionMs
 import hivens.widget.api.LocalSlotPath
 import hivens.widget.api.LocalUnknownWidgetDecorator
 import hivens.widget.api.LocalWidgetDecorator
-import hivens.widget.api.SlotControlDecorator
+import hivens.widget.api.SlotChromeModifier
 import hivens.widget.api.SlotDividerDecorator
 import hivens.widget.api.UnknownWidgetDecorator
 import hivens.widget.api.WidgetDecorator
@@ -185,10 +187,24 @@ fun EditorSurfaceHost(
     // Surface-level settings panel (currently the left rail's nav-selection
     // settings). Mutually exclusive with the per-widget prop panel + palette.
     var surfaceSettingsOpen by remember(availableSurfaces) { mutableStateOf(false) }
-    // Any edit-mode exit (FAB / Escape / Ctrl+E) drops the prop target and the
-    // surface settings panel, so re-entering does not silently reopen the last
-    // panel with the palette still hidden.
-    LaunchedEffect(editing) { if (!editing) { propTarget = null; surfaceSettingsOpen = false } }
+    // Selected slot (Tier 2 slot layout chrome): the highlighted slot, its window
+    // rect (for the handle anchor), the cursor anchor for a right-click menu, and
+    // whether the handle's menu is open. selectedSlotState stays a State so the slot
+    // chrome modifier can read it without the host capturing a stale value.
+    val selectedSlotState = remember(availableSurfaces) { mutableStateOf<SlotPath?>(null) }
+    var selectedSlotRect  by remember(availableSurfaces) { mutableStateOf<Rect?>(null) }
+    var slotMenuCursor    by remember(availableSurfaces) { mutableStateOf<Offset?>(null) }
+    var handleMenuOpen    by remember(availableSurfaces) { mutableStateOf(false) }
+    fun clearSlotSelection() {
+        selectedSlotState.value = null
+        selectedSlotRect = null
+        slotMenuCursor = null
+        handleMenuOpen = false
+    }
+    // Any edit-mode exit (FAB / Escape / Ctrl+E) drops the prop target, the surface
+    // settings panel, and any slot selection, so re-entering does not silently reopen
+    // the last panel with the palette still hidden.
+    LaunchedEffect(editing) { if (!editing) { propTarget = null; surfaceSettingsOpen = false; clearSlotSelection() } }
     val currentGraph = LocalLayoutGraph.current
     // Leaving a surface drops edit mode -- avoids a stale edit state
     // pointed at the wrong surface after navigation.
@@ -355,21 +371,29 @@ fun EditorSurfaceHost(
         }
     }
 
-    // Slot control decorator: a compact orientation + grid-columns
-    // control at the start of every non-empty slot on the selected
-    // surface. Identity (renders nothing) when off, previewing, or for a
-    // foreign surface -- so other surfaces and production builds pay
-    // nothing. SlotRenderer invokes this as the slot's first child.
-    val slotControlDecorator: SlotControlDecorator = remember(state, previewing) {
+    // Slot chrome modifier: a zero-footprint Modifier applied to each slot's flow
+    // root on the selected surface. It highlights the selected slot, reports its
+    // bounds for the handle anchor, and routes a background / right-click press to
+    // selection + the layout menu. Identity off / previewing / foreign surface, so
+    // other surfaces and production pay nothing.
+    val slotChromeFactory: SlotChromeModifier = remember(state, previewing) {
         if (state is EditModeState.On && !previewing) {
             val selected = state.surface
-            { path, content ->
+            { path, _ ->
                 if (path.surface == selected) {
-                    SlotControl(path = path, content = content, controller = controller)
+                    slotChromeModifier(
+                        path          = path,
+                        selectedSlot  = selectedSlotState,
+                        onSelect      = { selectedSlotState.value = it; handleMenuOpen = false; slotMenuCursor = null },
+                        onContextMenu = { p, off -> selectedSlotState.value = p; slotMenuCursor = off; handleMenuOpen = false },
+                        onReportRect  = { selectedSlotRect = it },
+                    )
+                } else {
+                    Modifier
                 }
             }
         } else {
-            { _, _ -> }
+            { _, _ -> Modifier }
         }
     }
 
@@ -402,7 +426,7 @@ fun EditorSurfaceHost(
         LocalWidgetDecorator    provides chromeDecorator,
         LocalEmptySlotDecorator provides emptyDecorator,
         LocalUnknownWidgetDecorator provides unknownDecorator,
-        LocalSlotControlDecorator provides slotControlDecorator,
+        LocalSlotChromeModifier provides slotChromeFactory,
         LocalSlotDividerDecorator provides slotDividerDecorator,
         // Edit-mode reflow duration -- slot add / remove / resize animates while
         // editing (style-driven: Brut resolves to ~instant), zero elsewhere.
@@ -441,7 +465,14 @@ fun EditorSurfaceHost(
                     // Box-level handler misses the chord when the side
                     // rails own focus.
                     if (editing && ev.type == KeyEventType.KeyUp && ev.key == Key.Escape) {
-                        editing = false
+                        // Staged: close an open slot menu, then drop the slot
+                        // selection, then exit edit mode (edit-exit stays the final
+                        // stage, matching the documented Ctrl+E / Escape contract).
+                        when {
+                            handleMenuOpen || slotMenuCursor != null -> { handleMenuOpen = false; slotMenuCursor = null }
+                            selectedSlotState.value != null          -> { selectedSlotState.value = null; selectedSlotRect = null }
+                            else                                     -> editing = false
+                        }
                         true
                     } else false
                 },
@@ -605,7 +636,7 @@ fun EditorSurfaceHost(
                     active                = editing,
                     surfaces              = availableSurfaces,
                     selectedSurface       = selectedSurface,
-                    onSurfacePicked       = { selectedSurface = it; surfaceSettingsOpen = false },
+                    onSurfacePicked       = { selectedSurface = it; surfaceSettingsOpen = false; clearSlotSelection() },
                     surfaceHasSettings    = surfaceHasSettings(selectedSurface),
                     onOpenSurfaceSettings = { surfaceSettingsOpen = !surfaceSettingsOpen; if (surfaceSettingsOpen) propTarget = null },
                     paletteOpen           = paletteOpen,
@@ -615,6 +646,20 @@ fun EditorSurfaceHost(
                     onOpenPresets         = { presetPanelOpen = true },
                     onRequestReset        = { if (selectedSurface != null) resetSurfaceConfirm = true },
                     modifier              = Modifier.align(Alignment.TopCenter).padding(top = 16.dp),
+                )
+            }
+
+            // Selected-slot chrome (Tier 2): handle + orientation menu, full-window
+            // so it is never a layout child of the edited slot.
+            if (editing && !previewing) {
+                SlotSelectionOverlay(
+                    selectedSlot     = selectedSlotState.value,
+                    selectedSlotRect = selectedSlotRect,
+                    handleMenuOpen   = handleMenuOpen,
+                    cursorAnchor     = slotMenuCursor,
+                    controller       = controller,
+                    onOpenHandleMenu = { handleMenuOpen = true },
+                    onDismiss        = { handleMenuOpen = false; slotMenuCursor = null },
                 )
             }
 

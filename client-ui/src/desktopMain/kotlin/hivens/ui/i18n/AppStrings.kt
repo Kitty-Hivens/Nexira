@@ -965,6 +965,11 @@ interface AppStrings {
     val editorSlotRow: String
     val editorSlotGrid: String
     val editorSlotCanvas: String
+    val editorSlotLayoutMenuTitle: String
+    val editorSlotGridColumns: String
+    val editorSlotGridColumnsDecrease: String
+    val editorSlotGridColumnsIncrease: String
+    val editorSlotLayoutHandle: String
 
     // --- Layout editor: prop panel ---
     val editorResetToDefault: String

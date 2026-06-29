@@ -97,6 +97,9 @@ data class SlotContent(
     val gridColumns: Int = 2,
 )
 
+/** Upper bound for [SlotContent.gridColumns]; the grid-column stepper clamps to it. */
+const val GRID_COLUMNS_MAX = 12
+
 @Serializable
 data class SurfaceLayout(val slots: Map<SlotId, SlotContent> = emptyMap())
 
@@ -245,7 +248,7 @@ fun seededCanvasPlacement(
 
 fun LayoutGraph.setGridColumns(path: SlotPath, columns: Int): LayoutGraph =
     mutate(path) { content ->
-        val coerced = columns.coerceAtLeast(1)
+        val coerced = columns.coerceIn(1, GRID_COLUMNS_MAX)
         if (content.gridColumns == coerced) content
         else content.copy(gridColumns = coerced)
     }
