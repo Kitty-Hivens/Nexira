@@ -1,8 +1,8 @@
 package hivens.ui.screens.settings
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
@@ -10,15 +10,16 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.core.diag.ActionRing
 import hivens.launcher.platform.DataDirMover
 import hivens.launcher.platform.PlatformPaths
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.nx.NxButton
+import hivens.ui.nx.NxButtonStyle
+import hivens.ui.nx.NxSection
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.LocalStyle
 import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
@@ -36,70 +37,37 @@ import kotlin.system.exitProcess
 private val log = LoggerFactory.getLogger("AdvancedSection")
 
 /**
- * Advanced surface -- currently houses the data-directory mover.
- *
- * Schedule-on-restart move via DataDirMover. The actual file copy
- * happens on next launcher start (BEFORE PlatformPaths is consulted)
- * so we don't have to fight Windows lock semantics or coordinate with
- * background tasks. The UI here just persists the intent and prompts
- * the user to restart.
+ * Advanced surface -- currently the data-directory mover. The move is scheduled
+ * on restart via DataDirMover (the copy runs on next start, before PlatformPaths
+ * is consulted), so this screen only persists the intent and prompts to restart.
  */
 @Composable
 internal fun AdvancedSection(paths: PlatformPaths) {
     val s = LocalStrings.current
-    val style = LocalStyle.current
-
-    SettingsSectionTitle(s.settingsSectionDataDir)
 
     var pendingTarget by remember { mutableStateOf<Path?>(null) }
     var showError     by remember { mutableStateOf<String?>(null) }
     val moveScope     = rememberCoroutineScope()
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(style.cardCorner))
-            .background(settingsRowBackground())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Text(
-            text  = s.settingsDataDirCurrent,
-            style = MaterialTheme.typography.bodySmall,
-            color = NxTheme.colors.textSecondary,
-        )
+    NxSection(s.settingsSectionDataDir) {
+        Text(s.settingsDataDirCurrent, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.textSecondary)
         Text(
             text       = paths.dataDir.toAbsolutePath().toString(),
             color      = NxTheme.colors.textPrimary,
             fontWeight = FontWeight.SemiBold,
             style      = MaterialTheme.typography.bodyMedium,
         )
-        OutlinedButton(
+        NxButton(
+            label   = s.settingsDataDirMove,
+            style   = NxButtonStyle.Secondary,
+            compact = true,
             onClick = {
                 showError = null
                 moveScope.launch {
-                    // filekit uses xdg-desktop-portal on Linux (native
-                    // Hyprland / KDE / GNOME picker), IFileDialog on
-                    // Windows, NSOpenPanel on macOS. No Metal LAF eyesore.
-                    //
-                    // dialogSettings(title=...) is the key bit -- without
-                    // it FileKit hands the portal a blank-title request
-                    // and some backends render a less-styled fallback
-                    // chrome (no titlebar text, generic icon). Match what
-                    // ProfileScreen + ServerSettingsScreen pass here.
-                    //
-                    // The bug this call site had on 2.3.1: button did
-                    // nothing on Windows AND on Linux AppImage. Initial
-                    // hypothesis was a platform-specific FileKit issue
-                    // (Win11 IFileDialog rejecting Local-AppData junction
-                    // paths via `directory =`), but the bug also showed
-                    // on AppImage Linux which ruled platform out and left
-                    // ProGuard as the only release-vs-dev discriminator.
-                    // Fix lives in client-ui/compose-desktop.pro: keep
-                    // io.github.vinceglb.filekit.** so PlatformFile +
-                    // the with-directory overload survive shrinking.
-                    // With the keep rule in place the original
-                    // directory-hint call below works on every platform.
+                    // filekit uses xdg-desktop-portal on Linux (native Hyprland / KDE /
+                    // GNOME picker), IFileDialog on Windows, NSOpenPanel on macOS. The
+                    // ProGuard keep on io.github.vinceglb.filekit.** is what makes the
+                    // directory-hint overload survive shrinking (the 2.3.1 dead-button bug).
                     val pickResult = runCatching {
                         FileKit.openDirectoryPicker(
                             directory      = PlatformFile(paths.dataDir.toFile()),
@@ -107,26 +75,20 @@ internal fun AdvancedSection(paths: PlatformPaths) {
                         )
                     }
                     val pickedFile = pickResult.getOrElse { ex ->
-                        // Swallowing the exception silently here was the
-                        // exact bug above. Surface it: log so the next
-                        // diagnostic bundle has the stack, show a short
-                        // line to the user so a "dead button" stops
-                        // looking dead.
+                        // Surface the failure so a "dead button" stops looking dead.
                         log.warn("openDirectoryPicker failed", ex)
                         showError = s.settingsDataDirErrorPickerFailed(ex.message ?: ex.javaClass.simpleName)
                         return@launch
                     } ?: return@launch
 
                     val picked = Paths.get(pickedFile.path)
-
                     if (picked.toAbsolutePath().normalize() == paths.dataDir.toAbsolutePath().normalize()) {
                         showError = s.settingsDataDirErrorSamePath
                         return@launch
                     }
                     val populated = withContext(Dispatchers.IO) {
                         runCatching {
-                            Files.exists(picked) &&
-                                Files.list(picked).use { it.findAny().isPresent }
+                            Files.exists(picked) && Files.list(picked).use { it.findAny().isPresent }
                         }.getOrDefault(false)
                     }
                     if (populated) {
@@ -136,16 +98,9 @@ internal fun AdvancedSection(paths: PlatformPaths) {
                     pendingTarget = picked
                 }
             },
-            shape = MaterialTheme.shapes.small,
-        ) {
-            Text(s.settingsDataDirMove, color = NxTheme.colors.textPrimary)
-        }
+        )
         if (showError != null) {
-            Text(
-                text  = showError!!,
-                style = MaterialTheme.typography.bodySmall,
-                color = NxTheme.colors.error,
-            )
+            Text(showError!!, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.error)
         }
     }
 
@@ -162,26 +117,14 @@ internal fun AdvancedSection(paths: PlatformPaths) {
             },
             confirmButton = {
                 Button(shape = MaterialTheme.shapes.small, onClick = {
-                    val ok = DataDirMover.schedule(
-                        source = paths.dataDir,
-                        target = target,
-                    )
+                    val ok = DataDirMover.schedule(source = paths.dataDir, target = target)
                     if (ok) {
-                        ActionRing.record(
-                            "Data-dir move scheduled: ${paths.dataDir} -> $target -- quitting for restart",
-                        )
-                        // Hard exit -- user explicitly clicked "Quit now".
-                        // Avoids the tray-shutdown path that might re-show
-                        // the window if a game is mid-launch. The pending
-                        // move only applies AFTER the launcher restarts,
-                        // so a clean process termination is the right move.
+                        ActionRing.record("Data-dir move scheduled: ${paths.dataDir} -> $target -- quitting for restart")
+                        // Hard exit -- user explicitly clicked "Quit now". The pending move
+                        // applies only after restart, so a clean process termination is right.
                         exitProcess(0)
                     } else {
-                        // Schedule was refused (target validations failed
-                        // at the mover layer -- e.g., race with another
-                        // process touching the target between our UI
-                        // check and DataDirMover.schedule). Close the
-                        // dialog so the user can pick a different target.
+                        // Schedule refused (target validation raced); let the user re-pick.
                         pendingTarget = null
                     }
                 }) { Text(s.settingsDataDirQuitNow) }
