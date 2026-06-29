@@ -42,7 +42,11 @@ fun NxToggle(
     ) {
         Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
             if (icon != null) {
-                Symbol(icon, null, tint = NxTheme.colors.textSecondary.copy(alpha = alpha), size = 22.dp)
+                // A semantic toggle (accent set) lights its icon with the accent while
+                // checked; the row stays neutral otherwise -- accent as a row state, not
+                // a whole-row wash.
+                val iconTint = if (accent != null && checked) accent else NxTheme.colors.textSecondary
+                Symbol(icon, null, tint = iconTint.copy(alpha = alpha), size = 22.dp)
                 Spacer(Modifier.width(12.dp))
             }
             Column {
