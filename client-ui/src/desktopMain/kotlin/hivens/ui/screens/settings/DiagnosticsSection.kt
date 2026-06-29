@@ -1,20 +1,13 @@
 package hivens.ui.screens.settings
 
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.TextUnitType
 import androidx.compose.ui.unit.dp
@@ -22,19 +15,17 @@ import hivens.config.Branding
 import hivens.launcher.diag.DiagnosticBundle
 import hivens.launcher.diag.IssueReporter
 import hivens.launcher.platform.PlatformPaths
-import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.easter.LocalAprilFools
 import hivens.ui.flexible.Flexible
 import hivens.ui.flexible.FlexibleKind
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
+import hivens.ui.nx.NxNavRow
 import hivens.ui.icons.NxIcon
-import hivens.ui.icons.Symbol
 import hivens.ui.platform.SystemActions
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.LocalStyle
 import java.awt.Toolkit
 import java.awt.datatransfer.StringSelection
 import java.nio.file.Path
@@ -69,7 +60,6 @@ internal fun DiagnosticsSection(
 ) {
     val s  = LocalStrings.current
     val af = LocalAprilFools.current
-    val style = LocalStyle.current
 
     // ── April Fools debug panel -- secret unlock ────────────────────
     // Only wire the 5-tap gesture when the active impl actually renders
@@ -234,28 +224,10 @@ internal fun DiagnosticsSection(
     SettingsSectionTitle(s.settingsSectionAbout)
     PuppetClick("settings.openAbout") { onOpenAbout() }
 
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(style.cardCorner))
-            .clickable(onClick = onOpenAbout)
-            .background(glassSurfaceAlpha(0.4f))
-            .padding(16.dp),
-        verticalAlignment     = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Symbol(NxIcon.Info, null, tint = NxTheme.colors.primary, modifier = Modifier.size(24.dp))
-            Spacer(Modifier.width(16.dp))
-            Column {
-                Text(Branding.TITLE, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
-                Text(
-                    "v${Branding.VERSION.removePrefix("v")} — GPLv3",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = NxTheme.colors.textSecondary
-                )
-            }
-        }
-        Symbol(NxIcon.ChevronRight, null, tint = NxTheme.colors.textSecondary)
-    }
+    NxNavRow(
+        icon     = NxIcon.Info,
+        title    = Branding.TITLE,
+        subtitle = "v${Branding.VERSION.removePrefix("v")} — GPLv3",
+        onClick  = onOpenAbout,
+    )
 }
