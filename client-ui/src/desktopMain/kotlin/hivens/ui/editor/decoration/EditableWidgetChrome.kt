@@ -174,7 +174,10 @@ fun EditableWidgetChrome(
         label         = "edit-source-alpha",
     )
     val borderAlpha by animateFloatAsState(
-        targetValue   = if (isHovered) 0.50f + depthBoost else 0.10f + depthBoost,
+        // Hover-only outline: at rest the edit view stays pixel-faithful to production
+        // (no frame around every widget), so the mandatory inter-widget spacing reads
+        // true; the outline appears only on the widget under the pointer.
+        targetValue   = if (isHovered) 0.50f + depthBoost else 0f,
         animationSpec = tween(chromeMotionMs),
         label         = "edit-border-alpha",
     )
