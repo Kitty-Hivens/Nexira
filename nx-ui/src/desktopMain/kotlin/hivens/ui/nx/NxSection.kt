@@ -33,6 +33,7 @@ import hivens.ui.theme.NxTheme
 fun NxSection(
     title: String,
     modifier: Modifier = Modifier,
+    titleModifier: Modifier = Modifier,
     level: NxSurfaceLevel = NxSurfaceLevel.Floating,
     spacing: Dp = 12.dp,
     content: @Composable ColumnScope.() -> Unit,
@@ -40,6 +41,7 @@ fun NxSection(
     Column(modifier.fillMaxWidth()) {
         Text(
             text       = title,
+            modifier   = titleModifier,
             style      = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.Bold,
             color      = NxTheme.colors.primary,
