@@ -6,7 +6,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.awaitTouchSlopOrCancellation
@@ -43,9 +42,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
@@ -175,6 +178,9 @@ fun EditableWidgetChrome(
         animationSpec = tween(chromeMotionMs),
         label         = "edit-border-alpha",
     )
+    // Captured here because NxTheme.colors is a @Composable read; the draw lambda
+    // applies the animated alpha (a snapshot read, so it redraws without recomposing).
+    val borderColor = NxTheme.colors.primary
 
     // Bordered widget + hover handles. Box-scoped so the AnimatedVisibility
     // buttons use plain BoxScope `.align` -- no this@Column / this@Row
@@ -182,19 +188,26 @@ fun EditableWidgetChrome(
     val widgetBox: @Composable () -> Unit = {
         Box(
             modifier = Modifier
-                .then(if (isRow) Modifier.padding(horizontal = 4.dp) else Modifier.padding(vertical = 4.dp))
                 .hoverable(interaction)
-                .padding(2.dp)
-                .border(
-                    width = 1.dp,
-                    color = NxTheme.colors.primary.copy(alpha = borderAlpha),
-                    shape = RoundedCornerShape(8.dp),
-                )
+                // Hover border drawn INSIDE the widget's own bounds (drawWithContent,
+                // not Modifier.border on a padded box) so edit mode never reflows the
+                // layout -- the old padding(4) + padding(2) added ~12dp per widget and
+                // shifted the whole surface down on entering edit mode.
+                .drawWithContent {
+                    drawContent()
+                    val strokePx = 1.dp.toPx()
+                    val edge     = strokePx / 2f
+                    val radius   = 8.dp.toPx()
+                    drawRoundRect(
+                        color        = borderColor.copy(alpha = borderAlpha),
+                        topLeft      = Offset(edge, edge),
+                        size         = Size(size.width - strokePx, size.height - strokePx),
+                        cornerRadius = CornerRadius(radius, radius),
+                        style        = Stroke(width = strokePx),
+                    )
+                }
                 .onGloballyPositioned { coords: LayoutCoordinates ->
-                    // Register AFTER padding+border so the hit-test rect includes
-                    // the visible border pad (edge drops land on the widget, not
-                    // the parent slot). Single registration -- the .widgetBounds
-                    // modifier was a redundant duplicate of this.
+                    // Register the widget's own bounds for the drop hit-test.
                     val rect = coords.boundsInWindow()
                     widgetWindowBounds = rect
                     registry.registerWidget(path, instance.instanceId, index, rect)
