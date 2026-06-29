@@ -15,7 +15,7 @@ import kotlin.test.assertEquals
 // silently -- this fails the build instead.
 class NavTargetSerialNameTest {
 
-    private val expected = setOf("Home", "Library", "Browse", "Profile", "Settings", "About", "Console", "Logout")
+    private val expected = setOf("Home", "Library", "Browse", "Profile", "Wardrobe", "Settings", "About", "Console", "Logout")
 
     @Test
     fun `NavTarget constant names match the migration's expected set`() {

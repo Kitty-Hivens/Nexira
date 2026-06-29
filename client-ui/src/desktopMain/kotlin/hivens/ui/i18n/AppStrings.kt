@@ -152,8 +152,6 @@ interface AppStrings {
     // --- Destructive-action confirm dialogs ---
     val serverSettingsResetConfirmTitle: String
     val serverSettingsResetConfirmBody: String
-    val customizationResetConfirmTitle: String
-    val customizationResetConfirmBody: String
     val backgroundResetConfirmTitle: String
     val backgroundResetConfirmBody: String
     val logoutConfirmTitle: String
@@ -716,19 +714,9 @@ interface AppStrings {
     val backgroundLoopOnce: String
 
     // --- Customization extension ---
-    val settingsCustomizationExt: String
-    val settingsCustomizationExtSub: String
-    val customizationTitle: String
-    val customizationSubtitle: String
-    val customizationDensity: String
-    val customizationGlassIntensity: String
-    val customizationAccentOverride: String
     val customizationAccentClear: String
     val customizationSectionVisual: String
     val customizationSectionColors: String
-    val customizationExperimentalToggle: String
-    val customizationExperimentalSub: String
-    val customizationReset: String
     val customizationHexInvalid: String
     val themePickerAccentOverride: String
 
@@ -941,12 +929,6 @@ interface AppStrings {
     val libraryHeaderSubtitle: String
 
     // --- Customization widget labels ---
-    val customGlassAlpha: String
-    val customCardCorner: String
-    val customCardBorder: String
-    val customButtonCorner: String
-    val customAnimSpeed: String
-    val customSoftGlow: String
 
     // --- Layout editor: common actions ---
     val editorClose: String
@@ -1039,7 +1021,6 @@ interface AppStrings {
     val editorSurfShortRightRail: String
     val editorSurfShortAbout: String
     val editorSurfShortBg: String
-    val editorSurfShortStyle: String
     val editorSurfShortProfile: String
     val editorSurfShortServer: String
     val editorSurfShortTheme: String
@@ -1055,7 +1036,6 @@ interface AppStrings {
     val editorSurfRightRail: String
     val editorSurfAbout: String
     val editorSurfBg: String
-    val editorSurfStyle: String
     val editorSurfProfile: String
     val editorSurfServer: String
     val editorSurfTheme: String

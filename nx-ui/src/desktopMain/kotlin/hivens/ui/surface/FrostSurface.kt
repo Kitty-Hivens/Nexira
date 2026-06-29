@@ -115,9 +115,8 @@ data class Texture(val grainAlpha: Float = 0.04f) : SurfaceLayer
 /** Hover / press state tint; rendered only when an interaction source is given. */
 data class StateOverlay(val role: FrostRole = FrostRole.Primary, val hoverAlpha: Float = 0.06f, val pressAlpha: Float = 0.12f) : SurfaceLayer
 
-/** Theme color roles a layer can pull from. Distinct from the persisted
- *  [hivens.ui.customization.ColorRole] string keys -- this maps to live palette
- *  fields for rendering, not to a settings file. */
+/** Theme color roles a layer can pull from -- maps to live palette fields for
+ *  rendering. */
 enum class FrostRole { Surface, SurfaceContainerLow, SurfaceContainer, SurfaceContainerHigh, Background, Primary, Secondary, Tertiary, Outline }
 
 private fun NxColors.frost(role: FrostRole): Color = when (role) {

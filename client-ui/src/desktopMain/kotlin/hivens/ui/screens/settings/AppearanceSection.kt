@@ -40,7 +40,6 @@ internal fun AppearanceSection(
     onToggleTheme: () -> Unit,
     onOpenThemePicker: () -> Unit,
     onOpenBackgroundSettings: () -> Unit,
-    onOpenCustomizationExtension: () -> Unit,
     currentLocale: AppLocale,
     onLocaleChanged: (AppLocale) -> Unit,
     homeView: HomeView,
@@ -157,31 +156,6 @@ internal fun AppearanceSection(
             Column {
                 Text(s.settingsBackground, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
                 Text(s.settingsBackgroundSub, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.textSecondary)
-            }
-        }
-        Symbol(NxIcon.ChevronRight, null, tint = NxTheme.colors.primary)
-    }
-
-    Spacer(Modifier.height(4.dp))
-
-    // Customization extension shortcut
-    PuppetClick("settings.openCustomizationExtension") { onOpenCustomizationExtension() }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(style.cardCorner))
-            .clickable(onClick = onOpenCustomizationExtension)
-            .background(glassSurfaceAlpha(0.4f))
-            .padding(16.dp),
-        verticalAlignment     = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Symbol(NxIcon.Tune, null, tint = NxTheme.colors.primary, modifier = Modifier.size(24.dp))
-            Spacer(Modifier.width(16.dp))
-            Column {
-                Text(s.settingsCustomizationExt, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
-                Text(s.settingsCustomizationExtSub, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.textSecondary)
             }
         }
         Symbol(NxIcon.ChevronRight, null, tint = NxTheme.colors.primary)

@@ -5,7 +5,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,7 +15,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
@@ -31,25 +29,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.customization.sliderKeyboardAdjust
 import hivens.ui.theme.NxTheme
 import hivens.ui.widgets.toWidgetColorOrNull
-
-@Composable
-internal fun SectionTitle(text: String) {
-    Text(
-        text          = text,
-        style         = MaterialTheme.typography.labelSmall,
-        fontWeight    = FontWeight.Bold,
-        color         = NxTheme.colors.primary,
-        letterSpacing = 1.sp,
-    )
-}
 
 @Composable
 internal fun LabeledSlider(
@@ -89,42 +74,6 @@ internal fun LabeledSlider(
             color    = NxTheme.colors.textSecondary.copy(alpha = 0.6f),
             modifier = Modifier.width(54.dp),
         )
-    }
-}
-
-@Composable
-internal fun ColorRoleRow(
-    role: String,
-    currentHex: String?,
-    invalidLabel: String,
-    onValidHex: (String) -> Unit,
-    onClear: () -> Unit,
-) {
-    Row(
-        modifier              = Modifier.fillMaxWidth(),
-        verticalAlignment     = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Text(
-            text       = role.replaceFirstChar { it.uppercase() },
-            modifier   = Modifier.width(100.dp),
-            color      = NxTheme.colors.textSecondary,
-            style      = MaterialTheme.typography.bodySmall,
-            fontFamily = LocalMonoFamily.current,
-        )
-        HexField(
-            initialHex   = currentHex ?: "",
-            invalidLabel = invalidLabel,
-            onValidHex   = onValidHex,
-            modifier     = Modifier.weight(1f),
-        )
-        if (currentHex != null) {
-            OutlinedButton(
-                onClick        = onClear,
-                shape          = MaterialTheme.shapes.small,
-                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-            ) { Text("x", fontSize = 12.sp) }
-        }
     }
 }
 

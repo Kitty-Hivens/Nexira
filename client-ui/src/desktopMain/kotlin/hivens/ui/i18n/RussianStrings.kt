@@ -144,8 +144,6 @@ object RussianStrings : AppStrings {
 
     override val serverSettingsResetConfirmTitle = "Сбросить клиент?"
     override val serverSettingsResetConfirmBody  = "Все скачанные файлы клиента этого сервера будут удалены без возможности восстановления."
-    override val customizationResetConfirmTitle  = "Сбросить кастомизацию?"
-    override val customizationResetConfirmBody   = "Все переопределения кастомизации (цвета, плотность, форма) вернутся к значениям по умолчанию."
     override val backgroundResetConfirmTitle     = "Сбросить фон?"
     override val backgroundResetConfirmBody      = "Вся конфигурация пользовательского фона вернётся к значениям по умолчанию."
     override val logoutConfirmTitle              = "Выйти из аккаунта?"
@@ -666,19 +664,9 @@ object RussianStrings : AppStrings {
     override val backgroundLoopForever   = "Бесконечно"
     override val backgroundLoopOnce      = "Один раз"
 
-    override val settingsCustomizationExt    = "Кастомизация (эксп.)"
-    override val settingsCustomizationExtSub = "Плотность, акцент, прозрачность стекла, переопределение цветов"
-    override val customizationTitle           = "Кастомизация"
-    override val customizationSubtitle        = "Экспериментальная тонкая настройка вида"
-    override val customizationDensity         = "Масштаб плотности"
-    override val customizationGlassIntensity  = "Плотность стекла"
-    override val customizationAccentOverride  = "Свой акцент"
     override val customizationAccentClear     = "Сбросить акцент"
     override val customizationSectionVisual   = "Визуал"
     override val customizationSectionColors   = "Переопределение цветов"
-    override val customizationExperimentalToggle = "Переопределять все цвета"
-    override val customizationExperimentalSub    = "Открыть матрицу из 7 цветов. Легко сделать нечитаемые сочетания."
-    override val customizationReset           = "Сбросить всё"
     override val customizationHexInvalid      = "Неверный hex"
     override val themePickerAccentOverride    = "Свой акцент (применяется сразу)"
 
@@ -911,12 +899,6 @@ object RussianStrings : AppStrings {
     override val libraryHeaderSubtitle = "Установленные сборки"
 
     // --- Customization widget labels ---
-    override val customGlassAlpha   = "Прозрачность стекла"
-    override val customCardCorner   = "Скругление карточек (dp)"
-    override val customCardBorder   = "Толщина рамки (dp)"
-    override val customButtonCorner = "Скругление кнопок (dp)"
-    override val customAnimSpeed    = "Скорость анимаций"
-    override val customSoftGlow     = "Декоративное свечение"
 
     // --- Layout editor: common actions ---
     override val editorClose   = "Закрыть"
@@ -988,29 +970,6 @@ object RussianStrings : AppStrings {
         "widget.container.tabs.label2" to "Вкладка 2",
         "widget.container.tabs.label3" to "Вкладка 3",
         "widget.container.tabs.tabCount" to "Вкладок",
-        "widget.customization.accent.override" to "Акцентный цвет",
-        "widget.customization.color.background" to "Цвет: background",
-        "widget.customization.color.criticalAccent" to "Цвет: criticalAccent",
-        "widget.customization.color.error" to "Цвет: error",
-        "widget.customization.color.outline" to "Цвет: outline",
-        "widget.customization.color.primary" to "Цвет: primary",
-        "widget.customization.color.progressAccent" to "Цвет: progressAccent",
-        "widget.customization.color.secondary" to "Цвет: secondary",
-        "widget.customization.color.success" to "Цвет: success",
-        "widget.customization.color.surface" to "Цвет: surface",
-        "widget.customization.color.textPrimary" to "Цвет: textPrimary",
-        "widget.customization.color.textSecondary" to "Цвет: textSecondary",
-        "widget.customization.color.warnAccent" to "Цвет: warnAccent",
-        "widget.customization.density" to "Плотность UI",
-        "widget.customization.experimental.toggle" to "Экспериментальные настройки",
-        "widget.customization.glass.alpha" to "Прозрачность стекла",
-        "widget.customization.glass.intensity" to "Интенсивность стекла",
-        "widget.customization.reset" to "Сброс кастомизации",
-        "widget.customization.shape.animMultiplier" to "Скорость анимаций",
-        "widget.customization.shape.buttonCorner" to "Скругление кнопок",
-        "widget.customization.shape.cardBorder" to "Толщина рамки карточек",
-        "widget.customization.shape.cardCorner" to "Скругление карточек",
-        "widget.customization.shape.softGlow" to "Декоративное свечение",
         "widget.home.classic.content" to "Классический дашборд",
         "widget.home.new.clock" to "Часы",
         "widget.home.new.clock.accent" to "Цвет акцента",
@@ -1136,7 +1095,6 @@ object RussianStrings : AppStrings {
     override val editorSurfShortRightRail = "Прав. рейл"
     override val editorSurfShortAbout     = "О приложении"
     override val editorSurfShortBg        = "Фон"
-    override val editorSurfShortStyle     = "Стиль"
     override val editorSurfShortProfile   = "Профиль"
     override val editorSurfShortServer    = "Сервер"
     override val editorSurfShortTheme     = "Темы"
@@ -1152,7 +1110,6 @@ object RussianStrings : AppStrings {
     override val editorSurfRightRail   = "Правая панель"
     override val editorSurfAbout       = "О приложении"
     override val editorSurfBg          = "Настройки фона"
-    override val editorSurfStyle       = "Кастомизация"
     override val editorSurfProfile     = "Профиль"
     override val editorSurfServer      = "Детали сервера"
     override val editorSurfTheme       = "Выбор темы"

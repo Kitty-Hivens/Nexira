@@ -10,7 +10,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
-import hivens.ui.customization.ColorRole
 import hivens.ui.customization.LocalCustomization
 
 // --- COLOR PALETTES ---
@@ -193,40 +192,14 @@ fun NxTheme(
         baseColors
     }
 
-    // Customization overrides land on top of the active theme. Accent
-    // always available; per-role full overrides only when the user has
-    // explicitly enabled the experimental toggle.
+    // The accent override lands on top of the active theme, re-seeding the
+    // primary accent.
     val targetColors = run {
         var c = themedColors
         customization.accentOverride?.let { hex ->
             parseHexColorOrNull(hex)?.let { col ->
                 c = c.copy(primary = col, primaryVariant = col.copy(alpha = 0.8f))
             }
-        }
-        if (customization.experimentalColorOverridesEnabled && customization.colorOverrides.isNotEmpty()) {
-            val o = customization.colorOverrides
-            c = c.copy(
-                primary        = o[ColorRole.PRIMARY]?.let(::parseHexColorOrNull)        ?: c.primary,
-                secondary      = o[ColorRole.SECONDARY]?.let(::parseHexColorOrNull)      ?: c.secondary,
-                background     = o[ColorRole.BACKGROUND]?.let(::parseHexColorOrNull)     ?: c.background,
-                surface        = o[ColorRole.SURFACE]?.let(::parseHexColorOrNull)        ?: c.surface,
-                success        = o[ColorRole.SUCCESS]?.let(::parseHexColorOrNull)        ?: c.success,
-                error          = o[ColorRole.ERROR]?.let(::parseHexColorOrNull)          ?: c.error,
-                outline        = o[ColorRole.OUTLINE]?.let(::parseHexColorOrNull)        ?: c.outline,
-                // editor-4 additions
-                textPrimary    = o[ColorRole.TEXT_PRIMARY]?.let(::parseHexColorOrNull)   ?: c.textPrimary,
-                textSecondary  = o[ColorRole.TEXT_SECONDARY]?.let(::parseHexColorOrNull) ?: c.textSecondary,
-                progressAccent = o[ColorRole.PROGRESS_ACCENT]?.let(::parseHexColorOrNull) ?: c.progressAccent,
-                warnAccent     = o[ColorRole.WARN_ACCENT]?.let(::parseHexColorOrNull)    ?: c.warnAccent,
-                criticalAccent = o[ColorRole.CRITICAL_ACCENT]?.let(::parseHexColorOrNull) ?: c.criticalAccent,
-                // GLASS_ALPHA stored as plain "0.55" string in the
-                // overrides map; parse to Float and clamp.
-                glassAlpha     = o[ColorRole.GLASS_ALPHA]?.toFloatOrNull()?.coerceIn(0f, 1f) ?: c.glassAlpha,
-                originSmartycraft = o[ColorRole.ORIGIN_SMARTYCRAFT]?.let(::parseHexColorOrNull) ?: c.originSmartycraft,
-                originMirror      = o[ColorRole.ORIGIN_MIRROR]?.let(::parseHexColorOrNull)      ?: c.originMirror,
-                originModrinth    = o[ColorRole.ORIGIN_MODRINTH]?.let(::parseHexColorOrNull)    ?: c.originModrinth,
-                originLocal       = o[ColorRole.ORIGIN_LOCAL]?.let(::parseHexColorOrNull)       ?: c.originLocal,
-            )
         }
         // Derive the tonal expansion from the resolved accents (after theme +
         // accent + experimental overrides), so containers and the third accent

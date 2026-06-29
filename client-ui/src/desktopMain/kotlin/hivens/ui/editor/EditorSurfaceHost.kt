@@ -92,8 +92,6 @@ import hivens.ui.widgets.about.LocalAboutContext
 import hivens.ui.widgets.about.STUB_ABOUT
 import hivens.ui.widgets.bgsettings.LocalBgSettingsContext
 import hivens.ui.widgets.bgsettings.STUB_BG_SETTINGS
-import hivens.ui.widgets.customization.LocalCustomizationContext
-import hivens.ui.widgets.customization.STUB_CUSTOMIZATION
 import hivens.ui.widgets.home.classic.LocalHomeClassicContext
 import hivens.ui.widgets.home.new.LocalHomeNewContext
 import hivens.ui.widgets.library.LocalLibraryContext
@@ -429,7 +427,6 @@ fun EditorSurfaceHost(
         LocalRightRailContext     provides STUB_RIGHTRAIL,
         LocalAboutContext         provides STUB_ABOUT,
         LocalBgSettingsContext    provides STUB_BG_SETTINGS,
-        LocalCustomizationContext provides STUB_CUSTOMIZATION,
         LocalProfileContext       provides STUB_PROFILE,
         LocalServerDetailsContext provides STUB_SERVER_DETAILS,
         LocalThemePickerContext   provides STUB_THEME_PICKER,
@@ -875,7 +872,6 @@ private fun humanSurfaceShortName(surface: SurfaceId, s: AppStrings): String = w
     "appshell.body"       -> s.editorSurfShortBody
     "about"               -> s.editorSurfShortAbout
     "bg.settings"         -> s.editorSurfShortBg
-    "customization"       -> s.editorSurfShortStyle
     "profile"             -> s.editorSurfShortProfile
     "server.details"      -> s.editorSurfShortServer
     "theme.picker"        -> s.editorSurfShortTheme
@@ -893,7 +889,6 @@ private fun humanSurfaceName(surface: SurfaceId, s: AppStrings): String = when (
     "appshell.body"       -> s.editorSurfBody
     "about"               -> s.editorSurfAbout
     "bg.settings"         -> s.editorSurfBg
-    "customization"       -> s.editorSurfStyle
     "profile"             -> s.editorSurfProfile
     "server.details"      -> s.editorSurfServer
     "theme.picker"        -> s.editorSurfTheme
@@ -996,7 +991,6 @@ private fun availableSurfacesFor(screen: Screen, homeView: HomeView): List<Surfa
         }
         Screen.About                  -> SurfaceId("about")
         Screen.BackgroundSettings     -> SurfaceId("bg.settings")
-        Screen.CustomizationExtension -> SurfaceId("customization")
         Screen.Library                -> SurfaceId("library")
         Screen.Profile                -> SurfaceId("profile")
         is Screen.ServerDetails       -> SurfaceId("server.details")

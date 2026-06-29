@@ -27,7 +27,6 @@ fun staticCrumbLabel(screen: Screen, s: AppStrings): String? = when (screen) {
     Screen.ThemePicker            -> s.themePickerTitle
     Screen.About                  -> s.aboutTitle
     Screen.BackgroundSettings     -> s.backgroundTitle
-    Screen.CustomizationExtension -> s.customizationTitle
     is Screen.ServerSettings      -> screen.server.title?.ifBlank { null } ?: screen.server.name
     is Screen.ServerDetails       -> screen.server.title?.ifBlank { null } ?: screen.server.name
     // Resolved to a human pack name by the catalogue / repository (see below).
