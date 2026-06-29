@@ -1,5 +1,6 @@
 package hivens.ui.nx
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -30,9 +31,11 @@ import hivens.ui.theme.NxTheme
 
 /**
  * A clickable navigation row: icon + title (+ optional [subtitle]) + a trailing
- * chevron, on a library-owned opaque body plane with a shape-correct hover. The
- * one "tap to go somewhere" row for settings shortcuts, replacing per-screen
- * `glassSurfaceAlpha` + raw `clickable` rows (Rule 0/5).
+ * chevron, on a library-owned opaque body plane. The one "tap to go somewhere" row
+ * for settings shortcuts, replacing per-screen `glassSurfaceAlpha` + raw `clickable`
+ * rows (Rule 0/5). Its hover/press uses the same soft NEUTRAL overlay as the in-plane
+ * [NxRow] ([softHoverAlpha]) so a navigable row reads the same on its own plane or in
+ * one. The [icon] keeps its [iconTint] accent.
  */
 @Composable
 fun NxNavRow(
@@ -46,17 +49,23 @@ fun NxNavRow(
 ) {
     val shape = RoundedCornerShape(LocalStyle.current.cardCorner)
     val interaction = remember { MutableInteractionSource() }
+    val alpha = softHoverAlpha(interaction)
     NxSurface(
-        level    = NxSurfaceLevel.Raised,
+        // Same level as an NxSection plane so a standalone nav card reads as the same
+        // material as the section planes around it, not a step-darker odd one out.
+        level    = NxSurfaceLevel.Floating,
         glass    = false,
         shape    = shape,
         modifier = modifier
             .fillMaxWidth()
             .clip(shape)
-            .clickable(interactionSource = interaction, indication = ShapedStateLayer(shape, iconTint), onClick = onClick),
+            .clickable(interactionSource = interaction, indication = null, onClick = onClick),
     ) {
         Row(
-            modifier              = Modifier.fillMaxWidth().padding(16.dp),
+            modifier              = Modifier
+                .fillMaxWidth()
+                .background(NxTheme.colors.textPrimary.copy(alpha = alpha))
+                .padding(16.dp),
             verticalAlignment     = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {

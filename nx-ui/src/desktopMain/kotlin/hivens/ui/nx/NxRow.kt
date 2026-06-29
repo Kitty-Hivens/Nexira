@@ -40,10 +40,9 @@ import hivens.ui.theme.NxTheme
  * (for a standalone shortcut on its own plane use [NxNavRow] instead).
  *
  * When [onClick] is set the whole row is the hit target. Its hover/press highlight is
- * a soft NEUTRAL overlay (not the accent), bleeds out to the section plane's edges
- * ([edgeBleed] matches the NxSection inset) so it reads as a full-width list row, and
- * fades in on hover-enter / out on hover-exit -- steady while hovered, never pulsing,
- * and instant when motion is off.
+ * the shared soft NEUTRAL overlay ([softHoverAlpha]) and bleeds out to the section
+ * plane's edges ([edgeBleed] matches the NxSection inset) so it reads as a full-width
+ * list row.
  */
 @Composable
 fun NxRow(
@@ -59,18 +58,7 @@ fun NxRow(
     val rowModifier = if (onClick != null) {
         val shape = RoundedCornerShape(LocalStyle.current.cardCorner)
         val interaction = remember { MutableInteractionSource() }
-        val hovered by interaction.collectIsHoveredAsState()
-        val pressed by interaction.collectIsPressedAsState()
-        val target = when {
-            pressed -> 0.11f
-            hovered -> 0.06f
-            else    -> 0f
-        }
-        val alpha by animateFloatAsState(
-            targetValue   = target,
-            animationSpec = tween(durationMillis = LocalStyle.current.animationDurationMs(150)),
-            label         = "nxRowHover",
-        )
+        val alpha = softHoverAlpha(interaction)
         Modifier
             .bleedHorizontally(edgeBleed)
             .fillMaxWidth()
@@ -101,6 +89,29 @@ fun NxRow(
         Spacer(Modifier.width(12.dp))
         trailing()
     }
+}
+
+/**
+ * The soft NEUTRAL row-highlight alpha for a clickable [interaction]: a low-opacity
+ * onSurface overlay that fades in on hover-enter / out on hover-exit -- steady while
+ * hovered, never pulsing, and instant when motion is off. Shared by [NxRow] (in-plane)
+ * and [NxNavRow] (own plane) so a navigable row reads the same wherever it sits.
+ */
+@Composable
+internal fun softHoverAlpha(interaction: MutableInteractionSource): Float {
+    val hovered by interaction.collectIsHoveredAsState()
+    val pressed by interaction.collectIsPressedAsState()
+    val target = when {
+        pressed -> 0.11f
+        hovered -> 0.06f
+        else    -> 0f
+    }
+    val alpha by animateFloatAsState(
+        targetValue   = target,
+        animationSpec = tween(durationMillis = LocalStyle.current.animationDurationMs(150)),
+        label         = "softHoverAlpha",
+    )
+    return alpha
 }
 
 /**
