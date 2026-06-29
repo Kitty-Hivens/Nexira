@@ -40,7 +40,6 @@ import hivens.ui.theme.LocalStyle
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.widgets.about.AboutSurface
 import hivens.ui.widgets.bgsettings.BgSettingsSurface
-import hivens.ui.widgets.customization.CustomizationSurface
 import hivens.ui.widgets.profile.ProfileSurface
 import hivens.ui.widgets.wardrobe.WardrobeSurface
 import hivens.ui.widgets.serverdetails.ServerDetailsSurface
@@ -171,7 +170,6 @@ fun AppLayout(
                             uiStyle                      = uiStyle,
                             onUiStyleChanged             = onUiStyleChanged,
                             onOpenBackgroundSettings     = { onScreenChange(Screen.BackgroundSettings) },
-                            onOpenCustomizationExtension = { onScreenChange(Screen.CustomizationExtension) },
                             onOpenAbout                  = { onScreenChange(Screen.About) },
                         )
 
@@ -183,13 +181,6 @@ fun AppLayout(
                                 onBack()
                             },
                             onBack          = onBack,
-                        )
-
-                    Screen.CustomizationExtension ->
-                        CustomizationSurface(
-                            currentSettings   = customization,
-                            onSettingsChanged = onCustomizationChanged,
-                            onBack            = onBack,
                         )
 
                     Screen.About ->

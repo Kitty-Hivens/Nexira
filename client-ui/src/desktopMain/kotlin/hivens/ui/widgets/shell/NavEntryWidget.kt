@@ -112,7 +112,7 @@ fun NavEntry(instance: WidgetInstance) {
             outlineSwap  = true,
             phase        = 2.2f,
             active       = screen is Screen.Settings || screen is Screen.ThemePicker ||
-                screen is Screen.BackgroundSettings || screen is Screen.CustomizationExtension,
+                screen is Screen.BackgroundSettings,
             onClick      = { ctx.onScreenChange(Screen.Settings) },
         )
         NavTarget.About -> NavSlot(

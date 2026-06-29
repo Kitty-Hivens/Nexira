@@ -87,7 +87,6 @@ import hivens.ui.screens.ConsoleWindow
 import hivens.ui.screens.MigrationScreen
 import hivens.ui.theme.BrutStyle
 import hivens.ui.theme.CelestiaStyle
-import hivens.ui.theme.applyOverrides
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.CustomTheme
 import hivens.ui.theme.ThemeRevealHost
@@ -174,7 +173,6 @@ sealed class Screen {
     object ThemePicker        : Screen()
     object About              : Screen()
     object BackgroundSettings : Screen()
-    object CustomizationExtension : Screen()
     data class ServerSettings(val server: ServerProfile) : Screen()
     data class ServerDetails (val server: ServerProfile) : Screen()
 
@@ -844,11 +842,7 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
                 LocalChromeClose                         provides onCloseChrome,
                 LocalUseCustomChrome                     provides settings.useCustomChrome,
             ) {
-            val effectiveStyle = if (customization.experimentalColorOverridesEnabled) {
-                styleSpec.applyOverrides(customization.styleOverrides)
-            } else {
-                styleSpec
-            }
+            val effectiveStyle = styleSpec
 
             // Console runs as its own OS window but is composed from here so
             // it inherits LocalCustomization + LocalNxColors via the

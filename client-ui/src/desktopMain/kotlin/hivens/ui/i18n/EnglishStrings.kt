@@ -147,8 +147,6 @@ object EnglishStrings : AppStrings {
 
     override val serverSettingsResetConfirmTitle = "Reset this client?"
     override val serverSettingsResetConfirmBody  = "All downloaded files for this server's client are deleted permanently. This cannot be undone."
-    override val customizationResetConfirmTitle  = "Reset customization?"
-    override val customizationResetConfirmBody   = "Every customization override (colors, density, shape) returns to its default."
     override val backgroundResetConfirmTitle     = "Reset background?"
     override val backgroundResetConfirmBody      = "The entire custom background configuration returns to its defaults."
     override val logoutConfirmTitle              = "Log out?"
@@ -667,19 +665,9 @@ object EnglishStrings : AppStrings {
     override val backgroundLoopForever   = "Forever"
     override val backgroundLoopOnce      = "Play once"
 
-    override val settingsCustomizationExt    = "Customization (exp.)"
-    override val settingsCustomizationExtSub = "Density, accent, glass intensity, color overrides"
-    override val customizationTitle           = "Customization"
-    override val customizationSubtitle        = "Experimental visual tuning"
-    override val customizationDensity         = "Density scale"
-    override val customizationGlassIntensity  = "Glass opacity"
-    override val customizationAccentOverride  = "Accent override"
     override val customizationAccentClear     = "Clear override"
     override val customizationSectionVisual   = "Visual"
     override val customizationSectionColors   = "Color overrides"
-    override val customizationExperimentalToggle = "Per-role color overrides"
-    override val customizationExperimentalSub    = "Unlock 7-color override matrix. Easy to make unreadable combinations."
-    override val customizationReset           = "Reset all"
     override val customizationHexInvalid      = "Invalid hex"
     override val themePickerAccentOverride    = "Accent override (live)"
 
@@ -896,12 +884,6 @@ object EnglishStrings : AppStrings {
     override val libraryHeaderSubtitle = "Installed packs"
 
     // --- Customization widget labels ---
-    override val customGlassAlpha   = "Glass alpha"
-    override val customCardCorner   = "Card corner (dp)"
-    override val customCardBorder   = "Card border (dp)"
-    override val customButtonCorner = "Button corner (dp)"
-    override val customAnimSpeed    = "Animation speed"
-    override val customSoftGlow     = "Decorative glow"
 
     // --- Layout editor: common actions ---
     override val editorClose   = "Close"
@@ -973,29 +955,6 @@ object EnglishStrings : AppStrings {
         "widget.container.tabs.label2" to "Tab 2",
         "widget.container.tabs.label3" to "Tab 3",
         "widget.container.tabs.tabCount" to "Tabs",
-        "widget.customization.accent.override" to "Accent color",
-        "widget.customization.color.background" to "Color: background",
-        "widget.customization.color.criticalAccent" to "Color: criticalAccent",
-        "widget.customization.color.error" to "Color: error",
-        "widget.customization.color.outline" to "Color: outline",
-        "widget.customization.color.primary" to "Color: primary",
-        "widget.customization.color.progressAccent" to "Color: progressAccent",
-        "widget.customization.color.secondary" to "Color: secondary",
-        "widget.customization.color.success" to "Color: success",
-        "widget.customization.color.surface" to "Color: surface",
-        "widget.customization.color.textPrimary" to "Color: textPrimary",
-        "widget.customization.color.textSecondary" to "Color: textSecondary",
-        "widget.customization.color.warnAccent" to "Color: warnAccent",
-        "widget.customization.density" to "UI density",
-        "widget.customization.experimental.toggle" to "Experimental settings",
-        "widget.customization.glass.alpha" to "Glass opacity",
-        "widget.customization.glass.intensity" to "Glass intensity",
-        "widget.customization.reset" to "Reset customization",
-        "widget.customization.shape.animMultiplier" to "Animation speed",
-        "widget.customization.shape.buttonCorner" to "Button rounding",
-        "widget.customization.shape.cardBorder" to "Card border width",
-        "widget.customization.shape.cardCorner" to "Card rounding",
-        "widget.customization.shape.softGlow" to "Decorative glow",
         "widget.home.classic.content" to "Classic dashboard",
         "widget.home.new.clock" to "Clock",
         "widget.home.new.clock.accent" to "Accent color",
@@ -1121,7 +1080,6 @@ object EnglishStrings : AppStrings {
     override val editorSurfShortRightRail = "Right rail"
     override val editorSurfShortAbout     = "About"
     override val editorSurfShortBg        = "Background"
-    override val editorSurfShortStyle     = "Style"
     override val editorSurfShortProfile   = "Profile"
     override val editorSurfShortServer    = "Server"
     override val editorSurfShortTheme     = "Themes"
@@ -1137,7 +1095,6 @@ object EnglishStrings : AppStrings {
     override val editorSurfRightRail   = "Right panel"
     override val editorSurfAbout       = "About"
     override val editorSurfBg          = "Background settings"
-    override val editorSurfStyle       = "Customization"
     override val editorSurfProfile     = "Profile"
     override val editorSurfServer      = "Server details"
     override val editorSurfTheme       = "Theme picker"

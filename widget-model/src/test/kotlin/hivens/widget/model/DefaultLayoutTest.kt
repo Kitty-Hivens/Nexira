@@ -25,7 +25,6 @@ class DefaultLayoutTest {
                 // Phase B.1 widgetized screens (incremental landing)
                 "about",
                 "bg.settings",
-                "customization",
                 "profile",
                 "server.details",
                 "theme.picker",

@@ -86,7 +86,7 @@ class NavBackStack(root: Screen) {
         // of stacking, so the history can't grow without bound from tab hopping.
         // Wardrobe and About are nav-rail siblings too -- they reset, not stack.
         // Detail screens (ServerSettings, PackDetail, ...) and the Settings
-        // drill-downs (ThemePicker, BackgroundSettings, CustomizationExtension)
+        // drill-downs (ThemePicker, BackgroundSettings)
         // are absent by design -- they push and are unwound by Back.
         private val TOP_LEVEL: Set<Screen> = setOf(
             Screen.Home,

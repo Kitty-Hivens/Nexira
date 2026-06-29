@@ -42,7 +42,6 @@ fun SettingsScreen(
     uiStyle: UiStyle,
     onUiStyleChanged: (UiStyle) -> Unit,
     onOpenBackgroundSettings: () -> Unit = {},
-    onOpenCustomizationExtension: () -> Unit = {},
     onOpenAbout: () -> Unit = {}
 ) {
     PuppetScreen("Settings")
@@ -98,7 +97,6 @@ fun SettingsScreen(
                             onToggleTheme                = onToggleTheme,
                             onOpenThemePicker            = onOpenThemePicker,
                             onOpenBackgroundSettings     = onOpenBackgroundSettings,
-                            onOpenCustomizationExtension = onOpenCustomizationExtension,
                             currentLocale                = currentLocale,
                             onLocaleChanged              = onLocaleChanged,
                             homeView                     = homeView,
