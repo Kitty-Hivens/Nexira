@@ -1026,6 +1026,11 @@ object GermanStrings : AppStrings {
     override val editorSlotRow    = "Reihe"
     override val editorSlotGrid   = "Raster"
     override val editorSlotCanvas = "Leinwand"
+    override val editorSlotLayoutMenuTitle     = "Layout"
+    override val editorSlotGridColumns         = "Spalten"
+    override val editorSlotGridColumnsDecrease = "Weniger Spalten"
+    override val editorSlotGridColumnsIncrease = "Mehr Spalten"
+    override val editorSlotLayoutHandle        = "Slot-Layout"
 
     // --- Layout editor: prop panel ---
     override val editorResetToDefault = "Auf Standard zurücksetzen"

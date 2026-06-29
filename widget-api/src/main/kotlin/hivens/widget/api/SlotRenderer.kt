@@ -17,7 +17,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.layout.boundsInWindow
@@ -96,7 +95,7 @@ private fun RenderSlotContent(path: SlotPath, modifier: Modifier, spacing: Dp) {
     val decorator = LocalWidgetDecorator.current
     val emptyDecorator = LocalEmptySlotDecorator.current
     val unknownDecorator = LocalUnknownWidgetDecorator.current
-    val slotControl = LocalSlotControlDecorator.current
+    val slotChrome = LocalSlotChromeModifier.current
     val slotDivider = LocalSlotDividerDecorator.current
     val motionMs = LocalSlotMotionMs.current
 
@@ -107,13 +106,12 @@ private fun RenderSlotContent(path: SlotPath, modifier: Modifier, spacing: Dp) {
         // Occupy the slot footprint (inter-slot sizing lives in `modifier`)
         // so an empty slot keeps its place; the empty decorator paints the
         // edit-mode placeholder, or nothing.
-        Box(modifier) { emptyDecorator(address) }
+        Box(slotChrome(path, content).then(modifier)) { emptyDecorator(address) }
         return
     }
 
     when (content.orientation) {
-        SlotOrientation.Row -> Row(modifier.animatedReflow(motionMs), horizontalArrangement = Arrangement.spacedBy(spacing)) {
-            slotControl(path, content)
+        SlotOrientation.Row -> Row(slotChrome(path, content).then(modifier).animatedReflow(motionMs), horizontalArrangement = Arrangement.spacedBy(spacing)) {
             content.widgets.forEachIndexed { index, instance ->
                 val descriptor = registry[instance.kind]
                 if (descriptor != null) {
@@ -136,8 +134,7 @@ private fun RenderSlotContent(path: SlotPath, modifier: Modifier, spacing: Dp) {
                 if (index < content.widgets.lastIndex) slotDivider(path, content, index)
             }
         }
-        SlotOrientation.Grid -> Column(modifier.animatedReflow(motionMs), verticalArrangement = Arrangement.spacedBy(spacing)) {
-            slotControl(path, content)
+        SlotOrientation.Grid -> Column(slotChrome(path, content).then(modifier).animatedReflow(motionMs), verticalArrangement = Arrangement.spacedBy(spacing)) {
             // Non-lazy chunked grid: a Column of equal-width Rows. Reuses the
             // decorator path so chrome + DnD stay consistent; cells are uniform
             // (per-widget weight is ignored in Grid) and the last row is padded
@@ -168,16 +165,14 @@ private fun RenderSlotContent(path: SlotPath, modifier: Modifier, spacing: Dp) {
             val reportSlotBounds = LocalSlotBoundsReporter.current
             var slotSizeDp by remember { mutableStateOf(Size.Zero) }
             Box(
-                modifier
+                slotChrome(path, content)
+                    .then(modifier)
                     .onSizeChanged { sz ->
                         slotSizeDp = with(density) { Size(sz.width.toDp().value, sz.height.toDp().value) }
                     }
                     .onGloballyPositioned { reportSlotBounds(path, it.boundsInWindow()) },
             ) {
                 CompositionLocalProvider(LocalCanvasSlotSizeDp provides slotSizeDp) {
-                    // Anchor the edit-mode orientation chip to the corner so it
-                    // does not overlap a widget placed at (0,0).
-                    Box(Modifier.align(Alignment.TopStart)) { slotControl(path, content) }
                     // Free canvas: each widget at its absolute dp offset + size,
                     // painted in z-order then index. Overlap is natural in a Box.
                     content.widgets.withIndex()
@@ -201,8 +196,7 @@ private fun RenderSlotContent(path: SlotPath, modifier: Modifier, spacing: Dp) {
             }
         }
         // Column.
-        else -> Column(modifier.animatedReflow(motionMs), verticalArrangement = Arrangement.spacedBy(spacing)) {
-            slotControl(path, content)
+        else -> Column(slotChrome(path, content).then(modifier).animatedReflow(motionMs), verticalArrangement = Arrangement.spacedBy(spacing)) {
             content.widgets.forEachIndexed { index, instance ->
                 val descriptor = registry[instance.kind]
                 if (descriptor != null) {

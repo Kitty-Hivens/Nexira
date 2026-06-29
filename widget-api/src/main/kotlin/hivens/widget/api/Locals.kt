@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ProvidableCompositionLocal
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import hivens.widget.model.LayoutGraph
@@ -75,16 +76,16 @@ typealias UnknownWidgetDecorator = @Composable (address: SlotAddress, index: Int
 val LocalUnknownWidgetDecorator: ProvidableCompositionLocal<UnknownWidgetDecorator> =
     staticCompositionLocalOf { { _, _, _ -> } }
 
-// Phase G: rendered by SlotRenderer at the start of a non-empty slot in
-// edit mode. Default = nothing (production: no control). The editor swaps
-// in a small control that changes the slot's orientation (Column/Row/Grid)
-// + grid columns. Receives the slot path + content so the control reads
-// the current orientation and dispatches the mutation. Kept editor-
-// agnostic here; the implementation lives in :client-ui.
-typealias SlotControlDecorator = @Composable (path: SlotPath, content: SlotContent) -> Unit
+// Phase G / Tier 2: a zero-footprint Modifier the editor applies to each slot's
+// flow root (and the empty Box). It lets the editor highlight the slot, select it,
+// and open its orientation menu WITHOUT being a layout child -- the old in-flow
+// control displaced the edited content. Production default is the identity Modifier
+// (no cost). Returns a plain Modifier so no nx-ui / editor type crosses into
+// widget-api; the implementation lives in :client-ui.
+typealias SlotChromeModifier = (path: SlotPath, content: SlotContent) -> Modifier
 
-val LocalSlotControlDecorator: ProvidableCompositionLocal<SlotControlDecorator> =
-    staticCompositionLocalOf { { _, _ -> } }
+val LocalSlotChromeModifier: ProvidableCompositionLocal<SlotChromeModifier> =
+    staticCompositionLocalOf { { _, _ -> Modifier } }
 
 // Phase G: rendered by SlotRenderer between two adjacent widgets in a
 // Row/Column slot in edit mode. Default = nothing. The editor swaps in a

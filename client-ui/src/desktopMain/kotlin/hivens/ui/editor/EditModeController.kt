@@ -22,6 +22,7 @@ import hivens.widget.model.setWidgetOffset
 import hivens.widget.model.setWidgetSize
 import hivens.widget.model.setWidgetWeight
 import hivens.widget.model.setWidgetZ
+import hivens.widget.model.traverse
 import hivens.widget.model.updateWidgetChrome
 import hivens.widget.model.updateWidgetProps
 import kotlinx.coroutines.CoroutineScope
@@ -151,8 +152,16 @@ class EditModeController(
         scope.launch(writeDispatcher) { repo.update { it.setSlotOrientation(path, orientation) } }
     }
 
-    fun setGridColumns(path: SlotPath, columns: Int) {
-        scope.launch(writeDispatcher) { repo.update { it.setGridColumns(path, columns) } }
+    // Grid column nudge. Reads the current count from the graph INSIDE the
+    // serialized update so rapid +/- clicks compose without a lost-update race; the
+    // model clamps the result to 1..GRID_COLUMNS_MAX.
+    fun nudgeGridColumns(path: SlotPath, delta: Int) {
+        scope.launch(writeDispatcher) {
+            repo.update { g ->
+                val current = g.traverse(path)?.gridColumns ?: SlotContent().gridColumns
+                g.setGridColumns(path, current + delta)
+            }
+        }
     }
 
     fun setWidgetWeight(path: SlotPath, instanceId: String, weight: Float) {

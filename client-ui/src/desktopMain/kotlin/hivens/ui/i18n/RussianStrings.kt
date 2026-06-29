@@ -1040,6 +1040,11 @@ object RussianStrings : AppStrings {
     override val editorSlotRow    = "Ряд"
     override val editorSlotGrid   = "Сетка"
     override val editorSlotCanvas = "Холст"
+    override val editorSlotLayoutMenuTitle     = "Раскладка"
+    override val editorSlotGridColumns         = "Столбцы"
+    override val editorSlotGridColumnsDecrease = "Меньше столбцов"
+    override val editorSlotGridColumnsIncrease = "Больше столбцов"
+    override val editorSlotLayoutHandle        = "Раскладка слота"
 
     // --- Layout editor: prop panel ---
     override val editorResetToDefault = "Сбросить к умолчанию"
