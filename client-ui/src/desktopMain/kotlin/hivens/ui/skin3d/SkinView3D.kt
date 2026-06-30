@@ -148,10 +148,14 @@ fun SkinView3D(
     )
 }
 
-// Projects + back-face-culls the figure into textured triangles for the rasterizer:
-// each face's 4 corners go through rotate/project (screen x,y) with depth = rotated z,
-// and carry the face's UV rect (1x texels * k). The implied 4th corner is
-// p0 + (pu - p0) + (pv - p0). Front faces wind so the screen cross product is positive.
+// Projects the figure into textured triangles for the rasterizer: each face's 4
+// corners go through rotate/project (screen x,y) with depth = rotated z, and carry
+// the face's UV rect (1x texels * k). The implied 4th corner is p0 + (pu-p0) + (pv-p0).
+// Every face is emitted DOUBLE-SIDED (no back-face cull): a part is a hollow box, so
+// culling the far wall let a cut-out overlay texel (a gap in the hair) show the void
+// behind the model. Drawing both sides reveals the inner far wall instead, textured,
+// and the depth buffer still keeps the nearest texel per pixel -- so a solid region
+// shows only its front faces, while a cut-out reads as solid rather than see-through.
 private fun facesToTris(
     faces: List<Face>,
     yaw: Float, pitch: Float, scale: Float, cx: Float, cy: Float, k: Float,
@@ -161,8 +165,8 @@ private fun facesToTris(
         val r0 = rotate(f.p0, yaw, pitch); val s0 = project(r0, scale, cx, cy)
         val ru = rotate(f.pu, yaw, pitch); val su = project(ru, scale, cx, cy)
         val rv = rotate(f.pv, yaw, pitch); val sv = project(rv, scale, cx, cy)
-        // Back-face cull: outward faces wind so screen (u x v) > 0 (see frontFacing).
-        if ((su.x - s0.x) * (sv.y - s0.y) - (su.y - s0.y) * (sv.x - s0.x) <= 0f) continue
+        // No back-face cull -- both sides are drawn (see the function header); the
+        // rasterizer normalizes either winding, so a back face keeps its UVs.
         val p3 = Vec3(f.pu.x + f.pv.x - f.p0.x, f.pu.y + f.pv.y - f.p0.y, f.pu.z + f.pv.z - f.p0.z)
         val r3 = rotate(p3, yaw, pitch); val s3 = project(r3, scale, cx, cy)
         val uv = f.uv
