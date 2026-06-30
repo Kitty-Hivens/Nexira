@@ -56,6 +56,7 @@ import androidx.compose.ui.window.PopupProperties
 import dev.hivens.skinema.compose.VideoScale
 import dev.hivens.skinema.compose.VideoSurface
 import dev.hivens.skinema.compose.rememberPlayerState
+import dev.hivens.skinema.libav.HwAccel
 import dev.hivens.skinema.player.VideoPlayer as SkinemaPlayer
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.IconKey
@@ -86,7 +87,9 @@ fun VideoPlayer(
     onRequestFullscreen: (() -> Unit)? = null,
 ) {
     val s = LocalStrings.current
-    val player = remember(path, loop, audio) { SkinemaPlayer(path = path, loop = loop, audio = audio) }
+    // Hardware decode where a device is available (AUTO falls back to software
+    // per file), so a 4K clip is not decoded on the CPU.
+    val player = remember(path, loop, audio) { SkinemaPlayer(path = path, loop = loop, audio = audio, hardware = HwAccel.AUTO) }
     DisposableEffect(player) { onDispose { player.close() } }
 
     val state = rememberPlayerState(player)

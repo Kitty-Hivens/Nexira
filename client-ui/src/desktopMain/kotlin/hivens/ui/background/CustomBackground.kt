@@ -131,7 +131,7 @@ private fun AnimatedParallaxImage(
     // first decoded frame (via the player's onSeed). Either feeds BackdropState.seedArgb.
     var videoSeed by remember(file) { mutableStateOf<Int?>(null) }
     val videoPainter = if (mediaKind == BackgroundMediaKind.TimeBased)
-        rememberSkinemaFrame(file, settings.animationSpeedMultiplier, settings.loopMode, onSeed = { videoSeed = it }) else null
+        rememberSkinemaFrame(file, settings.animationSpeedMultiplier, settings.loopMode, settings.hardwareDecode, onSeed = { videoSeed = it }) else null
     val staticSeed by produceState<Int?>(null, staticBitmap) {
         value = staticBitmap?.let { bmp -> withContext(Dispatchers.Default) { seedFromImage(bmp) } }
     }

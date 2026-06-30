@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.skiaCanvas
 import dev.hivens.skinema.compose.rememberPlayerState
+import dev.hivens.skinema.libav.HwAccel
 import dev.hivens.skinema.player.VideoPlayer
 import dev.hivens.skinema.skiko.VideoFrameImage
 import hivens.ui.theme.seedFromRgba
@@ -87,14 +88,20 @@ internal fun rememberSkinemaFrame(
     file: File,
     speedMultiplier: Float,
     loopMode: BackgroundLoopMode,
+    hardwareDecode: Boolean,
     onSeed: (Int) -> Unit = {},
 ): VideoFramePainter? {
-    val player = remember(file) {
+    // Keyed on hardwareDecode too: toggling the policy re-opens the player on
+    // the chosen backend rather than waiting for the file to change.
+    val player = remember(file, hardwareDecode) {
         VideoPlayer(
             path  = file.toPath(),
             // The background loops unless the user pinned it to a single pass.
             loop  = loopMode != BackgroundLoopMode.PlayOnce,
             audio = false,
+            // 4K on the CPU is brutal; AUTO offloads to the GPU and falls back
+            // to software per file when no device opens.
+            hardware = if (hardwareDecode) HwAccel.AUTO else HwAccel.OFF,
         )
     }
     DisposableEffect(player) { onDispose { player.close() } }
