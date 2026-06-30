@@ -619,3 +619,14 @@ tasks.matching { it.name.endsWith("ProcessResources") }.configureEach {
 // goes unnoticed locally until CI's version reaches a user. CI is
 // the single source of truth; reproduce the steps from
 // build_release.yml directly if you need a local portable.
+
+// Cap glibc's per-thread malloc arenas (Linux/glibc only). The native video
+// pipeline -- FFmpeg via Panama plus Skia across many allocating threads --
+// otherwise lets glibc grow an arena per thread and holds ~2.6 GB RSS at
+// steady state; capping to 2 arenas brings it to ~1.5 GB with no measured cost.
+// It is read by glibc at process start, so it cannot ride jvmArgs (a -D/-XX
+// flag) -- it goes on the run task's environment here, and the AppImage AppRun
+// in CI for the shipped Linux build. A no-op on Windows/macOS allocators.
+tasks.withType<JavaExec>().configureEach {
+    environment("MALLOC_ARENA_MAX", "2")
+}
