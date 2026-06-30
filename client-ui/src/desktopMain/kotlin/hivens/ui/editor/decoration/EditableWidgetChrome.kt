@@ -188,10 +188,12 @@ fun EditableWidgetChrome(
         label         = "edit-source-alpha",
     )
     val borderAlpha by animateFloatAsState(
-        // Hover-only outline: at rest the edit view stays pixel-faithful to production
-        // (no frame around every widget), so the mandatory inter-widget spacing reads
-        // true; the outline appears only on the widget under the pointer.
-        targetValue   = if (isHovered) 0.50f + depthBoost else 0f,
+        // Resting outline in edit mode: every widget's bounds must stay legible, since the
+        // hover affordance buttons that used to advertise "this is an editable widget" were
+        // removed -- without a resting cue the user can't tell a widget from the empty slot
+        // around it (and right-clicks / drags then land on the slot). It strengthens under
+        // the pointer. Drawn inside the widget's bounds (drawWithContent), so no reflow.
+        targetValue   = if (isHovered) 0.55f + depthBoost else 0.22f + depthBoost,
         animationSpec = tween(chromeMotionMs),
         label         = "edit-border-alpha",
     )
@@ -279,10 +281,10 @@ fun EditableWidgetChrome(
                                             editController.resizeWidgetCell(path, instance.instanceId, cs, rs, geo.columns)
                                         }
                                     } else {
-                                        menuAnchor = (widgetWindowBounds?.topLeft ?: Offset.Zero) + down.position
+                                        widgetWindowBounds?.let { menuAnchor = it.topLeft + down.position }
                                     }
                                 } else {
-                                    menuAnchor = (widgetWindowBounds?.topLeft ?: Offset.Zero) + down.position
+                                    widgetWindowBounds?.let { menuAnchor = it.topLeft + down.position }
                                 }
                                 return@awaitEachGesture
                             }
