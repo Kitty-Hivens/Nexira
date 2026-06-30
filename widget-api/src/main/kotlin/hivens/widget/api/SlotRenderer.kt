@@ -26,6 +26,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import hivens.widget.model.CanvasPlacement
+import hivens.widget.model.GridCell
 import hivens.widget.model.SlotContent
 import hivens.widget.model.SlotId
 import hivens.widget.model.SlotOrientation
@@ -190,6 +191,51 @@ private fun RenderSlotContent(path: SlotPath, modifier: Modifier, spacing: Dp) {
                                 Modifier.size(cp.width.dp, cp.height.dp) else Modifier
                             Box(Modifier.offset((cp?.x ?: 0f).dp, (cp?.y ?: 0f).dp).then(sizeMod)) {
                                 decorator(address, index, descriptor, instance) { RenderWidget(descriptor, instance) }
+                            }
+                        }
+                }
+            }
+        }
+        SlotOrientation.CubeGrid -> {
+            // Cube-cell grid: each widget occupies an addressed cell rectangle
+            // (col/row + span). Cell size derives from the measured slot width and
+            // the column count; cells are square (cellH = cellW); `spacing` is the
+            // gutter. Static placement here -- live move/resize land in later phases.
+            val density = LocalDensity.current
+            val reportSlotBounds = LocalSlotBoundsReporter.current
+            var slotSizeDp by remember { mutableStateOf(Size.Zero) }
+            val cols = content.gridColumns.coerceAtLeast(1)
+            Box(
+                slotChrome(path, content)
+                    .then(modifier)
+                    .onSizeChanged { sz ->
+                        slotSizeDp = with(density) { Size(sz.width.toDp().value, sz.height.toDp().value) }
+                    }
+                    .onGloballyPositioned { reportSlotBounds(path, it.boundsInWindow()) },
+            ) {
+                CompositionLocalProvider(LocalCanvasSlotSizeDp provides slotSizeDp) {
+                    val cellW: Dp =
+                        if (slotSizeDp.width > 0f) ((slotSizeDp.width.dp - spacing * (cols + 1)) / cols).coerceAtLeast(0.dp)
+                        else 0.dp
+                    content.widgets.withIndex()
+                        .sortedWith(compareBy({ it.value.cell?.z ?: 0 }, { it.index }))
+                        .forEach { (index, instance) ->
+                            val gc      = instance.cell ?: GridCell()
+                            val colSpan = gc.colSpan.coerceIn(1, cols)
+                            val col     = gc.col.coerceIn(0, cols - colSpan)
+                            val rowSpan = gc.rowSpan.coerceAtLeast(1)
+                            val row     = gc.row.coerceAtLeast(0)
+                            val x = spacing + (cellW + spacing) * col
+                            val y = spacing + (cellW + spacing) * row
+                            val w = cellW * colSpan + spacing * (colSpan - 1)
+                            val h = cellW * rowSpan + spacing * (rowSpan - 1)
+                            val descriptor = registry[instance.kind]
+                            Box(Modifier.offset(x, y).size(w, h)) {
+                                if (descriptor != null) {
+                                    decorator(address, index, descriptor, instance) { RenderWidget(descriptor, instance) }
+                                } else {
+                                    unknownDecorator(address, index, instance)
+                                }
                             }
                         }
                 }
