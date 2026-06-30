@@ -223,10 +223,13 @@ private fun RenderSlotContent(path: SlotPath, modifier: Modifier, spacing: Dp) {
                     }
                     .onGloballyPositioned { reportSlotBounds(path, it.boundsInWindow()) },
             ) {
-                CompositionLocalProvider(LocalCanvasSlotSizeDp provides slotSizeDp) {
-                    val cellW: Dp =
-                        if (slotSizeDp.width > 0f) ((slotSizeDp.width.dp - spacing * (cols + 1)) / cols).coerceAtLeast(0.dp)
-                        else 0.dp
+                val cellW: Dp =
+                    if (slotSizeDp.width > 0f) ((slotSizeDp.width.dp - spacing * (cols + 1)) / cols).coerceAtLeast(0.dp)
+                    else 0.dp
+                CompositionLocalProvider(
+                    LocalCanvasSlotSizeDp provides slotSizeDp,
+                    LocalCubeGeometry provides CubeGeometry(cellW.value, spacing.value, cols),
+                ) {
                     content.widgets.withIndex()
                         .sortedWith(compareBy({ it.value.cell?.z ?: 0 }, { it.index }))
                         .forEach { (index, instance) ->
