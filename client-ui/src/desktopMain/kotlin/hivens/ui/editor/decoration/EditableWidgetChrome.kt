@@ -13,7 +13,6 @@ import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -47,11 +46,10 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
@@ -63,13 +61,15 @@ import hivens.ui.editor.EditModeController
 import hivens.ui.editor.canvasDragOffset
 import hivens.ui.editor.canvasResizeSize
 import hivens.ui.editor.cubeDragCell
+import hivens.ui.editor.cubeResizeSpan
 import hivens.ui.editor.dnd.DragController
 import hivens.ui.editor.dnd.DragPayload
 import hivens.ui.editor.dnd.DropTargetRegistry
 import hivens.ui.i18n.LocalStrings
-import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.nx.NxContextMenu
+import hivens.ui.nx.NxMenuItem
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalStyle
 import hivens.widget.api.LocalCanvasSlotSizeDp
@@ -140,6 +140,8 @@ fun EditableWidgetChrome(
     val liveCell = rememberUpdatedState(instance.cell)
     val cubeGeo = rememberUpdatedState(LocalCubeGeometry.current)
     var cubeDrag by remember { mutableStateOf(Offset.Zero) }
+    // Cursor anchor for the right-click context menu (null = closed).
+    var menuAnchor by remember { mutableStateOf<Offset?>(null) }
     val resizeCursor = remember { PointerIcon(Cursor(Cursor.SE_RESIZE_CURSOR)) }
 
     // Drop-indicator hit test. Reading controller.active recomposes on
@@ -248,6 +250,35 @@ fun EditableWidgetChrome(
                             val down = awaitFirstDown(requireUnconsumed = true)
                             // Claim the press so a tap never reaches the content.
                             down.consume()
+                            if (currentEvent.buttons.isSecondaryPressed) {
+                                // Right button: open the widget context menu; in a cube
+                                // slot a drag past the slop resizes by whole cells first.
+                                if (isCubeGrid) {
+                                    val startCell = liveCell.value ?: GridCell()
+                                    var acc = Offset.Zero
+                                    var moved = false
+                                    drag(down.id) { change ->
+                                        acc += change.positionChange()
+                                        if (!moved && acc.getDistance() > viewConfiguration.touchSlop) moved = true
+                                        change.consume()
+                                    }
+                                    if (moved) {
+                                        cubeGeo.value?.let { geo ->
+                                            val (cs, rs) = cubeResizeSpan(
+                                                startCell.colSpan, startCell.rowSpan,
+                                                acc.x, acc.y, density,
+                                                geo.cellWidthDp, geo.gutterDp, geo.columns,
+                                            )
+                                            editController.resizeWidgetCell(path, instance.instanceId, cs, rs, geo.columns)
+                                        }
+                                    } else {
+                                        menuAnchor = (widgetWindowBounds?.topLeft ?: Offset.Zero) + down.position
+                                    }
+                                } else {
+                                    menuAnchor = (widgetWindowBounds?.topLeft ?: Offset.Zero) + down.position
+                                }
+                                return@awaitEachGesture
+                            }
                             when {
                                 isCanvas -> {
                                     // Absolute move: apply each frame's delta to the
@@ -327,62 +358,6 @@ fun EditableWidgetChrome(
                     },
             )
 
-            // Hover affordances, stacked vertically at the top-right so they
-            // fit narrow widgets (the 64dp rail) instead of overflowing a row.
-            // Each uses the Release-consume tap pattern so a tap acts without
-            // starting the body drag overlay.
-            Column(
-                modifier            = Modifier.align(Alignment.TopEnd).padding(3.dp),
-                horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(3.dp),
-            ) {
-                // Z-order (Canvas only): bring to front / send to back. Overlap
-                // is meaningful only under free placement.
-                if (isCanvas) {
-                    AnimatedVisibility(
-                        visible = isHovered,
-                        enter   = fadeIn(tween(chromeMotionMs)),
-                        exit    = fadeOut(tween(chromeMotionMs)),
-                    ) {
-                        AffordanceButton(NxIcon.FlipToFront, s.editorToFront, NxTheme.colors.primary, instance.instanceId) {
-                            val maxZ = graph.traverse(path)?.widgets?.maxOfOrNull { it.canvas?.z ?: 0 } ?: 0
-                            editController.setWidgetZ(path, instance.instanceId, maxZ + 1)
-                        }
-                    }
-                    AnimatedVisibility(
-                        visible = isHovered,
-                        enter   = fadeIn(tween(chromeMotionMs)),
-                        exit    = fadeOut(tween(chromeMotionMs)),
-                    ) {
-                        AffordanceButton(NxIcon.FlipToBack, s.editorToBack, NxTheme.colors.primary, instance.instanceId) {
-                            val minZ = graph.traverse(path)?.widgets?.minOfOrNull { it.canvas?.z ?: 0 } ?: 0
-                            editController.setWidgetZ(path, instance.instanceId, minZ - 1)
-                        }
-                    }
-                }
-                AnimatedVisibility(
-                    visible = isHovered,
-                    enter   = fadeIn(tween(chromeMotionMs)),
-                    exit    = fadeOut(tween(chromeMotionMs)),
-                ) {
-                    AffordanceButton(NxIcon.Tune, s.editorConfigure, NxTheme.colors.primary, instance.instanceId, onEditProps)
-                }
-                AnimatedVisibility(
-                    visible = isHovered && descriptor.removable,
-                    enter   = fadeIn(tween(chromeMotionMs)),
-                    exit    = fadeOut(tween(chromeMotionMs)),
-                ) {
-                    AffordanceButton(NxIcon.Close, s.editorDelete, NxTheme.colors.error, instance.instanceId, onRemove)
-                }
-                AnimatedVisibility(
-                    visible = isHovered && !descriptor.removable,
-                    enter   = fadeIn(tween(chromeMotionMs)),
-                    exit    = fadeOut(tween(chromeMotionMs)),
-                ) {
-                    AffordanceButton(NxIcon.DeleteForever, s.editorForceRemove, NxTheme.colors.warnAccent, instance.instanceId) { forceRemoveOpen = true }
-                }
-            }
-
             // SE resize handle (hover-only) -> setWidgetSize. Works on any slot:
             // on a Canvas slot it sizes the free-placed widget; in a flow slot
             // SlotRenderer applies the size. Seizes the measured px as the
@@ -453,6 +428,25 @@ fun EditableWidgetChrome(
         }
     }
 
+    // Right-click context menu (replaces the old hover affordance buttons): the
+    // widget's actions, anchored at the cursor. A right-drag in a cube slot resizes
+    // by cells; a right-click with no drag opens this.
+    menuAnchor?.let { anchor ->
+        NxContextMenu(anchorInWindow = anchor, expanded = true, onDismissRequest = { menuAnchor = null }) {
+            WidgetContextMenuContent(
+                isCanvas       = isCanvas,
+                removable      = descriptor.removable,
+                path           = path,
+                instanceId     = instance.instanceId,
+                editController = editController,
+                onConfigure    = { menuAnchor = null; onEditProps() },
+                onRemove       = { menuAnchor = null; onRemove() },
+                onForceRemove  = { menuAnchor = null; forceRemoveOpen = true },
+                onClose        = { menuAnchor = null },
+            )
+        }
+    }
+
     if (forceRemoveOpen) {
         AlertDialog(
             onDismissRequest = { forceRemoveOpen = false },
@@ -476,52 +470,36 @@ fun EditableWidgetChrome(
     }
 }
 
-// One hover affordance button (z-order / tune / remove / force-remove). Consumes
-// the press AND release so a tap fires the action without the body drag overlay
-// (which arms on any unconsumed down) also nudging the widget.
+// The widget's right-click context menu body (replaces the old hover affordance
+// buttons): configure, z-order on a Canvas, and remove / force-remove. Reads the
+// graph live for the z bounds; each item closes the menu.
 @Composable
-private fun AffordanceButton(
-    icon: IconKey,
-    description: String,
-    color: Color,
+private fun WidgetContextMenuContent(
+    isCanvas: Boolean,
+    removable: Boolean,
+    path: SlotPath,
     instanceId: String,
-    onTap: () -> Unit,
+    editController: EditModeController,
+    onConfigure: () -> Unit,
+    onRemove: () -> Unit,
+    onForceRemove: () -> Unit,
+    onClose: () -> Unit,
 ) {
-    // Read the latest onTap: the pointerInput is keyed on instanceId so it does
-    // not restart, and the z-order closures capture live graph state (current
-    // min/max z) that would otherwise be stale.
-    val tap by rememberUpdatedState(onTap)
-    Surface(
-        color    = color.copy(alpha = 0.85f),
-        shape    = RoundedCornerShape(6.dp),
-        modifier = Modifier
-            .size(20.dp)
-            .pointerInput(instanceId) {
-                awaitPointerEventScope {
-                    while (true) {
-                        val event = awaitPointerEvent()
-                        when (event.type) {
-                            // Consume the press so the body drag overlay
-                            // (awaitFirstDown(requireUnconsumed = true)) does not
-                            // also arm; a button tap with a little jitter would
-                            // otherwise nudge the widget under the button.
-                            PointerEventType.Press -> event.changes.forEach { it.consume() }
-                            PointerEventType.Release -> {
-                                tap()
-                                event.changes.forEach { it.consume() }
-                            }
-                            else -> {}
-                        }
-                    }
-                }
-            },
-    ) {
-        Symbol(icon = icon,
-            contentDescription = description,
-            tint               = NxTheme.colors.onPrimary,
-            modifier           = Modifier.size(13.dp),
-        )
+    val s = LocalStrings.current
+    val graph = LocalLayoutGraph.current
+    NxMenuItem(s.editorConfigure) { onConfigure() }
+    if (isCanvas) {
+        NxMenuItem(s.editorToFront) {
+            val maxZ = graph.traverse(path)?.widgets?.maxOfOrNull { it.canvas?.z ?: 0 } ?: 0
+            editController.setWidgetZ(path, instanceId, maxZ + 1); onClose()
+        }
+        NxMenuItem(s.editorToBack) {
+            val minZ = graph.traverse(path)?.widgets?.minOfOrNull { it.canvas?.z ?: 0 } ?: 0
+            editController.setWidgetZ(path, instanceId, minZ - 1); onClose()
+        }
     }
+    if (removable) NxMenuItem(s.editorDelete) { onRemove() }
+    else NxMenuItem(s.editorForceRemove) { onForceRemove() }
 }
 
 // Drop insertion bar. Horizontal (full width, 2dp tall) for a Column
