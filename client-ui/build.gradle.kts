@@ -30,7 +30,7 @@ kotlin {
     jvm("desktop")
 
     sourceSets {
-        val commonMain by getting {
+        getByName("commonMain") {
             dependencies {
                 implementation(libs.compose.runtime)
                 implementation(libs.compose.foundation)
@@ -60,7 +60,7 @@ kotlin {
             }
         }
 
-        val desktopMain by getting {
+        val desktopMain = getByName("desktopMain") {
             dependencies {
                 implementation(compose.desktop.currentOs)
 
@@ -134,7 +134,7 @@ kotlin {
         // task `desktopTest`; explicit source-set wiring lets the
         // module declare kotlin-test + coroutines-test deps and pull
         // in fakes from sibling modules.
-        val desktopTest by getting {
+        getByName("desktopTest") {
             dependencies {
                 implementation(kotlin("test"))
                 implementation(libs.kotlinx.coroutines.test)
@@ -470,7 +470,7 @@ packaging {
 // would resolve against the Task's own extensions. The config-time .get() snapshot keeps
 // doLast configuration-cache safe -- it closes over a plain List, not the build script.
 val packagingExtension = the<PackagingExtension>()
-val verifyRuntimeModules by tasks.registering {
+val verifyRuntimeModules = tasks.register("verifyRuntimeModules") {
     group = "verification"
     description = "Fails if packaging.modules omits a module the runtime read needs (jdk.management)."
     val modules = packagingExtension.modules.get()
