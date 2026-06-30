@@ -85,11 +85,11 @@ kotlin {
                 // per-user cache on first use. Ship one classifier per target tier.
                 implementation(libs.skinema.compose)
                 implementation(libs.skinema.skiko)
-                runtimeOnly("dev.hivens:skinema-natives:${libs.versions.skinema.get()}:linux-x64")
-                runtimeOnly("dev.hivens:skinema-natives:${libs.versions.skinema.get()}:linux-arm64")
-                runtimeOnly("dev.hivens:skinema-natives:${libs.versions.skinema.get()}:windows-x64")
-                runtimeOnly("dev.hivens:skinema-natives:${libs.versions.skinema.get()}:macos-arm64")
-                runtimeOnly("dev.hivens:skinema-natives:${libs.versions.skinema.get()}:macos-x64")
+                runtimeOnly("dev.hivens:skinema-natives:${libs.versions.skinema.get()}:decode-linux-x64")
+                runtimeOnly("dev.hivens:skinema-natives:${libs.versions.skinema.get()}:decode-linux-arm64")
+                runtimeOnly("dev.hivens:skinema-natives:${libs.versions.skinema.get()}:decode-windows-x64")
+                runtimeOnly("dev.hivens:skinema-natives:${libs.versions.skinema.get()}:decode-macos-arm64")
+                runtimeOnly("dev.hivens:skinema-natives:${libs.versions.skinema.get()}:decode-macos-x64")
                 implementation(libs.ktor.client.core)
                 // In-launcher HTML renderer (hivens.ui.render): jsoup parses, the
                 // markdown lib does md->html. The velocipede before the standalone lib.

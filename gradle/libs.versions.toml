@@ -80,7 +80,7 @@ libvault          = "0.2.1"
 # Replaces the in-tree Skia-Codec animation path in CustomBackground and adds
 # video wallpapers. dev.hivens family, mavenCentral; decode-only LGPL FFmpeg +
 # libwebp + libass ship in per-platform skinema-natives classifier jars.
-skinema           = "0.5.0"
+skinema           = "0.6.0"
 
 # ── Test ─────────────────────────────────────────────────────────────────────
 # junit held on the 5.x line: 6.x drops Java 8 and requires JVM runtime 17+,
