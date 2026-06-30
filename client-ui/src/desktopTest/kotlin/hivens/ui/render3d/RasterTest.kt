@@ -1,0 +1,68 @@
+package hivens.ui.render3d
+
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
+
+// Pins the depth-buffered rasterizer: occlusion order, UV interpolation, and the
+// translucent-over-opaque composite -- the three properties the painter's-algorithm
+// renderer could not guarantee. Pure data in / data out, no canvas.
+class RasterTest {
+
+    // A full [size] x [size] quad at a constant depth + constant UV (two triangles).
+    private fun quad(z: Float, tu: Float, tv: Float, opaque: Boolean, size: Float = 4f): List<Tri> {
+        val a = Vtx(0f, 0f, z, tu, tv); val b = Vtx(size, 0f, z, tu, tv)
+        val c = Vtx(size, size, z, tu, tv); val d = Vtx(0f, size, z, tu, tv)
+        return listOf(Tri(a, b, c, opaque), Tri(a, c, d, opaque))
+    }
+
+    @Test
+    fun `the nearer opaque triangle occludes the farther one`() {
+        val tex = Texture(intArrayOf(0xFFFF0000.toInt(), 0xFF0000FF.toInt()), width = 2, height = 1)
+        val far = quad(z = 0f, tu = 0.5f, tv = 0.5f, opaque = true)    // red, depth 0
+        val near = quad(z = 1f, tu = 1.5f, tv = 0.5f, opaque = true)   // blue, depth 1 (nearer)
+        val out = rasterize(far + near, tex, 4, 4)
+        assertEquals(0xFF0000FF.toInt(), out[2 * 4 + 2])               // centre = blue
+    }
+
+    @Test
+    fun `UV interpolates to the right texel`() {
+        // 2x2 texture: TL red, TR green, BL blue, BR white.
+        val tex = Texture(
+            intArrayOf(0xFFFF0000.toInt(), 0xFF00FF00.toInt(), 0xFF0000FF.toInt(), 0xFFFFFFFF.toInt()),
+            width = 2, height = 2,
+        )
+        // One quad maps the whole texture across a 2x2 output (corner UVs 0..2).
+        val a = Vtx(0f, 0f, 0f, 0f, 0f); val b = Vtx(2f, 0f, 0f, 2f, 0f)
+        val c = Vtx(2f, 2f, 0f, 2f, 2f); val d = Vtx(0f, 2f, 0f, 0f, 2f)
+        val out = rasterize(listOf(Tri(a, b, c, true), Tri(a, c, d, true)), tex, 2, 2)
+        assertEquals(0xFFFF0000.toInt(), out[0])   // (0,0) red
+        assertEquals(0xFF00FF00.toInt(), out[1])   // (1,0) green
+        assertEquals(0xFF0000FF.toInt(), out[2])   // (0,1) blue
+        assertEquals(0xFFFFFFFF.toInt(), out[3])   // (1,1) white
+    }
+
+    @Test
+    fun `a translucent overlay composites over the opaque base`() {
+        val tex = Texture(intArrayOf(0xFFFF0000.toInt(), 0x800000FF.toInt()), width = 2, height = 1)
+        val base = quad(z = 0f, tu = 0.5f, tv = 0.5f, opaque = true)     // opaque red
+        val coat = quad(z = 1f, tu = 1.5f, tv = 0.5f, opaque = false)    // half-alpha blue, in front
+        val out = rasterize(base + coat, tex, 4, 4)
+        val px = out[2 * 4 + 2]
+        val a = (px ushr 24) and 0xFF; val r = (px ushr 16) and 0xFF
+        val g = (px ushr 8) and 0xFF; val b = px and 0xFF
+        assertEquals(255, a)
+        assertTrue(r in 120..135, "r=$r")   // ~127: red showing through the half-alpha coat
+        assertEquals(0, g)
+        assertTrue(b in 120..135, "b=$b")   // ~128: blue coat
+    }
+
+    @Test
+    fun `a translucent overlay behind the opaque base is occluded`() {
+        val tex = Texture(intArrayOf(0xFFFF0000.toInt(), 0x800000FF.toInt()), width = 2, height = 1)
+        val base = quad(z = 0f, tu = 0.5f, tv = 0.5f, opaque = true)
+        val behind = quad(z = -1f, tu = 1.5f, tv = 0.5f, opaque = false)
+        val out = rasterize(base + behind, tex, 4, 4)
+        assertEquals(0xFFFF0000.toInt(), out[2 * 4 + 2])   // stays red
+    }
+}
