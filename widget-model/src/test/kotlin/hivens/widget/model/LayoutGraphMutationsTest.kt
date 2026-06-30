@@ -226,7 +226,7 @@ class LayoutGraphMutationsTest {
         assertEquals(CanvasPlacement(x = 16f, y = 176f, z = 3), seededCanvasPlacement(3))
     }
 
-    // ── CubeGrid: cell seeding + packing ──────────────────────────────
+    // ── CubeGrid: cell seeding + snap placement (no overlap, no compaction) ──
 
     private fun cubeContent(vararg pairs: Pair<String, GridCell>): SlotContent =
         SlotContent(
@@ -251,39 +251,56 @@ class LayoutGraphMutationsTest {
     }
 
     @Test
-    fun `resolveCubeGrid places moved at an empty cell without disturbing others`() {
-        val out = resolveCubeGrid(cubeContent("a" to GridCell(0, 0), "b" to GridCell(2, 0)), "a", GridCell(col = 1, row = 0), columns = 4)
+    fun `placeInCubeGrid snaps the moved widget to a free target, others fixed`() {
+        val out = placeInCubeGrid(cubeContent("a" to GridCell(0, 0), "b" to GridCell(2, 0)), "a", GridCell(col = 1, row = 0), columns = 4)
         assertEquals(GridCell(1, 0), out.cellOf("a"))
         assertEquals(GridCell(2, 0), out.cellOf("b"))
     }
 
     @Test
-    fun `resolveCubeGrid pushes an overlapped widget below the moved one`() {
-        val out = resolveCubeGrid(cubeContent("a" to GridCell(0, 0), "b" to GridCell(1, 0)), "a", GridCell(col = 1, row = 0), columns = 4)
-        assertEquals(GridCell(1, 0), out.cellOf("a"))
-        assertEquals(GridCell(1, 1), out.cellOf("b")) // bumped down a row, same column
-    }
-
-    @Test
-    fun `resolveCubeGrid compacts a gap upward`() {
-        // a at row 0, b floating at row 3 -> a no-op move triggers a pack -> b rises to row 1.
-        val out = resolveCubeGrid(cubeContent("a" to GridCell(0, 0), "b" to GridCell(0, 3)), "a", GridCell(0, 0), columns = 4)
+    fun `placeInCubeGrid snaps to the nearest free cell when the target is occupied`() {
+        // a -> b's cell (1,0): occupied, so a snaps to the nearest free cell (0,0); b never moves.
+        val out = placeInCubeGrid(cubeContent("a" to GridCell(0, 0), "b" to GridCell(1, 0)), "a", GridCell(col = 1, row = 0), columns = 4)
         assertEquals(GridCell(0, 0), out.cellOf("a"))
-        assertEquals(GridCell(0, 1), out.cellOf("b"))
+        assertEquals(GridCell(1, 0), out.cellOf("b"))
     }
 
     @Test
-    fun `resolveCubeGrid clamps span and column into the grid`() {
-        val out = resolveCubeGrid(cubeContent("a" to GridCell(0, 0)), "a", GridCell(col = 3, row = 0, colSpan = 5), columns = 4)
+    fun `placeInCubeGrid never compacts -- gaps are preserved`() {
+        // b floats at row 3; moving a must NOT pull b upward (this is a snap grid, not a packer).
+        val out = placeInCubeGrid(cubeContent("a" to GridCell(0, 0), "b" to GridCell(0, 3)), "a", GridCell(0, 0), columns = 4)
+        assertEquals(GridCell(0, 0), out.cellOf("a"))
+        assertEquals(GridCell(0, 3), out.cellOf("b"))
+    }
+
+    @Test
+    fun `placeInCubeGrid clamps span and column into the grid`() {
+        val out = placeInCubeGrid(cubeContent("a" to GridCell(0, 0)), "a", GridCell(col = 3, row = 0, colSpan = 5), columns = 4)
         val a = out.cellOf("a")!!
         assertEquals(4, a.colSpan) // 5 clamped to columns
         assertEquals(0, a.col)     // col clamped into [0, columns - span]
     }
 
     @Test
-    fun `resolveCubeGrid is identity when nothing moves`() {
+    fun `placeInCubeGrid is identity when nothing moves`() {
         val c = cubeContent("a" to GridCell(0, 0), "b" to GridCell(1, 0))
-        assertSame(c, resolveCubeGrid(c, "a", GridCell(0, 0), columns = 4))
+        assertSame(c, placeInCubeGrid(c, "a", GridCell(0, 0), columns = 4))
+    }
+
+    @Test
+    fun `resizeInCubeGrid clamps the span so it cannot grow over a neighbour`() {
+        // a (0,0) asks for 3 wide but b sits at (1,0): a stays 1 wide, b never moves.
+        val out = resizeInCubeGrid(cubeContent("a" to GridCell(0, 0), "b" to GridCell(1, 0)), "a", colSpan = 3, rowSpan = 1, columns = 4)
+        assertEquals(1, out.cellOf("a")!!.colSpan)
+        assertEquals(GridCell(1, 0), out.cellOf("b"))
+    }
+
+    @Test
+    fun `resizeInCubeGrid grows into free space`() {
+        val out = resizeInCubeGrid(cubeContent("a" to GridCell(0, 0), "b" to GridCell(3, 0)), "a", colSpan = 2, rowSpan = 2, columns = 4)
+        val a = out.cellOf("a")!!
+        assertEquals(2, a.colSpan)
+        assertEquals(2, a.rowSpan)
     }
 
     @Test

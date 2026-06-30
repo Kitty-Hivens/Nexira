@@ -18,6 +18,7 @@ import hivens.widget.model.moveWidget
 import hivens.widget.model.placeWidgetInCell
 import hivens.widget.model.removeWidget
 import hivens.widget.model.reorderInSlot
+import hivens.widget.model.resizeWidgetInCell
 import hivens.widget.model.setGridColumns
 import hivens.widget.model.setSlotOrientation
 import hivens.widget.model.setWidgetOffset
@@ -194,12 +195,7 @@ class EditModeController(
     }
 
     fun resizeWidgetCell(path: SlotPath, instanceId: String, colSpan: Int, rowSpan: Int, columns: Int) {
-        scope.launch(writeDispatcher) {
-            repo.update { g ->
-                val cur = g.traverse(path)?.widgets?.firstOrNull { it.instanceId == instanceId }?.cell ?: GridCell()
-                g.placeWidgetInCell(path, instanceId, cur.copy(colSpan = colSpan, rowSpan = rowSpan), columns)
-            }
-        }
+        scope.launch(writeDispatcher) { repo.update { it.resizeWidgetInCell(path, instanceId, colSpan, rowSpan, columns) } }
     }
 
     fun moveWidget(from: SlotPath, to: SlotPath, instanceId: String, toIndex: Int) {
