@@ -115,7 +115,10 @@ class Skin3dCoreTest {
         fun has(uv: UvRect, where: String) =
             assertTrue(base.any { it.uv == uv }, "head $where face must map to $uv")
         has(UvRect(8f, 0f, 8f, 8f), "top")
-        has(UvRect(16f, 0f, 8f, 8f), "bottom (neck underside)")
+        // Bottom samples the same (16,0)-(24,8) region but V-flipped (origin at the far
+        // edge, negative height) -- the MC down face is reversed vs the top, and mapping
+        // it front-to-back rendered the underside back-to-front (the reported bug).
+        has(UvRect(16f, 8f, 8f, -8f), "bottom (neck underside)")
         has(UvRect(0f, 8f, 8f, 8f), "right")
         has(UvRect(8f, 8f, 8f, 8f), "front")
         has(UvRect(16f, 8f, 8f, 8f), "left")
@@ -123,10 +126,11 @@ class Skin3dCoreTest {
     }
 
     @Test fun `the head overlay stays flush at the neck -- no z-fighting band into the torso`() {
-        // Hat (head overlay) bottom = UV (48,0,8,8). With the seam fix it sits at
-        // the head's bottom plane y=8, not inflated 0.5 down into the body, so it
-        // cannot overlap and z-fight the jacket overlay at the neck.
-        val hatBottom = buildFigure().single { it.layer && it.uv == UvRect(48f, 0f, 8f, 8f) }
+        // Hat (head overlay) bottom samples the (48,0)-(56,8) region V-flipped, so the
+        // UV is (48,8,8,-8). With the seam fix it sits at the head's bottom plane y=8,
+        // not inflated 0.5 down into the body, so it cannot overlap and z-fight the
+        // jacket overlay at the neck.
+        val hatBottom = buildFigure().single { it.layer && it.uv == UvRect(48f, 8f, 8f, -8f) }
         assertEquals(8f, hatBottom.p0.y, "hat bottom sits at the neck plane")
         assertEquals(8f, hatBottom.pu.y)
         assertEquals(8f, hatBottom.pv.y)

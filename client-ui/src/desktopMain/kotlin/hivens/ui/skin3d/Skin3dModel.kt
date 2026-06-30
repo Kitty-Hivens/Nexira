@@ -66,8 +66,11 @@ fun Box.faces(): List<Face> = listOf(
     Face(Vec3(x1, y1, z1), Vec3(x1, y1, z0), Vec3(x1, y0, z1), UvRect(u + d + w, v + d, d, h), layer),
     // top (+y): u left-to-right = +x, v back-to-front = +z
     Face(Vec3(x0, y1, z0), Vec3(x1, y1, z0), Vec3(x0, y1, z1), UvRect(u + d, v, w, d), layer),
-    // bottom (-y): v front-to-back
-    Face(Vec3(x0, y0, z1), Vec3(x1, y0, z1), Vec3(x0, y0, z0), UvRect(u + d + w, v, w, d), layer),
+    // bottom (-y): v BACK-to-front. The MC down face is flipped vs the up face; mapping
+    // it front-to-back renders the underside reversed (front texels at the back). The
+    // winding must stay (else the cull drops the face), so V is flipped via the UV rect
+    // (origin at the region's far edge, negative height) rather than by swapping corners.
+    Face(Vec3(x0, y0, z1), Vec3(x1, y0, z1), Vec3(x0, y0, z0), UvRect(u + d + w, v + d, w, -d), layer),
 )
 
 // ── Figure assembly ──────────────────────────────────────────────────────────
