@@ -27,6 +27,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.isPrimaryPressed
 import androidx.compose.ui.input.pointer.isSecondaryPressed
@@ -106,13 +107,15 @@ internal fun slotChromeModifier(
         .pointerInput(path) {
             awaitPointerEventScope {
                 while (true) {
-                    val event = awaitPointerEvent()
+                    // The slot is the LAST resort: handle the press on the Final pass, after
+                    // the Main pass has let any widget under the cursor consume it. So a press
+                    // on a widget reaches the widget (its own menu / drag / cube-resize) and the
+                    // slot acts only on a press no widget claimed -- explicit widget-over-slot
+                    // priority, instead of racing the widget on the same (Main) pass.
+                    val event = awaitPointerEvent(PointerEventPass.Final)
                     if (event.type != PointerEventType.Press) continue
                     val change = event.changes.first()
                     when {
-                        // Skip when a child widget already claimed the press (its own
-                        // right-click menu), so a widget right-click reaches the widget
-                        // and only an empty-slot right-click opens the layout menu.
                         event.buttons.isSecondaryPressed && !change.isConsumed -> {
                             onContextMenu(path, originInWindow + change.position)
                             change.consume()
