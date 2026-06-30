@@ -49,6 +49,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
@@ -61,6 +62,7 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.editor.EditModeController
 import hivens.ui.editor.canvasDragOffset
 import hivens.ui.editor.canvasResizeSize
+import hivens.ui.editor.cubeDragCell
 import hivens.ui.editor.dnd.DragController
 import hivens.ui.editor.dnd.DragPayload
 import hivens.ui.editor.dnd.DropTargetRegistry
@@ -71,8 +73,10 @@ import hivens.ui.icons.Symbol
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalStyle
 import hivens.widget.api.LocalCanvasSlotSizeDp
+import hivens.widget.api.LocalCubeGeometry
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.WidgetDescriptor
+import hivens.widget.model.GridCell
 import hivens.widget.model.SlotOrientation
 import hivens.widget.model.SlotPath
 import hivens.widget.model.WidgetInstance
@@ -121,6 +125,7 @@ fun EditableWidgetChrome(
 
     val isRow = orientation == SlotOrientation.Row
     val isCanvas = orientation == SlotOrientation.Canvas
+    val isCubeGrid = orientation == SlotOrientation.CubeGrid
     // Live placement read from inside the long-lived drag gesture: the
     // pointerInput is keyed only on instanceId so it does not restart
     // mid-drag, and without this the gesture would capture a stale start
@@ -129,6 +134,12 @@ fun EditableWidgetChrome(
     // Live canvas slot size for the move-clamp (published by SlotRenderer's
     // Canvas branch; Zero outside a Canvas slot disables clamping).
     val liveSlotSize = rememberUpdatedState(LocalCanvasSlotSizeDp.current)
+    // Cube-grid move: the widget's current cell + the slot's cell geometry, read
+    // live so the long-lived gesture sees the latest values. cubeDrag is the
+    // in-flight visual translation, committed to a target cell on release.
+    val liveCell = rememberUpdatedState(instance.cell)
+    val cubeGeo = rememberUpdatedState(LocalCubeGeometry.current)
+    var cubeDrag by remember { mutableStateOf(Offset.Zero) }
     val resizeCursor = remember { PointerIcon(Cursor(Cursor.SE_RESIZE_CURSOR)) }
 
     // Drop-indicator hit test. Reading controller.active recomposes on
@@ -191,6 +202,8 @@ fun EditableWidgetChrome(
     val widgetBox: @Composable () -> Unit = {
         Box(
             modifier = Modifier
+                // Live cube-move translation; zero except while dragging a cube widget.
+                .graphicsLayer { translationX = cubeDrag.x; translationY = cubeDrag.y }
                 .hoverable(interaction)
                 // Hover border drawn INSIDE the widget's own bounds (drawWithContent,
                 // not Modifier.border on a padded box) so edit mode never reflows the
@@ -235,56 +248,80 @@ fun EditableWidgetChrome(
                             val down = awaitFirstDown(requireUnconsumed = true)
                             // Claim the press so a tap never reaches the content.
                             down.consume()
-                            if (isCanvas) {
-                                // Absolute move: apply each frame's delta to the
-                                // current (already-clamped) position and re-seat,
-                                // so dragging past an edge and back responds at
-                                // once -- no dead-zone from an unbounded
-                                // accumulator. canvasDragOffset clamps the output.
-                                val p = liveCanvas.value
-                                var curX = p?.x ?: 0f
-                                var curY = p?.y ?: 0f
-                                drag(down.id) { change ->
-                                    val slot = liveSlotSize.value
-                                    val wb = widgetWindowBounds
-                                    val (nx, ny) = canvasDragOffset(
-                                        curX, curY,
-                                        change.positionChange().x, change.positionChange().y,
-                                        density,
-                                        slotWDp   = slot.width,
-                                        slotHDp   = slot.height,
-                                        widgetWDp = (wb?.width ?: 0f) / density,
-                                        widgetHDp = (wb?.height ?: 0f) / density,
-                                    )
-                                    curX = nx
-                                    curY = ny
-                                    editController.setWidgetOffset(path, instance.instanceId, nx, ny)
-                                    change.consume()
-                                }
-                            } else {
-                                // Flow reorder: drive the existing DnD controller
-                                // once past the touch slop (a tap is swallowed).
-                                val slop = awaitTouchSlopOrCancellation(down.id) { c, _ -> c.consume() }
-                                    ?: return@awaitEachGesture
-                                val bounds = widgetWindowBounds ?: return@awaitEachGesture
-                                controller.begin(
-                                    payload         = DragPayload.ExistingWidget(path, index, instance),
-                                    pointerInWindow = bounds.topLeft + slop.position,
-                                    pickupOffset    = slop.position,
-                                    widgetSize      = Offset(bounds.width, bounds.height),
-                                    ghost           = { CompositionLocalProvider(capturedLocals) { content() } },
-                                )
-                                var last = bounds.topLeft + slop.position
-                                drag(slop.id) { change ->
-                                    val wb = widgetWindowBounds
-                                    if (wb != null) {
-                                        last = wb.topLeft + change.position
-                                        controller.update(last)
+                            when {
+                                isCanvas -> {
+                                    // Absolute move: apply each frame's delta to the
+                                    // current (already-clamped) position and re-seat,
+                                    // so dragging past an edge and back responds at
+                                    // once -- no dead-zone from an unbounded
+                                    // accumulator. canvasDragOffset clamps the output.
+                                    val p = liveCanvas.value
+                                    var curX = p?.x ?: 0f
+                                    var curY = p?.y ?: 0f
+                                    drag(down.id) { change ->
+                                        val slot = liveSlotSize.value
+                                        val wb = widgetWindowBounds
+                                        val (nx, ny) = canvasDragOffset(
+                                            curX, curY,
+                                            change.positionChange().x, change.positionChange().y,
+                                            density,
+                                            slotWDp   = slot.width,
+                                            slotHDp   = slot.height,
+                                            widgetWDp = (wb?.width ?: 0f) / density,
+                                            widgetHDp = (wb?.height ?: 0f) / density,
+                                        )
+                                        curX = nx
+                                        curY = ny
+                                        editController.setWidgetOffset(path, instance.instanceId, nx, ny)
+                                        change.consume()
                                     }
-                                    change.consume()
                                 }
-                                onCommitDrop(last)
-                                controller.end()
+                                isCubeGrid -> {
+                                    // Cube move: follow the pointer live (cubeDrag), then
+                                    // commit to the nearest cell on release. placeWidgetInCell
+                                    // resolves collisions + compacts, so the grid reflows.
+                                    val start = liveCell.value ?: GridCell()
+                                    var acc = Offset.Zero
+                                    drag(down.id) { change ->
+                                        acc += change.positionChange()
+                                        cubeDrag = acc
+                                        change.consume()
+                                    }
+                                    cubeGeo.value?.let { geo ->
+                                        val (col, row) = cubeDragCell(
+                                            start.col, start.row,
+                                            acc.x, acc.y, density,
+                                            geo.cellWidthDp, geo.gutterDp, geo.columns,
+                                        )
+                                        editController.moveWidgetToCell(path, instance.instanceId, col, row, geo.columns)
+                                    }
+                                    cubeDrag = Offset.Zero
+                                }
+                                else -> {
+                                    // Flow reorder: drive the existing DnD controller
+                                    // once past the touch slop (a tap is swallowed).
+                                    val slop = awaitTouchSlopOrCancellation(down.id) { c, _ -> c.consume() }
+                                        ?: return@awaitEachGesture
+                                    val bounds = widgetWindowBounds ?: return@awaitEachGesture
+                                    controller.begin(
+                                        payload         = DragPayload.ExistingWidget(path, index, instance),
+                                        pointerInWindow = bounds.topLeft + slop.position,
+                                        pickupOffset    = slop.position,
+                                        widgetSize      = Offset(bounds.width, bounds.height),
+                                        ghost           = { CompositionLocalProvider(capturedLocals) { content() } },
+                                    )
+                                    var last = bounds.topLeft + slop.position
+                                    drag(slop.id) { change ->
+                                        val wb = widgetWindowBounds
+                                        if (wb != null) {
+                                            last = wb.topLeft + change.position
+                                            controller.update(last)
+                                        }
+                                        change.consume()
+                                    }
+                                    onCommitDrop(last)
+                                    controller.end()
+                                }
                             }
                         }
                     },
@@ -352,7 +389,7 @@ fun EditableWidgetChrome(
             // baseline when the placement size is 0 (intrinsic) so the first
             // drag does not jump from nothing.
             AnimatedVisibility(
-                visible  = isHovered,
+                visible  = isHovered && !isCubeGrid,
                 enter    = fadeIn(tween(chromeMotionMs)),
                 exit     = fadeOut(tween(chromeMotionMs)),
                 modifier = Modifier.align(Alignment.BottomEnd).padding(3.dp),
@@ -403,7 +440,7 @@ fun EditableWidgetChrome(
         // Canvas: the widget is positioned by SlotRenderer's outer offset Box.
         // No flow wrapper and no drop bars -- insertion index is meaningless
         // under free placement.
-        isCanvas -> widgetBox()
+        isCanvas || isCubeGrid -> widgetBox()
         isRow -> Row(modifier = Modifier.fillMaxHeight(), verticalAlignment = Alignment.Top) {
             if (showIndicatorBefore) DropIndicator(isRow = true)
             widgetBox()

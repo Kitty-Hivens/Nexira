@@ -152,6 +152,15 @@ val LocalSlotMotionMs: ProvidableCompositionLocal<Int> =
 val LocalCanvasSlotSizeDp: ProvidableCompositionLocal<Size> =
     compositionLocalOf { Size.Zero }
 
+// Cube-grid cell geometry published by SlotRenderer's CubeGrid branch (dp): the
+// editor's move / resize gestures read it to turn a pointer delta into a whole
+// number of cells. Null outside a CubeGrid slot. Dynamic, like the size above --
+// it updates as the slot is measured; only the chrome that reads it recomposes.
+data class CubeGeometry(val cellWidthDp: Float, val gutterDp: Float, val columns: Int)
+
+val LocalCubeGeometry: ProvidableCompositionLocal<CubeGeometry?> =
+    compositionLocalOf { null }
+
 // Editor-only hook: SlotRenderer's Canvas branch reports its window bounds here
 // so a palette drop can land at the release point (converted to slot-local dp).
 // Default no-op; the editor host provides one that registers into the
