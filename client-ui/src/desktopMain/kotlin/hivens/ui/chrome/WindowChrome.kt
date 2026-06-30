@@ -1,13 +1,14 @@
 package hivens.ui.chrome
 
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.drag
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.awt.ComposeWindow
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.window.WindowState
-import kotlin.math.roundToInt
+import java.awt.MouseInfo
 
 /**
  * Window-chrome plumbing for the custom (undecorated) title bar.
@@ -86,10 +87,26 @@ fun Modifier.windowDragArea(window: ComposeWindow?, onDoubleClick: (() -> Unit)?
             detectTapGestures(onDoubleTap = { onDoubleClick?.invoke() })
         }
         .pointerInput(window) {
-            detectDragGestures { change, drag ->
-                change.consume()
-                val p = window.location
-                window.setLocation(p.x + drag.x.roundToInt(), p.y + drag.y.roundToInt())
+            // Anchor the move against the ABSOLUTE screen cursor, not the Compose-local drag
+            // delta. Feeding the local delta back into setLocation oscillates: moving the
+            // window shifts the very coordinate frame the next delta is measured in, so each
+            // frame over-corrects and the window jitters back and forth. Track the window's
+            // start position plus the cursor's screen-space displacement instead -- stable
+            // because the cursor's screen position is independent of where the window is.
+            awaitPointerEventScope {
+                while (true) {
+                    val down = awaitFirstDown()
+                    val startWindow = window.location
+                    val startMouse = MouseInfo.getPointerInfo()?.location ?: continue
+                    drag(down.id) { change ->
+                        change.consume()
+                        val now = MouseInfo.getPointerInfo()?.location ?: return@drag
+                        window.setLocation(
+                            startWindow.x + (now.x - startMouse.x),
+                            startWindow.y + (now.y - startMouse.y),
+                        )
+                    }
+                }
             }
         }
 }
