@@ -226,6 +226,72 @@ class LayoutGraphMutationsTest {
         assertEquals(CanvasPlacement(x = 16f, y = 176f, z = 3), seededCanvasPlacement(3))
     }
 
+    // ── CubeGrid: cell seeding + packing ──────────────────────────────
+
+    private fun cubeContent(vararg pairs: Pair<String, GridCell>): SlotContent =
+        SlotContent(
+            widgets     = pairs.map { (id, c) -> WidgetInstance(WidgetKind("k"), id, JsonObject(emptyMap()), cell = c) },
+            orientation = SlotOrientation.CubeGrid,
+            gridColumns = 4,
+        )
+
+    private fun SlotContent.cellOf(id: String): GridCell? = widgets.first { it.instanceId == id }.cell
+
+    @Test
+    fun `setSlotOrientation to CubeGrid seeds 1x1 cells in flow order`() {
+        val w4  = WidgetInstance(WidgetKind("d"), "i4", JsonObject(emptyMap()))
+        val out = seed(w1, w2, w3, w4).setSlotOrientation(rootPath, SlotOrientation.CubeGrid)
+        val cells = out.mainWidgets().associate { it.instanceId to it.cell }
+        // gridColumns default = 2 -> two per row, row-major.
+        assertEquals(GridCell(0, 0), cells["i1"])
+        assertEquals(GridCell(1, 0), cells["i2"])
+        assertEquals(GridCell(0, 1), cells["i3"])
+        assertEquals(GridCell(1, 1), cells["i4"])
+        assertEquals(SlotOrientation.CubeGrid, out.surfaces[home]?.slots?.get(main)?.orientation)
+    }
+
+    @Test
+    fun `resolveCubeGrid places moved at an empty cell without disturbing others`() {
+        val out = resolveCubeGrid(cubeContent("a" to GridCell(0, 0), "b" to GridCell(2, 0)), "a", GridCell(col = 1, row = 0), columns = 4)
+        assertEquals(GridCell(1, 0), out.cellOf("a"))
+        assertEquals(GridCell(2, 0), out.cellOf("b"))
+    }
+
+    @Test
+    fun `resolveCubeGrid pushes an overlapped widget below the moved one`() {
+        val out = resolveCubeGrid(cubeContent("a" to GridCell(0, 0), "b" to GridCell(1, 0)), "a", GridCell(col = 1, row = 0), columns = 4)
+        assertEquals(GridCell(1, 0), out.cellOf("a"))
+        assertEquals(GridCell(1, 1), out.cellOf("b")) // bumped down a row, same column
+    }
+
+    @Test
+    fun `resolveCubeGrid compacts a gap upward`() {
+        // a at row 0, b floating at row 3 -> a no-op move triggers a pack -> b rises to row 1.
+        val out = resolveCubeGrid(cubeContent("a" to GridCell(0, 0), "b" to GridCell(0, 3)), "a", GridCell(0, 0), columns = 4)
+        assertEquals(GridCell(0, 0), out.cellOf("a"))
+        assertEquals(GridCell(0, 1), out.cellOf("b"))
+    }
+
+    @Test
+    fun `resolveCubeGrid clamps span and column into the grid`() {
+        val out = resolveCubeGrid(cubeContent("a" to GridCell(0, 0)), "a", GridCell(col = 3, row = 0, colSpan = 5), columns = 4)
+        val a = out.cellOf("a")!!
+        assertEquals(4, a.colSpan) // 5 clamped to columns
+        assertEquals(0, a.col)     // col clamped into [0, columns - span]
+    }
+
+    @Test
+    fun `resolveCubeGrid is identity when nothing moves`() {
+        val c = cubeContent("a" to GridCell(0, 0), "b" to GridCell(1, 0))
+        assertSame(c, resolveCubeGrid(c, "a", GridCell(0, 0), columns = 4))
+    }
+
+    @Test
+    fun `placeWidgetInCell on unknown instance is identity`() {
+        val g = LayoutGraph(surfaces = mapOf(home to SurfaceLayout(slots = mapOf(main to cubeContent("a" to GridCell(0, 0))))))
+        assertSame(g, g.placeWidgetInCell(rootPath, "ghost", GridCell(1, 1), 4))
+    }
+
     @Test
     fun `reorderInSlot swaps positions`() {
         val out = seed(w1, w2, w3).reorderInSlot(rootPath, fromIndex = 0, toIndex = 2)
