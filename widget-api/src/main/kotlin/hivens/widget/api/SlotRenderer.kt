@@ -97,7 +97,6 @@ private fun RenderSlotContent(path: SlotPath, modifier: Modifier, spacing: Dp) {
     val emptyDecorator = LocalEmptySlotDecorator.current
     val unknownDecorator = LocalUnknownWidgetDecorator.current
     val slotChrome = LocalSlotChromeModifier.current
-    val slotDivider = LocalSlotDividerDecorator.current
     val motionMs = LocalSlotMotionMs.current
 
     val content: SlotContent = graph.traverse(path) ?: SlotContent()
@@ -132,7 +131,6 @@ private fun RenderSlotContent(path: SlotPath, modifier: Modifier, spacing: Dp) {
                 } else {
                     unknownDecorator(address, index, instance)
                 }
-                if (index < content.widgets.lastIndex) slotDivider(path, content, index)
             }
         }
         SlotOrientation.Grid -> Column(slotChrome(path, content).then(modifier).animatedReflow(motionMs), verticalArrangement = Arrangement.spacedBy(spacing)) {
@@ -262,7 +260,6 @@ private fun RenderSlotContent(path: SlotPath, modifier: Modifier, spacing: Dp) {
                 } else {
                     unknownDecorator(address, index, instance)
                 }
-                if (index < content.widgets.lastIndex) slotDivider(path, content, index)
             }
         }
     }
