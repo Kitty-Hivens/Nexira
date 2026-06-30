@@ -29,8 +29,8 @@ import kotlin.math.PI
 // [buildFigure] using orthographic projection, through the render3d software
 // rasterizer: each face becomes two textured triangles drawn with a per-pixel
 // depth buffer (NEAREST sampling for crisp texels), so the inner head + the
-// translucent hat overlay + the coplanar seams order correctly at every angle --
-// no painter's-algorithm see-through. Drag rotates; when idle it auto-spins. The
+// alpha-cutout hat/jacket overlay + the coplanar seams order correctly at every
+// angle -- no painter's-algorithm see-through. Drag rotates; when idle it auto-spins. The
 // rasterized frame is cached (drawWithCache) so a static skin re-rasterizes only
 // when its size or texture changes, not every frame. No baked bitmap, no extra dep.
 
@@ -172,9 +172,14 @@ private fun facesToTris(
         val vu = Vtx(su.x, su.y, ru.z, tu1, tv0)         // top-right
         val v3 = Vtx(s3.x, s3.y, r3.z, tu1, tv1)         // bottom-right
         val vv = Vtx(sv.x, sv.y, rv.z, tu0, tv1)         // bottom-left
-        val opaque = !f.layer
-        tris.add(Tri(v0, vu, v3, opaque))
-        tris.add(Tri(v0, v3, vv, opaque))
+        // Both layers render as alpha-tested cutout (opaque), matching Minecraft's
+        // second layer: a texel is solid or absent, never blended. The overlay is
+        // inflated half a texel, so the depth buffer lets it cover the base where
+        // solid and reveal it where cut out -- at every angle. Routing the overlay
+        // through the translucent pass instead sorted its faces by centroid (the
+        // painter's algorithm), so they flickered in and out as the model turned.
+        tris.add(Tri(v0, vu, v3, opaque = true))
+        tris.add(Tri(v0, v3, vv, opaque = true))
     }
     return tris
 }
