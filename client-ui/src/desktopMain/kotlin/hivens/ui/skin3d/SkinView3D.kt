@@ -1,9 +1,8 @@
 package hivens.ui.skin3d
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -12,28 +11,28 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asSkiaBitmap
-import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
-import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.graphics.skiaCanvas
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.input.pointer.pointerInput
+import hivens.ui.render3d.Texture
+import hivens.ui.render3d.Tri
+import hivens.ui.render3d.Vtx
+import hivens.ui.render3d.rasterize
 import hivens.ui.theme.LocalStyle
-import org.jetbrains.skia.FilterMipmap
-import org.jetbrains.skia.FilterMode
-import org.jetbrains.skia.Image
-import org.jetbrains.skia.Matrix33
-import org.jetbrains.skia.MipmapMode
-import org.jetbrains.skia.Paint
-import org.jetbrains.skia.Rect
+import java.awt.image.BufferedImage
 import kotlin.math.PI
 
-// Live 3D Minecraft-skin view. Renders the raw skin texture on the box model
-// from [buildFigure] using orthographic projection: each visible face is a
-// parallelogram, so a single Skia drawImageRect under the face's affine
-// (Matrix33) maps the texture exactly, with NEAREST sampling for crisp texels.
-// Drag rotates; when idle it auto-spins. No baked bitmap, no extra dependency.
+// Live 3D Minecraft-skin view. Renders the raw skin texture on the box model from
+// [buildFigure] using orthographic projection, through the render3d software
+// rasterizer: each face becomes two textured triangles drawn with a per-pixel
+// depth buffer (NEAREST sampling for crisp texels), so the inner head + the
+// translucent hat overlay + the coplanar seams order correctly at every angle --
+// no painter's-algorithm see-through. Drag rotates; when idle it auto-spins. The
+// rasterized frame is cached (drawWithCache) so a static skin re-rasterizes only
+// when its size or texture changes, not every frame. No baked bitmap, no extra dep.
 
 private const val TWO_PI = (2.0 * PI).toFloat()
 
@@ -69,19 +68,18 @@ fun SkinView3D(
         guessModel(skin.width, skin.height) { x, y -> (pixels[x, y].alpha * 255f).toInt() }
     }
     val figure = remember(model, legacy) { buildFigure(model, legacy) }
-    val image = remember(skin) { Image.makeFromBitmap(skin.asSkiaBitmap()) }
-    // The Skia Image owns native memory; free it when the skin changes or the
-    // view leaves composition instead of waiting for the finalizer.
-    DisposableEffect(image) {
-        onDispose { image.close() }
+    // Straight-ARGB copy of the skin for the rasterizer's per-texel sampling. Built
+    // once per skin via Color.toArgb (so channel order / premultiply match), not the
+    // raw PixelMap buffer whose layout is the bitmap's native format.
+    val texture = remember(skin) {
+        val pm = skin.toPixelMap()
+        val arr = IntArray(pm.width * pm.height)
+        var i = 0
+        for (y in 0 until pm.height) for (x in 0 until pm.width) arr[i++] = pm[x, y].toArgb()
+        Texture(arr, pm.width, pm.height)
     }
-    val sampling = remember { FilterMipmap(FilterMode.NEAREST, MipmapMode.NONE) }
-    val paint = remember { Paint().apply { isAntiAlias = false } }
-    // Paint owns native memory; free it on leave instead of riding the Skia
-    // cleaner, matching the deterministic Image disposal above.
-    DisposableEffect(Unit) {
-        onDispose { paint.close() }
-    }
+    // UV rects are in 1x texels; an HD skin (64*k) multiplies them by k.
+    val k = remember(skin) { skin.width / 64f }
 
     // Start with a slight three-quarter turn so the face reads as 3D at rest.
     var yaw by remember { mutableFloatStateOf(0.5f) }
@@ -122,38 +120,67 @@ fun SkinView3D(
         Modifier
     }
 
-    Canvas(modifier.then(gestureModifier)) {
-        val w = size.width
-        val h = size.height
-        if (w <= 0f || h <= 0f) return@Canvas
-        // Full: figure spans ~33 model units tall / ~18 wide once limbs rotate in;
-        // fit to the smaller axis with margin so it never clips. Bust: zoom in and
-        // drop the model origin near the card's bottom so head+torso fill it and
-        // the legs fall off below.
-        val (scale, centerY) = when (framing) {
-            SkinFraming.Full -> minOf(h / 42f, w / 22f) to h / 2f
-            SkinFraming.Bust -> minOf(h / 24f, w / 18f) to h * 0.80f
-        }
-        val centerX = w / 2f
-        val faces = projectFaces(figure, yaw, pitch, scale, centerX, centerY)
-        val k = image.width / 64f
+    // drawWithCache re-rasterizes only when the size or a read state (yaw / pitch /
+    // figure / texture) changes -- so the auto-spinning hero rebuilds each frame,
+    // but a static grid card (fixed yaw/pitch) rasterizes once and just blits.
+    Box(
+        modifier
+            .then(gestureModifier)
+            .drawWithCache {
+                val w = size.width.toInt()
+                val h = size.height.toInt()
+                if (w <= 0 || h <= 0) {
+                    onDrawBehind { }
+                } else {
+                    // Full: figure spans ~33 model units tall / ~18 wide once limbs
+                    // rotate in; fit to the smaller axis with margin so it never
+                    // clips. Bust: zoom in and drop the origin near the bottom so
+                    // head+torso fill it and the legs fall off below.
+                    val (scale, centerY) = when (framing) {
+                        SkinFraming.Full -> minOf(h / 42f, w / 22f) to h / 2f
+                        SkinFraming.Bust -> minOf(h / 24f, w / 18f) to h * 0.80f
+                    }
+                    val tris = facesToTris(figure, yaw, pitch, scale, w / 2f, centerY, k)
+                    val bmp = rasterize(tris, texture, w, h).toImageBitmap(w, h)
+                    onDrawBehind { drawImage(bmp) }
+                }
+            },
+    )
+}
 
-        drawIntoCanvas { canvas ->
-            val nc = canvas.skiaCanvas
-            faces.forEach { f ->
-                val a = f.affine()
-                nc.save()
-                nc.concat(Matrix33(a.scaleX, a.skewX, a.transX, a.skewY, a.scaleY, a.transY, 0f, 0f, 1f))
-                nc.drawImageRect(
-                    image,
-                    Rect.makeXYWH(f.uv.u * k, f.uv.v * k, f.uv.w * k, f.uv.h * k),
-                    Rect.makeXYWH(f.uv.u, f.uv.v, f.uv.w, f.uv.h),
-                    sampling,
-                    paint,
-                    true,
-                )
-                nc.restore()
-            }
-        }
+// Projects + back-face-culls the figure into textured triangles for the rasterizer:
+// each face's 4 corners go through rotate/project (screen x,y) with depth = rotated z,
+// and carry the face's UV rect (1x texels * k). The implied 4th corner is
+// p0 + (pu - p0) + (pv - p0). Front faces wind so the screen cross product is positive.
+private fun facesToTris(
+    faces: List<Face>,
+    yaw: Float, pitch: Float, scale: Float, cx: Float, cy: Float, k: Float,
+): List<Tri> {
+    val tris = ArrayList<Tri>(faces.size * 2)
+    for (f in faces) {
+        val r0 = rotate(f.p0, yaw, pitch); val s0 = project(r0, scale, cx, cy)
+        val ru = rotate(f.pu, yaw, pitch); val su = project(ru, scale, cx, cy)
+        val rv = rotate(f.pv, yaw, pitch); val sv = project(rv, scale, cx, cy)
+        // Back-face cull: outward faces wind so screen (u x v) > 0 (see frontFacing).
+        if ((su.x - s0.x) * (sv.y - s0.y) - (su.y - s0.y) * (sv.x - s0.x) <= 0f) continue
+        val p3 = Vec3(f.pu.x + f.pv.x - f.p0.x, f.pu.y + f.pv.y - f.p0.y, f.pu.z + f.pv.z - f.p0.z)
+        val r3 = rotate(p3, yaw, pitch); val s3 = project(r3, scale, cx, cy)
+        val uv = f.uv
+        val tu0 = uv.u * k; val tv0 = uv.v * k
+        val tu1 = (uv.u + uv.w) * k; val tv1 = (uv.v + uv.h) * k
+        val v0 = Vtx(s0.x, s0.y, r0.z, tu0, tv0)         // texture top-left
+        val vu = Vtx(su.x, su.y, ru.z, tu1, tv0)         // top-right
+        val v3 = Vtx(s3.x, s3.y, r3.z, tu1, tv1)         // bottom-right
+        val vv = Vtx(sv.x, sv.y, rv.z, tu0, tv1)         // bottom-left
+        val opaque = !f.layer
+        tris.add(Tri(v0, vu, v3, opaque))
+        tris.add(Tri(v0, v3, vv, opaque))
     }
+    return tris
+}
+
+private fun IntArray.toImageBitmap(w: Int, h: Int): ImageBitmap {
+    val img = BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB)
+    img.setRGB(0, 0, w, h, this, 0, w)
+    return img.toComposeImageBitmap()
 }
