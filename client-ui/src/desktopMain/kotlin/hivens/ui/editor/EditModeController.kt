@@ -20,7 +20,6 @@ import hivens.widget.model.setGridColumns
 import hivens.widget.model.setSlotOrientation
 import hivens.widget.model.setWidgetOffset
 import hivens.widget.model.setWidgetSize
-import hivens.widget.model.setWidgetWeight
 import hivens.widget.model.setWidgetZ
 import hivens.widget.model.traverse
 import hivens.widget.model.updateWidgetChrome
@@ -162,10 +161,6 @@ class EditModeController(
                 g.setGridColumns(path, current + delta)
             }
         }
-    }
-
-    fun setWidgetWeight(path: SlotPath, instanceId: String, weight: Float) {
-        scope.launch(writeDispatcher) { repo.update(validate = false) { it.setWidgetWeight(path, instanceId, weight) } }
     }
 
     // Canvas free-placement (orientation == Canvas): offset + size in dp,

@@ -110,13 +110,11 @@ import hivens.widget.api.LocalEmptySlotDecorator
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalSlotBoundsReporter
 import hivens.widget.api.LocalSlotChromeModifier
-import hivens.widget.api.LocalSlotDividerDecorator
 import hivens.widget.api.LocalSlotMotionMs
 import hivens.widget.api.LocalSlotPath
 import hivens.widget.api.LocalUnknownWidgetDecorator
 import hivens.widget.api.LocalWidgetDecorator
 import hivens.widget.api.SlotChromeModifier
-import hivens.widget.api.SlotDividerDecorator
 import hivens.widget.api.UnknownWidgetDecorator
 import hivens.widget.api.WidgetDecorator
 import hivens.widget.model.DefaultLayout
@@ -397,28 +395,6 @@ fun EditorSurfaceHost(
         }
     }
 
-    // Slot divider decorator: a draggable handle between adjacent widgets
-    // in a Row/Column slot on the selected surface, redistributing their
-    // weight. Identity off / previewing / foreign surface.
-    val slotDividerDecorator: SlotDividerDecorator = remember(state, previewing) {
-        if (state is EditModeState.On && !previewing) {
-            val selected = state.surface
-            { path, content, leftIndex ->
-                if (path.surface == selected) {
-                    SlotDivider(
-                        path       = path,
-                        content    = content,
-                        leftIndex  = leftIndex,
-                        controller = controller,
-                        registry   = registry,
-                    )
-                }
-            }
-        } else {
-            { _, _, _ -> }
-        }
-    }
-
     CompositionLocalProvider(
         LocalEditMode           provides state,
         LocalDragController     provides dragController,
@@ -427,7 +403,6 @@ fun EditorSurfaceHost(
         LocalEmptySlotDecorator provides emptyDecorator,
         LocalUnknownWidgetDecorator provides unknownDecorator,
         LocalSlotChromeModifier provides slotChromeFactory,
-        LocalSlotDividerDecorator provides slotDividerDecorator,
         // Edit-mode reflow duration -- slot add / remove / resize animates while
         // editing (style-driven: Brut resolves to ~instant), zero elsewhere.
         LocalSlotMotionMs provides if (state is EditModeState.On && !previewing) {
