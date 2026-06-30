@@ -7,10 +7,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -283,20 +283,19 @@ private fun RenderSlotContent(path: SlotPath, modifier: Modifier, spacing: Dp) {
     }
 }
 
-// Renders a widget, wrapped in its per-instance backing when it has one. The
-// chrome wrap is inside the editor decorator (the drag handle / remove button
-// surround the glass card) but is PRODUCTION styling -- it paints whenever
-// instance.chrome != null, editor mounted or not.
-// Explicit per-widget size for a flow (Row/Column) slot, or null when the
-// widget has no canvas size set -- in which case the slot lays it out as
-// before (weighted or wrap/fill). Lets the editor's resize handle size a
-// widget (e.g. the music player) without switching the slot to Canvas. Only a
-// resized widget carries a size, so untouched layouts are unaffected.
+// Per-widget resize for a flow (Row/Column) slot, applied as a MAXIMUM bound, or
+// null when the widget has no canvas size set. Content that fills (a list, an
+// image) grows to the bound; content that does not (a card, a label, a spacer at
+// its prop height) wraps at its natural size instead of leaving empty space below
+// or beside it -- so dragging the handle past the content no longer inflates the
+// box with phantom padding. A fixed extent only suits the free canvas (which sets
+// Modifier.size directly). Only a resized widget carries a size, so untouched
+// layouts are unaffected.
 private fun canvasSizeModifier(cp: CanvasPlacement?): Modifier? {
     if (cp == null || (cp.width <= 0f && cp.height <= 0f)) return null
     var m: Modifier = Modifier
-    if (cp.width > 0f) m = m.width(cp.width.dp)
-    if (cp.height > 0f) m = m.height(cp.height.dp)
+    if (cp.width > 0f) m = m.widthIn(max = cp.width.dp)
+    if (cp.height > 0f) m = m.heightIn(max = cp.height.dp)
     return m
 }
 
@@ -324,6 +323,10 @@ private fun rememberWidgetMovable(descriptor: WidgetDescriptor, instance: Widget
     return remember { movableContentOf { RenderWidget(descriptorState.value, instanceState.value) } }
 }
 
+// Renders a widget, wrapped in its per-instance backing when it has one. The
+// chrome wrap is inside the editor decorator (the drag handle / remove button
+// surround the glass card) but is PRODUCTION styling -- it paints whenever
+// instance.chrome != null, editor mounted or not.
 @Composable
 private fun RenderWidget(descriptor: WidgetDescriptor, instance: WidgetInstance) {
     val chrome = instance.chrome
