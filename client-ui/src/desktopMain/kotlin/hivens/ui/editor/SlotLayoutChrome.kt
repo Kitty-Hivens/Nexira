@@ -226,11 +226,12 @@ internal fun SlotLayoutMenuContent(
     NxMenuItem(s.editorSlotCanvas, selected = live.orientation == SlotOrientation.Canvas) {
         controller.setSlotOrientation(path, SlotOrientation.Canvas); onClose()
     }
-    NxMenuItem(s.editorSlotCubeGrid, selected = live.orientation == SlotOrientation.CubeGrid) {
-        controller.setSlotOrientation(path, SlotOrientation.CubeGrid); onClose()
-    }
-    // The column count drives both the chunked Grid and the CubeGrid cell size.
-    if (live.orientation == SlotOrientation.Grid || live.orientation == SlotOrientation.CubeGrid) {
+    // CubeGrid is an EXPERIMENTAL stub, not exposed: the current implementation is a
+    // sector-snap grid, not a real Android-style widget cell layout (no reflow / eviction
+    // / drag-and-hold). Hidden from the menu until reworked from a proper launcher spec;
+    // the model + render stay dormant. A slot already in CubeGrid can still be switched
+    // out via the orientations above.
+    if (live.orientation == SlotOrientation.Grid) {
         Row(
             modifier          = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
