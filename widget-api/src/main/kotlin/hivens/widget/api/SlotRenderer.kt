@@ -14,8 +14,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.movableContentOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Size
@@ -113,23 +116,26 @@ private fun RenderSlotContent(path: SlotPath, modifier: Modifier, spacing: Dp) {
     when (content.orientation) {
         SlotOrientation.Row -> Row(slotChrome(path, content).then(modifier).animatedReflow(motionMs), horizontalArrangement = Arrangement.spacedBy(spacing)) {
             content.widgets.forEachIndexed { index, instance ->
-                val descriptor = registry[instance.kind]
-                if (descriptor != null) {
-                    val sizeMod = canvasSizeModifier(instance.canvas)
-                    when {
-                        // Weight wins over an explicit size in a flow slot: resizing
-                        // a weighted widget must not strip its flex (else the
-                        // weighted center region stops filling between the rails).
-                        instance.weight > 0f -> Box(Modifier.weight(instance.weight)) {
-                            decorator(address, index, descriptor, instance) { RenderWidget(descriptor, instance) }
+                key(instance.instanceId) {
+                    val descriptor = registry[instance.kind]
+                    if (descriptor != null) {
+                        val movable = rememberWidgetMovable(descriptor, instance)
+                        val sizeMod = canvasSizeModifier(instance.canvas)
+                        when {
+                            // Weight wins over an explicit size in a flow slot: resizing
+                            // a weighted widget must not strip its flex (else the
+                            // weighted center region stops filling between the rails).
+                            instance.weight > 0f -> Box(Modifier.weight(instance.weight)) {
+                                decorator(address, index, descriptor, instance) { movable() }
+                            }
+                            sizeMod != null -> Box(sizeMod) {
+                                decorator(address, index, descriptor, instance) { movable() }
+                            }
+                            else -> decorator(address, index, descriptor, instance) { movable() }
                         }
-                        sizeMod != null -> Box(sizeMod) {
-                            decorator(address, index, descriptor, instance) { RenderWidget(descriptor, instance) }
-                        }
-                        else -> decorator(address, index, descriptor, instance) { RenderWidget(descriptor, instance) }
+                    } else {
+                        unknownDecorator(address, index, instance)
                     }
-                } else {
-                    unknownDecorator(address, index, instance)
                 }
             }
         }
@@ -143,12 +149,15 @@ private fun RenderSlotContent(path: SlotPath, modifier: Modifier, spacing: Dp) {
                 Row(horizontalArrangement = Arrangement.spacedBy(spacing)) {
                     rowWidgets.forEachIndexed { colIndex, instance ->
                         val index = rowIndex * cols + colIndex
-                        val descriptor = registry[instance.kind]
-                        Box(Modifier.weight(1f)) {
-                            if (descriptor != null) {
-                                decorator(address, index, descriptor, instance) { RenderWidget(descriptor, instance) }
-                            } else {
-                                unknownDecorator(address, index, instance)
+                        key(instance.instanceId) {
+                            val descriptor = registry[instance.kind]
+                            Box(Modifier.weight(1f)) {
+                                if (descriptor != null) {
+                                    val movable = rememberWidgetMovable(descriptor, instance)
+                                    decorator(address, index, descriptor, instance) { movable() }
+                                } else {
+                                    unknownDecorator(address, index, instance)
+                                }
                             }
                         }
                     }
@@ -177,18 +186,21 @@ private fun RenderSlotContent(path: SlotPath, modifier: Modifier, spacing: Dp) {
                     content.widgets.withIndex()
                         .sortedWith(compareBy({ it.value.canvas?.z ?: 0 }, { it.index }))
                         .forEach { (index, instance) ->
-                            val cp = instance.canvas
-                            val descriptor = registry[instance.kind]
-                            if (descriptor == null) {
-                                Box(Modifier.offset((cp?.x ?: 0f).dp, (cp?.y ?: 0f).dp)) {
-                                    unknownDecorator(address, index, instance)
+                            key(instance.instanceId) {
+                                val cp = instance.canvas
+                                val descriptor = registry[instance.kind]
+                                if (descriptor == null) {
+                                    Box(Modifier.offset((cp?.x ?: 0f).dp, (cp?.y ?: 0f).dp)) {
+                                        unknownDecorator(address, index, instance)
+                                    }
+                                } else {
+                                    val movable = rememberWidgetMovable(descriptor, instance)
+                                    val sizeMod = if (cp != null && cp.width > 0f && cp.height > 0f)
+                                        Modifier.size(cp.width.dp, cp.height.dp) else Modifier
+                                    Box(Modifier.offset((cp?.x ?: 0f).dp, (cp?.y ?: 0f).dp).then(sizeMod)) {
+                                        decorator(address, index, descriptor, instance) { movable() }
+                                    }
                                 }
-                                return@forEach
-                            }
-                            val sizeMod = if (cp != null && cp.width > 0f && cp.height > 0f)
-                                Modifier.size(cp.width.dp, cp.height.dp) else Modifier
-                            Box(Modifier.offset((cp?.x ?: 0f).dp, (cp?.y ?: 0f).dp).then(sizeMod)) {
-                                decorator(address, index, descriptor, instance) { RenderWidget(descriptor, instance) }
                             }
                         }
                 }
@@ -218,21 +230,24 @@ private fun RenderSlotContent(path: SlotPath, modifier: Modifier, spacing: Dp) {
                     content.widgets.withIndex()
                         .sortedWith(compareBy({ it.value.cell?.z ?: 0 }, { it.index }))
                         .forEach { (index, instance) ->
-                            val gc      = instance.cell ?: GridCell()
-                            val colSpan = gc.colSpan.coerceIn(1, cols)
-                            val col     = gc.col.coerceIn(0, cols - colSpan)
-                            val rowSpan = gc.rowSpan.coerceAtLeast(1)
-                            val row     = gc.row.coerceAtLeast(0)
-                            val x = spacing + (cellW + spacing) * col
-                            val y = spacing + (cellW + spacing) * row
-                            val w = cellW * colSpan + spacing * (colSpan - 1)
-                            val h = cellW * rowSpan + spacing * (rowSpan - 1)
-                            val descriptor = registry[instance.kind]
-                            Box(Modifier.offset(x, y).size(w, h)) {
-                                if (descriptor != null) {
-                                    decorator(address, index, descriptor, instance) { RenderWidget(descriptor, instance) }
-                                } else {
-                                    unknownDecorator(address, index, instance)
+                            key(instance.instanceId) {
+                                val gc      = instance.cell ?: GridCell()
+                                val colSpan = gc.colSpan.coerceIn(1, cols)
+                                val col     = gc.col.coerceIn(0, cols - colSpan)
+                                val rowSpan = gc.rowSpan.coerceAtLeast(1)
+                                val row     = gc.row.coerceAtLeast(0)
+                                val x = spacing + (cellW + spacing) * col
+                                val y = spacing + (cellW + spacing) * row
+                                val w = cellW * colSpan + spacing * (colSpan - 1)
+                                val h = cellW * rowSpan + spacing * (rowSpan - 1)
+                                val descriptor = registry[instance.kind]
+                                Box(Modifier.offset(x, y).size(w, h)) {
+                                    if (descriptor != null) {
+                                        val movable = rememberWidgetMovable(descriptor, instance)
+                                        decorator(address, index, descriptor, instance) { movable() }
+                                    } else {
+                                        unknownDecorator(address, index, instance)
+                                    }
                                 }
                             }
                         }
@@ -242,23 +257,26 @@ private fun RenderSlotContent(path: SlotPath, modifier: Modifier, spacing: Dp) {
         // Column.
         else -> Column(slotChrome(path, content).then(modifier).animatedReflow(motionMs), verticalArrangement = Arrangement.spacedBy(spacing)) {
             content.widgets.forEachIndexed { index, instance ->
-                val descriptor = registry[instance.kind]
-                if (descriptor != null) {
-                    val sizeMod = canvasSizeModifier(instance.canvas)
-                    when {
-                        // Weight wins over an explicit size in a flow slot: resizing
-                        // a weighted widget must not strip its flex (else the
-                        // weighted center region stops filling between the rails).
-                        instance.weight > 0f -> Box(Modifier.weight(instance.weight)) {
-                            decorator(address, index, descriptor, instance) { RenderWidget(descriptor, instance) }
+                key(instance.instanceId) {
+                    val descriptor = registry[instance.kind]
+                    if (descriptor != null) {
+                        val movable = rememberWidgetMovable(descriptor, instance)
+                        val sizeMod = canvasSizeModifier(instance.canvas)
+                        when {
+                            // Weight wins over an explicit size in a flow slot: resizing
+                            // a weighted widget must not strip its flex (else the
+                            // weighted center region stops filling between the rails).
+                            instance.weight > 0f -> Box(Modifier.weight(instance.weight)) {
+                                decorator(address, index, descriptor, instance) { movable() }
+                            }
+                            sizeMod != null -> Box(sizeMod) {
+                                decorator(address, index, descriptor, instance) { movable() }
+                            }
+                            else -> decorator(address, index, descriptor, instance) { movable() }
                         }
-                        sizeMod != null -> Box(sizeMod) {
-                            decorator(address, index, descriptor, instance) { RenderWidget(descriptor, instance) }
-                        }
-                        else -> decorator(address, index, descriptor, instance) { RenderWidget(descriptor, instance) }
+                    } else {
+                        unknownDecorator(address, index, instance)
                     }
-                } else {
-                    unknownDecorator(address, index, instance)
                 }
             }
         }
@@ -291,6 +309,20 @@ private fun canvasSizeModifier(cp: CanvasPlacement?): Modifier? {
 // 0 (production, and Brut) returns the modifier untouched -- zero cost.
 private fun Modifier.animatedReflow(motionMs: Int): Modifier =
     if (motionMs > 0) this.then(Modifier.animateContentSize(tween(motionMs))) else this
+
+// Wraps a widget's content in a per-instance movableContentOf so the editor's
+// identity<->chrome decorator swap (a static-local change that relocates content()
+// deeper in the slot tree) MOVES the widget subtree instead of disposing it -- the
+// widget keeps its loaded state (remember / LaunchedEffect) across an edit-mode
+// toggle. rememberUpdatedState feeds the latest descriptor/instance so a prop edit
+// does not force the movable to be recreated. Call inside a key(instanceId) so the
+// movable is per-instance: stable across reorder, cleaned up when the instance leaves.
+@Composable
+private fun rememberWidgetMovable(descriptor: WidgetDescriptor, instance: WidgetInstance): @Composable () -> Unit {
+    val descriptorState = rememberUpdatedState(descriptor)
+    val instanceState   = rememberUpdatedState(instance)
+    return remember { movableContentOf { RenderWidget(descriptorState.value, instanceState.value) } }
+}
 
 @Composable
 private fun RenderWidget(descriptor: WidgetDescriptor, instance: WidgetInstance) {
