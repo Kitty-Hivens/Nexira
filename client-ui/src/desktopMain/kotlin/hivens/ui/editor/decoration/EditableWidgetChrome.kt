@@ -49,6 +49,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.input.pointer.pointerHoverIcon
@@ -62,7 +63,6 @@ import hivens.ui.editor.EditModeController
 import hivens.ui.editor.canvasDragOffset
 import hivens.ui.editor.canvasResizeSize
 import hivens.ui.editor.cubeDragCell
-import hivens.ui.editor.cubeResizeSpan
 import hivens.ui.editor.dnd.DragController
 import hivens.ui.editor.dnd.DragPayload
 import hivens.ui.editor.dnd.DropTargetRegistry
@@ -251,6 +251,25 @@ fun EditableWidgetChrome(
             Box(
                 Modifier
                     .matchParentSize()
+                    .pointerInput(instance.instanceId) {
+                        // Right-click detection. The drag gesture below starts with
+                        // awaitFirstDown, which fires ONLY on the primary (left) button --
+                        // so a bare right-click never reached the widget and fell through to
+                        // the slot chrome (which opened the layout menu). Detect the secondary
+                        // press with raw events instead, consume it on the Main pass (so the
+                        // slot's Final-pass handler sees it consumed and defers), then open the
+                        // widget context menu at the cursor.
+                        awaitPointerEventScope {
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                val change = event.changes.firstOrNull() ?: continue
+                                if (event.type == PointerEventType.Press && event.buttons.isSecondaryPressed && !change.isConsumed) {
+                                    change.consume()
+                                    widgetWindowBounds?.let { menuAnchor = it.topLeft + change.position }
+                                }
+                            }
+                        }
+                    }
                     .pointerInput(instance.instanceId, isCanvas) {
                         awaitEachGesture {
                             // requireUnconsumed: yield to the hover affordances
@@ -259,35 +278,6 @@ fun EditableWidgetChrome(
                             val down = awaitFirstDown(requireUnconsumed = true)
                             // Claim the press so a tap never reaches the content.
                             down.consume()
-                            if (currentEvent.buttons.isSecondaryPressed) {
-                                // Right button: open the widget context menu; in a cube
-                                // slot a drag past the slop resizes by whole cells first.
-                                if (isCubeGrid) {
-                                    val startCell = liveCell.value ?: GridCell()
-                                    var acc = Offset.Zero
-                                    var moved = false
-                                    drag(down.id) { change ->
-                                        acc += change.positionChange()
-                                        if (!moved && acc.getDistance() > viewConfiguration.touchSlop) moved = true
-                                        change.consume()
-                                    }
-                                    if (moved) {
-                                        cubeGeo.value?.let { geo ->
-                                            val (cs, rs) = cubeResizeSpan(
-                                                startCell.colSpan, startCell.rowSpan,
-                                                acc.x, acc.y, density,
-                                                geo.cellWidthDp, geo.gutterDp, geo.columns,
-                                            )
-                                            editController.resizeWidgetCell(path, instance.instanceId, cs, rs, geo.columns)
-                                        }
-                                    } else {
-                                        widgetWindowBounds?.let { menuAnchor = it.topLeft + down.position }
-                                    }
-                                } else {
-                                    widgetWindowBounds?.let { menuAnchor = it.topLeft + down.position }
-                                }
-                                return@awaitEachGesture
-                            }
                             when {
                                 isCanvas -> {
                                     // Absolute move: apply each frame's delta to the
