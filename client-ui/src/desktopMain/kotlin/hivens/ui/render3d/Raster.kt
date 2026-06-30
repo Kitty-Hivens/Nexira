@@ -99,9 +99,11 @@ private fun drawTri(
             if (covered(la, tlA) && covered(lb, tlB) && covered(lc, tlC)) {
                 val z = la * a.z + lb * b.z + lc * c.z
                 val idx = py * w + px
-                // Opaque writes the strictly-nearest; translucent shows at coplanar
-                // depth too (the inflated overlay sits on or just over the base).
-                if (if (opaque) z > depth[idx] else z >= depth[idx]) {
+                // Strict depth test, both passes: the inflated overlay is already
+                // nearer than the base so it wins, but a FLUSH seam overlay (coplanar
+                // with the base -- e.g. the hat bottom over the head bottom) must NOT
+                // overdraw the base, or two textures composite at the seam.
+                if (z > depth[idx]) {
                     val tu = la * a.tu + lb * b.tu + lc * c.tu
                     val tv = la * a.tv + lb * b.tv + lc * c.tv
                     val src = tex.argb(tu.toInt(), tv.toInt())
