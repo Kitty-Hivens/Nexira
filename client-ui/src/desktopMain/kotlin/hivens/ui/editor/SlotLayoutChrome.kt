@@ -220,7 +220,11 @@ internal fun SlotLayoutMenuContent(
     NxMenuItem(s.editorSlotCanvas, selected = live.orientation == SlotOrientation.Canvas) {
         controller.setSlotOrientation(path, SlotOrientation.Canvas); onClose()
     }
-    if (live.orientation == SlotOrientation.Grid) {
+    NxMenuItem(s.editorSlotCubeGrid, selected = live.orientation == SlotOrientation.CubeGrid) {
+        controller.setSlotOrientation(path, SlotOrientation.CubeGrid); onClose()
+    }
+    // The column count drives both the chunked Grid and the CubeGrid cell size.
+    if (live.orientation == SlotOrientation.Grid || live.orientation == SlotOrientation.CubeGrid) {
         Row(
             modifier          = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
