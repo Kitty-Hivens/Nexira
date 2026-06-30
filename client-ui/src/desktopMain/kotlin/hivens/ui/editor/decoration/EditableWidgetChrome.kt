@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -204,6 +205,12 @@ fun EditableWidgetChrome(
     val widgetBox: @Composable () -> Unit = {
         Box(
             modifier = Modifier
+                // A cube widget owns its whole cell: fill it so the hover border and the
+                // matchParentSize body overlay cover the cell, not just the (smaller)
+                // content -- otherwise a right-click on the empty cell area / gutter falls
+                // through to the slot chrome and opens the layout menu. Edit-mode only
+                // (the decorator is identity in production, so the cell renders as before).
+                .then(if (isCubeGrid) Modifier.fillMaxSize() else Modifier)
                 // Live cube-move translation; zero except while dragging a cube widget.
                 .graphicsLayer { translationX = cubeDrag.x; translationY = cubeDrag.y }
                 .hoverable(interaction)
