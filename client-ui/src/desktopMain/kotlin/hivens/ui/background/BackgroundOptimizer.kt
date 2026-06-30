@@ -5,6 +5,14 @@ import dev.hivens.skinema.encode.VideoEncodeConfig
 import dev.hivens.skinema.libav.LibavException
 import dev.hivens.skinema.libav.VideoDecoder
 import kotlinx.coroutines.CoroutineScope
+import org.jetbrains.skia.Bitmap
+import org.jetbrains.skia.Canvas
+import org.jetbrains.skia.ColorAlphaType
+import org.jetbrains.skia.ColorType
+import org.jetbrains.skia.Image
+import org.jetbrains.skia.ImageInfo
+import org.jetbrains.skia.Rect
+import org.jetbrains.skia.SamplingMode
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -79,7 +87,9 @@ class BackgroundOptimizer(
         Files.createDirectories(cacheDir)
         val dh = maxHeight.let { it - (it % 2) }
         val dw = ((sw.toLong() * dh / sh).toInt()).let { it - (it % 2) }.coerceAtLeast(2)
-        val part = dst.resolveSibling("${dst.fileName}.part")
+        // The temp file keeps the .mp4 suffix: avformat picks the muxer from the
+        // extension, and a bare ".part" leaves it with none -> open fails.
+        val part = dst.resolveSibling(dst.fileName.toString().removeSuffix(".mp4") + ".part.mp4")
 
         for (encoder in VIDEO_ENCODERS) {
             try {
@@ -87,7 +97,7 @@ class BackgroundOptimizer(
                     MediaWriter.open(part, VideoEncodeConfig(encoder, dw, dh, TRANSCODE_FPS)).use { writer ->
                         while (true) {
                             val frame = dec.nextFrame() ?: break
-                            writer.writeFrame(boxDownscale(frame.rgba, frame.width, frame.height, dw, dh), frame.ptsNanos)
+                            writer.writeFrame(scaleRgba(frame.rgba, frame.width, frame.height, dw, dh), frame.ptsNanos)
                         }
                         writer.finish()
                     }
@@ -125,38 +135,27 @@ class BackgroundOptimizer(
 }
 
 /**
- * Box-average downscale of a tightly packed RGBA8888 buffer ([sw]x[sh] ->
- * [dw]x[dh]). Each destination pixel averages its source block, which is the
- * right filter for shrinking (no aliasing, unlike nearest). Pure and
- * allocation-light so the one-time transcode stays predictable.
+ * Downscale a tightly packed RGBA8888 buffer ([sw]x[sh] -> [dw]x[dh]) with
+ * Skia's resampler -- SIMD C++, far faster than a per-pixel Kotlin loop, which
+ * is the slow half of a 4K transcode. Video frames are opaque, so the
+ * straight/premultiplied alpha distinction does not bite here.
  */
-internal fun boxDownscale(src: ByteArray, sw: Int, sh: Int, dw: Int, dh: Int): ByteArray {
+internal fun scaleRgba(src: ByteArray, sw: Int, sh: Int, dw: Int, dh: Int): ByteArray {
     if (sw == dw && sh == dh) return src
-    val dst = ByteArray(dw * dh * 4)
-    for (dy in 0 until dh) {
-        val sy0 = dy * sh / dh
-        val sy1 = (((dy + 1) * sh + dh - 1) / dh).coerceAtMost(sh).coerceAtLeast(sy0 + 1)
-        for (dx in 0 until dw) {
-            val sx0 = dx * sw / dw
-            val sx1 = (((dx + 1) * sw + dw - 1) / dw).coerceAtMost(sw).coerceAtLeast(sx0 + 1)
-            var r = 0L; var g = 0L; var b = 0L; var a = 0L; var n = 0L
-            for (sy in sy0 until sy1) {
-                var si = (sy * sw + sx0) * 4
-                for (sx in sx0 until sx1) {
-                    r += (src[si].toInt() and 0xFF).toLong()
-                    g += (src[si + 1].toInt() and 0xFF).toLong()
-                    b += (src[si + 2].toInt() and 0xFF).toLong()
-                    a += (src[si + 3].toInt() and 0xFF).toLong()
-                    n++
-                    si += 4
-                }
-            }
-            val di = (dy * dw + dx) * 4
-            dst[di] = (r / n).toByte()
-            dst[di + 1] = (g / n).toByte()
-            dst[di + 2] = (b / n).toByte()
-            dst[di + 3] = (a / n).toByte()
-        }
+    val srcImage = Image.makeRaster(ImageInfo(sw, sh, ColorType.RGBA_8888, ColorAlphaType.UNPREMUL), src, sw * 4)
+    val dst = Bitmap().apply { allocPixels(ImageInfo(dw, dh, ColorType.RGBA_8888, ColorAlphaType.UNPREMUL)) }
+    try {
+        Canvas(dst).drawImageRect(
+            srcImage,
+            Rect.makeWH(sw.toFloat(), sh.toFloat()),
+            Rect.makeWH(dw.toFloat(), dh.toFloat()),
+            SamplingMode.LINEAR,
+            null,
+            true,
+        )
+        return dst.readPixels() ?: ByteArray(dw * dh * 4)
+    } finally {
+        srcImage.close()
+        dst.close()
     }
-    return dst
 }
