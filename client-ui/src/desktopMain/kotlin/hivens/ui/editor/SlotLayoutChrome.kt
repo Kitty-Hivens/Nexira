@@ -110,7 +110,10 @@ internal fun slotChromeModifier(
                     if (event.type != PointerEventType.Press) continue
                     val change = event.changes.first()
                     when {
-                        event.buttons.isSecondaryPressed -> {
+                        // Skip when a child widget already claimed the press (its own
+                        // right-click menu), so a widget right-click reaches the widget
+                        // and only an empty-slot right-click opens the layout menu.
+                        event.buttons.isSecondaryPressed && !change.isConsumed -> {
                             onContextMenu(path, originInWindow + change.position)
                             change.consume()
                         }
