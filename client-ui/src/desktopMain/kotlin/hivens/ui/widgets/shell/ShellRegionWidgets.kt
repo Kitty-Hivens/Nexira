@@ -23,6 +23,7 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.movableContentOf
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -251,13 +252,24 @@ fun ShellRightRegion(instance: WidgetInstance) {
         }
     }
 
+    // RightPanel as a movableContentOf so the editing <-> non-editing branch swap below
+    // (driven by the static LocalEditMode) MOVES the panel -- and its news SlotRenderer's
+    // loaded state -- instead of disposing and reloading it on every Ctrl+E.
+    val ctx = LocalShellContext.current
+    val ctxState = rememberUpdatedState(ctx)
+    val rightPanelMovable = remember {
+        movableContentOf {
+            val c = ctxState.value
+            RightPanel(c.appState, c.onLogin, c.onLogout, c.sslBypass, Modifier.fillMaxSize())
+        }
+    }
+
     // Edit mode: static, no swipe/animation.
     if (editing) {
         if (props.collapsed) { CollapsedRegionStrip(); return }
-        val ctx = LocalShellContext.current
         val sized = if (props.widthDp > 0) Modifier.width(props.widthDp.dp) else Modifier.width(265.dp)
         NxSurface(NxSurfaceLevel.Floating, sized.fillMaxHeight(), RectangleShape, tier = props.frostTier) {
-            RightPanel(ctx.appState, ctx.onLogin, ctx.onLogout, ctx.sslBypass, Modifier.fillMaxSize())
+            rightPanelMovable()
         }
         return
     }
@@ -284,8 +296,6 @@ fun ShellRightRegion(instance: WidgetInstance) {
     LaunchedEffect(effectiveCollapsed, expandedPx, collapsedPx) {
         widthAnim.animateTo(if (effectiveCollapsed) collapsedPx else expandedPx)
     }
-
-    val ctx = LocalShellContext.current
 
     // Horizontal swipe anywhere on the rail opens / closes it; vertical scrolls
     // and taps still reach the news (orthogonal gestures arbitrate by direction),
@@ -321,7 +331,7 @@ fun ShellRightRegion(instance: WidgetInstance) {
         if (widthAnim.value > collapsedPx + 1f) {
             NxSurface(NxSurfaceLevel.Floating, Modifier.fillMaxSize(), RectangleShape, tier = props.frostTier) {
                 Row(modifier = Modifier.requiredWidth(expandedWidth).fillMaxHeight()) {
-                    RightPanel(ctx.appState, ctx.onLogin, ctx.onLogout, ctx.sslBypass, Modifier.weight(1f).fillMaxHeight())
+                    Box(Modifier.weight(1f).fillMaxHeight()) { rightPanelMovable() }
                 }
             }
         }
