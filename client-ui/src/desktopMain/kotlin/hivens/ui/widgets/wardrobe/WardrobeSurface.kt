@@ -83,6 +83,11 @@ import java.nio.file.Files
 
 private val SC_KEY = PackAuthRequirement.SmartyCraft.PROVIDER_KEY
 
+// Caption strip under every card. Fixed so a card with a delete button (an
+// IconButton is taller than a bare label) lines up with the "+" import tile and
+// the read-only defaults -- the grid does not equalize row heights on its own.
+private val CardCaptionHeight = 24.dp
+
 // Wardrobe screen -- the skins workspace. Left: the live 3D preview (the picked
 // library skin, else the current applied look). Right: the local library --
 // import a PNG, pick one to preview, apply it to SmartyCraft, or delete it.
@@ -345,7 +350,7 @@ private fun SkinCard(
                 )
             }
         }
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.height(CardCaptionHeight), verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text = name,
                 style = MaterialTheme.typography.labelSmall,
@@ -381,7 +386,9 @@ private fun AddTile(onClick: () -> Unit) {
         Box(Modifier.fillMaxWidth().aspectRatio(1f), contentAlignment = Alignment.Center) {
             Symbol(NxIcon.Add, s.wardrobeUpload, tint = NxTheme.colors.primary, size = 32.dp)
         }
-        Text(s.wardrobeUpload, style = MaterialTheme.typography.labelSmall, color = NxTheme.colors.textSecondary, maxLines = 1)
+        Box(Modifier.height(CardCaptionHeight), contentAlignment = Alignment.Center) {
+            Text(s.wardrobeUpload, style = MaterialTheme.typography.labelSmall, color = NxTheme.colors.textSecondary, maxLines = 1)
+        }
     }
     PuppetClick("wardrobe.upload") { onClick() }
 }
@@ -431,7 +438,7 @@ private fun CapeCard(
                 )
             }
         }
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.height(CardCaptionHeight), verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text = name,
                 style = MaterialTheme.typography.labelSmall,
