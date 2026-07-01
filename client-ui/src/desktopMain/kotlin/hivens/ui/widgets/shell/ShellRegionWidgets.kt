@@ -105,6 +105,21 @@ data class ShellRegionProps(
 }
 
 /**
+ * Props for the RIGHT region only. It renders its own [NxSurface] (frost coat via
+ * [frostTier]) instead of the flat glass backing the rails use, and it draws no
+ * divider -- so [ShellRegionProps.glassAlphaPct] and `showDivider` are inert here
+ * and simply do not exist on this class (the prop panel shows only what works).
+ * Defaults are the panel's shipped look: a flat matte, swipe-to-collapse off.
+ */
+@Serializable
+data class ShellRightRegionProps(
+    @PropLabel("widget.appshell.region.widthDp") @PropRange(0.0, 600.0) val widthDp: Int = 0,
+    @PropLabel("widget.appshell.region.collapsed") val collapsed: Boolean = false,
+    @PropLabel("widget.appshell.region.swipeToCollapse") val swipeToCollapse: Boolean = false,
+    @PropLabel("widget.appshell.region.frostTier") val frostTier: FrostTier = FrostTier.Flat,
+)
+
+/**
  * Everything the three shell regions need, provided once by [hivens.ui.AppLayout]
  * so the region widgets (which render through SlotRenderer and take no params)
  * can build the rails + center. `compositionLocalOf` so only the region readers
@@ -222,10 +237,10 @@ private val AUTO_COLLAPSE_BELOW = 980.dp   // window narrower than this auto-col
  * Collapsed it keeps a slim transparent swipe-catch at the edge, so a swipe back
  * (or Ctrl+N) reopens it. Edit mode keeps the static prop-driven behaviour.
  */
-@Widget(id = "appshell.region.right", displayName = "widget.appshell.region.right", removable = false, propsClass = ShellRegionProps::class)
+@Widget(id = "appshell.region.right", displayName = "widget.appshell.region.right", removable = false, propsClass = ShellRightRegionProps::class)
 @Composable
 fun ShellRightRegion(instance: WidgetInstance) {
-    val props = instance.rememberProps<ShellRegionProps>()
+    val props = instance.rememberProps<ShellRightRegionProps>()
     // The panel is an NxSurface at Floating depth: a SurfaceContainerHigh body (a step
     // up the tonal ladder from the page) plus a luminance-derived bevel, so it reads
     // as a distinct plane over any wallpaper and with none. The editable frostTier
