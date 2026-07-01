@@ -90,6 +90,8 @@ object EnglishStrings : AppStrings {
     override val settingsThemePickerSub     = "Customize the color scheme"
     override val settingsDarkTheme          = "Dark theme"
     override val settingsDarkThemeDesc      = "Dark interface theme"
+    override val settingsThemeFromWallpaper     = "Theme from wallpaper"
+    override val settingsThemeFromWallpaperDesc = "Match light/dark to the wallpaper's brightness"
     override val settingsCloseAfterLaunch   = "Hide launcher to tray after the game starts"
     override val settingsCloseAfterLaunchDesc = "Hides the launcher to the system tray once the game starts."
     override val settingsSaved              = "Settings saved"

@@ -22,6 +22,8 @@ import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import hivens.ui.theme.averageLuminanceFromImage
+import hivens.ui.theme.luminanceOfArgb
 import hivens.ui.theme.seedFromImage
 import org.jetbrains.skia.Codec
 import org.jetbrains.skia.Data
@@ -136,6 +138,12 @@ private fun AnimatedParallaxImage(
         value = staticBitmap?.let { bmp -> withContext(Dispatchers.Default) { seedFromImage(bmp) } }
     }
     val seedArgb = staticSeed ?: videoSeed
+    // Average brightness for the theme-from-wallpaper match: a real scan for stills,
+    // the seed's luma as an approximation for video (only its seed is exposed here).
+    val staticLuma by produceState<Float?>(null, staticBitmap) {
+        value = staticBitmap?.let { bmp -> withContext(Dispatchers.Default) { averageLuminanceFromImage(bmp) } }
+    }
+    val avgLuminance = staticLuma ?: videoSeed?.let { luminanceOfArgb(it) }
 
     val painter: Painter? = when {
         staticBitmap != null -> remember(staticBitmap) { BitmapPainter(staticBitmap) }
@@ -154,7 +162,7 @@ private fun AnimatedParallaxImage(
     // null bitmap + isAnimated so the frost falls back to a scrim (per-frame
     // reblur of video is too costly). Live parallax is read through
     // mousePosProvider so mouse movement does not churn this.
-    LaunchedEffect(staticBitmap, settings, isAnimated, seedArgb) {
+    LaunchedEffect(staticBitmap, settings, isAnimated, seedArgb, avgLuminance) {
         onBackdrop(
             BackdropState(
                 bitmap            = staticBitmap,
@@ -168,6 +176,7 @@ private fun AnimatedParallaxImage(
                 parallaxIntensity = settings.parallaxIntensity,
                 isAnimated        = isAnimated,
                 seedArgb          = seedArgb,
+                avgLuminance      = avgLuminance,
                 mouse             = mousePosProvider,
             ),
         )

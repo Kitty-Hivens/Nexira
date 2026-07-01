@@ -55,6 +55,13 @@ data class SettingsData(
      */
     val paletteFromWallpaper: Boolean = true,
     /**
+     * Match the dark/light theme to the wallpaper's average brightness: a dark
+     * image switches to the dark theme, a light image to the light one, re-evaluated
+     * when the wallpaper changes. Off by default (opt-in). Fixes dark wallpapers
+     * reading as mud under the light theme.
+     */
+    val themeFromWallpaper: Boolean = false,
+    /**
      * Replace the OS title bar with the in-app top bar (undecorated window +
      * custom caption buttons / drag / resize). On by default. Escape hatch: if a
      * window manager -- or a future native-Wayland JVM, where client-side window

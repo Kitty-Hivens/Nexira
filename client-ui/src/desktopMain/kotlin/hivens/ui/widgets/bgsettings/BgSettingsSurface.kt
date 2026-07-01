@@ -52,6 +52,8 @@ fun BgSettingsSurface(
     onBack: () -> Unit,
     isDarkTheme: Boolean,
     onToggleDarkTheme: () -> Unit,
+    themeFromWallpaper: Boolean,
+    onThemeFromWallpaperChanged: (Boolean) -> Unit,
     uiStyle: UiStyle,
     onUiStyleChanged: (UiStyle) -> Unit,
     onOpenThemePicker: () -> Unit,
@@ -95,12 +97,14 @@ fun BgSettingsSurface(
             Spacer(Modifier.weight(1f))
 
             AppearanceThemeIsland(
-                isDarkTheme       = isDarkTheme,
-                onToggleDarkTheme = onToggleDarkTheme,
-                uiStyle           = uiStyle,
-                onUiStyleChanged  = onUiStyleChanged,
-                onOpenThemePicker = onOpenThemePicker,
-                modifier          = Modifier.width(THEME_PANEL_WIDTH).fillMaxHeight(),
+                isDarkTheme                 = isDarkTheme,
+                onToggleDarkTheme           = onToggleDarkTheme,
+                themeFromWallpaper          = themeFromWallpaper,
+                onThemeFromWallpaperChanged = onThemeFromWallpaperChanged,
+                uiStyle                     = uiStyle,
+                onUiStyleChanged            = onUiStyleChanged,
+                onOpenThemePicker           = onOpenThemePicker,
+                modifier                    = Modifier.width(THEME_PANEL_WIDTH).fillMaxHeight(),
             )
         }
     }

@@ -19,28 +19,31 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.nx.NxChoiceChip
 import hivens.ui.nx.NxRow
+import hivens.ui.nx.NxToggle
 import hivens.ui.screens.settings.DayNightRow
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.theme.NxTheme
 
-// Right island of the Appearance studio: the theme axis (dark/light, UI style, and
-// a jump to the full theme picker) beside the wallpaper controls, over the live
-// preview. Palette-from-wallpaper is already on by default -- Monet seeds the scheme
-// from the image, so editing the wallpaper already re-tints everything here; a toggle
-// for it lands with the palette swatches later.
+// Right island of the Appearance studio: the theme axis (dark/light, match-to-wallpaper,
+// UI style, and a jump to the full theme picker) beside the wallpaper controls, over the
+// live preview. The palette itself is already seeded from the wallpaper by default
+// (Monet), so editing the wallpaper re-tints everything here; this island owns the
+// dark/light + style choices that Monet does not.
 @Composable
 internal fun AppearanceThemeIsland(
     isDarkTheme: Boolean,
     onToggleDarkTheme: () -> Unit,
+    themeFromWallpaper: Boolean,
+    onThemeFromWallpaperChanged: (Boolean) -> Unit,
     uiStyle: UiStyle,
     onUiStyleChanged: (UiStyle) -> Unit,
     onOpenThemePicker: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val s = LocalStrings.current
-    // Optimistic local so the switch flips at once while the reveal runs, matching
-    // the settings screen's DayNightRow behaviour.
+    // Optimistic local so the switch flips at once while the reveal runs; re-keyed on
+    // isDarkTheme so an auto match-to-wallpaper flip also moves it.
     var dark by remember(isDarkTheme) { mutableStateOf(isDarkTheme) }
 
     NxSurface(NxSurfaceLevel.Floating, modifier) {
@@ -51,6 +54,14 @@ internal fun AppearanceThemeIsland(
             DayNightRow(checked = dark, title = s.settingsDarkTheme, description = s.settingsDarkThemeDesc) {
                 dark = it; onToggleDarkTheme()
             }
+
+            NxToggle(
+                label           = s.settingsThemeFromWallpaper,
+                checked         = themeFromWallpaper,
+                description     = s.settingsThemeFromWallpaperDesc,
+                icon            = NxIcon.Wallpaper,
+                onCheckedChange = onThemeFromWallpaperChanged,
+            )
 
             BgPicker(s.settingsUiStyleTitle) {
                 NxChoiceChip(s.settingsUiStyleCelestia, uiStyle == UiStyle.Celestia) { onUiStyleChanged(UiStyle.Celestia) }
