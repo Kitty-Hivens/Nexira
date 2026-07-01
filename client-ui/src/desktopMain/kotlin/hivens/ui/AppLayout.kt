@@ -191,6 +191,11 @@ fun AppLayout(
                             currentSettings   = backgroundSettings,
                             onSettingsChanged = onBackgroundSettingsChanged,
                             onBack            = onBack,
+                            isDarkTheme       = isDarkTheme,
+                            onToggleDarkTheme = onToggleDarkTheme,
+                            uiStyle           = uiStyle,
+                            onUiStyleChanged  = onUiStyleChanged,
+                            onOpenThemePicker = { onScreenChange(Screen.ThemePicker) },
                         )
 
                     is Screen.ServerSettings ->
