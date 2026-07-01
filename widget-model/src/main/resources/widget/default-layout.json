@@ -20,7 +20,7 @@
             "widgets": [
               { "kind": "appshell.region.left",   "instance_id": "appshell-region-left-default",   "props": { "widthDp": 65 } },
               { "kind": "appshell.region.center", "instance_id": "appshell-region-center-default", "weight": 1.0 },
-              { "kind": "appshell.region.right",  "instance_id": "appshell-region-right-default",  "props": { "widthDp": 265 } }
+              { "kind": "appshell.region.right",  "instance_id": "appshell-region-right-default",  "props": { "widthDp": 265 }, "chrome": { "cornerRadiusDp": 14, "paddingBottomDp": 4, "paddingStartDp": 4 } }
             ]
           }
         }
