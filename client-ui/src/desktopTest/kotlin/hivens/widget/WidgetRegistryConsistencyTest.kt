@@ -87,7 +87,6 @@ class WidgetRegistryConsistencyTest {
             "bg.loop.mode",
             "bg.tint",
             "bg.reset",
-            "bg.preview",
             "profile.nav",
             "profile.skin.section",
             "profile.account.section",

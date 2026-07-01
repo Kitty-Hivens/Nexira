@@ -3,6 +3,7 @@ package hivens.ui.widgets.bgsettings
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.nx.NxSlider
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 
@@ -12,7 +13,12 @@ fun BgFxAnimSpeedWidget(instance: WidgetInstance) {
     val ctx = LocalBgSettingsContext.current
     val s = LocalStrings.current
     val settings by ctx.settings
-    LabeledSlider(s.backgroundAnimationSpeed, settings.animationSpeedMultiplier, 0.25f..4f, "%.2fx") {
-        ctx.update { copy(animationSpeedMultiplier = it) }
-    }
+    val v = settings.animationSpeedMultiplier
+    NxSlider(
+        label = s.backgroundAnimationSpeed,
+        value = v,
+        range = 0.25f..4f,
+        valueText = "%.2fx".format(v),
+        onValueChange = { ctx.update { copy(animationSpeedMultiplier = it) } },
+    )
 }

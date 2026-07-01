@@ -1,6 +1,5 @@
 package hivens.ui.widgets.bgsettings
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -11,8 +10,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -21,18 +18,17 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import hivens.ui.background.BackgroundSettings
-import hivens.ui.nx.GlassCard
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
-import hivens.ui.icons.Symbol
+import hivens.ui.nx.NxIconButton
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.puppet.PuppetToggle
+import hivens.ui.surface.NxSurface
+import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.theme.NxTheme
 import hivens.widget.api.SlotRenderer
 import hivens.widget.model.SlotId
@@ -40,23 +36,25 @@ import hivens.widget.model.SurfaceId
 
 private const val SURFACE = "bg.settings"
 
-// bg.settings surface. AppLayout routes Screen.BackgroundSettings
-// here. Two slots: `controls` (weight 1, holds enable+image+scale+
-// position+effects+loop+tint+reset widgets in a scrollable card)
-// and `preview` (weight 1, holds the live preview widget).
-//
-// The CONTROLS slot is wrapped in a GlassCard whose internal Column
-// has verticalScroll -- this is the one surface where a slot needs
-// scroll because the knob stack is genuinely tall (~15 widgets).
-// The scroll wraps the slot itself; widgets inside cannot be
-// Lazy-list-based without crashing, but the controls slot has no
-// such widget by default and the palette filter (Phase 5) will
-// eventually keep foreign Lazy widgets out. Until then, the user
-// can crash here by dropping LazyColumn into controls -- documented
-// trade-off, recoverable via reset.
-//
-// PREVIEW slot has no scroll; the preview widget fills its bounded
-// box and lets CustomBackground handle layered rendering.
+// Controls panel width -- bounded so sliders never run to the monitor edge
+// (Rule 6 / D08) and the live wallpaper breathes across the rest (Rule 3 gap).
+private val PANEL_WIDTH = 380.dp
+
+/**
+ * bg.settings surface. AppLayout routes Screen.BackgroundSettings here. One slot,
+ * `controls`, holding the enable + image + scale + position + effects + loop + tint
+ * + reset widgets in a scrollable island.
+ *
+ * There is no in-screen preview: the app's [hivens.ui.background.CustomBackground]
+ * already renders behind the whole shell (AppShell), so this screen stays transparent
+ * apart from the controls island and the LIVE wallpaper is the preview -- editing a
+ * knob updates the real background at full size, with no second video pipeline.
+ *
+ * The controls slot rides a `verticalScroll` on its own modifier: the knob stack is
+ * genuinely tall (~15 widgets). A Lazy-list widget dropped into this slot would crash
+ * measurement -- documented trade-off, recoverable via reset; the default controls
+ * carry no such widget.
+ */
 @Composable
 fun BgSettingsSurface(
     currentSettings: BackgroundSettings,
@@ -65,8 +63,6 @@ fun BgSettingsSurface(
 ) {
     val s = LocalStrings.current
     val settings = remember { mutableStateOf(currentSettings) }
-    val previewMousePos = remember { mutableStateOf(Offset(0.5f, 0.5f)) }
-    val previewSize = remember { mutableStateOf(IntSize.Zero) }
 
     val update: (BackgroundSettings.() -> BackgroundSettings) -> Unit = remember(onSettingsChanged) {
         { block ->
@@ -75,14 +71,7 @@ fun BgSettingsSurface(
         }
     }
 
-    val ctx = remember(settings, update, previewMousePos, previewSize) {
-        BgSettingsContext(
-            settings        = settings,
-            update          = update,
-            previewMousePos = previewMousePos,
-            previewSize     = previewSize,
-        )
-    }
+    val ctx = remember(settings, update) { BgSettingsContext(settings = settings, update = update) }
 
     PuppetScreen("BackgroundSettings")
     PuppetClick("background.back") { onBack() }
@@ -98,12 +87,7 @@ fun BgSettingsSurface(
     CompositionLocalProvider(LocalBgSettingsContext provides ctx) {
         Column(Modifier.fillMaxSize().padding(24.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onBack) {
-                    Symbol(icon = NxIcon.ArrowBack,
-                        contentDescription = s.navBack,
-                        tint               = NxTheme.colors.textPrimary,
-                    )
-                }
+                NxIconButton(NxIcon.ArrowBack, s.navBack, onClick = onBack)
                 Spacer(Modifier.width(8.dp))
                 Column {
                     Text(
@@ -122,24 +106,16 @@ fun BgSettingsSurface(
 
             Spacer(Modifier.height(20.dp))
 
-            Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-                GlassCard(Modifier.weight(1f).fillMaxHeight()) {
-                    SlotRenderer(
-                        SurfaceId(SURFACE),
-                        SlotId("controls"),
-                        // Scroll rides on the slot modifier: a Lazy-list widget dropped
-                        // into this slot would crash measurement (see file header).
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .verticalScroll(rememberScrollState())
-                            .padding(20.dp),
-                        spacing  = 16.dp,
-                    )
-                }
-
-                GlassCard(Modifier.weight(1f).fillMaxHeight()) {
-                    SlotRenderer(SurfaceId(SURFACE), SlotId("preview"), Modifier.fillMaxSize())
-                }
+            NxSurface(NxSurfaceLevel.Floating, Modifier.width(PANEL_WIDTH).fillMaxHeight()) {
+                SlotRenderer(
+                    SurfaceId(SURFACE),
+                    SlotId("controls"),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(20.dp),
+                    spacing  = 16.dp,
+                )
             }
         }
     }

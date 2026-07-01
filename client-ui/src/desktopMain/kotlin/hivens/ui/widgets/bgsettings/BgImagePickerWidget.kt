@@ -6,12 +6,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -25,7 +21,9 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.background.BackgroundOptimizer
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
-import hivens.ui.icons.Symbol
+import hivens.ui.nx.NxButton
+import hivens.ui.nx.NxButtonStyle
+import hivens.ui.nx.NxIconButton
 import hivens.ui.theme.NxTheme
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
@@ -55,15 +53,19 @@ fun BgImagePickerWidget(instance: WidgetInstance) {
     val targetHeight = remember { runCatching { Toolkit.getDefaultToolkit().screenSize.height }.getOrDefault(0) }
     var optimizing by remember { mutableStateOf(false) }
 
-    Column {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SectionTitle(s.backgroundSectionImage)
-        Spacer(Modifier.size(8.dp))
         Row(
             modifier              = Modifier.fillMaxWidth(),
             verticalAlignment     = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            OutlinedButton(
+            NxButton(
+                label    = s.backgroundPickButton,
+                icon     = NxIcon.Image,
+                style    = NxButtonStyle.Secondary,
+                enabled  = !optimizing,
+                modifier = Modifier.weight(1f),
                 onClick  = {
                     scope.launch {
                         val picked = FileKit.openFilePicker(
@@ -91,26 +93,18 @@ fun BgImagePickerWidget(instance: WidgetInstance) {
                         ctx.update { copy(imagePath = resolved, enabled = true) }
                     }
                 },
-                enabled  = !optimizing,
-                shape    = MaterialTheme.shapes.small,
-                modifier = Modifier.weight(1f),
-            ) {
-                if (optimizing) {
-                    CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-                } else {
-                    Symbol(NxIcon.Image, null, modifier = Modifier.size(18.dp))
-                }
-                Spacer(Modifier.width(8.dp))
-                Text(s.backgroundPickButton)
-            }
-            if (settings.imagePath != null) {
-                IconButton(onClick = { ctx.update { copy(imagePath = null, enabled = false) } }) {
-                    Symbol(NxIcon.Delete, null, tint = NxTheme.colors.error)
-                }
+            )
+            if (optimizing) {
+                CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = NxTheme.colors.primary)
+            } else if (settings.imagePath != null) {
+                NxIconButton(
+                    NxIcon.Delete, null,
+                    onClick = { ctx.update { copy(imagePath = null, enabled = false) } },
+                    tint    = NxTheme.colors.error,
+                )
             }
         }
         if (settings.imagePath != null) {
-            Spacer(Modifier.size(4.dp))
             Text(
                 text  = settings.imagePath!!.substringAfterLast("/").substringAfterLast("\\"),
                 style = MaterialTheme.typography.labelSmall,
