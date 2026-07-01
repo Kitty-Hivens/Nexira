@@ -97,6 +97,32 @@ class SkinLibraryTest {
     }
 
     @Test
+    fun `addUnique dedups on matching sha, adds on a new one, and always adds when sha is null`() {
+        val first = lib.addUnique(png, "current", false, now = 1, sha = "aaa")
+        // Same sha -> the existing entry, no second file.
+        val again = lib.addUnique(png, "current-again", false, now = 2, sha = "aaa")
+        assertEquals(first.id, again.id)
+        assertEquals(1, lib.list().size)
+        assertEquals("current", lib.list().single().name, "the existing entry is untouched")
+        // Different sha -> a new entry.
+        val other = lib.addUnique(png, "other", false, now = 3, sha = "bbb")
+        assertEquals(2, lib.list().size)
+        // Null sha (undecodable) skips the dedup and always adds.
+        lib.addUnique(png, "blind", false, now = 4, sha = null)
+        lib.addUnique(png, "blind", false, now = 5, sha = null)
+        assertEquals(4, lib.list().size)
+        assertTrue(other.id in lib.list().map { it.id })
+    }
+
+    @Test
+    fun `addUnique dedup is per-kind -- a cape does not match a skin sha`() {
+        val skin = lib.addUnique(png, "s", false, now = 1, sha = "dup", kind = SkinLibrary.Kind.Skin)
+        val cape = lib.addUnique(png, "c", false, now = 2, sha = "dup", kind = SkinLibrary.Kind.Cape)
+        assertTrue(skin.id != cape.id, "same sha across kinds still makes two entries")
+        assertEquals(2, lib.list().size)
+    }
+
+    @Test
     fun `empty library lists nothing`() {
         assertTrue(lib.list().isEmpty())
     }
