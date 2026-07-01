@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.unit.dp
 import hivens.ui.customization.LocalCustomization
 import hivens.ui.theme.NxColors
@@ -173,6 +174,10 @@ fun FrostSurface(
 
     val atoms = remember(layers) { layers.flatMap { if (it is Edge) it.toAtoms() else listOf(it) } }
     val glow = remember(atoms, softGlow) { if (softGlow) atoms.filterIsInstance<EdgeGlow>().firstOrNull() else null }
+    // A Fill with nothing opaque or blurred beneath it is a bare glass coat; over a
+    // wallpaper on a light palette that lands in mud (Rule 4). "Unbacked" marks that
+    // case so such a Fill draws opaque on light -- see the Fill branch below.
+    val unbacked = remember(atoms) { atoms.none { it is Backdrop || it is Body } }
 
     var outer = modifier
     if (glow != null) {
@@ -186,8 +191,12 @@ fun FrostSurface(
                 is Backdrop -> LocalBackdropPainter.current?.invoke(layer.blurRadiusDp, Modifier.matchParentSize())
 
                 is Fill -> {
-                    val c = colors.frost(layer.role).copy(alpha = coatAlpha(layer.alpha, glassIntensity))
-                    Box(Modifier.matchParentSize().drawBehind { drawRect(c) })
+                    val base = colors.frost(layer.role)
+                    // Bare + light -> opaque body (no good alpha for a light coat over a busy
+                    // wallpaper); otherwise the glass coat, thinning with the intensity knob.
+                    // Mirrors glassSurfaceAlpha so a Flat top bar and the rail stay in lockstep.
+                    val a = if (unbacked && base.luminance() > 0.5f) 1f else coatAlpha(layer.alpha, glassIntensity)
+                    Box(Modifier.matchParentSize().drawBehind { drawRect(base.copy(alpha = a)) })
                 }
 
                 is Body -> {
