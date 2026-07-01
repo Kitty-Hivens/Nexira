@@ -55,23 +55,30 @@ private fun seedFromArgb(pixels: IntArray, length: Int): Int? {
 }
 
 /**
- * Average perceived brightness (0..1) of a wallpaper bitmap -- the Rec.709 luma over a
- * subsampled scan. Used to match the dark/light theme to the wallpaper: below ~0.5 reads
- * as a dark image. Distinct from [seedFromImage], which returns the most VIVID colour,
- * not the overall lightness (a dark image with a bright accent has a bright seed).
+ * The wallpaper's palette [seedArgb] (the most VIVID colour) plus its overall
+ * [avgLuminance] (0..1 average brightness -- below ~0.5 reads as a dark image). The two
+ * are distinct: a dark image with a bright accent has a bright seed but a low average.
  */
-fun averageLuminanceFromImage(bitmap: ImageBitmap): Float? {
+data class WallpaperTone(val seedArgb: Int?, val avgLuminance: Float?)
+
+/**
+ * Seed + average brightness in ONE [readPixels]. A large wallpaper is tens of MB of
+ * pixels; reading it twice (once per value) allocates two full arrays at once and OOMs,
+ * so both are derived from a single read.
+ */
+fun wallpaperToneFromImage(bitmap: ImageBitmap): WallpaperTone {
     val w = bitmap.width
     val h = bitmap.height
-    if (w <= 0 || h <= 0) return null
+    if (w <= 0 || h <= 0) return WallpaperTone(null, null)
     val pixels = IntArray(w * h)
     bitmap.readPixels(pixels)
+    val seed = seedFromArgb(pixels, pixels.size)
     val step = maxOf(1, pixels.size / SEED_SAMPLE_BUDGET)
     var sum = 0.0
     var n = 0
     var i = 0
     while (i < pixels.size) { sum += luminanceOfArgb(pixels[i]); n++; i += step }
-    return if (n > 0) (sum / n).toFloat() else null
+    return WallpaperTone(seed, if (n > 0) (sum / n).toFloat() else null)
 }
 
 /** Rec.709 luma (0..1) of one 0xAARRGGBB colour. */
