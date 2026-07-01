@@ -198,7 +198,7 @@ private val MoonBlue  = Color(0xFF8AB4F8)
  * out of the switch) when a host is present; no host (or motion off) is a plain flip.
  */
 @Composable
-private fun DayNightRow(
+internal fun DayNightRow(
     checked: Boolean,
     title: String,
     description: String,

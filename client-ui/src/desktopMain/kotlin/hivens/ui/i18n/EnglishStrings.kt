@@ -287,8 +287,8 @@ object EnglishStrings : AppStrings {
     // =========================================================================
     // Custom Background
     // =========================================================================
-    override val backgroundTitle          = "Custom background"
-    override val backgroundSubtitle       = "Customize the launcher wallpaper"
+    override val backgroundTitle          = "Appearance"
+    override val backgroundSubtitle       = "Launcher wallpaper, theme and palette"
     override val backgroundEnable         = "Enable"
     override val backgroundSectionImage   = "Image or video"
     override val backgroundPickFile       = "Choose a background image or video"

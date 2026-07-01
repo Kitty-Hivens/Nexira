@@ -285,8 +285,8 @@ object RussianStrings : AppStrings {
     // =========================================================================
     // Custom Background
     // =========================================================================
-    override val backgroundTitle          = "Пользовательский фон"
-    override val backgroundSubtitle       = "Настройте обои лаунчера"
+    override val backgroundTitle          = "Внешний вид"
+    override val backgroundSubtitle       = "Обои, тема и палитра лаунчера"
     override val backgroundEnable         = "Включить"
     override val backgroundSectionImage   = "Изображение или видео"
     override val backgroundPickFile       = "Выберите изображение или видео для фона"

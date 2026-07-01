@@ -20,6 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import hivens.core.data.UiStyle
 import hivens.ui.background.BackgroundSettings
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
@@ -36,19 +37,22 @@ import hivens.widget.model.SurfaceId
 
 private const val SURFACE = "bg.settings"
 
-// Controls panel width -- bounded so sliders never run to the monitor edge
-// (Rule 6 / D08) and the live wallpaper breathes across the rest (Rule 3 gap).
+// Island widths -- bounded so sliders never run to the monitor edge (Rule 6 / D08)
+// and the live wallpaper breathes in the channel between them (Rule 3 gap).
 private val PANEL_WIDTH = 380.dp
+private val THEME_PANEL_WIDTH = 320.dp
 
 /**
- * bg.settings surface. AppLayout routes Screen.BackgroundSettings here. One slot,
- * `controls`, holding the enable + image + scale + position + effects + loop + tint
- * + reset widgets in a scrollable island.
+ * Appearance studio. AppLayout routes Screen.BackgroundSettings here. Two islands over
+ * the live wallpaper: the wallpaper controls (the `controls` slot -- enable + image +
+ * scale + position + effects + loop + tint + reset widgets) at the start, and the theme
+ * axis ([AppearanceThemeIsland] -- dark/light, UI style, theme picker) at the end.
  *
  * There is no in-screen preview: the app's [hivens.ui.background.CustomBackground]
  * already renders behind the whole shell (AppShell), so this screen stays transparent
- * apart from the controls island and the LIVE wallpaper is the preview -- editing a
- * knob updates the real background at full size, with no second video pipeline.
+ * apart from the islands and the LIVE UI is the preview -- editing a wallpaper knob or
+ * the theme updates the real background + palette at full size (Monet seeds the scheme
+ * from the wallpaper), with no second video pipeline.
  *
  * The controls slot rides a `verticalScroll` on its own modifier: the knob stack is
  * genuinely tall (~15 widgets). A Lazy-list widget dropped into this slot would crash
@@ -60,6 +64,11 @@ fun BgSettingsSurface(
     currentSettings: BackgroundSettings,
     onSettingsChanged: (BackgroundSettings) -> Unit,
     onBack: () -> Unit,
+    isDarkTheme: Boolean,
+    onToggleDarkTheme: () -> Unit,
+    uiStyle: UiStyle,
+    onUiStyleChanged: (UiStyle) -> Unit,
+    onOpenThemePicker: () -> Unit,
 ) {
     val s = LocalStrings.current
     val settings = remember { mutableStateOf(currentSettings) }
@@ -106,15 +115,31 @@ fun BgSettingsSurface(
 
             Spacer(Modifier.height(20.dp))
 
-            NxSurface(NxSurfaceLevel.Floating, Modifier.width(PANEL_WIDTH).fillMaxHeight()) {
-                SlotRenderer(
-                    SurfaceId(SURFACE),
-                    SlotId("controls"),
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .padding(20.dp),
-                    spacing  = 16.dp,
+            // Two islands over the live wallpaper: wallpaper tuning at the start,
+            // the theme axis at the end, the real background (= the preview) breathing
+            // in the channel between them.
+            Row(Modifier.fillMaxSize()) {
+                NxSurface(NxSurfaceLevel.Floating, Modifier.width(PANEL_WIDTH).fillMaxHeight()) {
+                    SlotRenderer(
+                        SurfaceId(SURFACE),
+                        SlotId("controls"),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                            .padding(20.dp),
+                        spacing  = 16.dp,
+                    )
+                }
+
+                Spacer(Modifier.weight(1f))
+
+                AppearanceThemeIsland(
+                    isDarkTheme       = isDarkTheme,
+                    onToggleDarkTheme = onToggleDarkTheme,
+                    uiStyle           = uiStyle,
+                    onUiStyleChanged  = onUiStyleChanged,
+                    onOpenThemePicker = onOpenThemePicker,
+                    modifier          = Modifier.width(THEME_PANEL_WIDTH).fillMaxHeight(),
                 )
             }
         }
