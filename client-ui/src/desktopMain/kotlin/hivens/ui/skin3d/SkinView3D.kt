@@ -42,6 +42,11 @@ private const val SPIN_RATE = 0.00055f
 // Pitch clamp so the model never flips fully upside down on a vertical drag.
 private const val PITCH_LIMIT = 1.2f
 
+// Depth nudge (model-space z units) that pulls the overlay layer just in front of the
+// base so a coplanar seam-flush overlay face wins the depth tie. Tiny next to the 0.5
+// overlay inflation, so genuinely separated faces keep their order.
+private const val OVERLAY_Z_BIAS = 0.02f
+
 /** How much of the figure to frame: the whole body, or a head-and-torso bust. */
 enum class SkinFraming { Full, Bust }
 
@@ -172,10 +177,15 @@ private fun facesToTris(
         val uv = f.uv
         val tu0 = uv.u * k; val tv0 = uv.v * k
         val tu1 = (uv.u + uv.w) * k; val tv1 = (uv.v + uv.h) * k
-        val v0 = Vtx(s0.x, s0.y, r0.z, tu0, tv0)         // texture top-left
-        val vu = Vtx(su.x, su.y, ru.z, tu1, tv0)         // top-right
-        val v3 = Vtx(s3.x, s3.y, r3.z, tu1, tv1)         // bottom-right
-        val vv = Vtx(sv.x, sv.y, rv.z, tu0, tv1)         // bottom-left
+        // Nudge the overlay a hair nearer so a seam-flush overlay face (the hat bottom
+        // kept coplanar with the head bottom) wins the depth tie and draws over the base
+        // instead of losing to draw order -- otherwise the hood underside shows the head's
+        // texture. Far smaller than the 0.5 inflation, so it never reorders real geometry.
+        val zb = if (f.layer) OVERLAY_Z_BIAS else 0f
+        val v0 = Vtx(s0.x, s0.y, r0.z + zb, tu0, tv0)    // texture top-left
+        val vu = Vtx(su.x, su.y, ru.z + zb, tu1, tv0)    // top-right
+        val v3 = Vtx(s3.x, s3.y, r3.z + zb, tu1, tv1)    // bottom-right
+        val vv = Vtx(sv.x, sv.y, rv.z + zb, tu0, tv1)    // bottom-left
         // Both layers render as alpha-tested cutout (opaque), matching Minecraft's
         // second layer: a texel is solid or absent, never blended. The overlay is
         // inflated half a texel, so the depth buffer lets it cover the base where
