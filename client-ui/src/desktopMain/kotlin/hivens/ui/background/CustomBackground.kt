@@ -22,9 +22,9 @@ import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import hivens.ui.theme.averageLuminanceFromImage
+import hivens.ui.theme.WallpaperTone
 import hivens.ui.theme.luminanceOfArgb
-import hivens.ui.theme.seedFromImage
+import hivens.ui.theme.wallpaperToneFromImage
 import org.jetbrains.skia.Codec
 import org.jetbrains.skia.Data
 import org.jetbrains.skia.ImageInfo
@@ -134,16 +134,13 @@ private fun AnimatedParallaxImage(
     var videoSeed by remember(file) { mutableStateOf<Int?>(null) }
     val videoPainter = if (mediaKind == BackgroundMediaKind.TimeBased)
         rememberSkinemaFrame(file, settings.animationSpeedMultiplier, settings.loopMode, settings.hardwareDecode, onSeed = { videoSeed = it }) else null
-    val staticSeed by produceState<Int?>(null, staticBitmap) {
-        value = staticBitmap?.let { bmp -> withContext(Dispatchers.Default) { seedFromImage(bmp) } }
+    // Seed + brightness in ONE pixel read (a large wallpaper is tens of MB; two reads
+    // OOM'd). Video only exposes its seed, so brightness falls back to the seed's luma.
+    val staticTone by produceState<WallpaperTone?>(null, staticBitmap) {
+        value = staticBitmap?.let { bmp -> withContext(Dispatchers.Default) { wallpaperToneFromImage(bmp) } }
     }
-    val seedArgb = staticSeed ?: videoSeed
-    // Average brightness for the theme-from-wallpaper match: a real scan for stills,
-    // the seed's luma as an approximation for video (only its seed is exposed here).
-    val staticLuma by produceState<Float?>(null, staticBitmap) {
-        value = staticBitmap?.let { bmp -> withContext(Dispatchers.Default) { averageLuminanceFromImage(bmp) } }
-    }
-    val avgLuminance = staticLuma ?: videoSeed?.let { luminanceOfArgb(it) }
+    val seedArgb = staticTone?.seedArgb ?: videoSeed
+    val avgLuminance = staticTone?.avgLuminance ?: videoSeed?.let { luminanceOfArgb(it) }
 
     val painter: Painter? = when {
         staticBitmap != null -> remember(staticBitmap) { BitmapPainter(staticBitmap) }
