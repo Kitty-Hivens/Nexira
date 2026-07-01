@@ -63,6 +63,9 @@ class BackdropState(
     // colour. Null when none could be extracted; static + video both fill it (video
     // from its first decoded frame). The theme reads it to seed the palette.
     val seedArgb: Int? = null,
+    // Average brightness (0..1) of the wallpaper -- distinct from [seedArgb] (the vivid
+    // dominant). Null when no image. The theme reads it to match dark/light.
+    val avgLuminance: Float? = null,
     val mouse: () -> Offset = { Offset(0.5f, 0.5f) },
 ) {
     companion object {

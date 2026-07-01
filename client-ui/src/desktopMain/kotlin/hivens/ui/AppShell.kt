@@ -267,6 +267,20 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
     // the palette from it. Default-on; the seed is null until a bitmap is decoded.
     val paletteFromWallpaper = settings.paletteFromWallpaper
     var wallpaperSeed by remember { mutableStateOf<Int?>(null) }
+    // Theme-from-wallpaper: match dark/light to the wallpaper's average brightness when
+    // opted in. Luminance is lifted up from the backdrop like the seed.
+    var themeFromWallpaper by remember { mutableStateOf(settings.themeFromWallpaper) }
+    var wallpaperLuminance by remember { mutableStateOf<Float?>(null) }
+    LaunchedEffect(themeFromWallpaper, wallpaperLuminance) {
+        val luma = wallpaperLuminance
+        if (themeFromWallpaper && luma != null) {
+            val wantDark = luma < 0.5f
+            if (wantDark != isDarkTheme) {
+                isDarkTheme = wantDark
+                settingsService.saveSettings(settingsService.getSettings().copy(isDarkTheme = isDarkTheme))
+            }
+        }
+    }
     var currentLocale by remember {
         mutableStateOf(AppLocale.fromTag(settings.locale))
     }
@@ -903,6 +917,7 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
                             }
                         },
                         onWallpaperSeed = { wallpaperSeed = it },
+                        onWallpaperLuminance = { wallpaperLuminance = it },
                         onRealExit   = { exitApplication() },
                         onHideToTray = if (TrayManager.canBeReady) {{ isWindowVisible = false }}
                         else null,
@@ -911,6 +926,11 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
                             isDarkTheme = !isDarkTheme
                             val current = settingsService.getSettings()
                             settingsService.saveSettings(current.copy(isDarkTheme = isDarkTheme))
+                        },
+                        themeFromWallpaper = themeFromWallpaper,
+                        onThemeFromWallpaperChanged = { on ->
+                            themeFromWallpaper = on
+                            settingsService.saveSettings(settingsService.getSettings().copy(themeFromWallpaper = on))
                         },
                         customTheme          = customTheme,
                         onCustomThemeChanged = { newTheme ->
@@ -967,10 +987,13 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
 fun AppRoot(
     onCloseApp: () -> Unit,
     onWallpaperSeed: (Int?) -> Unit,
+    onWallpaperLuminance: (Float?) -> Unit,
     isDarkTheme: Boolean,
     onRealExit: () -> Unit,
     onHideToTray: (() -> Unit)?,
     onToggleDarkTheme: () -> Unit,
+    themeFromWallpaper: Boolean,
+    onThemeFromWallpaperChanged: (Boolean) -> Unit,
     customTheme: CustomTheme,
     onCustomThemeChanged: (CustomTheme) -> Unit,
     currentLocale: AppLocale,
@@ -1092,6 +1115,7 @@ fun AppRoot(
     // Material You: forward the wallpaper palette seed (computed in CustomBackground
     // from the static bitmap or the first video frame) up to NxTheme.
     LaunchedEffect(backdrop.seedArgb) { onWallpaperSeed(backdrop.seedArgb) }
+    LaunchedEffect(backdrop.avgLuminance) { onWallpaperLuminance(backdrop.avgLuminance) }
 
     Box(
         Modifier
@@ -1143,6 +1167,8 @@ fun AppRoot(
                 onLogout = { pendingLogout = true },
                 isDarkTheme = isDarkTheme,
                 onToggleDarkTheme = onToggleDarkTheme,
+                themeFromWallpaper = themeFromWallpaper,
+                onThemeFromWallpaperChanged = onThemeFromWallpaperChanged,
                 customTheme = customTheme,
                 onCustomThemeChanged = onCustomThemeChanged,
                 currentLocale = currentLocale,

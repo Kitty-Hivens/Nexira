@@ -87,6 +87,8 @@ object GermanStrings : AppStrings {
     override val settingsThemePickerSub     = "Farbschema anpassen"
     override val settingsDarkTheme          = "Dunkles Design"
     override val settingsDarkThemeDesc      = "Dunkles Oberflächen-Design"
+    override val settingsThemeFromWallpaper     = "Thema nach Hintergrund"
+    override val settingsThemeFromWallpaperDesc = "Hell/Dunkel an die Hintergrundhelligkeit anpassen"
     override val settingsCloseAfterLaunch   = "Launcher nach Spielstart in Tray minimieren"
     override val settingsCloseAfterLaunchDesc = "Versteckt den Launcher im System-Tray, sobald das Spiel startet."
     override val settingsSaved              = "Einstellungen gespeichert"

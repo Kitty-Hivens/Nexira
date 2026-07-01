@@ -53,3 +53,31 @@ private fun seedFromArgb(pixels: IntArray, length: Int): Int? {
     val quantized = QuantizerCelebi.quantize(sampled, SEED_QUANTIZE_COLORS)
     return Score.score(quantized).firstOrNull()
 }
+
+/**
+ * Average perceived brightness (0..1) of a wallpaper bitmap -- the Rec.709 luma over a
+ * subsampled scan. Used to match the dark/light theme to the wallpaper: below ~0.5 reads
+ * as a dark image. Distinct from [seedFromImage], which returns the most VIVID colour,
+ * not the overall lightness (a dark image with a bright accent has a bright seed).
+ */
+fun averageLuminanceFromImage(bitmap: ImageBitmap): Float? {
+    val w = bitmap.width
+    val h = bitmap.height
+    if (w <= 0 || h <= 0) return null
+    val pixels = IntArray(w * h)
+    bitmap.readPixels(pixels)
+    val step = maxOf(1, pixels.size / SEED_SAMPLE_BUDGET)
+    var sum = 0.0
+    var n = 0
+    var i = 0
+    while (i < pixels.size) { sum += luminanceOfArgb(pixels[i]); n++; i += step }
+    return if (n > 0) (sum / n).toFloat() else null
+}
+
+/** Rec.709 luma (0..1) of one 0xAARRGGBB colour. */
+fun luminanceOfArgb(argb: Int): Float {
+    val r = ((argb ushr 16) and 0xFF) / 255f
+    val g = ((argb ushr 8) and 0xFF) / 255f
+    val b = (argb and 0xFF) / 255f
+    return 0.2126f * r + 0.7152f * g + 0.0722f * b
+}
