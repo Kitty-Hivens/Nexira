@@ -120,11 +120,6 @@
               { "kind": "bg.tint",            "instance_id": "bg-tint-default" },
               { "kind": "bg.reset",           "instance_id": "bg-reset-default" }
             ]
-          },
-          "preview": {
-            "widgets": [
-              { "kind": "bg.preview", "instance_id": "bg-preview-default" }
-            ]
           }
         }
       },
