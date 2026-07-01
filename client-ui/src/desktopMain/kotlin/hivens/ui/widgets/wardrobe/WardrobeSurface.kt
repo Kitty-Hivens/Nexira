@@ -26,6 +26,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -60,6 +61,7 @@ import hivens.ui.icons.Symbol
 import hivens.ui.identity.DefaultSkinProvider
 import hivens.ui.identity.SkinLibrary
 import hivens.ui.identity.SkinManager
+import hivens.ui.identity.skinContentHash
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.skin3d.SkinFraming
@@ -139,13 +141,31 @@ private fun Wardrobe(session: SessionData) {
     val activeSkinId = remember(refreshKey) { library.activeId(SkinLibrary.Kind.Skin) }
     val activeCapeId = remember(refreshKey) { library.activeId(SkinLibrary.Kind.Cape) }
 
+    // The current server skin is the player's real look but lives on the server, not the
+    // local library -- auto-import it (deduped by pixel content) so it shows among the
+    // saved skins and reads as the active one. Runs once per player: a genuine server-side
+    // skin change surfaces as a new entry on the next open, an identical one dedups.
+    LaunchedEffect(session.playerName) {
+        val bytes = skinManager.getRawSkinBytes(session.playerName) ?: return@LaunchedEffect
+        withContext(Dispatchers.IO) {
+            // No pixel hash -> no dedup, so skip rather than accumulate a copy per open.
+            val sha = skinContentHash(bytes) ?: return@withContext
+            val entry = library.addUnique(bytes, session.playerName, slim = false, now = System.currentTimeMillis(), sha = sha)
+            library.markApplied(entry.id, System.currentTimeMillis())
+        }
+        refreshKey++
+    }
+
     fun importInto(kind: SkinLibrary.Kind, select: (String) -> Unit) {
         scope.launch {
             val picked = FileKit.openFilePicker(type = FileKitType.File(extensions = listOf("png")))
             val file = picked?.path?.let { File(it) } ?: return@launch
             val bytes = withContext(Dispatchers.IO) { runCatching { file.readBytes() }.getOrNull() } ?: return@launch
             val entry = withContext(Dispatchers.IO) {
-                library.add(bytes, file.nameWithoutExtension, slim = false, now = System.currentTimeMillis(), kind = kind)
+                library.add(
+                    bytes, file.nameWithoutExtension, slim = false,
+                    now = System.currentTimeMillis(), kind = kind, sha = skinContentHash(bytes),
+                )
             }
             select(entry.id)
             refreshKey++

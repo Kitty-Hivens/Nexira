@@ -97,6 +97,18 @@ class SkinManager(
         bitmap
     }
 
+    /**
+     * The current skin's raw PNG bytes for [nickname] -- the exact cached texture
+     * the 3D renderer draws, so callers (the wardrobe auto-importing the current
+     * look) can persist it. Ensures the texture is fetched/cached, then returns the
+     * cache file's bytes; null when it cannot be fetched.
+     */
+    suspend fun getRawSkinBytes(nickname: String): ByteArray? = withContext(Dispatchers.IO) {
+        (getOrDownloadRawSkin(nickname) ?: return@withContext null).use { }
+        val rawFile = File(cacheDir, "raw_${safeCacheBase(nickname)}.png")
+        runCatching { rawFile.readBytes() }.getOrNull()
+    }
+
     // ── Disk cache helpers ─────────────────────────────────────────────────
 
     internal fun isExpired(file: File): Boolean {

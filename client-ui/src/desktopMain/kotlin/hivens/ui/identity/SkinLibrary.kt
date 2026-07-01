@@ -35,6 +35,8 @@ class SkinLibrary(private val dir: Path, private val json: Json) {
         val lastAppliedAt: Long? = null,
         // Skin vs cape; pre-existing entries (no field) default to Skin.
         val kind: Kind = Kind.Skin,
+        // Content fingerprint (pixel hash) for dedup; null on pre-existing entries.
+        val sha: String? = null,
     )
 
     @Serializable
@@ -53,14 +55,26 @@ class SkinLibrary(private val dir: Path, private val json: Json) {
         file(id).takeIf { Files.exists(it) }?.let { runCatching { Files.readAllBytes(it) }.getOrNull() }
 
     /** Imports [png] under [name] as a skin or cape; returns the new entry. */
-    fun add(png: ByteArray, name: String, slim: Boolean, now: Long, kind: Kind = Kind.Skin): Entry {
+    fun add(png: ByteArray, name: String, slim: Boolean, now: Long, kind: Kind = Kind.Skin, sha: String? = null): Entry {
         Files.createDirectories(dir)
         val id = UUID.randomUUID().toString().take(12)
         Files.write(file(id), png)
-        val entry = Entry(id, name.ifBlank { kind.name.lowercase() }, slim, now, kind = kind)
+        val entry = Entry(id, name.ifBlank { kind.name.lowercase() }, slim, now, kind = kind, sha = sha)
         writeIndex(Index(readIndex().skins + entry))
         log.info("Imported {} {} ({} bytes)", kind.name.lowercase(), id, png.size)
         return entry
+    }
+
+    /**
+     * Adds [png] unless an entry of [kind] already carries the same content [sha]
+     * (a pixel hash, stable across PNG re-encodings), so re-importing the same
+     * texture -- e.g. the current server skin on every wardrobe open -- does not
+     * pile up duplicates. Returns the existing match, else the freshly-added entry.
+     * A null [sha] (undecodable) skips the dedup and always adds.
+     */
+    fun addUnique(png: ByteArray, name: String, slim: Boolean, now: Long, sha: String?, kind: Kind = Kind.Skin): Entry {
+        if (sha != null) readIndex().skins.firstOrNull { it.kind == kind && it.sha == sha }?.let { return it }
+        return add(png, name, slim, now, kind, sha)
     }
 
     fun rename(id: String, name: String) {
