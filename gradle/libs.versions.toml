@@ -25,9 +25,7 @@ coroutines        = "1.11.0"
 # composeMaterial3 tracks JetBrains' separately-published material3 artifact,
 # which lags Compose-MP core by ~2 release lines. core 1.11.0 GA shipped but
 # material3 has no 1.10.x / 1.11.x stable; latest stable is 1.9.0 (two lines
-# behind), with 1.11.0-alpha07 as the JetBrains-paired alpha. Same pattern as
-# composeIcons (pinned to its own latest-stable 1.7.3 instead of the core ref).
-composeIcons      = "1.7.3"
+# behind), with 1.11.0-alpha07 as the JetBrains-paired alpha.
 composeMaterial3  = "1.11.0-alpha07"
 markdownRenderer  = "0.43.0"
 # org.jetbrains:markdown -- md->html parser under markdown-m3, used directly by the in-launcher HTML renderer (hivens.ui.render).
