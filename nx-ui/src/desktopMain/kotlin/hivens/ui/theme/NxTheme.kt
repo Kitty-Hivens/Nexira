@@ -4,6 +4,7 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.TweenSpec
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.LocalIndication
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
@@ -322,7 +323,13 @@ fun NxTheme(
             // Inside MaterialTheme's lambda on purpose: MaterialTheme provides its
             // default ripple into LocalIndication, so the app-wide state layer must
             // be provided beneath it to win. Placed outside, this is a silent no-op.
-            CompositionLocalProvider(LocalIndication provides ThemeStateLayer) {
+            // LocalContentColor is anchored to the palette because with no root M3
+            // Surface it defaults to Black, leaving the ambient state-layer wash
+            // near-invisible on dark; M3 components still override it inside.
+            CompositionLocalProvider(
+                LocalIndication provides ThemeStateLayer,
+                LocalContentColor provides animatedPalette.textPrimary,
+            ) {
                 content()
             }
         }
