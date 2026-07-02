@@ -138,9 +138,12 @@ fun frostColor(role: FrostRole): Color = NxTheme.colors.frost(role)
 /** Named depth presets -- each is just a saved layer list. Serializable so it
  *  can be a widget prop field (renders as a dropdown in the editor). */
 @kotlinx.serialization.Serializable
-enum class FrostTier { Flat, Frosted, Heavy }
+enum class FrostTier { Clear, Flat, Frosted, Heavy }
 
 fun FrostTier.toLayers(): List<SurfaceLayer> = when (this) {
+    // Clear is the transparent tier: a lone glass coat, no body. NxSurface renders it
+    // bodiless (see NxSurface); a raw FrostSurface just draws the fill, same as Flat.
+    FrostTier.Clear   -> listOf(Fill(alpha = 0.35f))
     FrostTier.Flat    -> listOf(Fill(alpha = 0.35f)) // matches the rail's glassSurfaceAlpha(0.35) for a seamless chrome
     FrostTier.Frosted -> listOf(Backdrop(), Fill(alpha = 0.55f), Edge())
     FrostTier.Heavy   -> listOf(Backdrop(blurRadiusDp = 28f), Fill(alpha = 0.45f), Wash(), Edge(border = true), Texture())

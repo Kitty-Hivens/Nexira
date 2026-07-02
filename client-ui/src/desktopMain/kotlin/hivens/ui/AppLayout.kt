@@ -21,7 +21,6 @@ import hivens.launcher.network.ServerProtocolConfig
 import hivens.ui.background.BackgroundSettings
 import hivens.ui.background.hasUsableImage
 import hivens.ui.customization.CustomizationSettings
-import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.easter.LocalAprilFools
 import hivens.ui.editor.EditorSurfaceHost
 import hivens.ui.i18n.AppLocale
@@ -324,7 +323,9 @@ fun AppSidebar(
     CompositionLocalProvider(LocalLeftRailContext provides ctx) {
         NavigationRail(
             modifier       = modifier,
-            containerColor = glassSurfaceAlpha(0.35f),
+            // Transparent: the rail's NxSurface wrapper (ShellLeftRegion) owns the
+            // background now, so its frostTier drives the matte.
+            containerColor = Color.Transparent,
             contentColor   = NxTheme.colors.textSecondary
         ) {
             // Items sit flush (spacing 0) so the rail is one contiguous column

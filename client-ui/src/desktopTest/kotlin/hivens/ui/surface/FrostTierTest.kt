@@ -14,6 +14,15 @@ class FrostTierTest {
         assertTrue(layers.single() is Fill)
     }
 
+    // Clear is the transparent tier: a lone glass fill, no body layer of its own
+    // (NxSurface renders it bodiless).
+    @Test
+    fun clearIsSingleFill() {
+        val layers = FrostTier.Clear.toLayers()
+        assertEquals(1, layers.size)
+        assertTrue(layers.single() is Fill)
+    }
+
     @Test
     fun frostedIsBackdropFillEdge() {
         assertEquals(
