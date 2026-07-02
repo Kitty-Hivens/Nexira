@@ -1,16 +1,15 @@
-package hivens.ui.skin3d
+package hivens.ui.scene3d
 
-import hivens.ui.scene3d.Pt2
-import hivens.ui.scene3d.Vec3
 import kotlin.math.cos
 import kotlin.math.sin
 
-// The view step of the skin pipeline: rotate the model by yaw/pitch and
+// The view step of the CPU 3D pipeline: rotate the model by yaw/pitch and
 // orthographic-project to screen pixels. These two functions pin the sign
 // conventions (yaw around Y, then pitch around X, +Z toward the viewer,
-// screen Y down) -- the Transform3-based scene path is tested against them
-// as the oracle (see Transform3Test), so they stay even though the scene
-// graph could express the same math.
+// screen Y down) -- the Transform3 matrix path is tested against them as the
+// oracle (see Transform3Test). The scene traversal keeps using the sequential
+// form for the view so a rig at identity pose renders bit-identical to the
+// pre-rig renderer (matrix composition rounds differently at the last ulp).
 
 /**
  * Rotates a model-space point by [yaw] (around Y) then [pitch] (around X).

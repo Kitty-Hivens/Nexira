@@ -27,6 +27,10 @@ data class Vtx(val x: Float, val y: Float, val z: Float, val tu: Float, val tv: 
  *  back-to-front over what is already there. */
 data class Tri(val a: Vtx, val b: Vtx, val c: Vtx, val opaque: Boolean)
 
+/** Triangles that sample one shared [texture] -- the unit a multi-object scene
+ *  feeds the rasterizer per object/material. */
+data class TriBatch(val tris: List<Tri>, val texture: Texture)
+
 /** ARGB texture addressed in native texels; out-of-range reads clamp to the edge. */
 class Texture(
     val pixels: IntArray,
