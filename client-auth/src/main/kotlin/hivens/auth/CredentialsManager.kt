@@ -1,4 +1,4 @@
-package hivens.launcher
+package hivens.auth
 
 import dev.hivens.libvault.SecretVault
 import hivens.core.api.interfaces.ICredentialStore
@@ -36,23 +36,14 @@ import java.nio.file.Path
  * An offline identity is NOT an account here (it has no secret -- a blank token
  * no-ops [saveAccount]); it is reconstructed from `SettingsData.offlinePlayerName`.
  */
-class CredentialsManager internal constructor(
+class CredentialsManager(
     workDir: Path,
     private val json: Json,
     private val vault: SecretVault,
     private val legacyProvider: () -> LegacyCredentialsManager,
-) : ICredentialStore {
+) : AccountStore {
     private val log = LoggerFactory.getLogger(CredentialsManager::class.java)
     private val credentialsFile = workDir.resolve("credentials.json")
-
-    /** Non-secret summary of a stored account, for the account-manager UI. */
-    data class StoredAccount(
-        val providerId: String,
-        val accountId: String,
-        val username: String,
-        val uuid: String,
-        val displayName: String,
-    )
 
     // ── ICredentialStore: the active session ──────────────────────────────────
 
@@ -64,18 +55,14 @@ class CredentialsManager internal constructor(
 
     // ── multi-account API ───────────────────────────────────────────────────────
 
-    fun listAccounts(): List<StoredAccount> =
+    override fun listAccounts(): List<StoredAccount> =
         (readAccountsFile()?.accounts ?: emptyList()).map {
             StoredAccount(it.providerId, it.accountId, it.username, it.uuid, it.displayName)
         }
 
-    fun activeAccountId(): String? = readAccountsFile()?.activeAccountId
+    override fun activeAccountId(): String? = readAccountsFile()?.activeAccountId
 
-    /**
-     * Persist [session] as the [providerId] account and make it active. No-op when
-     * the accessToken is blank (an offline identity carries nothing to store).
-     */
-    fun saveAccount(session: SessionData, providerId: String) {
+    override fun saveAccount(session: SessionData, providerId: String) {
         if (session.accessToken.isBlank()) return
         val accountId = accountIdFor(session)
         val account = SavedAccount(
@@ -93,8 +80,7 @@ class CredentialsManager internal constructor(
         log.info("Saved account {} ({}) -- vault tier={}", accountId, providerId, vault.tier)
     }
 
-    /** Active-account shim for [ICredentialStore] writers; infers the provider from the session shape. */
-    fun save(session: SessionData) = saveAccount(session, inferProviderId(session))
+    override fun save(session: SessionData) = saveAccount(session, inferProviderId(session))
 
     /**
      * The stored session for [providerId]'s account, or null when not signed in
@@ -109,18 +95,7 @@ class CredentialsManager internal constructor(
         return loadSession(account.accountId)
     }
 
-    /**
-     * The session that should front the shell -- the "primary face". When
-     * [preferredProviderId] names a provider with a signed-in account, that
-     * account wins; otherwise it falls back to licence priority (Microsoft, the
-     * licensed account, before SmartyCraft; unknown providers last) rather than
-     * to whichever account was saved last. Callers recompute it on add/remove so
-     * the face follows the choice, or the highest-priority account when the
-     * chosen provider has none. An offline identity is not an account, so it
-     * never wins here -- it is reconstructed separately from
-     * `SettingsData.offlinePlayerName`.
-     */
-    fun primarySession(preferredProviderId: String? = null): SessionData? {
+    override fun primarySession(preferredProviderId: String?): SessionData? {
         val accounts = readAccountsFile()?.accounts ?: return null
         if (preferredProviderId != null) {
             accounts.firstOrNull { it.providerId == preferredProviderId }
@@ -135,7 +110,7 @@ class CredentialsManager internal constructor(
     private fun facePriorityIndex(providerId: String): Int =
         FACE_PRIORITY.indexOf(providerId).let { if (it < 0) FACE_PRIORITY.size else it }
 
-    fun loadSession(accountId: String): SessionData? {
+    override fun loadSession(accountId: String): SessionData? {
         val account = readAccountsFile()?.accounts?.firstOrNull { it.accountId == accountId } ?: return null
         val accessToken = secret(account, FIELD_ACCESS_TOKEN)
         if (accessToken.isNullOrBlank()) {
@@ -153,13 +128,13 @@ class CredentialsManager internal constructor(
         )
     }
 
-    fun setActive(accountId: String) {
+    override fun setActive(accountId: String) {
         val file = readAccountsFile() ?: return
         if (file.accounts.none { it.accountId == accountId }) return
         writeAccountsFile(file.copy(activeAccountId = accountId))
     }
 
-    fun removeAccount(accountId: String) {
+    override fun removeAccount(accountId: String) {
         val file = readAccountsFile() ?: return
         val account = file.accounts.firstOrNull { it.accountId == accountId } ?: return
         deleteSecrets(account.providerId, accountId)
@@ -172,8 +147,7 @@ class CredentialsManager internal constructor(
         }
     }
 
-    /** Wipe every account's secrets and the file. */
-    fun clear() {
+    override fun clear() {
         readAccountsFile()?.accounts?.forEach { deleteSecrets(it.providerId, it.accountId) }
         // Drop any lingering legacy flat keys too.
         vault.delete(LEGACY_KEY_ACCESS_TOKEN)

@@ -47,7 +47,7 @@ import androidx.compose.ui.unit.dp
 import hivens.core.api.SkinRepository
 import hivens.core.data.PackAuthRequirement
 import hivens.core.data.SessionData
-import hivens.launcher.CredentialsManager
+import hivens.auth.AccountStore
 import hivens.ui.flexible.Flexible
 import hivens.ui.flexible.FlexibleKind
 import hivens.ui.nx.NxButton
@@ -117,7 +117,7 @@ private fun Wardrobe(session: SessionData) {
     val library: SkinLibrary = koinInject()
     val skinRepository: SkinRepository = koinInject()
     val skinManager: SkinManager = koinInject()
-    val credentials: CredentialsManager = koinInject()
+    val credentials: AccountStore = koinInject()
     val defaultSkinProvider: DefaultSkinProvider = koinInject()
     val scope = rememberCoroutineScope()
 

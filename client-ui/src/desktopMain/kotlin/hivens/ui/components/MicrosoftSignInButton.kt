@@ -27,7 +27,7 @@ import hivens.auth.DeviceCodeAuthProvider
 import hivens.auth.DeviceCodeChallenge
 import hivens.core.data.SessionData
 import hivens.core.diag.ActionRing
-import hivens.launcher.CredentialsManager
+import hivens.auth.AccountStore
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.platform.SystemActions
 import hivens.ui.puppet.PuppetClick
@@ -70,7 +70,7 @@ fun MicrosoftSignInButton(
     puppetId: String = "login.microsoft",
 ) {
     val authRegistry: AuthProviderRegistry     = koinInject()
-    val credentialsManager: CredentialsManager = koinInject()
+    val credentialsManager: AccountStore = koinInject()
     val s   = LocalStrings.current
     val scope = rememberCoroutineScope()
 

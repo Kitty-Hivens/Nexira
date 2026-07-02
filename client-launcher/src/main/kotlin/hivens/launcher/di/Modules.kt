@@ -2,7 +2,10 @@ package hivens.launcher.di
 
 import hivens.config.Protocol
 import hivens.config.Storage
+import hivens.auth.AccountStore
 import hivens.auth.AuthProvider
+import hivens.auth.CredentialsManager
+import hivens.auth.LegacyCredentialsManager
 import hivens.auth.AuthProviderRegistry
 import hivens.auth.OfflineAuthProvider
 import hivens.auth.microsoft.MsaAuthProvider
@@ -392,6 +395,7 @@ val authModule = module {
     // I* slices; other consumers keep the concrete type. get<Concrete>() reuses
     // the single instance rather than building a second.
     single<ICredentialStore> { get<CredentialsManager>() }
+    single<AccountStore> { get<CredentialsManager>() }
 
     single<AuthProvider> { SmartyCraftAuthProvider(get<IServerProtocol>()) }
 
@@ -591,7 +595,7 @@ val launchPipelineModule = module {
     single {
         val dataDir: Path = get()
         val profiles: ProfileManager = get()
-        val credentials: CredentialsManager = get()
+        val credentials: ICredentialStore = get()
         val settings: ISettingsService = get()
         AutoSyncService(
             authService = get(),

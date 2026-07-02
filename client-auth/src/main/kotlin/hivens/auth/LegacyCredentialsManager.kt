@@ -1,4 +1,4 @@
-package hivens.launcher
+package hivens.auth
 
 import hivens.core.data.SessionData
 import hivens.core.security.IKeyringStorage
@@ -67,7 +67,7 @@ import javax.crypto.spec.SecretKeySpec
  * `cachedPassword=null` -- the user can still play; re-login is requested
  * the next time the password is actually needed.
  */
-internal class LegacyCredentialsManager(
+class LegacyCredentialsManager(
     workDir: Path,
     private val json: Json,
     private val keyring: IKeyringStorage,

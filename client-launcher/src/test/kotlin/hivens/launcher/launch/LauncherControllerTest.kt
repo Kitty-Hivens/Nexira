@@ -22,7 +22,7 @@ import hivens.core.launch.SpawnResult
 import dev.hivens.libvault.Vault
 import dev.hivens.libvault.VaultConfig
 import dev.hivens.libvault.VaultTier
-import hivens.launcher.CredentialsManager
+import hivens.auth.CredentialsManager
 import hivens.launcher.ManifestCache
 import hivens.launcher.ProfileManager
 import hivens.launcher.smrt.SmartyModPlanner

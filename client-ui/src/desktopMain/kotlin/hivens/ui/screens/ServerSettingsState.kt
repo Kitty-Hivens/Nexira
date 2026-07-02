@@ -18,7 +18,7 @@ import hivens.core.data.InstanceProfile
 import hivens.core.data.OptionalMod
 import hivens.core.jvm.AutomaticHeap
 import hivens.core.jvm.SystemMemory
-import hivens.launcher.CredentialsManager
+import hivens.auth.AccountStore
 import hivens.launcher.ProfileManager
 import hivens.launcher.ProfilerProfileStore
 import hivens.ui.platform.SystemActions
@@ -66,7 +66,7 @@ internal class ServerSettingsState(
     private val manifestProcessor: IManifestProcessorService,
     private val settingsService: ISettingsService,
     private val profilerStore: ProfilerProfileStore,
-    private val credentialsManager: CredentialsManager,
+    private val credentialsManager: AccountStore,
     private val playerRepository: PlayerRepository,
     private val dataDirectory: Path,
     private val scope: CoroutineScope,
@@ -236,7 +236,7 @@ internal fun rememberServerSettingsState(server: ServerProfile): ServerSettingsS
     val manifestProcessor: IManifestProcessorService = koinInject()
     val settingsService: ISettingsService = koinInject()
     val profilerStore: ProfilerProfileStore = koinInject()
-    val credentialsManager: CredentialsManager = koinInject()
+    val credentialsManager: AccountStore = koinInject()
     val playerRepository: PlayerRepository = koinInject()
     val dataDirectory: Path = koinInject()
     val scope = rememberCoroutineScope()

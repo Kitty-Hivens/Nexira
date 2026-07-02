@@ -1,5 +1,6 @@
 plugins {
     alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 dependencies {
@@ -10,6 +11,11 @@ dependencies {
 
     implementation(libs.slf4j.api)
     implementation(libs.kotlinx.coroutines.core)
+    // credentials.json (the non-secret account list) is a @Serializable envelope.
+    implementation(libs.kotlinx.serialization.json)
+    // api (not implementation): SecretVault sits in CredentialsManager's public
+    // constructor, so the assembler constructing it needs the type.
+    api(libs.libvault)
 
     // ktor-io's ClosedByteChannelException is one of the transient-network
     // failures the agnostic retry classifier recognises.

@@ -60,6 +60,10 @@
 -keep class hivens.ui.MainKt { *; }
 -keep class hivens.ui.** { *; }
 -keep class hivens.launcher.** { *; }
+# Credential store + media resolvers moved out of hivens.launcher into their own
+# modules; without these they silently fall out of the keep set (release-only breakage).
+-keep class hivens.auth.** { *; }
+-keep class hivens.media.** { *; }
 -keep class hivens.core.** { *; }
 
 # --- Serialization & Data Classes ---

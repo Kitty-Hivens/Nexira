@@ -45,7 +45,7 @@ import hivens.launcher.ServerListCacheStore
 import hivens.launcher.bootstrap.AutoLoginCoordinator
 import hivens.launcher.bootstrap.LauncherBootstrap
 import hivens.ui.diag.UiRecoverySignal
-import hivens.launcher.CredentialsManager
+import hivens.auth.AccountStore
 import hivens.core.launch.LaunchState
 import hivens.launcher.launch.LauncherController
 import hivens.launcher.network.ServerProtocolConfig
@@ -239,7 +239,7 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
     val serverListCache: ServerListCacheStore  = koinInject()
     val controller: LauncherController         = koinInject()
     val launchDriver: LaunchDriver             = koinInject()
-    val credentialsManager: CredentialsManager = koinInject()
+    val credentialsManager: AccountStore = koinInject()
     val authService: AuthProvider              = koinInject()
     val profileManager: ProfileManager         = koinInject()
     val gameConsole: GameConsoleService        = koinInject()
@@ -1040,7 +1040,7 @@ fun AppRoot(
     customization: CustomizationSettings,
     onCustomizationChanged: (CustomizationSettings) -> Unit,
 ) {
-    val credentialsManager: CredentialsManager = koinInject()
+    val credentialsManager: AccountStore = koinInject()
     val authService: AuthProvider              = koinInject()
     val profileManager: ProfileManager         = koinInject()
     val settingsService: ISettingsService      = koinInject()

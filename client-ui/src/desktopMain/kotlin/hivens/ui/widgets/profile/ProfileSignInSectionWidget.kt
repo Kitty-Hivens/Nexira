@@ -29,7 +29,7 @@ import androidx.compose.ui.unit.dp
 import hivens.auth.AuthProviderRegistry
 import hivens.core.data.PackAuthRequirement
 import hivens.core.data.SessionData
-import hivens.launcher.CredentialsManager
+import hivens.auth.AccountStore
 import hivens.ui.components.MicrosoftSignInButton
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
@@ -63,7 +63,7 @@ private val MS_KEY = PackAuthRequirement.Microsoft.PROVIDER_KEY
 @Composable
 fun ProfileSignInSectionWidget(instance: WidgetInstance) {
     val ctx = LocalProfileContext.current
-    val credentials: CredentialsManager = koinInject()
+    val credentials: AccountStore = koinInject()
     val authRegistry: AuthProviderRegistry = koinInject()
     val s = LocalStrings.current
 
@@ -102,7 +102,7 @@ fun ProfileSignInSectionWidget(instance: WidgetInstance) {
 @Composable
 private fun MicrosoftAccount(session: SessionData, onChanged: () -> Unit) {
     val ctx = LocalProfileContext.current
-    val credentials: CredentialsManager = koinInject()
+    val credentials: AccountStore = koinInject()
     val s = LocalStrings.current
 
     // Signing out of Microsoft removes its account; if it was the only one, that
