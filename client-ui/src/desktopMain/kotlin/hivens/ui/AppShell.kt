@@ -37,7 +37,9 @@ import hivens.core.data.HomeView
 import hivens.core.data.PackAuthRequirement
 import hivens.core.data.PackOrigin
 import hivens.core.data.SessionData
+import hivens.core.data.ThemeMode
 import hivens.core.data.UiStyle
+import hivens.core.data.resolveInitialThemeMode
 import hivens.launcher.AutoSyncService
 import hivens.launcher.ServerListCacheStore
 import hivens.launcher.bootstrap.AutoLoginCoordinator
@@ -89,6 +91,7 @@ import hivens.ui.theme.BrutStyle
 import hivens.ui.theme.CelestiaStyle
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.CustomTheme
+import hivens.ui.theme.SystemTheme
 import hivens.ui.theme.ThemeRevealHost
 import hivens.ui.theme.rememberThemeReveal
 import hivens.ui.theme.ThemeManager
@@ -267,17 +270,34 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
     // the palette from it. Default-on; the seed is null until a bitmap is decoded.
     val paletteFromWallpaper = settings.paletteFromWallpaper
     var wallpaperSeed by remember { mutableStateOf<Int?>(null) }
-    // Theme-from-wallpaper: match dark/light to the wallpaper's average brightness when
-    // opted in. Luminance is lifted up from the backdrop like the seed.
-    var themeFromWallpaper by remember { mutableStateOf(settings.themeFromWallpaper) }
+    // Which source drives dark/light: the manual toggle, the OS scheme, or the
+    // wallpaper's brightness. Both automatic sources write through isDarkTheme (and
+    // persist it), so everything downstream keeps reading one boolean.
+    var themeMode by remember { mutableStateOf(resolveInitialThemeMode(settings)) }
+    // Whether the OS scheme is readable at all (no portal backend on Linux -> no).
+    // Probed once; drives the System chip's enabled state in the theme island.
+    var systemThemeAvailable by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { systemThemeAvailable = SystemTheme.probe() != null }
     var wallpaperLuminance by remember { mutableStateOf<Float?>(null) }
-    LaunchedEffect(themeFromWallpaper, wallpaperLuminance) {
+    LaunchedEffect(themeMode, wallpaperLuminance) {
         val luma = wallpaperLuminance
-        if (themeFromWallpaper && luma != null) {
+        if (themeMode == ThemeMode.Wallpaper && luma != null) {
             val wantDark = luma < 0.5f
             if (wantDark != isDarkTheme) {
                 isDarkTheme = wantDark
                 settingsService.saveSettings(settingsService.getSettings().copy(isDarkTheme = isDarkTheme))
+            }
+        }
+    }
+    // System mode: follow the OS scheme while the mode is active -- the cold flow
+    // polls only while collected, so the other modes cost nothing. Persisting each
+    // flip keeps the next cold start on the last observed scheme (no startup flash).
+    LaunchedEffect(themeMode) {
+        if (themeMode != ThemeMode.System) return@LaunchedEffect
+        SystemTheme.observe().collect { dark ->
+            if (dark != null && dark != isDarkTheme) {
+                isDarkTheme = dark
+                settingsService.saveSettings(settingsService.getSettings().copy(isDarkTheme = dark))
             }
         }
     }
@@ -923,15 +943,28 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
                         else null,
                         isDarkTheme          = isDarkTheme,
                         onToggleDarkTheme    = {
+                            // An explicit flip always wins: leaving an automatic mode
+                            // drops back to Manual in the same save.
                             isDarkTheme = !isDarkTheme
+                            themeMode = ThemeMode.Manual
                             val current = settingsService.getSettings()
-                            settingsService.saveSettings(current.copy(isDarkTheme = isDarkTheme))
+                            settingsService.saveSettings(current.copy(
+                                isDarkTheme = isDarkTheme,
+                                themeMode = ThemeMode.Manual,
+                                themeFromWallpaper = false,
+                            ))
                         },
-                        themeFromWallpaper = themeFromWallpaper,
-                        onThemeFromWallpaperChanged = { on ->
-                            themeFromWallpaper = on
-                            settingsService.saveSettings(settingsService.getSettings().copy(themeFromWallpaper = on))
+                        themeMode = themeMode,
+                        onThemeModeChanged = { mode ->
+                            themeMode = mode
+                            // themeFromWallpaper mirrors the mode so a downgrade to a
+                            // pre-mode build keeps the wallpaper opt-in coherent.
+                            settingsService.saveSettings(settingsService.getSettings().copy(
+                                themeMode = mode,
+                                themeFromWallpaper = mode == ThemeMode.Wallpaper,
+                            ))
                         },
+                        systemThemeAvailable = systemThemeAvailable,
                         customTheme          = customTheme,
                         onCustomThemeChanged = { newTheme ->
                             customTheme = newTheme
@@ -992,8 +1025,9 @@ fun AppRoot(
     onRealExit: () -> Unit,
     onHideToTray: (() -> Unit)?,
     onToggleDarkTheme: () -> Unit,
-    themeFromWallpaper: Boolean,
-    onThemeFromWallpaperChanged: (Boolean) -> Unit,
+    themeMode: ThemeMode,
+    onThemeModeChanged: (ThemeMode) -> Unit,
+    systemThemeAvailable: Boolean,
     customTheme: CustomTheme,
     onCustomThemeChanged: (CustomTheme) -> Unit,
     currentLocale: AppLocale,
@@ -1167,8 +1201,9 @@ fun AppRoot(
                 onLogout = { pendingLogout = true },
                 isDarkTheme = isDarkTheme,
                 onToggleDarkTheme = onToggleDarkTheme,
-                themeFromWallpaper = themeFromWallpaper,
-                onThemeFromWallpaperChanged = onThemeFromWallpaperChanged,
+                themeMode = themeMode,
+                onThemeModeChanged = onThemeModeChanged,
+                systemThemeAvailable = systemThemeAvailable,
                 customTheme = customTheme,
                 onCustomThemeChanged = onCustomThemeChanged,
                 currentLocale = currentLocale,

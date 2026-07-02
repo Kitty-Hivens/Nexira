@@ -14,6 +14,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import hivens.core.data.ThemeMode
 import hivens.core.data.UiStyle
 import hivens.ui.background.BackgroundSettings
 import hivens.ui.puppet.PuppetClick
@@ -52,8 +53,9 @@ fun BgSettingsSurface(
     onBack: () -> Unit,
     isDarkTheme: Boolean,
     onToggleDarkTheme: () -> Unit,
-    themeFromWallpaper: Boolean,
-    onThemeFromWallpaperChanged: (Boolean) -> Unit,
+    themeMode: ThemeMode,
+    onThemeModeChanged: (ThemeMode) -> Unit,
+    systemThemeAvailable: Boolean,
     uiStyle: UiStyle,
     onUiStyleChanged: (UiStyle) -> Unit,
     onOpenThemePicker: () -> Unit,
@@ -97,14 +99,15 @@ fun BgSettingsSurface(
             Spacer(Modifier.weight(1f))
 
             AppearanceThemeIsland(
-                isDarkTheme                 = isDarkTheme,
-                onToggleDarkTheme           = onToggleDarkTheme,
-                themeFromWallpaper          = themeFromWallpaper,
-                onThemeFromWallpaperChanged = onThemeFromWallpaperChanged,
-                uiStyle                     = uiStyle,
-                onUiStyleChanged            = onUiStyleChanged,
-                onOpenThemePicker           = onOpenThemePicker,
-                modifier                    = Modifier.width(THEME_PANEL_WIDTH).fillMaxHeight(),
+                isDarkTheme          = isDarkTheme,
+                onToggleDarkTheme    = onToggleDarkTheme,
+                themeMode            = themeMode,
+                onThemeModeChanged   = onThemeModeChanged,
+                systemThemeAvailable = systemThemeAvailable,
+                uiStyle              = uiStyle,
+                onUiStyleChanged     = onUiStyleChanged,
+                onOpenThemePicker    = onOpenThemePicker,
+                modifier             = Modifier.width(THEME_PANEL_WIDTH).fillMaxHeight(),
             )
         }
     }
