@@ -21,6 +21,8 @@ import hivens.ui.render3d.Texture
 import hivens.ui.render3d.Tri
 import hivens.ui.render3d.Vtx
 import hivens.ui.render3d.rasterize
+import hivens.ui.scene3d.Face
+import hivens.ui.scene3d.Vec3
 import hivens.ui.theme.LocalStyle
 import java.awt.image.BufferedImage
 import kotlin.math.PI
