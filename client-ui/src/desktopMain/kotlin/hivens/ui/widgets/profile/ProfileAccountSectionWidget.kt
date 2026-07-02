@@ -43,6 +43,8 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.platform.SystemActions
 import hivens.ui.puppet.PuppetClick
+import hivens.ui.skin3d.Cycles
+import hivens.ui.skin3d.rememberSkinViewState
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalStyle
 import hivens.widget.model.Widget
@@ -112,14 +114,17 @@ private fun SmartyCraftAccount(session: SessionData, onChanged: () -> Unit) {
     Column(Modifier.fillMaxSize().padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         AccountPanel(session)
 
-        // Skin below the panel, with upload + refresh directly under it.
+        // Skin below the panel, with upload + refresh directly under it. The
+        // hero idles (breath + head drift) instead of the turntable spin --
+        // the character inhabits the page; drag still orbits for inspection.
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             SkinHero(
                 session.playerName,
                 skinKey,
                 Modifier.width(190.dp).height(300.dp),
                 interactive = true,
-                autoSpin = true,
+                autoSpin = false,
+                state = rememberSkinViewState(initialAnimation = Cycles.idle()),
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Flexible("profile_upload_skin_btn", FlexibleKind.Button) {
