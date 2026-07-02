@@ -44,6 +44,34 @@ class SystemThemeTest {
         assertNull(parsePortalColorScheme("(<<uint32 7>>,)"))
     }
 
+    // -- gdbus monitor SettingChanged lines (real captured formats) --
+
+    @Test
+    fun signal_appearance_change_parses() {
+        val dark = "/org/freedesktop/portal/desktop: org.freedesktop.portal.Settings.SettingChanged " +
+            "('org.freedesktop.appearance', 'color-scheme', <uint32 1>)"
+        val light = "/org/freedesktop/portal/desktop: org.freedesktop.portal.Settings.SettingChanged " +
+            "('org.freedesktop.appearance', 'color-scheme', <uint32 2>)"
+        assertEquals(true, parseSettingChangedLine(dark))
+        assertEquals(false, parseSettingChangedLine(light))
+    }
+
+    @Test
+    fun signal_legacy_desktop_namespace_is_ignored() {
+        val gnome = "/org/freedesktop/portal/desktop: org.freedesktop.portal.Settings.SettingChanged " +
+            "('org.gnome.desktop.interface', 'color-scheme', <'prefer-light'>)"
+        assertNull(parseSettingChangedLine(gnome))
+    }
+
+    @Test
+    fun signal_unrelated_lines_are_ignored() {
+        assertNull(parseSettingChangedLine("Monitoring signals from all objects owned by org.freedesktop.portal.Desktop"))
+        assertNull(parseSettingChangedLine("The name org.freedesktop.portal.Desktop is owned by :1.22"))
+        val noPreference = "/org/freedesktop/portal/desktop: org.freedesktop.portal.Settings.SettingChanged " +
+            "('org.freedesktop.appearance', 'color-scheme', <uint32 0>)"
+        assertNull(parseSettingChangedLine(noPreference))
+    }
+
     // -- Windows registry --
 
     @Test
