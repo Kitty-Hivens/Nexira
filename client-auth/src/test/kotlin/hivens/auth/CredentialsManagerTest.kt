@@ -1,4 +1,4 @@
-package hivens.launcher
+package hivens.auth
 
 import dev.hivens.libvault.SecretVault
 import dev.hivens.libvault.VaultTier

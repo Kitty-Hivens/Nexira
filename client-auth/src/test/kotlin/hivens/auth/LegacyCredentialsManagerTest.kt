@@ -1,4 +1,4 @@
-package hivens.launcher
+package hivens.auth
 
 import hivens.core.data.SessionData
 import hivens.core.security.IKeyringStorage

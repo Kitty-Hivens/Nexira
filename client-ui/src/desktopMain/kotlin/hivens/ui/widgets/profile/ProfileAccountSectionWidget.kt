@@ -32,7 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.core.data.PackAuthRequirement
 import hivens.core.data.SessionData
-import hivens.launcher.CredentialsManager
+import hivens.auth.AccountStore
 import hivens.ui.LoginPanel
 import hivens.ui.flexible.Flexible
 import hivens.ui.flexible.FlexibleKind
@@ -61,7 +61,7 @@ private val SC_KEY = PackAuthRequirement.SmartyCraft.PROVIDER_KEY
 @Composable
 fun ProfileAccountSectionWidget(instance: WidgetInstance) {
     val ctx = LocalProfileContext.current
-    val credentials: CredentialsManager = koinInject()
+    val credentials: AccountStore = koinInject()
 
     var refreshKey by remember { mutableIntStateOf(0) }
     val scSession = remember(refreshKey, ctx.session) { credentials.accountFor(SC_KEY) }
@@ -88,7 +88,7 @@ fun ProfileAccountSectionWidget(instance: WidgetInstance) {
 @Composable
 private fun SmartyCraftAccount(session: SessionData, onChanged: () -> Unit) {
     val ctx = LocalProfileContext.current
-    val credentials: CredentialsManager = koinInject()
+    val credentials: AccountStore = koinInject()
     val s = LocalStrings.current
 
     // Bumped by the skin uploader so the skin re-loads after upload/refresh.

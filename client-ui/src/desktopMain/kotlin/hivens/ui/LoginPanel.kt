@@ -25,7 +25,7 @@ import hivens.core.data.AuthStatus
 import hivens.auth.AuthProvider
 import hivens.auth.OfflineAuthProvider
 import hivens.core.data.SessionData
-import hivens.launcher.CredentialsManager
+import hivens.auth.AccountStore
 import hivens.launcher.network.NetworkState
 import hivens.launcher.ProfileManager
 import hivens.launcher.network.ServerProtocolConfig
@@ -56,7 +56,7 @@ fun LoginPanel(
 ) {
     val authService: AuthProvider              = koinInject()
     val insecureAuthService: AuthProvider      = koinInject(named("insecure"))
-    val credentialsManager: CredentialsManager = koinInject()
+    val credentialsManager: AccountStore = koinInject()
     val profileManager: ProfileManager         = koinInject()
     val protocolConfig: ServerProtocolConfig   = koinInject()
     val offlineProvider: OfflineAuthProvider   = koinInject()
