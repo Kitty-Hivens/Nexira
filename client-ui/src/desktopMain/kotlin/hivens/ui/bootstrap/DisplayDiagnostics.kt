@@ -1,4 +1,4 @@
-package hivens.launcher.bootstrap
+package hivens.ui.bootstrap
 
 import hivens.core.platform.OS
 import org.slf4j.LoggerFactory

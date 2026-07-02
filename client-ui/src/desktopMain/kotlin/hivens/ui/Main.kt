@@ -9,6 +9,8 @@ import androidx.compose.ui.window.WindowExceptionHandlerFactory
 import androidx.compose.ui.window.application
 import hivens.core.api.interfaces.ISettingsService
 import hivens.launcher.bootstrap.LauncherBootstrap
+import hivens.ui.bootstrap.GuiBootstrap
+import hivens.ui.diag.CrashDialog
 import hivens.ui.diag.ShellRecovery
 import hivens.ui.diag.UiRecoverySignal
 import hivens.ui.i18n.AppLocale
@@ -58,7 +60,7 @@ import org.koin.dsl.module
 
 /**
  * Compose-aware Koin singletons that the ui module owns. Passed into
- * [LauncherBootstrap.preBoot] so they land in the same Koin context as
+ * [GuiBootstrap.preBoot] so they land in the same Koin context as
  * the launcher's own modules without inverting the module dependency
  * direction (client-launcher must not know about client-ui types).
  */
@@ -210,7 +212,7 @@ val uiModule = module {
 
 @OptIn(ExperimentalResourceApi::class)
 fun main() {
-    val boot = LauncherBootstrap.preBoot(listOf(uiModule))
+    val boot = GuiBootstrap.preBoot(listOf(uiModule))
 
     // Puppet mode: opt-in localhost HTTP control surface for automated
     // UI driving (see hivens.ui.puppet.PuppetServerLifecycle + Loader).
@@ -249,7 +251,7 @@ fun main() {
  * kernel), and a crash while already in safe mode falls back to the terminal
  * Swing crash dialog.
  *
- * Koin singletons and the data dirs are created in [LauncherBootstrap.preBoot]
+ * Koin singletons and the data dirs are created in [GuiBootstrap.preBoot]
  * -- outside this loop -- so a restart keeps the user's data, session and audio
  * playback; only transient composition state (current screen, scroll) is lost.
  */
@@ -318,7 +320,7 @@ private fun runShellWithRecovery(boot: LauncherBootstrap.Result) {
                 log.error("Safe mode itself crashed -- giving up on the UI")
                 if (saved != null) {
                     runCatching {
-                        SwingUtilities.invokeAndWait { boot.crashReporter.showCrashDialog(saved.first, saved.second) }
+                        SwingUtilities.invokeAndWait { CrashDialog.show(saved.first, saved.second) }
                     }
                 }
                 return

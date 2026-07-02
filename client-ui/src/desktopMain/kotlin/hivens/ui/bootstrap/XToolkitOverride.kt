@@ -1,4 +1,4 @@
-package hivens.launcher.bootstrap
+package hivens.ui.bootstrap
 
 import hivens.config.Branding
 import hivens.core.platform.OS
