@@ -1,7 +1,6 @@
 package hivens.ui.skin3d
 
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -11,28 +10,26 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.input.pointer.pointerInput
 import hivens.ui.render3d.Texture
-import hivens.ui.render3d.rasterize
-import hivens.ui.scene3d.collectTriBatches
+import hivens.ui.scene3d.OrthoCamera
+import hivens.ui.scene3d.Scene3DState
+import hivens.ui.scene3d.Scene3DView
 import hivens.ui.theme.LocalStyle
-import java.awt.image.BufferedImage
 import kotlin.math.PI
 
-// Live 3D Minecraft-skin view. Builds the posable rig from [buildRig], flattens
-// it through the scene traversal (collectTriBatches: double-sided alpha-tested
-// cutout emission with the overlay depth bias) and rasterizes with a per-pixel
-// depth buffer, so the inner head + hat/jacket overlays + coplanar seams order
-// correctly at every angle. Drag rotates; the hoisted [SkinViewState] carries
+// Live 3D Minecraft-skin view. Builds the posable rig from [buildRig] and
+// hosts it in a Scene3DView: the scene traversal (double-sided alpha-tested
+// cutout emission with the overlay depth bias) plus the depth-buffered
+// rasterizer keep the inner head + hat/jacket overlays + coplanar seams
+// ordered at every angle. Drag rotates; the hoisted [SkinViewState] carries
 // the orbit angles and the pose playback head, so surfaces can turn the model
-// or play pose animations from outside. The rasterized frame is cached
-// (drawWithCache) and re-renders only when a snapshot input changes: yaw,
-// pitch, or the pose clock -- a static pose at a fixed angle rasterizes once.
+// or play pose animations from outside. The frame is cached and re-renders
+// only when a snapshot input changes: yaw, pitch, or the pose clock -- a
+// static pose at a fixed angle rasterizes once.
 
 private const val TWO_PI = (2.0 * PI).toFloat()
 
@@ -79,6 +76,7 @@ fun SkinView3D(
     }
     // UV rects are in 1x texels; an HD skin (64*k) multiplies them by k.
     val rig = remember(skin) { buildRig(model, legacy, texture, uvScale = skin.width / 64f) }
+    val scene = remember(rig) { Scene3DState(rig.root) }
 
     var dragging by remember { mutableStateOf(false) }
 
@@ -132,37 +130,25 @@ fun SkinView3D(
         Modifier
     }
 
-    // drawWithCache re-rasterizes only when the size or a read state (yaw /
-    // pitch / pose clock) changes -- an animating hero rebuilds each frame,
-    // but a static grid card rasterizes once and just blits.
-    Box(
-        modifier
-            .then(gestureModifier)
-            .drawWithCache {
-                val w = size.width.toInt()
-                val h = size.height.toInt()
-                if (w <= 0 || h <= 0) {
-                    onDrawBehind { }
-                } else {
-                    // Full: figure spans ~33 model units tall / ~18 wide once limbs
-                    // rotate in; fit to the smaller axis with margin so it never
-                    // clips. Bust: zoom in and drop the origin near the bottom so
-                    // head+torso fill it and the legs fall off below.
-                    val (scale, centerY) = when (framing) {
-                        SkinFraming.Full -> minOf(h / 42f, w / 22f) to h / 2f
-                        SkinFraming.Bust -> minOf(h / 24f, w / 18f) to h * 0.80f
-                    }
-                    rig.apply(state.animator.poseAt(state.timeMs))
-                    val batch = collectTriBatches(rig.root, state.yaw, state.pitch, scale, w / 2f, centerY).single()
-                    val bmp = rasterize(batch.tris, batch.texture, w, h).toImageBitmap(w, h)
-                    onDrawBehind { drawImage(bmp) }
-                }
-            },
+    // The scene host draws; SkinViewState stays the single orbit/pose source
+    // of truth, so the built-in scene camera controls are off and the camera
+    // reads this state instead (snapshot reads inside cameraFor/prepareFrame
+    // invalidate the draw like any other).
+    Scene3DView(
+        state = scene,
+        modifier = modifier.then(gestureModifier),
+        interactive = false,
+        prepareFrame = { rig.apply(state.animator.poseAt(state.timeMs)) },
+        cameraFor = { w, h ->
+            // Full: figure spans ~33 model units tall / ~18 wide once limbs
+            // rotate in; fit to the smaller axis with margin so it never
+            // clips. Bust: zoom in and drop the origin near the bottom so
+            // head+torso fill it and the legs fall off below.
+            val (scale, centerY) = when (framing) {
+                SkinFraming.Full -> minOf(h / 42f, w / 22f) to h / 2f
+                SkinFraming.Bust -> minOf(h / 24f, w / 18f) to h * 0.80f
+            }
+            OrthoCamera(state.yaw, state.pitch, scale, w / 2f, centerY)
+        },
     )
-}
-
-private fun IntArray.toImageBitmap(w: Int, h: Int): ImageBitmap {
-    val img = BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB)
-    img.setRGB(0, 0, w, h, this, 0, w)
-    return img.toComposeImageBitmap()
 }
