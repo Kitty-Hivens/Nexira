@@ -1,13 +1,15 @@
 package hivens.ui.skin3d
 
-import kotlin.math.abs
+import hivens.ui.scene3d.Face
+import hivens.ui.scene3d.UvRect
+import hivens.ui.scene3d.Vec3
 
 // Pure-Kotlin (Compose-free) geometry for the 3D skin renderer. Builds the
-// player model as a set of textured boxes and exposes their faces; the UV
-// rectangles index the standard Minecraft skin layout in 1x texel units, so
-// an HD skin (64*k texels) multiplies them by k = textureWidth / 64 at draw
-// time. Compose-free on purpose: everything here is unit-tested without a
-// renderer (see Skin3dModelTest), matching SkinManager's split.
+// player model as a set of textured boxes and exposes their faces (the shared
+// scene3d types); the UV rectangles index the standard Minecraft skin layout
+// in 1x texel units, so an HD skin (64*k texels) multiplies them by
+// k = textureWidth / 64 at draw time. Compose-free on purpose: everything here
+// is unit-tested without a renderer, matching SkinManager's split.
 //
 // Model space: Y up, +Z toward the viewer, X to the right. The figure is
 // centred on the origin -- feet at y = -16, head top at y = +16 -- so yaw
@@ -15,24 +17,6 @@ import kotlin.math.abs
 
 /** Player arm width. Classic (Steve) = 4 texels, Slim (Alex) = 3. */
 enum class SkinModel(val armWidth: Float) { Classic(4f), Slim(3f) }
-
-data class Vec3(val x: Float, val y: Float, val z: Float)
-
-/** A 2D point in screen pixels (own type so the core carries no Compose dep). */
-data class Pt2(val x: Float, val y: Float)
-
-/** Texture sub-rectangle in 1x texels, top-left origin. */
-data class UvRect(val u: Float, val v: Float, val w: Float, val h: Float)
-
-/**
- * One quad of a box. [p0] is the model-space corner that maps to the texture
- * rect's top-left (u, v); [pu] maps to the top-right (u+w, v); [pv] maps to the
- * bottom-left (u, v+h). The fourth corner is implied (p0 + (pu-p0) + (pv-p0)),
- * so the quad is always a parallelogram -- exact under orthographic projection.
- * [layer] is the paint group: false = base box, true = the inflated overlay
- * (hat / jacket / sleeves / pants), which carries transparency.
- */
-data class Face(val p0: Vec3, val pu: Vec3, val pv: Vec3, val uv: UvRect, val layer: Boolean)
 
 /**
  * A box in model space ([x0..x1] x [y0..y1] x [z0..z1]) textured from the
@@ -167,6 +151,3 @@ fun guessModel(width: Int, height: Int, alphaAt: (x: Int, y: Int) -> Int): SkinM
     }
     return if (opaque > 0) SkinModel.Classic else SkinModel.Slim
 }
-
-// Small vector helper kept here so the projection file and tests share it.
-internal fun nearlyEqual(a: Float, b: Float, eps: Float = 1e-3f): Boolean = abs(a - b) <= eps
