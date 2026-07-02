@@ -22,6 +22,8 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.painter.BitmapPainter
@@ -57,6 +59,8 @@ class BackdropState(
     val darken: Float = 0f,
     val tint: Color? = null,
     val tintOpacity: Float = 0f,
+    // -1 = grayscale, 0 = unchanged, +1 = oversaturated (maps to setToSaturation(1 + v)).
+    val saturation: Float = 0f,
     val parallaxIntensity: Float = 0f,
     val isAnimated: Boolean = false,
     // Material-You palette seed (ARGB) extracted from the wallpaper -- the dominant
@@ -89,6 +93,13 @@ fun parallaxScaleFor(intensity: Float): Float = 1f + intensity * 0.15f
 /** Parallax translation in px from a normalized (0..1) mouse position. */
 fun parallaxTranslationFor(mouse: Offset, intensity: Float): Offset =
     Offset((0.5f - mouse.x) * intensity * 80f, (0.5f - mouse.y) * intensity * 80f)
+
+/** The saturation slider's ColorFilter: -1 -> grayscale, 0 -> none (null), +1 ->
+ *  oversaturated. Shared by the wallpaper draw and the frost slice. */
+fun bgSaturationFilter(saturation: Float): ColorFilter? =
+    saturation.takeIf { it != 0f }?.let {
+        ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(1f + it) })
+    }
 
 /** ScaleMode -> ContentScale, shared so the slice scales like the real image. */
 fun bgContentScale(mode: ScaleMode): ContentScale = when (mode) {
@@ -132,12 +143,16 @@ fun FrostBackdrop(extraBlurDp: Float, modifier: Modifier = Modifier) {
     val py by animateFloatAsState(target.y, spring(stiffness = 50f, dampingRatio = 0.8f), label = "frostParY")
     val pScale = parallaxScaleFor(st.parallaxIntensity)
 
+    // Mirror the wallpaper's saturation so the slice matches the real draw.
+    val saturationFilter = remember(st.saturation) { bgSaturationFilter(st.saturation) }
+
     Box(modifier.clipToBounds().onGloballyPositioned { origin = it.positionInWindow() }) {
         Image(
             painter            = BitmapPainter(bmp),
             contentDescription = null,
             contentScale       = st.contentScale,
             alignment          = st.alignment,
+            colorFilter        = saturationFilter,
             modifier           = Modifier
                 .size(with(density) { win.width.toDp() }, with(density) { win.height.toDp() })
                 .offset { IntOffset(-origin.x.roundToInt(), -origin.y.roundToInt()) }
