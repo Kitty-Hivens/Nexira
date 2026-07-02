@@ -1,4 +1,4 @@
-package hivens.launcher.diag
+package hivens.ui.diag
 
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
