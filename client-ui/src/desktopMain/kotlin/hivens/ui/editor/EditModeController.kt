@@ -2,7 +2,7 @@ package hivens.ui.editor
 
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
-import hivens.launcher.LayoutGraphRepository
+import hivens.ui.layout.LayoutGraphRepository
 import hivens.widget.model.CanvasPlacement
 import hivens.widget.model.GridCell
 import hivens.widget.model.SlotContent

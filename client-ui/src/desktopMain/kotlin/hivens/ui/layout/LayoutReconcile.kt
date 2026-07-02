@@ -1,4 +1,4 @@
-package hivens.launcher
+package hivens.ui.layout
 
 import hivens.widget.model.LayoutGraph
 import hivens.widget.model.walkInstances

@@ -72,7 +72,6 @@ import hivens.launcher.update.DesktopIntegration
 import hivens.launcher.update.SourceBuildService
 import hivens.launcher.update.UpdateApplicators
 import hivens.launcher.update.UpdateService
-import hivens.widget.model.DefaultLayout
 import io.ktor.client.*
 import io.ktor.client.engine.okhttp.*
 import io.ktor.client.plugins.*
@@ -742,27 +741,6 @@ val appModule = module {
         )
     }
 
-    // Widget layout graph persistence (Phase 1 / kernel-2). Default
-    // graph lives at /widget/default-layout.json inside :widget-api;
-    // first run seeds the file, thereafter the on-disk copy is the
-    // source of truth. Reactive via StateFlow so the future editor
-    // mutates the graph live.
-    single {
-        val dataDir: Path = get()
-        LayoutGraphRepository(
-            file         = dataDir.resolve(Storage.LAYOUT_GRAPH_FILE),
-            json         = get(),
-            scope        = get(),
-            defaultGraph = { DefaultLayout.load(get()) },
-        )
-    }
-
-    // Flush pending debounced layout writes on JVM shutdown. Lives as
-    // its own createdAtStart=true single so the hook is registered
-    // during startKoin{}. Runs in parallel with AppCoroutineScopeHook
-    // (JVM shutdown hooks run concurrently); flush() is mutex-locked
-    // and cancellation-safe, so racing with scope cancellation is OK.
-    single(createdAtStart = true) { LayoutGraphFlushHook(get()) }
 }
 
 // ── Module factories ────────────────────────────────────────────────────────

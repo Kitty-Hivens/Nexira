@@ -27,7 +27,10 @@ import hivens.config.Storage
 import hivens.ui.audio.AudioPlayer
 import hivens.ui.editor.EditModeController
 import hivens.ui.editor.presets.PresetRepository
+import hivens.ui.layout.LayoutGraphFlushHook
+import hivens.ui.layout.LayoutGraphRepository
 import hivens.ui.utils.GameConsoleService
+import hivens.widget.model.DefaultLayout
 import java.nio.file.Path
 import javax.swing.SwingUtilities
 import org.slf4j.LoggerFactory
@@ -106,6 +109,27 @@ val uiModule = module {
             register(Commands.SetDoNotDisturb, command { center.setDoNotDisturb(it) })
         }
     }
+
+    // Widget layout graph persistence. Default graph lives at
+    // /widget/default-layout.json inside :widget-model; first run seeds the
+    // file, thereafter the on-disk copy is the source of truth. Reactive via
+    // StateFlow so the editor mutates the graph live. Lives in the ui module:
+    // the layout graph is UI-shell state, the engine has no reader.
+    single {
+        val dataDir: Path = get()
+        LayoutGraphRepository(
+            file         = dataDir.resolve(Storage.LAYOUT_GRAPH_FILE),
+            json         = get(),
+            scope        = get(),
+            defaultGraph = { DefaultLayout.load(get()) },
+        )
+    }
+
+    // Flush pending debounced layout writes on JVM shutdown. createdAtStart so
+    // the hook registers during startKoin{}. Runs in parallel with the scope
+    // cancellation hook (JVM shutdown hooks run concurrently); flush() is
+    // mutex-locked and cancellation-safe, so the race is fine.
+    single(createdAtStart = true) { LayoutGraphFlushHook(get()) }
 
     // Per-instance widget runtime state (rememberWidgetState): the store backs the
     // WidgetStateHost local; the GC collector prunes orphans off the live layout
