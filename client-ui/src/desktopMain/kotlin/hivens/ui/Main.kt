@@ -29,6 +29,8 @@ import hivens.config.Storage
 import hivens.ui.audio.AudioPlayer
 import hivens.ui.editor.EditModeController
 import hivens.ui.editor.presets.PresetRepository
+import hivens.media.VideoCacheService
+import hivens.media.YtDlpService
 import hivens.ui.layout.LayoutGraphFlushHook
 import hivens.ui.layout.LayoutGraphRepository
 import hivens.ui.utils.GameConsoleService
@@ -54,6 +56,7 @@ import hivens.widget.generated.GeneratedWidgetRegistry
 import kotlinx.coroutines.CoroutineScope
 import org.jetbrains.compose.resources.ExperimentalResourceApi
 import org.koin.core.context.stopKoin
+import org.koin.core.qualifier.named
 import org.koin.dsl.module
 
 // ─── DI ──────────────────────────────────────────────────────────────────────
@@ -150,6 +153,19 @@ val uiModule = module {
     // playback state lives in the singleton so swapping the widget
     // out of the layout does not stop playback.
     single { AudioPlayer(scope = get()) }
+
+    // Media resolvers feeding the local-only Skinema player (client-media).
+    // Wired here: the UI is their only consumer, the launch engine does not
+    // know the module. "direct" channel: public CDNs / GitHub, not SC-proxied.
+    single { VideoCacheService(dir = get<Path>().resolve("video-cache"), http = get(named("direct")), scope = get()) }
+    single {
+        YtDlpService(
+            toolsDir      = get<Path>().resolve("tools"),
+            videoCacheDir = get<Path>().resolve("video-cache"),
+            http          = get(named("direct")),
+            scope         = get(),
+        )
+    }
 
     // Preset storage. One file per preset under <dataDir>/presets/.
     // Atomic write + share-by-file design lets users export to

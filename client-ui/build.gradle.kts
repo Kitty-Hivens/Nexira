@@ -68,6 +68,7 @@ kotlin {
                 implementation(project(":client-core"))
                 implementation(project(":client-auth"))
                 implementation(project(":client-launcher"))
+                implementation(project(":client-media"))
                 implementation(project(":widget-api"))
                 implementation(project(":nx-ui"))
 

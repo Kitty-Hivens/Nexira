@@ -77,6 +77,9 @@ include(":client-launcher")
 // (:client-ui) stays on the JVM -- Skiko/AWT block native-image of Compose.
 // See docs/native-image.md.
 include(":client-cli")
+// Media playback support (yt-dlp + URL video cache) feeding the Skinema player.
+// Its own seam: consumed by the UI only, unknown to the launch engine.
+include(":client-media")
 include(":client-ui")
 // Leaf design-system module (NxUI): tokens, primitives, surfaces, Flexible.
 // client-ui depends on it one-way; it depends on nothing in-tree.

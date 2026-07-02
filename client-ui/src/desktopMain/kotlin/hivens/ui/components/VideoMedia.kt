@@ -22,8 +22,8 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import dev.hivens.skinema.compose.VideoScale
-import hivens.launcher.media.VideoCacheService
-import hivens.launcher.media.YtDlpService
+import hivens.media.VideoCacheService
+import hivens.media.YtDlpService
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.render.openInBrowser
 import kotlinx.coroutines.CancellationException
