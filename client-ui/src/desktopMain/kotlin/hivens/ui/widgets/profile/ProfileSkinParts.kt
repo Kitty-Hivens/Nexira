@@ -31,7 +31,10 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.identity.SkinManager
+import hivens.ui.skin3d.SkinFraming
 import hivens.ui.skin3d.SkinView3D
+import hivens.ui.skin3d.SkinViewState
+import hivens.ui.skin3d.rememberSkinViewState
 import hivens.ui.theme.NxTheme
 import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
@@ -61,6 +64,8 @@ fun SkinHero(
     modifier: Modifier = Modifier,
     interactive: Boolean = true,
     autoSpin: Boolean = true,
+    framing: SkinFraming = SkinFraming.Full,
+    state: SkinViewState = rememberSkinViewState(),
 ) {
     val skinManager: SkinManager = koinInject()
     var skin by remember(playerName) { mutableStateOf<ImageBitmap?>(null) }
@@ -72,7 +77,14 @@ fun SkinHero(
     Box(modifier, contentAlignment = Alignment.Center) {
         val current = skin
         if (current != null) {
-            SkinView3D(current, Modifier.fillMaxSize(), interactive = interactive, autoSpin = autoSpin)
+            SkinView3D(
+                current,
+                Modifier.fillMaxSize(),
+                interactive = interactive,
+                autoSpin = autoSpin,
+                framing = framing,
+                state = state,
+            )
         } else {
             CircularProgressIndicator(
                 color = NxTheme.colors.primary,
