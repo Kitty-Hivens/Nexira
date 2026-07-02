@@ -58,15 +58,11 @@ import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.editor.EditModeController
 import hivens.ui.editor.EditModeState
 import hivens.ui.editor.LocalEditMode
-import hivens.ui.surface.Fill
-import hivens.ui.surface.FrostRole
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.surface.FrostSurface
 import hivens.ui.surface.FrostTier
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
-import hivens.ui.surface.toLayers
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalStyle
 import hivens.widget.api.LocalSlotPath
@@ -120,6 +116,21 @@ data class ShellRightRegionProps(
 )
 
 /**
+ * Props for the LEFT region (the navigation rail). Like the right panel it renders its own
+ * [NxSurface] whose matte is the editable [frostTier] (default [FrostTier.Clear] -- a
+ * transparent chrome that prioritises see-through over a wallpaper). The flat-glass knob
+ * [ShellRegionProps.glassAlphaPct] has no place here and does not exist on this class -- the
+ * prop panel shows only what works.
+ */
+@Serializable
+data class ShellLeftRegionProps(
+    @PropLabel("widget.appshell.region.widthDp") @PropRange(0.0, 600.0) val widthDp: Int = 0,
+    @PropLabel("widget.appshell.region.showDivider") val showDivider: Boolean = false,
+    @PropLabel("widget.appshell.region.collapsed") val collapsed: Boolean = false,
+    @PropLabel("widget.appshell.region.frostTier") val frostTier: FrostTier = FrostTier.Clear,
+)
+
+/**
  * Everything the three shell regions need, provided once by [hivens.ui.AppLayout]
  * so the region widgets (which render through SlotRenderer and take no params)
  * can build the rails + center. `compositionLocalOf` so only the region readers
@@ -151,15 +162,6 @@ val LocalShellContext = compositionLocalOf<ShellContext> {
     error("LocalShellContext not provided -- AppLayout must wrap the shell surface")
 }
 
-// Width + optional glass backing shared by the two rails. Flex (widthDp 0)
-// leaves sizing to the SlotRenderer weight wrapper; fixed pins a width.
-@Composable
-private fun regionModifier(props: ShellRegionProps): Modifier {
-    val sized = if (props.widthDp > 0) Modifier.width(props.widthDp.dp) else Modifier
-    val bg = if (props.glassAlpha > 0f) glassSurfaceAlpha(props.glassAlpha) else Color.Transparent
-    return sized.fillMaxHeight().background(bg)
-}
-
 @Composable
 private fun RowScope.RegionDivider(show: Boolean) {
     if (show) VerticalDivider(Modifier.fillMaxHeight(), color = glassSurfaceAlpha(0.6f))
@@ -177,23 +179,30 @@ private fun CollapsedRegionStrip() {
  * Left region: the navigation rail plus the divider that separates it from the
  * center. removable=false -- losing the rail would navigation-lock the launcher.
  */
-@Widget(id = "appshell.region.left", displayName = "widget.appshell.region.left", removable = false, propsClass = ShellRegionProps::class)
+@Widget(id = "appshell.region.left", displayName = "widget.appshell.region.left", removable = false, propsClass = ShellLeftRegionProps::class)
 @Composable
 fun ShellLeftRegion(instance: WidgetInstance) {
-    val props = instance.rememberProps<ShellRegionProps>()
+    val props = instance.rememberProps<ShellLeftRegionProps>()
     if (props.collapsed) {
         if (LocalEditMode.current is EditModeState.On) CollapsedRegionStrip()
         return
     }
     val ctx = LocalShellContext.current
-    Row(regionModifier(props)) {
-        AppSidebar(
-            currentScreen   = ctx.currentScreen,
-            isAuthenticated = ctx.isAuthenticated,
-            onScreenChange  = ctx.onScreenChange,
-            onLogout        = ctx.onLogout,
-            modifier        = Modifier.weight(1f).fillMaxHeight(),
-        )
+    val sized = if (props.widthDp > 0) Modifier.width(props.widthDp.dp) else Modifier
+    Row(sized.fillMaxHeight()) {
+        // The rail is an NxSurface: its matte is frostTier (default Clear = transparent).
+        // AppSidebar's NavigationRail is transparent so this owns the background. The
+        // divider stays OUTSIDE the surface, so the tinted area matches the old
+        // glassSurfaceAlpha(0.35) rail exactly.
+        NxSurface(NxSurfaceLevel.Floating, Modifier.weight(1f).fillMaxHeight(), RectangleShape, tier = props.frostTier) {
+            AppSidebar(
+                currentScreen   = ctx.currentScreen,
+                isAuthenticated = ctx.isAuthenticated,
+                onScreenChange  = ctx.onScreenChange,
+                onLogout        = ctx.onLogout,
+                modifier        = Modifier.fillMaxSize(),
+            )
+        }
         RegionDivider(props.showDivider)
     }
 }
@@ -370,7 +379,7 @@ data class ShellTopRegionProps(
     @PropLabel("widget.appshell.topbar.heightDp") @PropRange(36.0, 72.0) val heightDp: Int = 44,
     @PropLabel("widget.appshell.topbar.cornerStyle") val cornerStyle: CornerStyle = CornerStyle.Rect,
     @PropLabel("widget.appshell.topbar.groupStyle") val groupStyle: GroupStyle = GroupStyle.LineSeparated,
-    @PropLabel("widget.appshell.topbar.frostTier") val frostTier: FrostTier = FrostTier.Flat,
+    @PropLabel("widget.appshell.topbar.frostTier") val frostTier: FrostTier = FrostTier.Clear,
     @PropLabel("widget.appshell.topbar.controls") val controls: WindowControlsMode = WindowControlsMode.Auto,
 )
 
@@ -416,18 +425,6 @@ fun ShellTopRegion(instance: WidgetInstance) {
         CornerStyle.Rect  -> RectangleShape
     }
     val outerPad = if (props.cornerStyle == CornerStyle.Float) 6.dp else 0.dp
-    // The top bar reads as "especially dark" by default: a themed dark fill via
-    // the background role (a future theme engine re-tints it). Picking a frost
-    // tier opts into the glass look instead.
-    val layers = if (props.frostTier == FrostTier.Flat) {
-        // Same tone as the left rail (AppSidebar uses glassSurfaceAlpha(0.35) =
-        // surface @ 0.35), so the top bar and rail read as ONE combined chrome
-        // panel rather than two separate strips. Fill(Surface, 0.35) resolves to
-        // the identical color (incl. the glass-intensity knob).
-        listOf(Fill(role = FrostRole.Surface, alpha = 0.35f))
-    } else {
-        props.frostTier.toLayers()
-    }
 
     @Composable
     fun Caption() {
@@ -448,7 +445,7 @@ fun ShellTopRegion(instance: WidgetInstance) {
     val barModifier = Modifier.fillMaxWidth().height(props.heightDp.dp).padding(outerPad)
 
     when (props.groupStyle) {
-        GroupStyle.LineSeparated -> FrostSurface(layers = layers, modifier = barModifier, shape = shape) {
+        GroupStyle.LineSeparated -> NxSurface(NxSurfaceLevel.Floating, barModifier, shape, tier = props.frostTier) {
             Row(
                 Modifier.fillMaxSize().padding(horizontal = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -469,22 +466,22 @@ fun ShellTopRegion(instance: WidgetInstance) {
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             if (HOST_IS_MAC && showControls) {
-                FrostSurface(layers, Modifier.fillMaxHeight(), shape) { Caption() }
+                NxSurface(NxSurfaceLevel.Floating, Modifier.fillMaxHeight(), shape, tier = props.frostTier) { Caption() }
             }
             AppGlyph()
-            FrostSurface(layers, Modifier.fillMaxHeight(), shape) {
+            NxSurface(NxSurfaceLevel.Floating, Modifier.fillMaxHeight(), shape, tier = props.frostTier) {
                 Row(Modifier.fillMaxHeight().padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                     SlotRenderer(SurfaceId(TOPBAR_SURFACE), SlotId("left"), spacing = 4.dp)
                 }
             }
             DragLane()
-            FrostSurface(layers, Modifier.fillMaxHeight(), shape) {
+            NxSurface(NxSurfaceLevel.Floating, Modifier.fillMaxHeight(), shape, tier = props.frostTier) {
                 Row(Modifier.fillMaxHeight().padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                     SlotRenderer(SurfaceId(TOPBAR_SURFACE), SlotId("right"), spacing = 4.dp)
                 }
             }
             if (!HOST_IS_MAC && showControls) {
-                FrostSurface(layers, Modifier.fillMaxHeight(), shape) { Caption() }
+                NxSurface(NxSurfaceLevel.Floating, Modifier.fillMaxHeight(), shape, tier = props.frostTier) { Caption() }
             }
         }
     }

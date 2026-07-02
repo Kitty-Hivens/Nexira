@@ -58,6 +58,17 @@ fun NxSurface(
     interactionSource: InteractionSource? = null,
     content: @Composable BoxScope.() -> Unit,
 ) {
+    // Clear is the transparent tier: no opaque body, no bevel -- just the thin glass coat.
+    // On dark it reads as glass over the wallpaper; on light FrostSurface floors the
+    // unbacked Fill to opaque (Rule 4). It tints from the Fill's own Surface role @0.35,
+    // NOT the [level] ladder role -- [level] is inert here -- keeping exact parity with the
+    // old glassSurfaceAlpha(0.35) chrome. It fades on dark with no wallpaper: the
+    // deliberate, chosen cost of Clear.
+    if (tier == FrostTier.Clear) {
+        FrostSurface(if (glass) tier.toLayers() else emptyList(), modifier, shape, interactionSource, content)
+        return
+    }
+
     val role = level.role()
     val bodyColor = frostColor(role)
     val dark = bodyColor.luminance() < 0.5f
