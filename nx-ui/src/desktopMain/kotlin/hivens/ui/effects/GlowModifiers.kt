@@ -23,7 +23,9 @@ import androidx.compose.ui.unit.dp
 fun Modifier.pulsatingGlow(
     color: Color,
     enabled: Boolean = true,
-    cornerRadius: Dp = 12.dp
+    // No default on purpose: the caller passes its own shape token
+    // (LocalStyle cardCorner/buttonCorner), so the glow can't mismatch the host.
+    cornerRadius: Dp,
 ): Modifier = composed {
     if (!enabled) return@composed this
 
@@ -95,8 +97,9 @@ fun Modifier.shimmerOverlay(
 @Suppress("ModifierComposedModifier")
 fun Modifier.neonBorder(
     color: Color,
-    cornerRadius: Dp = 16.dp,
-    strokeWidth: Dp  = 2.dp
+    // No default on purpose -- same contract as pulsatingGlow.
+    cornerRadius: Dp,
+    strokeWidth: Dp = 2.dp
 ): Modifier = composed {
     val inf = rememberInfiniteTransition(label = "neonBorder")
     val alpha by inf.animateFloat(

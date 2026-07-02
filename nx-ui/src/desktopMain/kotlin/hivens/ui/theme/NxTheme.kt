@@ -3,6 +3,7 @@ package hivens.ui.theme
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.TweenSpec
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
@@ -11,6 +12,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
 import hivens.ui.customization.LocalCustomization
+import hivens.ui.nx.ThemeStateLayer
 
 // --- COLOR PALETTES ---
 data class NxColors(
@@ -316,8 +318,14 @@ fun NxTheme(
             colorScheme = colorScheme,
             shapes      = style.toMaterialShapes(),
             typography  = nexiraTypography(),
-            content     = content
-        )
+        ) {
+            // Inside MaterialTheme's lambda on purpose: MaterialTheme provides its
+            // default ripple into LocalIndication, so the app-wide state layer must
+            // be provided beneath it to win. Placed outside, this is a silent no-op.
+            CompositionLocalProvider(LocalIndication provides ThemeStateLayer) {
+                content()
+            }
+        }
     }
 }
 
