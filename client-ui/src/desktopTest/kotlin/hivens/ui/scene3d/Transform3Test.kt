@@ -1,6 +1,5 @@
 package hivens.ui.scene3d
 
-import hivens.ui.skin3d.rotate
 import kotlin.math.PI
 import kotlin.test.Test
 import kotlin.test.assertTrue
