@@ -9,8 +9,8 @@ import androidx.compose.ui.window.WindowExceptionHandlerFactory
 import androidx.compose.ui.window.application
 import hivens.core.api.interfaces.ISettingsService
 import hivens.launcher.bootstrap.LauncherBootstrap
-import hivens.launcher.diag.ShellRecovery
-import hivens.launcher.diag.UiRecoverySignal
+import hivens.ui.diag.ShellRecovery
+import hivens.ui.diag.UiRecoverySignal
 import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.stringsFor
 import hivens.launcher.platform.PlatformPaths

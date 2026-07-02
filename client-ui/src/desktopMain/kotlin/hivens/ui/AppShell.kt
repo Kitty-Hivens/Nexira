@@ -44,12 +44,12 @@ import hivens.launcher.AutoSyncService
 import hivens.launcher.ServerListCacheStore
 import hivens.launcher.bootstrap.AutoLoginCoordinator
 import hivens.launcher.bootstrap.LauncherBootstrap
-import hivens.launcher.diag.UiRecoverySignal
+import hivens.ui.diag.UiRecoverySignal
 import hivens.launcher.CredentialsManager
 import hivens.core.launch.LaunchState
 import hivens.launcher.launch.LauncherController
 import hivens.launcher.network.ServerProtocolConfig
-import hivens.launcher.platform.computeSafeWindowMinSize
+import hivens.ui.chrome.computeSafeWindowMinSize
 import hivens.launcher.ProfileManager
 import hivens.ui.background.BackdropState
 import hivens.ui.background.BackgroundManager

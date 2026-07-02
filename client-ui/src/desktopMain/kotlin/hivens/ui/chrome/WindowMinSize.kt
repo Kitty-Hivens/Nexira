@@ -1,4 +1,4 @@
-package hivens.launcher.platform
+package hivens.ui.chrome
 
 import java.awt.Dimension
 

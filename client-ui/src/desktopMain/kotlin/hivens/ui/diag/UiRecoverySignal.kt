@@ -1,4 +1,4 @@
-package hivens.launcher.diag
+package hivens.ui.diag
 
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

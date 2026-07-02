@@ -27,7 +27,7 @@ import java.util.Locale
 
 /**
  * Standalone last-resort window shown when the shell crash loop latches safe
- * mode (see hivens.launcher.diag.UiRecoverySignal + Main.runShellWithRecovery).
+ * mode (see hivens.ui.diag.UiRecoverySignal + Main.runShellWithRecovery).
  *
  * Deliberately self-contained: it does NOT touch Koin, NxTheme, the
  * widget kernel, or any surface CompositionLocal. A crash anywhere in that
