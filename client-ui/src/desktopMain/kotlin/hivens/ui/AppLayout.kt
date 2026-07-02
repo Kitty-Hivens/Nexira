@@ -305,6 +305,7 @@ fun AppSidebar(
     PuppetClick("nav.library")  { onScreenChange(Screen.Library) }
     PuppetClick("nav.browse")   { onScreenChange(Screen.Browse) }
     PuppetClick("nav.profile") { onScreenChange(Screen.Profile) }
+    PuppetClick("nav.wardrobe") { onScreenChange(Screen.Wardrobe) }
     PuppetClick("nav.settings") { onScreenChange(Screen.Settings) }
     PuppetClick("nav.about")    { onScreenChange(Screen.About) }
     PuppetClick("nav.console")  {

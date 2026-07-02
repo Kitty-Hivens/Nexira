@@ -200,14 +200,20 @@ private fun Wardrobe(session: SessionData) {
         }
     }
 
+    // The preview wears the picked cape (else the active one), so a cape can
+    // be inspected on the model before applying.
+    val previewCape = remember(selectedCapeId, activeCapeId, refreshKey) {
+        (selectedCapeId ?: activeCapeId)?.let { library.bytes(it) }?.let(::decodeSkin)
+    }
+
     Row(Modifier.fillMaxSize().padding(20.dp), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
         // Preview: the picked library skin, else the current applied look.
         Box(Modifier.width(260.dp).fillMaxHeight(), contentAlignment = Alignment.Center) {
             val bmp = selectedBitmap ?: defaultBitmap
             if (bmp != null) {
-                SkinView3D(bmp, Modifier.fillMaxHeight().width(260.dp), interactive = true, autoSpin = true)
+                SkinView3D(bmp, Modifier.fillMaxHeight().width(260.dp), interactive = true, autoSpin = true, cape = previewCape)
             } else {
-                SkinHero(session.playerName, refreshKey, Modifier.width(260.dp).fillMaxHeight(), interactive = true, autoSpin = true)
+                SkinHero(session.playerName, refreshKey, Modifier.width(260.dp).fillMaxHeight(), interactive = true, autoSpin = true, cape = previewCape)
             }
         }
 

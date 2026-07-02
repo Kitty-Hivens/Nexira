@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.input.pointer.pointerInput
 import hivens.ui.render3d.Texture
+import hivens.ui.scene3d.Node
 import hivens.ui.scene3d.OrthoCamera
 import hivens.ui.scene3d.Scene3DState
 import hivens.ui.scene3d.Scene3DView
@@ -45,6 +46,8 @@ enum class SkinFraming { Full, Bust }
  * @param autoSpin    when true, the model slowly turns while not being dragged.
  * @param framing     [SkinFraming.Bust] zooms to head+torso (grid cards); [Full]
  *                    keeps the whole standing figure (the big preview).
+ * @param cape        optional cape texture (64x32 layout or HD/legacy) hung on
+ *                    the Body node -- it follows torso posing and the orbit.
  * @param state       hoisted orbit + pose state; pass your own to drive the
  *                    model (SkinViewState.play / animateYawTo) from outside.
  *
@@ -57,6 +60,7 @@ fun SkinView3D(
     interactive: Boolean = true,
     autoSpin: Boolean = true,
     framing: SkinFraming = SkinFraming.Full,
+    cape: ImageBitmap? = null,
     state: SkinViewState = rememberSkinViewState(),
 ) {
     val legacy = remember(skin) { skin.height <= skin.width / 2 }
@@ -64,19 +68,23 @@ fun SkinView3D(
         val pixels = skin.toPixelMap()
         guessModel(skin.width, skin.height) { x, y -> (pixels[x, y].alpha * 255f).toInt() }
     }
-    // Straight-ARGB copy of the skin for the rasterizer's per-texel sampling. Built
-    // once per skin via Color.toArgb (so channel order / premultiply match), not the
-    // raw PixelMap buffer whose layout is the bitmap's native format.
-    val texture = remember(skin) {
-        val pm = skin.toPixelMap()
-        val arr = IntArray(pm.width * pm.height)
-        var i = 0
-        for (y in 0 until pm.height) for (x in 0 until pm.width) arr[i++] = pm[x, y].toArgb()
-        Texture(arr, pm.width, pm.height)
-    }
+    val texture = remember(skin) { skin.toTexture() }
     // UV rects are in 1x texels; an HD skin (64*k) multiplies them by k.
     val rig = remember(skin) { buildRig(model, legacy, texture, uvScale = skin.width / 64f) }
     val scene = remember(rig) { Scene3DState(rig.root) }
+
+    // Cape node lifecycle: swap the attached node whenever the cape bitmap
+    // changes, through scene.update so the draw picks the change up.
+    val capeTexture = remember(cape) { cape?.toTexture() }
+    val attachedCape = remember(rig) { arrayOfNulls<Node>(1) }
+    LaunchedEffect(rig, capeTexture) {
+        scene.update {
+            attachedCape[0]?.let { rig.node(BodyPart.Body).detach(it) }
+            attachedCape[0] = capeTexture?.let { tex ->
+                buildCapeNode(tex).also { rig.node(BodyPart.Body).attach(it) }
+            }
+        }
+    }
 
     var dragging by remember { mutableStateOf(false) }
 
@@ -151,4 +159,15 @@ fun SkinView3D(
             OrthoCamera(state.yaw, state.pitch, scale, w / 2f, centerY)
         },
     )
+}
+
+// Straight-ARGB copy for the rasterizer's per-texel sampling. Built via
+// Color.toArgb (so channel order / premultiply match), not the raw PixelMap
+// buffer whose layout is the bitmap's native format.
+private fun ImageBitmap.toTexture(): Texture {
+    val pm = toPixelMap()
+    val arr = IntArray(pm.width * pm.height)
+    var i = 0
+    for (y in 0 until pm.height) for (x in 0 until pm.width) arr[i++] = pm[x, y].toArgb()
+    return Texture(arr, pm.width, pm.height)
 }
