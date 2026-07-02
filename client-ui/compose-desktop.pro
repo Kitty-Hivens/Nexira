@@ -48,6 +48,11 @@
 -keep class okhttp3.** { *; }
 -keep interface okhttp3.** { *; }
 
+# jsoup optionally speeds its regexes with re2j when present; we don't ship it
+# and jsoup falls back to java.util.regex at runtime, so the dangling references
+# are harmless -- but ProGuard aborts on them without this.
+-dontwarn com.google.re2j.**
+
 # --- Coil 3 (Image Loading) ---
 -keep class coil3.** { *; }
 -keepnames class * implements coil3.ImageLoaderFactory
