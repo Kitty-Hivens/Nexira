@@ -83,6 +83,58 @@ fun rasterize(
     alphaCutoff: Int = 8,
 ): IntArray = rasterize(listOf(TriBatch(tris, tex)), outW, outH, alphaCutoff)
 
+/**
+ * Box-downsamples straight-ARGB [src] ([srcW] x [srcH], both multiples of
+ * [factor]) by an integer [factor] -- the resolve step of supersampled
+ * anti-aliasing. Colour channels average in PREMULTIPLIED space (weighted by
+ * subpixel alpha): a silhouette pixel covering 2 opaque + 2 transparent
+ * subpixels must come out as the opaque colour at half alpha, not a
+ * half-darkened colour -- straight averaging bleeds the transparent black
+ * into every edge.
+ */
+fun downsample(src: IntArray, srcW: Int, srcH: Int, factor: Int): IntArray {
+    if (factor <= 1) return src
+    val outW = srcW / factor
+    val outH = srcH / factor
+    val out = IntArray(outW * outH)
+    val n = factor * factor
+    var oy = 0
+    while (oy < outH) {
+        var ox = 0
+        while (ox < outW) {
+            var sumA = 0; var sumRA = 0; var sumGA = 0; var sumBA = 0
+            var sy = oy * factor
+            val syEnd = sy + factor
+            while (sy < syEnd) {
+                var i = sy * srcW + ox * factor
+                val iEnd = i + factor
+                while (i < iEnd) {
+                    val px = src[i]
+                    val a = (px ushr 24) and 0xFF
+                    if (a != 0) {
+                        sumA += a
+                        sumRA += ((px ushr 16) and 0xFF) * a
+                        sumGA += ((px ushr 8) and 0xFF) * a
+                        sumBA += (px and 0xFF) * a
+                    }
+                    i++
+                }
+                sy++
+            }
+            out[oy * outW + ox] = if (sumA == 0) 0 else {
+                val a = (sumA + n / 2) / n
+                val r = (sumRA + sumA / 2) / sumA
+                val g = (sumGA + sumA / 2) / sumA
+                val b = (sumBA + sumA / 2) / sumA
+                (a shl 24) or (r shl 16) or (g shl 8) or b
+            }
+            ox++
+        }
+        oy++
+    }
+    return out
+}
+
 private fun drawTri(
     t: Tri,
     color: IntArray,

@@ -1,5 +1,6 @@
 package hivens.ui.scene3d
 
+import hivens.ui.render3d.downsample
 import hivens.ui.render3d.rasterize
 import kotlin.math.max
 import kotlin.math.min
@@ -104,10 +105,18 @@ fun fitOrtho(
     )
 }
 
-/** One frame: flatten [root] under [camera] and rasterize. */
-fun renderScene(root: Node, camera: OrthoCamera, outW: Int, outH: Int): IntArray =
-    rasterize(
-        collectTriBatches(root, camera.yaw, camera.pitch, camera.scale, camera.centerX, camera.centerY),
-        outW,
-        outH,
+/**
+ * One frame: flatten [root] under [camera] and rasterize. [supersample] > 1
+ * renders at that multiple and box-resolves back down (SSAA): silhouette
+ * edges and rotating texel boundaries stop stair-stepping, while the texture
+ * sampling stays NEAREST -- the pixel-art look inside faces is kept, only
+ * geometry and texel EDGES gain coverage-accurate blending.
+ */
+fun renderScene(root: Node, camera: OrthoCamera, outW: Int, outH: Int, supersample: Int = 1): IntArray {
+    val ss = supersample.coerceAtLeast(1)
+    val batches = collectTriBatches(
+        root, camera.yaw, camera.pitch,
+        camera.scale * ss, camera.centerX * ss, camera.centerY * ss,
     )
+    return downsample(rasterize(batches, outW * ss, outH * ss), outW * ss, outH * ss, ss)
+}

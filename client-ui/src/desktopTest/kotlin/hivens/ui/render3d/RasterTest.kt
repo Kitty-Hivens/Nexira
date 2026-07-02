@@ -106,4 +106,39 @@ class RasterTest {
             rasterize(tris, tex, 4, 4).contentEquals(rasterize(listOf(TriBatch(tris, tex)), 4, 4)),
         )
     }
+
+    // ── SSAA resolve ─────────────────────────────────────────────────────────
+
+    @Test
+    fun `downsample averages a silhouette edge in premultiplied space`() {
+        // 2x2 block: two opaque red subpixels + two transparent. The resolved
+        // pixel must be RED at half alpha -- straight averaging would produce
+        // a half-DARKENED red instead (transparent black bleeding in).
+        val src = intArrayOf(
+            0xFFFF0000.toInt(), 0x00000000,
+            0xFFFF0000.toInt(), 0x00000000,
+        )
+        val out = downsample(src, 2, 2, 2)
+        assertEquals(1, out.size)
+        val px = out[0]
+        assertEquals(0x80, (px ushr 24) and 0xFF)
+        assertEquals(0xFF, (px ushr 16) and 0xFF, "red channel must stay full")
+        assertEquals(0, px and 0xFFFF)
+    }
+
+    @Test
+    fun `downsample keeps uniform blocks and fully transparent blocks intact`() {
+        val green = 0xFF00FF00.toInt()
+        val src = intArrayOf(green, green, 0, 0, green, green, 0, 0)   // 4x2
+        val out = downsample(src, 4, 2, 2)
+        assertEquals(2, out.size)
+        assertEquals(green, out[0])
+        assertEquals(0, out[1])
+    }
+
+    @Test
+    fun `downsample with factor 1 is the identity`() {
+        val src = intArrayOf(1, 2, 3, 4)
+        assertTrue(downsample(src, 2, 2, 1).contentEquals(src))
+    }
 }
