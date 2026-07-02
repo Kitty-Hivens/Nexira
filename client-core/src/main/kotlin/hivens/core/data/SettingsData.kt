@@ -36,6 +36,29 @@ enum class HomeView {
 @Serializable
 enum class UiStyle { Celestia, Brut }
 
+/**
+ * Which source drives the dark/light choice. Exactly one is active:
+ *
+ * - [Manual] -- the user's own day/night toggle; [SettingsData.isDarkTheme] as set.
+ * - [System] -- follow the OS colour scheme (XDG portal / registry / defaults).
+ * - [Wallpaper] -- follow the wallpaper's average brightness.
+ *
+ * Flipping the day/night toggle while in [System]/[Wallpaper] drops back to
+ * [Manual] -- an explicit choice always wins over an automatic source.
+ */
+@Serializable
+enum class ThemeMode { Manual, System, Wallpaper }
+
+/**
+ * The theme mode a fresh session starts in. Migrates the pre-mode opt-in: a
+ * settings file that enabled [SettingsData.themeFromWallpaper] before
+ * [SettingsData.themeMode] existed still decodes with the default [ThemeMode.Manual],
+ * so the legacy flag promotes it to [ThemeMode.Wallpaper]. An explicitly stored
+ * mode wins over the flag.
+ */
+fun resolveInitialThemeMode(s: SettingsData): ThemeMode =
+    if (s.themeMode == ThemeMode.Manual && s.themeFromWallpaper) ThemeMode.Wallpaper else s.themeMode
+
 @Serializable
 data class SettingsData(
     val javaPath: String? = null,
@@ -55,12 +78,17 @@ data class SettingsData(
      */
     val paletteFromWallpaper: Boolean = true,
     /**
-     * Match the dark/light theme to the wallpaper's average brightness: a dark
-     * image switches to the dark theme, a light image to the light one, re-evaluated
-     * when the wallpaper changes. Off by default (opt-in). Fixes dark wallpapers
-     * reading as mud under the light theme.
+     * Legacy mirror of `themeMode == Wallpaper`, kept so a downgrade to a build
+     * that predates [themeMode] still honours the wallpaper opt-in. New code
+     * reads [themeMode] and only writes this field in step with it.
      */
     val themeFromWallpaper: Boolean = false,
+    /**
+     * Which source drives dark/light -- see [ThemeMode]. [isDarkTheme] stays the
+     * resolved value the automatic sources write through, so everything downstream
+     * (and older builds) keeps reading one boolean.
+     */
+    val themeMode: ThemeMode = ThemeMode.Manual,
     /**
      * Replace the OS title bar with the in-app top bar (undecorated window +
      * custom caption buttons / drag / resize). On by default. Escape hatch: if a

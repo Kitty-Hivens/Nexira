@@ -86,8 +86,11 @@ interface AppStrings {
     val settingsThemePickerSub: String
     val settingsDarkTheme: String
     val settingsDarkThemeDesc: String
-    val settingsThemeFromWallpaper: String
-    val settingsThemeFromWallpaperDesc: String
+    val settingsThemeModeTitle: String
+    val settingsThemeModeManual: String
+    val settingsThemeModeSystem: String
+    val settingsThemeModeWallpaper: String
+    val settingsThemeModeSystemUnavailable: String
     val settingsCloseAfterLaunch: String
     val settingsCloseAfterLaunchDesc: String
     val settingsSaved: String

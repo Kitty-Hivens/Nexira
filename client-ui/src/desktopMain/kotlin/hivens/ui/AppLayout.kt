@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.dp
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.HomeView
 import hivens.core.data.SessionData
+import hivens.core.data.ThemeMode
 import hivens.core.data.UiStyle
 import hivens.launcher.network.NetworkState
 import hivens.launcher.network.ServerProtocolConfig
@@ -70,8 +71,9 @@ fun AppLayout(
     onLogout: () -> Unit,
     isDarkTheme: Boolean,
     onToggleDarkTheme: () -> Unit,
-    themeFromWallpaper: Boolean = false,
-    onThemeFromWallpaperChanged: (Boolean) -> Unit = {},
+    themeMode: ThemeMode = ThemeMode.Manual,
+    onThemeModeChanged: (ThemeMode) -> Unit = {},
+    systemThemeAvailable: Boolean = false,
     customTheme: CustomTheme,
     onCustomThemeChanged: (CustomTheme) -> Unit,
     currentLocale: AppLocale,
@@ -194,8 +196,9 @@ fun AppLayout(
                             onBack            = onBack,
                             isDarkTheme       = isDarkTheme,
                             onToggleDarkTheme = onToggleDarkTheme,
-                            themeFromWallpaper = themeFromWallpaper,
-                            onThemeFromWallpaperChanged = onThemeFromWallpaperChanged,
+                            themeMode = themeMode,
+                            onThemeModeChanged = onThemeModeChanged,
+                            systemThemeAvailable = systemThemeAvailable,
                             uiStyle           = uiStyle,
                             onUiStyleChanged  = onUiStyleChanged,
                             onOpenThemePicker = { onScreenChange(Screen.ThemePicker) },

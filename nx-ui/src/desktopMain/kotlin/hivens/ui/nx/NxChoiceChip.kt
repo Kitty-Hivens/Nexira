@@ -20,16 +20,22 @@ import hivens.ui.theme.NxTheme
  * A small selectable chip (e.g. regex / bold). Selected = an accent wash + accent
  * label; the hover/press state layer is shape-correct at the active style's button
  * corner, so the feedback matches the pill instead of a default Material ripple.
+ * [enabled] greys the chip (an unavailable option stays visible, per the
+ * capability-surfacing rule) and drops its click handling.
  */
 @Composable
 fun NxChoiceChip(
     label: String,
     selected: Boolean,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
     onToggle: () -> Unit,
 ) {
     val shape = RoundedCornerShape(LocalStyle.current.buttonCorner)
-    val fg = if (selected) NxTheme.colors.primary else NxTheme.colors.textSecondary
+    val alpha = if (enabled) 1f else 0.4f
+    val fg = (if (selected) NxTheme.colors.primary else NxTheme.colors.textSecondary).copy(alpha = alpha)
+    val bg = if (selected) NxTheme.colors.primary.copy(alpha = 0.18f * alpha)
+             else NxTheme.colors.surface.copy(alpha = alpha)
     val interaction = remember { MutableInteractionSource() }
     Text(
         text       = label,
@@ -38,10 +44,11 @@ fun NxChoiceChip(
         fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
         modifier   = modifier
             .clip(shape)
-            .background(if (selected) NxTheme.colors.primary.copy(alpha = 0.18f) else NxTheme.colors.surface)
+            .background(bg)
             .clickable(
                 interactionSource = interaction,
                 indication        = ShapedStateLayer(shape, fg),
+                enabled           = enabled,
                 onClick           = onToggle,
             )
             .padding(horizontal = 10.dp, vertical = 6.dp),
