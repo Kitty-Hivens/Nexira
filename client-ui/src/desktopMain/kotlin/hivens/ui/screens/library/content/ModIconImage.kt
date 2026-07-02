@@ -20,7 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import coil3.compose.AsyncImage
 import hivens.core.api.dto.smrt.SmrtModEntry
-import hivens.launcher.smrt.ModIconResolver
+import hivens.core.smrt.ModIconResolver
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.decorativeColor
 import org.koin.compose.koinInject

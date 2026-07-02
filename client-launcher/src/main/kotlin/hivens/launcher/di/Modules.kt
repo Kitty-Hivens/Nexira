@@ -40,7 +40,7 @@ import hivens.launcher.runtime.loader.ForgeResolver
 import hivens.launcher.runtime.loader.LoaderRegistry
 import hivens.launcher.runtime.loader.ModernInstallerResolver
 import hivens.launcher.security.KeyringStorageFactory
-import hivens.launcher.smrt.ModIconResolver
+import hivens.core.smrt.ModIconResolver
 import hivens.core.api.dto.modrinth.ModrinthProject
 import hivens.core.api.dto.modrinth.ModrinthVersion
 import hivens.core.api.dto.smrt.SmrtPackListing
