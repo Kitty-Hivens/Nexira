@@ -54,7 +54,8 @@ fun rememberScene3DState(build: Scene3DState.() -> Unit = {}): Scene3DState =
  * every draw; read snapshot state inside it to drive the camera). When
  * [interactive], drag orbits the built-in camera angles. [prepareFrame] runs
  * before each flatten -- the hook a rig uses to apply the current pose;
- * snapshot reads inside it invalidate the draw like any other.
+ * snapshot reads inside it invalidate the draw like any other. [supersample]
+ * is the SSAA factor (1 = raw aliased output).
  */
 @Composable
 fun Scene3DView(
@@ -63,6 +64,7 @@ fun Scene3DView(
     cameraFor: (w: Int, h: Int) -> OrthoCamera,
     interactive: Boolean = true,
     prepareFrame: (() -> Unit)? = null,
+    supersample: Int = 2,
 ) {
     val gestureModifier = if (interactive) {
         Modifier.pointerInput(Unit) {
@@ -87,7 +89,7 @@ fun Scene3DView(
                 } else {
                     state.revision   // subscribe to structural scene changes
                     prepareFrame?.invoke()
-                    val bmp = renderScene(state.root, cameraFor(w, h), w, h).toImageBitmap(w, h)
+                    val bmp = renderScene(state.root, cameraFor(w, h), w, h, supersample).toImageBitmap(w, h)
                     onDrawBehind { drawImage(bmp) }
                 }
             },
