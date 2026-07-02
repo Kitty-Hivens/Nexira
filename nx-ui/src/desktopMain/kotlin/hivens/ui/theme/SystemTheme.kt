@@ -1,8 +1,11 @@
 package hivens.ui.theme
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
@@ -31,27 +34,70 @@ object SystemTheme {
 
     private const val PROBE_TIMEOUT_SECONDS = 4L
 
+    private fun isLinux(): Boolean {
+        val os = System.getProperty("os.name").orEmpty().lowercase()
+        return os.contains("nux") || os.contains("nix")
+    }
+
     suspend fun probe(): Boolean? = withContext(Dispatchers.IO) {
         val os = System.getProperty("os.name").orEmpty().lowercase()
         when {
             os.contains("win")                      -> probeWindows()
             os.contains("mac") || os.contains("darwin") -> probeMac()
-            os.contains("nux") || os.contains("nix")    -> probeLinux()
+            isLinux()                                   -> probeLinux()
             else -> null
         }
     }
 
     /**
-     * The OS scheme as a cold polling flow: emits [probe] immediately, then every
-     * [pollMs]. Polling runs only while collected, so subscribing exactly while the
-     * System theme mode is active costs nothing in the other modes. 5s keeps an OS
-     * scheme flip feeling near-immediate; the probe itself is a ~10ms subprocess.
+     * The OS scheme as a cold flow, live only while collected (= while the System
+     * theme mode is active). One [probe] up front; then on Linux the portal's
+     * `SettingChanged` signal via a `gdbus monitor` subprocess -- an OS flip lands
+     * instantly. Polling every [pollMs] is the fallback: Windows/macOS have no
+     * subprocess signal, and a monitor that cannot start (no gdbus) or dies
+     * (portal restart) falls through to it after a re-sync probe.
      */
     fun observe(pollMs: Long = 5_000): Flow<Boolean?> = flow {
-        while (true) {
+        emit(probe())
+        if (isLinux()) {
+            emitAll(portalSignalFlow())
             emit(probe())
-            delay(pollMs)
         }
+        while (true) {
+            delay(pollMs)
+            emit(probe())
+        }
+    }
+
+    /**
+     * The portal's `SettingChanged` stream: each relevant signal line yields the new
+     * scheme. Completes when the monitor cannot start or its process dies; cancelling
+     * the collector kills the subprocess.
+     */
+    private fun portalSignalFlow(): Flow<Boolean?> = callbackFlow {
+        val process = try {
+            ProcessBuilder("gdbus", "monitor", "--session", "--dest", "org.freedesktop.portal.Desktop").start()
+        } catch (e: Exception) {
+            log.debug("portal monitor failed to start: {}", e.toString())
+            null
+        }
+        if (process == null) {
+            close()
+        } else {
+            Thread {
+                try {
+                    process.inputStream.bufferedReader().forEachLine { line ->
+                        parseSettingChangedLine(line)?.let { trySend(it) }
+                    }
+                } catch (_: Exception) {
+                    // stream torn down (monitor killed or portal gone) -- close below
+                }
+                close()
+            }.apply { isDaemon = true; start() }
+            Thread { process.errorStream.bufferedReader().forEachLine { } }
+                .apply { isDaemon = true; start() }
+        }
+        awaitClose { process?.destroyForcibly() }
     }
 
     private fun probeLinux(): Boolean? {
@@ -133,6 +179,18 @@ internal fun parsePortalColorScheme(stdout: String): Boolean? =
 /** `AppsUseLightTheme REG_DWORD 0x0` -> dark; nonzero -> light; missing -> null. */
 internal fun parseAppsUseLightTheme(stdout: String): Boolean? =
     REG_DWORD.find(stdout)?.groupValues?.get(1)?.toLongOrNull(16)?.let { it == 0L }
+
+/**
+ * One `gdbus monitor` line -> the new scheme, or null for anything else. Only the
+ * canonical `org.freedesktop.appearance` / `color-scheme` SettingChanged counts --
+ * the portal also mirrors legacy per-desktop namespaces (a gnome one with a STRING
+ * value rides along on the same flip) and those must not be parsed.
+ */
+internal fun parseSettingChangedLine(line: String): Boolean? =
+    if (line.contains("SettingChanged") &&
+        line.contains("org.freedesktop.appearance") &&
+        line.contains("color-scheme")
+    ) parsePortalColorScheme(line) else null
 
 /** `defaults read -g AppleInterfaceStyle`: exit 0 + "Dark" = dark; a nonzero exit
  *  means the key does not exist, which is how macOS signals light mode. */

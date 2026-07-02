@@ -290,8 +290,9 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
         }
     }
     // System mode: follow the OS scheme while the mode is active -- the cold flow
-    // polls only while collected, so the other modes cost nothing. Persisting each
-    // flip keeps the next cold start on the last observed scheme (no startup flash).
+    // (portal signal on Linux, polling fallback) runs only while collected, so the
+    // other modes cost nothing. Persisting each flip keeps the next cold start on
+    // the last observed scheme (no startup flash).
     LaunchedEffect(themeMode) {
         if (themeMode != ThemeMode.System) return@LaunchedEffect
         SystemTheme.observe().collect { dark ->
