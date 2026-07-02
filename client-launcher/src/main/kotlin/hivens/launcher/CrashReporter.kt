@@ -2,22 +2,16 @@ package hivens.launcher
 
 import hivens.config.Branding
 import hivens.core.diag.ActionRing
-import hivens.launcher.diag.IssueReporter
 import hivens.launcher.platform.PlatformPaths
-import java.awt.Desktop
-import java.awt.Toolkit
-import java.awt.datatransfer.StringSelection
 import java.io.File
-import java.net.URI
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import javax.swing.JOptionPane
 
 /**
- * Builds and persists crash reports, and surfaces the post-crash dialog
- * that lets the user open the report in their file manager, copy it,
- * or pre-fill a GitHub Issue with it.
+ * Builds and persists crash reports -- headless diagnostics. The GUI's
+ * post-crash Swing dialog lives with the UI layer (it is the one consumer
+ * of a report that needs a toolkit); the CLI logs the report path instead.
  *
  * Constructor-injected [paths] (rather than a mutable static field
  * resolved from `PlatformPaths.system()`) so all the other Koin-wired
@@ -26,10 +20,9 @@ import javax.swing.JOptionPane
  * otherwise leave crash reports landing in the old directory while
  * everything else writes to the new one.
  *
- * The default uncaught-exception handler in `Main.kt` constructs an
- * instance directly because it runs before Koin starts; the same type
- * is also registered as a Koin singleton so future components can
- * inject it through DI.
+ * The entrypoint bootstrap constructs an instance directly because it runs
+ * before Koin starts; the same type is also registered as a Koin singleton
+ * so future components can inject it through DI.
  */
 class CrashReporter(
     private val paths: PlatformPaths,
@@ -99,68 +92,6 @@ class CrashReporter(
         })
 
         return file
-    }
-
-    fun showCrashDialog(report: CrashReport, reportFile: File) {
-        val message = """
-            Nexira quit unexpectedly.
-
-            Report saved:
-            ${reportFile.absolutePath}
-
-            Please send this file to the developers.
-        """.trimIndent()
-
-        val options = arrayOf("Report on GitHub", "Copy report", "Open folder", "Close")
-        val choice = JOptionPane.showOptionDialog(
-            null,
-            message,
-            "Crash Report -- ${Branding.TITLE}",
-            JOptionPane.DEFAULT_OPTION,
-            JOptionPane.ERROR_MESSAGE,
-            null,
-            options,
-            options[0],
-        )
-
-        when (choice) {
-            0 -> {
-                // Beacon "Report on GitHub": opens browser at a pre-filled new-Issue
-                // URL. Nothing leaves the user's machine until they click Submit on
-                // github.com -- the launcher itself never POSTs anything.
-                openOnDaemonThread("crash-report-browse") {
-                    if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
-                        Desktop.getDesktop().browse(URI(IssueReporter.crashIssueUrl(report)))
-                    }
-                }
-            }
-            1 -> {
-                val clipboard = Toolkit.getDefaultToolkit().systemClipboard
-                clipboard.setContents(StringSelection(reportFile.readText()), null)
-            }
-            2 -> {
-                openOnDaemonThread("crash-report-open-folder") {
-                    if (Desktop.isDesktopSupported()) {
-                        Desktop.getDesktop().open(reportFile.parentFile)
-                    }
-                }
-            }
-        }
-    }
-
-    /**
-     * Fire-and-forget native Desktop call on a daemon thread. `Desktop.open` /
-     * `Desktop.browse` can stall for seconds on Linux/Wayland when the
-     * `xdg-desktop-portal` D-Bus is wedged; running them on the calling
-     * thread (which here is AWT EDT, since this is invoked from
-     * `JOptionPane.showOptionDialog`'s choice handler) freezes the UI.
-     * Daemon = true so a hung native call doesn't pin the JVM at exit.
-     */
-    private inline fun openOnDaemonThread(name: String, crossinline body: () -> Unit) {
-        Thread({ runCatching { body() } }, name).apply {
-            isDaemon = true
-            start()
-        }
     }
 
     companion object {
