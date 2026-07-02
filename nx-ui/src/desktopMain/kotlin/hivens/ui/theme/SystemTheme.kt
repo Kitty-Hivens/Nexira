@@ -44,9 +44,10 @@ object SystemTheme {
     /**
      * The OS scheme as a cold polling flow: emits [probe] immediately, then every
      * [pollMs]. Polling runs only while collected, so subscribing exactly while the
-     * System theme mode is active costs nothing in the other modes.
+     * System theme mode is active costs nothing in the other modes. 5s keeps an OS
+     * scheme flip feeling near-immediate; the probe itself is a ~10ms subprocess.
      */
-    fun observe(pollMs: Long = 15_000): Flow<Boolean?> = flow {
+    fun observe(pollMs: Long = 5_000): Flow<Boolean?> = flow {
         while (true) {
             emit(probe())
             delay(pollMs)
