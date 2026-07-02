@@ -10,7 +10,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
 import hivens.ui.customization.LocalCustomization
-import hivens.ui.effects.pulsatingGlow
 import hivens.ui.theme.CardSurface
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalStyle
