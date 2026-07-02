@@ -1,4 +1,4 @@
-package hivens.launcher.media
+package hivens.media
 
 import hivens.core.api.HttpClientProvider
 import hivens.core.platform.Arch

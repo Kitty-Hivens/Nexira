@@ -1,4 +1,4 @@
-package hivens.launcher.media
+package hivens.media
 
 import hivens.core.platform.Arch
 import hivens.core.platform.Platform
