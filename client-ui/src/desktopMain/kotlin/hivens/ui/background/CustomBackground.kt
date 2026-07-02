@@ -154,6 +154,9 @@ private fun AnimatedParallaxImage(
             try { Color(("FF" + it.removePrefix("#")).toLong(16)) } catch (_: Exception) { null }
         }
     }
+    // Saturation applies at the Image, so it covers the static painter and every
+    // video frame alike; the frost slice mirrors it via BackdropState.saturation.
+    val saturationFilter = remember(settings.saturation) { bgSaturationFilter(settings.saturation) }
     // Publish the wallpaper recipe for frosted surfaces. A still carries its
     // bitmap so the frost redraws a real blurred slice; time-based publishes a
     // null bitmap + isAnimated so the frost falls back to a scrim (per-frame
@@ -170,6 +173,7 @@ private fun AnimatedParallaxImage(
                 darken            = settings.darkenAmount,
                 tint              = tint,
                 tintOpacity       = settings.tintOpacity,
+                saturation        = settings.saturation,
                 parallaxIntensity = settings.parallaxIntensity,
                 isAnimated        = isAnimated,
                 seedArgb          = seedArgb,
@@ -198,6 +202,7 @@ private fun AnimatedParallaxImage(
             contentDescription = null,
             contentScale       = contentScale,
             alignment          = alignment,
+            colorFilter        = saturationFilter,
             modifier           = baseModifier.graphicsLayer {
                 val extraScale = parallaxScaleFor(settings.parallaxIntensity)
                 scaleX       = extraScale
@@ -212,6 +217,7 @@ private fun AnimatedParallaxImage(
             contentDescription = null,
             contentScale       = contentScale,
             alignment          = alignment,
+            colorFilter        = saturationFilter,
             modifier           = baseModifier
         )
     }
