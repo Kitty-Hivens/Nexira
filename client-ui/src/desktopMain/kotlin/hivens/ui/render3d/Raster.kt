@@ -44,28 +44,44 @@ class Texture(
 }
 
 /**
- * Rasterizes [tris] over an [outW] x [outH] straight-ARGB buffer with a depth
- * buffer. Opaque triangles draw first (depth-test + write, alpha-tested against
- * [alphaCutoff]); translucent ones draw after, sorted far-to-near, depth-tested
- * read-only against the opaque depths and alpha-composited. Returns the row-major
- * ARGB pixels (0 = transparent). Caller is responsible for back-face culling.
+ * Rasterizes [batches] over one shared [outW] x [outH] straight-ARGB buffer
+ * with one shared depth buffer -- a multi-object scene where each object
+ * carries its own texture. Opaque triangles draw first, batch by batch
+ * (depth-test + write, alpha-tested against [alphaCutoff]; the shared depth
+ * buffer makes the batch order irrelevant except for exact depth ties, which
+ * go to the first-drawn); translucent ones draw after, sorted far-to-near
+ * GLOBALLY across all batches, depth-tested read-only and alpha-composited.
+ * Returns the row-major ARGB pixels (0 = transparent). Caller is responsible
+ * for back-face culling.
  */
 fun rasterize(
-    tris: List<Tri>,
-    tex: Texture,
+    batches: List<TriBatch>,
     outW: Int,
     outH: Int,
     alphaCutoff: Int = 8,
 ): IntArray {
     val color = IntArray(outW * outH)
     val depth = FloatArray(outW * outH) { Float.NEGATIVE_INFINITY }
-    for (t in tris) if (t.opaque) drawTri(t, color, depth, outW, outH, tex, alphaCutoff, opaque = true)
-    tris.asSequence()
-        .filterNot { it.opaque }
-        .sortedBy { it.a.z + it.b.z + it.c.z }   // far (small z) first
-        .forEach { drawTri(it, color, depth, outW, outH, tex, alphaCutoff, opaque = false) }
+    for (b in batches) {
+        for (t in b.tris) {
+            if (t.opaque) drawTri(t, color, depth, outW, outH, b.texture, alphaCutoff, opaque = true)
+        }
+    }
+    batches.asSequence()
+        .flatMap { b -> b.tris.asSequence().filterNot { it.opaque }.map { it to b.texture } }
+        .sortedBy { (t, _) -> t.a.z + t.b.z + t.c.z }   // far (small z) first
+        .forEach { (t, tex) -> drawTri(t, color, depth, outW, outH, tex, alphaCutoff, opaque = false) }
     return color
 }
+
+/** Single-texture convenience: one batch. */
+fun rasterize(
+    tris: List<Tri>,
+    tex: Texture,
+    outW: Int,
+    outH: Int,
+    alphaCutoff: Int = 8,
+): IntArray = rasterize(listOf(TriBatch(tris, tex)), outW, outH, alphaCutoff)
 
 private fun drawTri(
     t: Tri,

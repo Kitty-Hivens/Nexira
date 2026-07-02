@@ -65,4 +65,45 @@ class RasterTest {
         val out = rasterize(base + behind, tex, 4, 4)
         assertEquals(0xFFFF0000.toInt(), out[2 * 4 + 2])   // stays red
     }
+
+    // ── batched form ─────────────────────────────────────────────────────────
+
+    @Test
+    fun `batches share one depth buffer -- the nearer object wins across batches`() {
+        val red = Texture(intArrayOf(0xFFFF0000.toInt()), width = 1, height = 1)
+        val blue = Texture(intArrayOf(0xFF0000FF.toInt()), width = 1, height = 1)
+        val far = TriBatch(quad(z = 0f, tu = 0.5f, tv = 0.5f, opaque = true), red)
+        val near = TriBatch(quad(z = 1f, tu = 0.5f, tv = 0.5f, opaque = true), blue)
+        // Depth decides, not batch order.
+        assertEquals(0xFF0000FF.toInt(), rasterize(listOf(far, near), 4, 4)[2 * 4 + 2])
+        assertEquals(0xFF0000FF.toInt(), rasterize(listOf(near, far), 4, 4)[2 * 4 + 2])
+    }
+
+    @Test
+    fun `translucent triangles sort globally across batches`() {
+        val white = Texture(intArrayOf(0xFFFFFFFF.toInt()), width = 1, height = 1)
+        val red = Texture(intArrayOf(0x80FF0000.toInt()), width = 1, height = 1)
+        val blue = Texture(intArrayOf(0x800000FF.toInt()), width = 1, height = 1)
+        val base = TriBatch(quad(z = 0f, tu = 0.5f, tv = 0.5f, opaque = true), white)
+        val redCoat = TriBatch(quad(z = 1f, tu = 0.5f, tv = 0.5f, opaque = false), red)
+        val blueCoat = TriBatch(quad(z = 2f, tu = 0.5f, tv = 0.5f, opaque = false), blue)
+        // Far-to-near composition must come out the same whichever way the
+        // batch list is ordered -- the sort is global, not per batch.
+        val a = rasterize(listOf(base, redCoat, blueCoat), 4, 4)
+        val b = rasterize(listOf(base, blueCoat, redCoat), 4, 4)
+        assertTrue(a.contentEquals(b), "batch order changed the translucent composite")
+        // Blue is the near coat, so the final pixel leans blue over red.
+        val px = a[2 * 4 + 2]
+        assertTrue((px and 0xFF) > ((px ushr 16) and 0xFF), "expected blue over red, got ${px.toUInt().toString(16)}")
+    }
+
+    @Test
+    fun `the single-texture overload equals a one-batch call`() {
+        val tex = Texture(intArrayOf(0xFFFF0000.toInt(), 0x800000FF.toInt()), width = 2, height = 1)
+        val tris = quad(z = 0f, tu = 0.5f, tv = 0.5f, opaque = true) +
+            quad(z = 1f, tu = 1.5f, tv = 0.5f, opaque = false)
+        assertTrue(
+            rasterize(tris, tex, 4, 4).contentEquals(rasterize(listOf(TriBatch(tris, tex)), 4, 4)),
+        )
+    }
 }
