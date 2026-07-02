@@ -52,12 +52,12 @@ enum class ThemeMode { Manual, System, Wallpaper }
 /**
  * The theme mode a fresh session starts in. Migrates the pre-mode opt-in: a
  * settings file that enabled [SettingsData.themeFromWallpaper] before
- * [SettingsData.themeMode] existed still decodes with the default [ThemeMode.Manual],
- * so the legacy flag promotes it to [ThemeMode.Wallpaper]. An explicitly stored
- * mode wins over the flag.
+ * [SettingsData.themeMode] existed decodes with the field's default ([ThemeMode.System]),
+ * so the legacy flag promotes exactly that default to [ThemeMode.Wallpaper] -- a
+ * non-default stored mode is an explicit choice and wins over the flag.
  */
 fun resolveInitialThemeMode(s: SettingsData): ThemeMode =
-    if (s.themeMode == ThemeMode.Manual && s.themeFromWallpaper) ThemeMode.Wallpaper else s.themeMode
+    if (s.themeMode == ThemeMode.System && s.themeFromWallpaper) ThemeMode.Wallpaper else s.themeMode
 
 @Serializable
 data class SettingsData(
@@ -86,9 +86,11 @@ data class SettingsData(
     /**
      * Which source drives dark/light -- see [ThemeMode]. [isDarkTheme] stays the
      * resolved value the automatic sources write through, so everything downstream
-     * (and older builds) keeps reading one boolean.
+     * (and older builds) keeps reading one boolean. Defaults to following the OS:
+     * where the scheme is unreadable the automatic source just never fires, so a
+     * fresh install falls back to [isDarkTheme]'s own default.
      */
-    val themeMode: ThemeMode = ThemeMode.Manual,
+    val themeMode: ThemeMode = ThemeMode.System,
     /**
      * Replace the OS title bar with the in-app top bar (undecorated window +
      * custom caption buttons / drag / resize). On by default. Escape hatch: if a

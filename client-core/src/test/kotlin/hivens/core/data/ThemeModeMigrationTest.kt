@@ -4,12 +4,13 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 /** Contract of [resolveInitialThemeMode]: the legacy wallpaper flag promotes the
- *  default mode, and an explicitly stored mode always wins over the stale flag. */
+ *  DEFAULT mode (a legacy file decodes to it), and any non-default stored mode is
+ *  an explicit choice that wins over the stale flag. */
 class ThemeModeMigrationTest {
 
     @Test
-    fun defaults_start_manual() {
-        assertEquals(ThemeMode.Manual, resolveInitialThemeMode(SettingsData()))
+    fun defaults_follow_the_system() {
+        assertEquals(ThemeMode.System, resolveInitialThemeMode(SettingsData()))
     }
 
     @Test
@@ -19,14 +20,14 @@ class ThemeModeMigrationTest {
     }
 
     @Test
-    fun explicit_mode_wins_over_stale_flag() {
-        val explicit = SettingsData(themeFromWallpaper = true, themeMode = ThemeMode.System)
-        assertEquals(ThemeMode.System, resolveInitialThemeMode(explicit))
+    fun explicit_manual_wins_over_stale_flag() {
+        val explicit = SettingsData(themeFromWallpaper = true, themeMode = ThemeMode.Manual)
+        assertEquals(ThemeMode.Manual, resolveInitialThemeMode(explicit))
     }
 
     @Test
-    fun explicit_manual_with_flag_off_stays_manual() {
-        val manual = SettingsData(themeFromWallpaper = false, themeMode = ThemeMode.Manual)
-        assertEquals(ThemeMode.Manual, resolveInitialThemeMode(manual))
+    fun explicit_wallpaper_stays_wallpaper() {
+        val wallpaper = SettingsData(themeFromWallpaper = true, themeMode = ThemeMode.Wallpaper)
+        assertEquals(ThemeMode.Wallpaper, resolveInitialThemeMode(wallpaper))
     }
 }
