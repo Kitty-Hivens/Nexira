@@ -65,6 +65,7 @@ fun SkinHero(
     interactive: Boolean = true,
     autoSpin: Boolean = true,
     framing: SkinFraming = SkinFraming.Full,
+    cape: ImageBitmap? = null,
     state: SkinViewState = rememberSkinViewState(),
 ) {
     val skinManager: SkinManager = koinInject()
@@ -83,6 +84,7 @@ fun SkinHero(
                 interactive = interactive,
                 autoSpin = autoSpin,
                 framing = framing,
+                cape = cape,
                 state = state,
             )
         } else {
