@@ -83,16 +83,21 @@ private fun Box.inflated(
 )
 
 /**
- * Builds the figure's faces for the given model + skin format. [legacy] is the
- * old 64x32 layout: no second layer except the hat, and the left arm/leg reuse
- * the right limb's texture (a mirror in vanilla; here a direct reuse, acceptable
+ * The figure's boxes grouped by body part -- base box first, then that part's
+ * overlay box (when the format carries one). The rig turns each entry into one
+ * node, so an overlay follows its base part structurally. [legacy] is the old
+ * 64x32 layout: no second layer except the hat, and the left arm/leg reuse the
+ * right limb's texture (a mirror in vanilla; here a direct reuse, acceptable
  * for the rare legacy skins SmartyCraft still serves).
+ *
+ * Overlay boxes: hat exists on every skin; the rest are 64x64 only. Seam faces
+ * (where a part abuts another) are kept flush so the overlays do not overlap
+ * and z-fight: head over body (head no bottom), torso between head and legs
+ * (body no top/bottom), arms/legs at the shoulders/hips (no top).
  */
-fun buildFigure(model: SkinModel = SkinModel.Classic, legacy: Boolean = false): List<Face> {
+internal fun partBoxes(model: SkinModel, legacy: Boolean): Map<BodyPart, List<Box>> {
     val aw = model.armWidth
-    val boxes = mutableListOf<Box>()
 
-    // Base parts.
     val head     = Box(-4f,  8f, -4f, 4f, 16f, 4f, u = 0f,  v = 0f,  w = 8f,  h = 8f,  d = 8f)
     val body     = Box(-4f, -4f, -2f, 4f,  8f, 2f, u = 16f, v = 16f, w = 8f,  h = 12f, d = 4f)
     val rightArm = Box(-4f - aw, -4f, -2f, -4f, 8f, 2f, u = 40f, v = 16f, w = aw, h = 12f, d = 4f)
@@ -100,32 +105,50 @@ fun buildFigure(model: SkinModel = SkinModel.Classic, legacy: Boolean = false): 
     val rightLeg = Box(-4f, -16f, -2f, 0f, -4f, 2f, u = 0f,  v = 16f, w = 4f, h = 12f, d = 4f)
     val leftLeg  = Box(0f, -16f, -2f, 4f, -4f, 2f, u = 16f, v = 48f, w = 4f, h = 12f, d = 4f)
 
-    boxes += head
-    boxes += body
-    boxes += rightArm
-    boxes += rightLeg
-    if (legacy) {
-        // Legacy has no dedicated left-limb texture; reuse the right limb's.
-        boxes += leftArm.copy(u = 40f, v = 16f)
-        boxes += leftLeg.copy(u = 0f, v = 16f)
-    } else {
-        boxes += leftArm
-        boxes += leftLeg
-    }
+    val parts = LinkedHashMap<BodyPart, MutableList<Box>>()
+    parts[BodyPart.Head]     = mutableListOf(head)
+    parts[BodyPart.Body]     = mutableListOf(body)
+    parts[BodyPart.RightArm] = mutableListOf(rightArm)
+    parts[BodyPart.LeftArm]  = mutableListOf(if (legacy) leftArm.copy(u = 40f, v = 16f) else leftArm)
+    parts[BodyPart.RightLeg] = mutableListOf(rightLeg)
+    parts[BodyPart.LeftLeg]  = mutableListOf(if (legacy) leftLeg.copy(u = 0f, v = 16f) else leftLeg)
 
-    // Overlay (second layer). Hat exists on every skin; the rest are 64x64 only.
-    // Seam faces (where a part abuts another) are kept flush so the overlays do
-    // not overlap and z-fight: head over body (head no bottom), torso between head
-    // and legs (body no top/bottom), arms/legs at the shoulders/hips (no top).
-    boxes += head.inflated(OVERLAY_INFLATE, u = 32f, v = 0f, layer = true, bottom = false)
+    parts.getValue(BodyPart.Head) += head.inflated(OVERLAY_INFLATE, u = 32f, v = 0f, layer = true, bottom = false)
     if (!legacy) {
-        boxes += body.inflated(OVERLAY_INFLATE,     u = 16f, v = 32f, layer = true, top = false, bottom = false)
-        boxes += rightArm.inflated(OVERLAY_INFLATE, u = 40f, v = 32f, layer = true, top = false)
-        boxes += leftArm.inflated(OVERLAY_INFLATE,  u = 48f, v = 48f, layer = true, top = false)
-        boxes += rightLeg.inflated(OVERLAY_INFLATE, u = 0f,  v = 32f, layer = true, top = false)
-        boxes += leftLeg.inflated(OVERLAY_INFLATE,  u = 0f,  v = 48f, layer = true, top = false)
+        parts.getValue(BodyPart.Body)     += body.inflated(OVERLAY_INFLATE,     u = 16f, v = 32f, layer = true, top = false, bottom = false)
+        parts.getValue(BodyPart.RightArm) += rightArm.inflated(OVERLAY_INFLATE, u = 40f, v = 32f, layer = true, top = false)
+        parts.getValue(BodyPart.LeftArm)  += leftArm.inflated(OVERLAY_INFLATE,  u = 48f, v = 48f, layer = true, top = false)
+        parts.getValue(BodyPart.RightLeg) += rightLeg.inflated(OVERLAY_INFLATE, u = 0f,  v = 32f, layer = true, top = false)
+        parts.getValue(BodyPart.LeftLeg)  += leftLeg.inflated(OVERLAY_INFLATE,  u = 0f,  v = 48f, layer = true, top = false)
     }
+    return parts
+}
 
+/**
+ * The figure as a flat face list in the historical emission order (all bases,
+ * then all overlays) -- the pre-rig renderer's order, kept as the reference
+ * the geometry tests and the render-parity pin are written against. Note the
+ * two historical quirks: bases run right-limb-before-left-limb interleaved
+ * (arm, leg, arm, leg) while overlays run arms-then-legs.
+ */
+fun buildFigure(model: SkinModel = SkinModel.Classic, legacy: Boolean = false): List<Face> {
+    val parts = partBoxes(model, legacy)
+    fun base(p: BodyPart) = parts.getValue(p).first()
+    fun overlays(p: BodyPart) = parts.getValue(p).drop(1)
+
+    val boxes = mutableListOf<Box>()
+    boxes += base(BodyPart.Head)
+    boxes += base(BodyPart.Body)
+    boxes += base(BodyPart.RightArm)
+    boxes += base(BodyPart.RightLeg)
+    boxes += base(BodyPart.LeftArm)
+    boxes += base(BodyPart.LeftLeg)
+    for (p in listOf(
+        BodyPart.Head, BodyPart.Body,
+        BodyPart.RightArm, BodyPart.LeftArm, BodyPart.RightLeg, BodyPart.LeftLeg,
+    )) {
+        boxes += overlays(p)
+    }
     return boxes.flatMap { it.faces() }
 }
 
