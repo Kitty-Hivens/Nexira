@@ -1,4 +1,4 @@
-package hivens.launcher
+package hivens.ui.layout
 
 import hivens.widget.model.CanvasPlacement
 import hivens.widget.model.LayoutGraph

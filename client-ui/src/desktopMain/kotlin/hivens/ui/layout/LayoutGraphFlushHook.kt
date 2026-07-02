@@ -1,6 +1,5 @@
-package hivens.launcher.di
+package hivens.ui.layout
 
-import hivens.launcher.LayoutGraphRepository
 import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
 

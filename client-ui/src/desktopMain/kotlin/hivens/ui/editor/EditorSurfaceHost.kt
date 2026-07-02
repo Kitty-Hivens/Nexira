@@ -62,8 +62,8 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import hivens.core.data.HomeView
 import hivens.core.data.UiStyle
-import hivens.launcher.LayoutGraphRepository
-import hivens.launcher.LayoutReconcile
+import hivens.ui.layout.LayoutGraphRepository
+import hivens.ui.layout.LayoutReconcile
 import hivens.ui.Screen
 import hivens.ui.customization.CustomizationSettings
 import hivens.ui.editor.decoration.EditableWidgetChrome

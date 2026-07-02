@@ -99,7 +99,7 @@ import hivens.ui.system.SystemNotifier
 import hivens.ui.tray.TrayManager
 import hivens.ui.utils.ConsoleSettingsManager
 import hivens.ui.utils.GameConsoleService
-import hivens.launcher.LayoutGraphRepository
+import hivens.ui.layout.LayoutGraphRepository
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalWidgetRegistry
 import hivens.widget.api.LocalWidgetChromeRenderer

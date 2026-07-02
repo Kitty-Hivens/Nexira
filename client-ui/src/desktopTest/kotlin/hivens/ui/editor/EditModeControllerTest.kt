@@ -1,6 +1,6 @@
 package hivens.ui.editor
 
-import hivens.launcher.LayoutGraphRepository
+import hivens.ui.layout.LayoutGraphRepository
 import hivens.widget.model.GRID_COLUMNS_MAX
 import hivens.widget.model.LayoutGraph
 import hivens.widget.model.SlotContent
