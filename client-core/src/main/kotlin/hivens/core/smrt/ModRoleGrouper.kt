@@ -1,4 +1,4 @@
-package hivens.launcher.smrt
+package hivens.core.smrt
 
 import hivens.core.api.dto.smrt.SmrtModEntry
 

@@ -33,7 +33,7 @@ import androidx.compose.ui.unit.dp
 import com.mikepenz.markdown.m3.Markdown
 import hivens.core.api.dto.smrt.SmrtModEntry
 import hivens.core.api.dto.smrt.SmrtRequirement
-import hivens.launcher.smrt.DepGraph
+import hivens.core.smrt.DepGraph
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon

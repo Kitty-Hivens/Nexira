@@ -16,8 +16,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import hivens.launcher.smrt.DepGraph
-import hivens.launcher.smrt.ModRoleGroup
+import hivens.core.smrt.DepGraph
+import hivens.core.smrt.ModRoleGroup
 import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.NxTheme
