@@ -662,6 +662,11 @@ object GermanStrings : AppStrings {
     override val wardrobeApplyCape           = "Clan-Umhang setzen"
     override val wardrobeCapeClanHint        = "Umhänge gelten clanweit -- nur der Clan-Anführer kann einen setzen."
     override val wardrobeDefaults            = "Standard-Skins"
+    override val wardrobePoseStand           = "Stehend"
+    override val wardrobePoseWave            = "Winken"
+    override val wardrobePoseSit             = "Sitzend"
+    override val wardrobePoseFaceCover       = "Gesicht verdecken"
+    override val wardrobePoseWalk            = "Gehen"
 
     override val backgroundLoopMode      = "Schleife"
     override val backgroundLoopUseCodec  = "Aus Codec"

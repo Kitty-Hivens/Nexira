@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -52,8 +53,11 @@ import hivens.core.data.SessionData
 import hivens.auth.AccountStore
 import hivens.ui.flexible.Flexible
 import hivens.ui.flexible.FlexibleKind
+import hivens.ui.i18n.AppStrings
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
+import hivens.ui.nx.NxChoiceChip
+import hivens.ui.nx.NxTooltip
 import hivens.ui.surface.NxCard
 import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.customization.glassSurfaceAlpha
@@ -68,8 +72,14 @@ import hivens.ui.identity.SkinManager
 import hivens.ui.identity.skinContentHash
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
+import hivens.ui.skin3d.Cycles
+import hivens.ui.skin3d.PoseSource
+import hivens.ui.skin3d.Poses
 import hivens.ui.skin3d.SkinFraming
 import hivens.ui.skin3d.SkinView3D
+import hivens.ui.skin3d.asSource
+import hivens.ui.skin3d.layered
+import hivens.ui.skin3d.rememberSkinViewState
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalStyle
 import hivens.ui.widgets.profile.SkinHero
@@ -127,15 +137,33 @@ private data class WardrobeData(
 /**
  * Whether the cape block (import tile, cards, apply) renders at all. Only a
  * POSITIVE finding of ineligibility hides it: no SmartyCraft account to apply
- * to, a login that resolved to no clan, or a roster that shows a non-leader
- * role. Unknown fails open with the clan hint -- a false-show costs one
- * failed upload, a false-hide silently locks a legitimate leader out.
+ * to, a profile that shows no clan, or a clan role below leader. Unknown
+ * fails open with the clan hint -- a false-show costs one failed upload, a
+ * false-hide silently locks a legitimate leader out.
  */
-internal fun capeSectionVisible(scSession: SessionData?, role: ClanRole): Boolean = when {
-    scSession == null -> false
-    scSession.clanResolved && scSession.clan == null -> false
-    role == ClanRole.NotLeader -> false
+internal fun capeSectionVisible(hasScAccount: Boolean, role: ClanRole): Boolean = when {
+    !hasScAccount -> false
+    role == ClanRole.NoClan || role == ClanRole.NotLeader -> false
     else -> true
+}
+
+// The wardrobe's pose presets for the preview model, in chip order.
+private enum class WardrobePose { Stand, Wave, Sit, FaceCover, Walk }
+
+private fun WardrobePose.source(): PoseSource = when (this) {
+    WardrobePose.Stand -> Poses.Stand.asSource()
+    WardrobePose.Wave -> layered(Poses.Wave.asSource(), Cycles.handWave())
+    WardrobePose.Sit -> Poses.Sit.asSource()
+    WardrobePose.FaceCover -> Poses.FaceCover.asSource()
+    WardrobePose.Walk -> Cycles.walk()
+}
+
+private fun WardrobePose.label(s: AppStrings): String = when (this) {
+    WardrobePose.Stand -> s.wardrobePoseStand
+    WardrobePose.Wave -> s.wardrobePoseWave
+    WardrobePose.Sit -> s.wardrobePoseSit
+    WardrobePose.FaceCover -> s.wardrobePoseFaceCover
+    WardrobePose.Walk -> s.wardrobePoseWalk
 }
 
 @Composable
@@ -202,19 +230,20 @@ private fun Wardrobe(session: SessionData) {
     val defaultBitmap = selectedDefault?.let { defaultBitmaps[it.name] }
     val scSession = remember(refreshKey, session) { credentials.accountFor(SC_KEY) }
 
-    // Cape capability -- clan membership from the session, leadership from the
-    // public clan page (see ClanRoleProvider).
+    // Cape capability. Fast path: a fresh login already said "no clan", no
+    // network needed. Otherwise the public player page decides -- it works
+    // regardless of how stale the persisted session is (pre-field sessions
+    // never resolve their clan flag).
     var capeRole by remember { mutableStateOf(ClanRole.Unknown) }
-    LaunchedEffect(scSession?.playerName, scSession?.clan) {
+    LaunchedEffect(scSession?.playerName, scSession?.clan, scSession?.clanResolved) {
         val sc = scSession
-        val clan = sc?.clan
-        capeRole = if (sc != null && sc.clanResolved && clan != null) {
-            clanRoles.role(sc.playerName, clan)
-        } else {
-            ClanRole.Unknown
+        capeRole = when {
+            sc == null -> ClanRole.Unknown
+            sc.clanResolved && sc.clan == null -> ClanRole.NoClan
+            else -> clanRoles.eligibility(sc.playerName)
         }
     }
-    val showCapes = capeSectionVisible(scSession, capeRole)
+    val showCapes = capeSectionVisible(scSession != null, capeRole)
 
     // The current server skin is the player's real look but lives on the server, not the
     // local library -- auto-import it (deduped by pixel content) so it shows among the
@@ -279,51 +308,80 @@ private fun Wardrobe(session: SessionData) {
     // no cape UI, no cape on the model.
     val previewCape = if (showCapes) (selectedCapeId ?: data.activeCapeId)?.let { bitmaps[it] } else null
 
+    // One hoisted view state so a picked pose survives switching skins, and
+    // one selected chip driving it.
+    val previewState = rememberSkinViewState()
+    var pose by remember { mutableStateOf(WardrobePose.Stand) }
+
     Row(Modifier.fillMaxSize().padding(20.dp), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-        // Preview: the picked library skin, else the current applied look.
-        Box(Modifier.width(260.dp).fillMaxHeight(), contentAlignment = Alignment.Center) {
-            val bmp = selectedBitmap ?: defaultBitmap
-            if (bmp != null) {
-                SkinView3D(bmp, Modifier.fillMaxHeight().width(260.dp), interactive = true, autoSpin = true, cape = previewCape)
-            } else {
-                SkinHero(session.playerName, refreshKey, Modifier.width(260.dp).fillMaxHeight(), interactive = true, autoSpin = true, cape = previewCape)
+        // Preview column: the picked library skin (else the current applied
+        // look) with the pose chips under it.
+        Column(Modifier.width(260.dp).fillMaxHeight()) {
+            Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                val bmp = selectedBitmap ?: defaultBitmap
+                if (bmp != null) {
+                    SkinView3D(bmp, Modifier.fillMaxSize(), interactive = true, autoSpin = true, cape = previewCape, state = previewState)
+                } else {
+                    SkinHero(session.playerName, refreshKey, Modifier.fillMaxSize(), interactive = true, autoSpin = true, cape = previewCape, state = previewState)
+                }
+            }
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+            ) {
+                WardrobePose.entries.forEach { p ->
+                    NxChoiceChip(label = p.label(s), selected = pose == p) {
+                        pose = p
+                        previewState.play(p.source())
+                    }
+                    PuppetClick("wardrobe.pose.${p.name}") {
+                        pose = p
+                        previewState.play(p.source())
+                    }
+                }
             }
         }
 
         Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            // Apply the picked skin (library entry or default) and/or cape to a
-            // signed-in SmartyCraft account. A default carries no markId (it is not a
-            // library entry, so it never enters the applied-history).
+            // Constant-height action strip: the apply buttons, the busy
+            // spinner and the error line all live INSIDE it, so neither
+            // picking a skin nor a failed upload shifts the grid below.
+            // A default skin carries no markId (it is not a library entry,
+            // so it never enters the applied-history).
             val skinSel: Pair<File, String?>? = selectedId?.let { library.file(it).toFile() to it }
                 ?: selectedDefault?.let { it.file.toFile() to null }
-            if (scSession != null && (skinSel != null || (showCapes && selectedCapeId != null))) {
+            Box(Modifier.fillMaxWidth().height(48.dp), contentAlignment = Alignment.CenterStart) {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth(),
                 ) {
-                    skinSel?.let { (file, markId) ->
-                        Flexible("wardrobe_apply_sc_btn", FlexibleKind.Button) {
-                            NxButton(
-                                label = s.wardrobeApplySmartycraft,
-                                onClick = { if (!busy) applyToSc(file, isCloak = false, markId = markId) },
-                                style = NxButtonStyle.Primary,
-                                enabled = !busy,
-                            )
-                        }
-                        PuppetClick("wardrobe.applySmartycraft") { if (!busy) applyToSc(file, isCloak = false, markId = markId) }
-                    }
-                    if (showCapes) {
-                        selectedCapeId?.let { id ->
-                            val capeFile = library.file(id).toFile()
-                            Flexible("wardrobe_apply_cape_sc_btn", FlexibleKind.Button) {
+                    if (scSession != null) {
+                        skinSel?.let { (file, markId) ->
+                            Flexible("wardrobe_apply_sc_btn", FlexibleKind.Button) {
                                 NxButton(
-                                    label = s.wardrobeApplyCape,
-                                    onClick = { if (!busy) applyToSc(capeFile, isCloak = true, markId = id) },
-                                    style = NxButtonStyle.Secondary,
+                                    label = s.wardrobeApplySmartycraft,
+                                    onClick = { if (!busy) applyToSc(file, isCloak = false, markId = markId) },
+                                    style = NxButtonStyle.Primary,
                                     enabled = !busy,
                                 )
                             }
-                            PuppetClick("wardrobe.applyCapeSmartycraft") { if (!busy) applyToSc(capeFile, isCloak = true, markId = id) }
+                            PuppetClick("wardrobe.applySmartycraft") { if (!busy) applyToSc(file, isCloak = false, markId = markId) }
+                        }
+                        if (showCapes) {
+                            selectedCapeId?.let { id ->
+                                val capeFile = library.file(id).toFile()
+                                Flexible("wardrobe_apply_cape_sc_btn", FlexibleKind.Button) {
+                                    NxButton(
+                                        label = s.wardrobeApplyCape,
+                                        onClick = { if (!busy) applyToSc(capeFile, isCloak = true, markId = id) },
+                                        style = NxButtonStyle.Secondary,
+                                        enabled = !busy,
+                                    )
+                                }
+                                PuppetClick("wardrobe.applyCapeSmartycraft") { if (!busy) applyToSc(capeFile, isCloak = true, markId = id) }
+                            }
                         }
                     }
                     if (busy) {
@@ -333,9 +391,18 @@ private fun Wardrobe(session: SessionData) {
                             modifier = Modifier.size(18.dp),
                         )
                     }
+                    error?.let {
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = NxTheme.colors.error,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false),
+                        )
+                    }
                 }
             }
-            error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.error) }
 
             // One grid, two sections (Modrinth shape). The "+" tile leads each, so a
             // section is never truly empty -- it doubles as the import prompt.
@@ -455,14 +522,7 @@ private fun SkinCard(
             }
         }
         Row(Modifier.height(CardCaptionHeight), verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = name,
-                style = MaterialTheme.typography.labelSmall,
-                color = NxTheme.colors.textPrimary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f, fill = false),
-            )
+            CardCaption(name, Modifier.weight(1f, fill = false))
             // Default skins are read-only (not library entries), so no delete.
             onDelete?.let { del ->
                 IconButton(onClick = del, modifier = Modifier.size(24.dp)) {
@@ -470,6 +530,23 @@ private fun SkinCard(
                 }
             }
         }
+    }
+}
+
+// Card caption that reveals the full name on hover, but only when the label
+// is actually cut -- an untruncated caption has nothing to add.
+@Composable
+private fun CardCaption(name: String, modifier: Modifier = Modifier) {
+    var truncated by remember { mutableStateOf(false) }
+    NxTooltip(text = name, enabled = truncated, modifier = modifier) {
+        Text(
+            text = name,
+            style = MaterialTheme.typography.labelSmall,
+            color = NxTheme.colors.textPrimary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            onTextLayout = { truncated = it.hasVisualOverflow },
+        )
     }
 }
 
@@ -543,14 +620,7 @@ private fun CapeCard(
             }
         }
         Row(Modifier.height(CardCaptionHeight), verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = name,
-                style = MaterialTheme.typography.labelSmall,
-                color = NxTheme.colors.textPrimary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f, fill = false),
-            )
+            CardCaption(name, Modifier.weight(1f, fill = false))
             IconButton(onClick = onDelete, modifier = Modifier.size(24.dp)) {
                 Symbol(NxIcon.Delete, s.accountRemove, tint = NxTheme.colors.textSecondary, size = 16.dp)
             }

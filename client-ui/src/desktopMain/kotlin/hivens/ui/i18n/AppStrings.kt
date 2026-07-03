@@ -711,6 +711,11 @@ interface AppStrings {
     val wardrobeApplyCape: String
     val wardrobeCapeClanHint: String
     val wardrobeDefaults: String
+    val wardrobePoseStand: String
+    val wardrobePoseWave: String
+    val wardrobePoseSit: String
+    val wardrobePoseFaceCover: String
+    val wardrobePoseWalk: String
 
     // --- Background loop mode ---
     val backgroundLoopMode: String
