@@ -10,8 +10,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.TooltipArea
-import androidx.compose.foundation.TooltipPlacement
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -33,7 +31,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -51,7 +48,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import hivens.ui.i18n.AppStrings
@@ -64,6 +60,7 @@ import hivens.ui.notifications.NotificationEvent
 import hivens.ui.notifications.NotificationGroup
 import hivens.ui.notifications.Severity
 import hivens.ui.theme.NxColors
+import hivens.ui.nx.NxTooltip
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalStyle
 import java.time.Duration
@@ -206,23 +203,7 @@ private fun HeaderRow(
         // Hover-tooltip with absolute date; the inline label stays relative
         // ("Now" / "5s" / "1d") so the card reads quickly. A 1d label loses
         // the exact "yesterday at HH:mm" detail; the tooltip recovers it.
-        TooltipArea(
-            tooltip = {
-                Surface(
-                    color = NxTheme.colors.surface,
-                    shape = RoundedCornerShape(4.dp),
-                ) {
-                    Text(
-                        text     = strings.notificationAbsoluteTime(group.latest.createdAt),
-                        style    = MaterialTheme.typography.labelSmall,
-                        color    = NxTheme.colors.textPrimary,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                    )
-                }
-            },
-            delayMillis = 400,
-            tooltipPlacement = TooltipPlacement.CursorPoint(offset = DpOffset(0.dp, 12.dp)),
-        ) {
+        NxTooltip(text = strings.notificationAbsoluteTime(group.latest.createdAt)) {
             Text(
                 text  = relativeTime(group.latest.createdAt, now, strings),
                 style = MaterialTheme.typography.labelSmall,
