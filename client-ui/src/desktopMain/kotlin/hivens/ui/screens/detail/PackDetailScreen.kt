@@ -85,6 +85,7 @@ import hivens.ui.screens.library.content.ContentTabPane
 import hivens.ui.screens.library.rememberPackArt
 import hivens.ui.screens.library.worlds.WorldsTabPane
 import hivens.ui.theme.NxTheme
+import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.LocalMonoFamily
 import hivens.ui.theme.decorativePair
 import hivens.ui.theme.origin
@@ -448,7 +449,15 @@ private fun Hero(
     val bannerIsVideo = bannerUrl != null && isVideoUrl(bannerUrl)
     var bannerFullscreen by remember(bannerUrl) { mutableStateOf(false) }
     val (hueA, hueB) = NxTheme.colors.decorativePair(pack.id)
-    Box(Modifier.fillMaxWidth().height(196.dp)) {
+    // Floated card treatment: the app's cards round via the cardCorner token,
+    // and a full-bleed square banner read as a foreign element next to them.
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .padding(start = 16.dp, top = 8.dp, end = 16.dp)
+            .height(196.dp)
+            .clip(RoundedCornerShape(LocalStyle.current.cardCorner)),
+    ) {
         // Pixel-art base -> real banner -> scrim, same layering as the cards.
         Box(Modifier.fillMaxSize().pixelArtBackground(pack.id, hueA, hueB))
         if (bannerUrl != null) {

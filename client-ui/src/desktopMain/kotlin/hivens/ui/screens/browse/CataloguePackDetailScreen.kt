@@ -53,6 +53,7 @@ import hivens.ui.render.MarkdownHtml
 import hivens.ui.render.openInBrowser
 import hivens.ui.screens.RetryStateBlock
 import hivens.ui.theme.NxTheme
+import hivens.ui.theme.LocalStyle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -138,6 +139,10 @@ fun CataloguePackDetailScreen(
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         val loaded = state as? DetailState.Loaded
         CatalogueHero(
+            // Same floated-card rounding as the Library detail hero.
+            modifier  = Modifier
+                .padding(start = 16.dp, top = 8.dp, end = 16.dp)
+                .clip(RoundedCornerShape(LocalStyle.current.cardCorner)),
             title     = loaded?.details?.title ?: packId,
             tagline   = loaded?.details?.tagline.orEmpty(),
             iconUrl   = loaded?.details?.iconUrl,

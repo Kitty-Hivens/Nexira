@@ -146,9 +146,12 @@ fun FrostBackdrop(extraBlurDp: Float, modifier: Modifier = Modifier) {
     // Mirror the wallpaper's saturation so the slice matches the real draw.
     val saturationFilter = remember(st.saturation) { bgSaturationFilter(st.saturation) }
 
+    // The painter survives recomposition: a fresh instance per pass busts the
+    // layer cache below and every BackdropState tick re-uploads the bitmap.
+    val painter = remember(bmp) { BitmapPainter(bmp) }
     Box(modifier.clipToBounds().onGloballyPositioned { origin = it.positionInWindow() }) {
         Image(
-            painter            = BitmapPainter(bmp),
+            painter            = painter,
             contentDescription = null,
             contentScale       = st.contentScale,
             alignment          = st.alignment,
@@ -160,8 +163,11 @@ fun FrostBackdrop(extraBlurDp: Float, modifier: Modifier = Modifier) {
                     scaleX = pScale; scaleY = pScale
                     translationX = px; translationY = py
                 }
-                .blur((st.bgBlurRadiusDp + extraBlurDp).dp, BlurredEdgeTreatment.Unbounded)
-                .alpha(st.opacity),
+                // alpha outside the blur: an opacity tick recomposites the
+                // cached blurred slice instead of re-blurring it (see the same
+                // ordering note in CustomBackground).
+                .alpha(st.opacity)
+                .blur((st.bgBlurRadiusDp + extraBlurDp).dp, BlurredEdgeTreatment.Unbounded),
         )
         // Mirror CustomBackground's darken + tint overlays so the slice matches
         // the real wallpaper's tone, not just its pixels.

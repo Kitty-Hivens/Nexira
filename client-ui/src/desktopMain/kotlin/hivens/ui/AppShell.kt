@@ -1111,6 +1111,19 @@ fun AppRoot(
     // ── Background settings ───────────────────────────────────────────────
     val backgroundManager = remember { BackgroundManager(dataDirectory, json) }
     var backgroundSettings by remember { mutableStateOf(backgroundManager.load()) }
+    // Persist background settings debounced and OFF the UI thread: the fx
+    // sliders fire per tick, and a synchronous write per tick both janks the
+    // drag and multiplies disk writes. The effect restarts on every value
+    // change (keyed), so one write lands ~300ms after the drag settles; the
+    // in-memory state above is already live, so a killed tail loses at most
+    // the final slider position (same contract as the layout-graph debounce).
+    var persistedBackground by remember { mutableStateOf(backgroundSettings) }
+    LaunchedEffect(backgroundSettings) {
+        if (backgroundSettings == persistedBackground) return@LaunchedEffect
+        delay(300)
+        withContext(Dispatchers.IO) { backgroundManager.save(backgroundSettings) }
+        persistedBackground = backgroundSettings
+    }
 
     // ── Auto-login with offline mode support ──────────────────────────────
     // Business logic lives in AutoLoginCoordinator; the Composable maps the
@@ -1248,10 +1261,7 @@ fun AppRoot(
                 uiStyle = uiStyle,
                 onUiStyleChanged = onUiStyleChanged,
                 backgroundSettings = backgroundSettings,
-                onBackgroundSettingsChanged = { newSettings ->
-                    backgroundSettings = newSettings
-                    backgroundManager.save(newSettings)
-                },
+                onBackgroundSettingsChanged = { backgroundSettings = it },
                 customization              = customization,
                 onCustomizationChanged     = onCustomizationChanged,
             )

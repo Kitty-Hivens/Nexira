@@ -184,14 +184,19 @@ private fun AnimatedParallaxImage(
     }
 
     val useParallax = settings.parallaxIntensity > 0f
+    // alpha OUTSIDE the blur (leftmost = outermost): an opacity tick then only
+    // recomposites the cached blurred layer. With alpha inside, every tick of
+    // the opacity slider invalidated the blur's input and re-blurred the whole
+    // wallpaper -- the slider-drag jank. Uniform alpha commutes with a linear
+    // blur, so the output is identical.
     val baseModifier = Modifier
         .fillMaxSize()
+        .alpha(settings.opacity)
         .let {
             if (settings.blurRadius > 0f)
                 it.blur(settings.blurRadius.dp, BlurredEdgeTreatment.Unbounded)
             else it
         }
-        .alpha(settings.opacity)
 
     if (useParallax) {
         val target = parallaxTranslationFor(mousePosProvider(), settings.parallaxIntensity)
