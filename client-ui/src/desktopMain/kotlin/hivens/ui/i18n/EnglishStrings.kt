@@ -37,7 +37,7 @@ object EnglishStrings : AppStrings {
     override val dashboardServers              = "Available servers"
     override val dashboardServersEmpty         = "No servers found"
     override val dashboardLoginRequiredTitle   = "Sign in to see servers"
-    override val dashboardLoginRequiredHint    = "Use the panel on the right to log in. The server list lives behind authentication on SMARTYcraft."
+    override val dashboardLoginRequiredHint    = "The SmartyCraft server list lives behind authentication. Sign in from the Profile section."
 
     // Launch Control
     override val launchReady       = "Ready to play"

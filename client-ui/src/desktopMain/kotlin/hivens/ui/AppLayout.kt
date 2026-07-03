@@ -27,6 +27,8 @@ import hivens.ui.editor.EditorSurfaceHost
 import hivens.ui.i18n.AppLocale
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
+import hivens.ui.nx.NxButton
+import hivens.ui.nx.NxButtonStyle
 import hivens.ui.icons.Symbol
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.screens.*
@@ -119,9 +121,14 @@ fun AppLayout(
                 when (screen) {
                     Screen.Home -> {
                         val session = currentSession
-                        when {
-                            session != null -> when (homeView) {
-                                HomeView.Classic -> DashboardScreen(
+                        when (homeView) {
+                            // The classic dashboard IS the SmartyCraft server list, so it
+                            // is genuinely gated on auth. `Loading` is the brief window
+                            // between startup and resolved credentials -- spinner is
+                            // appropriate; `Unauthenticated` is a stable state waiting on
+                            // user input, so it gets the explicit sign-in copy + route.
+                            HomeView.Classic -> when {
+                                session != null -> DashboardScreen(
                                     session               = session,
                                     initialSelectedServer = selectedServer,
                                     onServerSelected      = { selectedServer = it },
@@ -130,23 +137,24 @@ fun AppLayout(
                                     onOpenServerSettings  = { onScreenChange(Screen.ServerSettings(it)) },
                                     onOpenDetails         = { onScreenChange(Screen.ServerDetails(it)) }
                                 )
-                                HomeView.LibraryFirst -> LibraryScreen(
-                                    appState       = appState,
-                                    onScreenChange = onScreenChange,
-                                )
-                                HomeView.New -> NewHomeScreen(
-                                    appState         = appState,
-                                    onScreenChange   = onScreenChange,
-                                    onSessionUpdated = { currentSession = it },
+                                appState is AppState.Loading -> ContentLoadingPlaceholder()
+                                else -> ContentLoginRequiredPlaceholder(
+                                    onSignIn = { onScreenChange(Screen.Profile) },
                                 )
                             }
-                            // `Loading` is the brief window between startup and resolved
-                            // credentials -- spinner is appropriate. `Unauthenticated` is
-                            // a stable state waiting on user input; show the explicit
-                            // "sign in" copy so the spinning placeholder doesn't read as
-                            // a stuck network request.
-                            appState is AppState.Loading -> ContentLoadingPlaceholder()
-                            else -> ContentLoginRequiredPlaceholder()
+                            // The pack-centric variants run on LOCAL data (pack repo,
+                            // layout graph) and render signed-out; their launch
+                            // affordances degrade per-widget (offline / sign-in)
+                            // instead of gating the whole page on an SC session.
+                            HomeView.LibraryFirst -> LibraryScreen(
+                                appState       = appState,
+                                onScreenChange = onScreenChange,
+                            )
+                            HomeView.New -> NewHomeScreen(
+                                appState         = appState,
+                                onScreenChange   = onScreenChange,
+                                onSessionUpdated = { currentSession = it },
+                            )
                         }
                     }
 
@@ -362,7 +370,7 @@ private fun ContentLoadingPlaceholder() {
 }
 
 @Composable
-private fun ContentLoginRequiredPlaceholder() {
+private fun ContentLoginRequiredPlaceholder(onSignIn: () -> Unit) {
     val s = hivens.ui.i18n.LocalStrings.current
     Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
         Column(
@@ -385,6 +393,11 @@ private fun ContentLoginRequiredPlaceholder() {
                 color = NxTheme.colors.textSecondary,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.widthIn(max = 360.dp)
+            )
+            NxButton(
+                label   = s.loginButton,
+                onClick = onSignIn,
+                style   = NxButtonStyle.Primary,
             )
         }
     }

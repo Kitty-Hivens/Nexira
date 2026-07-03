@@ -82,7 +82,7 @@ fun LaunchButtonWidget(instance: WidgetInstance) {
                     .background(Color.White.copy(alpha = if (ready) 0.18f else 0.06f)),
                 contentAlignment = Alignment.Center,
             ) {
-                Symbol(icon = NxIcon.PlayArrow,
+                Symbol(icon = qt.icon,
                     contentDescription = null,
                     tint               = if (ready) Color.White else NxTheme.colors.textSecondary,
                     modifier           = Modifier.size(28.dp),
@@ -91,7 +91,7 @@ fun LaunchButtonWidget(instance: WidgetInstance) {
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
                 Text(
-                    text       = if (ready) p.label.ifBlank { s.launchTileReady } else s.launchTileBlocked,
+                    text       = if (ready) qt.buttonLabel ?: p.label.ifBlank { s.launchTileReady } else s.launchTileBlocked,
                     style      = MaterialTheme.typography.titleLarge,
                     color      = if (ready) Color.White else NxTheme.colors.textSecondary,
                     fontWeight = FontWeight.SemiBold,

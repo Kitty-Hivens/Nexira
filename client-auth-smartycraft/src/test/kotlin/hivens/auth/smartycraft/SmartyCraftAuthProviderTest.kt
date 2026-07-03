@@ -395,6 +395,9 @@ class SmartyCraftAuthProviderTest {
             SmartyCraftAuthProvider(proto).login("user", "pass", "Industrial")
         }
         assertEquals(AuthStatus.INTERNAL_ERROR, ex.status)
+        // Network-shaped: the auto-login coordinator retries on this flag;
+        // a server-side rejection must never carry it.
+        assertTrue(ex.isNetworkError)
     }
 
     @Test

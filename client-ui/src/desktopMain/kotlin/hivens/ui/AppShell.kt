@@ -42,7 +42,9 @@ import hivens.core.data.UiStyle
 import hivens.core.data.resolveInitialThemeMode
 import hivens.launcher.AutoSyncService
 import hivens.launcher.ServerListCacheStore
+import hivens.core.diag.ActionRing
 import hivens.launcher.bootstrap.AutoLoginCoordinator
+import hivens.launcher.network.NetworkState
 import hivens.launcher.bootstrap.LauncherBootstrap
 import hivens.ui.diag.UiRecoverySignal
 import hivens.auth.AccountStore
@@ -1111,32 +1113,64 @@ fun AppRoot(
     var backgroundSettings by remember { mutableStateOf(backgroundManager.load()) }
 
     // ── Auto-login with offline mode support ──────────────────────────────
-    // Business logic lives in AutoLoginCoordinator; the Composable just
-    // calls into it and maps the result into the local AppState machine.
-    LaunchedEffect(Unit) {
-        val settings = withContext(Dispatchers.IO) { settingsService.getSettings() }
-        val saved = withContext(Dispatchers.IO) {
-            credentialsManager.primarySession(settings.preferredFaceProvider)
-        }
-        val session = withContext(Dispatchers.IO) {
-            AutoLoginCoordinator.resolveSession(
-                settings            = settings,
-                saved               = saved,
-                lastServerId        = profileManager.lastServerId,
-                authService         = authService,
-                insecureAuthService = insecureAuthService,
-                protocolConfig      = protocolConfig,
-                msaProvider         = msaProvider,
-            )
-        }
-        // A silent MSA refresh rotates the refresh token; persist it so the next
-        // start uses the fresh one instead of re-spending the stored token.
-        if (session?.refreshToken != null && session.refreshToken != saved?.refreshToken) {
-            withContext(Dispatchers.IO) {
-                credentialsManager.saveAccount(session, PackAuthRequirement.Microsoft.PROVIDER_KEY)
+    // Business logic lives in AutoLoginCoordinator; the Composable maps the
+    // resolution into the local AppState machine. Network-shaped failures
+    // retry on a capped backoff for the app's lifetime (a launcher left open
+    // signs itself in when the network returns); rejections and missing
+    // credentials stop -- looping on those hammers the upstream for nothing.
+    // A proxy/bypass policy flip restarts the effect for an immediate fresh
+    // attempt with a reset ladder (the flip is a user action). A manual login
+    // racing the loop wins: the loop re-reads the state each pass.
+    val autoLoginForceProxy by NetworkState.forceProxyState.collectAsState()
+    val autoLoginBypasses by NetworkState.bypassesState.collectAsState()
+    LaunchedEffect(autoLoginForceProxy, autoLoginBypasses) {
+        var attempt = 0
+        while (appState !is AppState.Authenticated) {
+            val settings = withContext(Dispatchers.IO) { settingsService.getSettings() }
+            val saved = withContext(Dispatchers.IO) {
+                credentialsManager.primarySession(settings.preferredFaceProvider)
+            }
+            val resolution = withContext(Dispatchers.IO) {
+                AutoLoginCoordinator.resolveSession(
+                    settings            = settings,
+                    saved               = saved,
+                    lastServerId        = profileManager.lastServerId,
+                    authService         = authService,
+                    insecureAuthService = insecureAuthService,
+                    protocolConfig      = protocolConfig,
+                    msaProvider         = msaProvider,
+                )
+            }
+            when (resolution) {
+                is AutoLoginCoordinator.Resolution.Success -> {
+                    val session = resolution.session
+                    // A silent MSA refresh rotates the refresh token; persist it so
+                    // the next start uses the fresh one instead of re-spending the
+                    // stored token.
+                    if (session.refreshToken != null && session.refreshToken != saved?.refreshToken) {
+                        withContext(Dispatchers.IO) {
+                            credentialsManager.saveAccount(session, PackAuthRequirement.Microsoft.PROVIDER_KEY)
+                        }
+                    }
+                    appState = AppState.Authenticated(session)
+                    return@LaunchedEffect
+                }
+                AutoLoginCoordinator.Resolution.NoCredentials,
+                AutoLoginCoordinator.Resolution.Rejected -> {
+                    appState = AppState.Unauthenticated
+                    return@LaunchedEffect
+                }
+                AutoLoginCoordinator.Resolution.NetworkDown -> {
+                    // The startup spinner covers only the first attempt; after it
+                    // the login form is usable while the loop retries silently.
+                    if (appState is AppState.Loading) appState = AppState.Unauthenticated
+                    val delayMs = AutoLoginCoordinator.retryDelayMs(attempt)
+                    attempt += 1
+                    ActionRing.record("Auto-login: network down, retry #$attempt in ${delayMs / 1000}s")
+                    delay(delayMs)
+                }
             }
         }
-        appState = if (session != null) AppState.Authenticated(session) else AppState.Unauthenticated
     }
 
     // ── Render: background behind layout ──────────────────────────────────
