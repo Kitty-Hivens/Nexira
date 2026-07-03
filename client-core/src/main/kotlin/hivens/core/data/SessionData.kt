@@ -18,6 +18,15 @@ data class SessionData(
     val balance: Int = 0,
 
     /**
+     * Clan tag from the SmartyCraft login response; null = not in a clan.
+     * [clanResolved] separates "known to have no clan" from "session predates
+     * this field" (old persisted credentials decode to the defaults) -- the
+     * cape capability gate must fail open on the latter.
+     */
+    val clan: String? = null,
+    val clanResolved: Boolean = false,
+
+    /**
      * True for an offline-play identity (no provider auth). Drives the offline
      * launch fork in `GameCommandBuilder.addSessionAuthArgs` (real offline UUID +
      * `--userType legacy`). Runtime-only: an offline session carries a blank

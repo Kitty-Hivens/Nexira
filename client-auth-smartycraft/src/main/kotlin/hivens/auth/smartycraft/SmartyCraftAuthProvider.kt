@@ -192,6 +192,8 @@ class SmartyCraftAuthProvider(
             serverId = serverId,
             cachedPassword = password,
             balance = response.money,
+            clan = response.clan,
+            clanResolved = true,
         )
     }
 
