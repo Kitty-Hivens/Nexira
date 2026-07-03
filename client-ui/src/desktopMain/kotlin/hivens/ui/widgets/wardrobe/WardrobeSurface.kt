@@ -151,7 +151,8 @@ internal fun capeSectionVisible(hasScAccount: Boolean, role: ClanRole): Boolean 
 private enum class WardrobePose { Stand, Wave, Sit, FaceCover, Walk }
 
 private fun WardrobePose.source(): PoseSource = when (this) {
-    WardrobePose.Stand -> Poses.Stand.asSource()
+    // Standing breathes -- the same idle the profile hero plays.
+    WardrobePose.Stand -> Cycles.idle()
     WardrobePose.Wave -> layered(Poses.Wave.asSource(), Cycles.handWave())
     WardrobePose.Sit -> Poses.Sit.asSource()
     WardrobePose.FaceCover -> Poses.FaceCover.asSource()
@@ -309,8 +310,10 @@ private fun Wardrobe(session: SessionData) {
     val previewCape = if (showCapes) (selectedCapeId ?: data.activeCapeId)?.let { bitmaps[it] } else null
 
     // One hoisted view state so a picked pose survives switching skins, and
-    // one selected chip driving it.
-    val previewState = rememberSkinViewState()
+    // one selected chip driving it. The preview opens on the breathing idle
+    // (Stand's animation) and does NOT turntable -- poses are the point now;
+    // drag still orbits for inspection.
+    val previewState = rememberSkinViewState(initialAnimation = Cycles.idle())
     var pose by remember { mutableStateOf(WardrobePose.Stand) }
 
     Row(Modifier.fillMaxSize().padding(20.dp), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
@@ -320,9 +323,9 @@ private fun Wardrobe(session: SessionData) {
             Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
                 val bmp = selectedBitmap ?: defaultBitmap
                 if (bmp != null) {
-                    SkinView3D(bmp, Modifier.fillMaxSize(), interactive = true, autoSpin = true, cape = previewCape, state = previewState)
+                    SkinView3D(bmp, Modifier.fillMaxSize(), interactive = true, autoSpin = false, cape = previewCape, state = previewState)
                 } else {
-                    SkinHero(session.playerName, refreshKey, Modifier.fillMaxSize(), interactive = true, autoSpin = true, cape = previewCape, state = previewState)
+                    SkinHero(session.playerName, refreshKey, Modifier.fillMaxSize(), interactive = true, autoSpin = false, cape = previewCape, state = previewState)
                 }
             }
             FlowRow(

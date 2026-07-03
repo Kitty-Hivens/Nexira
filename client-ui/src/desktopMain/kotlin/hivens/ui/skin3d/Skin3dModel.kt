@@ -64,6 +64,9 @@ fun Box.faces(): List<Face> = listOf(
 // hat/jacket/sleeves/pants sit just outside the skin.
 private const val OVERLAY_INFLATE = 0.5f
 
+// How far a limb reaches past its neighbour's plane (see partBoxes).
+private const val SEAM_OVERLAP = 0.03f
+
 /**
  * Inflated copy of the box for the overlay (second) layer. [top]/[bottom] gate
  * the +y / -y growth: a seam face that abuts the adjacent part (head bottom over
@@ -98,12 +101,21 @@ private fun Box.inflated(
 internal fun partBoxes(model: SkinModel, legacy: Boolean): Map<BodyPart, List<Box>> {
     val aw = model.armWidth
 
+    // Limb inner planes historically COINCIDED with their neighbour's plane
+    // (arm inner and body/head side both on x = +-4, the two legs sharing
+    // x = 0). Coplanar faces of different parts tie in the depth buffer and
+    // the winner is per-pixel rounding noise -- invisible while a limb hangs
+    // at rest (the tied faces look at each other), but a raised arm or a
+    // walk swing turns both faces toward the viewer and the tie flickers as
+    // texture speckle. Each limb now reaches PAST the shared plane by a hair
+    // (overlap, not a gap, so no background bleeds through between the
+    // legs); the interpenetration is far below a pixel at any view scale.
     val head     = Box(-4f,  8f, -4f, 4f, 16f, 4f, u = 0f,  v = 0f,  w = 8f,  h = 8f,  d = 8f)
     val body     = Box(-4f, -4f, -2f, 4f,  8f, 2f, u = 16f, v = 16f, w = 8f,  h = 12f, d = 4f)
-    val rightArm = Box(-4f - aw, -4f, -2f, -4f, 8f, 2f, u = 40f, v = 16f, w = aw, h = 12f, d = 4f)
-    val leftArm  = Box(4f, -4f, -2f, 4f + aw, 8f, 2f, u = 32f, v = 48f, w = aw, h = 12f, d = 4f)
-    val rightLeg = Box(-4f, -16f, -2f, 0f, -4f, 2f, u = 0f,  v = 16f, w = 4f, h = 12f, d = 4f)
-    val leftLeg  = Box(0f, -16f, -2f, 4f, -4f, 2f, u = 16f, v = 48f, w = 4f, h = 12f, d = 4f)
+    val rightArm = Box(-4f - aw, -4f, -2f, -4f + SEAM_OVERLAP, 8f, 2f, u = 40f, v = 16f, w = aw, h = 12f, d = 4f)
+    val leftArm  = Box(4f - SEAM_OVERLAP, -4f, -2f, 4f + aw, 8f, 2f, u = 32f, v = 48f, w = aw, h = 12f, d = 4f)
+    val rightLeg = Box(-4f, -16f, -2f, SEAM_OVERLAP / 2f, -4f, 2f, u = 0f,  v = 16f, w = 4f, h = 12f, d = 4f)
+    val leftLeg  = Box(-SEAM_OVERLAP / 2f, -16f, -2f, 4f, -4f, 2f, u = 16f, v = 48f, w = 4f, h = 12f, d = 4f)
 
     val parts = LinkedHashMap<BodyPart, MutableList<Box>>()
     parts[BodyPart.Head]     = mutableListOf(head)
