@@ -37,6 +37,7 @@ import coil3.compose.AsyncImage
 import coil3.compose.SubcomposeAsyncImage
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
+import hivens.ui.components.InitialsAvatar
 import hivens.ui.nx.NxContextMenu
 import hivens.ui.nx.NxMenuItem
 import hivens.ui.effects.pixelArtBackground
@@ -174,27 +175,6 @@ private fun PackAvatar(iconUrl: String?, displayName: String, hue: Color) {
         loading            = { Box(Modifier.fillMaxSize().background(hue)) },
         error              = { InitialsAvatar(displayName, hue) },
     )
-}
-
-@Composable
-private fun InitialsAvatar(name: String, hue: Color) {
-    val initials = name
-        .split(' ', '-', '_')
-        .filter { it.isNotBlank() }
-        .take(2)
-        .joinToString("") { it.first().uppercaseChar().toString() }
-        .ifEmpty { "?" }
-    Box(
-        modifier         = Modifier.fillMaxSize().background(hue),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text       = initials,
-            color      = Color.White,
-            style      = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-        )
-    }
 }
 
 @Composable

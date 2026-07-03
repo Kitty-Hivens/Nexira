@@ -35,7 +35,7 @@ class LayoutReconcileTest {
 
     @Test
     fun `CURRENT_SCHEMA is the schema this build migrates up to`() {
-        assertEquals(6, LayoutReconcile.CURRENT_SCHEMA)
+        assertEquals(7, LayoutReconcile.CURRENT_SCHEMA)
     }
 
     @Test
@@ -69,7 +69,7 @@ class LayoutReconcileTest {
     @Test
     fun `reconcile leaves a current unique graph untouched when nothing to merge`() {
         val g = LayoutGraph(surfaces = mapOf(SurfaceId("a") to surface("main" to listOf(widget("k", "i1")))))
-        assertEquals(g, ok(LayoutReconcile.reconcile(6, g, LayoutGraph.EMPTY)))
+        assertEquals(g, ok(LayoutReconcile.reconcile(7, g, LayoutGraph.EMPTY)))
     }
 
     @Test
@@ -161,5 +161,60 @@ class LayoutReconcileTest {
         val top = ok(LayoutReconcile.reconcile(4, rail, LayoutGraph.EMPTY))
             .surfaces[SurfaceId("appshell.leftrail")]!!.slots[SlotId("top")]!!.widgets
         assertEquals(1, top.count { navTargetOf(it) == "Wardrobe" })
+    }
+
+    // ── v6 -> v7: home hero ──────────────────────────────────────────────────
+
+    private fun v6HomeDefault(welcomeProps: JsonObject = JsonObject(emptyMap())) =
+        LayoutGraph(surfaces = mapOf(
+            SurfaceId("home.new") to surface("main" to listOf(
+                WidgetInstance(WidgetKind("home.new.welcome"), "home-new-welcome-default", welcomeProps),
+                widget("home.new.spacer", "home-new-spacer-default"),
+                widget("home.new.recent", "home-new-recent-default"),
+                widget("home.new.quicklaunch", "home-new-quicklaunch-default"),
+            )),
+        ))
+
+    @Test
+    fun `reconcile v6 to v7 swaps the untouched home default onto the hero`() {
+        val out = ok(LayoutReconcile.reconcile(6, v6HomeDefault(), LayoutGraph.EMPTY))
+        val main = out.surfaces[SurfaceId("home.new")]!!.slots[SlotId("main")]!!.widgets
+        assertEquals(
+            listOf("home.new.welcome", "home.new.spacer", "home.new.hero", "home.new.recent"),
+            main.map { it.kind.value },
+        )
+        assertEquals("home-new-hero-default", main[2].instanceId)
+        assertEquals(JsonPrimitive(false), main.first().props["showSubtitle"], "onboarding line off by default")
+    }
+
+    @Test
+    fun `reconcile v6 to v7 keeps a user-set welcome subtitle choice`() {
+        val userProps = JsonObject(mapOf(
+            "showSubtitle" to JsonPrimitive(true),
+            "customGreeting" to JsonPrimitive("yo"),
+        ))
+        val out = ok(LayoutReconcile.reconcile(6, v6HomeDefault(userProps), LayoutGraph.EMPTY))
+        val welcome = out.surfaces[SurfaceId("home.new")]!!.slots[SlotId("main")]!!.widgets.first()
+        assertEquals(JsonPrimitive(true), welcome.props["showSubtitle"], "explicit user choice survives")
+        assertEquals(JsonPrimitive("yo"), welcome.props["customGreeting"], "other props carry over")
+    }
+
+    @Test
+    fun `reconcile v6 to v7 leaves a customised home slot alone`() {
+        // Any deviation from the bundled instance-id order means the user
+        // arranged the surface -- the migration must not undo their work.
+        val custom = LayoutGraph(surfaces = mapOf(
+            SurfaceId("home.new") to surface("main" to listOf(
+                widget("home.new.quicklaunch", "home-new-quicklaunch-default"),
+                widget("home.new.clock", "my-clock"),
+            )),
+        ))
+        assertEquals(custom, ok(LayoutReconcile.reconcile(6, custom, LayoutGraph.EMPTY)))
+    }
+
+    @Test
+    fun `reconcile v6 to v7 is a no-op on an already-migrated graph`() {
+        val migrated = ok(LayoutReconcile.reconcile(6, v6HomeDefault(), LayoutGraph.EMPTY))
+        assertEquals(migrated, ok(LayoutReconcile.reconcile(6, migrated, LayoutGraph.EMPTY)))
     }
 }

@@ -899,6 +899,7 @@ object RussianStrings : AppStrings {
     override val homeQuickContinue  = "Продолжить"
     override val homeQuickStart     = "Запустить"
     override val homeQuickButton    = "Играть"
+    override fun homeHeroPlaytime(hours: Long) = "В игре $hours ч"
     override val launchTileReady    = "Запустить"
     override val launchTileBlocked  = "Играть нельзя"
 
@@ -988,6 +989,9 @@ object RussianStrings : AppStrings {
         "widget.home.new.clock.mode" to "Режим",
         "widget.home.new.clock.showSeconds" to "Секунды",
         "widget.home.new.clock.title" to "Заголовок",
+        "widget.home.new.hero" to "Hero-карта пака",
+        "widget.home.new.hero.height" to "Высота",
+        "widget.home.new.hero.showMeta" to "Метаданные",
         "widget.home.new.launchbutton" to "Кнопка запуска",
         "widget.home.new.launchbutton.label" to "Надпись",
         "widget.home.new.music" to "Музыкальный плеер",

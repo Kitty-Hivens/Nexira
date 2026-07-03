@@ -17,7 +17,7 @@ object LayoutReconcile {
     private val log = LoggerFactory.getLogger(LayoutReconcile::class.java)
 
     /** Schema version this build writes and migrates up to. Single source of truth. */
-    const val CURRENT_SCHEMA: Int = 6
+    const val CURRENT_SCHEMA: Int = 7
 
     sealed interface Result {
         data class Ok(val graph: LayoutGraph) : Result
