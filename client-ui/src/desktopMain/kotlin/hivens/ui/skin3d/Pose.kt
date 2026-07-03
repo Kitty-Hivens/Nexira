@@ -118,10 +118,14 @@ object Poses {
     /** Back to the viewer -- the "typing a password" turn. */
     val TurnAway: Pose = Pose(rootYaw = PI.toFloat())
 
-    /** Both hands over the face, head dipped -- eyes covered. */
+    /** Both hands over the face, head dipped -- eyes covered. Pitch stops
+     *  short of vertical (a steeper angle reads as arms-up, not covering)
+     *  and the yaws pull the hands INWARD across the face: positive yaw
+     *  swings the raised right arm toward +x (the body centre), negative
+     *  the left. */
     val FaceCover: Pose = Pose(
-        rightArm = PartAngles(pitch = -2.6f, yaw = -0.35f),
-        leftArm = PartAngles(pitch = -2.6f, yaw = 0.35f),
-        head = PartAngles(pitch = 0.45f),
+        rightArm = PartAngles(pitch = -2.05f, yaw = 0.5f),
+        leftArm = PartAngles(pitch = -2.05f, yaw = -0.5f),
+        head = PartAngles(pitch = 0.25f),
     )
 }
