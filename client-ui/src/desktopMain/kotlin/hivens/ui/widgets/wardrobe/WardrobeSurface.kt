@@ -22,6 +22,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -29,6 +30,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -58,6 +60,8 @@ import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.identity.ClanRole
+import hivens.ui.identity.ClanRoleProvider
 import hivens.ui.identity.DefaultSkinProvider
 import hivens.ui.identity.SkinLibrary
 import hivens.ui.identity.SkinManager
@@ -111,6 +115,29 @@ fun WardrobeSurface(session: SessionData?, onBack: () -> Unit) {
     }
 }
 
+// One pass over the library index, read off the UI thread. The library
+// doubles as the history -- the last-applied entry (per kind) is active.
+private data class WardrobeData(
+    val skins: List<SkinLibrary.Entry> = emptyList(),
+    val capes: List<SkinLibrary.Entry> = emptyList(),
+    val activeSkinId: String? = null,
+    val activeCapeId: String? = null,
+)
+
+/**
+ * Whether the cape block (import tile, cards, apply) renders at all. Only a
+ * POSITIVE finding of ineligibility hides it: no SmartyCraft account to apply
+ * to, a login that resolved to no clan, or a roster that shows a non-leader
+ * role. Unknown fails open with the clan hint -- a false-show costs one
+ * failed upload, a false-hide silently locks a legitimate leader out.
+ */
+internal fun capeSectionVisible(scSession: SessionData?, role: ClanRole): Boolean = when {
+    scSession == null -> false
+    scSession.clanResolved && scSession.clan == null -> false
+    role == ClanRole.NotLeader -> false
+    else -> true
+}
+
 @Composable
 private fun Wardrobe(session: SessionData) {
     val s = LocalStrings.current
@@ -119,6 +146,7 @@ private fun Wardrobe(session: SessionData) {
     val skinManager: SkinManager = koinInject()
     val credentials: AccountStore = koinInject()
     val defaultSkinProvider: DefaultSkinProvider = koinInject()
+    val clanRoles: ClanRoleProvider = koinInject()
     val scope = rememberCoroutineScope()
 
     var refreshKey by remember { mutableIntStateOf(0) }
@@ -128,23 +156,65 @@ private fun Wardrobe(session: SessionData) {
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
-    val skins = remember(refreshKey) { library.list(SkinLibrary.Kind.Skin) }
-    val capes = remember(refreshKey) { library.list(SkinLibrary.Kind.Cape) }
+    val data by produceState(WardrobeData(), refreshKey) {
+        value = withContext(Dispatchers.IO) {
+            WardrobeData(
+                skins = library.list(SkinLibrary.Kind.Skin),
+                capes = library.list(SkinLibrary.Kind.Cape),
+                activeSkinId = library.activeId(SkinLibrary.Kind.Skin),
+                activeCapeId = library.activeId(SkinLibrary.Kind.Cape),
+            )
+        }
+    }
+
+    // Decoded library PNGs keyed by entry id. Content per id is immutable
+    // (apply never rewrites a file, import mints a new id), so each entry
+    // decodes exactly once -- a refresh re-lists the index without re-decoding
+    // or re-rasterizing anything already on screen, which is what used to
+    // hitch the whole grid on every apply.
+    val bitmaps = remember { mutableStateMapOf<String, ImageBitmap>() }
+    LaunchedEffect(data) {
+        withContext(Dispatchers.IO) {
+            for (entry in data.skins + data.capes) {
+                if (bitmaps.containsKey(entry.id)) continue
+                library.bytes(entry.id)?.let(::decodeSkin)?.let { bitmaps[entry.id] = it }
+            }
+        }
+    }
+
     // Default skins are extracted from a provisioned client jar on the IO pool; the
     // grid stays empty until that resolves (or no client jar carries them yet).
     val defaults by produceState(emptyList<DefaultSkinProvider.DefaultSkin>()) {
         value = withContext(Dispatchers.IO) { defaultSkinProvider.list() }
     }
-    val selectedBitmap = remember(selectedId, refreshKey) {
-        selectedId?.let { library.bytes(it) }?.let(::decodeSkin)
+    val defaultBitmaps = remember { mutableStateMapOf<String, ImageBitmap>() }
+    LaunchedEffect(defaults) {
+        withContext(Dispatchers.IO) {
+            for (def in defaults) {
+                if (defaultBitmaps.containsKey(def.name)) continue
+                runCatching { Files.readAllBytes(def.file) }.getOrNull()
+                    ?.let(::decodeSkin)?.let { defaultBitmaps[def.name] = it }
+            }
+        }
     }
-    val defaultBitmap = remember(selectedDefault) {
-        selectedDefault?.let { runCatching { Files.readAllBytes(it.file) }.getOrNull()?.let(::decodeSkin) }
-    }
+
+    val selectedBitmap = selectedId?.let { bitmaps[it] }
+    val defaultBitmap = selectedDefault?.let { defaultBitmaps[it.name] }
     val scSession = remember(refreshKey, session) { credentials.accountFor(SC_KEY) }
-    // The library doubles as the history -- the last-applied entry (per kind) is active.
-    val activeSkinId = remember(refreshKey) { library.activeId(SkinLibrary.Kind.Skin) }
-    val activeCapeId = remember(refreshKey) { library.activeId(SkinLibrary.Kind.Cape) }
+
+    // Cape capability -- clan membership from the session, leadership from the
+    // public clan page (see ClanRoleProvider).
+    var capeRole by remember { mutableStateOf(ClanRole.Unknown) }
+    LaunchedEffect(scSession?.playerName, scSession?.clan) {
+        val sc = scSession
+        val clan = sc?.clan
+        capeRole = if (sc != null && sc.clanResolved && clan != null) {
+            clanRoles.role(sc.playerName, clan)
+        } else {
+            ClanRole.Unknown
+        }
+    }
+    val showCapes = capeSectionVisible(scSession, capeRole)
 
     // The current server skin is the player's real look but lives on the server, not the
     // local library -- auto-import it (deduped by pixel content) so it shows among the
@@ -157,6 +227,7 @@ private fun Wardrobe(session: SessionData) {
             val sha = skinContentHash(bytes) ?: return@withContext
             val entry = library.addUnique(bytes, session.playerName, slim = false, now = System.currentTimeMillis(), sha = sha)
             library.markApplied(entry.id, System.currentTimeMillis())
+            decodeSkin(bytes)?.let { bitmaps[entry.id] = it }
         }
         refreshKey++
     }
@@ -172,6 +243,9 @@ private fun Wardrobe(session: SessionData) {
                     now = System.currentTimeMillis(), kind = kind, sha = skinContentHash(bytes),
                 )
             }
+            // Prime the decode cache from the bytes in hand so the preview
+            // flips to the import without a placeholder frame.
+            withContext(Dispatchers.IO) { decodeSkin(bytes)?.let { bitmaps[entry.id] = it } }
             select(entry.id)
             refreshKey++
         }
@@ -201,10 +275,9 @@ private fun Wardrobe(session: SessionData) {
     }
 
     // The preview wears the picked cape (else the active one), so a cape can
-    // be inspected on the model before applying.
-    val previewCape = remember(selectedCapeId, activeCapeId, refreshKey) {
-        (selectedCapeId ?: activeCapeId)?.let { library.bytes(it) }?.let(::decodeSkin)
-    }
+    // be inspected on the model before applying. Follows the capability gate:
+    // no cape UI, no cape on the model.
+    val previewCape = if (showCapes) (selectedCapeId ?: data.activeCapeId)?.let { bitmaps[it] } else null
 
     Row(Modifier.fillMaxSize().padding(20.dp), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
         // Preview: the picked library skin, else the current applied look.
@@ -223,28 +296,42 @@ private fun Wardrobe(session: SessionData) {
             // library entry, so it never enters the applied-history).
             val skinSel: Pair<File, String?>? = selectedId?.let { library.file(it).toFile() to it }
                 ?: selectedDefault?.let { it.file.toFile() to null }
-            if (scSession != null && (skinSel != null || selectedCapeId != null)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (scSession != null && (skinSel != null || (showCapes && selectedCapeId != null))) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     skinSel?.let { (file, markId) ->
                         Flexible("wardrobe_apply_sc_btn", FlexibleKind.Button) {
                             NxButton(
                                 label = s.wardrobeApplySmartycraft,
                                 onClick = { if (!busy) applyToSc(file, isCloak = false, markId = markId) },
                                 style = NxButtonStyle.Primary,
+                                enabled = !busy,
                             )
                         }
                         PuppetClick("wardrobe.applySmartycraft") { if (!busy) applyToSc(file, isCloak = false, markId = markId) }
                     }
-                    selectedCapeId?.let { id ->
-                        val capeFile = library.file(id).toFile()
-                        Flexible("wardrobe_apply_cape_sc_btn", FlexibleKind.Button) {
-                            NxButton(
-                                label = s.wardrobeApplyCape,
-                                onClick = { if (!busy) applyToSc(capeFile, isCloak = true, markId = id) },
-                                style = NxButtonStyle.Secondary,
-                            )
+                    if (showCapes) {
+                        selectedCapeId?.let { id ->
+                            val capeFile = library.file(id).toFile()
+                            Flexible("wardrobe_apply_cape_sc_btn", FlexibleKind.Button) {
+                                NxButton(
+                                    label = s.wardrobeApplyCape,
+                                    onClick = { if (!busy) applyToSc(capeFile, isCloak = true, markId = id) },
+                                    style = NxButtonStyle.Secondary,
+                                    enabled = !busy,
+                                )
+                            }
+                            PuppetClick("wardrobe.applyCapeSmartycraft") { if (!busy) applyToSc(capeFile, isCloak = true, markId = id) }
                         }
-                        PuppetClick("wardrobe.applyCapeSmartycraft") { if (!busy) applyToSc(capeFile, isCloak = true, markId = id) }
+                    }
+                    if (busy) {
+                        CircularProgressIndicator(
+                            color = NxTheme.colors.primary,
+                            strokeWidth = 2.dp,
+                            modifier = Modifier.size(18.dp),
+                        )
                     }
                 }
             }
@@ -259,43 +346,54 @@ private fun Wardrobe(session: SessionData) {
             ) {
                 item(key = "skins-h", span = { GridItemSpan(maxLineSpan) }) { SectionHeader(s.wardrobeSaved) }
                 item(key = "add-skin") { AddTile(onClick = { importInto(SkinLibrary.Kind.Skin) { selectedId = it } }) }
-                items(skins, key = { it.id }) { entry ->
+                items(data.skins, key = { it.id }) { entry ->
                     SkinCard(
-                        bitmap = remember(entry.id, refreshKey) { library.bytes(entry.id)?.let(::decodeSkin) },
+                        bitmap = bitmaps[entry.id],
                         name = entry.name,
                         selected = entry.id == selectedId,
-                        isActive = entry.id == activeSkinId,
+                        isActive = entry.id == data.activeSkinId,
                         onClick = { selectedId = entry.id; selectedDefault = null },
                         onDelete = {
-                            library.delete(entry.id)
-                            if (selectedId == entry.id) selectedId = null
-                            refreshKey++
+                            scope.launch {
+                                withContext(Dispatchers.IO) { library.delete(entry.id) }
+                                bitmaps.remove(entry.id)
+                                if (selectedId == entry.id) selectedId = null
+                                refreshKey++
+                            }
                         },
                     )
                 }
 
-                item(key = "capes-h", span = { GridItemSpan(maxLineSpan) }) { SectionHeader(s.wardrobeCapes) }
-                item(key = "capes-hint", span = { GridItemSpan(maxLineSpan) }) {
-                    Text(
-                        s.wardrobeCapeClanHint,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = NxTheme.colors.textSecondary,
-                    )
-                }
-                item(key = "add-cape") { AddTile(onClick = { importInto(SkinLibrary.Kind.Cape) { selectedCapeId = it } }) }
-                items(capes, key = { it.id }) { entry ->
-                    CapeCard(
-                        bitmap = remember(entry.id, refreshKey) { library.bytes(entry.id)?.let(::decodeSkin) },
-                        name = entry.name,
-                        selected = entry.id == selectedCapeId,
-                        isActive = entry.id == activeCapeId,
-                        onClick = { selectedCapeId = entry.id },
-                        onDelete = {
-                            library.delete(entry.id)
-                            if (selectedCapeId == entry.id) selectedCapeId = null
-                            refreshKey++
-                        },
-                    )
+                // The cape block renders only when the account could actually
+                // set one (capability gate above); the clan hint stays for the
+                // fail-open Unknown case.
+                if (showCapes) {
+                    item(key = "capes-h", span = { GridItemSpan(maxLineSpan) }) { SectionHeader(s.wardrobeCapes) }
+                    item(key = "capes-hint", span = { GridItemSpan(maxLineSpan) }) {
+                        Text(
+                            s.wardrobeCapeClanHint,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = NxTheme.colors.textSecondary,
+                        )
+                    }
+                    item(key = "add-cape") { AddTile(onClick = { importInto(SkinLibrary.Kind.Cape) { selectedCapeId = it } }) }
+                    items(data.capes, key = { it.id }) { entry ->
+                        CapeCard(
+                            bitmap = bitmaps[entry.id],
+                            name = entry.name,
+                            selected = entry.id == selectedCapeId,
+                            isActive = entry.id == data.activeCapeId,
+                            onClick = { selectedCapeId = entry.id },
+                            onDelete = {
+                                scope.launch {
+                                    withContext(Dispatchers.IO) { library.delete(entry.id) }
+                                    bitmaps.remove(entry.id)
+                                    if (selectedCapeId == entry.id) selectedCapeId = null
+                                    refreshKey++
+                                }
+                            },
+                        )
+                    }
                 }
 
                 // Mojang's default skins, read from a provisioned client jar (never
@@ -304,7 +402,7 @@ private fun Wardrobe(session: SessionData) {
                     item(key = "defaults-h", span = { GridItemSpan(maxLineSpan) }) { SectionHeader(s.wardrobeDefaults) }
                     items(defaults, key = { it.name }) { def ->
                         SkinCard(
-                            bitmap = remember(def.file) { runCatching { Files.readAllBytes(def.file) }.getOrNull()?.let(::decodeSkin) },
+                            bitmap = defaultBitmaps[def.name],
                             name = def.name,
                             selected = def == selectedDefault,
                             isActive = false,
