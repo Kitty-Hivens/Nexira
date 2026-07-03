@@ -929,6 +929,7 @@ interface AppStrings {
     val homeQuickContinue: String
     val homeQuickStart: String
     val homeQuickButton: String
+    fun homeHeroPlaytime(hours: Long): String
     val launchTileReady: String
     val launchTileBlocked: String
 

@@ -38,6 +38,7 @@ class WidgetRegistryConsistencyTest {
             "home.new.welcome",
             "home.new.recent",
             "home.new.quicklaunch",
+            "home.new.hero",
             "library.header",
             "library.body",
             "appshell.rightrail.compactnews",
@@ -145,6 +146,7 @@ class WidgetRegistryConsistencyTest {
             "home.new.video",
             "home.new.recent",
             "home.new.quicklaunch",
+            "home.new.hero",
             // About surface (title overrides)
             "about.logo",
             "about.system.card",

@@ -309,6 +309,9 @@ internal object Migrations {
         // v5 -> v6: the shell gained a top bar. Relocate the three regions under
         // a new appshell.body sub-surface and stack the bar over them.
         6 -> Step(::migrateShellAddTopBar)
+        // v6 -> v7: the new home's default swapped quicklaunch for the
+        // art-backed hero and turned the welcome subtitle off.
+        7 -> Step(::migrateHomeHero)
         else -> Step.IDENTITY
     }
 
@@ -443,3 +446,43 @@ private val REGIONS_SLOT       = SlotId("regions")
 private val BODY_CONTENT_SLOT  = SlotId("content")
 private val REGION_TOP_KIND    = WidgetKind("appshell.region.top")
 private val REGION_BODY_KIND   = WidgetKind("appshell.region.body")
+
+// Schema v6 -> v7: the new home's default replaced the quicklaunch block with
+// the art-backed hero card and switched the welcome subtitle (permanent
+// onboarding copy) off. Applies ONLY while home.new/main still holds the
+// untouched v6 default -- the exact four bundled instance ids in their
+// bundled order. Any customised slot keeps the user's arrangement byte for
+// byte (the hero stays available from the editor palette). The kept
+// instances carry their existing props over; the welcome only gains
+// showSubtitle=false when the user never set that key themselves.
+private fun migrateHomeHero(graph: LayoutGraph): LayoutGraph {
+    val home = graph.surfaces[HOME_NEW_SURFACE] ?: return graph
+    val main = home.slots[HOME_MAIN_SLOT] ?: return graph
+    if (main.widgets.map { it.instanceId } != HOME_V6_DEFAULT_IDS) return graph
+
+    val byId = main.widgets.associateBy { it.instanceId }
+    val welcome = byId.getValue("home-new-welcome-default").let { w ->
+        if ("showSubtitle" in w.props) w
+        else w.copy(props = JsonObject(w.props + ("showSubtitle" to JsonPrimitive(false))))
+    }
+    val newMain = main.copy(
+        widgets = listOf(
+            welcome,
+            byId.getValue("home-new-spacer-default"),
+            WidgetInstance(kind = HOME_HERO_KIND, instanceId = "home-new-hero-default"),
+            byId.getValue("home-new-recent-default"),
+        ),
+    )
+    val newHome = home.copy(slots = home.slots + (HOME_MAIN_SLOT to newMain))
+    return graph.copy(surfaces = graph.surfaces + (HOME_NEW_SURFACE to newHome))
+}
+
+private val HOME_NEW_SURFACE = SurfaceId("home.new")
+private val HOME_MAIN_SLOT   = SlotId("main")
+private val HOME_HERO_KIND   = WidgetKind("home.new.hero")
+private val HOME_V6_DEFAULT_IDS = listOf(
+    "home-new-welcome-default",
+    "home-new-spacer-default",
+    "home-new-recent-default",
+    "home-new-quicklaunch-default",
+)

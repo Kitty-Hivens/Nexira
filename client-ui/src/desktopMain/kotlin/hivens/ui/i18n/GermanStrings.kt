@@ -885,6 +885,7 @@ object GermanStrings : AppStrings {
     override val homeQuickContinue  = "Fortsetzen"
     override val homeQuickStart     = "Starten"
     override val homeQuickButton    = "Spielen"
+    override fun homeHeroPlaytime(hours: Long) = "$hours Std. gespielt"
     override val launchTileReady    = "Starten"
     override val launchTileBlocked  = "Noch nicht spielbar"
 
@@ -974,6 +975,9 @@ object GermanStrings : AppStrings {
         "widget.home.new.clock.mode" to "Modus",
         "widget.home.new.clock.showSeconds" to "Sekunden",
         "widget.home.new.clock.title" to "Überschrift",
+        "widget.home.new.hero" to "Pack-Hero-Karte",
+        "widget.home.new.hero.height" to "Höhe",
+        "widget.home.new.hero.showMeta" to "Metadaten",
         "widget.home.new.launchbutton" to "Startknopf",
         "widget.home.new.launchbutton.label" to "Beschriftung",
         "widget.home.new.music" to "Musikplayer",

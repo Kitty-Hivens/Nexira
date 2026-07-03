@@ -1,5 +1,5 @@
 {
-  "schema_version": 6,
+  "schema_version": 7,
   "graph": {
     "surfaces": {
       "appshell.root": {
@@ -43,10 +43,10 @@
         "slots": {
           "main": {
             "widgets": [
-              { "kind": "home.new.welcome",     "instance_id": "home-new-welcome-default" },
-              { "kind": "home.new.spacer",      "instance_id": "home-new-spacer-default" },
-              { "kind": "home.new.recent",      "instance_id": "home-new-recent-default" },
-              { "kind": "home.new.quicklaunch", "instance_id": "home-new-quicklaunch-default" }
+              { "kind": "home.new.welcome", "instance_id": "home-new-welcome-default", "props": { "showSubtitle": false } },
+              { "kind": "home.new.spacer",  "instance_id": "home-new-spacer-default" },
+              { "kind": "home.new.hero",    "instance_id": "home-new-hero-default" },
+              { "kind": "home.new.recent",  "instance_id": "home-new-recent-default" }
             ]
           }
         }
