@@ -34,7 +34,7 @@ object RussianStrings : AppStrings {
     override val dashboardServers              = "Доступные серверы"
     override val dashboardServersEmpty         = "Серверы не найдены"
     override val dashboardLoginRequiredTitle   = "Войдите, чтобы увидеть серверы"
-    override val dashboardLoginRequiredHint    = "Воспользуйтесь панелью справа. Список серверов на SMARTYcraft скрыт за авторизацией."
+    override val dashboardLoginRequiredHint    = "Список серверов SmartyCraft скрыт за авторизацией. Войти можно в разделе Профиль."
 
     // Launch Control
     override val launchReady       = "Готов к игре"

@@ -149,8 +149,8 @@ fun HomeNewHero(instance: WidgetInstance) {
             }
             Flexible("home_hero_play_btn", FlexibleKind.Button) {
                 NxButton(
-                    label     = s.homeQuickButton,
-                    icon      = NxIcon.PlayArrow,
+                    label     = qt.buttonLabel ?: s.homeQuickButton,
+                    icon      = qt.icon,
                     onClick   = qt.launch,
                     enabled   = qt.canLaunch,
                     style     = NxButtonStyle.Primary,

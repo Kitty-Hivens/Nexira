@@ -93,9 +93,12 @@ fun HomeNewQuickLaunch(instance: WidgetInstance) {
                     contentColor   = Color.White,
                 ),
             ) {
-                Symbol(NxIcon.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
+                Symbol(qt.icon, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(6.dp))
-                Text(p.buttonLabel.ifBlank { s.homeQuickButton }, fontWeight = FontWeight.SemiBold)
+                Text(
+                    qt.buttonLabel ?: p.buttonLabel.ifBlank { s.homeQuickButton },
+                    fontWeight = FontWeight.SemiBold,
+                )
             }
         }
     }

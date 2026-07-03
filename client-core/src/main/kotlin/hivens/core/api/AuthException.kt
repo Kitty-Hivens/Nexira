@@ -7,6 +7,12 @@ open class AuthException(
     message: String,
     /** True when caused by an expired or invalid SSL certificate. */
     val isSslError: Boolean = false,
+    /**
+     * True when the failure is network-shaped (DNS, connect, reset) -- nothing
+     * reached the server, so the credentials were never judged and a retry
+     * once connectivity returns is safe. False for server-side rejections.
+     */
+    val isNetworkError: Boolean = false,
 ) : Exception(message)
 
 /**
