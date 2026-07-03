@@ -57,6 +57,7 @@ import hivens.widget.generated.GeneratedWidgetRegistry
 import kotlinx.coroutines.CoroutineScope
 import org.jetbrains.compose.resources.ExperimentalResourceApi
 import org.koin.core.context.stopKoin
+import kotlin.system.exitProcess
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
 
@@ -248,8 +249,8 @@ fun main() {
     // NOT from a composition DisposableEffect, which also fires when the shell
     // is disposed on a crash and would then stop Koin out from under the
     // recovery restart (the next `application {}` would koinInject() into a
-    // dead context). `application(exitProcessOnExit = true)` exits via
-    // exitProcess on a normal window close, so this hook still runs then.
+    // dead context). The explicit exitProcess below routes every exit through
+    // this hook.
     Runtime.getRuntime().addShutdownHook(
         Thread {
             runCatching { PuppetServerLoader.instance.stop() }
@@ -258,6 +259,12 @@ fun main() {
     )
 
     runShellWithRecovery(boot)
+
+    // The recovery loop runs `application(exitProcessOnExit = false)`, so a
+    // normal quit RETURNS here instead of the framework killing the JVM.
+    // Exit explicitly: lingering non-daemon threads (tray, HTTP pools, AWT)
+    // must not keep a quit launcher alive as a zombie process.
+    exitProcess(0)
 }
 
 /**
@@ -284,7 +291,14 @@ private fun runShellWithRecovery(boot: LauncherBootstrap.Result) {
         // makes the safe surface actually reachable.
         val safe = UiRecoverySignal.safeMode.value
         val outcome = runCatching {
-            application {
+            // exitProcessOnExit = false is what makes this loop REAL: the
+            // default true had `application` call exitProcess(0) the moment
+            // exitApplication() ran, killing the JVM before the crash-consume /
+            // report / retry code below could execute -- a render-thread crash
+            // stashed by the handler died silently with only shutdown-hook
+            // lines in the log. With false, `application` returns and the
+            // recovery below actually runs; main() owns the final exitProcess.
+            application(exitProcessOnExit = false) {
                 // Convert a render/recompose crash into a clean restart. The
                 // default WindowExceptionHandler rethrows onto the AWT event
                 // thread, which logs it and keeps the now-dead window alive --
