@@ -8,8 +8,10 @@ import androidx.compose.ui.window.WindowExceptionHandler
 import androidx.compose.ui.window.WindowExceptionHandlerFactory
 import androidx.compose.ui.window.application
 import hivens.core.api.interfaces.ISettingsService
-import hivens.launcher.bootstrap.LauncherBootstrap
 import hivens.ui.bootstrap.GuiBootstrap
+import hivens.ui.threshold.BootOutcome
+import hivens.ui.threshold.BootStage
+import hivens.ui.threshold.toStage
 import hivens.ui.diag.CrashDialog
 import hivens.ui.diag.ShellRecovery
 import hivens.ui.diag.UiRecoverySignal
@@ -55,8 +57,10 @@ import hivens.widget.api.flowSource
 import hivens.widget.api.suspendCommand
 import hivens.widget.generated.GeneratedWidgetRegistry
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.MutableStateFlow
 import org.jetbrains.compose.resources.ExperimentalResourceApi
 import org.koin.core.context.stopKoin
+import kotlin.concurrent.thread
 import kotlin.system.exitProcess
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
@@ -231,26 +235,14 @@ val uiModule = module {
 
 @OptIn(ExperimentalResourceApi::class)
 fun main() {
-    val boot = GuiBootstrap.preBoot(listOf(uiModule))
+    val pre = GuiBootstrap.preWindow()
 
-    // Puppet mode: opt-in localhost HTTP control surface for automated
-    // UI driving (see hivens.ui.puppet.PuppetServerLifecycle + Loader).
-    // Two-layer gating: build-time SPI (RealPuppetServer ships only when
-    // -PauraPuppetPort=N is on the Gradle command line) + runtime system
-    // property (-Dnexira.puppet.port=N must be set to actually bind).
-    // MUST run after Koin (LauncherBootstrap.preBoot) so PuppetRegistry-
-    // using Composables can resolve their dependencies, and before
-    // `application` so the server is listening when the first Composable
-    // registers itself.
-    PuppetServerLoader.instance.startIfRequested()
-
-    // Process-lifetime teardown. Puppet + Koin are set up once here, outside
-    // the shell restart loop, so they get torn down once at process exit --
-    // NOT from a composition DisposableEffect, which also fires when the shell
-    // is disposed on a crash and would then stop Koin out from under the
-    // recovery restart (the next `application {}` would koinInject() into a
-    // dead context). The explicit exitProcess below routes every exit through
-    // this hook.
+    // Process-lifetime teardown. Puppet + Koin come up on the boot thread but
+    // are torn down once here at process exit -- NOT from a composition
+    // DisposableEffect, which also fires when the shell is disposed on a crash
+    // and would then stop Koin out from under the recovery restart (the next
+    // `application {}` would koinInject() into a dead context). The explicit
+    // exitProcess below routes every exit through this hook.
     Runtime.getRuntime().addShutdownHook(
         Thread {
             runCatching { PuppetServerLoader.instance.stop() }
@@ -258,7 +250,48 @@ fun main() {
         },
     )
 
-    runShellWithRecovery(boot)
+    // Boot inversion: the window goes up FIRST (ShellHost renders the
+    // threshold), and everything slow -- pending data-dir move, NetworkState
+    // restore, migration detect, Koin -- runs here behind the live boot
+    // screen. Daemon thread so a user closing the window mid-boot is not
+    // held hostage by a stuck phase.
+    val bootOutcome = MutableStateFlow<BootOutcome?>(null)
+    val bootStage   = MutableStateFlow(BootStage.Files)
+    // Dev knob: -Dnexira.boot.slowMs=800 stretches each phase so the
+    // threshold can actually be looked at on a warm machine.
+    val slowMs = System.getProperty("nexira.boot.slowMs")?.toLongOrNull() ?: 0L
+    thread(name = "nexira-boot", isDaemon = true) {
+        runCatching {
+            GuiBootstrap.completeBoot(pre, listOf(uiModule)) { phase ->
+                bootStage.value = phase.toStage()
+                if (slowMs > 0) Thread.sleep(slowMs)
+            }
+        }.mapCatching { result ->
+            // Puppet mode: opt-in localhost HTTP control surface for automated
+            // UI driving (see hivens.ui.puppet.PuppetServerLifecycle + Loader).
+            // Two-layer gating: build-time SPI (RealPuppetServer ships only when
+            // -PauraPuppetPort=N is on the Gradle command line) + runtime system
+            // property (-Dnexira.puppet.port=N must be set to actually bind).
+            // MUST run after Koin so PuppetRegistry-using Composables can resolve
+            // their dependencies, and before Ready is published so the server is
+            // already listening when the first shell Composable registers itself
+            // (the threshold overlay registers nothing).
+            PuppetServerLoader.instance.startIfRequested()
+            result
+        }.onSuccess { result ->
+            bootStage.value   = BootStage.Done
+            bootOutcome.value = BootOutcome.Ready(result)
+        }.onFailure { e ->
+            LoggerFactory.getLogger("Main").error("Boot failed before the shell could start", e)
+            runCatching {
+                val reporter = pre.crashReporter.get()
+                reporter.saveToDisk(reporter.generate(e, Thread.currentThread()))
+            }
+            bootOutcome.value = BootOutcome.Failed(e)
+        }
+    }
+
+    runShellWithRecovery(pre, bootOutcome, bootStage)
 
     // The recovery loop runs `application(exitProcessOnExit = false)`, so a
     // normal quit RETURNS here instead of the framework killing the JVM.
@@ -281,13 +314,17 @@ fun main() {
  * playback; only transient composition state (current screen, scroll) is lost.
  */
 @OptIn(ExperimentalComposeUiApi::class)
-private fun runShellWithRecovery(boot: LauncherBootstrap.Result) {
+private fun runShellWithRecovery(
+    pre: GuiBootstrap.PreBoot,
+    bootOutcome: MutableStateFlow<BootOutcome?>,
+    bootStage: MutableStateFlow<BootStage>,
+) {
     val log = LoggerFactory.getLogger("ShellRecovery")
     while (true) {
         // Safe mode runs a standalone window that does NOT build the shell
         // scaffolding (Koin inject, tray init, theme, widget kernel) -- a crash
         // anywhere in that scaffolding is what latched safe mode, so re-running
-        // it would just crash again. Deciding here (not inside AppShell) is what
+        // it would just crash again. Deciding here (not inside the shell) is what
         // makes the safe surface actually reachable.
         val safe = UiRecoverySignal.safeMode.value
         val outcome = runCatching {
@@ -320,7 +357,10 @@ private fun runShellWithRecovery(boot: LauncherBootstrap.Result) {
                     if (safe) {
                         SafeModeWindow(onQuit = { exitApplication() })
                     } else {
-                        AppShell(boot)
+                        // Boot already done on a restart iteration: ShellHost
+                        // sees Ready at first composition and skips the
+                        // threshold, so a recovered shell reappears directly.
+                        ShellHost(pre, bootOutcome, bootStage)
                     }
                 }
             }
@@ -338,8 +378,9 @@ private fun runShellWithRecovery(boot: LauncherBootstrap.Result) {
         )
 
         val saved = runCatching {
-            val report = boot.crashReporter.generate(crash, Thread.currentThread())
-            report to boot.crashReporter.saveToDisk(report)
+            val reporter = pre.crashReporter.get()
+            val report = reporter.generate(crash, Thread.currentThread())
+            report to reporter.saveToDisk(report)
         }.getOrNull()
 
         when (UiRecoverySignal.recordShellCrash()) {

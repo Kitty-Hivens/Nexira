@@ -964,6 +964,16 @@ interface AppStrings {
     val recoverySafeModeBody: String
     val recoverySafeModeQuit: String
 
+    // Boot-threshold readout (pre-Koin boot screen). Lowercase by design --
+    // a BIOS-style readout, rendered via lowercase() at the call site.
+    val thresholdStageFiles: String
+    val thresholdStageNetwork: String
+    val thresholdStageMigration: String
+    val thresholdStageModules: String
+    val thresholdErrorTitle: String
+    val thresholdOpenLogs: String
+    val thresholdQuit: String
+
     // Toast shown when the shell reloads itself after a recovered crash.
     val recoveryReloadedNotice: String
     val editorSave: String
