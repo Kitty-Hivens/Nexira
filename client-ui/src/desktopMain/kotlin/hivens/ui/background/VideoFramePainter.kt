@@ -1,6 +1,7 @@
 package hivens.ui.background
 
 import androidx.compose.runtime.Composable
+import hivens.ui.diag.SkinemaGate
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -91,6 +92,9 @@ internal fun rememberSkinemaFrame(
     hardwareDecode: Boolean,
     onSeed: (Int) -> Unit = {},
 ): VideoFramePainter? {
+    // Skinema disabled by boot recovery -> no animated background (same draw-
+    // nothing contract as the decode-failure gate below).
+    if (!SkinemaGate.enabled) return null
     // Keyed on hardwareDecode too: toggling the policy re-opens the player on
     // the chosen backend rather than waiting for the file to change.
     val player = remember(file, hardwareDecode) {

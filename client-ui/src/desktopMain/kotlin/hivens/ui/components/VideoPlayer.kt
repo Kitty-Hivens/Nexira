@@ -1,6 +1,7 @@
 package hivens.ui.components
 
 import androidx.compose.foundation.background
+import hivens.ui.diag.SkinemaGate
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -87,6 +88,14 @@ fun VideoPlayer(
     onRequestFullscreen: (() -> Unit)? = null,
 ) {
     val s = LocalStrings.current
+    // Skinema disabled by boot recovery -> render the same unavailable chrome the
+    // Failed state shows, without constructing the native player.
+    if (!SkinemaGate.enabled) {
+        Box(modifier, contentAlignment = Alignment.Center) {
+            Text(s.videoError, color = Color.White.copy(alpha = 0.85f), style = MaterialTheme.typography.bodyMedium)
+        }
+        return
+    }
     // Hardware decode where a device is available (AUTO falls back to software
     // per file), so a 4K clip is not decoded on the CPU.
     val player = remember(path, loop, audio) { SkinemaPlayer(path = path, loop = loop, audio = audio, hardware = HwAccel.AUTO) }

@@ -26,6 +26,7 @@ import hivens.core.api.interfaces.*
 import dev.hivens.libvault.SecretVault
 import dev.hivens.libvault.Vault
 import dev.hivens.libvault.VaultConfig
+import dev.hivens.libvault.VaultTier
 import hivens.launcher.*
 import hivens.launcher.component.ClasspathProvider
 import hivens.launcher.component.EnvironmentPreparer
@@ -51,6 +52,7 @@ import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.dto.smrt.SmrtPackSummary
 import hivens.core.cache.CacheConfig
 import hivens.core.data.DashboardData
+import hivens.core.data.ModuleId
 import hivens.core.time.Clock
 import hivens.core.time.SystemClock
 import hivens.launcher.cache.CacheFactory
@@ -379,12 +381,18 @@ val authModule = module {
     // locked keyring the vault degrades to the file tier rather than prompting
     // (see CredentialsManager KDoc).
     single<SecretVault> {
-        Vault.open(
-            VaultConfig(
-                namespace = "io.github.kitty_hivens.Nexira",
-                softwareFilePath = get<Path>().resolve("credentials.vault"),
-            ),
-        )
+        val ns = "io.github.kitty_hivens.Nexira"
+        val file = get<Path>().resolve("credentials.vault")
+        // Keyring disabled by boot recovery -> skip the OsKeyring tier (the DBus /
+        // Secret Service probe that can hang on a hostile session) and fall to the
+        // encrypted file, so saved credentials keep working without the keyring.
+        val keyringOff = ModuleId.Keyring.id in get<ISettingsService>().getSettings().disabledModules
+        val config = if (keyringOff) {
+            VaultConfig(namespace = ns, softwareFilePath = file, preferredTiers = listOf(VaultTier.SoftwareFile, VaultTier.Memory))
+        } else {
+            VaultConfig(namespace = ns, softwareFilePath = file)
+        }
+        Vault.open(config)
     }
     // Legacy keyring + AES reader, kept one release for the migration shim. Lazy
     // single: built -- and the old keyring probed -- only when CredentialsManager

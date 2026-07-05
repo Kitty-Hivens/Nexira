@@ -281,4 +281,15 @@ data class SettingsData(
      * name and skin the shell shows; the launch still routes per content.
      */
     val preferredFaceProvider: String? = null,
+
+    // -- Boot recovery state (not a user-facing toggle) -------------------
+
+    /**
+     * Modules boot recovery has disabled -- [ModuleId] ids the launcher skips at
+     * startup (tray, notify, skinema, keyring). NOT a normal settings toggle:
+     * written only from the recovery surface, effective on the next boot. Stored
+     * as stable string ids so an id a build does not recognise is ignored rather
+     * than resetting the file. Empty = everything on.
+     */
+    val disabledModules: Set<String> = emptySet(),
 )

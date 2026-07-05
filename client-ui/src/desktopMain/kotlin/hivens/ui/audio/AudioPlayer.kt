@@ -1,6 +1,7 @@
 package hivens.ui.audio
 
 import dev.hivens.skinema.player.VideoPlayer
+import hivens.ui.diag.SkinemaGate
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -52,6 +53,10 @@ class AudioPlayer(private val scope: CoroutineScope) {
             closeCurrent()
             currentFile = file
             started = false
+            if (!SkinemaGate.enabled) {
+                _state.value = PlaybackState.Error(file, AudioError.OpenFailed)
+                return@launch
+            }
             val p = try {
                 VideoPlayer(path = file, loop = false, audio = true)
             } catch (e: Exception) {
