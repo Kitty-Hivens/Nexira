@@ -44,6 +44,24 @@ object UiRecoverySignal {
     /** Latches once the crash-loop guard trips. Read by the entry-point loop. */
     val safeMode: StateFlow<Boolean> = _safeMode.asStateFlow()
 
+    /** Why the entry point should show the recovery surface instead of the shell. */
+    enum class RecoveryReason { None, CrashLoop, UserRequest }
+
+    private val _recoveryReason = MutableStateFlow(RecoveryReason.None)
+
+    /** Read fresh by the entry-point loop each iteration to pick the surface. */
+    val recoveryReason: StateFlow<RecoveryReason> = _recoveryReason.asStateFlow()
+
+    /**
+     * A user-initiated recovery request (env / --recovery / one-shot marker /
+     * hold-key), resolved pre-shell for a launcher that starts wrong but does not
+     * crash. A latched crash loop is the harder failure and wins, so this never
+     * downgrades [RecoveryReason.CrashLoop].
+     */
+    fun requestRecovery() {
+        if (_recoveryReason.value == RecoveryReason.None) _recoveryReason.value = RecoveryReason.UserRequest
+    }
+
     /**
      * Crash side-channel for the render path. A crash thrown while rendering a
      * frame runs on the AWT event thread, which catches it and keeps the window
@@ -96,6 +114,7 @@ object UiRecoverySignal {
         val crashLoop = recentFast > MAX_FAST_CRASHES || crashTimes.size > MAX_TOTAL_CRASHES
         return if (crashLoop) {
             _safeMode.value = true
+            _recoveryReason.value = RecoveryReason.CrashLoop
             ShellRecovery.SAFE_MODE
         } else {
             ShellRecovery.RETRY
