@@ -5,6 +5,7 @@ import hivens.launcher.bootstrap.LauncherBootstrap
 import hivens.ui.diag.CrashDialog
 import org.koin.core.module.Module
 import org.slf4j.LoggerFactory
+import java.util.concurrent.atomic.AtomicReference
 import javax.swing.SwingUtilities
 
 /**
@@ -12,42 +13,84 @@ import javax.swing.SwingUtilities
  * AWT-free pieces plus the toolkit-touching steps that must not enter the
  * headless CLI's reachable graph: the Skiko cap, the X11 WM_CLASS override,
  * the display diagnostics line, and a crash handler that surfaces the Swing
- * dialog. Called from hivens.ui.Main.main before `application { ... }`.
+ * dialog.
+ *
+ * Split to put a window up before the heavy boot work runs:
+ *
+ *   - [preWindow] is synchronous and cheap: everything that MUST precede
+ *     AWT/toolkit init (WM_CLASS reflection, skiko cap, single-instance
+ *     gate, log dir) plus a direct [SettingsPeek] of settings.json for the
+ *     window-creation-time values (undecorated chrome, locale) that
+ *     normally live behind Koin.
+ *   - [completeBoot] is the slow remainder (data move, NetworkState, Koin),
+ *     run by hivens.ui.Main on a background thread behind the live
+ *     boot-threshold window.
  */
 object GuiBootstrap {
 
     /**
-     * Run the full pre-Compose pipeline for the GUI launcher. [extraModules]
-     * is appended to the launcher's own Koin modules at startKoin time so
-     * the ui module's singletons land in the same Koin context.
+     * Values the window host needs before Koin exists. [crashReporter] is a
+     * mutable ref: it starts wired to the initial (pre-move) paths so a
+     * crash during boot still produces a report, and [completeBoot] swaps in
+     * the post-move instance.
      */
-    fun preBoot(extraModules: List<Module> = emptyList()): LauncherBootstrap.Result {
-        val core = LauncherBootstrap.prepareCore()
+    class PreBoot(
+        val core: LauncherBootstrap.PreWindow,
+        val peek: SettingsPeek,
+        val crashReporter: AtomicReference<CrashReporter>,
+    )
+
+    /**
+     * Run the synchronous pre-window pipeline. Cheap by construction; a
+     * window may be created immediately after this returns.
+     */
+    fun preWindow(): PreBoot {
+        val core = LauncherBootstrap.preWindow(singleInstance = true)
 
         System.setProperty("skiko.fps.limit", "60")
 
         // X11 WM_CLASS override. See XToolkitOverride doc for the
         // cross-vendor reflection rationale; the JVM must have been
         // launched with `--add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED`.
-        // Runs after prepareCore() set nexira.logs.dir so the diagnostics
-        // line below lands in the configured launcher.log.
+        // Must run before the AWT toolkit initializes -- i.e. before any
+        // window -- which is why it lives here and not in the boot thread.
         XToolkitOverride.applyLinuxAppClassName()
 
         // One INFO line per launch summarising toolkit + Wayland/X11 env --
         // gives every user-attached launcher.log enough context for triage.
         DisplayDiagnostics.logEnvironment()
 
-        installGuiCrashHandler(core.crashReporter)
+        // Pre-move reporter: good enough for a crash during boot. Swapped
+        // for the post-move instance by completeBoot.
+        val reporter = AtomicReference(CrashReporter(core.initialPaths))
+        installGuiCrashHandler(reporter)
 
-        return LauncherBootstrap.finishBoot(core, extraModules, singleInstance = true)
+        val peek = SettingsPeek.read(core.initialPaths.dataDir)
+
+        return PreBoot(core, peek, reporter)
+    }
+
+    /**
+     * Run the slow boot remainder. Called from the boot thread in
+     * hivens.ui.Main; [onPhase] feeds the threshold screen's progress bar.
+     */
+    fun completeBoot(
+        pre: PreBoot,
+        extraModules: List<Module> = emptyList(),
+        onPhase: (LauncherBootstrap.Phase) -> Unit = {},
+    ): LauncherBootstrap.Result {
+        val core = LauncherBootstrap.completeCore(pre.core, relockOnMove = true, onPhase = onPhase)
+        pre.crashReporter.set(core.crashReporter)
+        return LauncherBootstrap.finishBoot(core, extraModules, onPhase)
     }
 
     /**
      * GUI crash handler: persists the report AND surfaces the Swing dialog.
      * This is the single edge that would otherwise drag AWT/Swing into the
-     * headless engine module.
+     * headless engine module. Reads the reporter through the ref so a crash
+     * after a data-dir move reports against the live paths.
      */
-    private fun installGuiCrashHandler(crashReporter: CrashReporter) {
+    private fun installGuiCrashHandler(crashReporter: AtomicReference<CrashReporter>) {
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
             val handlerLog = LoggerFactory.getLogger("CrashHandler")
             handlerLog.error("Uncaught exception on thread '${thread.name}'", throwable)
@@ -56,8 +99,9 @@ object GuiBootstrap {
             // `application {}` and are recovered by the restart loop in
             // hivens.ui.Main instead -- they never reach here.
             runCatching {
-                val report     = crashReporter.generate(throwable, thread)
-                val reportFile = crashReporter.saveToDisk(report)
+                val reporter   = crashReporter.get()
+                val report     = reporter.generate(throwable, thread)
+                val reportFile = reporter.saveToDisk(report)
                 SwingUtilities.invokeLater { CrashDialog.show(report, reportFile) }
             }
         }

@@ -369,6 +369,13 @@ compose.desktop {
             // config-resolve.
             *(providers.gradleProperty("nexiraPuppetPort").orNull
                 ?.let { arrayOf("-Dnexira.puppet.port=$it") }
+                ?: emptyArray()),
+
+            // Boot-threshold dev knob: `-PnexiraBootSlowMs=N` stretches each
+            // boot phase by N ms (hivens.ui.Main) so the threshold screen can
+            // be inspected on a warm machine where real boot is sub-second.
+            *(providers.gradleProperty("nexiraBootSlowMs").orNull
+                ?.let { arrayOf("-Dnexira.boot.slowMs=$it") }
                 ?: emptyArray())
         )
     }

@@ -18,10 +18,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.ApplicationScope
-import androidx.compose.ui.window.Window
-import androidx.compose.ui.window.WindowPlacement
-import androidx.compose.ui.window.rememberWindowState
+import androidx.compose.ui.window.FrameWindowScope
+import androidx.compose.ui.window.WindowState
 import coil3.ImageLoader
 import coil3.SingletonImageLoader
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
@@ -59,7 +57,6 @@ import hivens.ui.background.CustomBackground
 import hivens.ui.background.LocalBackdrop
 import hivens.ui.background.FrostBackdrop
 import hivens.ui.surface.LocalBackdropPainter
-import hivens.ui.chrome.IS_TILING_WM
 import hivens.ui.chrome.LocalChromeClose
 import hivens.ui.chrome.LocalComposeWindow
 import hivens.ui.chrome.LocalUseCustomChrome
@@ -76,7 +73,6 @@ import hivens.ui.easter.LocalAprilFools
 import hivens.ui.editor.EditModeController
 import hivens.ui.editor.WidgetGraphReconciler
 import hivens.ui.generated.resources.Res
-import hivens.ui.generated.resources.icon
 import hivens.ui.i18n.AppLocale
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.i18n.LocaleProvider
@@ -132,7 +128,6 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import okhttp3.Call
 import org.jetbrains.compose.resources.ExperimentalResourceApi
-import org.jetbrains.compose.resources.painterResource
 import org.koin.compose.koinInject
 import org.koin.core.qualifier.named
 import org.slf4j.LoggerFactory
@@ -203,17 +198,23 @@ sealed class Screen {
 // ─── App Shell ───────────────────────────────────────────────────────────────
 
 /**
- * Compose-side root. Holds the Window + tray bootstrap + raise-tick
- * .show watcher + migration / AppRoot branch. Receives the
- * pre-Compose [LauncherBootstrap.Result] from [Main.main]; everything
- * below this is pure Compose.
- *
- * Extension on [ApplicationScope] so `exitApplication()` works inside
- * the window close handler without re-wiring the receiver.
+ * Compose-side shell content: tray bootstrap + raise-tick .show watcher +
+ * migration / AppRoot branch. Runs INSIDE the window that [ShellHost] owns
+ * -- the window is created BEFORE Koin so the boot threshold can render, so
+ * the window-level callbacks this used to install directly on Window() are
+ * late-bound through [chrome] instead. Receives the pre-Compose
+ * [LauncherBootstrap.Result] from the boot thread; everything below this
+ * is pure Compose.
  */
 @OptIn(ExperimentalResourceApi::class)
 @Composable
-fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
+fun FrameWindowScope.AppShellContent(
+    boot: LauncherBootstrap.Result,
+    windowState: WindowState,
+    visibleState: MutableState<Boolean>,
+    chrome: WindowChromeHooks,
+    exitApp: () -> Unit,
+) {
     // Tray teardown is composition-scoped: the tray is re-init'd per
     // composition (see the tray LaunchedEffect below), so disposing it here
     // gives a clean shutdown -> init cycle across a shell restart. Process-
@@ -228,14 +229,6 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
         }
     }
 
-    // On a tiling WM the compositor owns geometry/fullscreen; forcing
-    // MAXIMIZED_BOTH there fights it (Compose re-asserts maximize over the WM's
-    // fullscreen, so super+F / proper fullscreen misbehaves -- worse once
-    // undecorated drops the WM title bar that used to mediate it). Let the WM
-    // place it. Floating elsewhere is unchanged: open maximized on Win/floating-DE.
-    val windowState      = rememberWindowState(
-        placement = if (IS_TILING_WM) WindowPlacement.Floating else WindowPlacement.Maximized,
-    )
     val settingsService: ISettingsService      = koinInject()
     val serverListService: IServerListService  = koinInject()
     val serverListCache: ServerListCacheStore  = koinInject()
@@ -263,8 +256,9 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
     // close-while-game-running, not a launcher hide-by-default
     // mode -- a start-in-tray toggle was tried and dropped; it
     // confused users (launcher invisible after first run) without
-    // a clear use case.
-    var isWindowVisible by remember { mutableStateOf(true) }
+    // a clear use case. The state itself lives in ShellHost (it is a
+    // Window() parameter there); the delegate keeps every reader/writer.
+    var isWindowVisible by visibleState
 
     var isDarkTheme   by remember { mutableStateOf(settings.isDarkTheme) }
     // Material You palette: the wallpaper seed (computed in AppRoot from the backdrop
@@ -451,13 +445,6 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
         val consoleSettingsManager = remember { ConsoleSettingsManager(dataDirectory, customizationJson) }
         var consoleSettings        by remember { mutableStateOf(consoleSettingsManager.load()) }
 
-        // Window chrome icon -- KDE overview / Hyprland switcher / macOS
-        // dock want the detailed hi-res asset so they can be downscale
-        // cleanly to whatever the compositor demands. The tray builds
-        // its 64-px glyph from `drawable/favicon.png` separately via
-        // `Res.readBytes(...)` so it doesn't need a Painter here.
-        val windowIcon = painterResource(Res.drawable.icon)
-
         // Localized tray labels, derived from the active locale's strings.
         // Strings is a data class, so its structural equality lets the
         // locale-reactive effect below re-fire only when a label actually
@@ -622,7 +609,7 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
                     // visibility flip is unconditional during chaos so the
                     // dialog isn't hidden behind a minimized window.
                     if (af.isActive()) isWindowVisible = true
-                    af.requestCloseDialog { exitApplication() }
+                    af.requestCloseDialog { exitApp() }
                 }
             }
 
@@ -716,49 +703,38 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
                     // meant as "minimize".
                     isWindowVisible = false
                 } else {
-                    exitApplication()
+                    exitApp()
                 }
             }
         }
-        Window(
-            onCloseRequest = onCloseChrome,
-            state     = windowState,
-            visible   = isWindowVisible,
-            title     = Branding.TITLE,
-            // Replace the OS title bar with our own -- but ONLY where the OS draws
-            // one. A tiling WM draws no title bar for tiled windows (nothing to
-            // hide), and an undecorated AWT window there ignores the WM's external
-            // fullscreen state (_NET_WM_STATE_FULLSCREEN), so super+F breaks. So go
-            // undecorated only off-tiling; on tiling stay decorated (WM shows no
-            // chrome anyway) and the top bar still renders -- it is layout, not
-            // window decoration. useCustomChrome=false forces OS decorations always.
-            // transparent stays false -- opt-in later for Float corners.
-            undecorated = settings.useCustomChrome && !IS_TILING_WM,
-            resizable = true,
-            icon      = windowIcon,
-            onPreviewKeyEvent = { ev ->
-                // Window-scoped chords (preview = before focus dispatch) so they
-                // fire no matter which composable holds focus -- the side rails
-                // own focus, so a host Box-level handler misses them. Consume
-                // both edges so they never reach a focused control, and act on
-                // release only so holding does not repeat on auto-repeat KeyDowns.
-                when {
-                    // Ctrl+E toggles widget edit mode. EditorSurfaceHost observes
-                    // the controller signal and gates on its surface being editable.
-                    ev.isCtrlPressed && ev.key == Key.E -> {
-                        if (ev.type == KeyEventType.KeyUp) editModeController.requestEditToggle()
-                        true
-                    }
-                    // Ctrl+N collapses / expands the right rail. ShellRightRegion
-                    // observes the signal and flips its collapsed prop.
-                    ev.isCtrlPressed && ev.key == Key.N -> {
-                        if (ev.type == KeyEventType.KeyUp) editModeController.requestRightRailToggle()
-                        true
-                    }
-                    else -> false
+        // Window-level callbacks, late-bound: the window itself is created
+        // pre-Koin in ShellHost, so the real handlers register here once the
+        // shell mounts. Plain assignments -- the window reads the hooks at
+        // event time, and recomposition keeps them pointing at fresh captures.
+        chrome.onCloseRequest = onCloseChrome
+        chrome.onPreviewKey = { ev ->
+            // Window-scoped chords (preview = before focus dispatch) so they
+            // fire no matter which composable holds focus -- the side rails
+            // own focus, so a host Box-level handler misses them. Consume
+            // both edges so they never reach a focused control, and act on
+            // release only so holding does not repeat on auto-repeat KeyDowns.
+            when {
+                // Ctrl+E toggles widget edit mode. EditorSurfaceHost observes
+                // the controller signal and gates on its surface being editable.
+                ev.isCtrlPressed && ev.key == Key.E -> {
+                    if (ev.type == KeyEventType.KeyUp) editModeController.requestEditToggle()
+                    true
                 }
-            },
-        ) {
+                // Ctrl+N collapses / expands the right rail. ShellRightRegion
+                // observes the signal and flips its collapsed prop.
+                ev.isCtrlPressed && ev.key == Key.N -> {
+                    if (ev.type == KeyEventType.KeyUp) editModeController.requestRightRailToggle()
+                    true
+                }
+                else -> false
+            }
+        }
+        run {
             // Pulled-forward: triggered by the .show watcher above when a
             // second instance fires its signal. Skip on raiseTick == 0 so
             // the first composition doesn't steal focus from whatever the
@@ -923,7 +899,7 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
                     MigrationScreen(
                         source = migration,
                         target = boot.paths.dataDir,
-                        onQuit = { exitApplication() },
+                        onQuit = exitApp,
                     )
                 } else {
                     AppRoot(
@@ -936,12 +912,12 @@ fun ApplicationScope.AppShell(boot: LauncherBootstrap.Result) {
                                 // init is still mid-flight.
                                 isWindowVisible = false
                             } else {
-                                exitApplication()
+                                exitApp()
                             }
                         },
                         onWallpaperSeed = { wallpaperSeed = it },
                         onWallpaperLuminance = { wallpaperLuminance = it },
-                        onRealExit   = { exitApplication() },
+                        onRealExit   = exitApp,
                         onHideToTray = if (TrayManager.canBeReady) {{ isWindowVisible = false }}
                         else null,
                         isDarkTheme          = isDarkTheme,

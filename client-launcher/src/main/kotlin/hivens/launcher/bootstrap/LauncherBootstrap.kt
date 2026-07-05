@@ -30,6 +30,19 @@ import kotlin.system.exitProcess
  * data-dir migration, session-id tagging, NetworkState SSL-bypass
  * restore, crash-report handler, single-instance lock, Koin startup.
  *
+ * The pipeline is split in two so the GUI can show a window BEFORE the
+ * heavy boot work runs (the boot-threshold screen):
+ *
+ *   - [preWindow]  -- the synchronous, milliseconds-cheap prologue that MUST
+ *     precede any window/toolkit init: log-dir property, session tagging,
+ *     the single-instance gate (so a duplicate launch never flashes a
+ *     window before yielding to the running instance).
+ *   - [completeCore] + [finishBoot] -- the potentially-slow remainder
+ *     (data-dir move, NetworkState restore, migration detect, Koin). The
+ *     GUI runs these on a background thread behind a live window and maps
+ *     the [Phase] callbacks onto its progress bar; the CLI runs them
+ *     inline.
+ *
  * Result is the small set of values the entrypoint needs to keep
  * threading through: the resolved [PlatformPaths] (for window-side
  * `.show` watcher and data-dir-relative reads) and a possibly non-null
@@ -40,11 +53,11 @@ import kotlin.system.exitProcess
  * public pieces: [preBootHeadless] is the CLI's whole pipeline (a
  * log-and-persist crash handler, no single-instance lock);
  * the GUI pipeline lives with the UI layer (hivens.ui.bootstrap), which
- * runs [prepareCore], layers its toolkit setup + Swing crash dialog on
- * top, then calls [finishBoot]. Keeping the GUI edge out of this module
- * keeps AWT out of the CLI's reachable graph and out of the native
- * image -- which is the whole point, since AWT/Skiko is what blocks
- * native-image of the Compose GUI.
+ * runs [preWindow], layers its toolkit setup + Swing crash dialog on
+ * top, then drives [completeCore] + [finishBoot] from its boot thread.
+ * Keeping the GUI edge out of this module keeps AWT out of the CLI's
+ * reachable graph and out of the native image -- which is the whole
+ * point, since AWT/Skiko is what blocks native-image of the Compose GUI.
  *
  * Anything that should run AFTER Koin but before the Compose entry
  * (puppet server startup, UI Koin module registration) is the caller's
@@ -52,6 +65,13 @@ import kotlin.system.exitProcess
  * here without inverting the module direction.
  */
 object LauncherBootstrap {
+
+    /**
+     * Coarse boot phases, reported through the `onPhase` callbacks so a
+     * boot-progress surface can label its bar honestly. Values arrive in
+     * declaration order; a phase is reported when its work STARTS.
+     */
+    enum class Phase { Data, Network, Migration, Modules }
 
     /**
      * Bundle of values the Compose layer needs from pre-Compose setup.
@@ -65,6 +85,11 @@ object LauncherBootstrap {
         val paths: PlatformPaths,
         val pendingMigration: DataDirMigration.Source?,
         val crashReporter: CrashReporter,
+    )
+
+    /** Pre-window prologue values [completeCore] resumes from. */
+    data class PreWindow(
+        val initialPaths: PlatformPaths,
     )
 
     /** Pre-Koin core values an entry pipeline composes [finishBoot] around. */
@@ -81,73 +106,41 @@ object LauncherBootstrap {
      * instance instead of silently exiting when the GUI holds the lock.
      */
     fun preBootHeadless(extraModules: List<Module> = emptyList()): Result {
-        val core = prepareCore()
+        val pre = preWindow(singleInstance = false)
+        val core = completeCore(pre, relockOnMove = false)
         installHeadlessCrashHandler(core.crashReporter)
-        return finishBoot(core, extraModules, singleInstance = false)
+        return finishBoot(core, extraModules)
     }
 
     /**
-     * AWT-free core: log dir + data-dir migration + session tagging +
-     * NetworkState restore + data dir + CrashReporter. Shared verbatim by
-     * every entrypoint; contains zero references to AWT/Swing so the CLI's
-     * reachable graph stays clean. Public for the GUI pipeline in
-     * hivens.ui.bootstrap, which layers toolkit setup + its Swing crash
-     * handler between this and [finishBoot].
+     * The synchronous prologue: log-dir resolution, session tagging, and
+     * (for the GUI) the single-instance gate. Everything here is
+     * milliseconds-cheap by construction -- the point of the split is
+     * that a window can go up immediately after this returns.
+     *
+     * Resolve logs dir BEFORE any LoggerFactory.getLogger() call so
+     * logback.xml (which reads `${nexira.logs.dir}` for its rolling-file
+     * appenders) sees the platform-correct path on its very first init.
+     * PlatformPaths.system() is pure computation -- no logger init --
+     * safe to call before the property is set.
+     *
+     * The resolved paths are an INITIAL value: [completeCore] may commit
+     * a pending `data-dir` move and re-resolve; the post-move paths are
+     * what the rest of the session runs on. The single-instance lock is
+     * taken on the initial dir (a duplicate launch must be gated before
+     * its window shows); [completeCore] re-locks on the post-move dir in
+     * the rare pending-move case.
      */
-    fun prepareCore(): Core {
-        // Resolve logs dir BEFORE any LoggerFactory.getLogger() call so
-        // logback.xml (which reads `${nexira.logs.dir}` for its rolling-file
-        // appenders) sees the platform-correct path on its very first init.
-        // PlatformPaths.system() is pure computation -- no logger init --
-        // safe to call before the property is set. DataDirMover and
-        // BootstrapConf both have lazy log fields specifically so this
-        // ordering works without their applyPending() / read() touching
-        // logback first.
-        //
-        // The initial resolution is a temporary value: applyPending below
-        // can commit a brand-new `data-dir` into BootstrapConf, in which
-        // case the second PlatformPaths.system() call right after picks
-        // up the new path and that becomes [paths] for the rest of the
-        // session. Holding only [initialPaths] across applyPending was a
-        // race: the move would copy + commit, then the rest of preBoot
-        // (Files.createDirectories, NetworkState.initialize, Koin) used
-        // the stale captured path -- recreating an empty old dir and
-        // wiring every singleton against it. The user observed:
-        // "files moved but the launcher still uses the old (now empty)
-        // path", logged out, fresh-login surfaced trustAnchors / network
-        // errors because the cache / creds / ssl-bypasses landed at the
-        // wrong location. The re-resolve below is the fix.
+    fun preWindow(singleInstance: Boolean): PreWindow {
         val initialPaths = PlatformPaths.system()
         System.setProperty("nexira.logs.dir", initialPaths.logsDir.toString())
-
-        // NOW safe to apply any pending data-dir move scheduled from the
-        // Settings UI. If user clicked "Move data directory" -> picker ->
-        // restart, this is where the relocation actually happens. Operation
-        // is idempotent; safe to call on every startup. The first log line
-        // it produces (only in the actual-move case, no-op otherwise) lands
-        // in `initialPaths.logsDir/launcher.log`.
-        //
-        // Edge case: if applyPending DOES move the data dir, initialPaths.logsDir
-        // points at the old location and logback opens the file there --
-        // log entries about the move itself stream to the old path right
-        // up until the source dir is deleted. Logback's rolling-file
-        // appender keeps writing to the old (now-deleted on Linux /
-        // unlinked-but-handle-held on Windows) file for the rest of this
-        // session; the next launch starts fresh under the new path.
-        DataDirMover.applyPending()
-
-        // Re-resolve so the rest of preBoot uses the post-move data-dir.
-        // No-op when applyPending didn't change anything (steady state).
-        val paths = PlatformPaths.system()
-        if (paths.dataDir != initialPaths.dataDir) {
-            System.setProperty("nexira.logs.dir", paths.logsDir.toString())
-        }
 
         // Pulse: tag every log line in this process with a stable 8-char sessionId
         // so a multi-launch user dump can be sliced per process invocation
         // (`grep sessionId=abc12345 *.log`). System property (not MDC) because
         // MDC is thread-local, and we want this on every line from every thread --
         // the logback pattern reads the property via `${nexira.sessionId}`.
+        // Set BEFORE the first possible logger init (the lock below logs).
         val sessionId = UUID.randomUUID().toString().take(8)
         System.setProperty("nexira.sessionId", sessionId)
 
@@ -156,6 +149,69 @@ object LauncherBootstrap {
         ActionRing.record(
             "Launcher started (v${Branding.VERSION}, sessionId=$sessionId, os=${System.getProperty("os.name")})"
         )
+
+        if (singleInstance) {
+            // The data dir may not exist yet on a fresh install; the lock file
+            // needs its parent. Idempotent, and completeCore re-creates after
+            // a potential data-dir move.
+            runCatching { Files.createDirectories(initialPaths.dataDir) }
+            // Acquired BEFORE any window shows: a duplicate launch drops the
+            // .show signal for the running instance and exits without ever
+            // flashing a window of its own. Also before migration is consulted
+            // -- two launchers started close together would otherwise both
+            // render the MigrationScreen and race on file copies.
+            if (!SingleInstance.acquire(initialPaths.dataDir)) exitProcess(0)
+        }
+
+        return PreWindow(initialPaths)
+    }
+
+    /**
+     * The potentially-slow, AWT-free middle: pending data-dir move,
+     * post-move re-resolution, NetworkState SSL-bypass restore, data-dir
+     * creation, CrashReporter construction. Safe to run on a background
+     * thread behind a live window.
+     */
+    fun completeCore(
+        pre: PreWindow,
+        relockOnMove: Boolean,
+        onPhase: (Phase) -> Unit = {},
+    ): Core {
+        onPhase(Phase.Data)
+
+        // Apply any pending data-dir move scheduled from the Settings UI. If
+        // user clicked "Move data directory" -> picker -> restart, this is
+        // where the relocation actually happens. Operation is idempotent;
+        // safe to call on every startup.
+        //
+        // Edge case: if applyPending DOES move the data dir, the logs
+        // property points at the old location and logback opens the file
+        // there -- log entries about the move itself stream to the old path
+        // right up until the source dir is deleted. Logback's rolling-file
+        // appender keeps writing to the old (now-deleted on Linux /
+        // unlinked-but-handle-held on Windows) file for the rest of this
+        // session; the next launch starts fresh under the new path.
+        DataDirMover.applyPending()
+
+        // Re-resolve so the rest of boot uses the post-move data-dir.
+        // No-op when applyPending didn't change anything (steady state).
+        // Holding only the initial paths across applyPending was a race:
+        // the move would copy + commit, then the rest of boot used the
+        // stale captured path -- recreating an empty old dir and wiring
+        // every singleton against it.
+        val paths = PlatformPaths.system()
+        if (paths.dataDir != pre.initialPaths.dataDir) {
+            System.setProperty("nexira.logs.dir", paths.logsDir.toString())
+            if (relockOnMove) {
+                // The pre-window lock guards the OLD dir; a duplicate started
+                // after the move would gate on the NEW dir. Best-effort
+                // re-acquire keeps the single-instance invariant across the
+                // (rare) move session; both locks are held until exit.
+                if (!SingleInstance.acquire(paths.dataDir)) exitProcess(0)
+            }
+        }
+
+        onPhase(Phase.Network)
 
         // Vault #2: wire SSL-bypass persistence. Expired entries from prior
         // sessions are dropped during load -- a 30-day grant from a month ago
@@ -168,8 +224,8 @@ object LauncherBootstrap {
 
         Files.createDirectories(paths.dataDir)
 
-        // Constructed here (pre-Koin) so the uncaught-exception handler below
-        // can capture an instance with the resolved PlatformPaths. A parallel
+        // Constructed here (pre-Koin) so uncaught-exception handlers can
+        // capture an instance with the resolved PlatformPaths. A parallel
         // Koin singleton wires the same shape for post-Koin consumers; they
         // share no mutable state so the parallel instances are functionally
         // identical.
@@ -196,30 +252,26 @@ object LauncherBootstrap {
     }
 
     /**
-     * Shared tail: single-instance lock (GUI only), migration detection,
-     * Koin startup. AWT-free. Public for the GUI pipeline in
-     * hivens.ui.bootstrap.
+     * Shared tail: migration detection, Koin startup. AWT-free. The
+     * single-instance gate lives in [preWindow] now -- it must precede
+     * window creation, and it already precedes migration by construction.
      */
     fun finishBoot(
         core: Core,
         extraModules: List<Module>,
-        singleInstance: Boolean,
+        onPhase: (Phase) -> Unit = {},
     ): Result {
         val (paths, crashReporter) = core
-        // Single-instance lock acquired BEFORE migration is consulted. Two
-        // launchers started close together would otherwise both render the
-        // MigrationScreen and race on file copies. DataDirMigration's
-        // emptiness check is taught to ignore .lock / .show / .migrated so
-        // its first-run trigger still fires. Skipped for the headless CLI --
-        // it must coexist with a running GUI instance, not exit when the GUI
-        // already holds the lock.
-        if (singleInstance && !SingleInstance.acquire(paths.dataDir)) exitProcess(0)
 
-        // Migration runs INSIDE Compose now, as a mandatory full-screen UI
+        onPhase(Phase.Migration)
+
+        // Migration runs INSIDE Compose, as a mandatory full-screen UI
         // shown before AppRoot. The detection is read here once so the
         // result is stable across recompositions; the actual copy and
         // progress reporting happens in MigrationScreen.
         val pendingMigration = DataDirMigration.detect(paths)
+
+        onPhase(Phase.Modules)
 
         // Two createdAtStart hooks registered in appModule fire here:
         //   - SettingsRestoreHook       -- replays persisted experimental overrides.
