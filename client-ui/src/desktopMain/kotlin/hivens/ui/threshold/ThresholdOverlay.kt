@@ -6,7 +6,6 @@ import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -30,29 +30,40 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import hivens.ui.generated.resources.Res
+import hivens.ui.generated.resources.press_start_2p
 import hivens.ui.i18n.AppStrings
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
+import org.jetbrains.compose.resources.Font
 import java.awt.Desktop
 import java.nio.file.Path
 import kotlin.concurrent.thread
+import kotlin.math.ceil
+import kotlin.math.floor
 import kotlin.math.min
 
-// BIOS-brutal boot readout: near-black field, 1px square frame, white fill.
+// Pixel-game boot readout: near-black field, thick block frame with stepped
+// corners, the fill made of discrete segments -- the reference is the classic
+// 8/16-bit loading bar, not a hairline material progress.
 private val FieldBlack  = Color(0xFF0B0B0C)
 private val FrameWhite  = Color(0xFFE8E8E8)
 private val FillWhite   = Color(0xFFFFFFFF)
-private val TextGray    = Color(0xFF8C8C8C)
+
+// The pixel quantum. Frame thickness, corner steps, segment gaps and the
+// flood's chunky growth are all multiples of this -- one knob keeps every
+// element on the same virtual pixel grid.
+private val UNIT = 6.dp
 
 // The bar group sits at the golden fraction of the surface -- low enough to
 // read staged, without the lower-third hole a 27" fullscreen would open.
@@ -68,9 +79,9 @@ private const val HOLD_MS  = 180L
  * The boot-threshold screen, composed OVER the (not-yet or just-mounted)
  * shell inside the same window. Opaque while boot runs -- which also masks
  * the shell's expensive first composition -- then plays the exit beat:
- * bar completes, one breath, the bar's white floods the canvas, the flood
- * fades to reveal the live shell beneath. Calls [onDone] when nothing is
- * left to draw; the host removes it from composition.
+ * bar completes, one breath, the bar's white floods the canvas (growing on
+ * the pixel grid), the flood fades to reveal the live shell beneath. Calls
+ * [onDone] when nothing is left to draw; the host removes it.
  *
  * Tier-0 by construction: no Koin, no NxTheme, no widget kernel. Strings
  * arrive pre-resolved from the settings peek.
@@ -88,6 +99,7 @@ fun ThresholdOverlay(
     val currentOutcome by rememberUpdatedState(outcome)
     val ready  = outcome is BootOutcome.Ready
     val failed = outcome as? BootOutcome.Failed
+    val pixelFont = FontFamily(Font(Res.font.press_start_2p))
 
     var contentShown by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
@@ -138,37 +150,51 @@ fun ThresholdOverlay(
     }
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        val barWidth  = min(320f, maxWidth.value * 0.4f).dp
-        val topAreaH  = maxHeight * BAR_CENTER_Y - 8.dp /* half bar */ - 4.dp /* gap+frame */ - 12.dp
+        // Bar geometry on the pixel grid: everything derives from UNIT.
+        val barWidth  = min(64, floor((maxWidth.value * 0.5f) / UNIT.value).toInt()).let { (it - it % 2) * UNIT.value }.dp
+        val barHeight = UNIT * 9
+        val barTop    = maxHeight * BAR_CENTER_Y - barHeight / 2
 
         Canvas(Modifier.fillMaxSize()) {
             val f = flood.value
-            val frameRect = barFrameRect(size, barWidth.toPx(), 16.dp.toPx())
+            val u = UNIT.toPx()
+            val frameRect = Rect(
+                Offset((size.width - barWidth.toPx()) / 2f, barTop.toPx()),
+                Size(barWidth.toPx(), barHeight.toPx()),
+            )
 
             if (f < 1f) {
                 drawRect(FieldBlack)
-                // Frame: 1px stroke, square corners. The fill lives INSIDE a
-                // 3px gap -- the gap is what makes the frame read as a frame.
-                drawRect(
-                    color   = FrameWhite.copy(alpha = 0.92f * contentAlpha),
-                    topLeft = frameRect.topLeft,
-                    size    = frameRect.size,
-                    style   = Stroke(width = 1.dp.toPx()),
+                drawPixelFrame(frameRect, u, FrameWhite.copy(alpha = 0.92f * contentAlpha))
+                // Fill: discrete segments on the pixel grid, each 3 units wide
+                // with a unit gap -- the bar loads chunk by chunk, never as a
+                // smooth smear. Segment count derives from the inner width.
+                val inner = Rect(
+                    Offset(frameRect.left + 2 * u, frameRect.top + 2 * u),
+                    Size(frameRect.width - 4 * u, frameRect.height - 4 * u),
                 )
-                val gap = 4.dp.toPx()
-                val innerW = (frameRect.width - gap * 2).coerceAtLeast(0f)
+                val segStride = 4 * u
+                val segCount = floor((inner.width + u) / segStride).toInt().coerceAtLeast(1)
                 val fillFraction = if (failed != null) 0f else bar
-                drawRect(
-                    color   = FillWhite.copy(alpha = if (failed != null) 0.25f else contentAlpha),
-                    topLeft = Offset(frameRect.left + gap, frameRect.top + gap),
-                    size    = Size(innerW * fillFraction, (frameRect.height - gap * 2).coerceAtLeast(0f)),
-                )
+                val lit = floor(fillFraction * segCount).toInt().coerceIn(0, segCount)
+                val alpha = if (failed != null) 0.25f else contentAlpha
+                for (i in 0 until lit) {
+                    drawPixelSegment(
+                        Rect(
+                            Offset(inner.left + i * segStride, inner.top),
+                            Size(3 * u, inner.height),
+                        ),
+                        step = u / 2f,
+                        color = FillWhite.copy(alpha = alpha),
+                    )
+                }
             }
             if (f > 0f) {
                 // The bar's light is the transition: its rect grows to the full
-                // canvas, covers, then fades to reveal the shell beneath.
+                // canvas ON THE PIXEL GRID (chunky expansion), covers, then
+                // fades to reveal the shell beneath.
                 val full = Rect(Offset.Zero, size)
-                val r = lerpRect(frameRect, full, f)
+                val r = lerpRect(frameRect, full, f).snapToGrid(u)
                 drawRect(
                     color   = FillWhite.copy(alpha = whiteFade.value),
                     topLeft = r.topLeft,
@@ -177,30 +203,43 @@ fun ThresholdOverlay(
             }
         }
 
+        val labelRowSpace = barTop - UNIT * 2
         if (failed == null) {
-            // Stage readout, bottom-anchored just above the frame.
+            // Stage readout left + honest percent right, both on the bar's own
+            // edges, pixel font. Percent shows the displayed (smoothed) value --
+            // the same thing the segments show.
             Box(
-                modifier = Modifier.fillMaxWidth().height(topAreaH),
+                modifier = Modifier.fillMaxWidth().height(labelRowSpace),
                 contentAlignment = Alignment.BottomCenter,
             ) {
-                Text(
-                    text       = stageLabel(strings, stage).lowercase(),
-                    fontFamily = FontFamily.Monospace,
-                    fontSize   = 11.sp,
-                    color      = TextGray.copy(alpha = contentAlpha),
-                )
+                Row(
+                    modifier = Modifier.width(barWidth),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(
+                        text       = stageLabel(strings, stage).lowercase(),
+                        fontFamily = pixelFont,
+                        fontSize   = 16.sp,
+                        color      = FrameWhite.copy(alpha = contentAlpha),
+                    )
+                    Text(
+                        text       = "${(bar * 100).toInt()}%",
+                        fontFamily = pixelFont,
+                        fontSize   = 16.sp,
+                        color      = FrameWhite.copy(alpha = contentAlpha),
+                    )
+                }
             }
         } else {
             Column(
-                modifier = Modifier.fillMaxWidth().height(topAreaH),
+                modifier = Modifier.fillMaxWidth().height(labelRowSpace),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Bottom,
             ) {
                 Text(
                     text       = strings.thresholdErrorTitle.lowercase(),
-                    fontFamily = FontFamily.Monospace,
-                    fontSize   = 13.sp,
-                    fontWeight = FontWeight.Bold,
+                    fontFamily = pixelFont,
+                    fontSize   = 18.sp,
                     color      = FrameWhite,
                 )
                 Text(
@@ -209,16 +248,16 @@ fun ThresholdOverlay(
                     },
                     fontFamily = FontFamily.Monospace,
                     fontSize   = 11.sp,
-                    color      = TextGray,
-                    modifier   = Modifier.padding(top = 6.dp, bottom = 16.dp),
+                    color      = Color(0xFF8C8C8C),
+                    modifier   = Modifier.padding(top = 10.dp, bottom = 20.dp),
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    ThresholdButton(strings.thresholdOpenLogs.lowercase()) {
+                Row(horizontalArrangement = Arrangement.spacedBy(UNIT * 2)) {
+                    ThresholdButton(strings.thresholdOpenLogs.lowercase(), pixelFont) {
                         thread(isDaemon = true) {
                             runCatching { Desktop.getDesktop().open(logsDir.toFile()) }
                         }
                     }
-                    ThresholdButton(strings.thresholdQuit.lowercase(), onClick = onQuit)
+                    ThresholdButton(strings.thresholdQuit.lowercase(), pixelFont, onClick = onQuit)
                 }
             }
         }
@@ -226,27 +265,52 @@ fun ThresholdOverlay(
 }
 
 @Composable
-private fun ThresholdButton(label: String, onClick: () -> Unit) {
+private fun ThresholdButton(label: String, font: FontFamily, onClick: () -> Unit) {
     Box(
         modifier = Modifier
-            .border(1.dp, FrameWhite.copy(alpha = 0.76f))
+            .drawBehind {
+                drawPixelFrame(Rect(Offset.Zero, size), (UNIT / 2).toPx(), FrameWhite.copy(alpha = 0.85f))
+            }
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = UNIT * 3, vertical = UNIT * 2),
     ) {
         Text(
             text       = label,
-            fontFamily = FontFamily.Monospace,
+            fontFamily = font,
             fontSize   = 12.sp,
             color      = FrameWhite,
         )
     }
 }
 
-private fun barFrameRect(canvas: Size, barWidthPx: Float, frameHeightPx: Float): Rect {
-    val cx = canvas.width / 2f
-    val cy = canvas.height * BAR_CENTER_Y
-    return Rect(Offset(cx - barWidthPx / 2f, cy - frameHeightPx / 2f), Size(barWidthPx, frameHeightPx))
+/**
+ * The classic 8-bit block frame: four bands of [thickness], each inset by one
+ * thickness at both ends, leaving the corner squares EMPTY -- the one-step
+ * cut corner every pixel game rounds its rects with.
+ */
+private fun DrawScope.drawPixelFrame(r: Rect, thickness: Float, color: Color) {
+    val t = thickness
+    // top / bottom bands
+    drawRect(color, Offset(r.left + t, r.top), Size(r.width - 2 * t, t))
+    drawRect(color, Offset(r.left + t, r.bottom - t), Size(r.width - 2 * t, t))
+    // left / right bands
+    drawRect(color, Offset(r.left, r.top + t), Size(t, r.height - 2 * t))
+    drawRect(color, Offset(r.right - t, r.top + t), Size(t, r.height - 2 * t))
 }
+
+/** A fill segment with stepped corners: full-height core, end columns inset by [step]. */
+private fun DrawScope.drawPixelSegment(r: Rect, step: Float, color: Color) {
+    drawRect(color, Offset(r.left + step, r.top), Size((r.width - 2 * step).coerceAtLeast(0f), r.height))
+    drawRect(color, Offset(r.left, r.top + step), Size(step, (r.height - 2 * step).coerceAtLeast(0f)))
+    drawRect(color, Offset(r.right - step, r.top + step), Size(step, (r.height - 2 * step).coerceAtLeast(0f)))
+}
+
+private fun Rect.snapToGrid(u: Float): Rect = Rect(
+    left   = floor(left / u) * u,
+    top    = floor(top / u) * u,
+    right  = ceil(right / u) * u,
+    bottom = ceil(bottom / u) * u,
+)
 
 private fun lerpRect(a: Rect, b: Rect, t: Float): Rect = Rect(
     left   = a.left   + (b.left   - a.left)   * t,
