@@ -9,6 +9,7 @@ import androidx.compose.ui.window.WindowExceptionHandlerFactory
 import androidx.compose.ui.window.application
 import hivens.core.api.interfaces.ISettingsService
 import hivens.ui.bootstrap.GuiBootstrap
+import hivens.ui.bootstrap.RecoveryEntry
 import hivens.ui.threshold.BootOutcome
 import hivens.ui.threshold.BootStage
 import hivens.ui.threshold.toStage
@@ -234,8 +235,15 @@ val uiModule = module {
 // ─── Entry Point ─────────────────────────────────────────────────────────────
 
 @OptIn(ExperimentalResourceApi::class)
-fun main() {
+fun main(args: Array<String>) {
     val pre = GuiBootstrap.preWindow()
+
+    // Boot straight into recovery when asked (env NEXIRA_RECOVERY / --recovery /
+    // a one-shot marker), for a launcher that starts wrong but does not crash.
+    // Recovery needs only the data dir, so we skip the whole boot -- Koin, vault,
+    // network -- and a broken module cannot take the recovery surface down with it.
+    val recovery = RecoveryEntry.resolve(pre.core.initialPaths.dataDir, args)
+    if (recovery) UiRecoverySignal.requestRecovery()
 
     // Process-lifetime teardown. Puppet + Koin come up on the boot thread but
     // are torn down once here at process exit -- NOT from a composition
@@ -260,7 +268,7 @@ fun main() {
     // Dev knob: -Dnexira.boot.slowMs=800 stretches each phase so the
     // threshold can actually be looked at on a warm machine.
     val slowMs = System.getProperty("nexira.boot.slowMs")?.toLongOrNull() ?: 0L
-    thread(name = "nexira-boot", isDaemon = true) {
+    if (!recovery) thread(name = "nexira-boot", isDaemon = true) {
         runCatching {
             GuiBootstrap.completeBoot(pre, listOf(uiModule)) { phase ->
                 bootStage.value = phase.toStage()
@@ -327,6 +335,7 @@ private fun runShellWithRecovery(
         // it would just crash again. Deciding here (not inside the shell) is what
         // makes the safe surface actually reachable.
         val safe = UiRecoverySignal.safeMode.value
+        val reason = UiRecoverySignal.recoveryReason.value
         val outcome = runCatching {
             // exitProcessOnExit = false is what makes this loop REAL: the
             // default true had `application` call exitProcess(0) the moment
@@ -354,7 +363,9 @@ private fun runShellWithRecovery(
                     }
                 }
                 CompositionLocalProvider(LocalWindowExceptionHandlerFactory provides handler) {
-                    if (safe) {
+                    if (reason != UiRecoverySignal.RecoveryReason.None) {
+                        // Crash-loop or a user request routes here; P3 replaces
+                        // this stand-in with the richer RecoveryWindow.
                         SafeModeWindow(onQuit = { exitApplication() })
                     } else {
                         // Boot already done on a restart iteration: ShellHost
