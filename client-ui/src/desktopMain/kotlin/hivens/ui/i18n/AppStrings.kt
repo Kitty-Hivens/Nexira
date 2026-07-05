@@ -964,6 +964,22 @@ interface AppStrings {
     val recoverySafeModeBody: String
     val recoverySafeModeQuit: String
 
+    // --- Boot recovery mode (module toggles + resets; user-triggered or crash-latched) ---
+    val recoveryTitle: String
+    val recoveryBody: String
+    val recoveryModulesHeading: String
+    val recoveryModuleTray: String
+    val recoveryModuleNotify: String
+    val recoveryModuleSkinema: String
+    val recoveryModuleKeyring: String
+    val recoveryResetsHeading: String
+    val recoveryResetLayout: String
+    val recoveryResetCustomization: String
+    val recoveryResetSettings: String
+    val recoveryContinue: String
+    val recoveryRelaunchFailed: String
+    val recoveryRestartInApp: String
+
     // Boot-threshold readout (pre-Koin boot screen). Lowercase by design --
     // a BIOS-style readout, rendered via lowercase() at the call site.
     val thresholdStageFiles: String
