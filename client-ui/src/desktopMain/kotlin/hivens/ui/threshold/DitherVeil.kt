@@ -1,6 +1,7 @@
 package hivens.ui.threshold
 
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shader
 import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.graphics.asComposeShader
@@ -26,6 +27,7 @@ object DitherVeil {
     private const val SKSL = """
         uniform float progress;
         uniform float cell;
+        uniform float3 veilColor;
 
         float bayer2(float2 a) {
             a = floor(a);
@@ -39,8 +41,7 @@ object DitherVeil {
             if (progress > t) {
                 return half4(0.0);
             }
-            // FieldBlack 0x0B0B0C, premultiplied opaque.
-            return half4(0.0431, 0.0431, 0.0471, 1.0);
+            return half4(veilColor, 1.0);
         }
     """
 
@@ -48,14 +49,15 @@ object DitherVeil {
 
     val available: Boolean get() = effect != null
 
-    /** A brush drawing the veil at [progress] lifted, on a [cellPx] grid. */
-    fun brush(progress: Float, cellPx: Float): ShaderBrush? {
+    /** A brush drawing the [color] veil at [progress] lifted, on a [cellPx] grid. */
+    fun brush(progress: Float, cellPx: Float, color: Color): ShaderBrush? {
         val fx = effect ?: return null
         return object : ShaderBrush() {
             override fun createShader(size: Size): Shader {
                 val b = RuntimeShaderBuilder(fx)
                 b.uniform("progress", progress)
                 b.uniform("cell", cellPx)
+                b.uniform("veilColor", color.red, color.green, color.blue)
                 return b.makeShader().asComposeShader()
             }
         }

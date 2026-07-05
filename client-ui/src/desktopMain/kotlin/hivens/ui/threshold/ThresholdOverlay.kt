@@ -51,12 +51,22 @@ import kotlin.concurrent.thread
 import kotlin.math.floor
 import kotlin.math.min
 
-// Pixel-game boot readout: near-black field, thick block frame with stepped
-// corners, the fill made of discrete segments -- the reference is the classic
-// 8/16-bit loading bar, not a hairline material progress.
-private val FieldBlack  = Color(0xFF0B0B0C)
-private val FrameWhite  = Color(0xFFE8E8E8)
-private val FillWhite   = Color(0xFFFFFFFF)
+// Pixel-game boot readout: thick block frame with stepped corners, the fill
+// made of discrete segments -- the reference is the classic 8/16-bit loading
+// bar, not a hairline material progress. Two palettes, chosen by the peeked
+// theme so a light-theme user is never blackout-flashed: dark = pixels of
+// light in the dark; light = dark pixels on a pale field (the Game Boy way).
+internal data class ThresholdPalette(
+    val field: Color,
+    val frame: Color,
+    val fill: Color,
+    val dim: Color,
+) {
+    companion object {
+        val Dark  = ThresholdPalette(Color(0xFF0B0B0C), Color(0xFFE8E8E8), Color(0xFFFFFFFF), Color(0xFF8C8C8C))
+        val Light = ThresholdPalette(Color(0xFFF2F1EC), Color(0xFF17171A), Color(0xFF000000), Color(0xFF6E6E6A))
+    }
+}
 
 // The pixel quantum. Frame thickness, corner steps, segment gaps and the
 // flood's chunky growth are all multiples of this -- one knob keeps every
@@ -90,9 +100,11 @@ fun ThresholdOverlay(
     outcome: BootOutcome?,
     strings: AppStrings,
     logsDir: Path,
+    dark: Boolean,
     onQuit: () -> Unit,
     onDone: () -> Unit,
 ) {
+    val pal = if (dark) ThresholdPalette.Dark else ThresholdPalette.Light
     val stage by stageFlow.collectAsState()
     val currentOutcome by rememberUpdatedState(outcome)
     val ready  = outcome is BootOutcome.Ready
@@ -171,16 +183,16 @@ fun ThresholdOverlay(
             // leaves cell by cell on the pixel grid; if the effect failed to
             // compile, a plain alpha ramp does the same job less prettily.
             val lift = 1f - veil.value
-            val ditherBrush = if (lift > 0f) DitherVeil.brush(lift, u) else null
+            val ditherBrush = if (lift > 0f) DitherVeil.brush(lift, u, pal.field) else null
             when {
-                lift <= 0f         -> drawRect(FieldBlack)
+                lift <= 0f          -> drawRect(pal.field)
                 ditherBrush != null -> drawRect(brush = ditherBrush)
-                else                -> drawRect(FieldBlack.copy(alpha = veil.value))
+                else                -> drawRect(pal.field.copy(alpha = veil.value))
             }
 
             val readout = contentAlpha * readoutFade.value
             if (readout > 0f) {
-                drawPixelFrame(frameRect, u, FrameWhite.copy(alpha = 0.92f * readout))
+                drawPixelFrame(frameRect, u, pal.frame.copy(alpha = 0.92f * readout))
                 // Fill: discrete segments on the pixel grid, each 3 units wide
                 // with a unit gap -- the bar loads chunk by chunk, never as a
                 // smooth smear. Segment count derives from the inner width.
@@ -200,7 +212,7 @@ fun ThresholdOverlay(
                             Size(3 * u, inner.height),
                         ),
                         step = u / 2f,
-                        color = FillWhite.copy(alpha = alpha),
+                        color = pal.fill.copy(alpha = alpha),
                     )
                 }
             }
@@ -223,13 +235,13 @@ fun ThresholdOverlay(
                         text       = stageLabel(strings, stage).lowercase(),
                         fontFamily = pixelFont,
                         fontSize   = 16.sp,
-                        color      = FrameWhite.copy(alpha = contentAlpha * readoutFade.value),
+                        color      = pal.frame.copy(alpha = contentAlpha * readoutFade.value),
                     )
                     Text(
                         text       = "${(bar * 100).toInt()}%",
                         fontFamily = pixelFont,
                         fontSize   = 16.sp,
-                        color      = FrameWhite.copy(alpha = contentAlpha * readoutFade.value),
+                        color      = pal.frame.copy(alpha = contentAlpha * readoutFade.value),
                     )
                 }
             }
@@ -243,7 +255,7 @@ fun ThresholdOverlay(
                     text       = strings.thresholdErrorTitle.lowercase(),
                     fontFamily = pixelFont,
                     fontSize   = 18.sp,
-                    color      = FrameWhite,
+                    color      = pal.frame,
                 )
                 Text(
                     text       = failed.error.let { e ->
@@ -251,16 +263,16 @@ fun ThresholdOverlay(
                     },
                     fontFamily = FontFamily.Monospace,
                     fontSize   = 11.sp,
-                    color      = Color(0xFF8C8C8C),
+                    color      = pal.dim,
                     modifier   = Modifier.padding(top = 10.dp, bottom = 20.dp),
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(UNIT * 2)) {
-                    ThresholdButton(strings.thresholdOpenLogs.lowercase(), pixelFont) {
+                    ThresholdButton(strings.thresholdOpenLogs.lowercase(), pixelFont, pal) {
                         thread(isDaemon = true) {
                             runCatching { Desktop.getDesktop().open(logsDir.toFile()) }
                         }
                     }
-                    ThresholdButton(strings.thresholdQuit.lowercase(), pixelFont, onClick = onQuit)
+                    ThresholdButton(strings.thresholdQuit.lowercase(), pixelFont, pal, onClick = onQuit)
                 }
             }
         }
@@ -268,11 +280,11 @@ fun ThresholdOverlay(
 }
 
 @Composable
-private fun ThresholdButton(label: String, font: FontFamily, onClick: () -> Unit) {
+private fun ThresholdButton(label: String, font: FontFamily, pal: ThresholdPalette, onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .drawBehind {
-                drawPixelFrame(Rect(Offset.Zero, size), (UNIT / 2).toPx(), FrameWhite.copy(alpha = 0.85f))
+                drawPixelFrame(Rect(Offset.Zero, size), (UNIT / 2).toPx(), pal.frame.copy(alpha = 0.85f))
             }
             .clickable(onClick = onClick)
             .padding(horizontal = UNIT * 3, vertical = UNIT * 2),
@@ -281,7 +293,7 @@ private fun ThresholdButton(label: String, font: FontFamily, onClick: () -> Unit
             text       = label,
             fontFamily = font,
             fontSize   = 12.sp,
-            color      = FrameWhite,
+            color      = pal.frame,
         )
     }
 }
