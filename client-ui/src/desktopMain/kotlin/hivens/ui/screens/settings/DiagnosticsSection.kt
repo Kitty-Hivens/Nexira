@@ -14,7 +14,9 @@ import androidx.compose.ui.unit.dp
 import hivens.config.Branding
 import hivens.launcher.diag.DiagnosticBundle
 import hivens.launcher.diag.IssueReporter
+import hivens.launcher.platform.AppRelauncher
 import hivens.launcher.platform.PlatformPaths
+import hivens.ui.bootstrap.RecoveryEntry
 import hivens.ui.easter.LocalAprilFools
 import hivens.ui.flexible.Flexible
 import hivens.ui.flexible.FlexibleKind
@@ -30,6 +32,7 @@ import hivens.ui.theme.NxTheme
 import java.awt.Toolkit
 import java.awt.datatransfer.StringSelection
 import java.nio.file.Path
+import kotlin.system.exitProcess
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -202,6 +205,18 @@ internal fun DiagnosticsSection(
                 modifier = Modifier.padding(start = 8.dp),
             )
         }
+
+        // Restart into the boot recovery surface -- disable a broken module or
+        // reset corrupted state when the shell starts but misbehaves.
+        Flexible("settings_restart_recovery_btn", FlexibleKind.Button) {
+            NxButton(
+                label    = s.recoveryRestartInApp,
+                onClick  = { restartIntoRecovery(paths.dataDir) },
+                modifier = Modifier.fillMaxWidth(),
+                style    = NxButtonStyle.Secondary,
+            )
+        }
+        PuppetClick("settings.restartRecovery") { restartIntoRecovery(paths.dataDir) }
     }
 
     Spacer(Modifier.height(16.dp))
@@ -213,4 +228,14 @@ internal fun DiagnosticsSection(
         subtitle = "v${Branding.VERSION.removePrefix("v")} — GPLv3",
         onClick  = onOpenAbout,
     )
+}
+
+/**
+ * Arm the recovery marker, relaunch, and exit so the fresh process boots into the
+ * recovery surface. On a dev / unsupported run relaunch returns false: the marker is
+ * still armed, so the next manual start enters recovery.
+ */
+private fun restartIntoRecovery(dataDir: Path) {
+    RecoveryEntry.requestOnNextBoot(dataDir)
+    if (AppRelauncher.relaunch()) exitProcess(0)
 }

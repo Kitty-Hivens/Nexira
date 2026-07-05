@@ -26,6 +26,12 @@ object RecoveryEntry {
         return fromEnv || fromArg || fromMarker
     }
 
+    /** Arm the next boot to enter recovery -- the in-app "restart into recovery" writes
+     *  this, then relaunches; [resolve] consumes it on the fresh process. */
+    fun requestOnNextBoot(dataDir: Path) {
+        runCatching { Files.writeString(dataDir.resolve(Storage.RECOVERY_REQUEST_FILE), "") }
+    }
+
     /** True if the marker existed; delete it so recovery fires once, not every boot. */
     private fun consumeMarker(dataDir: Path): Boolean = runCatching {
         val marker = dataDir.resolve(Storage.RECOVERY_REQUEST_FILE)

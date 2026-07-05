@@ -364,9 +364,14 @@ private fun runShellWithRecovery(
                 }
                 CompositionLocalProvider(LocalWindowExceptionHandlerFactory provides handler) {
                     if (reason != UiRecoverySignal.RecoveryReason.None) {
-                        // Crash-loop or a user request routes here; P3 replaces
-                        // this stand-in with the richer RecoveryWindow.
-                        SafeModeWindow(onQuit = { exitApplication() })
+                        // Crash-loop or a user request both route to the recovery
+                        // surface; it needs only the data dir, so it renders even
+                        // when boot itself is broken (or skipped).
+                        RecoveryWindow(
+                            dataDir = pre.core.initialPaths.dataDir,
+                            reason = reason,
+                            onExit = { exitApplication() },
+                        )
                     } else {
                         // Boot already done on a restart iteration: ShellHost
                         // sees Ready at first composition and skips the
