@@ -3,6 +3,7 @@ package hivens.ui.background
 import dev.hivens.skinema.encode.MediaWriter
 import dev.hivens.skinema.encode.VideoEncodeConfig
 import dev.hivens.skinema.libav.LibavException
+import hivens.ui.diag.SkinemaGate
 import dev.hivens.skinema.libav.VideoDecoder
 import kotlinx.coroutines.CoroutineScope
 import org.jetbrains.skia.Bitmap
@@ -78,9 +79,14 @@ class BackgroundOptimizer(
         return deferred.await()
     }
 
-    private fun probeSize(src: Path): Pair<Int, Int>? = runCatching {
-        VideoDecoder.open(src).use { it.videoSize() }
-    }.getOrNull()
+    private fun probeSize(src: Path): Pair<Int, Int>? {
+        // Skinema disabled -> report unknown size; optimize() then returns the
+        // source unchanged and never reaches the native transcode.
+        if (!SkinemaGate.enabled) return null
+        return runCatching {
+            VideoDecoder.open(src).use { it.videoSize() }
+        }.getOrNull()
+    }
 
     /** Decode -> box-downscale -> encode into [dst] (atomically via a .part file). */
     private fun transcode(src: Path, dst: Path, sw: Int, sh: Int, maxHeight: Int) {

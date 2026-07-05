@@ -32,6 +32,7 @@ import hivens.core.api.interfaces.IServerListService
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.api.model.ServerProfile
 import hivens.core.data.HomeView
+import hivens.core.data.ModuleId
 import hivens.core.data.PackAuthRequirement
 import hivens.core.data.PackOrigin
 import hivens.core.data.SessionData
@@ -44,6 +45,7 @@ import hivens.core.diag.ActionRing
 import hivens.launcher.bootstrap.AutoLoginCoordinator
 import hivens.launcher.network.NetworkState
 import hivens.launcher.bootstrap.LauncherBootstrap
+import hivens.ui.diag.SkinemaGate
 import hivens.ui.diag.UiRecoverySignal
 import hivens.auth.AccountStore
 import hivens.core.launch.LaunchState
@@ -251,6 +253,11 @@ fun FrameWindowScope.AppShellContent(
     val applicationScope: CoroutineScope        = koinInject()
 
     val settings = remember { settingsService.getSettings() }
+
+    // Skinema media (FFmpeg natives) can be disabled by boot recovery on an
+    // environment where it fails; latch the process gate before the background
+    // or any player composes.
+    remember { SkinemaGate.enabled = ModuleId.Skinema.id !in settings.disabledModules }
 
     // Window starts visible. Tray is the dock-style fallback for
     // close-while-game-running, not a launcher hide-by-default
@@ -474,28 +481,34 @@ fun FrameWindowScope.AppShellContent(
                 // window before [fetchDashboardData] returns sees the
                 // "(No servers)" placeholder and concludes the tray is
                 // broken. The live fetch below overwrites the seed.
+                // Both gated by boot recovery: a disabled tray leaves state
+                // NOT_STARTED (isSupported/canBeReady false) so close quits
+                // instead of hiding; a disabled notifier stays unsupported.
+                val trayEnabled   = ModuleId.Tray.id   !in settings.disabledModules
+                val notifyEnabled = ModuleId.Notify.id !in settings.disabledModules
+
                 val cachedServers = serverListCache.load()
-                if (cachedServers.isNotEmpty()) {
+                if (trayEnabled && cachedServers.isNotEmpty()) {
                     TrayManager.updateServers(cachedServers)
                 }
 
                 try {
                     val iconBytes = Res.readBytes("drawable/favicon.png")
-                    TrayManager.init(
+                    if (trayEnabled) TrayManager.init(
                         iconStream = iconBytes.inputStream(),
                         strings    = trayLabels,
                         appName    = Branding.TITLE
                     )
-                    SystemNotifier.init(appName = Branding.TITLE, appId = NEXIRA_APP_ID, iconBytes = iconBytes)
+                    if (notifyEnabled) SystemNotifier.init(appName = Branding.TITLE, appId = NEXIRA_APP_ID, iconBytes = iconBytes)
                 } catch (_: Exception) {
                     runCatching {
                         val iconBytes = Res.readBytes("drawable/icon.png")
-                        TrayManager.init(
+                        if (trayEnabled) TrayManager.init(
                             iconStream = iconBytes.inputStream(),
                             strings    = trayLabels,
                             appName    = Branding.TITLE
                         )
-                        SystemNotifier.init(appName = Branding.TITLE, appId = NEXIRA_APP_ID, iconBytes = iconBytes)
+                        if (notifyEnabled) SystemNotifier.init(appName = Branding.TITLE, appId = NEXIRA_APP_ID, iconBytes = iconBytes)
                     }
                 }
             }
