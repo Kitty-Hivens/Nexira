@@ -21,6 +21,7 @@ import java.nio.file.Path
 data class SettingsPeek(
     val locale: String = "en",
     val useCustomChrome: Boolean = true,
+    val isDarkTheme: Boolean = true,
 ) {
     companion object {
         fun read(dataDir: Path): SettingsPeek = runCatching {
@@ -30,6 +31,7 @@ data class SettingsPeek(
             SettingsPeek(
                 locale          = root["locale"]?.jsonPrimitive?.contentOrNull ?: "en",
                 useCustomChrome = root["useCustomChrome"]?.jsonPrimitive?.booleanOrNull ?: true,
+                isDarkTheme     = root["isDarkTheme"]?.jsonPrimitive?.booleanOrNull ?: true,
             )
         }.getOrDefault(SettingsPeek())
     }

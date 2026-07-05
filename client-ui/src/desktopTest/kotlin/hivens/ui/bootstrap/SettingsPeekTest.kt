@@ -8,14 +8,15 @@ import kotlin.test.assertEquals
 class SettingsPeekTest {
 
     @Test
-    fun `reads locale and chrome from a real-shaped settings file`() {
+    fun `reads locale, chrome and theme from a real-shaped settings file`() {
         val dir = Files.createTempDirectory("peek")
         dir.resolve("settings.json").writeText(
-            """{"locale":"ru","useCustomChrome":false,"isDarkTheme":true,"unrelated":{"nested":1}}"""
+            """{"locale":"ru","useCustomChrome":false,"isDarkTheme":false,"unrelated":{"nested":1}}"""
         )
         val peek = SettingsPeek.read(dir)
         assertEquals("ru", peek.locale)
         assertEquals(false, peek.useCustomChrome)
+        assertEquals(false, peek.isDarkTheme)
     }
 
     @Test
@@ -24,6 +25,7 @@ class SettingsPeekTest {
         val peek = SettingsPeek.read(dir)
         assertEquals("en", peek.locale)
         assertEquals(true, peek.useCustomChrome)
+        assertEquals(true, peek.isDarkTheme)
     }
 
     @Test

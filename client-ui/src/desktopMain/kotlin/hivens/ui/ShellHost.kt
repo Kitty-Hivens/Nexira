@@ -105,6 +105,7 @@ fun ApplicationScope.ShellHost(
                     outcome   = outcome,
                     strings   = thresholdStrings,
                     logsDir   = pre.core.initialPaths.logsDir,
+                    dark      = pre.peek.isDarkTheme,
                     onQuit    = { exitApplication() },
                     onDone    = { thresholdDone = true },
                 )
