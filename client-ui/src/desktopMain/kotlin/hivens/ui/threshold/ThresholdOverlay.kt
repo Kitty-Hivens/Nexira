@@ -1,7 +1,6 @@
 package hivens.ui.threshold
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -49,7 +48,6 @@ import org.jetbrains.compose.resources.Font
 import java.awt.Desktop
 import java.nio.file.Path
 import kotlin.concurrent.thread
-import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.min
 
@@ -129,23 +127,28 @@ fun ThresholdOverlay(
         }
     }
 
-    val flood     = remember { Animatable(0f) }
-    val whiteFade = remember { Animatable(1f) }
+    // Exit is a LUMINANCE transition, not a color one: the readout fades
+    // first, then the dark veil lifts off the already-live shell -- lights
+    // coming up, no white flash on a night-black screen.
+    val readoutFade = remember { Animatable(1f) }
+    val veil        = remember { Animatable(1f) }
     LaunchedEffect(ready) {
         if (!ready) return@LaunchedEffect
         if (!contentShown) {
             // Fast path: the readout never appeared. Give the shell two frames
-            // to land its first composition behind the black, then hand off.
+            // to land its first composition behind the black, then lift the
+            // veil quickly instead of popping it.
             withFrameNanos {}
             withFrameNanos {}
+            veil.animateTo(0f, tween(140, easing = LinearOutSlowInEasing))
             onDone()
             return@LaunchedEffect
         }
-        // Exit beat: full bar, one breath, then the fill becomes the transition.
+        // Exit beat: full bar, one breath, readout dims, darkness lifts.
         snapshotFlow { bar }.first { it >= 0.995f }
         delay(HOLD_MS)
-        flood.animateTo(1f, tween(300, easing = FastOutLinearInEasing))
-        whiteFade.animateTo(0f, tween(220, easing = LinearOutSlowInEasing))
+        readoutFade.animateTo(0f, tween(160))
+        veil.animateTo(0f, tween(420, easing = LinearOutSlowInEasing))
         onDone()
     }
 
@@ -156,16 +159,28 @@ fun ThresholdOverlay(
         val barTop    = maxHeight * BAR_CENTER_Y - barHeight / 2
 
         Canvas(Modifier.fillMaxSize()) {
-            val f = flood.value
             val u = UNIT.toPx()
             val frameRect = Rect(
                 Offset((size.width - barWidth.toPx()) / 2f, barTop.toPx()),
                 Size(barWidth.toPx(), barHeight.toPx()),
             )
 
-            if (f < 1f) {
-                drawRect(FieldBlack)
-                drawPixelFrame(frameRect, u, FrameWhite.copy(alpha = 0.92f * contentAlpha))
+            // The dark veil: fully opaque while boot runs (masking the shell's
+            // first composition), lifted by the exit beat. The lift is a
+            // Bayer-dither dissolve (the project's first shader) -- darkness
+            // leaves cell by cell on the pixel grid; if the effect failed to
+            // compile, a plain alpha ramp does the same job less prettily.
+            val lift = 1f - veil.value
+            val ditherBrush = if (lift > 0f) DitherVeil.brush(lift, u) else null
+            when {
+                lift <= 0f         -> drawRect(FieldBlack)
+                ditherBrush != null -> drawRect(brush = ditherBrush)
+                else                -> drawRect(FieldBlack.copy(alpha = veil.value))
+            }
+
+            val readout = contentAlpha * readoutFade.value
+            if (readout > 0f) {
+                drawPixelFrame(frameRect, u, FrameWhite.copy(alpha = 0.92f * readout))
                 // Fill: discrete segments on the pixel grid, each 3 units wide
                 // with a unit gap -- the bar loads chunk by chunk, never as a
                 // smooth smear. Segment count derives from the inner width.
@@ -177,7 +192,7 @@ fun ThresholdOverlay(
                 val segCount = floor((inner.width + u) / segStride).toInt().coerceAtLeast(1)
                 val fillFraction = if (failed != null) 0f else bar
                 val lit = floor(fillFraction * segCount).toInt().coerceIn(0, segCount)
-                val alpha = if (failed != null) 0.25f else contentAlpha
+                val alpha = if (failed != null) 0.25f * readout else readout
                 for (i in 0 until lit) {
                     drawPixelSegment(
                         Rect(
@@ -188,18 +203,6 @@ fun ThresholdOverlay(
                         color = FillWhite.copy(alpha = alpha),
                     )
                 }
-            }
-            if (f > 0f) {
-                // The bar's light is the transition: its rect grows to the full
-                // canvas ON THE PIXEL GRID (chunky expansion), covers, then
-                // fades to reveal the shell beneath.
-                val full = Rect(Offset.Zero, size)
-                val r = lerpRect(frameRect, full, f).snapToGrid(u)
-                drawRect(
-                    color   = FillWhite.copy(alpha = whiteFade.value),
-                    topLeft = r.topLeft,
-                    size    = r.size,
-                )
             }
         }
 
@@ -220,13 +223,13 @@ fun ThresholdOverlay(
                         text       = stageLabel(strings, stage).lowercase(),
                         fontFamily = pixelFont,
                         fontSize   = 16.sp,
-                        color      = FrameWhite.copy(alpha = contentAlpha),
+                        color      = FrameWhite.copy(alpha = contentAlpha * readoutFade.value),
                     )
                     Text(
                         text       = "${(bar * 100).toInt()}%",
                         fontFamily = pixelFont,
                         fontSize   = 16.sp,
-                        color      = FrameWhite.copy(alpha = contentAlpha),
+                        color      = FrameWhite.copy(alpha = contentAlpha * readoutFade.value),
                     )
                 }
             }
@@ -304,20 +307,6 @@ private fun DrawScope.drawPixelSegment(r: Rect, step: Float, color: Color) {
     drawRect(color, Offset(r.left, r.top + step), Size(step, (r.height - 2 * step).coerceAtLeast(0f)))
     drawRect(color, Offset(r.right - step, r.top + step), Size(step, (r.height - 2 * step).coerceAtLeast(0f)))
 }
-
-private fun Rect.snapToGrid(u: Float): Rect = Rect(
-    left   = floor(left / u) * u,
-    top    = floor(top / u) * u,
-    right  = ceil(right / u) * u,
-    bottom = ceil(bottom / u) * u,
-)
-
-private fun lerpRect(a: Rect, b: Rect, t: Float): Rect = Rect(
-    left   = a.left   + (b.left   - a.left)   * t,
-    top    = a.top    + (b.top    - a.top)    * t,
-    right  = a.right  + (b.right  - a.right)  * t,
-    bottom = a.bottom + (b.bottom - a.bottom) * t,
-)
 
 private fun stageLabel(s: AppStrings, stage: BootStage): String = when (stage) {
     BootStage.Files     -> s.thresholdStageFiles
