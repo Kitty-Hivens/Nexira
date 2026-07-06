@@ -26,7 +26,12 @@ class RecoveryEntryTest {
 
     @Test
     fun `no signal means no recovery`() {
-        assertFalse(RecoveryEntry.resolve(dataDir, emptyArray()))
+        assertFalse(RecoveryEntry.resolve(dataDir, emptyArray(), holdKey = { false }))
+    }
+
+    @Test
+    fun `the hold-key gesture enters recovery`() {
+        assertTrue(RecoveryEntry.resolve(dataDir, emptyArray(), holdKey = { true }))
     }
 
     @Test
@@ -40,8 +45,8 @@ class RecoveryEntryTest {
         val marker = dataDir / Storage.RECOVERY_REQUEST_FILE
         Files.writeString(marker, "")
 
-        assertTrue(RecoveryEntry.resolve(dataDir, emptyArray()), "marker present -> recovery")
+        assertTrue(RecoveryEntry.resolve(dataDir, emptyArray(), holdKey = { false }), "marker present -> recovery")
         assertFalse(Files.exists(marker), "marker must be deleted after it fires")
-        assertFalse(RecoveryEntry.resolve(dataDir, emptyArray()), "one-shot: no recovery on the next boot")
+        assertFalse(RecoveryEntry.resolve(dataDir, emptyArray(), holdKey = { false }), "one-shot: no recovery on the next boot")
     }
 }
