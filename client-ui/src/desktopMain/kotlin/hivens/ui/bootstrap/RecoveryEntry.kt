@@ -19,11 +19,15 @@ object RecoveryEntry {
 
     private val TRUTHY = setOf("1", "true", "yes", "on")
 
-    fun resolve(dataDir: Path, args: Array<String>): Boolean {
+    fun resolve(dataDir: Path, args: Array<String>, holdKey: () -> Boolean = HoldKeyProbe::shiftHeld): Boolean {
         val fromEnv = System.getenv("NEXIRA_RECOVERY")?.trim()?.lowercase() in TRUTHY
         val fromArg = args.any { it == "--recovery" }
+        // Always consume the marker (clears a stale one) before short-circuiting.
         val fromMarker = consumeMarker(dataDir)
-        return fromEnv || fromArg || fromMarker
+        if (fromEnv || fromArg || fromMarker) return true
+        // Last, and the only one worth skipping when another signal already fired:
+        // the hold-Shift-at-launch gesture opens a short-lived X connection.
+        return holdKey()
     }
 
     /** Arm the next boot to enter recovery -- the in-app "restart into recovery" writes
