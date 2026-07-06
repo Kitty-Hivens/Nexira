@@ -280,7 +280,7 @@ fun FrameWindowScope.AppShellContent(
     // Whether the OS scheme is readable at all (no portal backend on Linux -> no).
     // Probed once; drives the System chip's enabled state in the theme island.
     var systemThemeAvailable by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { systemThemeAvailable = SystemTheme.probe() != null }
+    LaunchedEffect(Unit) { systemThemeAvailable = withContext(Dispatchers.IO) { SystemTheme.probe() } != null }
     var wallpaperLuminance by remember { mutableStateOf<Float?>(null) }
     LaunchedEffect(themeMode, wallpaperLuminance) {
         val luma = wallpaperLuminance
