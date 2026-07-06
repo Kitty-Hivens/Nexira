@@ -27,6 +27,7 @@ import dev.hivens.libvault.SecretVault
 import dev.hivens.libvault.Vault
 import dev.hivens.libvault.VaultConfig
 import dev.hivens.libvault.VaultTier
+import hivens.auth.LazySecretVault
 import hivens.launcher.*
 import hivens.launcher.component.ClasspathProvider
 import hivens.launcher.component.EnvironmentPreparer
@@ -381,18 +382,24 @@ val authModule = module {
     // locked keyring the vault degrades to the file tier rather than prompting
     // (see CredentialsManager KDoc).
     single<SecretVault> {
-        val ns = "io.github.kitty_hivens.Nexira"
-        val file = get<Path>().resolve("credentials.vault")
-        // Keyring disabled by boot recovery -> skip the OsKeyring tier (the DBus /
-        // Secret Service probe that can hang on a hostile session) and fall to the
-        // encrypted file, so saved credentials keep working without the keyring.
-        val keyringOff = ModuleId.Keyring.id in get<ISettingsService>().getSettings().disabledModules
-        val config = if (keyringOff) {
-            VaultConfig(namespace = ns, softwareFilePath = file, preferredTiers = listOf(VaultTier.SoftwareFile, VaultTier.Memory))
-        } else {
-            VaultConfig(namespace = ns, softwareFilePath = file)
+        // Open lazily, off the Compose first-composition thread: the OsKeyring open
+        // is a ~1.4s D-Bus probe, and resolving the account store eagerly in the
+        // shell would put it on the UI thread and delay the boot-threshold reveal.
+        // Every real consumer runs on Dispatchers.IO, so the open lands there.
+        LazySecretVault {
+            val ns = "io.github.kitty_hivens.Nexira"
+            val file = get<Path>().resolve("credentials.vault")
+            // Keyring disabled by boot recovery -> skip the OsKeyring tier (the DBus /
+            // Secret Service probe that can hang on a hostile session) and fall to the
+            // encrypted file, so saved credentials keep working without the keyring.
+            val keyringOff = ModuleId.Keyring.id in get<ISettingsService>().getSettings().disabledModules
+            val config = if (keyringOff) {
+                VaultConfig(namespace = ns, softwareFilePath = file, preferredTiers = listOf(VaultTier.SoftwareFile, VaultTier.Memory))
+            } else {
+                VaultConfig(namespace = ns, softwareFilePath = file)
+            }
+            Vault.open(config)
         }
-        Vault.open(config)
     }
     // Legacy keyring + AES reader, kept one release for the migration shim. Lazy
     // single: built -- and the old keyring probed -- only when CredentialsManager
