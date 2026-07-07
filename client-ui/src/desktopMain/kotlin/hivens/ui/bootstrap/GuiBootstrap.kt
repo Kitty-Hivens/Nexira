@@ -47,7 +47,11 @@ object GuiBootstrap {
     fun preWindow(): PreBoot {
         val core = LauncherBootstrap.preWindow(singleInstance = true)
 
-        System.setProperty("skiko.fps.limit", "60")
+        // Present on the display's vsync. This is Skiko's default; stated
+        // explicitly so the pacing intent is visible and survives a default
+        // change. (The `skiko.fps.limit` property set here before was a no-op
+        // -- not a property Skiko reads -- so nothing was ever capped to 60.)
+        System.setProperty("skiko.vsync.enabled", "true")
 
         // X11 WM_CLASS override. See XToolkitOverride doc for the
         // cross-vendor reflection rationale; the JVM must have been
