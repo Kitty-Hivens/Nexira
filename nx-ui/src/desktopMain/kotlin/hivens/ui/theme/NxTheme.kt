@@ -1,8 +1,5 @@
 package hivens.ui.theme
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.TweenSpec
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
@@ -221,89 +218,43 @@ fun NxTheme(
         c
     }
 
-    // Color change animation duration scales with style.animationMultiplier.
-    // Brut (multiplier 0) collapses to ~1ms so palette swaps land instantly;
-    // Celestia keeps the original 500ms cross-fade.
-    val animDurationMs = style.animationDurationMs(500)
-    val colorAnimSpec = remember(animDurationMs) { TweenSpec<Color>(durationMillis = animDurationMs) }
-
-    val animatedPrimary by animateColorAsState(targetColors.primary, colorAnimSpec)
-    val animatedSecondary by animateColorAsState(targetColors.secondary, colorAnimSpec)
-    val animatedBackground by animateColorAsState(targetColors.background, colorAnimSpec)
-    val animatedSurface by animateColorAsState(targetColors.surface, colorAnimSpec)
-    val animatedSurfaceVariant by animateColorAsState(targetColors.surfaceVariant, colorAnimSpec)
-    val animatedError by animateColorAsState(targetColors.error, colorAnimSpec)
-    val animatedSuccess by animateColorAsState(targetColors.success, colorAnimSpec)
-    val animatedTextPrimary by animateColorAsState(targetColors.textPrimary, colorAnimSpec)
-    val animatedTextSecondary by animateColorAsState(targetColors.textSecondary, colorAnimSpec)
-    val animatedOutline by animateColorAsState(targetColors.outline, colorAnimSpec)
-    val animatedGlassBg by animateColorAsState(targetColors.glassBackground, colorAnimSpec)
-    val animatedGlassAlpha by animateFloatAsState(targetColors.glassAlpha, TweenSpec(animDurationMs))
-    val animatedProgressAccent by animateColorAsState(targetColors.progressAccent, colorAnimSpec)
-    val animatedWarnAccent by animateColorAsState(targetColors.warnAccent, colorAnimSpec)
-    val animatedCriticalAccent by animateColorAsState(targetColors.criticalAccent, colorAnimSpec)
-    val animatedTertiary by animateColorAsState(targetColors.tertiary, colorAnimSpec)
-    val animatedPrimaryContainer by animateColorAsState(targetColors.primaryContainer, colorAnimSpec)
-    val animatedSecondaryContainer by animateColorAsState(targetColors.secondaryContainer, colorAnimSpec)
-    val animatedTertiaryContainer by animateColorAsState(targetColors.tertiaryContainer, colorAnimSpec)
-    val animatedSurfaceContainerLow by animateColorAsState(targetColors.surfaceContainerLow, colorAnimSpec)
-    val animatedSurfaceContainer by animateColorAsState(targetColors.surfaceContainer, colorAnimSpec)
-    val animatedSurfaceContainerHigh by animateColorAsState(targetColors.surfaceContainerHigh, colorAnimSpec)
-
-    // Assembling an animated palette
-    val animatedPalette = targetColors.copy(
-        primary = animatedPrimary,
-        secondary = animatedSecondary,
-        background = animatedBackground,
-        surface = animatedSurface,
-        surfaceVariant = animatedSurfaceVariant,
-        error = animatedError,
-        success = animatedSuccess,
-        textPrimary = animatedTextPrimary,
-        textSecondary = animatedTextSecondary,
-        outline = animatedOutline,
-        glassBackground = animatedGlassBg,
-        glassAlpha = animatedGlassAlpha,
-        progressAccent = animatedProgressAccent,
-        warnAccent = animatedWarnAccent,
-        criticalAccent = animatedCriticalAccent,
-        tertiary = animatedTertiary,
-        primaryContainer = animatedPrimaryContainer,
-        secondaryContainer = animatedSecondaryContainer,
-        tertiaryContainer = animatedTertiaryContainer,
-        surfaceContainerLow = animatedSurfaceContainerLow,
-        surfaceContainer = animatedSurfaceContainer,
-        surfaceContainerHigh = animatedSurfaceContainerHigh,
-    )
+    // Palette swaps in ONE recomposition -- deliberately not animated per token.
+    // Feeding per-frame animateColorAsState values into LocalNxColors (a
+    // staticCompositionLocalOf) re-invalidated every reader of it ~30 times per
+    // switch, recomposing + redrawing the whole tree on the single UI thread --
+    // that was the freeze on toggle. The light<->dark transition is carried by
+    // the circular reveal instead (theme/ThemeReveal.kt); Brut had no color
+    // animation to begin with.
+    val activePalette = targetColors
 
     // M3 ColorScheme
     val colorScheme = if (useDarkTheme) {
         darkColorScheme(
-            primary = animatedPalette.primary,
-            secondary = animatedPalette.secondary,
-            background = animatedPalette.background,
-            surface = animatedPalette.surface,
-            surfaceVariant = animatedPalette.surfaceVariant,
-            error = animatedPalette.error,
-            onPrimary = animatedPalette.onPrimary,
-            onSecondary = animatedPalette.onSecondary,
-            onBackground = animatedPalette.onBackground,
-            onSurface = animatedPalette.onSurface,
-            outline = animatedPalette.outline
+            primary = activePalette.primary,
+            secondary = activePalette.secondary,
+            background = activePalette.background,
+            surface = activePalette.surface,
+            surfaceVariant = activePalette.surfaceVariant,
+            error = activePalette.error,
+            onPrimary = activePalette.onPrimary,
+            onSecondary = activePalette.onSecondary,
+            onBackground = activePalette.onBackground,
+            onSurface = activePalette.onSurface,
+            outline = activePalette.outline
         )
     } else {
         lightColorScheme(
-            primary = animatedPalette.primary,
-            secondary = animatedPalette.secondary,
-            background = animatedPalette.background,
-            surface = animatedPalette.surface,
-            surfaceVariant = animatedPalette.surfaceVariant,
-            error = animatedPalette.error,
-            onPrimary = animatedPalette.onPrimary,
-            onSecondary = animatedPalette.onSecondary,
-            onBackground = animatedPalette.onBackground,
-            onSurface = animatedPalette.onSurface,
-            outline = animatedPalette.outline
+            primary = activePalette.primary,
+            secondary = activePalette.secondary,
+            background = activePalette.background,
+            surface = activePalette.surface,
+            surfaceVariant = activePalette.surfaceVariant,
+            error = activePalette.error,
+            onPrimary = activePalette.onPrimary,
+            onSecondary = activePalette.onSecondary,
+            onBackground = activePalette.onBackground,
+            onSurface = activePalette.onSurface,
+            outline = activePalette.outline
         )
     }
 
@@ -311,7 +262,7 @@ fun NxTheme(
     // read StyleSpec tokens without a separate CompositionLocalProvider
     // chain at every entry point.
     CompositionLocalProvider(
-        LocalNxColors provides animatedPalette,
+        LocalNxColors provides activePalette,
         LocalStyle          provides style,
         LocalMonoFamily     provides nexiraMonoFamily(),
     ) {
@@ -328,7 +279,7 @@ fun NxTheme(
             // near-invisible on dark; M3 components still override it inside.
             CompositionLocalProvider(
                 LocalIndication provides ThemeStateLayer,
-                LocalContentColor provides animatedPalette.textPrimary,
+                LocalContentColor provides activePalette.textPrimary,
             ) {
                 content()
             }
