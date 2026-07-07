@@ -29,8 +29,9 @@ import java.awt.Cursor
 /**
  * Edge/corner resize grips for the undecorated window -- undecorated drops the
  * native resize border, so we synthesize 8 thin hit-zones that mutate
- * [WindowState.size] / [WindowState.position]. Clamped to [minSize]; only shown
- * while Floating (a maximized window is not resizable).
+ * [WindowState.size] / [WindowState.position]. Clamped to [minSize]; stand down
+ * when [maximized] (a maximized window is not resizable -- our manual maximize
+ * keeps placement=Floating, so this flag, not placement, is the real gate).
  *
  * Best-effort under Wayland/XWayland: AWT setBounds is honored but the compositor
  * owns the surface, so a fast drag can lag. Overlay this LAST so the grips sit
@@ -40,6 +41,7 @@ import java.awt.Cursor
 fun WindowResizeHandles(
     state: WindowState,
     minSize: DpSize,
+    maximized: Boolean,
     modifier: Modifier = Modifier,
     thickness: Dp = 6.dp,
 ) {
@@ -47,6 +49,7 @@ fun WindowResizeHandles(
     // without ever setting placement=Maximized) -- client-side grips would let
     // the user drag-resize a tiled/fullscreen window. Leave resizing to the WM.
     if (IS_TILING_WM) return
+    if (maximized) return
     if (state.placement != WindowPlacement.Floating) return
     val density = LocalDensity.current
     Box(modifier.fillMaxSize()) {

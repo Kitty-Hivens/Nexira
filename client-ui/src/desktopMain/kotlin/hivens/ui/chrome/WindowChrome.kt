@@ -75,9 +75,15 @@ val IS_TILING_WM: Boolean = run {
  * Drags the OS window when the user drags this region (the bar's empty space).
  * Replaces FrameWindowScope.WindowDraggableArea, which a deep widget can't reach:
  * moves the AWT window by the pointer delta (works under X11 / XWayland).
- * Double-click toggles maximize via [onDoubleClick]. No-op when [window] is null.
+ * Double-click toggles maximize via [onDoubleClick]. Dragging a maximized window
+ * un-maximizes it under the cursor via [maximizer] (OS behavior). No-op when
+ * [window] is null.
  */
-fun Modifier.windowDragArea(window: ComposeWindow?, onDoubleClick: (() -> Unit)? = null): Modifier {
+fun Modifier.windowDragArea(
+    window: ComposeWindow?,
+    maximizer: WindowMaximizer? = null,
+    onDoubleClick: (() -> Unit)? = null,
+): Modifier {
     // On a tiling WM the compositor owns window position (and maximize) -- a
     // client-side AWT move fights it. Leave moving to the WM there, same as the
     // resize grips. Drag-to-move only makes sense for OS-floating windows.
@@ -86,7 +92,7 @@ fun Modifier.windowDragArea(window: ComposeWindow?, onDoubleClick: (() -> Unit)?
         .pointerInput(window, onDoubleClick) {
             detectTapGestures(onDoubleTap = { onDoubleClick?.invoke() })
         }
-        .pointerInput(window) {
+        .pointerInput(window, maximizer) {
             // Anchor the move against the ABSOLUTE screen cursor, not the Compose-local drag
             // delta. Feeding the local delta back into setLocation oscillates: moving the
             // window shifts the very coordinate frame the next delta is measured in, so each
@@ -96,11 +102,23 @@ fun Modifier.windowDragArea(window: ComposeWindow?, onDoubleClick: (() -> Unit)?
             awaitPointerEventScope {
                 while (true) {
                     val down = awaitFirstDown()
-                    val startWindow = window.location
-                    val startMouse = MouseInfo.getPointerInfo()?.location ?: continue
+                    var startMouse = MouseInfo.getPointerInfo()?.location ?: continue
+                    var startWindow = window.location
+                    // Un-maximize on the FIRST drag movement, not on the press: a plain click
+                    // or a double-click on the maximized bar must be left to those gestures
+                    // (a press-time restore would eat the click and break double-click-to-
+                    // restore). On that first move, re-anchor to the restored frame so the
+                    // move continues smoothly from under the cursor.
+                    var restored = false
                     drag(down.id) { change ->
                         change.consume()
                         val now = MouseInfo.getPointerInfo()?.location ?: return@drag
+                        if (!restored && maximizer?.maximized == true) {
+                            maximizer.unmaximizeUnderCursor(now.x, now.y)
+                            startWindow = window.location
+                            startMouse = now
+                        }
+                        restored = true
                         window.setLocation(
                             startWindow.x + (now.x - startMouse.x),
                             startWindow.y + (now.y - startMouse.y),

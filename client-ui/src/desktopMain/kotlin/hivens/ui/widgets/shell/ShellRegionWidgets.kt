@@ -39,7 +39,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.WindowPlacement
 import hivens.core.data.SessionData
 import hivens.ui.AppSidebar
 import hivens.ui.AppState
@@ -49,6 +48,7 @@ import hivens.ui.chrome.HOST_IS_MAC
 import hivens.ui.chrome.LocalChromeClose
 import hivens.ui.chrome.LocalComposeWindow
 import hivens.ui.chrome.LocalUseCustomChrome
+import hivens.ui.chrome.LocalWindowMaximizer
 import hivens.ui.chrome.LocalWindowState
 import hivens.ui.chrome.WindowControls
 import hivens.ui.chrome.WindowControlsMode
@@ -399,22 +399,18 @@ fun ShellTopRegion(instance: WidgetInstance) {
     val props = instance.rememberProps<ShellTopRegionProps>()
     val windowState = LocalWindowState.current
     val composeWindow = LocalComposeWindow.current
+    val maximizer = LocalWindowMaximizer.current
     val onClose = LocalChromeClose.current
     // With OS decorations (useCustomChrome off) the window already has caption
     // buttons + drag + resize, so the bar's chrome stands down; the breadcrumb
     // still renders (it is content, not window chrome).
     val useCustomChrome = LocalUseCustomChrome.current
-    val showControls = useCustomChrome && props.controls.resolved() && windowState != null
+    val showControls = useCustomChrome && props.controls.resolved() && windowState != null && maximizer != null
     // In edit mode the center is a widget drop-lane, not a window-drag zone --
     // otherwise dragging there moves the window instead of rearranging widgets.
     val editing = LocalEditMode.current is EditModeState.On
 
-    val maximizeToggle: () -> Unit = {
-        windowState?.let {
-            it.placement = if (it.placement == WindowPlacement.Maximized) WindowPlacement.Floating
-            else WindowPlacement.Maximized
-        }
-    }
+    val maximizeToggle: () -> Unit = { maximizer?.toggle() }
     val corner = LocalStyle.current.cardCorner
     // Hug = flush to the window's top edge, only the bottom corners curve into the
     // body so it reads as part of the chrome; Float = a detached, inset, all-round
@@ -428,14 +424,14 @@ fun ShellTopRegion(instance: WidgetInstance) {
 
     @Composable
     fun Caption() {
-        if (showControls) WindowControls(windowState, onClose)
+        if (showControls) WindowControls(windowState, maximizer, onClose)
     }
 
     @Composable
     fun RowScope.DragLane() {
         Box(
             Modifier.weight(1f).fillMaxHeight()
-                .then(if (editing || !useCustomChrome) Modifier else Modifier.windowDragArea(composeWindow, maximizeToggle)),
+                .then(if (editing || !useCustomChrome) Modifier else Modifier.windowDragArea(composeWindow, maximizer, maximizeToggle)),
             contentAlignment = Alignment.Center,
         ) {
             SlotRenderer(SurfaceId(TOPBAR_SURFACE), SlotId("center"), spacing = 4.dp)

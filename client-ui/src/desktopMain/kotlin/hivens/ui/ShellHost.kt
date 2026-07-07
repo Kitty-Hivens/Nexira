@@ -10,13 +10,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.KeyEvent
+import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.ApplicationScope
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPlacement
+import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberWindowState
 import hivens.config.Branding
 import hivens.ui.bootstrap.GuiBootstrap
 import hivens.ui.chrome.IS_TILING_WM
+import hivens.ui.chrome.screenWorkArea
 import hivens.ui.generated.resources.Res
 import hivens.ui.generated.resources.icon
 import hivens.ui.i18n.AppLocale
@@ -24,6 +28,7 @@ import hivens.ui.i18n.stringsFor
 import hivens.ui.threshold.BootOutcome
 import hivens.ui.threshold.BootStage
 import hivens.ui.threshold.ThresholdOverlay
+import java.awt.GraphicsEnvironment
 import kotlinx.coroutines.flow.StateFlow
 import org.jetbrains.compose.resources.painterResource
 
@@ -58,11 +63,30 @@ fun ApplicationScope.ShellHost(
 ) {
     val outcome by outcomeFlow.collectAsState()
 
-    // Same placement policy AppShell used: on a tiling WM the compositor owns
-    // geometry/fullscreen; forcing MAXIMIZED_BOTH there fights it. Floating
-    // elsewhere is unchanged: open maximized on Win/floating-DE.
+    // Placement policy by chrome:
+    //  - tiling WM: the compositor owns geometry/fullscreen; Floating + platform
+    //    default lets it place us (forcing MAXIMIZED_BOTH fights it).
+    //  - undecorated custom chrome (Win / mac / floating-DE): open "maximized" as
+    //    Floating sized to the work area, so we never hit AWT's broken undecorated
+    //    MAXIMIZED_BOTH (racy glyph, taskbar overlap, wrong monitor -- see
+    //    WindowMaximizer). Compose applies size/position while still !visible, so
+    //    there is no remap/flash behind the boot overlay.
+    //  - decorated non-tiling (custom chrome off): the OS frame's native maximize
+    //    is correct, so keep MAXIMIZED_BOTH.
+    val undecorated = pre.peek.useCustomChrome && !IS_TILING_WM
+    val openArea = remember(undecorated) {
+        if (undecorated) screenWorkArea(
+            GraphicsEnvironment.getLocalGraphicsEnvironment().defaultScreenDevice.defaultConfiguration,
+        ) else null
+    }
     val windowState = rememberWindowState(
-        placement = if (IS_TILING_WM) WindowPlacement.Floating else WindowPlacement.Maximized,
+        placement = if (undecorated || IS_TILING_WM) WindowPlacement.Floating else WindowPlacement.Maximized,
+        position  = if (openArea != null) WindowPosition.Absolute(openArea.x.dp, openArea.y.dp)
+                    else WindowPosition.PlatformDefault,
+        // Restore/default floating size for the non-undecorated cases (ignored under
+        // MAXIMIZED_BOTH, overridden by a tiling WM); the library default otherwise.
+        size      = if (openArea != null) DpSize(openArea.width.dp, openArea.height.dp)
+                    else DpSize(800.dp, 600.dp),
     )
     val visibleState = remember { mutableStateOf(true) }
     val chrome = remember { WindowChromeHooks(defaultClose = { exitApplication() }) }
@@ -84,7 +108,7 @@ fun ApplicationScope.ShellHost(
         // fullscreen state (_NET_WM_STATE_FULLSCREEN), so super+F breaks.
         // Peeked pre-Koin because flipping undecorated later recreates the
         // AWT peer -- a visible flash.
-        undecorated    = pre.peek.useCustomChrome && !IS_TILING_WM,
+        undecorated    = undecorated,
         resizable      = true,
         icon           = windowIcon,
         onPreviewKeyEvent = { chrome.onPreviewKey(it) },
@@ -92,11 +116,12 @@ fun ApplicationScope.ShellHost(
         Box(Modifier.fillMaxSize()) {
             (outcome as? BootOutcome.Ready)?.let { ready ->
                 AppShellContent(
-                    boot         = ready.result,
-                    windowState  = windowState,
-                    visibleState = visibleState,
-                    chrome       = chrome,
-                    exitApp      = { exitApplication() },
+                    boot            = ready.result,
+                    windowState     = windowState,
+                    visibleState    = visibleState,
+                    chrome          = chrome,
+                    openedMaximized = undecorated,
+                    exitApp         = { exitApplication() },
                 )
             }
             if (!thresholdDone) {
