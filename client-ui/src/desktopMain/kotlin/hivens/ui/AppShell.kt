@@ -62,7 +62,9 @@ import hivens.ui.surface.LocalBackdropPainter
 import hivens.ui.chrome.LocalChromeClose
 import hivens.ui.chrome.LocalComposeWindow
 import hivens.ui.chrome.LocalUseCustomChrome
+import hivens.ui.chrome.LocalWindowMaximizer
 import hivens.ui.chrome.LocalWindowState
+import hivens.ui.chrome.WindowMaximizer
 import hivens.ui.chrome.WindowResizeHandles
 import hivens.ui.components.DestructiveConfirmDialog
 import hivens.ui.components.UpdateManager
@@ -215,6 +217,7 @@ fun FrameWindowScope.AppShellContent(
     windowState: WindowState,
     visibleState: MutableState<Boolean>,
     chrome: WindowChromeHooks,
+    openedMaximized: Boolean,
     exitApp: () -> Unit,
 ) {
     // Tray teardown is composition-scoped: the tray is re-init'd per
@@ -253,6 +256,12 @@ fun FrameWindowScope.AppShellContent(
     val applicationScope: CoroutineScope        = koinInject()
 
     val settings = remember { settingsService.getSettings() }
+
+    // Deterministic maximize/restore for the undecorated window -- AWT's undecorated
+    // MAXIMIZED_BOTH is broken on Windows (racy glyph, taskbar overlap, wrong
+    // monitor), so this owns the frame geometry itself. Seeded with the placement
+    // ShellHost opened the window at.
+    val maximizer = remember { WindowMaximizer(openedMaximized).also { it.attach(window) } }
 
     // Skinema media (FFmpeg natives) can be disabled by boot recovery on an
     // environment where it fails; latch the process gate before the background
@@ -864,6 +873,7 @@ fun FrameWindowScope.AppShellContent(
                 LocalWidgetStateHost                     provides widgetStateStore,
                 LocalWidgetChromeRenderer                provides chromeRenderer,
                 LocalWindowState                         provides windowState,
+                LocalWindowMaximizer                     provides maximizer,
                 LocalComposeWindow                       provides window,
                 LocalChromeClose                         provides onCloseChrome,
                 LocalUseCustomChrome                     provides settings.useCustomChrome,
@@ -995,8 +1005,9 @@ fun FrameWindowScope.AppShellContent(
             // Floating + non-tiling and is transparent, so it's otherwise harmless.
             if (settings.useCustomChrome) {
                 WindowResizeHandles(
-                    state   = windowState,
-                    minSize = DpSize(MIN_WINDOW_WIDTH_DP.dp, MIN_WINDOW_HEIGHT_DP.dp),
+                    state     = windowState,
+                    minSize   = DpSize(MIN_WINDOW_WIDTH_DP.dp, MIN_WINDOW_HEIGHT_DP.dp),
+                    maximized = maximizer.maximized,
                 )
             }
             } // end Box(window resize overlay)

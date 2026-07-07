@@ -20,7 +20,6 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.WindowState
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.NxTheme
@@ -34,12 +33,15 @@ val HOST_IS_MAC: Boolean = System.getProperty("os.name").orEmpty().lowercase().c
  * font-subset entry. Close routes through [onClose] -- pass the SAME lambda the
  * window's onCloseRequest uses so tray-hide / chaos-dialog behavior is preserved.
  *
- * Placement (which end of the bar) is the caller's job; on macOS use [HOST_IS_MAC]
- * to put these on the left.
+ * Maximize/restore is driven by [maximizer], not [WindowState.placement]: the
+ * undecorated frame's AWT placement round-trip is unreliable on Windows, so the
+ * glyph reads our own state (see [WindowMaximizer]). Placement (which end of the
+ * bar) is the caller's job; on macOS use [HOST_IS_MAC] to put these on the left.
  */
 @Composable
 fun WindowControls(
     state: WindowState,
+    maximizer: WindowMaximizer,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -47,7 +49,7 @@ fun WindowControls(
     val tint = NxTheme.colors.textSecondary
     val hover = NxTheme.colors.textPrimary.copy(alpha = 0.12f)
     val closeHover = NxTheme.colors.error
-    val maximized = state.placement == WindowPlacement.Maximized
+    val maximized = maximizer.maximized
 
     Row(modifier) {
         CaptionButton(
@@ -70,7 +72,7 @@ fun WindowControls(
             label = if (maximized) s.windowRestore else s.windowMaximize,
             tint = tint,
             hoverBg = hover,
-            onClick = { state.placement = if (maximized) WindowPlacement.Floating else WindowPlacement.Maximized },
+            onClick = { maximizer.toggle() },
             glyph = { c ->
                 if (maximized) {
                     val o = size.minDimension * 0.24f
