@@ -61,7 +61,29 @@ fun rasterize(
     alphaCutoff: Int = 8,
 ): IntArray {
     val color = IntArray(outW * outH)
-    val depth = FloatArray(outW * outH) { Float.NEGATIVE_INFINITY }
+    val depth = FloatArray(outW * outH)
+    rasterizeInto(batches, outW, outH, color, depth, alphaCutoff)
+    return color
+}
+
+/**
+ * Reused-buffer form of [rasterize]: rasterizes into caller-owned [color] and
+ * [depth] (each at least outW*outH long) instead of allocating them. Both are
+ * cleared first -- color to 0 (transparent), depth to -inf -- so an animating
+ * view can hand back the same two arrays every frame and allocate nothing on
+ * the hot path. The [color] contents are identical to what [rasterize] returns.
+ */
+fun rasterizeInto(
+    batches: List<TriBatch>,
+    outW: Int,
+    outH: Int,
+    color: IntArray,
+    depth: FloatArray,
+    alphaCutoff: Int = 8,
+) {
+    val n = outW * outH
+    color.fill(0, 0, n)
+    depth.fill(Float.NEGATIVE_INFINITY, 0, n)
     for (b in batches) {
         for (t in b.tris) {
             if (t.opaque) drawTri(t, color, depth, outW, outH, b.texture, alphaCutoff, opaque = true)
@@ -71,7 +93,6 @@ fun rasterize(
         .flatMap { b -> b.tris.asSequence().filterNot { it.opaque }.map { it to b.texture } }
         .sortedBy { (t, _) -> t.a.z + t.b.z + t.c.z }   // far (small z) first
         .forEach { (t, tex) -> drawTri(t, color, depth, outW, outH, tex, alphaCutoff, opaque = false) }
-    return color
 }
 
 /** Single-texture convenience: one batch. */
@@ -94,9 +115,20 @@ fun rasterize(
  */
 fun downsample(src: IntArray, srcW: Int, srcH: Int, factor: Int): IntArray {
     if (factor <= 1) return src
+    val out = IntArray((srcW / factor) * (srcH / factor))
+    downsampleInto(src, srcW, srcH, factor, out)
+    return out
+}
+
+/**
+ * Reused-buffer form of [downsample] for [factor] > 1: box-resolves [src]
+ * ([srcW] x [srcH]) into caller-owned [out] (at least (srcW/factor) *
+ * (srcH/factor) long). Same math as [downsample]; lets an animating view reuse
+ * the resolve buffer across frames instead of allocating it every frame.
+ */
+fun downsampleInto(src: IntArray, srcW: Int, srcH: Int, factor: Int, out: IntArray) {
     val outW = srcW / factor
     val outH = srcH / factor
-    val out = IntArray(outW * outH)
     val n = factor * factor
     var oy = 0
     while (oy < outH) {
@@ -132,7 +164,6 @@ fun downsample(src: IntArray, srcW: Int, srcH: Int, factor: Int): IntArray {
         }
         oy++
     }
-    return out
 }
 
 private fun drawTri(
