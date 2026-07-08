@@ -1,7 +1,9 @@
 package hivens.ui.screens.library
 
-import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -48,6 +50,7 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.nx.NxVerticalScrollbar
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalMonoFamily
 import java.awt.Desktop
@@ -109,12 +112,15 @@ fun FileBrowserPane(rootDir: Path, modifier: Modifier = Modifier) {
 
     Row(modifier = modifier.fillMaxSize()) {
         // Left: tree.
+        val hover = remember { MutableInteractionSource() }
+        val hovered by hover.collectIsHoveredAsState()
         Box(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxHeight()
                 .clip(MaterialTheme.shapes.medium)
-                .background(glassSurfaceAlpha(0.55f)),
+                .background(glassSurfaceAlpha(0.55f))
+                .hoverable(hover),
         ) {
             val listState = rememberLazyListState()
             LazyColumn(
@@ -142,8 +148,9 @@ fun FileBrowserPane(rootDir: Path, modifier: Modifier = Modifier) {
                     )
                 }
             }
-            VerticalScrollbar(
+            NxVerticalScrollbar(
                 adapter  = rememberScrollbarAdapter(listState),
+                revealed = hovered || listState.isScrollInProgress,
                 modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
             )
         }
