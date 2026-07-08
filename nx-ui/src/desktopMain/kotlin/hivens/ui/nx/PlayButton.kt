@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -80,6 +81,8 @@ fun PlayButton(
                 color      = content,
                 style      = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.Bold,
+                maxLines   = 1,
+                overflow   = TextOverflow.Ellipsis,
             )
         }
     }

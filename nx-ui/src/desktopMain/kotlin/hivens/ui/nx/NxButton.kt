@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import hivens.ui.icons.IconKey
@@ -97,6 +98,8 @@ fun NxButton(
                 color      = content.copy(alpha = dim),
                 style      = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold,
+                maxLines   = 1,
+                overflow   = TextOverflow.Ellipsis,
             )
         }
     }

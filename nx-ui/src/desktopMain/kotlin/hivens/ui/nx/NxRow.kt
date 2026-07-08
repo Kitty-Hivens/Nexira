@@ -26,6 +26,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import hivens.ui.icons.IconKey
@@ -80,9 +81,9 @@ fun NxRow(
                 Spacer(Modifier.width(12.dp))
             }
             Column {
-                Text(title, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Medium)
+                Text(title, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 if (subtitle != null) {
-                    Text(subtitle, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.textSecondary)
+                    Text(subtitle, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.textSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
             }
         }

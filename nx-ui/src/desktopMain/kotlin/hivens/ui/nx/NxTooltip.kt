@@ -6,6 +6,7 @@ import androidx.compose.foundation.TooltipPlacement
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -50,7 +51,7 @@ fun NxTooltip(
                     text = text,
                     style = MaterialTheme.typography.labelSmall,
                     color = NxTheme.colors.textPrimary,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    modifier = Modifier.widthIn(max = 280.dp).padding(horizontal = 8.dp, vertical = 4.dp),
                 )
             }
         },

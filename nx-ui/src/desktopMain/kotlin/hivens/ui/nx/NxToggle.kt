@@ -12,6 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.Symbol
@@ -54,12 +55,16 @@ fun NxToggle(
                     text       = label,
                     color      = NxTheme.colors.textPrimary.copy(alpha = alpha),
                     fontWeight = FontWeight.Medium,
+                    maxLines   = 1,
+                    overflow   = TextOverflow.Ellipsis,
                 )
                 if (description != null) {
                     Text(
-                        text  = description,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = NxTheme.colors.textSecondary.copy(alpha = alpha),
+                        text     = description,
+                        style    = MaterialTheme.typography.bodySmall,
+                        color    = NxTheme.colors.textSecondary.copy(alpha = alpha),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
             }
