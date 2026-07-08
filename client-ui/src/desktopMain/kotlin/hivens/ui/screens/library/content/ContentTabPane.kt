@@ -1,7 +1,9 @@
 package hivens.ui.screens.library.content
 
-import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -69,6 +71,7 @@ import hivens.ui.components.DestructiveConfirmDialog
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxSwitch
 import hivens.ui.nx.NxButtonStyle
+import hivens.ui.nx.NxVerticalScrollbar
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
@@ -264,7 +267,9 @@ fun ContentTabPane(instance: PackInstance, onDetach: () -> Unit, modifier: Modif
             }
             else -> {
                 val listState = rememberLazyListState()
-                Box(Modifier.fillMaxSize()) {
+                val hover = remember { MutableInteractionSource() }
+                val hovered by hover.collectIsHoveredAsState()
+                Box(Modifier.fillMaxSize().hoverable(hover)) {
                     LazyColumn(
                         state               = listState,
                         modifier            = Modifier.fillMaxSize(),
@@ -304,8 +309,9 @@ fun ContentTabPane(instance: PackInstance, onDetach: () -> Unit, modifier: Modif
                             )
                         }
                     }
-                    VerticalScrollbar(
+                    NxVerticalScrollbar(
                         adapter  = rememberScrollbarAdapter(listState),
+                        revealed = hovered || listState.isScrollInProgress,
                         modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
                     )
                 }
@@ -568,7 +574,9 @@ private fun ModBrowser(mcVersion: String, loader: String, modsDir: Path, modifie
             }
             else -> {
                 val listState = rememberLazyListState()
-                Box(Modifier.fillMaxSize()) {
+                val hover = remember { MutableInteractionSource() }
+                val hovered by hover.collectIsHoveredAsState()
+                Box(Modifier.fillMaxSize().hoverable(hover)) {
                     LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         items(items = r, key = { it.projectId }) { hit ->
                             ModResultRow(
@@ -591,7 +599,7 @@ private fun ModBrowser(mcVersion: String, loader: String, modsDir: Path, modifie
                             )
                         }
                     }
-                    VerticalScrollbar(adapter = rememberScrollbarAdapter(listState), modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight())
+                    NxVerticalScrollbar(adapter = rememberScrollbarAdapter(listState), revealed = hovered || listState.isScrollInProgress, modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight())
                 }
             }
         }
