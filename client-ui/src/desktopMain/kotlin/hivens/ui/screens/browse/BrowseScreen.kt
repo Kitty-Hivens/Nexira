@@ -110,6 +110,7 @@ fun BrowseScreen(
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     origins.forEach { o ->
                         SourceTab(label = originLabel(o), selected = o == origin) { origin = o }
+                        PuppetClick("browse.source.${o.name}") { origin = o }
                     }
                 }
                 Spacer(Modifier.height(12.dp))
@@ -263,6 +264,7 @@ private fun BrowseList(packs: List<CataloguePack>, onOpenPack: (CataloguePack) -
     ) {
         items(items = packs, key = { "${it.origin}:${it.id}" }) { pack ->
             BrowsePackCard(pack = pack, onClick = { onOpenPack(pack) })
+            PuppetClick("browse.open.${pack.origin}.${pack.id}") { onOpenPack(pack) }
         }
     }
 }

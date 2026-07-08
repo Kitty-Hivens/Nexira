@@ -6,6 +6,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -201,6 +203,13 @@ fun CataloguePackDetailScreen(
         }
     }
 
+    (state as? DetailState.Loaded)?.let { ld ->
+        PuppetClick("catalogue.detail.install", enabled = installing == null && ld.details.versions.isNotEmpty()) {
+            val versions = ld.details.versions
+            if (versions.size > 1) showPicker = true else versions.firstOrNull()?.let { install(ld.details, it) }
+        }
+    }
+
     val pickerTarget = state as? DetailState.Loaded
     if (showPicker && pickerTarget != null) {
         VersionPickerModal(
@@ -373,17 +382,21 @@ private fun VersionPickerModal(
                     }
                 }
                 HorizontalDivider(color = NxTheme.colors.outline.copy(alpha = 0.25f))
-                Column(
-                    modifier            = Modifier.verticalScroll(rememberScrollState()).padding(16.dp),
+                // LazyColumn, not Column+verticalScroll+forEach: a Modrinth pack can
+                // carry hundreds of versions, and composing every row up front stalls
+                // the modal on open.
+                LazyColumn(
+                    modifier            = Modifier.weight(1f, fill = false).padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    versions.forEach { v ->
+                    items(versions, key = { it.id }) { v ->
                         VersionRow(
                             version       = v,
                             installing    = installingVersionId == v.id,
                             anyInstalling = installingVersionId != null,
                             onInstall     = { onPick(v) },
                         )
+                        PuppetClick("catalogue.version.${v.id}") { onPick(v) }
                     }
                 }
             }
