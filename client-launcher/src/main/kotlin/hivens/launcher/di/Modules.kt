@@ -60,6 +60,7 @@ import hivens.launcher.cache.CacheFactory
 import hivens.launcher.PackImportService
 import hivens.launcher.PackInstallCoordinator
 import hivens.launcher.PackInstallService
+import hivens.launcher.imports.ForeignInstanceImporter
 import hivens.launcher.imports.FtbAppSource
 import hivens.launcher.imports.LauncherImportService
 import hivens.launcher.imports.LauncherRootLocator
@@ -513,6 +514,18 @@ val mirrorModule = module {
                 PrismLauncherSource(get(), get()),
                 FtbAppSource(get(), get()),
             ),
+        )
+    }
+    // Import engine: copies a discovered instance's content and dedups a
+    // vanilla-layout runtime into the shared roots (see ForeignInstanceImporter).
+    single {
+        ForeignInstanceImporter(
+            runtimeProvisioner = get(),
+            javaManager = get(),
+            repository = get(),
+            dataDir = get(),
+            librariesDir = get<PlatformPaths>().librariesDir,
+            assetsDir = get<PlatformPaths>().assetsDir,
         )
     }
     single<IPackSyncService> { get<SmrtSyncService>() }
