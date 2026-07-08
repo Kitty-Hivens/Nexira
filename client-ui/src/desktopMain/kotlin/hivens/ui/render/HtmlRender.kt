@@ -7,7 +7,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -101,16 +103,20 @@ fun HtmlBody(
     onLink: (String) -> Unit = ::openInBrowser,
 ) {
     val body = remember(html) { Jsoup.parse(html).body() }
-    val ctx = InlineCtx(linkColor = NxTheme.colors.primary, baseColor = baseColor)
+    val ctx = InlineCtx(
+        linkColor = NxTheme.colors.primary,
+        baseColor = baseColor,
+        codeBg = NxTheme.colors.surface,
+    )
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         blocks(body, ctx, onLink)
     }
 }
 
-private data class InlineCtx(val linkColor: Color, val baseColor: Color)
+private data class InlineCtx(val linkColor: Color, val baseColor: Color, val codeBg: Color)
 
 private val BLOCK_TAGS = setOf(
-    "p", "div", "section", "article", "header", "footer", "main", "aside", "figure",
+    "p", "div", "section", "article", "header", "footer", "main", "aside", "figure", "center",
     "h1", "h2", "h3", "h4", "h5", "h6",
     "ul", "ol", "li", "blockquote", "pre", "hr", "table", "thead", "tbody", "tr", "details", "summary",
 )
@@ -137,50 +143,76 @@ private fun group(parent: Element): List<Frag> {
 }
 
 @Composable
-private fun ColumnScope.blocks(parent: Element, ctx: InlineCtx, onLink: (String) -> Unit) {
+private fun ColumnScope.blocks(parent: Element, ctx: InlineCtx, onLink: (String) -> Unit, center: Boolean = false) {
     for (frag in remember(parent) { group(parent) }) {
         when (frag) {
             is InlineRun -> {
                 val ann = buildInline(frag.nodes, ctx, onLink)
-                if (ann.text.isNotBlank()) Text(ann, style = TextStyle(color = ctx.baseColor))
+                if (ann.text.isNotBlank()) Text(
+                    ann,
+                    style    = TextStyle(color = ctx.baseColor, textAlign = if (center) TextAlign.Center else TextAlign.Unspecified),
+                    modifier = if (center) Modifier.fillMaxWidth() else Modifier,
+                )
             }
-            is BlockEl -> block(frag.el, ctx, onLink)
+            is BlockEl -> block(frag.el, ctx, onLink, center)
         }
     }
 }
 
 @Composable
-private fun ColumnScope.block(el: Element, ctx: InlineCtx, onLink: (String) -> Unit) {
-    val align = cssTextAlign(el)
+private fun ColumnScope.block(el: Element, ctx: InlineCtx, onLink: (String) -> Unit, center: Boolean = false) {
+    val align = cssTextAlign(el).let { if (it == TextAlign.Unspecified && center) TextAlign.Center else it }
     when (el.tagName().lowercase()) {
+        // <center> (and align=center containers): center BOTH text and images.
+        // A centered image-only run (a banner wrapped in center>a>img) renders as
+        // a real image, not its empty alt.
+        "center" -> {
+            val imgs = imageRunOf(el)
+            if (imgs != null) ImageRunBlock(imgs, onLink, center = true)
+            else Column(
+                Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) { blocks(el, ctx, onLink, center = true) }
+        }
         "h1", "h2", "h3", "h4", "h5", "h6" -> {
-            val base = when (el.tagName().lowercase()) {
-                "h1" -> MaterialTheme.typography.headlineSmall
-                "h2" -> MaterialTheme.typography.titleLarge
-                "h3" -> MaterialTheme.typography.titleMedium
+            val tag = el.tagName().lowercase()
+            val base = when (tag) {
+                "h1" -> MaterialTheme.typography.headlineMedium
+                "h2" -> MaterialTheme.typography.headlineSmall
+                "h3" -> MaterialTheme.typography.titleLarge
+                "h4" -> MaterialTheme.typography.titleMedium
                 else -> MaterialTheme.typography.titleSmall
             }
+            // Extra air above a heading so sections read as sections, not one wall.
+            val top = if (tag == "h1" || tag == "h2") 10.dp else 4.dp
             Text(
                 buildInline(el.childNodes(), ctx, onLink),
-                style = base.copy(color = ctx.baseColor, textAlign = align, fontWeight = FontWeight.Bold),
+                style    = base.copy(color = ctx.baseColor, textAlign = align, fontWeight = FontWeight.Bold),
+                modifier = Modifier.padding(top = top).then(if (center) Modifier.fillMaxWidth() else Modifier),
             )
         }
-        "p" -> {
-            // A paragraph that is only images (badges, a video thumbnail) renders
-            // as clickable images, not their alt text.
+        "p", "figure" -> {
+            // Image-only paragraph (badges / a banner / a video thumbnail, however
+            // wrapped) -> clickable images. A paragraph that (invalidly, but as
+            // Modrinth emits) holds block children -> flow them. Otherwise inline text.
             val imgs = imageRunOf(el)
-            if (imgs != null) ImageRunBlock(imgs, onLink)
-            else Text(
-                buildInline(el.childNodes(), ctx, onLink),
-                style = TextStyle(color = ctx.baseColor, textAlign = align),
-            )
+            when {
+                imgs != null -> ImageRunBlock(imgs, onLink, center = center)
+                el.children().any { it.tagName().lowercase() in BLOCK_TAGS || it.tagName().equals("img", true) } ->
+                    blocks(el, ctx, onLink, center)
+                else -> Text(
+                    buildInline(el.childNodes(), ctx, onLink),
+                    style    = TextStyle(color = ctx.baseColor, textAlign = align),
+                    modifier = if (center) Modifier.fillMaxWidth() else Modifier,
+                )
+            }
         }
         "ul", "ol" -> ListBlock(el, ctx, onLink, ordered = el.tagName().equals("ol", true))
-        "blockquote" -> Box(
-            Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small)
-                .background(NxTheme.colors.surface).padding(12.dp),
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { blocks(el, ctx, onLink) }
+        "blockquote" -> Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min).clip(MaterialTheme.shapes.small).background(NxTheme.colors.surface)) {
+            // Left accent bar so a quote reads as a quote, not a generic box.
+            Box(Modifier.width(3.dp).fillMaxHeight().background(NxTheme.colors.primary.copy(alpha = 0.7f)))
+            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { blocks(el, ctx, onLink) }
         }
         "pre" -> Text(
             el.wholeText().trimEnd(),
@@ -191,8 +223,8 @@ private fun ColumnScope.block(el: Element, ctx: InlineCtx, onLink: (String) -> U
         "hr" -> HorizontalDivider(color = NxTheme.colors.outline.copy(alpha = 0.4f))
         "img" -> ImageBlock(el)
         "table" -> TableBlock(el, ctx, onLink)
-        // div / section / li / summary / details / figure / unknown container -> flow children into this column.
-        else -> blocks(el, ctx, onLink)
+        // div / section / li / summary / details / unknown container -> flow children (propagating center).
+        else -> blocks(el, ctx, onLink, center)
     }
 }
 
@@ -213,21 +245,30 @@ private fun ListBlock(el: Element, ctx: InlineCtx, onLink: (String) -> Unit, ord
 
 @Composable
 private fun TableBlock(el: Element, ctx: InlineCtx, onLink: (String) -> Unit) {
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        el.select("tr").forEach { tr ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                tr.children().filter { it.tagName().equals("td", true) || it.tagName().equals("th", true) }
-                    .forEach { cell ->
-                        Text(
-                            buildInline(cell.childNodes(), ctx, onLink),
-                            modifier = Modifier.weight(1f),
-                            style = TextStyle(
-                                color = ctx.baseColor,
-                                fontWeight = if (cell.tagName().equals("th", true)) FontWeight.Bold else FontWeight.Normal,
-                            ),
-                        )
-                    }
+    // Bare Text-in-columns read as loose text, not a table. Give it a surface
+    // container plus per-row hairline separators and cell padding so the grid
+    // reads. No column borders (block-flow renderer) -- rows carry the structure.
+    val rows = el.select("tr")
+    Column(Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small).background(NxTheme.colors.surface)) {
+        rows.forEachIndexed { rowIdx, tr ->
+            val cells = tr.children().filter { it.tagName().equals("td", true) || it.tagName().equals("th", true) }
+            val header = cells.any { it.tagName().equals("th", true) }
+            Row(
+                modifier              = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                cells.forEach { cell ->
+                    Text(
+                        buildInline(cell.childNodes(), ctx, onLink),
+                        modifier = Modifier.weight(1f),
+                        style = TextStyle(
+                            color = ctx.baseColor,
+                            fontWeight = if (header) FontWeight.Bold else FontWeight.Normal,
+                        ),
+                    )
+                }
             }
+            if (rowIdx < rows.size - 1) HorizontalDivider(color = NxTheme.colors.outline.copy(alpha = 0.2f))
         }
     }
 }
@@ -236,14 +277,14 @@ private fun TableBlock(el: Element, ctx: InlineCtx, onLink: (String) -> Unit) {
 private fun ImageBlock(el: Element) {
     val src = el.attr("src").ifBlank { el.attr("data-src") }
     if (src.isBlank()) return
-    var m: Modifier = Modifier
-    el.attr("width").toIntOrNull()?.let { m = m.width(it.dp) }
-    el.attr("height").toIntOrNull()?.let { m = m.height(it.dp) }
+    // HTML width/height are CSS px, not dp -- honouring them as dp overflowed the
+    // column (a width="660" banner blew past the content). Scale to the column
+    // width, capped so a very tall image stays sane.
     AsyncImage(
         model = src,
         contentDescription = el.attr("alt").ifBlank { null },
         contentScale = ContentScale.Fit,
-        modifier = m,
+        modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp),
     )
 }
 
@@ -256,24 +297,31 @@ private data class ImgItem(val src: String, val alt: String, val href: String?)
  * `[![alt](img)](href)`. Returns null when the paragraph carries real text too,
  * so prose paragraphs keep their normal inline rendering.
  */
-private fun imageRunOf(p: Element): List<ImgItem>? {
+private fun imageRunOf(el: Element): List<ImgItem>? {
     val items = ArrayList<ImgItem>()
-    for (n in p.childNodes()) {
-        when (n) {
-            is TextNode -> if (n.text().isNotBlank()) return null
-            is Element -> when (n.tagName().lowercase()) {
-                "img" -> items.add(ImgItem(imgSrc(n), n.attr("alt"), null))
-                "a" -> {
-                    val img = n.children().singleOrNull { it.tagName().equals("img", true) } ?: return null
-                    if (n.text().isNotBlank()) return null
-                    items.add(ImgItem(imgSrc(img), img.attr("alt"), n.attr("href").ifBlank { null }))
-                }
+    // Walk the subtree; bail (null) the moment real text shows up, so a prose
+    // paragraph keeps normal rendering. Descends through the inline / alignment
+    // wrappers Modrinth stacks around banners -- `center > a > img`, `p > span >
+    // img`, etc. -- which the old flat scan treated as "not an image run" and
+    // dropped to empty alt text.
+    fun walk(node: Node, href: String?): Boolean {
+        when (node) {
+            is TextNode -> if (node.text().isNotBlank()) return false
+            is Element -> when (node.tagName().lowercase()) {
+                "img" -> items.add(ImgItem(imgSrc(node), node.attr("alt"), href))
                 "br" -> {}
-                else -> return null
+                "a" -> {
+                    val h = node.attr("href").ifBlank { null } ?: href
+                    for (c in node.childNodes()) if (!walk(c, h)) return false
+                }
+                "center", "span", "font", "p", "div", "picture", "b", "strong", "em", "i" ->
+                    for (c in node.childNodes()) if (!walk(c, href)) return false
+                else -> return false
             }
-            else -> return null
         }
+        return true
     }
+    for (c in el.childNodes()) if (!walk(c, null)) return null
     return items.takeIf { it.isNotEmpty() }
 }
 
@@ -284,9 +332,11 @@ private fun imgSrc(img: Element): String = img.attr("src").ifBlank { img.attr("d
  * a video link gets a play badge and is routed to the in-app player upstream.
  */
 @Composable
-private fun ImageRunBlock(items: List<ImgItem>, onLink: (String) -> Unit) {
+private fun ImageRunBlock(items: List<ImgItem>, onLink: (String) -> Unit, center: Boolean = false) {
     FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier              = if (center) Modifier.fillMaxWidth() else Modifier,
+        horizontalArrangement = if (center) Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)
+                                else Arrangement.spacedBy(8.dp),
         verticalArrangement   = Arrangement.spacedBy(8.dp),
     ) {
         for (item in items) {
@@ -299,7 +349,7 @@ private fun ImageRunBlock(items: List<ImgItem>, onLink: (String) -> Unit) {
                     model              = item.src.ifBlank { null },
                     contentDescription = item.alt.ifBlank { null },
                     contentScale       = ContentScale.Fit,
-                    modifier           = Modifier.heightIn(max = 180.dp),
+                    modifier           = Modifier.heightIn(max = 220.dp),
                 )
                 if (href != null && isPlayableVideoUrl(href)) {
                     Box(
@@ -328,7 +378,7 @@ private fun AnnotatedString.Builder.appendInline(node: Node, ctx: InlineCtx, onL
                 "i", "em" -> withStyle(SpanStyle(fontStyle = FontStyle.Italic)) { kids() }
                 "u", "ins" -> withStyle(SpanStyle(textDecoration = TextDecoration.Underline)) { kids() }
                 "s", "del", "strike" -> withStyle(SpanStyle(textDecoration = TextDecoration.LineThrough)) { kids() }
-                "code" -> withStyle(SpanStyle(fontFamily = FontFamily.Monospace)) { kids() }
+                "code" -> withStyle(SpanStyle(fontFamily = FontFamily.Monospace, background = ctx.codeBg)) { kids() }
                 "a" -> {
                     val href = node.attr("href")
                     if (href.isBlank()) kids() else withLink(
