@@ -40,4 +40,22 @@ data class SessionData(
      * never written to credentials.json. Null for non-Microsoft sessions.
      */
     val refreshToken: String? = null,
-)
+) {
+    // Redact the three secrets (accessToken / cachedPassword / refreshToken) so a
+    // stray log line or an exception carrying the session never prints them. The
+    // serializer and equals/hashCode still use every field -- only the
+    // human-readable form masks them.
+    override fun toString(): String =
+        "SessionData(status=$status, playerName='$playerName', uid='$uid', uuid='$uuid', " +
+        "accessToken=${accessToken.redactedSecret()}, fileManifest=$fileManifest, serverId=$serverId, " +
+        "cachedPassword=${cachedPassword.redactedSecret()}, balance=$balance, clan=$clan, " +
+        "clanResolved=$clanResolved, offline=$offline, refreshToken=${refreshToken.redactedSecret()})"
+}
+
+// Masks a secret's value while still telling apart null / empty / set-with-length,
+// which is all a log needs and never the secret itself.
+private fun String?.redactedSecret(): String = when {
+    this == null -> "null"
+    isEmpty()    -> "\"\""
+    else         -> "<redacted:$length>"
+}
