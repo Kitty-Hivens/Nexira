@@ -28,6 +28,13 @@ import hivens.ui.theme.LocalStyle
  * that want a specific shape regardless of style variant. Default
  * pulls from the active style, so most callers don't need to pass it.
  */
+@Deprecated(
+    "Pre-nx Caelestia card: it alpha-blends its glass fill even on light, so over a wallpaper it " +
+    "reads muddy. Move to NxCard (or NxPanel for full-height regions), which route through the " +
+    "opaque-on-light body floor. Not a 1:1 swap -- backgroundColor / borderColor / shape overrides " +
+    "need a per-site decision.",
+    level = DeprecationLevel.WARNING,
+)
 @Composable
 fun GlassCard(
     modifier: Modifier = Modifier,
