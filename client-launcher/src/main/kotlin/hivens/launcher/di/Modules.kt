@@ -60,6 +60,12 @@ import hivens.launcher.cache.CacheFactory
 import hivens.launcher.PackImportService
 import hivens.launcher.PackInstallCoordinator
 import hivens.launcher.PackInstallService
+import hivens.launcher.imports.FtbAppSource
+import hivens.launcher.imports.LauncherImportService
+import hivens.launcher.imports.LauncherRootLocator
+import hivens.launcher.imports.MinecraftLauncherSource
+import hivens.launcher.imports.ModrinthAppSource
+import hivens.launcher.imports.PrismLauncherSource
 import hivens.launcher.curseforge.CurseForgeZipInstaller
 import hivens.launcher.cache.ModrinthCaches
 import hivens.launcher.cache.SmrtPackCaches
@@ -496,6 +502,19 @@ val mirrorModule = module {
         )
     }
     single { PackImportService(mrpackInstaller = get(), cfInstaller = get()) }
+    // Foreign-launcher import (phase 1: discovery). Candidate-root locator spans
+    // native XDG / Flatpak / Snap; one source per supported launcher.
+    single { LauncherRootLocator() }
+    single {
+        LauncherImportService(
+            sources = listOf(
+                MinecraftLauncherSource(get(), get()),
+                ModrinthAppSource(get()),
+                PrismLauncherSource(get(), get()),
+                FtbAppSource(get(), get()),
+            ),
+        )
+    }
     single<IPackSyncService> { get<SmrtSyncService>() }
 
     // Smarty -> open-smrt-network swap. Direct channel: GitHub releases +
