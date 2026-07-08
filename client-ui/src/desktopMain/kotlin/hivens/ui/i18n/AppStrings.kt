@@ -901,6 +901,14 @@ interface AppStrings {
     fun notifPackRunning(packName: String): String
     fun notifPackFailed(packName: String): String
     fun notifPackSessionEnded(packName: String): String
+
+    // --- Notification driver templates (pack install lifecycle) ---
+    fun notifInstallSyncing(packName: String): String
+    fun notifInstallDone(packName: String): String
+    fun notifInstallFailed(packName: String): String
+    fun notifInstallCancelled(packName: String): String
+    val notifActionCancel: String
+
     val notifActionShowConsole: String
     val notifActionStop: String
     val notifActionPlayOffline: String

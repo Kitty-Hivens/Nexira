@@ -19,11 +19,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,7 +38,8 @@ import hivens.core.api.catalogue.CataloguePack
 import hivens.core.api.catalogue.CataloguePackDetails
 import hivens.core.api.catalogue.CataloguePackVersion
 import hivens.core.data.PackOrigin
-import hivens.launcher.PackInstallCoordinator
+import hivens.launcher.InstallPhase
+import hivens.launcher.PackInstallService
 import hivens.launcher.catalogue.PackCatalogueRegistry
 import hivens.ui.components.FullscreenVideo
 import hivens.ui.components.ImageGallery
@@ -55,17 +56,21 @@ import hivens.ui.screens.RetryStateBlock
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalStyle
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 
 /**
  * Source-neutral catalogue detail page. Both the Hivens mirror and Modrinth flow
  * through the SAME screen: the read side comes off [PackCatalogueRegistry] and the
- * write side off [PackInstallCoordinator], so the only thing that varies per source
+ * write side off [PackInstallService], so the only thing that varies per source
  * is which provider the registry hands back. The install glyph in the hero installs
  * the single version directly (the mirror serves one) or opens a version picker when
  * the source publishes several (Modrinth).
+ *
+ * The install itself runs on [PackInstallService]'s app scope, so progress is read
+ * back from the service rather than owned here: leaving this screen no longer
+ * cancels the download, and re-entering while it runs re-attaches to the live
+ * progress instead of showing an idle button.
  *
  * The compat metadata (MC / loader / runtime / tags) renders in the in-page sidebar
  * for now; per the shell rule it will move into the contextual right rail once that
@@ -80,8 +85,7 @@ fun CataloguePackDetailScreen(
 ) {
     val s = LocalStrings.current
     val registry: PackCatalogueRegistry = koinInject()
-    val coordinator: PackInstallCoordinator = koinInject()
-    val scope = rememberCoroutineScope()
+    val installService: PackInstallService = koinInject()
 
     // Back is the top-bar breadcrumb's job now (no hero arrow), but automation
     // still needs a handle on it.
@@ -89,35 +93,43 @@ fun CataloguePackDetailScreen(
 
     var state by remember(origin, packId) { mutableStateOf<DetailState>(DetailState.Loading) }
     var retryTick by remember(origin, packId) { mutableIntStateOf(0) }
-    var installing by remember(origin, packId) { mutableStateOf<InstallProgress?>(null) }
-    var installError by remember(origin, packId) { mutableStateOf<String?>(null) }
     var showPicker by remember(origin, packId) { mutableStateOf(false) }
 
-    fun install(details: CataloguePackDetails, version: CataloguePackVersion) {
-        installError = null
-        installing = InstallProgress(version.id, 0, 0, "")
-        scope.launch {
-            try {
-                val instance = coordinator.install(
-                    pack = CataloguePack(
-                        origin  = details.origin,
-                        id      = details.id,
-                        title   = details.title,
-                        tagline = details.tagline,
-                        iconUrl = details.iconUrl,
-                    ),
-                    version  = version,
-                    progress = { current, total, filename ->
-                        installing = InstallProgress(version.id, current, total, filename)
-                    },
-                )
-                onInstalled(instance.id)
-            } catch (e: Exception) {
-                installError = e.message ?: s.browseDetailInstallFailedGeneric
-            } finally {
-                installing = null
-            }
+    // Install state is owned by the app-scoped service, not this composition.
+    // Match on (origin, packId) so a return to this screen re-attaches to an
+    // install started before we navigated away.
+    val installs by installService.installs.collectAsState()
+    val active = installs.values.firstOrNull { it.origin == origin && it.packId == packId }
+    val installing = active?.let { snap ->
+        (snap.phase as? InstallPhase.Running)?.let { r ->
+            InstallProgress(snap.versionId, r.current, r.total, r.filename)
         }
+    }
+    val installError = (active?.phase as? InstallPhase.Failed)?.message
+
+    // Success navigates to the installed instance (unchanged behaviour), then
+    // evicts the terminal snapshot so a later reinstall starts clean.
+    LaunchedEffect(active?.key, active?.phase) {
+        val snap = active
+        val phase = snap?.phase
+        if (snap != null && phase is InstallPhase.Succeeded) {
+            installService.dismiss(snap.key)
+            onInstalled(phase.instanceId)
+        }
+    }
+
+    fun install(details: CataloguePackDetails, version: CataloguePackVersion) {
+        installService.start(
+            pack = CataloguePack(
+                origin    = details.origin,
+                id        = details.id,
+                title     = details.title,
+                tagline   = details.tagline,
+                iconUrl   = details.iconUrl,
+                bannerUrl = details.bannerUrl,
+            ),
+            version = version,
+        )
     }
 
     LaunchedEffect(origin, packId, retryTick) {

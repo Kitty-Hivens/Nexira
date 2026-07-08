@@ -27,6 +27,7 @@ import hivens.ui.notifications.IndicationCenter
 import hivens.ui.notifications.NotificationArchiveStore
 import hivens.ui.notifications.NotificationCenter
 import hivens.ui.notifications.SessionRegistry
+import hivens.ui.notifications.drivers.InstallDriver
 import hivens.ui.notifications.drivers.LaunchDriver
 import hivens.ui.puppet.PuppetServerLoader
 import hivens.config.Storage
@@ -229,6 +230,18 @@ val uiModule = module {
             credentialStore = get(),
             stringsProvider = { stringsFor(AppLocale.fromTag(settingsService.getSettings().locale)) },
         )
+    }
+    // Surfaces app-scoped installs (PackInstallService) into the notification
+    // center. createdAtStart so its collector is live before the first install
+    // can fire; start() launches on the shared app scope.
+    single(createdAtStart = true) {
+        val settingsService: ISettingsService = get()
+        InstallDriver(
+            service         = get(),
+            notifications   = get(),
+            appScope        = get(),
+            stringsProvider = { stringsFor(AppLocale.fromTag(settingsService.getSettings().locale)) },
+        ).also { it.start() }
     }
 }
 

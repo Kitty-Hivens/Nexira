@@ -59,6 +59,7 @@ import hivens.core.time.SystemClock
 import hivens.launcher.cache.CacheFactory
 import hivens.launcher.PackImportService
 import hivens.launcher.PackInstallCoordinator
+import hivens.launcher.PackInstallService
 import hivens.launcher.curseforge.CurseForgeZipInstaller
 import hivens.launcher.cache.ModrinthCaches
 import hivens.launcher.cache.SmrtPackCaches
@@ -481,6 +482,10 @@ val mirrorModule = module {
     // Install write side: dispatches a (pack, version) by origin onto the
     // mirror sync installer or the Modrinth .mrpack installer.
     single { PackInstallCoordinator(mirrorInstaller = get(), mrpackInstaller = get(), mirrorClient = get()) }
+    // App-scoped owner of catalogue installs: runs the install on the shared
+    // process scope (get<CoroutineScope>()) so navigating away from Browse does
+    // not cancel a download mid-flight.
+    single { PackInstallService(runInstall = get<PackInstallCoordinator>()::install, scope = get()) }
     single {
         CurseForgeZipInstaller(
             json = get(),
