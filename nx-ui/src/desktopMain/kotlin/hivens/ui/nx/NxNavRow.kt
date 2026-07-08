@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
@@ -73,9 +74,9 @@ fun NxNavRow(
                 Symbol(icon, null, tint = iconTint, size = 24.dp)
                 Spacer(Modifier.width(16.dp))
                 Column {
-                    Text(title, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
+                    Text(title, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     if (subtitle != null) {
-                        Text(subtitle, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.textSecondary)
+                        Text(subtitle, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.textSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }
                 }
             }

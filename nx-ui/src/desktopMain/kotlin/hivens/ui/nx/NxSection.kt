@@ -12,6 +12,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import hivens.ui.surface.NxSurface
@@ -45,6 +46,8 @@ fun NxSection(
             style      = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.Bold,
             color      = NxTheme.colors.primary,
+            maxLines   = 1,
+            overflow   = TextOverflow.Ellipsis,
         )
         Spacer(Modifier.height(8.dp))
         NxSurface(level = level, glass = false, modifier = Modifier.fillMaxWidth()) {

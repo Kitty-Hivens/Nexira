@@ -12,6 +12,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.NxTheme
@@ -42,6 +43,8 @@ fun NxChoiceChip(
         style      = MaterialTheme.typography.labelSmall,
         color      = fg,
         fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+        maxLines   = 1,
+        overflow   = TextOverflow.Ellipsis,
         modifier   = modifier
             .clip(shape)
             .background(bg)

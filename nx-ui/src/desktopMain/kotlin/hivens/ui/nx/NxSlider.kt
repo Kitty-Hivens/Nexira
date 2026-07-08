@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
@@ -14,6 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import hivens.ui.customization.sliderKeyboardAdjust
@@ -43,8 +45,21 @@ fun NxSlider(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment     = Alignment.CenterVertically,
         ) {
-            Text(label, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Medium)
-            Text(valueText, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.textSecondary)
+            Text(
+                label,
+                color      = NxTheme.colors.textPrimary,
+                fontWeight = FontWeight.Medium,
+                maxLines   = 1,
+                overflow   = TextOverflow.Ellipsis,
+                modifier   = Modifier.weight(1f, fill = false).padding(end = 8.dp),
+            )
+            Text(
+                valueText,
+                style    = MaterialTheme.typography.bodySmall,
+                color    = NxTheme.colors.textSecondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
         // widthIn caps the max constraint, fillMaxWidth fills within it: the track
         // grows to the section width but never past maxTrackWidth, so it stops well
