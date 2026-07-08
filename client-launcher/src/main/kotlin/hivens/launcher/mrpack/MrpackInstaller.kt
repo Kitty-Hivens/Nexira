@@ -61,6 +61,7 @@ class MrpackInstaller(
         source: MrpackSource? = null,
         iconUrl: String? = null,
         bannerUrl: String? = null,
+        onReserveDir: (Path) -> Unit = {},
         progress: (current: Int, total: Int, filename: String) -> Unit = { _, _, _ -> },
     ): PackInstance = withContext(Dispatchers.IO) {
         ZipFile(mrpack.toFile()).use { zip ->
@@ -78,6 +79,9 @@ class MrpackInstaller(
             val instanceId = UUID.randomUUID().toString()
             val instanceDirName = sanitize("$displayName-$instanceId")
             val clientDir = dataDir.resolve("instances").resolve(instanceDirName)
+            // Reserve before createDirectories, so a cancel mid-download can
+            // delete exactly this partial dir.
+            onReserveDir(clientDir)
             Files.createDirectories(clientDir)
             log.info("mrpack: installing '{}' ({} {} on {}) -> {}", displayName, loaderName ?: "vanilla", loaderVersion, mcVersion, clientDir)
 
@@ -140,6 +144,7 @@ class MrpackInstaller(
         source: MrpackSource,
         iconUrl: String? = null,
         bannerUrl: String? = null,
+        onReserveDir: (Path) -> Unit = {},
         progress: (current: Int, total: Int, filename: String) -> Unit = { _, _, _ -> },
     ): PackInstance = withContext(Dispatchers.IO) {
         val tmp = Files.createTempFile("nexira-mrpack-", ".mrpack")
@@ -148,7 +153,7 @@ class MrpackInstaller(
                 if (!resp.status.isSuccess()) throw IOException("GET $url -> HTTP ${resp.status}")
                 FileOutputStream(tmp.toFile()).use { out -> resp.bodyAsChannel().copyTo(out) }
             }
-            install(tmp, source, iconUrl, bannerUrl, progress)
+            install(tmp, source, iconUrl, bannerUrl, onReserveDir, progress)
         } finally {
             runCatching { Files.deleteIfExists(tmp) }
         }
