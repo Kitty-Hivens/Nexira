@@ -62,6 +62,7 @@ import hivens.launcher.PackInstallCoordinator
 import hivens.launcher.PackInstallService
 import hivens.launcher.imports.ForeignInstanceImporter
 import hivens.launcher.imports.FtbAppSource
+import hivens.launcher.imports.LocalPackCreator
 import hivens.launcher.imports.LauncherImportService
 import hivens.launcher.imports.LauncherRootLocator
 import hivens.launcher.imports.MinecraftLauncherSource
@@ -528,6 +529,9 @@ val mirrorModule = module {
             assetsDir = get<PlatformPaths>().assetsDir,
         )
     }
+    // Create an empty local pack from scratch (name + MC + loader); the Content
+    // tab's Modrinth browser + local-jar add fill it in.
+    single { LocalPackCreator(runtimeProvisioner = get(), javaManager = get(), repository = get(), dataDir = get()) }
     single<IPackSyncService> { get<SmrtSyncService>() }
 
     // Smarty -> open-smrt-network swap. Direct channel: GitHub releases +
