@@ -106,8 +106,17 @@ object GuiBootstrap {
                 val reporter   = crashReporter.get()
                 val report     = reporter.generate(throwable, thread)
                 val reportFile = reporter.saveToDisk(report)
-                SwingUtilities.invokeLater { CrashDialog.show(report, reportFile) }
-            }
+                // invokeLater dispatches AFTER this runCatching returns, so the
+                // dialog runs unguarded on the EDT. Any throw there -- a missing
+                // dialog class in a stale/packaged build, no display, a Swing
+                // error -- would land back in THIS handler and loop forever,
+                // flooding the log. Guard it so a failed dialog degrades to the
+                // saved report plus one log line.
+                SwingUtilities.invokeLater {
+                    runCatching { CrashDialog.show(report, reportFile) }
+                        .onFailure { handlerLog.error("Could not surface the crash dialog; report saved to {}", reportFile, it) }
+                }
+            }.onFailure { handlerLog.error("Crash reporting itself failed", it) }
         }
     }
 }
