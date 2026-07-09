@@ -45,7 +45,7 @@
          use raw `%msg` in any pattern below — the disk MUST NEVER carry the raw
          values, even momentarily. -->
     <conversionRule conversionWord="rmsg"
-                    converterClass="hivens.ui.logging.RedactingMessageConverter"/>
+                    class="hivens.ui.logging.RedactingMessageConverter"/>
 
     <!-- `%rex` is the redacted-throwable counterpart for stack traces. Without
          it the standard `%ex` / `%xEx` would print throwable.toString() raw and
@@ -54,7 +54,7 @@
          throwable auto-append, which would otherwise re-inject the unredacted
          `%xEx` at line end. -->
     <conversionRule conversionWord="rex"
-                    converterClass="hivens.ui.logging.RedactingThrowableConverter"/>
+                    class="hivens.ui.logging.RedactingThrowableConverter"/>
 
     <property name="LOGS_DIR"   value="${nexira.logs.dir:-${java.io.tmpdir}/nexira-fallback-logs}"/>
     <property name="SESSION_ID" value="${nexira.sessionId:-?}"/>
