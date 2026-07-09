@@ -231,12 +231,16 @@ private fun NewLocalPackDialog(
 
     Popup(alignment = Alignment.Center, onDismissRequest = onDismiss, properties = PopupProperties(focusable = true)) {
         Box(
-            Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.55f))
+            Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.72f))
                 .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onDismiss),
             contentAlignment = Alignment.Center,
         ) {
             NxSurface(
                 level = NxSurfaceLevel.Floating,
+                // Opaque, not glass: a modal sits over a dark scrim, so there is
+                // nothing behind it to frost -- glass would read as a flat muddy
+                // panel (the same reason the codebase is retiring GlassCard).
+                glass = false,
                 shape = MaterialTheme.shapes.large,
                 modifier = Modifier.widthIn(max = 460.dp).fillMaxWidth(0.9f)
                     .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = {}),
