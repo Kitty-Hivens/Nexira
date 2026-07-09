@@ -31,6 +31,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -241,7 +242,10 @@ private fun NewLocalPackDialog(
                             value = mc,
                             onValueChange = { mc = it; mcMenuOpen = true },
                             placeholder = "1.20.1",
-                            modifier = Modifier.fillMaxWidth().clickable { mcMenuOpen = true },
+                            // Open the picker on focus (a click focuses the field) rather than a
+                            // clickable -- clickable's default hover/press state layer is an
+                            // unclipped square whose corners poke past the field's rounded shape.
+                            modifier = Modifier.fillMaxWidth().onFocusChanged { if (it.isFocused) mcMenuOpen = true },
                         )
                         NxContextMenu(expanded = mcMenuOpen && matches.isNotEmpty(), onDismissRequest = { mcMenuOpen = false }) {
                             Column(Modifier.heightIn(max = 240.dp).verticalScroll(rememberScrollState())) {
