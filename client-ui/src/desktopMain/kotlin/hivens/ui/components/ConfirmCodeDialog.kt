@@ -1,5 +1,6 @@
 package hivens.ui.components
 
+import hivens.ui.nx.NxButton
 import hivens.ui.theme.LocalMonoFamily
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardActions
@@ -151,16 +152,11 @@ fun ConfirmCodeDialog(
                     }
                     PuppetClick("login.twoFactor.cancel", enabled = !isSubmitting) { onDismiss() }
                     Spacer(Modifier.width(8.dp))
-                    Button(
+                    NxButton(
+                        label   = s.auth2faSubmit,
                         onClick = { onSubmit(code) },
                         enabled = code.length == 6 && !isSubmitting,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = NxTheme.colors.primary,
-                        ),
-                        shape = MaterialTheme.shapes.small,
-                    ) {
-                        Text(s.auth2faSubmit)
-                    }
+                    )
                     PuppetClick("login.twoFactor.submit", enabled = code.length == 6 && !isSubmitting) {
                         onSubmit(code)
                     }

@@ -9,8 +9,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -25,6 +23,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.nx.NxButton
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetField
 import hivens.ui.puppet.PuppetScreen
@@ -131,13 +130,7 @@ fun DeviceCodeDialog(
                     }
                     PuppetClick("login.msa.cancel") { onCancel() }
                     Spacer(Modifier.width(8.dp))
-                    Button(
-                        onClick = onOpenBrowser,
-                        shape = MaterialTheme.shapes.small,
-                        colors = ButtonDefaults.buttonColors(containerColor = NxTheme.colors.primary),
-                    ) {
-                        Text(s.msaOpenBrowser, maxLines = 1)
-                    }
+                    NxButton(label = s.msaOpenBrowser, onClick = onOpenBrowser)
                     PuppetClick("login.msa.openBrowser") { onOpenBrowser() }
                 }
             }

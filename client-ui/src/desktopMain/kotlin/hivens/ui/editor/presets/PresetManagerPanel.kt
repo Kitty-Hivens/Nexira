@@ -17,8 +17,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -34,7 +32,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -45,6 +42,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.nx.NxButton
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.theme.NxTheme
@@ -157,7 +155,8 @@ fun PresetManagerPanel(
                         },
                     )
                     Spacer(Modifier.width(10.dp))
-                    Button(
+                    NxButton(
+                        label   = s.editorSave,
                         onClick = {
                             val n = newName.trim()
                             if (n.isNotEmpty()) {
@@ -172,17 +171,10 @@ fun PresetManagerPanel(
                                 }
                             }
                         },
-                        shape   = RoundedCornerShape(8.dp),
+                        icon    = NxIcon.Save,
                         enabled = newName.isNotBlank(),
-                        colors  = ButtonDefaults.buttonColors(
-                            containerColor = NxTheme.colors.primary,
-                            contentColor   = Color.White,
-                        ),
-                    ) {
-                        Symbol(NxIcon.Save, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text(s.editorSave, fontWeight = FontWeight.Medium)
-                    }
+                        compact = true,
+                    )
                 }
 
                 Spacer(Modifier.height(16.dp))
@@ -268,16 +260,7 @@ private fun PresetRow(
             )
         }
         Spacer(Modifier.width(8.dp))
-        Button(
-            onClick = onLoad,
-            shape   = RoundedCornerShape(8.dp),
-            colors  = ButtonDefaults.buttonColors(
-                containerColor = NxTheme.colors.primary,
-                contentColor   = Color.White,
-            ),
-        ) {
-            Text(s.editorApply, fontWeight = FontWeight.Medium, style = MaterialTheme.typography.labelMedium)
-        }
+        NxButton(label = s.editorApply, onClick = onLoad, compact = true)
         Spacer(Modifier.width(4.dp))
         IconButton(onClick = onExport, modifier = Modifier.size(36.dp)) {
             Symbol(icon = NxIcon.Upload,

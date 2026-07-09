@@ -1,5 +1,6 @@
 package hivens.ui.components
 import hivens.ui.nx.GlassCard
+import hivens.ui.nx.NxButton
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -21,8 +22,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.BasicAlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -41,7 +40,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -236,15 +234,12 @@ fun UpdateManagerDialog(onDismiss: () -> Unit) {
                 // Filtered locally from the single cached fetch (cumulative).
                 val releases = allReleases.filter { it.channel.ordinal <= channel.ordinal }
                 if (channel.isSourceBuild) {
-                    Button(
-                        onClick = { buildFromSource() },
-                        enabled = !busy && experimentalOn && toolchainReady,
+                    NxButton(
+                        label    = s.updateManagerBuild,
+                        onClick  = { buildFromSource() },
+                        enabled  = !busy && experimentalOn && toolchainReady,
                         modifier = Modifier.fillMaxWidth(),
-                        shape = MaterialTheme.shapes.small,
-                        colors = ButtonDefaults.buttonColors(containerColor = NxTheme.colors.primary),
-                    ) {
-                        Text(s.updateManagerBuild, color = Color.White, fontWeight = FontWeight.Bold)
-                    }
+                    )
                     if (buildLog.isNotEmpty()) {
                         Spacer(Modifier.height(8.dp))
                         Box(

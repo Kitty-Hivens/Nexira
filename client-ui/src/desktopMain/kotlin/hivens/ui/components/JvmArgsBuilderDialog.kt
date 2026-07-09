@@ -1,4 +1,5 @@
 package hivens.ui.components
+import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxSectionHeader
 import hivens.ui.nx.NxSwitch
 
@@ -168,17 +169,11 @@ fun JvmArgsBuilderDialog(
                         Text(s.jvmCancel, color = NxTheme.colors.textSecondary)
                     }
                     Spacer(Modifier.width(8.dp))
-                    Button(
+                    NxButton(
+                        label   = s.jvmApply,
                         onClick = { onApply(config.toArgString()) },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = NxTheme.colors.primary,
-                        ),
-                        shape = MaterialTheme.shapes.small,
-                    ) {
-                        Symbol(NxIcon.Check, null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text(s.jvmApply)
-                    }
+                        icon    = NxIcon.Check,
+                    )
                 }
             }
         }
