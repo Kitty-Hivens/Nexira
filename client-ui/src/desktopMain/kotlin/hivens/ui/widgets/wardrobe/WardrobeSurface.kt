@@ -57,6 +57,7 @@ import hivens.ui.i18n.AppStrings
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxChoiceChip
+import hivens.ui.nx.NxSectionHeader
 import hivens.ui.nx.NxTooltip
 import hivens.ui.surface.NxCard
 import hivens.ui.surface.NxSurfaceLevel
@@ -414,7 +415,9 @@ private fun Wardrobe(session: SessionData) {
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                item(key = "skins-h", span = { GridItemSpan(maxLineSpan) }) { SectionHeader(s.wardrobeSaved) }
+                item(key = "skins-h", span = { GridItemSpan(maxLineSpan) }) {
+                    NxSectionHeader(s.wardrobeSaved, muted = true, modifier = Modifier.padding(top = 4.dp))
+                }
                 item(key = "add-skin") { AddTile(onClick = { importInto(SkinLibrary.Kind.Skin) { selectedId = it } }) }
                 items(data.skins, key = { it.id }) { entry ->
                     SkinCard(
@@ -438,7 +441,9 @@ private fun Wardrobe(session: SessionData) {
                 // set one (capability gate above); the clan hint stays for the
                 // fail-open Unknown case.
                 if (showCapes) {
-                    item(key = "capes-h", span = { GridItemSpan(maxLineSpan) }) { SectionHeader(s.wardrobeCapes) }
+                    item(key = "capes-h", span = { GridItemSpan(maxLineSpan) }) {
+                        NxSectionHeader(s.wardrobeCapes, muted = true, modifier = Modifier.padding(top = 4.dp))
+                    }
                     item(key = "capes-hint", span = { GridItemSpan(maxLineSpan) }) {
                         Text(
                             s.wardrobeCapeClanHint,
@@ -469,7 +474,9 @@ private fun Wardrobe(session: SessionData) {
                 // Mojang's default skins, read from a provisioned client jar (never
                 // bundled). Read-only -- pick to preview / apply, no delete.
                 if (defaults.isNotEmpty()) {
-                    item(key = "defaults-h", span = { GridItemSpan(maxLineSpan) }) { SectionHeader(s.wardrobeDefaults) }
+                    item(key = "defaults-h", span = { GridItemSpan(maxLineSpan) }) {
+                        NxSectionHeader(s.wardrobeDefaults, muted = true, modifier = Modifier.padding(top = 4.dp))
+                    }
                     items(defaults, key = { it.name }) { def ->
                         SkinCard(
                             bitmap = defaultBitmaps[def.name],
@@ -575,16 +582,6 @@ private fun AddTile(onClick: () -> Unit) {
         }
     }
     PuppetClick("wardrobe.upload") { onClick() }
-}
-
-@Composable
-private fun SectionHeader(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.titleSmall,
-        color = NxTheme.colors.textSecondary,
-        modifier = Modifier.padding(top = 4.dp),
-    )
 }
 
 @Composable

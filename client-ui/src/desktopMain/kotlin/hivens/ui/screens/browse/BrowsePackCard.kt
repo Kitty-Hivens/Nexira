@@ -14,8 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -31,13 +29,15 @@ import coil3.compose.AsyncImage
 import coil3.compose.SubcomposeAsyncImage
 import hivens.core.api.catalogue.CataloguePack
 import hivens.core.data.PackOrigin
+import hivens.ui.components.SourceBadge
 import hivens.ui.effects.pixelArtBackground
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.nx.NxMetaChip
+import hivens.ui.nx.NxMetaChipTone
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.decorativePair
-import hivens.ui.theme.origin
 
 /**
  * One Browse row. Same shape as Library's PackCard (banner-as-bg + avatar +
@@ -119,9 +119,12 @@ fun BrowsePackCard(
                     verticalAlignment     = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    pack.mcVersion?.let { MetaChip("MC $it") }
+                    pack.mcVersion?.let { NxMetaChip("MC $it", tone = NxMetaChipTone.OnMedia) }
                     pack.tags.take(3).forEach { tag ->
-                        MetaChip(if (pack.origin == PackOrigin.Modrinth) s.modrinthCategory(tag) else tag)
+                        NxMetaChip(
+                            if (pack.origin == PackOrigin.Modrinth) s.modrinthCategory(tag) else tag,
+                            tone = NxMetaChipTone.OnMedia,
+                        )
                     }
                 }
             }
@@ -172,42 +175,3 @@ private fun InitialsAvatar(title: String, hue: Color) {
     }
 }
 
-@Composable
-private fun SourceBadge(origin: PackOrigin) {
-    Box(
-        modifier = Modifier
-            .clip(MaterialTheme.shapes.extraSmall)
-            .background(NxTheme.colors.origin(origin).copy(alpha = 0.85f))
-            .padding(horizontal = 8.dp, vertical = 2.dp),
-    ) {
-        Text(
-            text       = originLabel(origin),
-            style      = MaterialTheme.typography.labelSmall,
-            color      = Color.White,
-            fontWeight = FontWeight.Bold,
-        )
-    }
-}
-
-private fun originLabel(origin: PackOrigin): String = when (origin) {
-    PackOrigin.Mirror -> "Mirror"
-    PackOrigin.Modrinth -> "Modrinth"
-    PackOrigin.Smartycraft -> "SmartyCraft"
-    PackOrigin.Local -> "Local"
-    PackOrigin.Unknown -> "Other"
-}
-
-@Composable
-private fun MetaChip(text: String) {
-    AssistChip(
-        onClick = {},
-        enabled = false,
-        shape   = MaterialTheme.shapes.extraSmall,
-        label   = { Text(text, style = MaterialTheme.typography.labelSmall, color = Color.White) },
-        colors  = AssistChipDefaults.assistChipColors(
-            disabledContainerColor = Color.Black.copy(alpha = 0.35f),
-            disabledLabelColor     = Color.White,
-        ),
-        border  = null,
-    )
-}

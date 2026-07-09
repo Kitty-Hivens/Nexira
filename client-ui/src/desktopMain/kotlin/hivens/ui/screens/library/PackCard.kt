@@ -15,8 +15,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -38,8 +36,11 @@ import coil3.compose.SubcomposeAsyncImage
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
 import hivens.ui.components.InitialsAvatar
+import hivens.ui.components.SourceBadge
 import hivens.ui.nx.NxContextMenu
 import hivens.ui.nx.NxMenuItem
+import hivens.ui.nx.NxMetaChip
+import hivens.ui.nx.NxMetaChipTone
 import hivens.ui.effects.pixelArtBackground
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
@@ -47,7 +48,6 @@ import hivens.ui.icons.Symbol
 import hivens.ui.screens.detail.PackDetailScreen
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.decorativePair
-import hivens.ui.theme.origin
 import java.time.Duration
 import java.time.Instant
 
@@ -131,9 +131,9 @@ fun PackCard(
                         verticalAlignment     = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
-                        MetaChip(instance.packRef.version ?: "—")
+                        NxMetaChip(instance.packRef.version ?: "—", tone = NxMetaChipTone.OnMedia)
                         instance.forkedFrom?.let {
-                            MetaChip("fork", emphasis = true)
+                            NxMetaChip("fork", tone = NxMetaChipTone.OnMediaAccent)
                         }
                         LastPlayedChip(instance.lastPlayedEpochOrZero)
                     }
@@ -178,46 +178,10 @@ private fun PackAvatar(iconUrl: String?, displayName: String, hue: Color) {
 }
 
 @Composable
-private fun SourceBadge(origin: PackOrigin) {
-    val label = when (origin) {
-        PackOrigin.Smartycraft -> "SC"
-        PackOrigin.Mirror      -> "Mirror"
-        PackOrigin.Modrinth    -> "Modrinth"
-        PackOrigin.Local       -> "Local"
-        PackOrigin.Unknown     -> "?"
-    }
-    val color = NxTheme.colors.origin(origin)
-    Box(
-        modifier = Modifier
-            .clip(MaterialTheme.shapes.extraSmall)
-            .background(color.copy(alpha = 0.85f))
-            .padding(horizontal = 8.dp, vertical = 2.dp),
-    ) {
-        Text(label, style = MaterialTheme.typography.labelSmall, color = Color.White, fontWeight = FontWeight.Bold)
-    }
-}
-
-@Composable
-private fun MetaChip(text: String, emphasis: Boolean = false) {
-    AssistChip(
-        onClick   = {},
-        enabled   = false,
-        shape     = MaterialTheme.shapes.extraSmall,
-        label     = { Text(text, style = MaterialTheme.typography.labelSmall, color = Color.White) },
-        colors    = AssistChipDefaults.assistChipColors(
-            disabledContainerColor = if (emphasis) NxTheme.colors.primary.copy(alpha = 0.85f)
-                                     else          Color.Black.copy(alpha = 0.35f),
-            disabledLabelColor     = Color.White,
-        ),
-        border    = null,
-    )
-}
-
-@Composable
 private fun LastPlayedChip(lastPlayedEpoch: Long) {
     val s = LocalStrings.current
     if (lastPlayedEpoch <= 0L) {
-        MetaChip(s.packCardNeverPlayed)
+        NxMetaChip(s.packCardNeverPlayed, tone = NxMetaChipTone.OnMedia)
         return
     }
     val now = Instant.now()
@@ -230,15 +194,11 @@ private fun LastPlayedChip(lastPlayedEpoch: Long) {
         dur.toDays()    < 14  -> s.packCardPlayedDaysAgo(dur.toDays())
         else                  -> s.packCardPlayedLongAgo
     }
-    MetaChip(label)
+    NxMetaChip(label, tone = NxMetaChipTone.OnMedia)
 }
 
-/**
- * Workaround helper for the `requiredJava` chip on the detail screen
- * (PackDetailScreen reuses [MetaChip] via this re-exported alias so
- * it doesn't have to duplicate the chip styling).
- */
+/** The card's on-media meta chip, kept as a named alias for other over-banner surfaces. */
 @Composable
 internal fun PackMetaChip(text: String, emphasis: Boolean = false) {
-    MetaChip(text, emphasis = emphasis)
+    NxMetaChip(text, tone = if (emphasis) NxMetaChipTone.OnMediaAccent else NxMetaChipTone.OnMedia)
 }

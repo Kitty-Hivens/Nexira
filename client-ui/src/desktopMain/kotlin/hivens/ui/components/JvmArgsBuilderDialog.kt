@@ -1,4 +1,5 @@
 package hivens.ui.components
+import hivens.ui.nx.NxSectionHeader
 import hivens.ui.nx.NxSwitch
 
 import androidx.compose.foundation.background
@@ -237,7 +238,7 @@ private fun PresetPickerRow(
 private fun GcTabContent(config: JvmConfig, onChange: (JvmConfig) -> Unit) {
     val s = LocalStrings.current
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        SectionHeader(s.jvmGcHeader)
+        NxSectionHeader(s.jvmGcHeader)
 
         GcOption("G1GC", s.jvmGcG1Hint,
             selected = config.gc == GcChoice.G1) {
@@ -311,7 +312,7 @@ private fun GcTuningTabContent(config: JvmConfig, onChange: (JvmConfig) -> Unit)
 private fun G1TuningPanel(g1: G1Tuning, onChange: (G1Tuning) -> Unit) {
     val s = LocalStrings.current
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        SectionHeader(s.jvmG1Header)
+        NxSectionHeader(s.jvmG1Header)
         SliderField(
             label = "MaxGCPauseMillis", hint = s.jvmG1MaxPauseMillisHint,
             value = g1.maxPauseMs.toFloat(), valueRange = 50f..500f, steps = 8,
@@ -355,7 +356,7 @@ private fun G1TuningPanel(g1: G1Tuning, onChange: (G1Tuning) -> Unit) {
 private fun ZgcTuningPanel(z: ZgcTuning, onChange: (ZgcTuning) -> Unit) {
     val s = LocalStrings.current
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        SectionHeader(s.jvmZHeader)
+        NxSectionHeader(s.jvmZHeader)
         ToggleField(
             label = "Generational ZGC",
             hint = s.jvmZGenerationalHint,
@@ -368,7 +369,7 @@ private fun ZgcTuningPanel(z: ZgcTuning, onChange: (ZgcTuning) -> Unit) {
 private fun ShenandoahTuningPanel(tuning: ShenandoahTuning, onChange: (ShenandoahTuning) -> Unit) {
     val s = LocalStrings.current
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        SectionHeader(s.jvmShenandoahHeader)
+        NxSectionHeader(s.jvmShenandoahHeader)
         ShenandoahTuning.Heuristic.entries.forEach { heuristic ->
             val hint = when (heuristic) {
                 ShenandoahTuning.Heuristic.Adaptive -> s.jvmShenandoahAdaptiveHint
@@ -388,7 +389,7 @@ private fun ShenandoahTuningPanel(tuning: ShenandoahTuning, onChange: (Shenandoa
 private fun CdsTabContent(config: JvmConfig, onChange: (JvmConfig) -> Unit) {
     val s = LocalStrings.current
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        SectionHeader(s.jvmCdsHeader)
+        NxSectionHeader(s.jvmCdsHeader)
         Text(
             s.jvmCdsIntro,
             color = NxTheme.colors.textSecondary,
@@ -428,7 +429,7 @@ private fun CdsTabContent(config: JvmConfig, onChange: (JvmConfig) -> Unit) {
 private fun JitTabContent(config: JvmConfig, onChange: (JvmConfig) -> Unit) {
     val s = LocalStrings.current
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        SectionHeader(s.jvmJitHeader)
+        NxSectionHeader(s.jvmJitHeader)
         ToggleField(
             label = "Tiered compilation",
             hint = s.jvmJitTieredHint,
@@ -452,7 +453,7 @@ private fun JitTabContent(config: JvmConfig, onChange: (JvmConfig) -> Unit) {
 private fun PerfTabContent(config: JvmConfig, onChange: (JvmConfig) -> Unit) {
     val s = LocalStrings.current
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        SectionHeader(s.jvmPerfHeader)
+        NxSectionHeader(s.jvmPerfHeader)
         ToggleField(
             label = "AlwaysPreTouch",
             hint = s.jvmPerfAlwaysPreTouchHint,
@@ -497,7 +498,7 @@ private fun PerfTabContent(config: JvmConfig, onChange: (JvmConfig) -> Unit) {
 private fun JfrTabContent(config: JvmConfig, onChange: (JvmConfig) -> Unit) {
     val s = LocalStrings.current
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        SectionHeader(s.jvmJfrHeader)
+        NxSectionHeader(s.jvmJfrHeader)
         Text(
             s.jvmJfrIntro,
             color = NxTheme.colors.textSecondary,
@@ -519,7 +520,7 @@ private fun JfrTabContent(config: JvmConfig, onChange: (JvmConfig) -> Unit) {
             ) {
                 onChange(config.copy(jfr = config.jfr.copy(durationMinutes = it ?: 60)))
             }
-            SectionHeader(s.jvmJfrSettingsHeader)
+            NxSectionHeader(s.jvmJfrSettingsHeader)
             JfrConfig.SettingsPreset.entries.forEach { preset ->
                 val hint = when (preset) {
                     JfrConfig.SettingsPreset.Default -> s.jvmJfrSettingsDefaultHint
@@ -548,7 +549,7 @@ private fun CustomTabContent(config: JvmConfig, onChange: (JvmConfig) -> Unit) {
     val s = LocalStrings.current
     var text by remember(config.custom) { mutableStateOf(config.custom.joinToString(" ")) }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        SectionHeader(s.jvmCustomHeader)
+        NxSectionHeader(s.jvmCustomHeader)
         Text(
             s.jvmCustomIntro,
             color = NxTheme.colors.textSecondary,
@@ -610,16 +611,6 @@ private fun ArgsPreviewBox(config: JvmConfig) {
 }
 
 // ─── Reusable widgets ─────────────────────────────────────────────────────
-
-@Composable
-private fun SectionHeader(text: String) {
-    Text(
-        text,
-        color = NxTheme.colors.primary,
-        fontWeight = FontWeight.Bold,
-        style = MaterialTheme.typography.titleSmall,
-    )
-}
 
 @Composable
 private fun SliderField(

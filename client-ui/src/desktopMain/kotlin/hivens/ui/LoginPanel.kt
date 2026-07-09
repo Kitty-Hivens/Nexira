@@ -1,7 +1,6 @@
 package hivens.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -35,6 +34,8 @@ import hivens.ui.flexible.Flexible
 import hivens.ui.flexible.FlexibleKind
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
+import hivens.ui.nx.NxCalloutBanner
+import hivens.ui.nx.NxCalloutTone
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetField
@@ -260,32 +261,11 @@ fun LoginPanel(
 
         // ── SSL warning banner ────────────────────────────────────────────
         if (sslWarning) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(
-                        color = NxTheme.colors.warnAccent.copy(alpha = 0.12f),
-                        shape = MaterialTheme.shapes.medium
-                    )
-                    .border(
-                        width = 1.dp,
-                        color = NxTheme.colors.warnAccent.copy(alpha = 0.5f),
-                        shape = MaterialTheme.shapes.medium
-                    )
-                    .padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+            NxCalloutBanner(
+                tone  = NxCalloutTone.Warning,
+                title = s.sslWarningTitle,
+                body  = s.sslWarningBody,
             ) {
-                Text(
-                    text       = "⚠ ${s.sslWarningTitle}",
-                    style      = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color      = NxTheme.colors.warnAccent
-                )
-                Text(
-                    text  = s.sslWarningBody,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = NxTheme.colors.textPrimary.copy(alpha = 0.85f)
-                )
                 // Trust-duration prompt + 3 grant buttons. Each click both
                 // grants the bypass for that duration AND retries login --
                 // single-click UX. Cancel button is on its own row above so
@@ -343,32 +323,11 @@ fun LoginPanel(
 
         // ── 2FA unsupported banner ────────────────────────────────────────
         if (twoFactorUnsupported) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(
-                        color = NxTheme.colors.warnAccent.copy(alpha = 0.12f),
-                        shape = MaterialTheme.shapes.medium
-                    )
-                    .border(
-                        width = 1.dp,
-                        color = NxTheme.colors.warnAccent.copy(alpha = 0.5f),
-                        shape = MaterialTheme.shapes.medium
-                    )
-                    .padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+            NxCalloutBanner(
+                tone  = NxCalloutTone.Warning,
+                title = s.auth2faUnsupportedTitle,
+                body  = s.auth2faUnsupportedBody,
             ) {
-                Text(
-                    text       = s.auth2faUnsupportedTitle,
-                    style      = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color      = NxTheme.colors.warnAccent
-                )
-                Text(
-                    text  = s.auth2faUnsupportedBody,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = NxTheme.colors.textPrimary.copy(alpha = 0.85f)
-                )
                 OutlinedButton(
                     onClick  = { twoFactorUnsupported = false },
                     modifier = Modifier.align(Alignment.End),
