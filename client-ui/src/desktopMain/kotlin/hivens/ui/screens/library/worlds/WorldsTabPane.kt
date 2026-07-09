@@ -41,6 +41,7 @@ import hivens.ui.i18n.AppStrings
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.nx.NxSectionHeader
 import hivens.ui.screens.CenteredProgress
 import hivens.ui.screens.RetryStateBlock
 import hivens.ui.theme.NxTheme
@@ -120,7 +121,7 @@ private fun WorldsList(
         modifier            = modifier.fillMaxSize().padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        item { SectionHeader(text = s.worldsTabLocalSection(worlds.size)) }
+        item { NxSectionHeader(text = s.worldsTabLocalSection(worlds.size)) }
         if (worlds.isEmpty()) {
             item { EmptyHint(text = s.worldsTabLocalEmpty) }
         } else {
@@ -129,7 +130,7 @@ private fun WorldsList(
 
         item { Spacer(Modifier.height(4.dp)) }
 
-        item { SectionHeader(text = s.worldsTabServersSection(servers.size)) }
+        item { NxSectionHeader(text = s.worldsTabServersSection(servers.size)) }
         if (servers.isEmpty()) {
             item { EmptyHint(text = s.worldsTabServersEmpty) }
         } else {
@@ -138,16 +139,6 @@ private fun WorldsList(
 
         item { Spacer(Modifier.height(8.dp)) }
     }
-}
-
-@Composable
-private fun SectionHeader(text: String) {
-    Text(
-        text       = text,
-        style      = MaterialTheme.typography.titleSmall,
-        color      = NxTheme.colors.primary,
-        fontWeight = FontWeight.Bold,
-    )
 }
 
 @Composable

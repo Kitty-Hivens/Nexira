@@ -13,8 +13,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -34,10 +32,13 @@ import com.mikepenz.markdown.m3.Markdown
 import hivens.core.api.dto.smrt.SmrtModEntry
 import hivens.core.api.dto.smrt.SmrtRequirement
 import hivens.core.smrt.DepGraph
+import hivens.ui.components.SourceBadge
 import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.nx.NxMetaChip
+import hivens.ui.nx.NxMetaChipTone
 import hivens.ui.theme.NxTheme
 import java.awt.Desktop
 import java.net.URI
@@ -176,7 +177,7 @@ private fun ExpandedDetails(mod: SmrtModEntry, graph: DepGraph) {
         // License + URL chip row.
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             mod.display?.license?.takeIf { it.isNotBlank() }?.let { lic ->
-                MetaChip(text = s.contentTabModLicensePrefix(lic))
+                NxMetaChip(text = s.contentTabModLicensePrefix(lic))
             }
             mod.display?.url?.takeIf { it.isNotBlank() }?.let { url ->
                 LinkChip(text = s.contentTabModUrlLabel, url = url)
@@ -281,32 +282,10 @@ private fun DependencyRow(filename: String, versionRange: String?, optional: Boo
             style = MaterialTheme.typography.bodySmall,
             color = if (missing) NxTheme.colors.error else NxTheme.colors.textPrimary,
         )
-        if (versionRange != null) MetaChip(text = versionRange)
-        if (optional)             MetaChip(text = s.contentTabDepOptional)
-        if (missing)              MetaChip(text = s.contentTabDepMissing, error = true)
+        if (versionRange != null) NxMetaChip(text = versionRange)
+        if (optional)             NxMetaChip(text = s.contentTabDepOptional)
+        if (missing)              NxMetaChip(text = s.contentTabDepMissing, tone = NxMetaChipTone.Error)
     }
-}
-
-@Composable
-private fun MetaChip(text: String, error: Boolean = false) {
-    AssistChip(
-        onClick = {},
-        enabled = false,
-        shape   = MaterialTheme.shapes.extraSmall,
-        label   = {
-            Text(
-                text  = text,
-                style = MaterialTheme.typography.labelSmall,
-                color = if (error) NxTheme.colors.error else NxTheme.colors.textSecondary,
-            )
-        },
-        colors  = AssistChipDefaults.assistChipColors(
-            disabledContainerColor = if (error) NxTheme.colors.error.copy(alpha = 0.15f)
-                                     else NxTheme.colors.outline.copy(alpha = 0.2f),
-            disabledLabelColor     = if (error) NxTheme.colors.error else NxTheme.colors.textSecondary,
-        ),
-        border  = null,
-    )
 }
 
 @Composable
