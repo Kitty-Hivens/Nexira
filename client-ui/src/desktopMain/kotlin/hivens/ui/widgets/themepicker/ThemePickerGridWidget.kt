@@ -36,6 +36,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import hivens.ui.nx.GlassCard
+import hivens.ui.surface.NxCard
 import hivens.ui.customization.scaledAlpha
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
@@ -56,7 +57,7 @@ fun ThemePickerGridWidget(instance: WidgetInstance) {
     val s = LocalStrings.current
     val selectedTheme by ctx.selectedTheme
 
-    GlassCard(modifier = Modifier.fillMaxSize(), shape = MaterialTheme.shapes.large) {
+    NxCard(modifier = Modifier.fillMaxSize(), shape = MaterialTheme.shapes.large) {
         LazyVerticalGrid(
             columns               = GridCells.Fixed(2),
             contentPadding        = PaddingValues(16.dp),

@@ -8,7 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import hivens.ui.nx.GlassCard
+import hivens.ui.surface.NxCard
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.widget.api.rememberProps
@@ -34,7 +34,7 @@ fun AboutSystemCardWidget(instance: WidgetInstance) {
     val ctx = LocalAboutContext.current
     val s = LocalStrings.current
 
-    GlassCard(Modifier.fillMaxWidth()) {
+    NxCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(20.dp)) {
             SectionLabel(p.title.ifBlank { s.aboutSectionSystem })
             Spacer(Modifier.height(12.dp))

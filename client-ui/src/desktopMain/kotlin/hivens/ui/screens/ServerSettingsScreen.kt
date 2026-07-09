@@ -22,12 +22,11 @@ import hivens.core.api.model.ServerProfile
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.components.DestructiveConfirmDialog
-import hivens.ui.nx.GlassCard
+import hivens.ui.surface.NxCard
 import hivens.ui.components.JvmArgsBuilderDialog
 import hivens.ui.components.ModItemCard
 import hivens.ui.nx.NxSwitch
 import hivens.ui.components.RamSelector
-import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -135,9 +134,8 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
             // ══════════════════════════════════════════════════════════════════
             // LEFT COLUMN -- System settings
             // ══════════════════════════════════════════════════════════════════
-            GlassCard(
-                modifier        = Modifier.weight(1f).fillMaxHeight(),
-                backgroundColor = glassSurfaceAlpha(0.7f),
+            NxCard(
+                modifier = Modifier.weight(1f).fillMaxHeight(),
             ) {
                 Column(Modifier.padding(24.dp).verticalScroll(rememberScrollState())) {
 
@@ -353,9 +351,8 @@ fun ServerSettingsScreen(server: ServerProfile, onBack: () -> Unit) {
             // ══════════════════════════════════════════════════════════════════
             // RIGHT COLUMN -- Mods
             // ══════════════════════════════════════════════════════════════════
-            GlassCard(
-                modifier        = Modifier.weight(1f).fillMaxHeight(),
-                backgroundColor = glassSurfaceAlpha(0.7f),
+            NxCard(
+                modifier = Modifier.weight(1f).fillMaxHeight(),
             ) {
                 Column(Modifier.padding(24.dp)) {
                     Text(s.serverSettingsSectionMods, style = MaterialTheme.typography.titleSmall, color = NxTheme.colors.primary)

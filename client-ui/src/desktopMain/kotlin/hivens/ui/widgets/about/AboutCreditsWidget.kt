@@ -24,7 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import hivens.ui.BuildConfig
-import hivens.ui.nx.GlassCard
+import hivens.ui.surface.NxCard
 import hivens.ui.easter.GibberishMode
 import hivens.ui.easter.LocalAprilFools
 import hivens.ui.i18n.LocalStrings
@@ -54,7 +54,7 @@ fun AboutCreditsWidget(instance: WidgetInstance) {
     val af = LocalAprilFools.current
     val s = LocalStrings.current
 
-    GlassCard(Modifier.fillMaxWidth()) {
+    NxCard(Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier
                 .padding(20.dp)

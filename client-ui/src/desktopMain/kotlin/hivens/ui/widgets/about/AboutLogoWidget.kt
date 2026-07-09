@@ -21,7 +21,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import hivens.config.Branding
 import hivens.ui.BuildConfig
-import hivens.ui.nx.GlassCard
+import hivens.ui.surface.NxCard
 import hivens.ui.easter.GibberishMode
 import hivens.ui.easter.LocalAprilFools
 import hivens.ui.generated.resources.Res
@@ -58,7 +58,7 @@ fun AboutLogoWidget(instance: WidgetInstance) {
     val af = LocalAprilFools.current
     val s = LocalStrings.current
 
-    GlassCard(Modifier.fillMaxWidth()) {
+    NxCard(Modifier.fillMaxWidth()) {
         Column(
             modifier            = Modifier.fillMaxWidth().padding(28.dp),
             horizontalAlignment = Alignment.CenterHorizontally,

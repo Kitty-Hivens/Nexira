@@ -1,6 +1,7 @@
 package hivens.ui.components
-import hivens.ui.nx.GlassCard
 import hivens.ui.nx.NxButton
+import hivens.ui.surface.NxSurface
+import hivens.ui.surface.NxSurfaceLevel
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -175,12 +176,13 @@ fun UpdateManagerDialog(onDismiss: () -> Unit) {
     PuppetClick("updateManager.dismiss", enabled = !busy) { onDismiss() }
 
     BasicAlertDialog(onDismissRequest = { if (!busy) onDismiss() }) {
-        GlassCard(
-            // A modal stays readable regardless of the glass-intensity knob, so
-            // this is a fixed near-opaque dark panel, not glassIntensity-scaled
+        NxSurface(
+            // A modal stays readable regardless of the glass-intensity knob, so it
+            // is a fixed opaque panel (glass = false), not glassIntensity-scaled
             // (BasicAlertDialog draws no scrim behind it).
+            level    = NxSurfaceLevel.Floating,
+            glass    = false,
             modifier = Modifier.width(560.dp).wrapContentHeight(),
-            backgroundColor = NxTheme.colors.background.copy(alpha = 0.97f),
         ) {
             Column(Modifier.padding(24.dp)) {
                 // ── Header ───────────────────────────────────────────────────────
