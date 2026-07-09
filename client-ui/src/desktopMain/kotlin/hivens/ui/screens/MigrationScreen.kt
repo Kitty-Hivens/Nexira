@@ -14,7 +14,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import hivens.launcher.platform.DataDirMigration
-import hivens.ui.nx.GlassCard
+import hivens.ui.surface.NxCard
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.customization.glassSurfaceAlpha
@@ -62,7 +62,7 @@ fun MigrationScreen(
             .background(NxTheme.colors.background),
         contentAlignment = Alignment.Center,
     ) {
-        GlassCard(modifier = Modifier.widthIn(min = 480.dp, max = 640.dp)) {
+        NxCard(modifier = Modifier.widthIn(min = 480.dp, max = 640.dp)) {
             Column(
                 modifier = Modifier.padding(36.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,

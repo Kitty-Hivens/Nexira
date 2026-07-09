@@ -26,9 +26,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import hivens.config.Branding
 import hivens.core.data.ReleaseChannel
-import hivens.ui.nx.GlassCard
+import hivens.ui.surface.NxCard
 import hivens.ui.components.channelColor
-import hivens.ui.customization.glassSurfaceAlpha
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -65,7 +64,7 @@ fun AboutUpdatePanelWidget(instance: WidgetInstance) {
     val channel = remember { ReleaseChannel.classify(Branding.VERSION.removePrefix("v")) }
     val accent = channelColor(channel)
 
-    GlassCard(Modifier.fillMaxWidth()) {
+    NxCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(20.dp)) {
             SectionLabel(p.title.ifBlank { s.aboutSectionUpdates })
             Spacer(Modifier.height(16.dp))

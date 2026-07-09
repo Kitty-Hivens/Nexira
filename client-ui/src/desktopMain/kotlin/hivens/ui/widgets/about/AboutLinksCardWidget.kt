@@ -8,7 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import hivens.ui.nx.GlassCard
+import hivens.ui.surface.NxCard
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.widget.api.rememberProps
@@ -33,7 +33,7 @@ fun AboutLinksCardWidget(instance: WidgetInstance) {
     val p = instance.rememberProps<AboutLinksProps>()
     val s = LocalStrings.current
 
-    GlassCard(Modifier.fillMaxWidth()) {
+    NxCard(Modifier.fillMaxWidth()) {
         // No inner scroll: the surface already scrolls the right slot in narrow
         // layouts, and nesting a second scroll crashes (unbounded height).
         Column(Modifier.padding(20.dp)) {
