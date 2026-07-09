@@ -204,17 +204,29 @@ private fun NewLocalPackDialog(
     var name by remember { mutableStateOf("") }
     var mc by remember { mutableStateOf("") }
     var mcMenuOpen by remember { mutableStateOf(false) }
+    var showSnapshots by remember { mutableStateOf(false) }
     var loaderVersion by remember { mutableStateOf("") }
     var versions by remember { mutableStateOf<List<String>>(emptyList()) }
     val loaders = remember { listOf("Vanilla" to null, "Fabric" to "fabric", "Forge" to "forge", "NeoForge" to "neoforge", "Quilt" to "quilt") }
     var loaderSel by remember { mutableStateOf(0) }
-    val canCreate = name.isNotBlank() && mc.isNotBlank()
+
+    // Smart default name from the loader + version ("Fabric 1.20.1"); the name
+    // field is optional and falls back to it.
+    val defaultName = remember(loaderSel, mc) {
+        listOf(loaders[loaderSel].first, mc.trim()).filter { it.isNotBlank() }.joinToString(" ")
+    }
+    val effectiveName = name.ifBlank { defaultName }
+    val canCreate = mc.isNotBlank()
 
     LaunchedEffect(Unit) {
         versions = runCatching { withContext(Dispatchers.IO) { provisioner.availableMinecraftVersions() } }.getOrDefault(emptyList())
     }
-    val matches = remember(mc, versions) {
-        (if (mc.isBlank()) versions else versions.filter { it.contains(mc.trim(), ignoreCase = true) }).take(60)
+    // Releases only by default (a plain a.b or a.b.c id); snapshots / rc / pre are
+    // behind a toggle, so the common case is not buried under nightly builds.
+    val matches = remember(mc, versions, showSnapshots) {
+        val release = Regex("""^\d+\.\d+(\.\d+)?$""")
+        val pool = if (showSnapshots) versions else versions.filter { release.matches(it) }
+        (if (mc.isBlank()) pool else pool.filter { it.contains(mc.trim(), ignoreCase = true) }).take(60)
     }
 
     Popup(alignment = Alignment.Center, onDismissRequest = onDismiss, properties = PopupProperties(focusable = true)) {
@@ -233,7 +245,7 @@ private fun NewLocalPackDialog(
                     Text(s.libraryNewLocalPack, style = MaterialTheme.typography.titleMedium, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
 
                     FieldLabel(s.createPackName)
-                    NxField(value = name, onValueChange = { name = it }, placeholder = s.createPackName, modifier = Modifier.fillMaxWidth())
+                    NxField(value = name, onValueChange = { name = it }, placeholder = defaultName.ifBlank { s.createPackName }, modifier = Modifier.fillMaxWidth())
                     PuppetField("createPack.name", name) { name = it }
 
                     FieldLabel(s.createPackMc)
@@ -247,11 +259,14 @@ private fun NewLocalPackDialog(
                             // unclipped square whose corners poke past the field's rounded shape.
                             modifier = Modifier.fillMaxWidth().onFocusChanged { if (it.isFocused) mcMenuOpen = true },
                         )
-                        NxContextMenu(expanded = mcMenuOpen && matches.isNotEmpty(), onDismissRequest = { mcMenuOpen = false }) {
+                        NxContextMenu(expanded = mcMenuOpen && versions.isNotEmpty(), onDismissRequest = { mcMenuOpen = false }) {
                             Column(Modifier.heightIn(max = 240.dp).verticalScroll(rememberScrollState())) {
                                 matches.forEach { v ->
                                     NxMenuItem(label = v, selected = v == mc) { mc = v; mcMenuOpen = false }
                                 }
+                            }
+                            NxMenuItem(label = if (showSnapshots) s.createPackHideSnapshots else s.createPackShowSnapshots) {
+                                showSnapshots = !showSnapshots
                             }
                         }
                     }
@@ -273,13 +288,13 @@ private fun NewLocalPackDialog(
                         NxButton(label = s.createPackCancel, onClick = onDismiss, style = NxButtonStyle.Tertiary, compact = true)
                         NxButton(
                             label = s.createPackConfirm,
-                            onClick = { onCreate(name.trim(), mc.trim(), loaders[loaderSel].second, loaderVersion.trim()) },
+                            onClick = { onCreate(effectiveName.trim(), mc.trim(), loaders[loaderSel].second, loaderVersion.trim()) },
                             style = NxButtonStyle.Primary,
                             enabled = canCreate,
                             compact = true,
                         )
                         PuppetClick("createPack.create", enabled = canCreate) {
-                            onCreate(name.trim(), mc.trim(), loaders[loaderSel].second, loaderVersion.trim())
+                            onCreate(effectiveName.trim(), mc.trim(), loaders[loaderSel].second, loaderVersion.trim())
                         }
                     }
                 }

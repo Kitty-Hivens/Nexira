@@ -691,6 +691,8 @@ object GermanStrings : AppStrings {
     override val createPackLoaderVersion = "Loader-Version (optional)"
     override val createPackConfirm       = "Erstellen"
     override val createPackCancel        = "Abbrechen"
+    override val createPackShowSnapshots = "Snapshots anzeigen"
+    override val createPackHideSnapshots = "Snapshots ausblenden"
     override val browseEmptyTitle        = "Katalog ist leer"
     override val browseEmptyMessage      = "Der Mirror ist erreichbar, hat aber noch keine Packs veröffentlicht. Schau später wieder vorbei."
     override val browseErrorTitle        = "Mirror nicht erreichbar"
