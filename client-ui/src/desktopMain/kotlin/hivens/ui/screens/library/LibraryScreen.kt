@@ -1,5 +1,12 @@
 package hivens.ui.screens.library
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -58,6 +65,7 @@ import hivens.ui.puppet.PuppetField
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.NxSurfaceLevel
+import hivens.ui.theme.LocalStyle
 import hivens.ui.theme.NxTheme
 import hivens.ui.widgets.library.LibraryContext
 import hivens.ui.widgets.library.LocalLibraryContext
@@ -229,12 +237,25 @@ private fun NewLocalPackDialog(
         (if (mc.isBlank()) pool else pool.filter { it.contains(mc.trim(), ignoreCase = true) }).take(60)
     }
 
+    // Unfold on open: fade the scrim in and scale the card up from 92%.
+    // Durations run through the active style so Brut (animationMultiplier 0)
+    // collapses the unfold to instant, honouring its motion-off contract.
+    val style = LocalStyle.current
+    var shown by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { shown = true }
+    val scrimAlpha by animateFloatAsState(if (shown) 0.72f else 0f, animationSpec = tween(style.animationDurationMs(180)), label = "scrim")
+
     Popup(alignment = Alignment.Center, onDismissRequest = onDismiss, properties = PopupProperties(focusable = true)) {
         Box(
-            Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.72f))
+            Modifier.fillMaxSize().background(Color.Black.copy(alpha = scrimAlpha))
                 .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onDismiss),
             contentAlignment = Alignment.Center,
         ) {
+          AnimatedVisibility(
+              visible = shown,
+              enter = fadeIn(tween(style.animationDurationMs(200))) + scaleIn(tween(style.animationDurationMs(200)), initialScale = 0.92f),
+              exit  = fadeOut(tween(style.animationDurationMs(120))) + scaleOut(tween(style.animationDurationMs(120)), targetScale = 0.95f),
+          ) {
             NxSurface(
                 level = NxSurfaceLevel.Floating,
                 // Opaque, not glass: a modal sits over a dark scrim, so there is
@@ -246,7 +267,10 @@ private fun NewLocalPackDialog(
                     .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = {}),
             ) {
                 Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Text(s.libraryNewLocalPack, style = MaterialTheme.typography.titleMedium, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Symbol(NxIcon.Inventory2, contentDescription = null, tint = NxTheme.colors.primary, size = 22.dp)
+                        Text(s.libraryNewLocalPack, style = MaterialTheme.typography.titleMedium, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
+                    }
 
                     FieldLabel(s.createPackName)
                     NxField(value = name, onValueChange = { name = it }, placeholder = defaultName.ifBlank { s.createPackName }, modifier = Modifier.fillMaxWidth())
@@ -269,9 +293,10 @@ private fun NewLocalPackDialog(
                                     NxMenuItem(label = v, selected = v == mc) { mc = v; mcMenuOpen = false }
                                 }
                             }
-                            NxMenuItem(label = if (showSnapshots) s.createPackHideSnapshots else s.createPackShowSnapshots) {
-                                showSnapshots = !showSnapshots
-                            }
+                            NxMenuItem(
+                                label = if (showSnapshots) s.createPackHideSnapshots else s.createPackShowSnapshots,
+                                icon = if (showSnapshots) NxIcon.VisibilityOff else NxIcon.Visibility,
+                            ) { showSnapshots = !showSnapshots }
                         }
                     }
                     PuppetField("createPack.mc", mc) { mc = it; mcMenuOpen = true }
@@ -294,6 +319,7 @@ private fun NewLocalPackDialog(
                             label = s.createPackConfirm,
                             onClick = { onCreate(effectiveName.trim(), mc.trim(), loaders[loaderSel].second, loaderVersion.trim()) },
                             style = NxButtonStyle.Primary,
+                            icon = NxIcon.Add,
                             enabled = canCreate,
                             compact = true,
                         )
@@ -303,6 +329,7 @@ private fun NewLocalPackDialog(
                     }
                 }
             }
+          }
         }
     }
 }
