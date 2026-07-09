@@ -692,6 +692,8 @@ object RussianStrings : AppStrings {
     override val createPackLoaderVersion = "Версия загрузчика (необязательно)"
     override val createPackConfirm       = "Создать"
     override val createPackCancel        = "Отмена"
+    override val createPackShowSnapshots = "Показать снапшоты"
+    override val createPackHideSnapshots = "Скрыть снапшоты"
     override val browseEmptyTitle        = "Каталог пуст"
     override val browseEmptyMessage      = "Зеркало доступно, но пока не публикует сборки. Загляни позже."
     override val browseErrorTitle        = "Зеркало недоступно"

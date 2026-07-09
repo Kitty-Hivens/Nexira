@@ -749,6 +749,8 @@ interface AppStrings {
     val createPackLoaderVersion: String
     val createPackConfirm: String
     val createPackCancel: String
+    val createPackShowSnapshots: String
+    val createPackHideSnapshots: String
     /** Localized label for a Modrinth category id (e.g. `optimization`); brands/unknowns fall back to a humanized form. */
     fun modrinthCategory(id: String): String
 
