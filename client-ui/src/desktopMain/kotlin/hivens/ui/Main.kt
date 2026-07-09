@@ -412,7 +412,7 @@ private fun runShellWithRecovery(
             report to reporter.saveToDisk(report)
         }.getOrNull()
 
-        when (UiRecoverySignal.recordShellCrash()) {
+        when (UiRecoverySignal.recordShellCrash(crash = crash)) {
             ShellRecovery.RETRY     -> {
                 log.warn("Restarting shell with a fresh composition")
                 UiRecoverySignal.markRecovered()
