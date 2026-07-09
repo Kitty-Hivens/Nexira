@@ -212,6 +212,13 @@ class RuntimeProvisioner(
      * The rule-allowed vanilla libraries with maven coordinates -- the base of
      * the merge. Paths match [planVanillaDownloads]'s library destinations.
      */
+    /**
+     * Every Minecraft version id from Mojang's manifest, newest-first -- the
+     * source list for a version picker when creating a pack from scratch.
+     */
+    suspend fun availableMinecraftVersions(): List<String> =
+        json.decodeFromString(MojangVersionManifest.serializer(), fetchText(versionManifestUrl)).versions.map { it.id }
+
     internal fun vanillaLibraries(version: MojangVersion): List<ResolvedLibrary> =
         version.libraries.mapNotNull { lib ->
             if (!isLibraryAllowed(lib.rules)) return@mapNotNull null
