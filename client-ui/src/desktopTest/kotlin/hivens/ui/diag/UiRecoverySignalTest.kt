@@ -65,4 +65,33 @@ class UiRecoverySignalTest {
         assertEquals(true, UiRecoverySignal.consumeRecovered())
         assertFalse(UiRecoverySignal.consumeRecovered())
     }
+
+    // --- Structural (class-linkage) crash detection: the deterministic-fault
+    //     branch that latches safe mode one restart sooner. Pure, so it is safe
+    //     to exercise without latching safeMode.
+
+    @Test
+    fun `a NoClassDefFoundError is structural`() {
+        assertTrue(UiRecoverySignal.isStructural(NoClassDefFoundError("hivens/ui/diag/CrashDialog")))
+    }
+
+    @Test
+    fun `a ClassNotFoundException wrapped in an ordinary exception is structural`() {
+        val boom = RuntimeException("shell boot", ClassNotFoundException("hivens.ui.diag.CrashDialog"))
+        assertTrue(UiRecoverySignal.isStructural(boom))
+    }
+
+    @Test
+    fun `an ordinary logic exception is not structural`() {
+        assertFalse(UiRecoverySignal.isStructural(IllegalStateException("a real bug, retry may help")))
+    }
+
+    @Test
+    fun `a cyclic cause chain terminates without a linkage error`() {
+        val a = RuntimeException("a")
+        val b = RuntimeException("b")
+        a.initCause(b)
+        b.initCause(a)
+        assertFalse(UiRecoverySignal.isStructural(a))
+    }
 }

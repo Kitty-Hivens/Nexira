@@ -101,7 +101,7 @@ object UiRecoverySignal {
      * called from the entry point's main thread after `application {}` unwinds.
      */
     @Synchronized
-    fun recordShellCrash(now: Long = System.currentTimeMillis()): ShellRecovery {
+    fun recordShellCrash(now: Long = System.currentTimeMillis(), crash: Throwable? = null): ShellRecovery {
         if (_safeMode.value) return ShellRecovery.FATAL
 
         crashTimes.addLast(now)
@@ -110,8 +110,17 @@ object UiRecoverySignal {
             crashTimes.removeFirst()
         }
 
+        // A LinkageError (NoClassDefFoundError etc.) is a DETERMINISTIC fault:
+        // the class is gone on every restart, so retrying only reproduces it --
+        // reviving what already vanished. Latch safe mode one crash sooner for
+        // these, still keeping a single retry: a class re-patched during a
+        // recompile-while-running can reappear by the time the loop re-enters,
+        // but if the retry hits the same linkage fault the class really is gone,
+        // so stop burning restarts on it.
+        val fastLimit = if (crash != null && isStructural(crash)) 1 else MAX_FAST_CRASHES
+
         val recentFast = crashTimes.count { now - it <= FAST_WINDOW_MS }
-        val crashLoop = recentFast > MAX_FAST_CRASHES || crashTimes.size > MAX_TOTAL_CRASHES
+        val crashLoop = recentFast > fastLimit || crashTimes.size > MAX_TOTAL_CRASHES
         return if (crashLoop) {
             _safeMode.value = true
             _recoveryReason.value = RecoveryReason.CrashLoop
@@ -119,6 +128,21 @@ object UiRecoverySignal {
         } else {
             ShellRecovery.RETRY
         }
+    }
+
+    /** A class-linkage failure (a missing or re-patched class) reproduces on every
+     *  restart, so recovery must not spend the full retry budget on it. Walks the
+     *  cause chain, bounded against a cyclic `cause`. Internal for unit tests --
+     *  the count-based decision cannot be tested without latching safeMode. */
+    internal fun isStructural(t: Throwable): Boolean {
+        var cur: Throwable? = t
+        var depth = 0
+        while (cur != null && depth < 16) {
+            if (cur is LinkageError || cur is ClassNotFoundException) return true
+            cur = cur.cause
+            depth++
+        }
+        return false
     }
 
     private const val FAST_WINDOW_MS = 20_000L
