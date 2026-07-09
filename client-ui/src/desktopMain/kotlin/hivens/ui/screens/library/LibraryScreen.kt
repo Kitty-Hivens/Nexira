@@ -1,47 +1,62 @@
 package hivens.ui.screens.library
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.AlertDialog
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
 import hivens.launcher.InstallPhase
 import hivens.launcher.PackImportService
 import hivens.launcher.PackInstallService
 import hivens.launcher.imports.LocalPackCreator
+import hivens.launcher.runtime.RuntimeProvisioner
 import hivens.ui.AppState
 import hivens.ui.Screen
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.nx.NxButton
+import hivens.ui.nx.NxButtonStyle
+import hivens.ui.nx.NxChoiceChip
+import hivens.ui.nx.NxContextMenu
+import hivens.ui.nx.NxField
+import hivens.ui.nx.NxMenuItem
 import hivens.ui.puppet.PuppetClick
+import hivens.ui.puppet.PuppetField
 import hivens.ui.puppet.PuppetScreen
+import hivens.ui.surface.NxSurface
+import hivens.ui.surface.NxSurfaceLevel
 import hivens.ui.theme.NxTheme
 import hivens.ui.widgets.library.LibraryContext
 import hivens.ui.widgets.library.LocalLibraryContext
@@ -53,18 +68,20 @@ import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
 import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.dialogs.openFilePicker
 import io.github.vinceglb.filekit.path
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 import java.nio.file.Path
 import java.util.UUID
 
 /**
- * Library = user's collection of installed packs. A bottom-right action opens
- * either the pack importer (local `.mrpack`/`.zip`) or the from-scratch creator
- * (an empty local pack to author by hand). Both run through the app-scoped
- * [PackInstallService] so a create's runtime download survives the dialog
- * closing, and both open the new instance when done.
+ * Library = user's collection of installed packs. The bottom-right action opens
+ * a menu: create a from-scratch local pack or import one from a local archive.
+ * Both run through the app-scoped [PackInstallService] so a runtime download
+ * survives the dialog closing, and both open the new instance when done -- a
+ * created pack lands on its Content tab, where the Modrinth mod browser and
+ * local-jar add fill it in.
  */
 @Composable
 fun LibraryScreen(
@@ -90,8 +107,8 @@ fun LibraryScreen(
     val creating = createSnap?.phase is InstallPhase.Running
     val createError = (createSnap?.phase as? InstallPhase.Failed)?.message
 
-    // A finished create opens the new instance's detail (where the Content tab's
-    // Modrinth browser + local-jar add fill the pack in), then evicts the snapshot.
+    // A finished create opens the new instance's detail (Content tab), then
+    // evicts the snapshot.
     LaunchedEffect(createSnap?.phase) {
         val phase = createSnap?.phase
         val key = createKey
@@ -102,7 +119,6 @@ fun LibraryScreen(
         }
     }
 
-    // Pick a .mrpack/.zip and import it, then open the new instance.
     fun startImport() {
         scope.launch {
             val picked = FileKit.openFilePicker(
@@ -136,9 +152,6 @@ fun LibraryScreen(
         Box(Modifier.fillMaxSize()) {
             Column(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 20.dp)) {
                 SlotRenderer(SurfaceId(SURFACE), SlotId("header"), modifier = Modifier.fillMaxWidth(), spacing = 8.dp)
-                // No verticalScroll on the body slot: library.body owns its own
-                // LazyColumn scroll; wrapping it hands maxHeight = Infinity and
-                // Compose aborts measure.
                 SlotRenderer(SurfaceId(SURFACE), SlotId("body"), modifier = Modifier.weight(1f).fillMaxWidth(), spacing = 8.dp)
             }
 
@@ -163,15 +176,9 @@ fun LibraryScreen(
                         Symbol(NxIcon.Add, contentDescription = s.libraryAddAction)
                     }
                 }
-                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                    DropdownMenuItem(
-                        text = { Text(s.libraryNewLocalPack) },
-                        onClick = { menuOpen = false; showCreate = true },
-                    )
-                    DropdownMenuItem(
-                        text = { Text(s.libraryImportPack) },
-                        onClick = { menuOpen = false; startImport() },
-                    )
+                NxContextMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                    NxMenuItem(label = s.libraryNewLocalPack, icon = NxIcon.Add) { menuOpen = false; showCreate = true }
+                    NxMenuItem(label = s.libraryImportPack, icon = NxIcon.Download) { menuOpen = false; startImport() }
                 }
                 PuppetClick("library.newLocalPack") { menuOpen = false; showCreate = true }
                 PuppetClick("library.importPack") { menuOpen = false; startImport() }
@@ -184,49 +191,102 @@ fun LibraryScreen(
     }
 }
 
-/** Name + Minecraft version + loader, for an empty from-scratch local pack. */
+/** Name + Minecraft version (picked from Mojang's list) + loader, for a from-scratch local pack. */
 @Composable
 private fun NewLocalPackDialog(
     onDismiss: () -> Unit,
     onCreate: (name: String, mc: String, loader: String?, loaderVersion: String) -> Unit,
 ) {
     val s = LocalStrings.current
+    val provisioner: RuntimeProvisioner = koinInject()
+
     var name by remember { mutableStateOf("") }
     var mc by remember { mutableStateOf("") }
+    var mcMenuOpen by remember { mutableStateOf(false) }
     var loaderVersion by remember { mutableStateOf("") }
-    // Label -> LoaderRegistry id (null = vanilla).
+    var versions by remember { mutableStateOf<List<String>>(emptyList()) }
     val loaders = remember { listOf("Vanilla" to null, "Fabric" to "fabric", "Forge" to "forge", "NeoForge" to "neoforge", "Quilt" to "quilt") }
     var loaderSel by remember { mutableStateOf(0) }
     val canCreate = name.isNotBlank() && mc.isNotBlank()
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(s.libraryNewLocalPack, fontWeight = FontWeight.Bold) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(value = name, onValueChange = { name = it }, singleLine = true,
-                    label = { Text(s.createPackName) }, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(value = mc, onValueChange = { mc = it }, singleLine = true,
-                    label = { Text(s.createPackMc) }, placeholder = { Text("1.20.1") }, modifier = Modifier.fillMaxWidth())
-                Text(s.createPackLoader, style = MaterialTheme.typography.labelMedium, color = NxTheme.colors.textSecondary)
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    loaders.forEachIndexed { i, (label, _) ->
-                        FilterChip(selected = loaderSel == i, onClick = { loaderSel = i }, label = { Text(label) })
+    LaunchedEffect(Unit) {
+        versions = runCatching { withContext(Dispatchers.IO) { provisioner.availableMinecraftVersions() } }.getOrDefault(emptyList())
+    }
+    val matches = remember(mc, versions) {
+        (if (mc.isBlank()) versions else versions.filter { it.contains(mc.trim(), ignoreCase = true) }).take(60)
+    }
+
+    Popup(alignment = Alignment.Center, onDismissRequest = onDismiss, properties = PopupProperties(focusable = true)) {
+        Box(
+            Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.55f))
+                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onDismiss),
+            contentAlignment = Alignment.Center,
+        ) {
+            NxSurface(
+                level = NxSurfaceLevel.Floating,
+                shape = MaterialTheme.shapes.large,
+                modifier = Modifier.widthIn(max = 460.dp).fillMaxWidth(0.9f)
+                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = {}),
+            ) {
+                Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Text(s.libraryNewLocalPack, style = MaterialTheme.typography.titleMedium, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.Bold)
+
+                    FieldLabel(s.createPackName)
+                    NxField(value = name, onValueChange = { name = it }, placeholder = s.createPackName, modifier = Modifier.fillMaxWidth())
+                    PuppetField("createPack.name", name) { name = it }
+
+                    FieldLabel(s.createPackMc)
+                    Box {
+                        NxField(
+                            value = mc,
+                            onValueChange = { mc = it; mcMenuOpen = true },
+                            placeholder = "1.20.1",
+                            modifier = Modifier.fillMaxWidth().clickable { mcMenuOpen = true },
+                        )
+                        NxContextMenu(expanded = mcMenuOpen && matches.isNotEmpty(), onDismissRequest = { mcMenuOpen = false }) {
+                            Column(Modifier.heightIn(max = 240.dp).verticalScroll(rememberScrollState())) {
+                                matches.forEach { v ->
+                                    NxMenuItem(label = v, selected = v == mc) { mc = v; mcMenuOpen = false }
+                                }
+                            }
+                        }
+                    }
+                    PuppetField("createPack.mc", mc) { mc = it; mcMenuOpen = true }
+
+                    FieldLabel(s.createPackLoader)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        loaders.forEachIndexed { i, (label, _) ->
+                            NxChoiceChip(label = label, selected = loaderSel == i) { loaderSel = i }
+                        }
+                    }
+
+                    if (loaders[loaderSel].second != null) {
+                        FieldLabel(s.createPackLoaderVersion)
+                        NxField(value = loaderVersion, onValueChange = { loaderVersion = it }, placeholder = s.createPackLoaderVersion, modifier = Modifier.fillMaxWidth())
+                    }
+
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End)) {
+                        NxButton(label = s.createPackCancel, onClick = onDismiss, style = NxButtonStyle.Tertiary, compact = true)
+                        NxButton(
+                            label = s.createPackConfirm,
+                            onClick = { onCreate(name.trim(), mc.trim(), loaders[loaderSel].second, loaderVersion.trim()) },
+                            style = NxButtonStyle.Primary,
+                            enabled = canCreate,
+                            compact = true,
+                        )
+                        PuppetClick("createPack.create", enabled = canCreate) {
+                            onCreate(name.trim(), mc.trim(), loaders[loaderSel].second, loaderVersion.trim())
+                        }
                     }
                 }
-                if (loaders[loaderSel].second != null) {
-                    OutlinedTextField(value = loaderVersion, onValueChange = { loaderVersion = it }, singleLine = true,
-                        label = { Text(s.createPackLoaderVersion) }, modifier = Modifier.fillMaxWidth())
-                }
             }
-        },
-        confirmButton = {
-            TextButton(enabled = canCreate, onClick = { onCreate(name.trim(), mc.trim(), loaders[loaderSel].second, loaderVersion.trim()) }) {
-                Text(s.createPackConfirm)
-            }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(s.createPackCancel) } },
-    )
+        }
+    }
+}
+
+@Composable
+private fun FieldLabel(text: String) {
+    Text(text, style = MaterialTheme.typography.labelMedium, color = NxTheme.colors.textSecondary)
 }
 
 private const val SURFACE = "library"
