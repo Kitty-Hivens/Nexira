@@ -740,6 +740,15 @@ interface AppStrings {
     val browseRetry: String
     /** Label on the Library action that imports a pack from a local file. */
     val browseImport: String
+    val libraryAddAction: String
+    val libraryNewLocalPack: String
+    val libraryImportPack: String
+    val createPackName: String
+    val createPackMc: String
+    val createPackLoader: String
+    val createPackLoaderVersion: String
+    val createPackConfirm: String
+    val createPackCancel: String
     /** Localized label for a Modrinth category id (e.g. `optimization`); brands/unknowns fall back to a humanized form. */
     fun modrinthCategory(id: String): String
 

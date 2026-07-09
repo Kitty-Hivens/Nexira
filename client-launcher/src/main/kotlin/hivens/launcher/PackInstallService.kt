@@ -90,35 +90,49 @@ class PackInstallService(
      * a caller passes to [cancel] / [dismiss] and what it matches against
      * [installs] to observe progress.
      */
-    fun start(pack: CataloguePack, version: CataloguePackVersion): String {
-        val key = keyOf(pack.origin, pack.id, version.id)
+    fun start(pack: CataloguePack, version: CataloguePackVersion): String =
+        run(
+            key = keyOf(pack.origin, pack.id, version.id),
+            title = pack.title,
+            iconUrl = pack.iconUrl,
+            origin = pack.origin,
+            packId = pack.id,
+            versionId = version.id,
+        ) { onReserveDir, progress -> runInstall(pack, version, onReserveDir, progress) }
+
+    /**
+     * Run any pack-producing job -- a catalogue install, a local import, a
+     * from-scratch create -- on the app scope with the same snapshot / cancel /
+     * cleanup machinery, so it survives the composition that kicked it off and
+     * surfaces through [installs] (and the notification driver). Re-invoking with
+     * an already-running [key] is a no-op that returns the same key. [block]
+     * gets the reserve hook (its dir is deleted on cancel) and a progress sink,
+     * and returns the registered [PackInstance].
+     */
+    fun run(
+        key: String,
+        title: String,
+        iconUrl: String? = null,
+        origin: PackOrigin = PackOrigin.Local,
+        packId: String = key,
+        versionId: String = "",
+        block: suspend (onReserveDir: (Path) -> Unit, progress: (Int, Int, String) -> Unit) -> PackInstance,
+    ): String {
         jobs[key]?.let { if (it.isActive) return key }
 
-        // Dirs the installer reserves before writing. Race-free precise cleanup:
-        // on cancel we delete exactly these, never a sibling install's dir.
+        // Dirs the job reserves before writing. Race-free precise cleanup:
+        // on cancel we delete exactly these, never a sibling job's dir.
         val reservedDirs = ConcurrentHashMap.newKeySet<Path>()
 
         _installs.update {
-            it + (key to InstallSnapshot(
-                key = key,
-                origin = pack.origin,
-                packId = pack.id,
-                versionId = version.id,
-                title = pack.title,
-                iconUrl = pack.iconUrl,
-                phase = InstallPhase.Running(0, 0, ""),
-            ))
+            it + (key to InstallSnapshot(key, origin, packId, versionId, title, iconUrl, InstallPhase.Running(0, 0, "")))
         }
 
         val job = scope.launch {
             try {
-                val instance = runInstall(
-                    pack,
-                    version,
+                val instance = block(
                     { reservedDirs.add(it) },
-                    { current, total, filename ->
-                        updatePhase(key, InstallPhase.Running(current, total, filename))
-                    },
+                    { current, total, filename -> updatePhase(key, InstallPhase.Running(current, total, filename)) },
                 )
                 updatePhase(key, InstallPhase.Succeeded(instance.id))
             } catch (e: CancellationException) {
@@ -126,7 +140,7 @@ class PackInstallService(
                 cleanupReserved(reservedDirs)
                 throw e
             } catch (e: Exception) {
-                log.warn("install failed for {}", key, e)
+                log.warn("pack job failed for {}", key, e)
                 updatePhase(key, InstallPhase.Failed(e.message ?: e::class.simpleName.orEmpty()))
             } finally {
                 jobs.remove(key)
