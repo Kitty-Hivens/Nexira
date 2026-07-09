@@ -22,8 +22,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -346,11 +344,7 @@ private fun DetachBanner(body: String, onDetach: () -> Unit) {
             Text(s.contentDetachTitle, style = MaterialTheme.typography.titleSmall, color = NxTheme.colors.textPrimary, fontWeight = FontWeight.SemiBold)
             Text(body, style = MaterialTheme.typography.bodySmall, color = NxTheme.colors.textSecondary)
         }
-        Button(
-            onClick = onDetach,
-            shape   = MaterialTheme.shapes.small,
-            colors  = ButtonDefaults.buttonColors(containerColor = NxTheme.colors.primary, contentColor = Color.White),
-        ) { Text(s.contentDetachButton, fontWeight = FontWeight.SemiBold) }
+        NxButton(label = s.contentDetachButton, onClick = onDetach)
     }
 }
 
@@ -631,11 +625,7 @@ private fun ModResultRow(hit: ModrinthSearchHit, installed: Boolean, working: Bo
         when {
             installed -> Symbol(NxIcon.Check, contentDescription = null, tint = NxTheme.colors.primary, size = 20.dp)
             working   -> CircularProgressIndicator(color = NxTheme.colors.primary, strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
-            else      -> Button(
-                onClick = onInstall,
-                shape   = MaterialTheme.shapes.small,
-                colors  = ButtonDefaults.buttonColors(containerColor = NxTheme.colors.primary, contentColor = Color.White),
-            ) { Text(s.browseDetailInstallButton, fontWeight = FontWeight.SemiBold) }
+            else      -> NxButton(label = s.browseDetailInstallButton, onClick = onInstall)
         }
     }
 }

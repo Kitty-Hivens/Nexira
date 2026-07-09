@@ -18,8 +18,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -42,6 +40,7 @@ import hivens.core.api.catalogue.CataloguePack
 import hivens.core.data.PackOrigin
 import hivens.launcher.catalogue.PackCatalogueRegistry
 import hivens.ui.i18n.LocalStrings
+import hivens.ui.nx.NxButton
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.puppet.PuppetClick
@@ -231,14 +230,7 @@ private fun BrowseEmpty(onRetry: () -> Unit) {
                 textAlign = TextAlign.Center,
                 modifier  = Modifier.widthIn(max = 420.dp),
             )
-            Button(
-                onClick = onRetry,
-                shape   = MaterialTheme.shapes.small,
-                colors  = ButtonDefaults.buttonColors(
-                    containerColor = NxTheme.colors.primary,
-                    contentColor   = Color.White,
-                ),
-            ) { Text(s.browseRetry, fontWeight = FontWeight.SemiBold) }
+            NxButton(label = s.browseRetry, onClick = onRetry)
         }
     }
 }

@@ -8,7 +8,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -24,8 +23,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -50,6 +47,7 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxVerticalScrollbar
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.LocalMonoFamily
@@ -412,19 +410,11 @@ private fun BinaryPreview(file: Path) {
                 color = NxTheme.colors.textSecondary,
             )
         }
-        Button(
-            onClick        = { runCatching { Desktop.getDesktop().open(file.toFile()) } },
-            shape          = MaterialTheme.shapes.small,
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
-            colors         = ButtonDefaults.buttonColors(
-                containerColor = NxTheme.colors.primary,
-                contentColor   = Color.White,
-            ),
-        ) {
-            Symbol(NxIcon.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp))
-            Text(s.fileBrowserOpenExternally, fontWeight = FontWeight.SemiBold)
-        }
+        NxButton(
+            label   = s.fileBrowserOpenExternally,
+            onClick = { runCatching { Desktop.getDesktop().open(file.toFile()) } },
+            icon    = NxIcon.OpenInNew,
+        )
     }
 }
 

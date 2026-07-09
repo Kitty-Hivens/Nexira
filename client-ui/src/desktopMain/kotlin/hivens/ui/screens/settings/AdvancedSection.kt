@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -116,7 +115,7 @@ internal fun AdvancedSection(paths: PlatformPaths) {
                 ))
             },
             confirmButton = {
-                Button(shape = MaterialTheme.shapes.small, onClick = {
+                NxButton(label = s.settingsDataDirQuitNow, onClick = {
                     val ok = DataDirMover.schedule(source = paths.dataDir, target = target)
                     if (ok) {
                         ActionRing.record("Data-dir move scheduled: ${paths.dataDir} -> $target -- quitting for restart")
@@ -127,7 +126,7 @@ internal fun AdvancedSection(paths: PlatformPaths) {
                         // Schedule refused (target validation raced); let the user re-pick.
                         pendingTarget = null
                     }
-                }) { Text(s.settingsDataDirQuitNow) }
+                })
             },
             dismissButton = {
                 OutlinedButton(onClick = { pendingTarget = null }, shape = MaterialTheme.shapes.small) {
