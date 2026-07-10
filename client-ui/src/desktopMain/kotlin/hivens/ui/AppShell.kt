@@ -449,8 +449,8 @@ fun FrameWindowScope.AppShellContent(
 
         // Customization extension: persisted overrides for accent /
         // density / glass intensity / full color overrides. Provided
-        // via [LocalCustomization] so NxTheme + GlassCard can
-        // read without prop-drilling.
+        // via [LocalCustomization] so NxTheme and the glass surfaces
+        // can read without prop-drilling.
         val customizationJson    = remember { Json { ignoreUnknownKeys = true; encodeDefaults = true } }
         val customizationManager = remember { CustomizationManager(dataDirectory, customizationJson) }
         var customization        by remember { mutableStateOf(customizationManager.load()) }

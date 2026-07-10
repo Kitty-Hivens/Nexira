@@ -35,13 +35,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import hivens.ui.nx.GlassCard
 import hivens.ui.surface.NxCard
+import hivens.ui.surface.NxColorSurface
 import hivens.ui.customization.scaledAlpha
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.theme.CustomTheme
+import hivens.ui.theme.NxTheme
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 
@@ -89,7 +90,8 @@ private fun ThemeCard(
     )
 
     Box(modifier = Modifier.aspectRatio(1.2f).scale(scale)) {
-        GlassCard(
+        NxColorSurface(
+            color    = scaledAlpha(CustomTheme.parseHexColor(theme.background), 0.8f),
             modifier = Modifier
                 .fillMaxSize()
                 .clickable(onClick = onClick)
@@ -103,8 +105,8 @@ private fun ThemeCard(
                     ) else Brush.linearGradient(listOf(Color.Transparent, Color.Transparent)),
                     shape = MaterialTheme.shapes.medium,
                 ),
-            shape           = MaterialTheme.shapes.medium,
-            backgroundColor = scaledAlpha(CustomTheme.parseHexColor(theme.background), 0.8f),
+            shape    = MaterialTheme.shapes.medium,
+            border   = BorderStroke(1.dp, NxTheme.colors.outline),
         ) {
             Column(
                 modifier            = Modifier.fillMaxSize().padding(16.dp),

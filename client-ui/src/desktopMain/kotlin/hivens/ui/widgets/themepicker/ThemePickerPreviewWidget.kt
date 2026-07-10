@@ -29,7 +29,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import hivens.ui.nx.GlassCard
+import hivens.ui.surface.NxColorSurface
 import hivens.ui.customization.scaledAlpha
 import hivens.ui.i18n.LocalStrings
 import hivens.ui.theme.NxTheme
@@ -48,10 +48,11 @@ fun ThemePickerPreviewWidget(instance: WidgetInstance) {
     val s = LocalStrings.current
     val theme by ctx.selectedTheme
 
-    GlassCard(
-        modifier        = Modifier.fillMaxSize(),
-        shape           = MaterialTheme.shapes.large,
-        backgroundColor = scaledAlpha(CustomTheme.parseHexColor(theme.background), 0.8f),
+    NxColorSurface(
+        color    = scaledAlpha(CustomTheme.parseHexColor(theme.background), 0.8f),
+        modifier = Modifier.fillMaxSize(),
+        shape    = MaterialTheme.shapes.large,
+        border   = BorderStroke(1.dp, NxTheme.colors.outline),
     ) {
         Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
             Text(
