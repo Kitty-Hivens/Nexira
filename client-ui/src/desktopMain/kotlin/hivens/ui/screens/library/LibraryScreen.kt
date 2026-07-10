@@ -260,7 +260,7 @@ private fun NewLocalPackDialog(
                 level = NxSurfaceLevel.Floating,
                 // Opaque, not glass: a modal sits over a dark scrim, so there is
                 // nothing behind it to frost -- glass would read as a flat muddy
-                // panel (the same reason the codebase is retiring GlassCard).
+                // panel.
                 glass = false,
                 shape = MaterialTheme.shapes.large,
                 modifier = Modifier.widthIn(max = 460.dp).fillMaxWidth(0.9f)

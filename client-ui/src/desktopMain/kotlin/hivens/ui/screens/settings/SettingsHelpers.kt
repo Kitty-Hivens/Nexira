@@ -15,7 +15,7 @@ import hivens.ui.theme.NxTheme
 /**
  * Glass-tinted panel background for the few legacy Settings rows still off an
  * [hivens.ui.nx.NxSection] plane (the editor's surface-properties panel). The Settings
- * page stays neutral; Flat treatment applies only to content surfaces (GlassCard,
+ * page stays neutral; Flat treatment applies only to content surfaces (NxCard,
  * library cards) elsewhere.
  */
 @Composable

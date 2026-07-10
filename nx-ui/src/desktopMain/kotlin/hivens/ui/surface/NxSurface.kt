@@ -86,7 +86,7 @@ fun NxSurface(
 }
 
 /** Card-shaped plane (defaults to [NxSurfaceLevel.Raised] + the card-corner token).
- *  The structural successor to GlassCard for new code. */
+ *  The default surface for content cards. */
 @Composable
 fun NxCard(
     modifier: Modifier = Modifier,
