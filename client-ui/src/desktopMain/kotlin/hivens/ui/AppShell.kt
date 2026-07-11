@@ -217,7 +217,6 @@ fun FrameWindowScope.AppShellContent(
     windowState: WindowState,
     visibleState: MutableState<Boolean>,
     chrome: WindowChromeHooks,
-    openedMaximized: Boolean,
     exitApp: () -> Unit,
 ) {
     // Tray teardown is composition-scoped: the tray is re-init'd per
@@ -257,11 +256,11 @@ fun FrameWindowScope.AppShellContent(
 
     val settings = remember { settingsService.getSettings() }
 
-    // Deterministic maximize/restore for the undecorated window -- AWT's undecorated
-    // MAXIMIZED_BOTH is broken on Windows (racy glyph, taskbar overlap, wrong
-    // monitor), so this owns the frame geometry itself. Seeded with the placement
-    // ShellHost opened the window at.
-    val maximizer = remember { WindowMaximizer(openedMaximized).also { it.attach(window) } }
+    // Native maximize/restore for the undecorated window -- the WM owns the
+    // geometry and reports the real maximized state back through WindowMaximizer's
+    // listener; we never fake it. Detach the listener on dispose.
+    val maximizer = remember { WindowMaximizer(windowState).also { it.attach(window) } }
+    DisposableEffect(window) { onDispose { maximizer.detach() } }
 
     // Skinema media (FFmpeg natives) can be disabled by boot recovery on an
     // environment where it fails; latch the process gate before the background

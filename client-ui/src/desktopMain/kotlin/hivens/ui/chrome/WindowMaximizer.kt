@@ -5,25 +5,27 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.awt.ComposeWindow
+import androidx.compose.ui.window.WindowState
+import java.awt.Frame
 import java.awt.GraphicsConfiguration
 import java.awt.Rectangle
 import java.awt.Toolkit
+import java.awt.event.ComponentAdapter
+import java.awt.event.ComponentEvent
+import java.awt.event.WindowStateListener
+import org.slf4j.LoggerFactory
 
 /**
- * Work area of [gc] -- the monitor's bounds minus its screen insets (taskbar /
- * panel / menu bar + dock). AWT user space is numerically the Compose Dp value
- * 1:1 here (density scales the render, never the frame geometry), so these ints
- * are the window bounds directly, with no px<->dp conversion. A Wayland peer can
- * report a non-null gc with zero bounds before the surface negotiates; fall back
- * to the toolkit screen size then.
+ * Work area of [gc] -- the monitor's bounds minus the screen insets the WM
+ * reports (taskbar / panel / menu bar + dock). AWT user space is numerically the
+ * Compose Dp value 1:1 here (density scales the render, never the frame geometry).
+ * A Wayland peer can report a non-null gc with zero bounds before the surface
+ * negotiates; fall back to the toolkit screen size then.
  */
 fun screenWorkArea(gc: GraphicsConfiguration?): Rectangle {
     val tk = Toolkit.getDefaultToolkit()
     val b = gc?.bounds
     if (gc == null || b == null || b.width <= 0 || b.height <= 0) {
-        // Degenerate (null gc, or a Wayland peer before the surface negotiates):
-        // fall back to the primary screen, but still minus its insets when a gc is
-        // available, so a maximize taken here never covers the taskbar.
         val s = tk.screenSize
         val i = gc?.let { tk.getScreenInsets(it) }
         return if (i != null) Rectangle(i.left, i.top, s.width - i.left - i.right, s.height - i.top - i.bottom)
@@ -34,76 +36,162 @@ fun screenWorkArea(gc: GraphicsConfiguration?): Rectangle {
 }
 
 /**
- * Deterministic maximize / restore for the undecorated (custom-chrome) window.
+ * Maximize / restore driven end-to-end by the window manager.
  *
- * AWT's MAXIMIZED_BOTH on an undecorated frame is unusable on Windows: the
- * extendedState read-back is racy so the caption glyph desyncs, and Compose
- * never sets `maximizedBounds`, so the frame covers the taskbar and snaps to the
- * primary monitor. So we own the maximize instead of routing through
- * [androidx.compose.ui.window.WindowPlacement.Maximized]: [maximized] is the
- * single source of truth for the glyph and the drag / resize gates, and we size
- * the frame to the current monitor's work area via [screenWorkArea]. Placement
- * stays Floating throughout -- Compose never runs the broken path -- and a direct
- * setBounds is resynced back into WindowState by Compose's own component
- * listeners, so the synthetic resize grips keep tracking the real geometry.
+ * The window never fakes its own maximized state. [maximized] is recomputed ONLY
+ * from what the system actually did -- never optimistically when a button is
+ * pressed. Two system-driven signals feed it, so it is correct on every WM:
+ *   - the maximized state the WM declares, via [WindowStateListener] on the frame's
+ *     extendedState (the EWMH `_NET_WM_STATE_MAXIMIZED` contract);
+ *   - the frame actually filling the work area, via [java.awt.event.ComponentListener]
+ *     on resize -- ground truth for a compositor that maximizes without setting the
+ *     state atom. We read the geometry the WM produced; we never impose it.
  *
- * Every method runs on the AWT EDT (all Compose click / effect bodies do), and
- * the bounds change is kept synchronous with the [maximized] flip -- that
- * synchrony is what removes the desync, so neither half is deferred to invokeLater.
+ * [maximize] / [restore] COMMAND the system directly via [Frame.setExtendedState]
+ * (MAXIMIZED_BOTH), NOT through WindowState.placement, whose "apply only on change"
+ * caching swallows the request whenever Compose's observed placement has drifted to
+ * the target value already (a WM that maximizes without confirming the frame state
+ * leaves placement out of sync, so the button would silently no-op). [supported]
+ * asks the toolkit whether the WM supports the state at all; the caller hides the
+ * button when not.
+ *
+ * With `-Dnexira.puppet.port` set, every event dumps the full window state (raw
+ * extendedState, Compose placement, observed flag, bounds vs work area) under the
+ * `WINDBG` tag, so a run can be correlated line-by-line against the WM's own view.
  */
-class WindowMaximizer(initiallyMaximized: Boolean) {
-    var maximized by mutableStateOf(initiallyMaximized)
+class WindowMaximizer(private val state: WindowState) {
+    /** Real WM-reported state. Recomputed only from system events, never on click. */
+    var maximized by mutableStateOf(false)
+        private set
+
+    /** Whether the running WM supports programmatic maximize, per the toolkit. */
+    var supported by mutableStateOf(true)
         private set
 
     private var window: ComposeWindow? = null
-    // The floating frame to return to. Null until the first maximize captures it:
-    // the window can open already-maximized, so the first restore has no prior
-    // frame and falls back to [defaultRestoreBounds].
-    private var restoreBounds: Rectangle? = null
+    private var stateListener: WindowStateListener? = null
+    private var sizeListener: ComponentAdapter? = null
 
-    fun attach(w: ComposeWindow) { window = w }
+    fun attach(w: ComposeWindow) {
+        window = w
+        supported = Toolkit.getDefaultToolkit().isFrameStateSupported(Frame.MAXIMIZED_BOTH)
+        refresh(w)
+        val sl = WindowStateListener { e ->
+            dump(w, "WM-state-event old=${decode(e.oldState)} new=${decode(e.newState)}")
+            refresh(w)
+        }
+        val cl = object : ComponentAdapter() {
+            override fun componentResized(e: ComponentEvent) {
+                dump(w, "resize-event")
+                refresh(w)
+            }
+        }
+        w.addWindowStateListener(sl)
+        w.addComponentListener(cl)
+        stateListener = sl
+        sizeListener = cl
+        log.info("window maximize: WM support={}, initial maximized={}", supported, maximized)
+        dump(w, "attach")
+    }
+
+    fun detach() {
+        stateListener?.let { window?.removeWindowStateListener(it) }
+        sizeListener?.let { window?.removeComponentListener(it) }
+        stateListener = null
+        sizeListener = null
+        window = null
+    }
+
+    private fun refresh(w: ComposeWindow) {
+        val now = isMax(w.extendedState) || fillsWorkArea(w)
+        if (now != maximized) {
+            maximized = now
+            log.info("window state <- WM reports maximized={}", maximized)
+        }
+    }
+
+    private fun fillsWorkArea(w: ComposeWindow): Boolean {
+        val wa = screenWorkArea(w.graphicsConfiguration)
+        if (wa.width <= 0 || wa.height <= 0) return false
+        val b = w.bounds
+        return b.width >= wa.width * 0.95f && b.height >= wa.height * 0.95f
+    }
 
     fun maximize() {
         val w = window ?: return
-        if (!maximized) restoreBounds = Rectangle(w.bounds)
-        w.bounds = screenWorkArea(w.graphicsConfiguration)
-        maximized = true
+        runCatching { w.maximizedBounds = screenWorkArea(w.graphicsConfiguration) }
+        log.info("window state -> WM: requesting maximize")
+        dump(w, "cmd maximize PRE")
+        w.extendedState = w.extendedState or Frame.MAXIMIZED_BOTH
+        dump(w, "cmd maximize POST")
     }
 
     fun restore() {
         val w = window ?: return
-        w.bounds = restoreBounds ?: defaultRestoreBounds(w)
-        maximized = false
+        log.info("window state -> WM: requesting restore")
+        dump(w, "cmd restore PRE")
+        w.extendedState = w.extendedState and Frame.MAXIMIZED_BOTH.inv()
+        dump(w, "cmd restore POST")
     }
 
-    fun toggle() { if (maximized) restore() else maximize() }
+    // Decide off the window's real state at click time, not the possibly-lagging
+    // observed flag, so a fast click can't act on a stale value.
+    fun toggle() {
+        val w = window ?: return
+        if (isMax(w.extendedState) || fillsWorkArea(w)) restore() else maximize()
+    }
 
     /**
-     * Un-maximize for a title-bar drag: restore the floating size but re-anchor it
-     * so the cursor stays proportionally over the bar, matching the OS. The caller
-     * passes the absolute screen cursor and re-reads `window.location` afterward, so
-     * the delta-drag continues from the restored frame.
+     * Un-maximize for a title-bar drag on an undecorated frame: request a native
+     * restore, then best-effort re-anchor so the cursor stays proportionally over
+     * the bar. The restored bounds settle asynchronously on some WMs, so this reads
+     * what it can and the drag loop re-reads `window.location` afterward.
      */
     fun unmaximizeUnderCursor(mouseX: Int, mouseY: Int) {
         val w = window ?: return
         if (!maximized) return
-        val target = restoreBounds ?: defaultRestoreBounds(w)
         val cur = w.bounds
+        restore()
+        val restored = w.bounds
         val ratioX = if (cur.width > 0) ((mouseX - cur.x).toFloat() / cur.width).coerceIn(0f, 1f) else 0.5f
-        val newX = mouseX - (ratioX * target.width).toInt()
-        // The bar sits at the maximized top (cur.y == work-area top); keeping that
-        // y leaves it under the cursor.
-        w.bounds = Rectangle(newX, cur.y, target.width, target.height)
-        maximized = false
+        w.setLocation(mouseX - (ratioX * restored.width).toInt(), cur.y)
     }
 
-    // Centered ~0.8x of the current work area, floored at the frame's minimum so
-    // the native peer does not clamp a programmatic restore.
-    private fun defaultRestoreBounds(w: ComposeWindow): Rectangle {
-        val area = screenWorkArea(w.graphicsConfiguration)
-        val width = (area.width * 0.8f).toInt().coerceAtLeast(w.minimumSize.width)
-        val height = (area.height * 0.8f).toInt().coerceAtLeast(w.minimumSize.height)
-        return Rectangle(area.x + (area.width - width) / 2, area.y + (area.height - height) / 2, width, height)
+    private fun isMax(s: Int) = (s and Frame.MAXIMIZED_BOTH) == Frame.MAXIMIZED_BOTH
+
+    // ---- window-management diagnostics (WINDBG) --------------------------------
+    // Enabled with -Dnexira.puppet.port so a debug run correlates the launcher's
+    // view against the WM's. Off (and free) in production.
+
+    private fun dump(w: ComposeWindow, event: String) {
+        if (!DEBUG) return
+        val es = w.extendedState
+        val b = w.bounds
+        val wa = screenWorkArea(w.graphicsConfiguration)
+        log.info(
+            "WINDBG | $event | ext=${decode(es)} placement=${state.placement} observed.max=$maximized " +
+                "bounds=[${b.x},${b.y} ${b.width}x${b.height}] work=[${wa.x},${wa.y} ${wa.width}x${wa.height}] " +
+                "fills=${fillsWorkArea(w)} supported=$supported",
+        )
+    }
+
+    private fun decode(s: Int): String = buildString {
+        if (s and Frame.MAXIMIZED_BOTH == Frame.MAXIMIZED_BOTH) {
+            append("MAX_BOTH")
+        } else {
+            if (s and Frame.MAXIMIZED_HORIZ != 0) append("MAX_H")
+            if (s and Frame.MAXIMIZED_VERT != 0) append("MAX_V")
+        }
+        if (s and Frame.ICONIFIED != 0) {
+            if (isNotEmpty()) append("+")
+            append("ICONIFIED")
+        }
+        if (isEmpty()) append("NORMAL")
+    }
+
+    private companion object {
+        val log = LoggerFactory.getLogger(WindowMaximizer::class.java)
+        val DEBUG = System.getProperty("nexira.puppet.port") != null
     }
 }
 

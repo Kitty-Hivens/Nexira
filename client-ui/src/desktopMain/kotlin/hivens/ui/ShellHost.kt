@@ -20,7 +20,6 @@ import androidx.compose.ui.window.rememberWindowState
 import hivens.config.Branding
 import hivens.ui.bootstrap.GuiBootstrap
 import hivens.ui.chrome.IS_TILING_WM
-import hivens.ui.chrome.screenWorkArea
 import hivens.ui.generated.resources.Res
 import hivens.ui.generated.resources.icon
 import hivens.ui.i18n.AppLocale
@@ -28,7 +27,6 @@ import hivens.ui.i18n.stringsFor
 import hivens.ui.threshold.BootOutcome
 import hivens.ui.threshold.BootStage
 import hivens.ui.threshold.ThresholdOverlay
-import java.awt.GraphicsEnvironment
 import kotlinx.coroutines.flow.StateFlow
 import org.jetbrains.compose.resources.painterResource
 
@@ -63,30 +61,19 @@ fun ApplicationScope.ShellHost(
 ) {
     val outcome by outcomeFlow.collectAsState()
 
-    // Placement policy by chrome:
-    //  - tiling WM: the compositor owns geometry/fullscreen; Floating + platform
-    //    default lets it place us (forcing MAXIMIZED_BOTH fights it).
-    //  - undecorated custom chrome (Win / mac / floating-DE): open "maximized" as
-    //    Floating sized to the work area, so we never hit AWT's broken undecorated
-    //    MAXIMIZED_BOTH (racy glyph, taskbar overlap, wrong monitor -- see
-    //    WindowMaximizer). Compose applies size/position while still !visible, so
-    //    there is no remap/flash behind the boot overlay.
-    //  - decorated non-tiling (custom chrome off): the OS frame's native maximize
-    //    is correct, so keep MAXIMIZED_BOTH.
+    // Placement policy:
+    //  - tiling WM: the compositor owns geometry/fullscreen. Floating + platform
+    //    default lets it place us (forcing a maximize fights it).
+    //  - everything else (undecorated custom chrome OR native decoration): open
+    //    MAXIMIZED NATIVELY, so the OS owns the maximized geometry per its own
+    //    rules -- never a hand-computed frame. The size below is only the restore
+    //    target. On an undecorated frame WindowMaximizer hands AWT the work-area
+    //    rect via maximizedBounds so the native maximize respects the taskbar.
     val undecorated = pre.peek.useCustomChrome && !IS_TILING_WM
-    val openArea = remember(undecorated) {
-        if (undecorated) screenWorkArea(
-            GraphicsEnvironment.getLocalGraphicsEnvironment().defaultScreenDevice.defaultConfiguration,
-        ) else null
-    }
     val windowState = rememberWindowState(
-        placement = if (undecorated || IS_TILING_WM) WindowPlacement.Floating else WindowPlacement.Maximized,
-        position  = if (openArea != null) WindowPosition.Absolute(openArea.x.dp, openArea.y.dp)
-                    else WindowPosition.PlatformDefault,
-        // Restore/default floating size for the non-undecorated cases (ignored under
-        // MAXIMIZED_BOTH, overridden by a tiling WM); the library default otherwise.
-        size      = if (openArea != null) DpSize(openArea.width.dp, openArea.height.dp)
-                    else DpSize(800.dp, 600.dp),
+        placement = if (IS_TILING_WM) WindowPlacement.Floating else WindowPlacement.Maximized,
+        position  = WindowPosition.PlatformDefault,
+        size      = DpSize(1100.dp, 720.dp),
     )
     val visibleState = remember { mutableStateOf(true) }
     val chrome = remember { WindowChromeHooks(defaultClose = { exitApplication() }) }
@@ -120,7 +107,6 @@ fun ApplicationScope.ShellHost(
                     windowState     = windowState,
                     visibleState    = visibleState,
                     chrome          = chrome,
-                    openedMaximized = undecorated,
                     exitApp         = { exitApplication() },
                 )
             }

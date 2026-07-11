@@ -68,22 +68,26 @@ fun WindowControls(
             },
         )
 
-        CaptionButton(
-            label = if (maximized) s.windowRestore else s.windowMaximize,
-            tint = tint,
-            hoverBg = hover,
-            onClick = { maximizer.toggle() },
-            glyph = { c ->
-                if (maximized) {
-                    val o = size.minDimension * 0.24f
-                    val side = size.minDimension - o
-                    drawRect(c, Offset(o, 0f), Size(side, side), style = Stroke(strokePx()))
-                    drawRect(c, Offset(0f, o), Size(side, side), style = Stroke(strokePx()))
-                } else {
-                    drawRect(c, Offset.Zero, Size(size.minDimension, size.minDimension), style = Stroke(strokePx()))
-                }
-            },
-        )
+        // Offered only when the WM actually supports programmatic maximize
+        // (queried via the toolkit, not guessed) -- no dead control otherwise.
+        if (maximizer.supported) {
+            CaptionButton(
+                label = if (maximized) s.windowRestore else s.windowMaximize,
+                tint = tint,
+                hoverBg = hover,
+                onClick = { maximizer.toggle() },
+                glyph = { c ->
+                    if (maximized) {
+                        val o = size.minDimension * 0.24f
+                        val side = size.minDimension - o
+                        drawRect(c, Offset(o, 0f), Size(side, side), style = Stroke(strokePx()))
+                        drawRect(c, Offset(0f, o), Size(side, side), style = Stroke(strokePx()))
+                    } else {
+                        drawRect(c, Offset.Zero, Size(size.minDimension, size.minDimension), style = Stroke(strokePx()))
+                    }
+                },
+            )
+        }
 
         CaptionButton(
             label = s.windowClose,
