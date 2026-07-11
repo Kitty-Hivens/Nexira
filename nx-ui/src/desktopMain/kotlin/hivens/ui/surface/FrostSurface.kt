@@ -18,6 +18,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawOutline
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.luminance
@@ -185,93 +187,116 @@ fun FrostSurface(
     var outer = modifier
     if (glow != null) {
         val glowColor = colors.frost(glow.role)
-        outer = outer.shadow(glow.elevationDp.dp, shape, ambientColor = glowColor, spotColor = glowColor)
+        // clip = false so the unclipped hairline overlay below is not re-clipped by
+        // the shadow node; the coat's own clip still bounds the body.
+        outer = outer.shadow(glow.elevationDp.dp, shape, clip = false, ambientColor = glowColor, spotColor = glowColor)
     }
 
-    Box(outer.clip(shape)) {
-        atoms.forEach { layer ->
-            when (layer) {
-                is Backdrop -> LocalBackdropPainter.current?.invoke(layer.blurRadiusDp, Modifier.matchParentSize())
+    Box(outer) {
+        // Body + emphasis coat, clipped to the shape. matchParentSize so it fills the
+        // surface without driving its size -- content (a sibling below) still does
+        // that, so wrap-content cards and weighted panels measure exactly as before.
+        Box(Modifier.matchParentSize().clip(shape)) {
+            atoms.forEach { layer ->
+                when (layer) {
+                    is Backdrop -> LocalBackdropPainter.current?.invoke(layer.blurRadiusDp, Modifier.matchParentSize())
 
-                is Fill -> {
-                    val base = colors.frost(layer.role)
-                    // Bare + light -> opaque body (no good alpha for a light coat over a busy
-                    // wallpaper); otherwise the glass coat, thinning with the intensity knob.
-                    // Mirrors glassSurfaceAlpha so a Flat top bar and the rail stay in lockstep.
-                    val a = if (unbacked && base.luminance() > 0.5f) 1f else coatAlpha(layer.alpha, glassIntensity)
-                    Box(Modifier.matchParentSize().drawBehind { drawRect(base.copy(alpha = a)) })
-                }
-
-                is Body -> {
-                    val c = colors.frost(layer.role).copy(alpha = bodyAlpha(layer.floorAlpha))
-                    Box(Modifier.matchParentSize().drawBehind { drawRect(c) })
-                }
-
-                is Wash -> {
-                    val base = colors.frost(layer.role)
-                    val stops = listOf(base.copy(alpha = layer.startAlpha), base.copy(alpha = layer.endAlpha))
-                    Box(Modifier.matchParentSize().drawBehind {
-                        val brush = if (layer.vertical) Brush.verticalGradient(stops) else Brush.horizontalGradient(stops)
-                        drawRect(brush)
-                    })
-                }
-
-                is EdgeHighlight -> Box(Modifier.matchParentSize().drawBehind {
-                    val band = 6.dp.toPx().coerceAtMost(size.height)
-                    drawRect(
-                        brush = Brush.verticalGradient(
-                            listOf(Color.White.copy(alpha = layer.alpha), Color.Transparent),
-                            startY = 0f, endY = band,
-                        ),
-                        size = Size(size.width, band),
-                    )
-                })
-
-                is EdgeShadow -> Box(Modifier.matchParentSize().drawBehind {
-                    val band = 8.dp.toPx().coerceAtMost(size.height)
-                    drawRect(
-                        brush = Brush.verticalGradient(
-                            listOf(Color.Transparent, Color.Black.copy(alpha = layer.alpha)),
-                            startY = size.height - band, endY = size.height,
-                        ),
-                        topLeft = Offset(0f, size.height - band),
-                        size = Size(size.width, band),
-                    )
-                })
-
-                is EdgeBorder -> {
-                    val c = layer.explicitColor ?: colors.frost(layer.role).copy(alpha = layer.alpha)
-                    Box(Modifier.matchParentSize().border(layer.widthDp.dp, c, shape))
-                }
-
-                is Edge -> Unit     // already expanded to atoms before this loop
-                is EdgeGlow -> Unit // handled as the outer drop shadow above
-
-                is Texture -> Box(Modifier.matchParentSize().drawBehind {
-                    // Stand-in depth break: a faint diagonal wash. True film grain
-                    // wants a Skia RuntimeShader -- a localized future swap.
-                    drawRect(
-                        Brush.linearGradient(
-                            listOf(Color.White.copy(alpha = layer.grainAlpha), Color.Transparent, Color.Black.copy(alpha = layer.grainAlpha)),
-                        ),
-                    )
-                })
-
-                is StateOverlay -> if (interactionSource != null) {
-                    val hovered by interactionSource.collectIsHoveredAsState()
-                    val pressed by interactionSource.collectIsPressedAsState()
-                    val a = when {
-                        pressed -> layer.pressAlpha
-                        hovered -> layer.hoverAlpha
-                        else    -> 0f
+                    is Fill -> {
+                        val base = colors.frost(layer.role)
+                        // Bare + light -> opaque body (no good alpha for a light coat over a busy
+                        // wallpaper); otherwise the glass coat, thinning with the intensity knob.
+                        // Mirrors glassSurfaceAlpha so a Flat top bar and the rail stay in lockstep.
+                        val a = if (unbacked && base.luminance() > 0.5f) 1f else coatAlpha(layer.alpha, glassIntensity)
+                        Box(Modifier.matchParentSize().drawBehind { drawRect(base.copy(alpha = a)) })
                     }
-                    if (a > 0f) {
-                        val c = colors.frost(layer.role).copy(alpha = a)
+
+                    is Body -> {
+                        val c = colors.frost(layer.role).copy(alpha = bodyAlpha(layer.floorAlpha))
                         Box(Modifier.matchParentSize().drawBehind { drawRect(c) })
+                    }
+
+                    is Wash -> {
+                        val base = colors.frost(layer.role)
+                        val stops = listOf(base.copy(alpha = layer.startAlpha), base.copy(alpha = layer.endAlpha))
+                        Box(Modifier.matchParentSize().drawBehind {
+                            val brush = if (layer.vertical) Brush.verticalGradient(stops) else Brush.horizontalGradient(stops)
+                            drawRect(brush)
+                        })
+                    }
+
+                    is EdgeHighlight -> Box(Modifier.matchParentSize().drawBehind {
+                        val band = 6.dp.toPx().coerceAtMost(size.height)
+                        drawRect(
+                            brush = Brush.verticalGradient(
+                                listOf(Color.White.copy(alpha = layer.alpha), Color.Transparent),
+                                startY = 0f, endY = band,
+                            ),
+                            size = Size(size.width, band),
+                        )
+                    })
+
+                    is EdgeShadow -> Box(Modifier.matchParentSize().drawBehind {
+                        val band = 8.dp.toPx().coerceAtMost(size.height)
+                        drawRect(
+                            brush = Brush.verticalGradient(
+                                listOf(Color.Transparent, Color.Black.copy(alpha = layer.alpha)),
+                                startY = size.height - band, endY = size.height,
+                            ),
+                            topLeft = Offset(0f, size.height - band),
+                            size = Size(size.width, band),
+                        )
+                    })
+
+                    // Stroked below as an overlay outside this clip: inside it the
+                    // clip's rounded-corner AA ate the thin stroke at the corners.
+                    is EdgeBorder -> Unit
+
+                    is Edge -> Unit     // already expanded to atoms before this loop
+                    is EdgeGlow -> Unit // handled as the outer drop shadow above
+
+                    is Texture -> Box(Modifier.matchParentSize().drawBehind {
+                        // Stand-in depth break: a faint diagonal wash. True film grain
+                        // wants a Skia RuntimeShader -- a localized future swap.
+                        drawRect(
+                            Brush.linearGradient(
+                                listOf(Color.White.copy(alpha = layer.grainAlpha), Color.Transparent, Color.Black.copy(alpha = layer.grainAlpha)),
+                            ),
+                        )
+                    })
+
+                    is StateOverlay -> if (interactionSource != null) {
+                        val hovered by interactionSource.collectIsHoveredAsState()
+                        val pressed by interactionSource.collectIsPressedAsState()
+                        val a = when {
+                            pressed -> layer.pressAlpha
+                            hovered -> layer.hoverAlpha
+                            else    -> 0f
+                        }
+                        if (a > 0f) {
+                            val c = colors.frost(layer.role).copy(alpha = a)
+                            Box(Modifier.matchParentSize().drawBehind { drawRect(c) })
+                        }
                     }
                 }
             }
         }
+
         content()
+
+        // Hairline last and OUTSIDE the coat's clip, stroked with drawOutline so the
+        // full rounded outline (corners included) is drawn once, not trimmed by the
+        // container's corner AA that ate it when it lived as a clipped child.
+        atoms.forEach { layer ->
+            if (layer is EdgeBorder) {
+                val c = layer.explicitColor ?: colors.frost(layer.role).copy(alpha = layer.alpha)
+                Box(Modifier.matchParentSize().drawBehind {
+                    drawOutline(
+                        outline = shape.createOutline(size, layoutDirection, this),
+                        color   = c,
+                        style   = Stroke(width = layer.widthDp.dp.toPx()),
+                    )
+                })
+            }
+        }
     }
 }
