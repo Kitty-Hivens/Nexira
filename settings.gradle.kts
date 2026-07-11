@@ -80,6 +80,11 @@ include(":client-cli")
 // Media playback support (yt-dlp + URL video cache) feeding the Skinema player.
 // Its own seam: consumed by the UI only, unknown to the launch engine.
 include(":client-media")
+// Tray seam carved out of client-ui: :client-tray holds the TrayController SPI
+// and its libtray-backed impl. It depends only on libtray -- the launch engine
+// and auth are off-limits by construction, so a tray action can never block on
+// them.
+include(":client-tray")
 include(":client-ui")
 // Leaf design-system module (NxUI): tokens, primitives, surfaces, Flexible.
 // client-ui depends on it one-way; it depends on nothing in-tree.

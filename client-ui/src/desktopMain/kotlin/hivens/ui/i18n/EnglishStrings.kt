@@ -373,8 +373,6 @@ object EnglishStrings : AppStrings {
     override val trayStatusIdle    = "Idle"
     override val trayStatusRunning = "Game running"
     override val trayShow          = "Show launcher"
-    override val trayServers       = "Servers"
-    override val trayNoServers     = "No servers loaded"
     override val trayHintTitle     = "Nexira is still running"
     override val trayHintBody      = "The window is hidden in the system tray. Click the tray icon to bring it back."
     override val trayHintShow      = "Show window"

@@ -69,6 +69,7 @@ kotlin {
                 implementation(project(":client-auth"))
                 implementation(project(":client-launcher"))
                 implementation(project(":client-media"))
+                implementation(project(":client-tray"))
                 implementation(project(":widget-api"))
                 implementation(project(":nx-ui"))
 
@@ -78,7 +79,8 @@ kotlin {
                 implementation(libs.koin.compose)
                 implementation(libs.kotlinx.coroutines.swing)
                 implementation(libs.logback.classic)
-                implementation(libs.libtray)
+                // libtray now enters transitively via :client-tray; only
+                // libnotify (SystemNotifier) is consumed directly here.
                 implementation(libs.libnotify)
                 // Video / animated-image backgrounds (hivens.ui.background): FFmpeg
                 // via Panama. skinema-compose brings -core + -skiko; the natives are

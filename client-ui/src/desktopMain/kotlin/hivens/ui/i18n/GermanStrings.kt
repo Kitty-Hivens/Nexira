@@ -371,8 +371,6 @@ object GermanStrings : AppStrings {
     override val trayStatusIdle    = "Wartend"
     override val trayStatusRunning = "Spiel läuft"
     override val trayShow          = "Launcher anzeigen"
-    override val trayServers       = "Server"
-    override val trayNoServers     = "Keine Server geladen"
     override val trayHintTitle     = "Nexira läuft weiter"
     override val trayHintBody      = "Das Fenster liegt im System-Tray. Klicke auf das Tray-Symbol, um es zurückzuholen."
     override val trayHintShow      = "Fenster anzeigen"
