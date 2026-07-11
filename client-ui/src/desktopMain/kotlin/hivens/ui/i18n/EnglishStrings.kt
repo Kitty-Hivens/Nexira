@@ -460,9 +460,9 @@ object EnglishStrings : AppStrings {
     override val settingsOpenSmrtHelperDesc       = "Replace the upstream Smarty mod with our open-source helper on Smarty servers. Same network features, none of the surveillance. If no replacement exists for the game version, the launch is blocked rather than running the original mod."
     override val settingsStrictModCheckTitle      = "Exact mod verification"
     override val settingsStrictModCheckDesc       = "After syncing, delete everything in the mods folder the server did not ask for. Keeps the install clean, but also removes any mods you added by hand."
-    override val settingsNetworkAgentTitle        = "Use the network-support agent?"
+    override val settingsNetworkAgentTitle        = "Use the network-support agent"
     override val settingsNetworkAgentDesc         = "Point the game's login at SmartyCraft when it starts: the in-game join and the skin checks. The join then authenticates against SmartyCraft and skins still load, without swapping in SmartyCraft's patched login library. Needed to join SmartyCraft servers."
-    override val settingsSmartyAuthLibTitle       = "Use SmartyCraft's login library?"
+    override val settingsSmartyAuthLibTitle       = "Use SmartyCraft's login library"
     override val settingsSmartyAuthLibDesc        = "The older approach: take SmartyCraft's patched login library from its client and put it on the pack instead of the original. Replaced by the network agent above and kept as a fallback. If the file cannot be fetched, the launch is blocked. Off by default."
 
     override val settingsSectionDataDir       = "Data directory"
