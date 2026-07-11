@@ -12,7 +12,7 @@ import org.slf4j.LoggerFactory
  * OS-level desktop notifications via libnotify (`dev.hivens:libnotify`) --
  * freedesktop Notifications over D-Bus on Linux, WinRT toast on Windows,
  * NSUserNotification on macOS. Pure Project Panama, same binding family as
- * [hivens.ui.tray.TrayManager].
+ * [hivens.tray.TrayController].
  *
  * Distinct from the in-app [hivens.ui.notifications.NotificationCenter]: those
  * render inside the launcher window and vanish with it. These post to the
@@ -20,7 +20,7 @@ import org.slf4j.LoggerFactory
  * hidden -- which is exactly what the "minimized to tray" hint needs.
  *
  * Currently drives a single message (the one-time tray hint), but kept as a
- * general manager mirroring [hivens.ui.tray.TrayManager] so future OS
+ * general manager mirroring [hivens.tray.TrayController] so future OS
  * notifications (download done, update ready) have a home.
  *
  * Lifecycle: [init] once after Koin + strings are ready; [shutdown] on exit.
@@ -43,7 +43,7 @@ object SystemNotifier {
      * Restore-the-window callback, fired when the user clicks the hint banner
      * or its action button. Runs on libnotify's dispatch thread -- the
      * implementation hops to the UI thread itself (mirrors
-     * [hivens.ui.tray.TrayManager.onShowWindow]).
+     * [hivens.tray.TrayController.onShowWindow]).
      */
     var onShowWindow: (() -> Unit)? = null
 

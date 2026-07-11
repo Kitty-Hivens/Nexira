@@ -27,7 +27,6 @@ import hivens.config.Branding
 import hivens.auth.AuthProvider
 import hivens.auth.AuthProviderRegistry
 import hivens.auth.RefreshableAuthProvider
-import hivens.core.api.TwoFactorRequiredException
 import hivens.core.api.interfaces.IServerListService
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.api.model.ServerProfile
@@ -53,6 +52,8 @@ import hivens.launcher.launch.LauncherController
 import hivens.launcher.network.ServerProtocolConfig
 import hivens.ui.chrome.computeSafeWindowMinSize
 import hivens.launcher.ProfileManager
+import hivens.tray.TrayController
+import hivens.tray.TrayStrings
 import hivens.ui.background.BackdropState
 import hivens.ui.background.BackgroundManager
 import hivens.ui.background.CustomBackground
@@ -82,10 +83,8 @@ import hivens.ui.i18n.LocalStrings
 import hivens.ui.i18n.LocaleProvider
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.notifications.Kind
-import hivens.ui.notifications.LaunchTarget
 import hivens.ui.notifications.NotificationCenter
 import hivens.ui.notifications.Severity
-import hivens.ui.notifications.drivers.LaunchDriver
 import hivens.ui.notifications.render.NotificationStack
 import hivens.ui.screens.ConsoleWindow
 import hivens.ui.screens.MigrationScreen
@@ -98,7 +97,6 @@ import hivens.ui.theme.ThemeRevealHost
 import hivens.ui.theme.rememberThemeReveal
 import hivens.ui.theme.ThemeManager
 import hivens.ui.system.SystemNotifier
-import hivens.ui.tray.TrayManager
 import hivens.ui.utils.ConsoleSettingsManager
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.layout.LayoutGraphRepository
@@ -226,9 +224,11 @@ fun FrameWindowScope.AppShellContent(
     // also fires when the composition is disposed on a crash, which would stop
     // Koin out from under the recovery restart loop. It lives in a JVM
     // shutdown hook in Main instead.
+    val tray: TrayController = koinInject()
+
     DisposableEffect(Unit) {
         onDispose {
-            TrayManager.shutdown()
+            tray.shutdown()
             SystemNotifier.shutdown()
         }
     }
@@ -237,9 +237,6 @@ fun FrameWindowScope.AppShellContent(
     val serverListService: IServerListService  = koinInject()
     val serverListCache: ServerListCacheStore  = koinInject()
     val controller: LauncherController         = koinInject()
-    val launchDriver: LaunchDriver             = koinInject()
-    val credentialsManager: AccountStore = koinInject()
-    val authService: AuthProvider              = koinInject()
     val profileManager: ProfileManager         = koinInject()
     val gameConsole: GameConsoleService        = koinInject()
     val layoutGraphRepo: LayoutGraphRepository = koinInject()
@@ -400,14 +397,14 @@ fun FrameWindowScope.AppShellContent(
     LaunchedEffect(launchState) {
         val serverName = profileManager.lastServerId
         when (launchState) {
-            is LaunchState.GameRunning -> TrayManager.setGameStatus(true, serverName)
+            is LaunchState.GameRunning -> tray.setGameStatus(true, serverName)
             is LaunchState.Error -> {
-                TrayManager.setGameStatus(false)
+                tray.setGameStatus(false)
                 if (!isWindowVisible) {
                     SwingUtilities.invokeLater { isWindowVisible = true }
                 }
             }
-            else -> TrayManager.setGameStatus(false)
+            else -> tray.setGameStatus(false)
         }
     }
 
@@ -464,45 +461,30 @@ fun FrameWindowScope.AppShellContent(
         // Strings is a data class, so its structural equality lets the
         // locale-reactive effect below re-fire only when a label actually
         // changes -- not on every unrelated recomposition.
-        val trayLabels = TrayManager.Strings(
+        val trayLabels = TrayStrings(
             statusIdle    = s.trayStatusIdle,
             statusRunning = s.trayStatusRunning,
             show          = s.trayShow,
             console       = s.trayConsole,
-            servers       = s.trayServers,
-            noServers     = s.trayNoServers,
             exit          = s.trayExit,
         )
 
-        // ── Tray bring-up + server population (run once) ──────────────
-        // The IO ordering here is load-bearing: seed the tray from the disk
-        // cache BEFORE init() so the first published menu already carries
-        // servers, then init, then overwrite with the live dashboard fetch.
-        // Callback wiring and locale-reactive labels are split into their own
-        // focused effects below.
+        // ── Tray + notifier bring-up, then server-list fetch (run once) ──
+        // The tray no longer carries servers, so init() needs no seed; the
+        // dashboard-server fetch further down now feeds only the auto-sync
+        // opt-in. Callback wiring and locale-reactive labels are split into
+        // their own focused effects below.
         LaunchedEffect(Unit) {
             withContext(Dispatchers.IO) {
-                // Stale-while-revalidate: seed [TrayManager] from the disk
-                // cache BEFORE init() so libtray's first published DBusMenu
-                // layout already carries real servers. Without this seed,
-                // a user right-clicking the tray icon during the 0.5-3s
-                // window before [fetchDashboardData] returns sees the
-                // "(No servers)" placeholder and concludes the tray is
-                // broken. The live fetch below overwrites the seed.
-                // Both gated by boot recovery: a disabled tray leaves state
-                // NOT_STARTED (isSupported/canBeReady false) so close quits
-                // instead of hiding; a disabled notifier stays unsupported.
+                // Recovery gates: a disabled tray leaves it NOT_STARTED
+                // (isSupported/canBeReady false) so a close quits instead of
+                // hiding; a disabled notifier stays unsupported.
                 val trayEnabled   = ModuleId.Tray.id   !in settings.disabledModules
                 val notifyEnabled = ModuleId.Notify.id !in settings.disabledModules
 
-                val cachedServers = serverListCache.load()
-                if (trayEnabled && cachedServers.isNotEmpty()) {
-                    TrayManager.updateServers(cachedServers)
-                }
-
                 try {
                     val iconBytes = Res.readBytes("drawable/favicon.png")
-                    if (trayEnabled) TrayManager.init(
+                    if (trayEnabled) tray.init(
                         iconStream = iconBytes.inputStream(),
                         strings    = trayLabels,
                         appName    = Branding.TITLE
@@ -511,7 +493,7 @@ fun FrameWindowScope.AppShellContent(
                 } catch (_: Exception) {
                     runCatching {
                         val iconBytes = Res.readBytes("drawable/icon.png")
-                        if (trayEnabled) TrayManager.init(
+                        if (trayEnabled) tray.init(
                             iconStream = iconBytes.inputStream(),
                             strings    = trayLabels,
                             appName    = Branding.TITLE
@@ -527,56 +509,31 @@ fun FrameWindowScope.AppShellContent(
             // canBeReady, not isSupported, to avoid killing the launcher
             // mid-init). Without this restore the process keeps running
             // with no UI and the user has to kill it.
-            if (!TrayManager.isSupported && !isWindowVisible) {
+            if (!tray.isSupported && !isWindowVisible) {
                 isWindowVisible = true
             }
 
-            // ── Populate server list ───────────────────────────────────
+            // ── Fetch the server roster (feeds the auto-sync opt-in) ────
             // [SmartyCraftServerListService.fetchDashboardData] swallows
-            // network failures and returns `DashboardData(empty, empty)`
-            // rather than throwing, so an outage looks like a successful
-            // empty fetch from this call site. Without an explicit
-            // fetch-failed signal we cannot fully distinguish "outage"
-            // from "admin truly cleared the roster"; use the disk cache
-            // [serverListCache] as a heuristic: a previously-cached
-            // non-empty roster going to empty implies outage and we
-            // keep the seed; an already-empty cache going to empty is
-            // accepted as the new truth.
-            //
-            // Tradeoff: false-positive (admin actually cleared the
-            // roster while cache exists) keeps a stale entry for ONE
-            // session until next launch's fresh load(); the
-            // false-negative (transient outage wipes a real seed)
-            // hurts more, so the heuristic leans toward seed
-            // preservation. Reviewer flagged the previous "always
-            // preserve on empty" version as conflating both cases.
-            // Re-read the on-disk cache here -- the seed read inside
-            // the tray-init withContext block is local to that lambda,
-            // and re-reading is a cheap ~2 KB JSON load. The value is
-            // the heuristic we use to distinguish outage from a
-            // legitimately-empty roster below.
+            // network failures and returns an empty roster rather than
+            // throwing, so an outage looks like a successful empty fetch.
+            // Tell the two apart via the disk cache: a previously-cached
+            // non-empty roster going empty implies an outage, so keep the
+            // cached list (auto-sync then still refreshes the packs the user
+            // actually has); an already-empty cache going empty is accepted
+            // as the new truth. The false-negative (a transient outage wiping
+            // a real roster) hurts more than the false-positive, so the
+            // heuristic leans toward preserving the cache.
             val seedFromCache = withContext(Dispatchers.IO) { serverListCache.load() }
             val dashboardServers = try {
                 val data = withContext(Dispatchers.IO) {
                     serverListService.fetchDashboardData().get()
                 }
                 when {
-                    data.servers.isNotEmpty() -> {
-                        TrayManager.updateServers(data.servers)
-                        data.servers
-                    }
-                    seedFromCache.isEmpty() -> {
-                        // No seed to preserve; accept the empty roster
-                        // and let the tray render "(No servers)".
-                        TrayManager.updateServers(emptyList())
-                        emptyList()
-                    }
-                    else -> {
-                        // Probable outage: keep the seeded tray entries
-                        // from the disk cache and return them so the
-                        // dashboard surface stays populated.
-                        seedFromCache
-                    }
+                    data.servers.isNotEmpty() -> data.servers
+                    seedFromCache.isEmpty()   -> emptyList()
+                    // Probable outage: keep the cached roster.
+                    else                      -> seedFromCache
                 }
             } catch (e: CancellationException) {
                 // Composition leave / locale switch / exit mid-fetch
@@ -584,7 +541,7 @@ fun FrameWindowScope.AppShellContent(
                 // would defeat structured concurrency.
                 throw e
             } catch (_: Exception) {
-                /* tray keeps the seeded cache from the IO init block */
+                /* fall back to the cached roster */
                 seedFromCache
             }
 
@@ -613,7 +570,7 @@ fun FrameWindowScope.AppShellContent(
         // so a Unit key is correct -- the assignments need to happen exactly
         // once, not on every recomposition.
         LaunchedEffect(Unit) {
-            TrayManager.onShowWindow = {
+            tray.onShowWindow = {
                 SwingUtilities.invokeLater { isWindowVisible = true }
             }
 
@@ -623,7 +580,7 @@ fun FrameWindowScope.AppShellContent(
                 SwingUtilities.invokeLater { isWindowVisible = true }
             }
 
-            TrayManager.onExit = {
+            tray.onExit = {
                 SwingUtilities.invokeLater {
                     // Real impl pops the chaos close-dialog (during April Fools
                     // window); NoOp invokes onActualClose synchronously. The
@@ -634,41 +591,8 @@ fun FrameWindowScope.AppShellContent(
                 }
             }
 
-            TrayManager.onShowConsole = {
+            tray.onShowConsole = {
                 SwingUtilities.invokeLater { gameConsole.show() }
-            }
-
-            TrayManager.onLaunchServer = { server ->
-                applicationScope.launch {
-                    val credentials = credentialsManager.load()
-                    if (credentials?.cachedPassword != null) {
-                        try {
-                            val session = try {
-                                authService.login(
-                                    credentials.playerName,
-                                    credentials.cachedPassword!!,
-                                    server.assetDir,
-                                )
-                            } catch (_: TwoFactorRequiredException) {
-                                // Tray-launched 2FA accounts: same trust-the-cache
-                                // policy as the auto-login path. controller.launch
-                                // augments the session with a cached manifest if
-                                // needed (and reports cleanly when the cache is
-                                // empty, which is its job).
-                                credentials.copy(serverId = server.assetDir)
-                            }
-                            launchDriver.observe(LaunchTarget.Server(server))
-                            controller.launch(session, server)
-                        } catch (e: Exception) {
-                            LoggerFactory.getLogger("Main").warn(
-                                "Tray-launched login failed for ${server.assetDir}", e
-                            )
-                            SwingUtilities.invokeLater { isWindowVisible = true }
-                        }
-                    } else {
-                        SwingUtilities.invokeLater { isWindowVisible = true }
-                    }
-                }
             }
         }
 
@@ -677,7 +601,7 @@ fun FrameWindowScope.AppShellContent(
         // this republishes them when the user switches language at runtime so
         // the tray menu + tooltip don't stay stuck in the startup locale.
         LaunchedEffect(trayLabels) {
-            TrayManager.updateStrings(trayLabels)
+            tray.updateStrings(trayLabels)
         }
 
         // First-time-only OS notification when the window hides to the tray:
@@ -715,7 +639,7 @@ fun FrameWindowScope.AppShellContent(
         // undecorated chrome must keep the same tray-hide / chaos behavior.
         val onCloseChrome: () -> Unit = {
             af.requestCloseDialog {
-                if (TrayManager.canBeReady) {
+                if (tray.canBeReady) {
                     // canBeReady (not isSupported) so we don't kill the launcher
                     // mid-init while the tray library is still settling D-Bus /
                     // SNI handshake. If it ultimately fails, the user can quit via
@@ -927,7 +851,7 @@ fun FrameWindowScope.AppShellContent(
                     AppRoot(
                         onCloseApp = {
                             val gameRunning = launchState is LaunchState.GameRunning
-                            if (gameRunning && TrayManager.canBeReady) {
+                            if (gameRunning && tray.canBeReady) {
                                 // Same canBeReady reasoning as the Window
                                 // onCloseRequest: don't pull the rug from
                                 // under a running game just because tray
@@ -940,7 +864,7 @@ fun FrameWindowScope.AppShellContent(
                         onWallpaperSeed = { wallpaperSeed = it },
                         onWallpaperLuminance = { wallpaperLuminance = it },
                         onRealExit   = exitApp,
-                        onHideToTray = if (TrayManager.canBeReady) {{ isWindowVisible = false }}
+                        onHideToTray = if (tray.canBeReady) {{ isWindowVisible = false }}
                         else null,
                         isDarkTheme          = isDarkTheme,
                         onToggleDarkTheme    = {

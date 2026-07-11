@@ -278,10 +278,9 @@ object LauncherBootstrap {
         //   - AppCoroutineScopeHook     -- installs JVM shutdown hook that cancels
         //                                   the shared process-lifetime scope.
         // The shared CoroutineScope itself is also createdAtStart so the hook above
-        // has a real instance to wire up, and LauncherController + tray-launch flow
-        // share the same scope -- otherwise a tray-launched process can outlive
-        // the JVM shutdown signal because its launching coroutine isn't joined to
-        // the canceled scope.
+        // has a real instance to wire up; LauncherController and every fire-and-forget
+        // launch/sync coroutine share it, so JVM shutdown cancels them together instead
+        // of leaving a launched game process orphaned past the shutdown signal.
         startKoin {
             modules(
                 listOf(

@@ -14,16 +14,12 @@ import java.nio.file.Path
 /**
  * Disk snapshot of the most recently fetched dashboard server list.
  *
- * Read synchronously at process startup so the tray menu's first
- * published DBusMenu layout already carries real servers, not the
- * "(No servers)" placeholder users see when they right-click during
- * the 0.5-3s window between [TrayManager.init] and the first
- * successful [SmartyCraftServerListService.fetchDashboardData].
- *
- * Stale-while-revalidate: cached entries seed the tray; the live
- * fetch then overwrites both the in-memory state and the cache.
- * First-ever launch (no cache file yet) still shows the empty
- * fallback -- honest, because we genuinely don't know the list yet.
+ * Read synchronously at process startup so a consumer has a roster immediately,
+ * before the first [SmartyCraftServerListService.fetchDashboardData] returns
+ * (the live fetch can take a few seconds). Stale-while-revalidate: the cached
+ * entries are served first; the live fetch then overwrites both the in-memory
+ * state and the cache. First-ever launch (no cache file yet) returns the empty
+ * list -- honest, because we genuinely don't know the roster yet.
  */
 interface ServerListCacheStore {
 
@@ -61,8 +57,7 @@ interface ServerListCacheStore {
  *  - Missing file -> empty list, no log noise (cold start).
  *  - Malformed JSON -> empty list AND error logged. The launcher
  *    must not die on a half-written cache; the worst real cost is
- *    the user seeing "(No servers)" on the next right-click until
- *    the live fetch arrives.
+ *    an empty roster until the live fetch arrives.
  *  - Save writes through a `<file>.tmp` rename so a crash mid-write
  *    leaves either the previous valid cache or the new one, never
  *    a half-baked file.
@@ -76,8 +71,8 @@ class JsonServerListCacheStore(
 
     // Set by load() when the file's schema_version is newer than this build
     // understands. The cache self-heals from the next live fetch, so the only
-    // cost of not writing back is one cold tray render -- worth it to never let
-    // an older binary downgrade a newer build's file.
+    // cost of not writing back is one stale-until-refresh read -- worth it to
+    // never let an older binary downgrade a newer build's file.
     @Volatile private var readOnly = false
 
     override fun load(): List<ServerProfile> {

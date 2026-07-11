@@ -371,8 +371,6 @@ object RussianStrings : AppStrings {
     override val trayStatusIdle    = "Ожидание"
     override val trayStatusRunning = "Игра запущена"
     override val trayShow          = "Открыть лаунчер"
-    override val trayServers       = "Серверы"
-    override val trayNoServers     = "Серверы не загружены"
     override val trayHintTitle     = "Nexira всё ещё работает"
     override val trayHintBody      = "Окно свёрнуто в системный трей. Нажмите на значок в трее, чтобы вернуть его."
     override val trayHintShow      = "Показать окно"

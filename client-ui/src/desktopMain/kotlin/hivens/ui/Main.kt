@@ -36,6 +36,8 @@ import hivens.ui.editor.EditModeController
 import hivens.ui.editor.presets.PresetRepository
 import hivens.media.VideoCacheService
 import hivens.media.YtDlpService
+import hivens.tray.LibTrayController
+import hivens.tray.TrayController
 import hivens.ui.layout.LayoutGraphFlushHook
 import hivens.ui.layout.LayoutGraphRepository
 import hivens.ui.utils.GameConsoleService
@@ -81,6 +83,10 @@ val uiModule = module {
     single { SkinLibrary(get<Path>().resolve("skins"), get()) }
     single { DefaultSkinProvider(get<PlatformPaths>().clientsDir, get<PlatformPaths>().skinCacheDir.resolve("defaults")) }
     single { GameConsoleService(get()) }
+
+    // System tray (client-tray seam): one libtray-backed impl. A plain single, so
+    // client-cli -- which never injects it -- never loads libtray's natives.
+    single<TrayController> { LibTrayController() }
 
     // Widget kernel registry. KSP-generated; entries land as @Widget
     // composables are added across the codebase. Kernel-1 starts the

@@ -386,8 +386,6 @@ interface AppStrings {
     val trayStatusIdle: String
     val trayStatusRunning: String
     val trayShow: String
-    val trayServers: String
-    val trayNoServers: String
     /** Title of the one-time OS notification posted the first time the window hides to the tray. */
     val trayHintTitle: String
     /** Body of that hint -- explains the launcher is still running in the tray, not closed. */
