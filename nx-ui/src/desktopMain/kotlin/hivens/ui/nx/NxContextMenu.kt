@@ -109,6 +109,9 @@ private fun NxContextMenuPopup(
             NxSurface(
                 level    = NxSurfaceLevel.Floating,
                 glass    = false,
+                // Opaque: a menu floats over arbitrary content, so the dark-theme
+                // body bleed-through (0.92) would read the rows underneath through it.
+                opaque   = true,
                 shape    = MaterialTheme.shapes.medium,
                 modifier = Modifier.width(IntrinsicSize.Max),
             ) {

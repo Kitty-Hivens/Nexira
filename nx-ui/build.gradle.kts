@@ -38,6 +38,10 @@ kotlin {
             dependencies {
                 implementation(kotlin("test"))
                 implementation(libs.kotlinx.coroutines.test)
+                // Skiko native runtime (current OS) so off-screen render tests
+                // (ImageComposeScene) can create a Skia surface. Test-only -- the
+                // published leaf module stays free of any compose.desktop dep.
+                implementation(compose.desktop.currentOs)
             }
         }
     }
