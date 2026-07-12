@@ -8,6 +8,7 @@ import io.ktor.http.isSuccess
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 import java.io.IOException
@@ -35,7 +36,11 @@ class FabricLikeResolver(
 
     override suspend fun resolve(mcVersion: String, loaderVersion: String): LoaderProfile =
         withContext(Dispatchers.IO) {
-            val url = "${metaBaseUrl.trimEnd('/')}/versions/loader/$mcVersion/$loaderVersion/profile/json"
+            // A blank loader version is the "pick the default" contract (see
+            // LocalPackCreator): resolve the latest, so the URL never carries an
+            // empty segment -- `/loader/<mc>//profile/json` is a 404.
+            val version = loaderVersion.ifBlank { latestLoaderVersion(mcVersion) }
+            val url = "${metaBaseUrl.trimEnd('/')}/versions/loader/$mcVersion/$version/profile/json"
             log.info("{}: fetching loader profile {}", loaderId, url)
             val profile = json.decodeFromString(FabricProfileJson.serializer(), fetchText(url))
             LoaderProfile(
@@ -43,6 +48,20 @@ class FabricLikeResolver(
                 mainClass = profile.mainClass,
             )
         }
+
+    /**
+     * The loader version to use when a pack pins none. The meta list
+     * (`/versions/loader/<mc>`) is newest-first; prefer the newest STABLE loader,
+     * falling back to the newest overall (Quilt entries may not flag stability).
+     */
+    private suspend fun latestLoaderVersion(mcVersion: String): String {
+        val url = "${metaBaseUrl.trimEnd('/')}/versions/loader/$mcVersion"
+        val entries = json.decodeFromString(ListSerializer(FabricLoaderEntry.serializer()), fetchText(url))
+        val chosen = entries.firstOrNull { it.loader.stable } ?: entries.firstOrNull()
+            ?: throw IOException("$loaderId has no loader versions for Minecraft $mcVersion")
+        log.info("{}: no loader version pinned; using latest {} for MC {}", loaderId, chosen.loader.version, mcVersion)
+        return chosen.loader.version
+    }
 
     private fun FabricProfileLib.toSpec(): LibrarySpec {
         val coord = MavenCoord.parse(name)
@@ -77,3 +96,10 @@ data class FabricProfileLib(
     val sha1: String? = null,
     val size: Long = 0,
 )
+
+/** One entry of a Fabric/Quilt meta loader LIST (`/versions/loader/<mc>`), newest first. */
+@Serializable
+data class FabricLoaderEntry(val loader: FabricLoaderInfo)
+
+@Serializable
+data class FabricLoaderInfo(val version: String, val stable: Boolean = false)
